@@ -13,10 +13,15 @@ void main() {
     test('survit à une destination qui contient déjà une requête', () {
       // Sans encodage, `&filtre=actif` deviendrait un paramètre de /login et
       // serait perdu au retour.
-      final String location = Routes.loginWithNext('/prospects?tri=date&filtre=actif');
+      final String location = Routes.loginWithNext(
+        '/prospects?tri=date&filtre=actif',
+      );
       final Uri uri = Uri.parse(location);
       expect(uri.path, '/login');
-      expect(uri.queryParameters[Routes.nextParam], '/prospects?tri=date&filtre=actif');
+      expect(
+        uri.queryParameters[Routes.nextParam],
+        '/prospects?tri=date&filtre=actif',
+      );
     });
 
     test('n\'empile pas /login sur lui-même', () {
@@ -50,7 +55,10 @@ void main() {
 
     setUp(() async {
       SharedPreferences.setMockInitialValues(<String, Object>{});
-      memory = RouteMemory(await SharedPreferences.getInstance(), buildNumber: '42');
+      memory = RouteMemory(
+        await SharedPreferences.getInstance(),
+        buildNumber: '42',
+      );
     });
 
     test('rien à restaurer au premier lancement', () {
@@ -130,7 +138,8 @@ void main() {
       expect(
         memory.read(authenticated: true, now: t0),
         isNull,
-        reason: 'la mémoire suit l\'intention, pas la dernière adresse mémorisable',
+        reason:
+            'la mémoire suit l\'intention, pas la dernière adresse mémorisable',
       );
 
       expect(RouteMemory.isRestorable('/reglages/autorisations'), isFalse);
@@ -173,30 +182,45 @@ void main() {
       );
     }
 
-    test('revenir à l\'écran parent n\'écrase pas l\'adresse du brouillon', () async {
-      final RouteMemory m = await withDrafts(<String>{'d1'});
-      await m.write('/representants/nouveau?draft=d1', now: t0);
-      await m.write('/representants', now: t0);
-      expect(m.read(authenticated: true, now: t0), '/representants/nouveau?draft=d1');
-    });
+    test(
+      'revenir à l\'écran parent n\'écrase pas l\'adresse du brouillon',
+      () async {
+        final RouteMemory m = await withDrafts(<String>{'d1'});
+        await m.write('/representants/nouveau?draft=d1', now: t0);
+        await m.write('/representants', now: t0);
+        expect(
+          m.read(authenticated: true, now: t0),
+          '/representants/nouveau?draft=d1',
+        );
+      },
+    );
 
-    test('une fois le brouillon enregistré, l\'écriture reprend son cours', () async {
-      final RouteMemory kept = await withDrafts(<String>{'d1'});
-      await kept.write('/representants/nouveau?draft=d1', now: t0);
+    test(
+      'une fois le brouillon enregistré, l\'écriture reprend son cours',
+      () async {
+        final RouteMemory kept = await withDrafts(<String>{'d1'});
+        await kept.write('/representants/nouveau?draft=d1', now: t0);
 
-      // Le formulaire a été enregistré : la transaction d'écriture a supprimé
-      // le brouillon. Il n'y a plus rien à protéger.
-      final RouteMemory saved = await withDrafts(const <String>{});
-      await saved.write('/representants', now: t0);
-      expect(saved.read(authenticated: true, now: t0), '/representants');
-    });
+        // Le formulaire a été enregistré : la transaction d'écriture a supprimé
+        // le brouillon. Il n'y a plus rien à protéger.
+        final RouteMemory saved = await withDrafts(const <String>{});
+        await saved.write('/representants', now: t0);
+        expect(saved.read(authenticated: true, now: t0), '/representants');
+      },
+    );
 
-    test('un vrai changement de contexte écrase, sinon la mémoire se fige', () async {
-      final RouteMemory m = await withDrafts(<String>{'d1'});
-      await m.write('/representants/nouveau?draft=d1', now: t0);
-      await m.write('/prospects/nouveau?rep=r1', now: t0);
-      expect(m.read(authenticated: true, now: t0), '/prospects/nouveau?rep=r1');
-    });
+    test(
+      'un vrai changement de contexte écrase, sinon la mémoire se fige',
+      () async {
+        final RouteMemory m = await withDrafts(<String>{'d1'});
+        await m.write('/representants/nouveau?draft=d1', now: t0);
+        await m.write('/prospects/nouveau?rep=r1', now: t0);
+        expect(
+          m.read(authenticated: true, now: t0),
+          '/prospects/nouveau?rep=r1',
+        );
+      },
+    );
 
     test('l\'accueil n\'est ancêtre de rien : il écrase normalement', () async {
       // `/` préfixe toutes les routes ; le traiter comme un ancêtre figerait la

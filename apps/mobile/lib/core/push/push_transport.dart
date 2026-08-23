@@ -14,7 +14,8 @@ class NullPushTransport implements PushTransport {
   const NullPushTransport();
 
   @override
-  Stream<PushMessage> get foregroundMessages => const Stream<PushMessage>.empty();
+  Stream<PushMessage> get foregroundMessages =>
+      const Stream<PushMessage>.empty();
 
   @override
   Stream<PushMessage> get openedMessages => const Stream<PushMessage>.empty();
@@ -24,7 +25,8 @@ class NullPushTransport implements PushTransport {
 }
 
 class FakePushTransport implements PushTransport {
-  FakePushTransport({PushMessage? launchMessage}) : _launchMessage = launchMessage;
+  FakePushTransport({PushMessage? launchMessage})
+    : _launchMessage = launchMessage;
 
   PushMessage? _launchMessage;
 
@@ -32,7 +34,8 @@ class FakePushTransport implements PushTransport {
 
   final StreamController<PushMessage> _foreground =
       StreamController<PushMessage>.broadcast();
-  final StreamController<PushMessage> _opened = StreamController<PushMessage>.broadcast();
+  final StreamController<PushMessage> _opened =
+      StreamController<PushMessage>.broadcast();
 
   void emitForeground(PushMessage message) => _foreground.add(message);
 

@@ -33,12 +33,41 @@ async function refusal(run: () => Promise<unknown>): Promise<unknown> {
   throw new Error('aucune exception levée alors qu’un refus était attendu');
 }
 
+/**
+ * `pg_advisory_xact_lock` simulé : la file ne s'ouvre qu'à la fin de la
+ * transaction qui tient le verrou, comme le fait PostgreSQL.
+ */
+function serviceFor(db: FakePrisma): BankCaseStagesService {
+  let queue = Promise.resolve();
+  const client = db as unknown as Record<string, unknown>;
+  const runTransaction = db.$transaction.bind(db);
+
+  client.$transaction = (work: unknown): Promise<unknown> => {
+    if (Array.isArray(work)) return runTransaction(work as Promise<unknown>[]);
+    let release: (() => void) | undefined;
+    return runTransaction(async (tx: FakePrisma) => {
+      (tx as unknown as Record<string, unknown>).$executeRaw = async (): Promise<number> => {
+        const ahead = queue;
+        queue = new Promise<void>((resolve) => (release = resolve));
+        await ahead;
+        return 1;
+      };
+      try {
+        return await (work as (tx: FakePrisma) => Promise<unknown>)(tx);
+      } finally {
+        release?.();
+      }
+    });
+  };
+  return new BankCaseStagesService(db.asService());
+}
+
 let db: FakePrisma;
 let service: BankCaseStagesService;
 
 beforeEach(() => {
   db = new FakePrisma();
-  service = new BankCaseStagesService(db.asService());
+  service = serviceFor(db);
 });
 
 describe('lecture', () => {
@@ -75,6 +104,15 @@ describe('création', () => {
     expect(created.isSystem).toBe(false);
     expect(created.isInitial).toBe(false);
     expect(created.position).toBe(3);
+  });
+
+  it('deux créations simultanées ne se posent pas sur la même position', async () => {
+    const [premiere, seconde] = await Promise.all([
+      service.create({ code: 'validation_dg', label: 'Validation DG', color: 'warning' }),
+      service.create({ code: 'controle', label: 'Contrôle', color: 'info' }),
+    ]);
+
+    expect(new Set([premiere.position, seconde.position]).size).toBe(2);
   });
 
   it('insérer au milieu décale les étapes ouvertes suivantes', async () => {

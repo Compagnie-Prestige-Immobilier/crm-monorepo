@@ -29,8 +29,12 @@ export function isStrictlyPositive(value: string): boolean {
   return /[1-9]/u.test(value);
 }
 
-/** Pour Excel, et là seulement : la feuille sert au calcul. */
-export function moneyToNumber(value: string | null): number | null {
+/**
+ * Pour Excel, et là seulement : la feuille sert au calcul. Au-delà de 2^53 la
+ * chaîne part telle quelle, un nombre faux passerait inaperçu dans un total.
+ */
+export function moneyToNumber(value: string | null): number | string | null {
   if (value === null) return null;
-  return Number(value);
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) ? parsed : value;
 }

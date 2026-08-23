@@ -223,7 +223,10 @@ void main() {
       ),
     );
     expect(action.onTap, isNull);
-    expect(tester.widget<TextField>(find.byType(TextField).first).enabled, isFalse);
+    expect(
+      tester.widget<TextField>(find.byType(TextField).first).enabled,
+      isFalse,
+    );
   });
 
   phase2TestWidgets('quitter pendant la capture efface le fichier incomplet', (

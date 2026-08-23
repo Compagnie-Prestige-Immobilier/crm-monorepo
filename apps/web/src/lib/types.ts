@@ -40,6 +40,22 @@ export const PROSPECT_STATUT_LABELS: Record<ProspectStatut, string> = {
   PERDU: 'Perdu',
 };
 
+export type Projet = Schemas['Projet'];
+
+/**
+ * Le statut du PARCOURS demandé, et non celui du point d'entrée.
+ *
+ * L'API classe sur `journeys.some({ projet, statut })` : une fiche entrée par
+ * CHUES puis convertie en Grand Public reste « Nouveau » en premier niveau,
+ * alors qu'elle remonte dans une liste filtrée sur « Converti ». Sans parcours
+ * pour ce projet — fiche d'avant les parcours — le champ de premier niveau est
+ * la seule réponse disponible.
+ */
+export function statutForProjet(prospect: ProspectRow, projet: Projet | null): ProspectStatut {
+  if (projet === null) return prospect.statut;
+  return prospect.journeys.find((journey) => journey.projet === projet)?.statut ?? prospect.statut;
+}
+
 export const ROLE_LABELS: Record<Role, string> = {
   ADMIN: 'Administrateur',
   COMMERCIAL: 'Téléconseiller',

@@ -114,6 +114,11 @@ function row(fixture: Fixture): Record<string, unknown> {
     deletedAt: null,
     banque: { name: `Banque ${fixture.shortName}`, shortName: fixture.shortName },
     syndicat: { sigle: fixture.sigle, name: `Syndicat ${fixture.sigle}` },
+    // Partie de l'include partagé : une doublure qui l'omet ne ressemble à
+    // aucune ligne que Prisma rend vraiment.
+    journeys: [{ projet: 'CHUES', statut: 'NOUVEAU' }],
+    canalProvenance: null,
+    professionRef: null,
     createdBy: { fullName: 'Awa Sy' },
     enrollmentCapturedBy: fixture.method ? { fullName: 'Omar Ba' } : null,
     representant: {
@@ -321,6 +326,8 @@ describe('colonnes', () => {
       'Nom',
       'Prénom',
       'Téléphone',
+      'Projets',
+      'Statut',
       'Banque',
       'Syndicat',
       'Représentant',
@@ -328,6 +335,10 @@ describe('colonnes', () => {
       'Département',
       'Commercial',
       'Date de saisie',
+      'Secteur',
+      'Profession',
+      'Canal de provenance',
+      'Durée du système (mois)',
       'Segment',
       'Méthode d’enrôlement',
       'Statut phase 2',

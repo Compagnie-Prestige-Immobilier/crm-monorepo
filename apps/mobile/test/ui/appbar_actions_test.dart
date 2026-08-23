@@ -2,6 +2,8 @@ import 'package:cpi_go/core/providers/app_providers.dart';
 import 'package:cpi_go/core/providers/sync_coordinator.dart';
 import 'package:cpi_go/core/router/route_paths.dart';
 import 'package:cpi_go/core/theme/app_theme.dart';
+import 'package:cpi_go/core/theme/cpi_tokens.dart';
+import 'package:cpi_go/ui/widgets/appbar_badge.dart';
 import 'package:cpi_go/data/local/database.dart';
 import 'package:cpi_go/features/auth/auth_controller.dart';
 import 'package:cpi_go/features/auth/auth_state.dart';
@@ -96,6 +98,20 @@ void main() {
     // Deux boutons voisins qui ne se touchent pas de la même façon sont un
     // piège : l'un rate, l'autre pas, et l'utilisateur ne comprend pas.
     expect(badge.height, bell.height);
+    expect(badge.height, greaterThanOrEqualTo(kCpiMinTouchTarget));
+
+    // Les deux étaient la MÊME implémentation recopiée, à 2 px d'icône près.
+    final Iterable<double?> tailles = tester
+        .widgetList<Icon>(
+          find.descendant(
+            of: find.byType(CpiAppBarBadge),
+            matching: find.byType(Icon),
+          ),
+        )
+        .map((Icon i) => i.size);
+    expect(tailles, hasLength(2));
+    expect(tailles.toSet(), hasLength(1), reason: 'deux tailles d\'icône');
+    expect(tailles.first, CpiIconSize.md);
 
     await unmount(tester);
   });

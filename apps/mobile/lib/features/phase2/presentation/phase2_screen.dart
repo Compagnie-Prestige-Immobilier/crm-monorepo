@@ -368,7 +368,10 @@ class _DownloadBar extends ConsumerWidget {
                 height: 18,
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
-            : const Icon(PhosphorIconsRegular.cloudArrowDown, size: 20),
+            : const Icon(
+                PhosphorIconsRegular.cloudArrowDown,
+                size: CpiIconSize.md,
+              ),
         label: const Text('Télécharger l\'annuaire'),
       ),
     );
@@ -398,7 +401,7 @@ class _Metric extends StatelessWidget {
         children: <Widget>[
           Row(
             children: <Widget>[
-              Icon(icon, size: 18, color: color),
+              Icon(icon, size: CpiIconSize.sm, color: color),
               const SizedBox(width: CpiSpacing.xxs),
               Flexible(
                 child: Text(
@@ -470,7 +473,7 @@ class _DirectoryLine extends ConsumerWidget {
           directory == 0
               ? PhosphorIconsRegular.cloudArrowDown
               : PhosphorIconsRegular.addressBook,
-          size: 18,
+          size: CpiIconSize.sm,
           color: directory == 0
               ? cpi.accentText
               : theme.colorScheme.onSurfaceVariant,
@@ -576,7 +579,7 @@ class _SearchHint extends StatelessWidget {
         const SizedBox(height: CpiSpacing.xxl),
         Icon(
           PhosphorIconsDuotone.phoneList,
-          size: 56,
+          size: CpiIconSize.display,
           color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
         ),
       ],
@@ -615,7 +618,7 @@ class _NotFound extends StatelessWidget {
         const SizedBox(height: CpiSpacing.md),
         OutlinedButton.icon(
           onPressed: onClear,
-          icon: const Icon(PhosphorIconsRegular.eraser, size: 20),
+          icon: const Icon(PhosphorIconsRegular.eraser, size: CpiIconSize.md),
           label: const Text('Effacer et recommencer'),
         ),
       ],
@@ -661,7 +664,7 @@ class _AlreadyClosed extends StatelessWidget {
                         obtained
                             ? PhosphorIconsFill.checkCircle
                             : PhosphorIconsFill.prohibit,
-                        size: 22,
+                        size: CpiIconSize.lg,
                         color: tone,
                       ),
                       const SizedBox(width: CpiSpacing.xs),
@@ -708,7 +711,10 @@ class _AlreadyClosed extends StatelessWidget {
             const SizedBox(height: CpiSpacing.md),
             FilledButton.icon(
               onPressed: onNext,
-              icon: const Icon(PhosphorIconsRegular.arrowRight, size: 20),
+              icon: const Icon(
+                PhosphorIconsRegular.arrowRight,
+                size: CpiIconSize.md,
+              ),
               label: const Text('Numéro suivant'),
             ),
           ],
@@ -793,7 +799,7 @@ class _Capture extends StatelessWidget {
           height: 52,
           child: OutlinedButton.icon(
             onPressed: enabled ? onNegative : null,
-            icon: const Icon(PhosphorIconsRegular.phoneX, size: 20),
+            icon: const Icon(PhosphorIconsRegular.phoneX, size: CpiIconSize.md),
             label: const Text('Méthode non obtenue'),
           ),
         ),
@@ -863,7 +869,11 @@ class _MethodCard extends StatelessWidget {
                     color: theme.colorScheme.secondary,
                     borderRadius: CpiRadius.brMd,
                   ),
-                  child: Icon(icon, size: 22, color: theme.colorScheme.primary),
+                  child: Icon(
+                    icon,
+                    size: CpiIconSize.lg,
+                    color: theme.colorScheme.primary,
+                  ),
                 ),
                 const SizedBox(width: CpiSpacing.sm),
                 Expanded(
@@ -884,7 +894,7 @@ class _MethodCard extends StatelessWidget {
                 ),
                 Icon(
                   PhosphorIconsRegular.caretRight,
-                  size: 20,
+                  size: CpiIconSize.md,
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ],
@@ -924,7 +934,7 @@ class _Confirmed extends StatelessWidget {
                   _SpringIn(
                     child: Icon(
                       PhosphorIconsFill.checkCircle,
-                      size: 30,
+                      size: CpiIconSize.xxl,
                       color: cpi.success,
                     ),
                   ),
@@ -951,7 +961,10 @@ class _Confirmed extends StatelessWidget {
             const SizedBox(height: CpiSpacing.md),
             FilledButton.icon(
               onPressed: onNext,
-              icon: const Icon(PhosphorIconsRegular.arrowRight, size: 20),
+              icon: const Icon(
+                PhosphorIconsRegular.arrowRight,
+                size: CpiIconSize.md,
+              ),
               label: const Text('Numéro suivant'),
             ),
           ],
@@ -1203,7 +1216,7 @@ class _CallOutcomeSheetState extends State<CallOutcomeSheet> {
                         children: <Widget>[
                           Icon(
                             PhosphorIconsRegular.warningCircle,
-                            size: 18,
+                            size: CpiIconSize.sm,
                             color: cpi.syncFailed,
                           ),
                           const SizedBox(width: CpiSpacing.xs),
@@ -1226,7 +1239,7 @@ class _CallOutcomeSheetState extends State<CallOutcomeSheet> {
                       onPressed: _submit,
                       icon: const Icon(
                         PhosphorIconsRegular.floppyDisk,
-                        size: 20,
+                        size: CpiIconSize.md,
                       ),
                       label: const Text('Enregistrer'),
                     ),
@@ -1314,7 +1327,7 @@ class _OutcomeTile extends StatelessWidget {
                 children: <Widget>[
                   Icon(
                     _icon(reason.effect),
-                    size: 20,
+                    size: CpiIconSize.md,
                     color: selected
                         ? theme.colorScheme.primary
                         : (_tint(reason.color) ??
@@ -1340,7 +1353,7 @@ class _OutcomeTile extends StatelessWidget {
                   if (selected)
                     Icon(
                       PhosphorIconsFill.checkCircle,
-                      size: 20,
+                      size: CpiIconSize.md,
                       color: theme.colorScheme.primary,
                     ),
                 ],
@@ -1376,7 +1389,7 @@ class _Notice extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Icon(icon, size: 18, color: color),
+          Icon(icon, size: CpiIconSize.sm, color: color),
           const SizedBox(width: CpiSpacing.xs),
           Expanded(
             child: Text(

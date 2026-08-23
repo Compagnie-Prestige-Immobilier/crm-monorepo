@@ -8,6 +8,7 @@ import { usePathname } from 'next/navigation';
 import {
   COQUES,
   coqueOf,
+  fallbackCoque,
   HUB_PATH,
   isNavItemActive,
   navSections,
@@ -28,7 +29,7 @@ export function SidebarNav({
   navId?: string | undefined;
 }) {
   const pathname = usePathname();
-  const coque = coqueOf(pathname);
+  const coque = coqueOf(pathname) ?? fallbackCoque(role);
   const sections = coque === null ? [] : navSections(role, coque);
   const coqueLabel = COQUES.find((entry) => entry.id === coque)?.label ?? 'CPI GO';
   const hubHref = `${HUB_PATH}?retour=${encodeURIComponent(pathname)}`;

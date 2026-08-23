@@ -9,14 +9,17 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/providers/app_providers.dart';
 import '../../../core/providers/connectivity.dart';
+import '../../../core/providers/sync_coordinator.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/router/single_push.dart';
 import '../../../core/sync/api_port.dart';
 import '../../../core/sync/outbox_status.dart';
+import '../../../core/sync/phase2_directory_sync.dart';
 import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../data/local/database.dart';
 import '../../../data/repositories/write_repository.dart';
+import '../../../ui/widgets/empty_state.dart';
 import '../../../ui/widgets/cpi_pressable.dart';
 import '../../../ui/widgets/offline_indicator.dart';
 import 'discard_confirmation.dart';
@@ -69,8 +72,11 @@ class CorrectionsScreen extends ConsumerWidget {
         if (list.isEmpty) return const _Empty();
         return RefreshIndicator(
           onRefresh: () async {
+            final SyncCoordinator sync = ref.read(
+              syncCoordinatorProvider.notifier,
+            );
             await HapticFeedback.selectionClick();
-            await ref.read(syncCoordinatorProvider.notifier).run(pull: false);
+            await sync.run(pull: false);
           },
           child: ListView.separated(
             padding: const EdgeInsets.fromLTRB(
@@ -121,7 +127,11 @@ class _LastCycleFailure extends ConsumerWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Icon(PhosphorIconsRegular.info, size: 18, color: cpi.accentText),
+          Icon(
+            PhosphorIconsRegular.info,
+            size: CpiIconSize.sm,
+            color: cpi.accentText,
+          ),
           const SizedBox(width: CpiSpacing.xs),
           Expanded(child: Text(label, style: theme.textTheme.bodySmall)),
         ],
@@ -169,7 +179,7 @@ class _CorrectionCardState extends ConsumerState<_CorrectionCard> {
                 isConflict
                     ? PhosphorIconsRegular.warningCircle
                     : PhosphorIconsRegular.xCircle,
-                size: 20,
+                size: CpiIconSize.md,
                 color: tint,
               ),
               const SizedBox(width: CpiSpacing.xs),
@@ -211,7 +221,10 @@ class _CorrectionCardState extends ConsumerState<_CorrectionCard> {
                           dimension: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(PhosphorIconsRegular.userSwitch, size: 18),
+                      : const Icon(
+                          PhosphorIconsRegular.userSwitch,
+                          size: CpiIconSize.sm,
+                        ),
                   label: const Text('Choisir'),
                 )
               else
@@ -219,7 +232,7 @@ class _CorrectionCardState extends ConsumerState<_CorrectionCard> {
                   onPressed: _busy ? null : () => unawaited(_retry()),
                   icon: const Icon(
                     PhosphorIconsRegular.arrowClockwise,
-                    size: 18,
+                    size: CpiIconSize.sm,
                   ),
                   label: const Text('Réessayer'),
                 ),
@@ -229,13 +242,16 @@ class _CorrectionCardState extends ConsumerState<_CorrectionCard> {
                   row.entityType == 'representant'
                       ? PhosphorIconsRegular.pencilSimple
                       : PhosphorIconsRegular.listMagnifyingGlass,
-                  size: 18,
+                  size: CpiIconSize.sm,
                 ),
                 label: Text(_editLabel),
               ),
               TextButton.icon(
                 onPressed: _busy ? null : () => unawaited(_discard()),
-                icon: const Icon(PhosphorIconsRegular.trash, size: 18),
+                icon: const Icon(
+                  PhosphorIconsRegular.trash,
+                  size: CpiIconSize.sm,
+                ),
                 label: const Text('Supprimer'),
               ),
             ],
@@ -251,9 +267,13 @@ class _CorrectionCardState extends ConsumerState<_CorrectionCard> {
       row.lastErrorCode == ServerErrorCodes.entityIdOwnedByAnotherUser;
 
   String get _title {
-    final String what = row.entityType == 'representant'
-        ? 'Représentant'
-        : 'Prospect';
+    final String what = switch (row.entityType) {
+      'representant' => 'Représentant',
+      'representant_comment' => 'Commentaire',
+      callAttemptEntity => 'Appel',
+      'visite' => 'Visite',
+      _ => 'Prospect',
+    };
     final String verb = switch (row.op) {
       'create' => 'création',
       'update' => 'modification',
@@ -262,6 +282,7 @@ class _CorrectionCardState extends ConsumerState<_CorrectionCard> {
     final Object? decoded = _payload;
     final String name = decoded is Map
         ? (decoded['fullName'] as String? ??
+              decoded['visitorName'] as String? ??
               <String?>[
                 decoded['prenom'] as String?,
                 decoded['nom'] as String?,
@@ -352,7 +373,9 @@ class _CorrectionCardState extends ConsumerState<_CorrectionCard> {
     setState(() => _busy = true);
     final DiscardResult result;
     try {
-      result = await ref.read(writeRepositoryProvider).discardOperation(row.seq);
+      result = await ref
+          .read(writeRepositoryProvider)
+          .discardOperation(row.seq);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -369,22 +392,10 @@ class _Empty extends StatelessWidget {
   const _Empty();
 
   @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.all(CpiSpacing.xl),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: <Widget>[
-          Icon(
-            PhosphorIconsDuotone.checkCircle,
-            size: 56,
-            color: context.cpi.success,
-          ),
-          const SizedBox(height: CpiSpacing.md),
-          Text('Rien à corriger', style: theme.textTheme.titleSmall),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => CpiEmptyState(
+    icon: PhosphorIconsDuotone.checkCircle,
+    title: 'Rien à corriger',
+    message: 'Toutes les saisies de cet appareil sont parties au serveur.',
+    iconColor: context.cpi.success,
+  );
 }

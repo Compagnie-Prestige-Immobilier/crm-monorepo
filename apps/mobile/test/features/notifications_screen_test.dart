@@ -94,7 +94,8 @@ class _SilentInbox implements NotificationInbox {
   }
 
   @override
-  Future<void> markRead(String notificationId) async => reads.add(notificationId);
+  Future<void> markRead(String notificationId) async =>
+      reads.add(notificationId);
 
   @override
   void dispose() => _status.dispose();
@@ -260,24 +261,25 @@ void main() {
       expect(find.textContaining('Liste non actualisée'), findsNothing);
     });
 
-    notificationTestWidgets('l\'état VIDE offre lui aussi le tirer-pour-actualiser', (
-      WidgetTester tester,
-    ) async {
-      // `RefreshIndicator` n'enveloppait que la branche non vide : sur un
-      // premier lancement raté : c'est-à-dire exactement l'état où il faut
-      // réessayer : il n'existait aucun geste pour redemander la liste.
-      await tester.pumpWidget(host());
-      await tester.pumpAndSettle();
+    notificationTestWidgets(
+      'l\'état VIDE offre lui aussi le tirer-pour-actualiser',
+      (WidgetTester tester) async {
+        // `RefreshIndicator` n'enveloppait que la branche non vide : sur un
+        // premier lancement raté : c'est-à-dire exactement l'état où il faut
+        // réessayer : il n'existait aucun geste pour redemander la liste.
+        await tester.pumpWidget(host());
+        await tester.pumpAndSettle();
 
-      expect(find.text('Aucune annonce'), findsOneWidget);
-      expect(
-        find.ancestor(
-          of: find.text('Aucune annonce'),
-          matching: find.byType(RefreshIndicator),
-        ),
-        findsOneWidget,
-      );
-    });
+        expect(find.text('Aucune annonce'), findsOneWidget);
+        expect(
+          find.ancestor(
+            of: find.text('Aucune annonce'),
+            matching: find.byType(RefreshIndicator),
+          ),
+          findsOneWidget,
+        );
+      },
+    );
 
     Widget routedHost(GoRouter router) {
       return ProviderScope(
@@ -383,7 +385,9 @@ void main() {
       expect(find.text('1'), findsNothing);
     });
 
-    notificationTestWidgets('affiche le nombre de non-lues', (WidgetTester tester) async {
+    notificationTestWidgets('affiche le nombre de non-lues', (
+      WidgetTester tester,
+    ) async {
       await PushInboxHelper(db).seed(message('a'));
       await PushInboxHelper(db).seed(message('b'));
 
@@ -468,7 +472,9 @@ void main() {
         // Le coordinateur n'est démarré que par la racine réelle ; ici on le
         // déclenche explicitement, ce qui est exactement ce que fait `app.dart`
         // quand la session est ouverte.
-        final BuildContext context = tester.element(find.byType(MaterialApp).first);
+        final BuildContext context = tester.element(
+          find.byType(MaterialApp).first,
+        );
         final ProviderContainer scope = ProviderScope.containerOf(context);
         scope.read(notificationsCoordinatorProvider.notifier);
         await tester.pumpAndSettle();
@@ -501,7 +507,9 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        final BuildContext context = tester.element(find.byType(MaterialApp).first);
+        final BuildContext context = tester.element(
+          find.byType(MaterialApp).first,
+        );
         final ProviderContainer scope = ProviderScope.containerOf(context);
 
         // Route offerte AVANT la résolution du garde.
@@ -535,7 +543,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final BuildContext context = tester.element(find.byType(MaterialApp).first);
+      final BuildContext context = tester.element(
+        find.byType(MaterialApp).first,
+      );
       final ProviderContainer scope = ProviderScope.containerOf(context);
 
       scope
@@ -558,7 +568,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final BuildContext context = tester.element(find.byType(MaterialApp).first);
+      final BuildContext context = tester.element(
+        find.byType(MaterialApp).first,
+      );
       final ProviderContainer scope = ProviderScope.containerOf(context);
       scope.read(notificationsCoordinatorProvider.notifier);
       await tester.pumpAndSettle();
@@ -583,7 +595,9 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        final BuildContext context = tester.element(find.byType(MaterialApp).first);
+        final BuildContext context = tester.element(
+          find.byType(MaterialApp).first,
+        );
         final ProviderContainer scope = ProviderScope.containerOf(context);
         scope.read(notificationsCoordinatorProvider.notifier);
         await tester.pumpAndSettle();
@@ -601,7 +615,8 @@ void main() {
         expect(
           router.routerDelegate.currentConfiguration.matches.length,
           greaterThan(1),
-          reason: 'la destination doit s’empiler, pas remplacer le travail en cours',
+          reason:
+              'la destination doit s’empiler, pas remplacer le travail en cours',
         );
       },
     );

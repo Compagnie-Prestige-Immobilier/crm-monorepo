@@ -56,7 +56,8 @@ void main() {
         ),
         GoRoute(
           path: Routes.newProspect,
-          builder: (_, _) => page('Saisie de prospects', fallback: Routes.historique),
+          builder: (_, _) =>
+              page('Saisie de prospects', fallback: Routes.historique),
         ),
         GoRoute(
           path: Routes.historique,
@@ -67,7 +68,8 @@ void main() {
         ),
         GoRoute(
           path: Routes.batteryHelp,
-          builder: (_, _) => page('Autorisations et batterie', fallback: Routes.reglages),
+          builder: (_, _) =>
+              page('Autorisations et batterie', fallback: Routes.reglages),
         ),
         GoRoute(
           path: Routes.about,
@@ -84,7 +86,10 @@ void main() {
     );
   }
 
-  Future<GoRouter> pumpApp(WidgetTester tester, {String at = Routes.home}) async {
+  Future<GoRouter> pumpApp(
+    WidgetTester tester, {
+    String at = Routes.home,
+  }) async {
     final GoRouter router = buildRouter(initialLocation: at);
     await tester.pumpWidget(MaterialApp.router(routerConfig: router));
     await tester.pumpAndSettle();
@@ -102,21 +107,26 @@ void main() {
 
   group('la flèche de l\'AppBar dépile', () {
     for (final MapEntry<String, String> route in fullScreenRoutes.entries) {
-      testWidgets('${route.value} : empilée depuis l\'accueil, la flèche revient', (
-        WidgetTester tester,
-      ) async {
-        final GoRouter router = await pumpApp(tester);
-        // La future de `push` ne se règle qu'au dépilement, qui arrive plus bas.
-        unawaited(router.push<void>(route.key));
-        await tester.pumpAndSettle();
-        expect(find.text('corps ${route.value}'), findsOneWidget);
-        expect(router.canPop(), isTrue, reason: 'push doit empiler, pas remplacer');
+      testWidgets(
+        '${route.value} : empilée depuis l\'accueil, la flèche revient',
+        (WidgetTester tester) async {
+          final GoRouter router = await pumpApp(tester);
+          // La future de `push` ne se règle qu'au dépilement, qui arrive plus bas.
+          unawaited(router.push<void>(route.key));
+          await tester.pumpAndSettle();
+          expect(find.text('corps ${route.value}'), findsOneWidget);
+          expect(
+            router.canPop(),
+            isTrue,
+            reason: 'push doit empiler, pas remplacer',
+          );
 
-        await tester.tap(find.byTooltip('Retour'));
-        await tester.pumpAndSettle();
+          await tester.tap(find.byTooltip('Retour'));
+          await tester.pumpAndSettle();
 
-        expect(find.text('corps Accueil'), findsOneWidget);
-      });
+          expect(find.text('corps Accueil'), findsOneWidget);
+        },
+      );
     }
   });
 
@@ -189,7 +199,10 @@ void main() {
               onPressed: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
                   builder: (_) => const CpiPopScope(
-                    child: Scaffold(appBar: null, body: Center(child: Text('second'))),
+                    child: Scaffold(
+                      appBar: null,
+                      body: Center(child: Text('second')),
+                    ),
                   ),
                 ),
               ),
@@ -209,22 +222,23 @@ void main() {
     expect(find.text('ouvrir'), findsOneWidget);
   });
 
-  testWidgets('sans routeur ni pile : le retour système ne se rappelle pas lui-même', (
-    WidgetTester tester,
-  ) async {
-    // `maybePop` redemande son avis au `PopScope` qui vient de refuser : le
-    // refus rappelle `popOrHome`, qui redemande, sans fin. L'écran se fige.
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: CpiPopScope(
-          child: Scaffold(body: Center(child: Text('seul'))),
+  testWidgets(
+    'sans routeur ni pile : le retour système ne se rappelle pas lui-même',
+    (WidgetTester tester) async {
+      // `maybePop` redemande son avis au `PopScope` qui vient de refuser : le
+      // refus rappelle `popOrHome`, qui redemande, sans fin. L'écran se fige.
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: CpiPopScope(
+            child: Scaffold(body: Center(child: Text('seul'))),
+          ),
         ),
-      ),
-    );
+      );
 
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
 
-    expect(find.text('seul'), findsOneWidget);
-  });
+      expect(find.text('seul'), findsOneWidget);
+    },
+  );
 }

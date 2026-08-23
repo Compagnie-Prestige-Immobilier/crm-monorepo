@@ -30,6 +30,9 @@ import {
 
 import { PageMetaDto } from '../../common/dto/prospect-filter.dto.js';
 
+/** Plafond du type `Int` de PostgreSQL, en FCFA. */
+const MONTANT_MAX_XOF = 2_147_483_647;
+
 export class CreateProspectDto {
   @ApiPropertyOptional({
     format: 'uuid',
@@ -316,10 +319,17 @@ export class ConfirmGrandPublicConversionDto {
   @IsEnum(PaymentMode)
   paymentMode?: PaymentMode;
 
-  @ApiPropertyOptional({ type: Number, minimum: 0 })
+  /**
+   * La colonne est un `Int` PostgreSQL : au-delà de 2 147 483 647 FCFA, la base
+   * répond « integer out of range » et l'appelant reçoit un 500 non qualifié
+   * sur une valeur que la validation venait d'accepter. La borne dit la vraie
+   * limite plutôt que de la laisser découvrir par un plantage.
+   */
+  @ApiPropertyOptional({ type: Number, minimum: 0, maximum: MONTANT_MAX_XOF })
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(MONTANT_MAX_XOF)
   amountXof?: number;
 
   @ApiPropertyOptional({ type: Number, minimum: 1, maximum: 300 })

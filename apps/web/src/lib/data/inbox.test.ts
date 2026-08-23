@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { movedTarget } from '@/app/moved-routes';
+
 import {
   bellLabel,
   hasNewArrival,
@@ -30,7 +32,20 @@ describe('webRouteFor', () => {
 
   it('refuse les routes MOBILES, qui n’existent pas ici', () => {
     expect(webRouteFor('/a-corriger')).toBeNull();
-    expect(webRouteFor('/phase2')).toBeNull();
+  });
+
+  // Les trois rappels quotidiens de `reminders.service.ts`. Refusées, elles
+  // rendaient leur notification muette : lue au clic, et menant nulle part.
+  it('accepte les adresses des rappels quotidiens', () => {
+    expect(webRouteFor('/phase2')).toBe('/phase2');
+    expect(webRouteFor('/phase2/callbacks')).toBe('/phase2/callbacks');
+    expect(webRouteFor('/rep-campaigns')).toBe('/rep-campaigns');
+  });
+
+  it('et chacune atterrit sur un écran servi', () => {
+    expect(movedTarget('phase2')).toBe('/chues/campagnes');
+    expect(movedTarget('phase2', ['callbacks'])).toBe('/chues/rappels');
+    expect(movedTarget('rep-campaigns')).toBe('/chues/campagnes/representants');
   });
 
   it('ne se laisse pas piéger par un préfixe partiel', () => {

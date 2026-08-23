@@ -8,6 +8,7 @@ import 'features/notifications/push_deep_link_listener.dart';
 import 'core/router/app_router.dart';
 import 'core/settings/display_settings.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/cpi_tokens.dart';
 import 'features/auth/auth_state.dart';
 import 'core/updates/app_update_controller.dart';
 import 'core/onboarding/onboarding_controller.dart';
@@ -122,8 +123,9 @@ class _BrandSplash extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
     return ColoredBox(
-      color: const Color(0xFF630210),
+      color: theme.colorScheme.primary,
       child: Stack(
         children: <Widget>[
           const Center(
@@ -136,23 +138,25 @@ class _BrandSplash extends StatelessWidget {
             ),
           ),
           Positioned(
-            left: 28,
-            right: 28,
-            bottom: 32,
+            left: CpiSpacing.xl,
+            right: CpiSpacing.xl,
+            bottom: CpiSpacing.xxl,
             child: Column(
               children: <Widget>[
-                const Text(
-                  'Chargement…',
-                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                Text(
+                  'Chargement\u2026',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onPrimary,
+                  ),
                   semanticsLabel: 'Chargement en cours',
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: CpiSpacing.xs),
                 Semantics(
                   label: 'Chargement en cours',
-                  child: const LinearProgressIndicator(
+                  child: LinearProgressIndicator(
                     minHeight: 3,
-                    backgroundColor: Color(0x66FFFFFF),
-                    color: Colors.white,
+                    backgroundColor: cpiTrackOn(theme.colorScheme.primary),
+                    color: theme.colorScheme.onPrimary,
                   ),
                 ),
               ],

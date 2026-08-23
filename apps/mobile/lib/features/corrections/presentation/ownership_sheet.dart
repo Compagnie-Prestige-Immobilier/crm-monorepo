@@ -23,7 +23,8 @@ Future<void> showOwnershipSheet({
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
-    builder: (BuildContext context) => _OwnershipSheet(row: row, lookup: lookup),
+    builder: (BuildContext context) =>
+        _OwnershipSheet(row: row, lookup: lookup),
   );
 }
 
@@ -66,7 +67,11 @@ class _OwnershipSheetState extends ConsumerState<_OwnershipSheet> {
           children: <Widget>[
             Row(
               children: <Widget>[
-                Icon(PhosphorIconsRegular.userCircle, size: 22, color: cpi.accentText),
+                Icon(
+                  PhosphorIconsRegular.userCircle,
+                  size: CpiIconSize.lg,
+                  color: cpi.accentText,
+                ),
                 const SizedBox(width: CpiSpacing.xs),
                 Expanded(
                   child: Text(
@@ -89,19 +94,29 @@ class _OwnershipSheetState extends ConsumerState<_OwnershipSheet> {
                       dimension: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Icon(PhosphorIconsRegular.linkSimple, size: 20),
+                  : const Icon(
+                      PhosphorIconsRegular.linkSimple,
+                      size: CpiIconSize.md,
+                    ),
               label: const Text('Rattacher mes prospects'),
             ),
             const SizedBox(height: CpiSpacing.xs),
             OutlinedButton.icon(
               onPressed: _busy ? null : _correct,
-              icon: const Icon(PhosphorIconsRegular.pencilSimple, size: 20),
+              icon: const Icon(
+                PhosphorIconsRegular.pencilSimple,
+                size: CpiIconSize.md,
+              ),
               label: const Text('Corriger le numéro'),
             ),
             const SizedBox(height: CpiSpacing.xs),
             TextButton.icon(
               onPressed: _busy ? null : () => unawaited(_discard()),
-              icon: Icon(PhosphorIconsRegular.trash, size: 20, color: cpi.syncFailed),
+              icon: Icon(
+                PhosphorIconsRegular.trash,
+                size: CpiIconSize.md,
+                color: cpi.syncFailed,
+              ),
               label: Text(
                 'Supprimer cette saisie',
                 style: TextStyle(color: cpi.syncFailed),
@@ -130,7 +145,9 @@ class _OwnershipSheetState extends ConsumerState<_OwnershipSheet> {
     setState(() => _busy = true);
     final DiscardResult result;
     try {
-      result = await ref.read(writeRepositoryProvider).discardOperation(row.seq);
+      result = await ref
+          .read(writeRepositoryProvider)
+          .discardOperation(row.seq);
     } finally {
       if (mounted) setState(() => _busy = false);
     }

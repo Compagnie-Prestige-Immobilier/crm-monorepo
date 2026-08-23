@@ -696,7 +696,36 @@ describe('autocomplétion prospect', () => {
     const isole = new BankCasesService(prisma);
     await isole.prospectSearch({ search: 'Ndiaye' });
 
+    // Les formes cherchées voyagent en TABLEAU depuis que la requête emprunte
+    // `prospects_nom_prenom_unaccent_trgm` : une seule expression indexée,
+    // comparée à `LIKE ANY`.
     const valeurs = requetes.flat().flatMap((sql) => (sql as { values?: unknown[] }).values ?? []);
-    expect(valeurs).toContain('%ndiaye%');
+    expect(valeurs.flat()).toContain('%ndiaye%');
+  });
+
+  /// L'ordre inversé se traite en permutant les JETONS : inverser les colonnes
+  /// demanderait une seconde expression, que l'index ne couvre pas.
+  it('« Fall Moussa » cherche aussi « Moussa Fall », sans seconde expression', async () => {
+    const requetes: unknown[][] = [];
+    const prisma = {
+      $queryRaw: (...args: unknown[]) => {
+        requetes.push(args);
+        return Promise.resolve([]);
+      },
+    } as unknown as ReturnType<FakePrisma['asService']>;
+
+    await new BankCasesService(prisma).prospectSearch({ search: 'Fall Moussa' });
+
+    const valeurs = requetes.flat().flatMap((sql) => (sql as { values?: unknown[] }).values ?? []);
+    expect(valeurs.flat()).toEqual(expect.arrayContaining(['%fall moussa%', '%moussa fall%']));
+
+    // UNE seule expression indexée par prédicat — la liste et son total
+    // partagent le même `where`, d'où deux requêtes.
+    const sql = requetes.flat().map((s) => (s as { strings?: string[] }).strings?.join('') ?? '');
+    for (const requete of sql.filter((r) => r.includes('immutable_unaccent'))) {
+      expect(requete.match(/immutable_unaccent/gu)?.length).toBe(1);
+      // L'ancienne forme, non indexable, a bien disparu.
+      expect(requete).not.toMatch(/(?<!immutable_)unaccent\(lower/u);
+    }
   });
 });

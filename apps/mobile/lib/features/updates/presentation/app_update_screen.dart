@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/updates/app_update_controller.dart';
+import '../../../core/theme/cpi_tokens.dart';
 
 class AppUpdateScreen extends ConsumerWidget {
   const AppUpdateScreen({super.key, required this.state});
@@ -26,7 +27,10 @@ class AppUpdateScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  const Icon(Icons.system_update_rounded, size: 54),
+                  const Icon(
+                    Icons.system_update_rounded,
+                    size: CpiIconSize.display,
+                  ),
                   const SizedBox(height: 24),
                   Text(
                     force
@@ -64,7 +68,8 @@ class AppUpdateScreen extends ConsumerWidget {
                       icon: const Icon(Icons.install_mobile_rounded),
                       label: const Text('Installer la mise à jour'),
                     ),
-                  ] else if (state.blocker == AppUpdateBlocker.meteredLink) ...<Widget>[
+                  ] else if (state.blocker ==
+                      AppUpdateBlocker.meteredLink) ...<Widget>[
                     Text(
                       'Vous êtes sur des données mobiles. '
                       '${_megabytes(release.fileSize)} seront téléchargés.',

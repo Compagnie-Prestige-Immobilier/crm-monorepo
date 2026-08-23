@@ -28,7 +28,15 @@ import { formatDate, withRetired } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import type { FilterOption } from '@/lib/types';
 
-type Errors = Partial<Record<'visitorName' | 'entrepriseId' | 'objetId', string>>;
+type Errors = Partial<
+  Record<'visitorName' | 'phone' | 'comment' | 'entrepriseId' | 'objetId' | 'date', string>
+>;
+
+/** Bornes de `CreateVisiteDto` : dépassées, l'API rend un 400 qui ne nomme aucun champ. */
+const NOM_MIN = 2;
+const NOM_MAX = 160;
+const TELEPHONE_MAX = 40;
+const COMMENTAIRE_MAX = 2000;
 
 // L'API ne sert que les entrées encore proposées : sans `courant`, le champ
 // s'afficherait vide sur une ligne dont l'entrée a été retirée depuis.
@@ -120,9 +128,21 @@ export function VisiteForm({
     if (save.isPending) return;
 
     const found: Errors = {};
-    if (visitorName.trim() === '') found.visitorName = 'À renseigner.';
+    const nom = visitorName.trim();
+    if (nom === '') found.visitorName = 'À renseigner.';
+    else if (nom.length < NOM_MIN) found.visitorName = 'Au moins deux caractères.';
+    else if (nom.length > NOM_MAX) found.visitorName = `${String(NOM_MAX)} caractères au maximum.`;
+    if (phone.trim().length > TELEPHONE_MAX) {
+      found.phone = `${String(TELEPHONE_MAX)} caractères au maximum.`;
+    }
+    if (comment.trim().length > COMMENTAIRE_MAX) {
+      found.comment = `${String(COMMENTAIRE_MAX)} caractères au maximum.`;
+    }
     if (entrepriseId === null) found.entrepriseId = 'À choisir dans la liste.';
     if (objetId === null) found.objetId = 'À choisir dans la liste.';
+    // La date effacée par la croix du sélecteur ne remplissait AUCUNE entrée :
+    // le bouton ne faisait rien, sans message, pendant que le visiteur attend.
+    if (date === null) found.date = 'À renseigner.';
 
     setErrors(found);
     if (entrepriseId === null || objetId === null || date === null) return;
@@ -163,7 +183,14 @@ export function VisiteForm({
             </p>
           </div>
         ) : (
-          <DatePicker id={dateId} label={VISITE_COLONNES.date} value={date} onChange={setDate} />
+          <div className="flex flex-col gap-1.5">
+            <DatePicker id={dateId} label={VISITE_COLONNES.date} value={date} onChange={setDate} />
+            {errors.date === undefined ? null : (
+              <p role="alert" className="text-[0.75rem] text-[var(--destructive)]">
+                {errors.date}
+              </p>
+            )}
+          </div>
         )}
 
         <Field label={VISITE_COLONNES.time}>
@@ -184,6 +211,7 @@ export function VisiteForm({
             <Input
               {...props}
               ref={nomRef}
+              maxLength={NOM_MAX}
               autoFocus={!correction}
               autoComplete="off"
               value={visitorName}
@@ -194,10 +222,11 @@ export function VisiteForm({
           )}
         </Field>
 
-        <Field label={VISITE_COLONNES.phone}>
+        <Field label={VISITE_COLONNES.phone} error={errors.phone}>
           {(props) => (
             <Input
               {...props}
+              maxLength={TELEPHONE_MAX}
               type="tel"
               autoComplete="off"
               value={phone}
@@ -249,10 +278,15 @@ export function VisiteForm({
         </div>
       </div>
 
-      <Field label={VISITE_COLONNES.comment}>
+      <Field
+        label={VISITE_COLONNES.comment}
+        description={`${String(comment.length)} / ${String(COMMENTAIRE_MAX)} caractères`}
+        error={errors.comment}
+      >
         {(props) => (
           <Textarea
             {...props}
+            maxLength={COMMENTAIRE_MAX}
             rows={2}
             value={comment}
             onChange={(event) => {

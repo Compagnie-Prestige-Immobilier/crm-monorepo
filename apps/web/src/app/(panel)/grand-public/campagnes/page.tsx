@@ -1,4 +1,5 @@
 import { HydrationBoundary, dehydrate } from '@tanstack/react-query';
+import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 
 import { PermissionDenied } from '@/components/permission-denied';
@@ -9,6 +10,8 @@ import { fetchCampaigns } from '@/lib/data/phase2';
 import { getQueryClient } from '@/lib/query-client';
 import { queryKeys } from '@/lib/query-keys';
 import { guardRoles } from '@/lib/session';
+
+export const metadata: Metadata = { title: 'Campagnes d’appels Grand Public' };
 
 export default async function GrandPublicCampaignsPage({
   searchParams,

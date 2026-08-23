@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { RotateCcwIcon } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { buildAdvancedChips } from '@/components/filters/advanced-chips';
 import { AdvancedPanel } from '@/components/filters/advanced-panel';
@@ -32,7 +32,7 @@ import {
   type Phase2Status,
   type ProspectStatut,
 } from '@/lib/types';
-import { useDebouncedValue } from '@/lib/use-debounced-value';
+import { useDebouncedSearch } from '@/lib/use-debounced-search';
 
 const STATUT_OPTIONS: FilterOption[] = PROSPECT_STATUTS.map((statut) => ({
   value: statut,
@@ -69,18 +69,13 @@ export function FiltersBar() {
     staleTime: 5 * 60_000,
   });
 
-  const [searchDraft, setSearchDraft] = useState(filters.search);
+  const { draft: searchDraft, setDraft: setSearchDraft } = useDebouncedSearch(
+    filters.search,
+    (search) => {
+      setFilters({ search });
+    },
+  );
   const [regionDraft, setRegionDraft] = useState<string | null>(null);
-
-  useEffect(() => {
-    setSearchDraft(filters.search);
-  }, [filters.search]);
-
-  const debouncedSearch = useDebouncedValue(searchDraft);
-  useEffect(() => {
-    if (debouncedSearch === filters.search) return;
-    setFilters({ search: debouncedSearch });
-  }, [debouncedSearch, filters.search, setFilters]);
 
   const removeAdvanced = useCallback(
     (key: AdvancedFilterKey) => {

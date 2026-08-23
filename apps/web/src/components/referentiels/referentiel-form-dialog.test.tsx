@@ -17,9 +17,7 @@ vi.mock('@/lib/data/referentiels', () => ({
   updateSyndicat: (id: string, body: unknown) => updateSyndicat(id, body) as unknown,
 }));
 
-const { SyndicatFormDialog } = await import(
-  '@/components/referentiels/referentiel-form-dialog'
-);
+const { SyndicatFormDialog } = await import('@/components/referentiels/referentiel-form-dialog');
 
 const syndicat = {
   id: 's-1',
@@ -41,10 +39,7 @@ describe('SyndicatFormDialog', () => {
     await user.click(screen.getByRole('button', { name: 'Enregistrer' }));
 
     await waitFor(() => {
-      expect(updateSyndicat).toHaveBeenCalledWith(
-        's-1',
-        expect.objectContaining({ secteur: '' }),
-      );
+      expect(updateSyndicat).toHaveBeenCalledWith('s-1', expect.objectContaining({ secteur: '' }));
     });
   });
 });

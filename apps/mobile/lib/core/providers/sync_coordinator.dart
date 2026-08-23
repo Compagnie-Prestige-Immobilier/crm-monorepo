@@ -38,15 +38,24 @@ class SyncUiState {
         'Réseau injoignable. Vérifiez le portail Wi-Fi ou votre crédit data.',
       FailureKind.throttled =>
         'Le serveur limite les envois. La file repartira toute seule.',
-      FailureKind.sessionExpired => 'Session expirée. Reconnectez-vous pour envoyer.',
+      FailureKind.sessionExpired =>
+        'Session expirée. Reconnectez-vous pour envoyer.',
       FailureKind.idempotencyInProgress =>
         'Un envoi précédent est encore en cours de traitement.',
-      FailureKind.retryable => 'Le serveur a répondu en erreur ($code). Nouvel essai à venir.',
+      FailureKind.retryable =>
+        'Le serveur a répondu en erreur ($code). Nouvel essai à venir.',
       FailureKind.terminal =>
         'Le serveur a refusé cet envoi ($code). Ouvrez « À corriger ».',
+      FailureKind.appUpdateRequired =>
+        'Cette version ne reçoit plus les fiches. Vos saisies partent toujours : '
+            'installez la mise à jour.',
       null => 'Envoi impossible ($code).',
     };
   }
+
+  /// Le serveur a fermé la DESCENTE à cet APK (426). Distinct d'un refus : rien
+  /// ne se corrigera dans « À corriger », il faut mettre à jour.
+  bool get requiresAppUpdate => lastErrorKind == FailureKind.appUpdateRequired;
 
   SyncUiState copyWith({
     bool? running,
@@ -83,6 +92,11 @@ class SyncUiState {
 class SyncCoordinator extends Notifier<SyncUiState> {
   static const Duration foregroundPeriod = Duration(seconds: 60);
 
+  /// L'annuaire complet fait plusieurs centaines de milliers de lignes. Le
+  /// borner par cycle étale le premier remplissage au lieu de bloquer une
+  /// synchronisation entière : le curseur reprend là où il s'est arrêté.
+  static const int directoryPagesPerRun = 3;
+
   Timer? _periodic;
   AppLifecycleListener? _lifecycle;
   bool _observing = false;
@@ -90,13 +104,16 @@ class SyncCoordinator extends Notifier<SyncUiState> {
   @override
   SyncUiState build() {
     ref.onDispose(_teardown);
-    ref.listen<AsyncValue<List<ConnectivityResult>>>(connectivityTriggerProvider, (
-      AsyncValue<List<ConnectivityResult>>? _,
-      AsyncValue<List<ConnectivityResult>> next,
-    ) {
-      if (next.value == null) return;
-      unawaited(run(pull: false));
-    });
+    ref.listen<AsyncValue<List<ConnectivityResult>>>(
+      connectivityTriggerProvider,
+      (
+        AsyncValue<List<ConnectivityResult>>? _,
+        AsyncValue<List<ConnectivityResult>> next,
+      ) {
+        if (next.value == null) return;
+        unawaited(run(pull: false));
+      },
+    );
     scheduleMicrotask(_start);
     return const SyncUiState();
   }
@@ -148,14 +165,19 @@ class SyncCoordinator extends Notifier<SyncUiState> {
         running: false,
         lastRunAt: DateTime.now(),
         lastPushed: outcome.pushed,
-        lastError: outcome.status == SyncRunStatus.failed ? outcome.reason : null,
-        lastErrorKind: outcome.status == SyncRunStatus.failed ? outcome.kind : null,
+        lastError: outcome.status == SyncRunStatus.failed
+            ? outcome.reason
+            : null,
+        lastErrorKind: outcome.status == SyncRunStatus.failed
+            ? outcome.kind
+            : null,
         clearError: outcome.status != SyncRunStatus.failed,
       );
       if (outcome.kind == FailureKind.sessionExpired) {
         ref.read(authControllerProvider.notifier).onSessionExpired();
       }
       _recordReachability(outcome);
+      if (pull && outcome.isOk) await _pullDirectory();
       return outcome;
     } on Object catch (e) {
       state = state.copyWith(
@@ -164,7 +186,29 @@ class SyncCoordinator extends Notifier<SyncUiState> {
         lastError: e.toString(),
         lastErrorKind: FailureKind.retryable,
       );
-      return const SyncOutcome.failed('unexpected', kind: FailureKind.retryable);
+      return const SyncOutcome.failed(
+        'unexpected',
+        kind: FailureKind.retryable,
+      );
+    }
+  }
+
+  /// L'annuaire n'avait qu'un seul déclencheur, un bouton d'écran : le
+  /// téléconseiller parti sans avoir appuyé composait des numéros
+  /// « introuvables » toute la journée. Son échec ne fait pas échouer le cycle,
+  /// à la différence d'une page de saisies perdue.
+  Future<void> _pullDirectory() async {
+    try {
+      await ref
+          .read(phase2DirectoryProvider)
+          .pull(maxPages: directoryPagesPerRun);
+    } on Object catch (e, stack) {
+      developer.log(
+        'Annuaire de phase 2 non rafraîchi',
+        name: 'cpi.sync',
+        error: e,
+        stackTrace: stack,
+      );
     }
   }
 
@@ -181,7 +225,9 @@ class SyncCoordinator extends Notifier<SyncUiState> {
 
   Future<void> _scheduleCatchUp() async {
     try {
-      final int schedulable = await ref.read(syncEngineProvider).schedulableCount();
+      final int schedulable = await ref
+          .read(syncEngineProvider)
+          .schedulableCount();
       if (schedulable <= 0) return;
       await BackgroundSync.enqueueCatchUp();
     } on Object catch (e, stack) {

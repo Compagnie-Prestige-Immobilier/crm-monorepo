@@ -46,12 +46,13 @@ export async function updateUser(
 export async function setUserActive(
   id: string,
   isActive: boolean,
+  handoverToId?: string,
   client: ApiClient = getApiClient(),
 ): Promise<UserRow> {
   return unwrap(
     await client.PUT('/api/v1/users/{id}/active', {
       params: { path: { id } },
-      body: { isActive },
+      body: { isActive, ...(handoverToId === undefined ? {} : { handoverToId }) },
     }),
   );
 }

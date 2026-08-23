@@ -11,13 +11,7 @@ import '../../core/push/push_message.dart';
 import '../../data/local/database.dart';
 import 'notifications_controller.dart';
 
-enum InboxSync {
-  never,
-
-  ok,
-
-  offline,
-}
+enum InboxSync { never, ok, offline }
 
 @immutable
 class InboxStatus {
@@ -41,9 +35,11 @@ class InboxStatus {
 }
 
 class NotificationInbox {
-  NotificationInbox({required NotificationsApi api, required PushInboxStore store})
-    : _api = api,
-      _store = store;
+  NotificationInbox({
+    required NotificationsApi api,
+    required PushInboxStore store,
+  }) : _api = api,
+       _store = store;
 
   static const Duration minimumInterval = Duration(minutes: 2);
 
@@ -64,7 +60,9 @@ class NotificationInbox {
     if (running != null) return running;
 
     final DateTime? last = _lastRefreshAt;
-    if (!force && last != null && DateTime.now().difference(last) < minimumInterval) {
+    if (!force &&
+        last != null &&
+        DateTime.now().difference(last) < minimumInterval) {
       return Future<int>.value(0);
     }
 
@@ -106,7 +104,10 @@ class NotificationInbox {
       final List<String> unreported = await _unreportedReads(readStates);
 
       await _store.upsertAll(messages, readStates: readStates);
-      _status.value = InboxStatus(state: InboxSync.ok, lastSuccessAt: DateTime.now());
+      _status.value = InboxStatus(
+        state: InboxSync.ok,
+        lastSuccessAt: DateTime.now(),
+      );
 
       for (final String id in unreported) {
         await markRead(id);
@@ -125,7 +126,9 @@ class NotificationInbox {
     }
   }
 
-  Future<List<String>> _unreportedReads(Map<String, DateTime?> serverReads) async {
+  Future<List<String>> _unreportedReads(
+    Map<String, DateTime?> serverReads,
+  ) async {
     final List<String> pending = <String>[];
     for (final MapEntry<String, DateTime?> entry in serverReads.entries) {
       if (entry.value != null) continue;
@@ -139,20 +142,22 @@ class NotificationInbox {
     try {
       await _api.markNotificationRead(id: notificationId);
     } on Object catch (error) {
-      developer.log('Remontée de lecture échouée : $error', name: 'cpi.notifications');
+      developer.log(
+        'Remontée de lecture échouée : $error',
+        name: 'cpi.notifications',
+      );
     }
   }
 
   void dispose() => _status.dispose();
 }
 
-final Provider<NotificationInbox> notificationInboxProvider = Provider<NotificationInbox>(
-  (Ref ref) {
-    final NotificationInbox inbox = NotificationInbox(
-      api: ref.watch(apiClientProvider).client.getNotificationsApi(),
-      store: ref.watch(pushInboxStoreProvider),
-    );
-    ref.onDispose(inbox.dispose);
-    return inbox;
-  },
-);
+final Provider<NotificationInbox> notificationInboxProvider =
+    Provider<NotificationInbox>((Ref ref) {
+      final NotificationInbox inbox = NotificationInbox(
+        api: ref.watch(apiClientProvider).client.getNotificationsApi(),
+        store: ref.watch(pushInboxStoreProvider),
+      );
+      ref.onDispose(inbox.dispose);
+      return inbox;
+    });

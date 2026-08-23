@@ -141,6 +141,9 @@ describe('remontée d’une tentative avec un motif d’issue', () => {
     const implicite = [...db.callAttempts.values()][0];
 
     db.callAttempts.clear();
+    // Le parcours porte désormais l'état de phase 2 : le réinitialiser aussi,
+    // sinon la seconde tentative repart sur une fiche déjà soldée.
+    db.prospectJourneys.clear();
     seedProspect(PROSPECT_A);
     await sync.push(
       alice,
@@ -216,5 +219,64 @@ describe('remontée d’une tentative avec un motif d’issue', () => {
     expect(statuses(result.body.results)).toEqual([SyncOpStatus.INVALID, SyncOpStatus.APPLIED]);
     expect(result.body.results[0]?.errorCode).toBe('PHASE2_COMMENT_REQUIRED');
     expect([...db.callAttempts.values()][0]?.reasonId).toBe('reason-BOITE_VOCALE');
+  });
+});
+
+describe('à qui appartient la fiche appelée', () => {
+  const PROSPECT_DE_BOB = '0198f000-0000-7000-8000-000000000003';
+
+  const seedProspectDe = (id: string, createdById: string): void => {
+    seedProspect(id);
+    const row = db.prospects.get(id);
+    if (row) row.createdById = createdById;
+  };
+
+  it('la fiche d’un collègue est refusée, pas appliquée', async () => {
+    seedProspectDe(PROSPECT_DE_BOB, 'com-bob');
+
+    const result = await sync.push(alice, push([attempt(PROSPECT_DE_BOB)]));
+
+    expect(statuses(result.body.results)).toEqual([SyncOpStatus.CONFLICT]);
+    expect(result.body.results[0]?.errorCode).toBe('ENTITY_ID_OWNED_BY_ANOTHER_USER');
+    expect(db.callAttempts.size).toBe(0);
+  });
+
+  /// Le cas qui a motivé la porte : la campagne confie une fiche que le
+  /// téléconseiller n'a pas saisie.
+  it('la fiche d’un collègue CONFIÉE par une campagne passe', async () => {
+    seedProspectDe(PROSPECT_DE_BOB, 'com-bob');
+    db.callTasks.set('task-1', {
+      id: 'task-1',
+      prospectId: PROSPECT_DE_BOB,
+      assignedToId: alice.id,
+      isActive: true,
+      status: 'OPEN',
+      campaignId: 'camp-1',
+      createdAt: new Date('2026-08-10T09:00:00.000Z'),
+    });
+
+    const result = await sync.push(alice, push([attempt(PROSPECT_DE_BOB)]));
+
+    expect(statuses(result.body.results)).toEqual([SyncOpStatus.APPLIED]);
+    expect(db.callAttempts.size).toBe(1);
+  });
+
+  /// Une tentative saisie hors ligne arrive souvent après que la file a été
+  /// soldée : la tâche close reste une autorisation.
+  it('une tâche déjà close autorise encore la remontée tardive', async () => {
+    seedProspectDe(PROSPECT_DE_BOB, 'com-bob');
+    db.callTasks.set('task-1', {
+      id: 'task-1',
+      prospectId: PROSPECT_DE_BOB,
+      assignedToId: alice.id,
+      isActive: false,
+      status: 'DONE',
+      campaignId: 'camp-1',
+      createdAt: new Date('2026-08-10T09:00:00.000Z'),
+    });
+
+    const result = await sync.push(alice, push([attempt(PROSPECT_DE_BOB)]));
+
+    expect(statuses(result.body.results)).toEqual([SyncOpStatus.APPLIED]);
   });
 });

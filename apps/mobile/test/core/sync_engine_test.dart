@@ -456,6 +456,32 @@ void main() {
       expect((await outboxById(db, 'A1')).status, OutboxStatus.done);
     });
 
+    /// L'accueil saisit hors ligne et l'écran annonce « inscrit(e) au
+    /// registre ». Tant que `_entityOf` ignorait `'visite'`, la ligne partait
+    /// en échec définitif : une journée d'accueil disparaissait sans un mot.
+    test('une visite saisie hors ligne part vraiment', () async {
+      await queueOp(
+        db,
+        id: 'V1',
+        entityType: 'visite',
+        entityId: 'vis-1',
+        payload: <String, Object?>{
+          'visitorName': 'Awa Ndiaye',
+          'visitDate': '2026-08-12',
+          'entrepriseId': 'e1',
+          'objetId': 'o1',
+        },
+      );
+
+      await engine.drain();
+
+      expect(api.calls, hasLength(1));
+      final SyncOperationDto envoyee = api.calls.single.operations.single;
+      expect(envoyee.entity, SyncEntity.visite);
+      expect(envoyee.data?.visitorName, 'Awa Ndiaye');
+      expect((await outboxById(db, 'V1')).status, OutboxStatus.done);
+    });
+
     test('un verdict `duplicate` est un succès, pas un échec', () async {
       await insertRepresentant(db, id: 'repA', phone: '+221770000001');
       await queueOp(db, id: 'A1', entityType: 'representant', entityId: 'repA');
@@ -989,12 +1015,95 @@ void main() {
     test('les tentatives épuisées font passer en `failed`', () async {
       await (db.update(db.outbox)..where((Outbox o) => o.id.equals('A1')))
           .write(const OutboxCompanion(attempts: Value<int>(7)));
-      api.failNextPush = const ApiException('timeout', statusCode: 504);
+      // Un lot revenu SANS verdict pour cette ligne : le serveur a répondu,
+      // c'est bien cette opération-là qu'il n'a pas jugée.
+      api.verdicts['A1'] = SyncOperationResultDto(
+        opId: 'une-autre',
+        status: SyncOpStatus.applied,
+        entityId: 'repA',
+        rev: 1,
+        serverUpdatedAt: t0,
+        errorCode: null,
+        error: null,
+      );
       await build().drain();
       final OutboxData row = await outboxById(db, 'A1');
       expect(row.status, OutboxStatus.failed);
       expect(row.attempts, 8);
-      expect(row.lastErrorCode, 'timeout');
+      expect(row.lastErrorCode, ClientErrorCodes.noResult);
+    });
+
+    /// ═══ HUIT MINUTES DE DÉPLOIEMENT CONDAMNAIENT LA FILE ═══
+    ///
+    /// `maxAttempts` était consommé indistinctement par le 429 et le 5xx, avec
+    /// un cycle de soixante secondes : dix minutes de serveur indisponible
+    /// mettaient toute la journée en `ATTEMPTS_EXHAUSTED`, à reprendre à la
+    /// main ligne par ligne. Or aucune de ces deux réponses ne dit quoi que ce
+    /// soit de la SAISIE.
+    test('un 5xx n\'épuise pas le quota de la saisie', () async {
+      await (db.update(db.outbox)..where((Outbox o) => o.id.equals('A1')))
+          .write(const OutboxCompanion(attempts: Value<int>(7)));
+      api.failNextPush = const ApiException(
+        'SERVER_ERROR',
+        statusCode: 503,
+        kind: FailureKind.retryable,
+      );
+      await build().drain();
+      final OutboxData row = await outboxById(db, 'A1');
+      expect(row.status, OutboxStatus.pending);
+      expect(
+        row.attempts,
+        lessThan(8),
+        reason:
+            'le compteur ne doit pas franchir le seuil sur une panne '
+            'serveur',
+      );
+    });
+
+    test('un 429 n\'épuise pas le quota de la saisie', () async {
+      await (db.update(db.outbox)..where((Outbox o) => o.id.equals('A1')))
+          .write(const OutboxCompanion(attempts: Value<int>(7)));
+      api.failNextPush = const ApiException(
+        'RATE_LIMITED',
+        statusCode: 429,
+        kind: FailureKind.throttled,
+        retryAfter: Duration(minutes: 2),
+      );
+      await build().drain();
+      final OutboxData row = await outboxById(db, 'A1');
+      expect(row.status, OutboxStatus.pending);
+      expect(row.nextAttemptAt, t0.add(const Duration(minutes: 2)));
+    });
+
+    /// ═══ LE LOT QUI NE PARTAIT JAMAIS, SANS JAMAIS SE VOIR ═══
+    ///
+    /// Sur EDGE, les 512 Ko d'un lot dépassaient le `sendTimeout` à chaque
+    /// cycle. Le lot était reconstruit à l'identique, ne comptait AUCUNE
+    /// tentative, et n'apparaissait donc jamais dans « À corriger ».
+    test('un envoi qui expire finit par devenir visible', () async {
+      await (db.update(db.outbox)..where((Outbox o) => o.id.equals('A1')))
+          .write(const OutboxCompanion(attempts: Value<int>(7)));
+      api.failNextPush = const ApiException(
+        ClientErrorCodes.sendTimeout,
+        kind: FailureKind.unreachable,
+      );
+      await build().drain();
+      final OutboxData row = await outboxById(db, 'A1');
+      expect(row.status, OutboxStatus.failed);
+      expect(row.attempts, 8);
+    });
+
+    test('un réseau absent, lui, n\'use toujours rien', () async {
+      await (db.update(db.outbox)..where((Outbox o) => o.id.equals('A1')))
+          .write(const OutboxCompanion(attempts: Value<int>(7)));
+      api.failNextPush = const ApiException(
+        'NETWORK',
+        kind: FailureKind.unreachable,
+      );
+      await build().drain();
+      final OutboxData row = await outboxById(db, 'A1');
+      expect(row.status, OutboxStatus.pending);
+      expect(row.attempts, 7);
     });
 
     test('verdict `invalid` : échec visible dans « À corriger »', () async {
@@ -1016,6 +1125,66 @@ void main() {
         expect(row.lastErrorCode, ServerErrorCodes.parentRepresentantFailed);
       },
     );
+
+    // ── Un seul refus ne condamne pas le lot ──────────────────────────────────
+    //
+    // Avec `maxBatchOps = 200`, marquer TOUT le lot en échec pour une saisie
+    // malformée renvoyait une journée entière de prospection dans
+    // « À corriger ». Le refus de validation du serveur nomme pourtant les
+    // opérations fautives, une par une.
+
+    test('un refus nominatif ne condamne que les saisies nommées', () async {
+      await insertRepresentant(db, id: 'repB', phone: '+221770000002');
+      await insertRepresentant(db, id: 'repC', phone: '+221770000003');
+      await queueOp(db, id: 'A2', entityType: 'representant', entityId: 'repB');
+      await queueOp(db, id: 'A3', entityType: 'representant', entityId: 'repC');
+
+      api.failNextPush = const ApiException(
+        'BAD_REQUEST',
+        statusCode: 400,
+        kind: FailureKind.terminal,
+        message: 'operations.1.data.phone must be a string',
+        rejectedOperations: <int>[1],
+      );
+      await build().drain();
+
+      expect((await outboxById(db, 'A1')).status, OutboxStatus.pending);
+      expect((await outboxById(db, 'A2')).status, OutboxStatus.failed);
+      expect((await outboxById(db, 'A3')).status, OutboxStatus.pending);
+      expect(
+        (await outboxById(db, 'A3')).attempts,
+        0,
+        reason: 'la saisie d\'à côté ne paie pas le refus d\'une autre',
+      );
+    });
+
+    test('un refus qui ne nomme personne condamne bien tout le lot', () async {
+      await insertRepresentant(db, id: 'repB', phone: '+221770000002');
+      await queueOp(db, id: 'A2', entityType: 'representant', entityId: 'repB');
+
+      api.failNextPush = const ApiException(
+        'PAYLOAD_VERSION_UNSUPPORTED',
+        statusCode: 400,
+        kind: FailureKind.terminal,
+      );
+      await build().drain();
+
+      expect((await outboxById(db, 'A1')).status, OutboxStatus.failed);
+      expect((await outboxById(db, 'A2')).status, OutboxStatus.failed);
+    });
+
+    /// Un rang hors du lot ne désigne rien : mieux vaut le refus entier, qui est
+    /// visible, qu'un acquittement silencieux de saisies que le serveur refuse.
+    test('un rang hors du lot retombe sur le refus entier', () async {
+      api.failNextPush = const ApiException(
+        'BAD_REQUEST',
+        statusCode: 400,
+        kind: FailureKind.terminal,
+        rejectedOperations: <int>[42],
+      );
+      await build().drain();
+      expect((await outboxById(db, 'A1')).status, OutboxStatus.failed);
+    });
 
     // ── Rejeu bloqué : plancher et plafond ────────────────────────────────────
     //
@@ -1464,6 +1633,53 @@ void main() {
 
       expect(api.calls.single.operations.single.clearedFields, isNull);
     });
+
+    /// La liste du client doit être la COPIE de `CLEARABLE_FIELDS`
+    /// (`apps/api/src/modules/sync/dto.ts`) : un nom absent de la liste serveur
+    /// fait refuser le LOT ENTIER, un nom absent de la liste cliente fait
+    /// disparaître silencieusement l'effacement.
+    test('la liste des champs effaçables est celle du serveur', () async {
+      await insertRepresentant(
+        db,
+        id: 'repC',
+        phone: '+221770000003',
+        serverUpdatedAt: t0,
+      );
+      await queueOp(
+        db,
+        id: 'C1',
+        entityType: 'representant',
+        entityId: 'repC',
+        op: 'update',
+        baseRev: 1,
+        payload: <String, Object?>{
+          'fullName': 'Awa Sy',
+          'phone': '+221770000003',
+          'departementId': 'dep-1',
+          'iefId': null,
+          'notes': null,
+          'whatsappE164': null,
+          'profession': null,
+          'prenom': null,
+          'etablissement': null,
+          // Le serveur ne sait PAS vider ceux-ci : les annoncer ferait refuser
+          // le lot entier sur `IsIn`.
+          'banqueId': null,
+          'syndicatId': null,
+          'representantId': null,
+        },
+      );
+      await engine.drain();
+
+      expect(api.calls.single.operations.single.clearedFields, <String>[
+        'iefId',
+        'notes',
+        'whatsappE164',
+        'profession',
+        'prenom',
+        'etablissement',
+      ]);
+    });
   });
 
   group('pull', () {
@@ -1531,6 +1747,8 @@ void main() {
             iefs: const <IefDto>[],
             banques: const <BanqueDto>[],
             syndicats: const <SyndicatDto>[],
+            canauxProvenance: const <CanalProvenanceDto>[],
+            visiteReferentiels: const <SyncVisiteReferentielDto>[],
             representants: <RepresentantDto>[
               representantDto(
                 id: 'repA',
@@ -1560,6 +1778,49 @@ void main() {
       expect(await engine.readCursor(), 'cur-2');
     });
 
+    // Une fiche peut suivre les DEUX projets. Aplatir ses parcours sur la
+    // colonne `projet` la faisait disparaître de la liste CHUES le jour où elle
+    // rejoignait le Grand Public.
+    test('le pull garde les deux parcours d’une même fiche', () async {
+      api.pullPages.add(
+        PullPage(
+          changes: SyncChangesDto(
+            departements: const <DepartementDto>[],
+            iefs: const <IefDto>[],
+            banques: const <BanqueDto>[],
+            syndicats: const <SyndicatDto>[],
+            canauxProvenance: const <CanalProvenanceDto>[],
+            visiteReferentiels: const <SyncVisiteReferentielDto>[],
+            representants: const <RepresentantDto>[],
+            prospects: <ProspectDto>[
+              prospectDto(
+                id: 'pro-double',
+                parcours: const <Projet>[Projet.CHUES, Projet.GRAND_PUBLIC],
+              ),
+            ],
+            callCampaigns: const <SyncCallCampaignDto>[],
+            callTasks: const <SyncCallTaskDto>[],
+            visites: const <SyncVisiteDto>[],
+          ),
+          deletions: const <SyncDeletionDto>[],
+          nextCursor: 'cur-parcours',
+          hasMore: false,
+          serverTime: t0,
+        ),
+      );
+
+      await engine.pullChanges();
+
+      expect((await db.select(db.prospects).get()).single.projet, 'CHUES');
+      expect(
+        (await db.select(db.prospectJourneys).get())
+            .map((ProspectJourney j) => j.projet)
+            .toList()
+          ..sort(),
+        <String>['CHUES', 'GRAND_PUBLIC'],
+      );
+    });
+
     // Le pull est la SEULE source de ces deux libellés : ils sont écrits par le
     // serveur et jamais depuis le terrain. Les jeter à l'upsert rendait la
     // cascade région et la relation invisibles hors ligne.
@@ -1581,6 +1842,8 @@ void main() {
             iefs: const <IefDto>[],
             banques: const <BanqueDto>[],
             syndicats: const <SyndicatDto>[],
+            canauxProvenance: const <CanalProvenanceDto>[],
+            visiteReferentiels: const <SyncVisiteReferentielDto>[],
             representants: <RepresentantDto>[
               representantDto(
                 id: 'repZ',
@@ -1626,6 +1889,8 @@ void main() {
             iefs: const <IefDto>[],
             banques: const <BanqueDto>[],
             syndicats: const <SyndicatDto>[],
+            canauxProvenance: const <CanalProvenanceDto>[],
+            visiteReferentiels: const <SyncVisiteReferentielDto>[],
             representants: const <RepresentantDto>[],
             prospects: const <ProspectDto>[],
             callCampaigns: const <SyncCallCampaignDto>[],
@@ -1659,6 +1924,8 @@ void main() {
             iefs: const <IefDto>[],
             banques: const <BanqueDto>[],
             syndicats: const <SyndicatDto>[],
+            canauxProvenance: const <CanalProvenanceDto>[],
+            visiteReferentiels: const <SyncVisiteReferentielDto>[],
             representants: const <RepresentantDto>[],
             prospects: const <ProspectDto>[],
             callCampaigns: const <SyncCallCampaignDto>[],
@@ -1686,6 +1953,8 @@ void main() {
               iefs: const <IefDto>[],
               banques: const <BanqueDto>[],
               syndicats: const <SyndicatDto>[],
+              canauxProvenance: const <CanalProvenanceDto>[],
+              visiteReferentiels: const <SyncVisiteReferentielDto>[],
               representants: const <RepresentantDto>[],
               prospects: const <ProspectDto>[],
               callCampaigns: <SyncCallCampaignDto>[
@@ -1759,6 +2028,8 @@ void main() {
               iefs: const <IefDto>[],
               banques: const <BanqueDto>[],
               syndicats: const <SyndicatDto>[],
+              canauxProvenance: const <CanalProvenanceDto>[],
+              visiteReferentiels: const <SyncVisiteReferentielDto>[],
               representants: const <RepresentantDto>[],
               prospects: const <ProspectDto>[],
               callCampaigns: const <SyncCallCampaignDto>[],
@@ -1833,6 +2104,181 @@ void main() {
       );
       expect(outcome.shouldRetry, isTrue);
       expect(outcome.pushed, 3);
+    });
+
+    /// Un APK sous le palier du serveur ne recevra rien de plus en réessayant :
+    /// le worker doit rendre la main, et l'interface doit pouvoir DIRE pourquoi.
+    test('une mise à jour requise ne se réessaie pas et se nomme', () {
+      const SyncOutcome outcome = SyncOutcome.failed(
+        ServerErrorCodes.appUpdateRequired,
+        kind: FailureKind.appUpdateRequired,
+      );
+      expect(outcome.shouldRetry, isFalse);
+      expect(outcome.requiresAppUpdate, isTrue);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Purge de l'outbox
+  // ─────────────────────────────────────────────────────────────────────────
+  //
+  // Rien ne supprimait jamais les lignes `done`. Sur un appareil en service
+  // depuis un an, la file grossit indéfiniment : chaque sélection de lot balaie
+  // des dizaines de milliers de lignes acquittées pour en trouver dix.
+
+  group('purge des lignes acquittées', () {
+    late AppDatabase db;
+    late FakeClock clock;
+
+    SyncEngine build() => SyncEngine(
+      database: db,
+      api: FakeApi(),
+      tokens: InMemoryTokenStore(refreshToken: 'r', userId: 'me'),
+      clock: clock,
+      random: Random(5),
+    );
+
+    setUp(() async {
+      db = await openTestDatabase();
+      clock = FakeClock(t0);
+      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+    });
+    tearDown(() => db.close());
+
+    Future<void> queueDone(String id, DateTime createdAt) async {
+      await queueOp(db, id: id, entityType: 'representant', entityId: 'repA');
+      await (db.update(db.outbox)..where((Outbox o) => o.id.equals(id))).write(
+        OutboxCompanion(
+          status: const Value<String>(OutboxStatus.done),
+          createdAt: Value<DateTime>(createdAt),
+        ),
+      );
+    }
+
+    test('une ligne acquittée finit par quitter la file', () async {
+      await queueDone('vieille', t0.subtract(const Duration(days: 30)));
+      expect(await build().purgeAcknowledged(), 1);
+      expect(await db.select(db.outbox).get(), isEmpty);
+    });
+
+    /// La rétention laisse le temps de diagnostiquer un envoi contesté quelques
+    /// jours plus tard : purger à l'acquittement rendrait la question sans
+    /// réponse.
+    test('une ligne acquittée hier reste diagnosticable', () async {
+      await queueDone('recente', t0.subtract(const Duration(days: 1)));
+      expect(await build().purgeAcknowledged(), 0);
+    });
+
+    test('rien d\'ouvert n\'est emporté, si vieux soit-il', () async {
+      await queueOp(
+        db,
+        id: 'ouverte',
+        entityType: 'representant',
+        entityId: 'repA',
+        status: OutboxStatus.failed,
+      );
+      await (db.update(
+        db.outbox,
+      )..where((Outbox o) => o.id.equals('ouverte'))).write(
+        OutboxCompanion(
+          createdAt: Value<DateTime>(t0.subtract(const Duration(days: 300))),
+        ),
+      );
+      expect(await build().purgeAcknowledged(), 0);
+    });
+
+    test('la vidange purge d\'elle-même', () async {
+      await queueDone('vieille', t0.subtract(const Duration(days: 30)));
+      await build().drain();
+      expect(await db.select(db.outbox).get(), isEmpty);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Référentiel des motifs d'issue
+  // ─────────────────────────────────────────────────────────────────────────
+
+  group('motifs d\'issue : le référentiel ne coupe pas la file', () {
+    late AppDatabase db;
+    late FakeApi api;
+    late SyncEngine engine;
+
+    setUp(() async {
+      db = await openTestDatabase();
+      api = FakeApi();
+      engine = SyncEngine(
+        database: db,
+        api: api,
+        tokens: InMemoryTokenStore(refreshToken: 'r', userId: 'me'),
+        clock: FakeClock(t0),
+        random: Random(23),
+      );
+      await db
+          .into(db.callOutcomeReasons)
+          .insert(
+            CallOutcomeReasonsCompanion.insert(
+              code: 'RETIRE',
+              label: 'Motif retiré du web',
+              effect: CallEffects.keepOpen,
+            ),
+          );
+    });
+    tearDown(() => db.close());
+
+    CallOutcomeReasonDto dto(String code) => CallOutcomeReasonDto(
+      id: 'r-$code',
+      code: code,
+      label: code,
+      effect: CallOutcomeEffect.KEEP_OPEN,
+      requiresComment: false,
+      requiresCallback: false,
+      countsAsReached: false,
+      isActive: true,
+      isSystem: false,
+      sortOrder: 10,
+      color: null,
+      minPayloadVersion: 1,
+      updatedAt: t0,
+    );
+
+    /// ═══ UN MOTIF SUPPRIMÉ CÔTÉ WEB CONDAMNAIT DES TENTATIVES DÉJÀ SAISIES ═══
+    ///
+    /// Le tirage vidait la table ENTIÈRE puis réinsérait. Une tentative encore
+    /// en file qui cite le motif retiré devient alors illisible pour
+    /// `_toOperation` : `PAYLOAD_SCHEMA_MISMATCH`, échec définitif, sur une
+    /// saisie parfaitement valide au moment où elle a été faite.
+    test('un motif encore cité par la file survit au tirage', () async {
+      await queueOp(
+        db,
+        id: 'T1',
+        entityType: callAttemptEntity,
+        entityId: 'att-1',
+        payload: <String, Object?>{
+          'prospectId': 'pro-1',
+          'outcome': CallOutcomes.unreachable,
+          'reasonCode': 'RETIRE',
+          'clientCreatedAt': '2026-08-12T09:00:00.000Z',
+        },
+      );
+      api.callOutcomeReasons.add(dto('NRP'));
+
+      await engine.pullCallOutcomeReasons();
+
+      final Set<String> codes = (await db.select(db.callOutcomeReasons).get())
+          .map((CallOutcomeReason r) => r.code)
+          .toSet();
+      expect(codes, containsAll(<String>['RETIRE', 'NRP']));
+    });
+
+    test('un motif que plus rien ne cite s\'en va', () async {
+      api.callOutcomeReasons.add(dto('NRP'));
+
+      await engine.pullCallOutcomeReasons();
+
+      final Set<String> codes = (await db.select(db.callOutcomeReasons).get())
+          .map((CallOutcomeReason r) => r.code)
+          .toSet();
+      expect(codes, <String>{'NRP'});
     });
   });
 

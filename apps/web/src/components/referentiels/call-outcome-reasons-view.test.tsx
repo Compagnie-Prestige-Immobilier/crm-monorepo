@@ -8,6 +8,7 @@ import type * as CallOutcomeReasonsModule from '@/lib/data/call-outcome-reasons'
 
 const fetchCallOutcomeReasons = vi.fn();
 const setCallOutcomeReasonActive = vi.fn();
+const updateCallOutcomeReason = vi.fn();
 
 vi.mock('@/lib/data/call-outcome-reasons', async () => {
   const actual = await vi.importActual<typeof CallOutcomeReasonsModule>(
@@ -18,6 +19,8 @@ vi.mock('@/lib/data/call-outcome-reasons', async () => {
     fetchCallOutcomeReasons: () => fetchCallOutcomeReasons() as unknown,
     setCallOutcomeReasonActive: (id: string, isActive: boolean) =>
       setCallOutcomeReasonActive(id, isActive) as unknown,
+    updateCallOutcomeReason: (id: string, patch: unknown) =>
+      updateCallOutcomeReason(id, patch) as unknown,
   };
 });
 
@@ -55,6 +58,8 @@ describe('référentiel des issues d’appel', () => {
   beforeEach(() => {
     fetchCallOutcomeReasons.mockReturnValue(Promise.resolve([SYSTEME, NEUF]));
     setCallOutcomeReasonActive.mockReturnValue(Promise.resolve({ ...NEUF, isActive: false }));
+    updateCallOutcomeReason.mockReset();
+    updateCallOutcomeReason.mockReturnValue(Promise.resolve(NEUF));
   });
 
   it('dit en clair, sans qu’on ait à cliquer, qu’un motif neuf n’atteint pas les téléphones', async () => {
@@ -102,5 +107,50 @@ describe('référentiel des issues d’appel', () => {
     await userEvent.click(await screen.findByRole('button', { name: /Retirer Ne répond pas/ }));
 
     expect(setCallOutcomeReasonActive).toHaveBeenCalledWith('r-2', false);
+  });
+
+  // Le champ existe dans les DTO serveur depuis toujours ; l'interface écrite à
+  // la main l'omettait, et aucune couleur n'était modifiable depuis le panneau.
+  it('montre la couleur du motif et la rend modifiable', async () => {
+    renderWithQuery(<CallOutcomeReasonsView />);
+
+    const ligne = (await screen.findByText('Injoignable')).closest('tr');
+    expect(ligne?.textContent).toContain('Orange · vigilance');
+
+    await userEvent.click(screen.getByRole('button', { name: /Modifier Ne répond pas/ }));
+    expect(await screen.findByRole('combobox', { name: /Couleur/ })).toBeTruthy();
+  });
+
+  // Champ vidé : `valueAsNumber` rendait `NaN`, donc `null` dans le JSON, que la
+  // colonne refuse. L'admin ne lisait qu'un « Enregistrement impossible ».
+  it('refuse un ordre d’affichage vide EN NOMMANT le champ, sans appeler l’API', async () => {
+    renderWithQuery(<CallOutcomeReasonsView />);
+
+    await userEvent.click(await screen.findByRole('button', { name: /Modifier Ne répond pas/ }));
+
+    const ordre = await screen.findByLabelText(/Ordre d’affichage/);
+    await userEvent.clear(ordre);
+    await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    expect(await screen.findByText('Indiquez un entier positif, 0 compris.')).toBeTruthy();
+    expect(updateCallOutcomeReason).not.toHaveBeenCalled();
+  });
+
+  it('laisse passer zéro, qui est un ordre valable', async () => {
+    renderWithQuery(<CallOutcomeReasonsView />);
+
+    await userEvent.click(await screen.findByRole('button', { name: /Modifier Ne répond pas/ }));
+
+    const ordre = await screen.findByLabelText(/Ordre d’affichage/);
+    await userEvent.clear(ordre);
+    await userEvent.type(ordre, '0');
+    await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    await vi.waitFor(() => {
+      expect(updateCallOutcomeReason).toHaveBeenCalledWith(
+        'r-2',
+        expect.objectContaining({ sortOrder: 0 }),
+      );
+    });
   });
 });

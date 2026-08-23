@@ -58,7 +58,8 @@ export function scopeLabel(scope: CampaignScope): string {
     GP3: 'GP3 : Informel',
     GP4: 'GP4 : Diaspora',
   };
-  if (gpLabels[scope]) return gpLabels[scope] as string;
+  const gp = gpLabels[scope];
+  if (gp !== undefined) return gp;
   // ALL n'a pas de libellé de segment : les quatre segments réunis FORMENT la
   // base, sans recouvrement ni trou (voir `segment.ts`).
   return scope === CampaignScope.ALL
@@ -357,9 +358,9 @@ export class Phase2CampaignsService {
       items: campaigns.map((row): CampaignSummaryDto => ({
         id: row.id,
         name: row.name,
-        projet: row.projet ?? Projet.CHUES,
+        projet: row.projet,
         scope: row.scope,
-        scopeLabel: projectScopeLabel(row.scope, row.projet ?? Projet.CHUES),
+        scopeLabel: projectScopeLabel(row.scope, row.projet),
         status: row.status,
         offerLabel: row.offer?.label ?? null,
         seed: row.seed,
@@ -437,9 +438,9 @@ export class Phase2CampaignsService {
     return {
       id: campaign.id,
       name: campaign.name,
-      projet: campaign.projet ?? Projet.CHUES,
+      projet: campaign.projet,
       scope: campaign.scope,
-      scopeLabel: projectScopeLabel(campaign.scope, campaign.projet ?? Projet.CHUES),
+      scopeLabel: projectScopeLabel(campaign.scope, campaign.projet),
       status: campaign.status,
       offerLabel: campaign.offer?.label ?? null,
       seed: campaign.seed,
@@ -696,10 +697,7 @@ export class Phase2CampaignsService {
     return {
       campaignName: membership.campaign.name,
       commercialName: membership.user.fullName,
-      segmentLabel: projectScopeLabel(
-        membership.campaign.scope,
-        membership.campaign.projet ?? Projet.CHUES,
-      ),
+      segmentLabel: projectScopeLabel(membership.campaign.scope, membership.campaign.projet),
       rows: tasks.map((task) => ({
         position: task.position,
         shortCode: shortCode(task.prospect.id),

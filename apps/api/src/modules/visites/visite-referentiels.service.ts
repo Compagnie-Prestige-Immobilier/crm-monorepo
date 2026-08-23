@@ -171,7 +171,16 @@ export class VisiteReferentielsService {
     kind: VisiteReferentielKind,
     input: ReorderVisiteReferentielDto,
   ): Promise<VisiteReferentielListDto> {
-    for (const id of input.ids) await this.entry(kind, id);
+    const known = await this.delegate(kind).findMany({ where: { id: { in: input.ids } } });
+    const found = new Set(known.map((row) => row.id));
+    const missing = input.ids.filter((id) => !found.has(id));
+    if (missing.length > 0) {
+      throw new NotFoundException({
+        code: VisiteReferentielError.NOT_FOUND,
+        message: `Aucun ${LABELS[kind]} sous cet identifiant.`,
+        missing,
+      });
+    }
 
     await this.prisma.$transaction(async (tx) => {
       const delegate = this.delegate(kind, tx);

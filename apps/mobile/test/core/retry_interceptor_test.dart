@@ -47,12 +47,13 @@ void main() {
     // C'est LE point : sur un `Dio` nu, la seconde requête part sans
     // `Authorization`, revient en 401, et le 401 est propagé vers l'avant sans
     // jamais repasser par le renouvellement.
-    final ({Dio dio, _RecordingAuth auth, _ScriptedAdapter adapter}) t = buildDio(
-      script: <_Answer>[
-        const _Answer.failure(DioExceptionType.connectionError),
-        _Answer.success(<String, Object?>{'ok': true}),
-      ],
-    );
+    final ({Dio dio, _RecordingAuth auth, _ScriptedAdapter adapter}) t =
+        buildDio(
+          script: <_Answer>[
+            const _Answer.failure(DioExceptionType.connectionError),
+            _Answer.success(<String, Object?>{'ok': true}),
+          ],
+        );
 
     final Response<dynamic> response = await t.dio.get<dynamic>('/api/v1/ping');
 
@@ -70,12 +71,13 @@ void main() {
   });
 
   test('un 429 fait attendre ce que le serveur demande', () async {
-    final ({Dio dio, _RecordingAuth auth, _ScriptedAdapter adapter}) t = buildDio(
-      script: <_Answer>[
-        const _Answer.throttled(retryAfterSeconds: 1),
-        _Answer.success(<String, Object?>{'ok': true}),
-      ],
-    );
+    final ({Dio dio, _RecordingAuth auth, _ScriptedAdapter adapter}) t =
+        buildDio(
+          script: <_Answer>[
+            const _Answer.throttled(retryAfterSeconds: 1),
+            _Answer.success(<String, Object?>{'ok': true}),
+          ],
+        );
 
     final Stopwatch clock = Stopwatch()..start();
     final Response<dynamic> response = await t.dio.get<dynamic>('/api/v1/ping');
@@ -91,27 +93,79 @@ void main() {
     );
   });
 
-  test('un Retry-After déraisonnable rend la main plutôt que de figer', () async {
-    final ({Dio dio, _RecordingAuth auth, _ScriptedAdapter adapter}) t = buildDio(
-      script: <_Answer>[const _Answer.throttled(retryAfterSeconds: 3600)],
-    );
+  /// `Retry-After` est légal sur TOUT statut. Ne le lire que sur 429 fait
+  /// insister sur un serveur en maintenance qui vient de demander une pause.
+  test('un 503 qui demande une pause est écouté aussi', () async {
+    final ({Dio dio, _RecordingAuth auth, _ScriptedAdapter adapter}) t =
+        buildDio(
+          script: <_Answer>[
+            const _Answer.unavailable(retryAfterSeconds: 1),
+            _Answer.success(<String, Object?>{'ok': true}),
+          ],
+        );
 
-    await expectLater(
-      t.dio.get<dynamic>('/api/v1/ping'),
-      throwsA(isA<DioException>()),
+    final Stopwatch clock = Stopwatch()..start();
+    final Response<dynamic> response = await t.dio.get<dynamic>('/api/v1/ping');
+    clock.stop();
+
+    expect(response.statusCode, 200);
+    expect(
+      clock.elapsed,
+      greaterThanOrEqualTo(const Duration(milliseconds: 900)),
     );
-    expect(t.adapter.calls, 1, reason: 'aucune attente d\'une heure en ligne');
   });
 
-  test('les tentatives restent bornées', () async {
-    final ({Dio dio, _RecordingAuth auth, _ScriptedAdapter adapter}) t = buildDio(
-      script: <_Answer>[
-        const _Answer.failure(DioExceptionType.connectionError),
-        const _Answer.failure(DioExceptionType.connectionError),
-        const _Answer.failure(DioExceptionType.connectionError),
-        const _Answer.failure(DioExceptionType.connectionError),
-      ],
+  /// Sans plancher, un 429 nu repartait dans les 400 ms : on se refaisait
+  /// limiter aussitôt.
+  test('un 429 SANS en-tête attend quand même', () async {
+    final ({Dio dio, _RecordingAuth auth, _ScriptedAdapter adapter}) t =
+        buildDio(
+          script: <_Answer>[
+            const _Answer.throttled(),
+            _Answer.success(<String, Object?>{'ok': true}),
+          ],
+        );
+
+    final Stopwatch clock = Stopwatch()..start();
+    await t.dio.get<dynamic>('/api/v1/ping');
+    clock.stop();
+
+    expect(
+      clock.elapsed,
+      greaterThanOrEqualTo(const Duration(milliseconds: 900)),
     );
+  });
+
+  test(
+    'un Retry-After déraisonnable rend la main plutôt que de figer',
+    () async {
+      final ({Dio dio, _RecordingAuth auth, _ScriptedAdapter adapter}) t =
+          buildDio(
+            script: <_Answer>[const _Answer.throttled(retryAfterSeconds: 3600)],
+          );
+
+      await expectLater(
+        t.dio.get<dynamic>('/api/v1/ping'),
+        throwsA(isA<DioException>()),
+      );
+      expect(
+        t.adapter.calls,
+        1,
+        reason: 'aucune attente d\'une heure en ligne',
+      );
+    },
+  );
+
+  test('les tentatives restent bornées', () async {
+    final ({Dio dio, _RecordingAuth auth, _ScriptedAdapter adapter}) t =
+        buildDio(
+          script: <_Answer>[
+            const _Answer.failure(DioExceptionType.connectionError),
+            const _Answer.failure(DioExceptionType.connectionError),
+            const _Answer.failure(DioExceptionType.connectionError),
+            const _Answer.failure(DioExceptionType.connectionError),
+          ],
+        );
 
     await expectLater(
       t.dio.get<dynamic>('/api/v1/ping'),
@@ -121,17 +175,23 @@ void main() {
     expect(t.adapter.calls, 3);
   });
 
-  test('une écriture n\'est JAMAIS rejouée ici : c\'est le rôle de l\'outbox', () async {
-    final ({Dio dio, _RecordingAuth auth, _ScriptedAdapter adapter}) t = buildDio(
-      script: <_Answer>[const _Answer.failure(DioExceptionType.connectionError)],
-    );
+  test(
+    'une écriture n\'est JAMAIS rejouée ici : c\'est le rôle de l\'outbox',
+    () async {
+      final ({Dio dio, _RecordingAuth auth, _ScriptedAdapter adapter}) t =
+          buildDio(
+            script: <_Answer>[
+              const _Answer.failure(DioExceptionType.connectionError),
+            ],
+          );
 
-    await expectLater(
-      t.dio.post<dynamic>('/api/v1/sync/push'),
-      throwsA(isA<DioException>()),
-    );
-    expect(t.adapter.calls, 1);
-  });
+      await expectLater(
+        t.dio.post<dynamic>('/api/v1/sync/push'),
+        throwsA(isA<DioException>()),
+      );
+      expect(t.adapter.calls, 1);
+    },
+  );
 
   group('retryAfterOf', () {
     Response<dynamic> withHeader(String value) => Response<dynamic>(
@@ -178,7 +238,9 @@ void main() {
 
     test('sans en-tête, rien', () {
       expect(
-        retryAfterOf(Response<dynamic>(requestOptions: RequestOptions(path: '/x'))),
+        retryAfterOf(
+          Response<dynamic>(requestOptions: RequestOptions(path: '/x')),
+        ),
         isNull,
       );
     });
@@ -205,9 +267,14 @@ class _Answer {
       body = null,
       retryAfterSeconds = null;
 
-  const _Answer.throttled({required this.retryAfterSeconds})
+  const _Answer.throttled({this.retryAfterSeconds})
     : errorType = DioExceptionType.badResponse,
       status = 429,
+      body = null;
+
+  const _Answer.unavailable({this.retryAfterSeconds})
+    : errorType = DioExceptionType.badResponse,
+      status = 503,
       body = null;
 
   _Answer.success(Map<String, Object?> payload)
@@ -243,13 +310,14 @@ class _ScriptedAdapter implements HttpClientAdapter {
     final _Answer answer = _script[calls.clamp(0, _script.length - 1)];
     calls++;
 
-    if (answer.status == 429) {
+    if (answer.status == 429 || answer.status == 503) {
       return ResponseBody.fromString(
-        '{"code":"RATE_LIMITED"}',
-        429,
+        '{"code":"BUSY"}',
+        answer.status!,
         headers: <String, List<String>>{
           Headers.contentTypeHeader: <String>['application/json'],
-          'retry-after': <String>['${answer.retryAfterSeconds}'],
+          if (answer.retryAfterSeconds != null)
+            'retry-after': <String>['${answer.retryAfterSeconds}'],
         },
       );
     }

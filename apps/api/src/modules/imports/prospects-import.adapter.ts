@@ -3,6 +3,8 @@ import type { EnrollmentMethod } from '@crm/database';
 import { v7 as uuidv7 } from 'uuid';
 
 import { tryNormalizePhone } from '../../common/phone.js';
+import { ENROLLMENT_METHOD_LABELS, ENROLLMENT_METHOD_ORDER } from '../prospects/phase2-labels.js';
+import { normalizeKey } from '../representants/representants-import.service.js';
 import type {
   ChunkOutcome,
   ImportAdapter,
@@ -16,32 +18,16 @@ import {
   PROSPECTS_IMPORT_COLUMNS,
   PROSPECT_IMPORT_HEADERS,
 } from './prospects-import-template.js';
-import {
-  ProspectImportError,
-  notPrepared,
-  referentialAmbiguous,
-  rowError,
-} from './prospects-import.errors.js';
+import { ProspectImportError, referentialAmbiguous, rowError } from './prospects-import.errors.js';
 
 /** Import massif de prospects, dédoublonné par travail et téléphone normalisé. */
-export class ProspectsImportAdapter implements ImportAdapter<ProspectImportRow> {
+export class ProspectsImportAdapter implements ImportAdapter<ProspectImportRow, ProspectImportRun> {
   readonly kind = ImportKind.PROSPECTS;
 
   /** Au-delà, utiliser une migration plutôt qu'un import. */
   readonly maxRows = 150_000;
 
   readonly templateColumns: readonly ImportColumn[] = PROSPECTS_IMPORT_COLUMNS;
-
-  private referentials: ProspectImportReferentials | null = null;
-
-  /**
-   * Un état par travail en cours.
-   *
-   * `seen` associe un téléphone normalisé à la PREMIÈRE ligne où il est
-   * apparu : c'est celle du haut du fichier que l'utilisateur reconnaît, donc
-   * c'est elle qu'on garde et les suivantes qu'on refuse.
-   */
-  private readonly runs = new Map<string, ProspectImportRunState>();
 
   /**
    * Charge les trois référentiels UNE FOIS.
@@ -51,13 +37,7 @@ export class ProspectsImportAdapter implements ImportAdapter<ProspectImportRow> 
    * tables tiennent en mémoire : quelques dizaines de banques, autant de
    * syndicats, quelques milliers de représentants.
    */
-  async prepare(ctx: ImportRunContext): Promise<void> {
-    // L'état repart à VIDE, y compris sur une reprise après incident : les
-    // lignes déjà comptées sont sautées sans être relues par le moteur, donc
-    // aucun de leurs téléphones ne doit rester en mémoire. Les garder ferait
-    // refuser en « doublon interne » des lignes que la reprise n'a jamais vues.
-    this.runs.set(ctx.jobId, { seen: new Map() });
-
+  async prepare(ctx: ImportRunContext): Promise<ProspectImportRun> {
     const [banques, syndicats, representants] = await Promise.all([
       ctx.tx.banque.findMany({
         where: { isActive: true },
@@ -75,7 +55,12 @@ export class ProspectsImportAdapter implements ImportAdapter<ProspectImportRow> 
       }),
     ]);
 
-    this.referentials = {
+    return {
+      // `seen` repart à VIDE, y compris sur une reprise après incident : les
+      // lignes déjà comptées sont sautées sans être relues par le moteur, donc
+      // aucun de leurs téléphones ne doit rester en mémoire. Les garder ferait
+      // refuser en « doublon interne » des lignes que la reprise n'a jamais vues.
+      seen: new Map(),
       banques: indexByKey(
         banques.map((row) => [row.shortName, row.id]),
         PROSPECT_IMPORT_HEADERS.banque,
@@ -94,10 +79,11 @@ export class ProspectsImportAdapter implements ImportAdapter<ProspectImportRow> 
     };
   }
 
-  parseRow(cells: Record<string, string>, rowNumber: number): ParsedRow<ProspectImportRow> {
-    const refs = this.referentials;
-    if (!refs) throw notPrepared();
-
+  parseRow(
+    cells: Record<string, string>,
+    rowNumber: number,
+    refs: ProspectImportRun,
+  ): ParsedRow<ProspectImportRow> {
     const nom = (cells[PROSPECT_IMPORT_HEADERS.nom] ?? '').trim();
     if (nom === '') {
       return {
@@ -270,11 +256,9 @@ export class ProspectsImportAdapter implements ImportAdapter<ProspectImportRow> 
   async writeChunk(
     rows: readonly ProspectImportRow[],
     ctx: ImportRunContext,
+    run: ProspectImportRun,
   ): Promise<ChunkOutcome> {
     if (rows.length === 0) return { created: 0, skipped: 0, errors: [] };
-
-    const state = this.runs.get(ctx.jobId) ?? { seen: new Map<string, number>() };
-    this.runs.set(ctx.jobId, state);
 
     const errors: ImportRowError[] = [];
     const unique: ProspectImportRow[] = [];
@@ -282,7 +266,7 @@ export class ProspectsImportAdapter implements ImportAdapter<ProspectImportRow> 
     // PREMIÈRE FAMILLE : le fichier contre lui-même. Écartée avant la lecture
     // en base, pour que la requête ne porte pas deux fois le même numéro.
     for (const row of rows) {
-      const firstSeen = state.seen.get(row.phoneE164);
+      const firstSeen = run.seen.get(row.phoneE164);
       if (firstSeen !== undefined) {
         errors.push(
           rowError({
@@ -294,7 +278,7 @@ export class ProspectsImportAdapter implements ImportAdapter<ProspectImportRow> 
         );
         continue;
       }
-      state.seen.set(row.phoneE164, row.rowNumber);
+      run.seen.set(row.phoneE164, row.rowNumber);
       unique.push(row);
     }
 
@@ -445,12 +429,15 @@ export interface ProspectImportRow {
   readonly enrollmentMethod: EnrollmentMethod | null;
 }
 
-/** Ce qu'un import en cours mémorise de son propre fichier. */
-interface ProspectImportRunState {
+/**
+ * Ce qu'une exécution garde sous la main : ses référentiels et sa mémoire.
+ *
+ * `seen` associe un téléphone normalisé à la PREMIÈRE ligne où il est apparu :
+ * c'est celle du haut du fichier que l'utilisateur reconnaît, donc c'est elle
+ * qu'on garde et les suivantes qu'on refuse.
+ */
+export interface ProspectImportRun {
   readonly seen: Map<string, number>;
-}
-
-interface ProspectImportReferentials {
   readonly banques: ReadonlyMap<string, string>;
   readonly banqueLabels: readonly string[];
   readonly syndicats: ReadonlyMap<string, string>;
@@ -503,15 +490,22 @@ function indexByKey(
 }
 
 /**
- * Jeton de méthode d'enrôlement.
+ * Méthode d'enrôlement, au libellé français OU au jeton technique.
  *
- * La casse et les espaces sont tolérés, pour la même raison que sur les
- * référentiels. Rien d'autre : les trois valeurs sont des constantes
- * techniques, pas des libellés.
+ * Le modèle et l'export écrivent le libellé, mais les classeurs déjà remplis
+ * par les administrateurs portent le jeton : refuser l'un des deux casserait un
+ * chemin ou l'autre. Accents et casse sont indifférents, comme partout ailleurs
+ * sur les libellés en toutes lettres.
  */
+const ENROLLMENT_METHOD_BY_KEY = new Map<string, EnrollmentMethod>(
+  ENROLLMENT_METHOD_ORDER.flatMap((method) => [
+    [normalizeKey(ENROLLMENT_METHOD_LABELS[method]), method],
+    [normalizeKey(method), method],
+  ]),
+);
+
 function parseEnrollmentMethod(value: string): EnrollmentMethod | null {
-  const key = referentialKey(value).replace(/[\s-]+/g, '_');
-  return ENROLLMENT_METHOD_TOKENS.find((token) => token === key) ?? null;
+  return ENROLLMENT_METHOD_BY_KEY.get(normalizeKey(value)) ?? null;
 }
 
 /**

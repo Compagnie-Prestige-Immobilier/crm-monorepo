@@ -83,34 +83,19 @@ interface IefRow extends ReferentielRow {
   readonly departementId: string;
 }
 
-interface Referentiels {
-  readonly departements: ReadonlyMap<string, ReferentielRow>;
-  readonly iefs: ReadonlyMap<string, IefRow>;
-}
-
 /**
  * L'état d'UNE course, celui qui ne peut pas vivre sur l'instance.
  *
- * Les téléphones déjà vus appartiennent au fichier en cours de lecture, pas à
- * l'adaptateur, qui est un singleton. Ils sont donc indexés par identifiant de
- * travail. `parseRow` ne reçoit pas de contexte (le contrat est gelé) : c'est
- * bien pour cela que la première famille de doublons est détectée dans
- * `writeChunk`, qui, lui, connaît `ctx.jobId`.
+ * Référentiels et téléphones déjà vus appartiennent au fichier en cours de
+ * lecture, pas à l'adaptateur, qui est un singleton. `prepare` les rend, le
+ * moteur les repasse aux deux autres méthodes, et deux imports simultanés ne
+ * peuvent plus se marcher dessus.
  */
-interface RunState {
+export interface RepresentantImportRun {
   readonly seen: Map<string, number>;
+  readonly departements: ReadonlyMap<string, ReferentielRow>;
+  readonly iefs: ReadonlyMap<string, IefRow>;
 }
-
-/**
- * Nombre de courses dont l'état est conservé.
- *
- * Le contrat gelé n'a pas de temps de clôture : rien ne dit à l'adaptateur
- * qu'un travail est fini. Une table non bornée fuirait donc une entrée par
- * import, indéfiniment. Huit couvrent très largement les courses simultanées
- * d'un même conteneur — le balayage en traite une à la fois — et la plus
- * ancienne est évincée au-delà.
- */
-const MAX_TRACKED_RUNS = 8;
 
 /** Numéros interrogés en une fois lors du contrôle contre la base. */
 const PHONE_LOOKUP_CHUNK = 1_000;
@@ -129,13 +114,13 @@ const cellAt = (cells: Record<string, string>, index: number): string => {
 };
 
 @Injectable()
-export class RepresentantsImportAdapter implements ImportAdapter<RepresentantImportRow> {
+export class RepresentantsImportAdapter implements ImportAdapter<
+  RepresentantImportRow,
+  RepresentantImportRun
+> {
   readonly kind = ImportKind.REPRESENTANTS;
   readonly maxRows = REPRESENTANTS_MAX_ROWS;
   readonly templateColumns: readonly ImportColumn[] = IMPORT_COLUMNS;
-
-  private referentiels: Referentiels = { departements: new Map(), iefs: new Map() };
-  private readonly runs = new Map<string, RunState>();
 
   /**
    * Charge les référentiels et arme l'état de course.
@@ -144,7 +129,7 @@ export class RepresentantsImportAdapter implements ImportAdapter<RepresentantImp
    * du processus : un département activé ce matin doit être accepté par l'import
    * de cet après-midi, sans redéploiement.
    */
-  async prepare(ctx: ImportRunContext): Promise<void> {
+  async prepare(ctx: ImportRunContext): Promise<RepresentantImportRun> {
     const [departements, iefs] = await Promise.all([
       ctx.tx.departement.findMany({
         where: { isActive: true },
@@ -156,7 +141,13 @@ export class RepresentantsImportAdapter implements ImportAdapter<RepresentantImp
       }),
     ]);
 
-    this.referentiels = {
+    return {
+      // REMISE À ZÉRO à chaque course, et c'est ce qui rend une reprise
+      // correcte : un travail repris relit son classeur depuis `processedRows`,
+      // et les téléphones vus par le travailleur mort ne sont plus là pour
+      // l'aider. Les lignes déjà écrites sont retrouvées par la SECONDE famille
+      // (contre la base), qui, elle, ne dépend d'aucune mémoire de course.
+      seen: new Map(),
       // Indexés sur la forme NORMALISÉE (sans accent, sans casse) : un fichier
       // rempli à la main écrit « SAINT-LOUIS », « Saint Louis » et « saint
       // louis » pour le même département, et refuser les trois pour un accent
@@ -174,28 +165,20 @@ export class RepresentantsImportAdapter implements ImportAdapter<RepresentantImp
         ]),
       ),
     };
-
-    // REMISE À ZÉRO, et c'est ce qui rend une reprise correcte : un travail
-    // repris relit son classeur depuis `processedRows`, et les téléphones vus
-    // par le travailleur mort ne sont plus là pour l'aider. Les lignes déjà
-    // écrites sont retrouvées par la SECONDE famille (contre la base), qui, elle,
-    // ne dépend d'aucune mémoire de course.
-    this.runs.set(ctx.jobId, { seen: new Map() });
-    while (this.runs.size > MAX_TRACKED_RUNS) {
-      const oldest = this.runs.keys().next();
-      if (oldest.done === true) break;
-      this.runs.delete(oldest.value);
-    }
   }
 
   /**
-   * Analyse une ligne. PURE : elle ne connaît ni le travail, ni la base.
+   * Analyse une ligne. Elle ne connaît que ses référentiels, jamais la base.
    *
    * Le rapprochement se fait par POSITION dans le modèle, jamais par le texte de
    * l'en-tête du fichier : un utilisateur renomme une colonne bien plus souvent
    * qu'il n'en déplace une (voir `import-template.ts`).
    */
-  parseRow(cells: Record<string, string>, rowNumber: number): ParsedRow<RepresentantImportRow> {
+  parseRow(
+    cells: Record<string, string>,
+    rowNumber: number,
+    refs: RepresentantImportRun,
+  ): ParsedRow<RepresentantImportRow> {
     const fullName = cellAt(cells, 0);
     const phone = cellAt(cells, 1);
     const departement = cellAt(cells, 2);
@@ -227,7 +210,7 @@ export class RepresentantsImportAdapter implements ImportAdapter<RepresentantImp
       };
     }
 
-    const departementRow = this.referentiels.departements.get(normalizeKey(departement));
+    const departementRow = refs.departements.get(normalizeKey(departement));
     if (!departementRow) {
       return {
         ok: false,
@@ -242,7 +225,7 @@ export class RepresentantsImportAdapter implements ImportAdapter<RepresentantImp
 
     let iefRow: IefRow | null = null;
     if (ief) {
-      iefRow = this.referentiels.iefs.get(normalizeKey(ief)) ?? null;
+      iefRow = refs.iefs.get(normalizeKey(ief)) ?? null;
       if (!iefRow) {
         return {
           ok: false,
@@ -296,10 +279,8 @@ export class RepresentantsImportAdapter implements ImportAdapter<RepresentantImp
   async writeChunk(
     rows: readonly RepresentantImportRow[],
     ctx: ImportRunContext,
+    run: RepresentantImportRun,
   ): Promise<ChunkOutcome> {
-    const state = this.runs.get(ctx.jobId) ?? { seen: new Map<string, number>() };
-    this.runs.set(ctx.jobId, state);
-
     const errors: ImportRowError[] = [];
     let skipped = 0;
 
@@ -308,7 +289,7 @@ export class RepresentantsImportAdapter implements ImportAdapter<RepresentantImp
     // l'utilisateur reconnaît.
     const unique: RepresentantImportRow[] = [];
     for (const row of rows) {
-      const previous = state.seen.get(row.phoneE164);
+      const previous = run.seen.get(row.phoneE164);
       if (previous !== undefined) {
         skipped += 1;
         errors.push({
@@ -319,7 +300,7 @@ export class RepresentantsImportAdapter implements ImportAdapter<RepresentantImp
         });
         continue;
       }
-      state.seen.set(row.phoneE164, row.rowNumber);
+      run.seen.set(row.phoneE164, row.rowNumber);
       unique.push(row);
     }
 
