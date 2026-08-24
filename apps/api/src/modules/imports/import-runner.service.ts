@@ -4,6 +4,7 @@ import { ImportStatus, type ImportJob, type Prisma } from '@crm/database';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import {
   IMPORT_ADAPTERS,
+  ImportAdapterFailure,
   type ImportAdapter,
   type ImportRowError,
   type ImportRunContext,
@@ -57,6 +58,7 @@ type AnyImportAdapter = ImportAdapter<unknown>;
 interface Totals {
   processed: number;
   created: number;
+  updated: number;
   skipped: number;
   errorRows: number;
   errors: ImportRowError[];
@@ -99,6 +101,9 @@ export class ImportRunnerService {
       if (error instanceof ImportRunFailure) {
         return await this.fail(claim, error.code, error.message);
       }
+      if (error instanceof ImportAdapterFailure) {
+        return await this.fail(claim, error.code, error.message);
+      }
       if (error instanceof UnreadableWorkbookError) {
         return await this.fail(claim, 'IMPORT_FILE_UNREADABLE', error.reason);
       }
@@ -135,6 +140,7 @@ export class ImportRunnerService {
     const totals: Totals = {
       processed: skip,
       created: job.createdRows,
+      updated: job.updatedRows,
       skipped: job.skippedRows,
       errorRows: job.errorRows,
       errors: reportedErrors(job.report),
@@ -203,6 +209,7 @@ export class ImportRunnerService {
           status: ImportStatus.succeeded,
           processedRows: totals.processed,
           createdRows: totals.created,
+          updatedRows: totals.updated,
           skippedRows: totals.skipped,
           errorRows: totals.errorRows,
           totalRows: seen,
@@ -239,6 +246,7 @@ export class ImportRunnerService {
             status: ImportStatus.running,
             processedRows: processed,
             createdRows: totals.created + chunk.created,
+            updatedRows: totals.updated + (chunk.updated ?? 0),
             skippedRows: totals.skipped + chunk.skipped,
             errorRows: totals.errorRows + chunk.errors.length,
           },
@@ -253,6 +261,7 @@ export class ImportRunnerService {
 
     totals.processed = processed;
     totals.created += outcome.created;
+    totals.updated += outcome.updated ?? 0;
     totals.skipped += outcome.skipped;
     totals.errorRows += outcome.errors.length;
     totals.errors = boundErrors(totals.errors, outcome.errors);
@@ -309,6 +318,7 @@ function buildReport(job: ImportJob, totals: Totals, totalRows: number): Prisma.
     totalRows,
     processedRows: totals.processed,
     createdRows: totals.created,
+    updatedRows: totals.updated,
     skippedRows: totals.skipped,
     errorRows: totals.errorRows,
     truncated: totals.errorRows > totals.errors.length,

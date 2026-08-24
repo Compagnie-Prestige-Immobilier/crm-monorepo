@@ -21,6 +21,7 @@ import '../../../data/local/database.dart';
 import '../../../data/repositories/draft_repository.dart';
 import '../../../data/repositories/reference_repository.dart';
 import '../../../ui/widgets/local_typeahead.dart';
+import '../../../ui/widgets/cpi_resume_banner.dart';
 import '../../../ui/widgets/offline_indicator.dart';
 import '../../../ui/widgets/phone_field.dart';
 import '../../../ui/widgets/referentials_banner.dart';
@@ -501,7 +502,7 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
             children: <Widget>[
               ReferentialsBanner(missing: departements.isEmpty),
               if (_pendingRestore != null)
-                _ResumeBanner(
+                CpiResumeBanner(
                   label: (_pendingRestore!.values['fullName'] as String?)
                       ?.trim(),
                   onResume: () => _apply(_pendingRestore!),
@@ -971,63 +972,6 @@ class _DuplicateBanner extends StatelessWidget {
               ),
             ),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-class _ResumeBanner extends StatelessWidget {
-  const _ResumeBanner({
-    required this.onResume,
-    required this.onDiscard,
-    this.label,
-  });
-
-  final String? label;
-  final VoidCallback onResume;
-  final VoidCallback onDiscard;
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final CpiColors cpi = context.cpi;
-    final String who = (label == null || label!.isEmpty) ? 'la saisie' : label!;
-    return Container(
-      width: double.infinity,
-      color: cpi.infoSurface,
-      padding: const EdgeInsets.symmetric(
-        horizontal: CpiSpacing.md,
-        vertical: CpiSpacing.xs,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Icon(
-                PhosphorIconsRegular.arrowCounterClockwise,
-                size: CpiIconSize.sm,
-                color: cpi.info,
-              ),
-              const SizedBox(width: CpiSpacing.xs),
-              Expanded(
-                child: Text(
-                  'Saisie non terminée : $who',
-                  style: theme.textTheme.bodySmall?.copyWith(color: cpi.info),
-                ),
-              ),
-            ],
-          ),
-          Wrap(
-            alignment: WrapAlignment.end,
-            children: <Widget>[
-              TextButton(onPressed: onResume, child: const Text('Reprendre')),
-              TextButton(onPressed: onDiscard, child: const Text('Supprimer')),
-            ],
-          ),
         ],
       ),
     );

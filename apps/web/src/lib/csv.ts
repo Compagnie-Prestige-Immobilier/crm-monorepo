@@ -19,3 +19,13 @@ export function csvCell(value: string | number | null): string {
 export function csvRows(rows: readonly (readonly (string | number | null)[])[]): string {
   return rows.map((row) => row.map(csvCell).join(';')).join('\r\n');
 }
+
+/** Le BOM est ce qui fait lire l'UTF-8 à Excel, qui sinon casse les accents. */
+export function downloadCsv(text: string, fileName: string): void {
+  const url = URL.createObjectURL(new Blob([`﻿${text}`], { type: 'text/csv;charset=utf-8' }));
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}

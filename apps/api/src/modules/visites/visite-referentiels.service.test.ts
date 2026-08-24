@@ -2,11 +2,29 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
-import { FakeVisitesPrisma, fakeRef } from './fake-visites-prisma.js';
+import { FakeVisitesPrisma, fakeRef, type FakeVisiteRow } from './fake-visites-prisma.js';
 import {
   VisiteReferentielError,
   VisiteReferentielsService,
 } from './visite-referentiels.service.js';
+
+const fakeVisite = (
+  over: Partial<FakeVisiteRow> & { id: string; entrepriseId: string; objetId: string },
+): FakeVisiteRow => ({
+  reference: `V-2026-${over.id}`,
+  visitedAt: new Date('2026-01-01T00:00:00Z'),
+  timeKnown: true,
+  visitorName: 'Visiteuse Test',
+  phone: null,
+  phoneE164: null,
+  directionId: null,
+  destinataireId: null,
+  comment: null,
+  createdById: 'user-1',
+  createdAt: new Date('2026-01-01T00:00:00Z'),
+  updatedAt: new Date('2026-01-01T00:00:00Z'),
+  ...over,
+});
 
 describe('listes de l’accueil', () => {
   let prisma: FakeVisitesPrisma;
@@ -140,5 +158,25 @@ describe('listes de l’accueil', () => {
     await expect(service.update('objets', 'ent-cpi', { label: 'X' })).rejects.toThrow(
       NotFoundException,
     );
+  });
+
+  it('compte, pour chaque entrée, les visites qui la désignent, entrées retirées comprises', async () => {
+    prisma.visites = [
+      fakeVisite({ id: 'v1', entrepriseId: 'ent-cpi', objetId: 'obj-suivi' }),
+      fakeVisite({ id: 'v2', entrepriseId: 'ent-cpi', objetId: 'obj-suivi' }),
+      fakeVisite({ id: 'v3', entrepriseId: 'ent-old', objetId: 'obj-suivi' }),
+    ];
+
+    const usage = await service.usage();
+
+    expect(usage.entreprises).toEqual(
+      expect.arrayContaining([
+        { id: 'ent-cpi', count: 2 },
+        { id: 'ent-san', count: 0 },
+        { id: 'ent-old', count: 1 },
+      ]),
+    );
+    expect(usage.objets).toEqual([{ id: 'obj-suivi', count: 3 }]);
+    expect(usage.directions).toEqual([{ id: 'dir-com', count: 0 }]);
   });
 });

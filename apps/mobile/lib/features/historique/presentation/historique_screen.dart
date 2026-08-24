@@ -17,6 +17,7 @@ import '../../../core/utils/phone.dart';
 import '../../../data/local/database.dart';
 import '../../../data/repositories/write_repository.dart';
 import '../../../ui/widgets/cpi_pressable.dart';
+import '../../../ui/widgets/cpi_action_bar.dart';
 import '../../../ui/widgets/empty_state.dart';
 import '../../../ui/widgets/error_state.dart';
 import '../../../ui/widgets/offline_indicator.dart';
@@ -108,19 +109,7 @@ class _NewRepresentantBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(
-        CpiSpacing.md,
-        CpiSpacing.xs,
-        CpiSpacing.md,
-        CpiSpacing.sm,
-      ),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        border: Border(top: BorderSide(color: context.cpi.borderSubtle)),
-      ),
+    return CpiActionBar(
       child: FilledButton.icon(
         onPressed: () {
           unawaited(HapticFeedback.selectionClick());

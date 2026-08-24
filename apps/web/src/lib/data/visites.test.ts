@@ -40,6 +40,8 @@ describe('filtres du registre dans l’URL', () => {
       toutePeriode: true,
       page: 3,
       pageSize: EMPTY_VISITE_FILTERS.pageSize,
+      sortBy: 'visitedAt',
+      sortDir: 'desc',
     });
   });
 
@@ -49,6 +51,9 @@ describe('filtres du registre dans l’URL', () => {
       'objetId=o-1&page=2',
     );
     expect(serializeVisiteFilters(filters({ toutePeriode: true })).toString()).toBe('periode=tout');
+    expect(
+      serializeVisiteFilters(filters({ sortBy: 'visitorName', sortDir: 'asc' })).toString(),
+    ).toBe('sortBy=visitorName&sortDir=asc');
   });
 
   it('ignore une date qui n’est pas une date', () => {
@@ -144,7 +149,15 @@ describe('requête servie à l’API', () => {
       to: '2026-08-19',
       page: 1,
       pageSize: 100,
+      sortBy: 'visitedAt',
+      sortOrder: 'desc',
     });
+  });
+
+  it('renomme « sortDir » en « sortOrder », à la frontière de l’API', () => {
+    const query = visitesQuery(filters({ sortBy: 'visitorName', sortDir: 'asc' }), '2026-08-19');
+    expect(query.sortBy).toBe('visitorName');
+    expect(query.sortOrder).toBe('asc');
   });
 
   it('retire les deux bornes quand tout le registre est demandé', () => {

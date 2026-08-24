@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/about/presentation/about_screen.dart';
+import '../../features/accueil/presentation/chiffres_screen.dart';
 import '../../features/accueil/presentation/registre_screen.dart';
 import '../../features/accueil/presentation/visite_form_screen.dart';
 import '../../features/auth/auth_state.dart';
@@ -112,6 +113,16 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
             const ProjectScope(
               project: CpiProject.accueil,
               child: RegistreScreen(),
+            ),
+      ),
+      GoRoute(
+        path: Routes.accueilChiffres,
+        name: 'accueilChiffres',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) =>
+            const ProjectScope(
+              project: CpiProject.accueil,
+              child: ChiffresScreen(),
             ),
       ),
       GoRoute(

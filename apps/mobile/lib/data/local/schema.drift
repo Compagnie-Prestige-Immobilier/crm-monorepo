@@ -876,7 +876,7 @@ CREATE TABLE visites (
 
 CREATE INDEX visites_date_idx ON visites (date, time);
 
--- Le registre du jour, le plus récent d'abord ; les entrées sans heure
--- (saisies hors ligne pas encore relevées par le serveur) ferment la liste.
-registreDuJour:
-    SELECT * FROM visites WHERE date = :jour ORDER BY time DESC, created_at DESC;
+-- Sert le filtre par entreprise sur la période « Tout » de l'historique.
+-- Rien n'aide la RECHERCHE : `LIKE '%awa%'` porte un joker en tête, que SQLite
+-- ne peut indexer. Ne pas ajouter d'index dessus en croyant corriger un oubli.
+CREATE INDEX visites_entreprise_date_idx ON visites (entreprise_id, date);

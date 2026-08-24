@@ -87,6 +87,8 @@ const IMPORT_HINTS: Readonly<Record<ImportKind, string>> = {
   REPRESENTANTS:
     'Département et IEF se choisissent dans les listes déroulantes du modèle, tirées des référentiels du jour.',
   VISITES: 'Seuls les onglets « BDD VISITES » sont lus, avec l’en-tête en ligne 3.',
+  // Jamais choisi ici : le dépôt du registre part de l'écran d'accueil, pas de cette liste.
+  VISITES_REGISTRE: 'Aller-retour du registre des visites, déposé depuis l’écran d’accueil.',
 };
 
 /** « Grand Public » ne prend pas la marque du pluriel : elle ne peut pas être ajoutée au vol. */
@@ -100,13 +102,19 @@ const IMPORT_NOUNS: Readonly<
   },
   REPRESENTANTS: { un: 'représentant', plusieurs: 'représentants' },
   VISITES: { un: 'visite', plusieurs: 'visites' },
+  VISITES_REGISTRE: { un: 'visite', plusieurs: 'visites' },
 };
 
+/** Seul l'aller-retour du registre des visites réécrit des lignes : ailleurs `updatedRows` reste à 0. */
+const totalWriteRows = (job: ImportJob): number => job.createdRows + job.updatedRows;
+
+const FEMININE_KINDS: readonly ImportKind[] = ['VISITES', 'VISITES_REGISTRE'];
+
 const nounFor = (job: ImportJob): string =>
-  job.createdRows > 1 ? IMPORT_NOUNS[job.kind].plusieurs : IMPORT_NOUNS[job.kind].un;
+  totalWriteRows(job) > 1 ? IMPORT_NOUNS[job.kind].plusieurs : IMPORT_NOUNS[job.kind].un;
 
 const createdPast = (job: ImportJob): string =>
-  `créé${job.kind === 'VISITES' ? 'e' : ''}${job.createdRows > 1 ? 's' : ''}`;
+  `créé${FEMININE_KINDS.includes(job.kind) ? 'e' : ''}${totalWriteRows(job) > 1 ? 's' : ''}`;
 
 function isRunning(job: ImportJob | undefined): boolean {
   return job?.status === 'queued' || job?.status === 'running';
@@ -150,16 +158,22 @@ function progressLabel(job: ImportJob): string {
 function canApply(job: ImportJob, now = new Date()): boolean {
   if (job.status !== 'succeeded' || job.mode !== 'DRY_RUN') return false;
   if (new Date(job.expiresAt).getTime() <= now.getTime()) return false;
-  return job.createdRows > 0;
+  return totalWriteRows(job) > 0;
 }
 
 /** Le bouton porte le chiffre : « Appliquer » ne se relit pas, « Créer 12 480 prospects » si. */
 function applyLabel(job: ImportJob): string {
-  return `Créer ${formatNumber(job.createdRows)} ${nounFor(job)}`;
+  if (job.updatedRows === 0) return `Créer ${formatNumber(job.createdRows)} ${nounFor(job)}`;
+  const parts: string[] = [];
+  if (job.createdRows > 0) {
+    parts.push(`${formatNumber(job.createdRows)} création${job.createdRows > 1 ? 's' : ''}`);
+  }
+  parts.push(`${formatNumber(job.updatedRows)} correction${job.updatedRows > 1 ? 's' : ''}`);
+  return `Appliquer ${parts.join(' et ')}`;
 }
 
 function createdVerb(job: ImportJob): string {
-  return `${job.createdRows > 1 ? 'seront' : 'sera'} ${createdPast(job)}`;
+  return `${totalWriteRows(job) > 1 ? 'seront' : 'sera'} ${createdPast(job)}`;
 }
 
 /** `errorRows` reste exact, `errors` est bornée : la troncature doit se dire. */
@@ -181,7 +195,7 @@ export function ImportsView() {
   const inputRef = useRef<HTMLInputElement>(null);
   const template = useFileDownload();
 
-  const [kind, setKind] = useState<ImportKind>('PROSPECTS');
+  const [kind, setKind] = useState<Exclude<ImportKind, 'VISITES_REGISTRE'>>('PROSPECTS');
   const [dragging, setDragging] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -204,7 +218,7 @@ export function ImportsView() {
     if (job === undefined || job.status !== 'succeeded' || job.mode !== 'APPLY') return;
     if (invalidatedFor.current === job.id) return;
     invalidatedFor.current = job.id;
-    if (job.kind === 'VISITES') {
+    if (job.kind === 'VISITES' || job.kind === 'VISITES_REGISTRE') {
       void queryClient.invalidateQueries({ queryKey: ['visites'] });
       return;
     }
@@ -214,7 +228,7 @@ export function ImportsView() {
   }, [job, queryClient]);
 
   const deposit = useMutation({
-    mutationFn: (input: { kind: ImportKind; file: File }) =>
+    mutationFn: (input: { kind: Exclude<ImportKind, 'VISITES_REGISTRE'>; file: File }) =>
       createImportJob(input.kind, input.file),
     onSuccess: (created) => {
       queryClient.setQueryData(queryKeys.importJob(created.id), created);
@@ -476,11 +490,11 @@ function JobPanel({
           <CheckCircle2Icon className="mt-0.5 size-5 shrink-0 text-success" aria-hidden="true" />
           <div className="min-w-0 text-[0.875rem]">
             <p className="font-[600]">
-              {formatNumber(job.createdRows)} {nounFor(job)} {createdPast(job)}.
+              {formatNumber(totalWriteRows(job))} {nounFor(job)} {createdPast(job)}.
             </p>
             <p className="mt-1 text-muted-foreground">
               Corrigez les lignes refusées dans le classeur et redéposez-le :{' '}
-              {job.kind === 'VISITES'
+              {job.kind === 'VISITES' || job.kind === 'VISITES_REGISTRE'
                 ? 'les visites déjà au registre seront de nouveau ignorées'
                 : `les ${IMPORT_NOUNS[job.kind].plusieurs} déjà en base seront de nouveau ignorés`}
               , sans doublon.
@@ -584,9 +598,10 @@ function TerminalState({ job }: { job: ImportJob }) {
  */
 function Figures({ job }: { job: ImportJob }) {
   const simulated = job.mode === 'DRY_RUN';
+  const registre = job.kind === 'VISITES_REGISTRE';
 
   return (
-    <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <dl className={cn('grid gap-3 sm:grid-cols-2', registre ? 'lg:grid-cols-5' : 'lg:grid-cols-4')}>
       <Figure
         label={simulated ? 'À créer' : 'Créées'}
         value={job.createdRows}
@@ -597,6 +612,18 @@ function Figures({ job }: { job: ImportJob }) {
             : 'Fiches écrites en base.'
         }
       />
+      {registre ? (
+        <Figure
+          label={simulated ? 'À corriger' : 'Corrigées'}
+          value={job.updatedRows}
+          color="text-success"
+          help={
+            simulated
+              ? 'Visites déjà au registre dont une colonne diverge du classeur.'
+              : 'Visites réécrites avec le contenu du classeur.'
+          }
+        />
+      ) : null}
       <Figure
         label="Ignorées"
         value={job.skippedRows}
@@ -820,7 +847,7 @@ function ApplyDialog({
             <DialogHeader>
               <DialogTitle>{applyLabel(job)} ?</DialogTitle>
               <DialogDescription>
-                {job.kind === 'VISITES'
+                {job.kind === 'VISITES' || job.kind === 'VISITES_REGISTRE'
                   ? 'Cette action écrit les visites en base et ne s’annule pas.'
                   : 'Cette action écrit en base et ne s’annule pas : une fiche supprimée ensuite garde son numéro dans l’index d’unicité.'}
               </DialogDescription>
@@ -829,7 +856,7 @@ function ApplyDialog({
             <div className="flex flex-col gap-3">
               <p className="rounded-md border border-border bg-secondary px-3 py-2.5 text-[0.875rem]">
                 <span className="font-display text-[1.5rem] font-[800] tabular-nums">
-                  {formatNumber(job.createdRows)}
+                  {formatNumber(totalWriteRows(job))}
                 </span>{' '}
                 {nounFor(job)} {createdVerb(job)} à partir de « {job.fileName} ».
               </p>

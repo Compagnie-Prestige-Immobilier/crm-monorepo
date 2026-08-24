@@ -12,6 +12,8 @@ import { ProspectsGrandPublicImportAdapter } from './prospects-grand-public.adap
 import { ProspectsImportAdapter } from './prospects-import.adapter.js';
 import { RepresentantsImportAdapter } from './representants.adapter.js';
 import { VisitesImportAdapter } from './visites.adapter.js';
+import { VisitesRegistreAdapter } from './visites-registre.adapter.js';
+import { VisitesRegistreRevueService } from './visites-registre.revue.service.js';
 import { ExcelStreamRowReader, IMPORT_ROW_READER } from './xlsx-rows.js';
 
 @Module({
@@ -25,6 +27,8 @@ import { ExcelStreamRowReader, IMPORT_ROW_READER } from './xlsx-rows.js';
     ProspectsImportAdapter,
     ProspectsGrandPublicImportAdapter,
     VisitesImportAdapter,
+    VisitesRegistreAdapter,
+    VisitesRegistreRevueService,
     {
       provide: IMPORT_ADAPTERS,
       useFactory: (
@@ -32,12 +36,20 @@ import { ExcelStreamRowReader, IMPORT_ROW_READER } from './xlsx-rows.js';
         prospects: ProspectsImportAdapter,
         grandPublic: ProspectsGrandPublicImportAdapter,
         visites: VisitesImportAdapter,
-      ): readonly ImportAdapter<unknown>[] => [representants, prospects, grandPublic, visites],
+        visitesRegistre: VisitesRegistreAdapter,
+      ): readonly ImportAdapter<unknown>[] => [
+        representants,
+        prospects,
+        grandPublic,
+        visites,
+        visitesRegistre,
+      ],
       inject: [
         RepresentantsImportAdapter,
         ProspectsImportAdapter,
         ProspectsGrandPublicImportAdapter,
         VisitesImportAdapter,
+        VisitesRegistreAdapter,
       ],
     },
     { provide: IMPORT_ROW_READER, useFactory: () => new ExcelStreamRowReader() },
@@ -46,5 +58,6 @@ import { ExcelStreamRowReader, IMPORT_ROW_READER } from './xlsx-rows.js';
       useFactory: () => new DiskImportFileStore(readImportsEnv().IMPORTS_DIR),
     },
   ],
+  exports: [ImportsService, VisitesRegistreRevueService],
 })
 export class ImportsModule {}

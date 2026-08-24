@@ -31,6 +31,7 @@ import { SupervisionController } from '../../modules/analytics/supervision.contr
 import { SyncController } from '../../modules/sync/sync.controller.js';
 import { CallOutcomeReasonsController } from '../../modules/referentiels/call-outcome-reasons.controller.js';
 import { VisitesController } from '../../modules/visites/visites.controller.js';
+import { VisitesImportController } from '../../modules/visites/visites-import.controller.js';
 import { UsersController } from '../../modules/users/users.controller.js';
 
 type Controller = new (...args: never[]) => object;
@@ -63,6 +64,7 @@ const CONTROLLERS: readonly Controller[] = [
   SyncController,
   UsersController,
   VisitesController,
+  VisitesImportController,
 ];
 
 /**
@@ -184,9 +186,13 @@ const SOCLE: readonly string[] = [
 
 /** Le registre lui-même : ce que l'ACCUEIL tient, et que la DIRECTION relit. */
 const REGISTRE: readonly string[] = [
+  'ExportController.visitesExportRoute',
   'VisitesController.create',
+  'VisitesController.deleteDashboardLayout',
   'VisitesController.get',
+  'VisitesController.getDashboardLayout',
   'VisitesController.list',
+  'VisitesController.putDashboardLayout',
   'VisitesController.statistiques',
   'VisitesController.update',
 ];
@@ -221,6 +227,12 @@ const ADMISES_DIRECTION: readonly string[] = [
   'VisitesController.reorderReferentiel',
   'VisitesController.setReferentielActive',
   'VisitesController.updateReferentiel',
+  'VisitesController.usage',
+  'VisitesImportController.apply',
+  'VisitesImportController.create',
+  'VisitesImportController.get',
+  'VisitesImportController.revue',
+  'VisitesImportController.setSelection',
 ];
 
 const guard = new RolesGuard(new Reflector());
@@ -360,6 +372,7 @@ describe('ce qu’un compte d’ACCUEIL atteint, route par route', () => {
       'updateReferentiel',
       'setReferentielActive',
       'reorderReferentiel',
+      'usage',
     ]) {
       expect(allowsAs(Role.ACCUEIL, VisitesController, method), `visites.${method}`).toBe(false);
     }
@@ -417,5 +430,9 @@ describe('ce qu’une DIRECTION atteint, route par route', () => {
     for (const method of routesOf(ImportsController)) {
       expect(allowsAs(Role.DIRECTION, ImportsController, method), `imports.${method}`).toBe(false);
     }
+  });
+
+  it('ne fixe pas la disposition par défaut du tableau de bord, réservée à l’ADMIN', () => {
+    expect(allowsAs(Role.DIRECTION, VisitesController, 'putDefaultDashboardLayout')).toBe(false);
   });
 });

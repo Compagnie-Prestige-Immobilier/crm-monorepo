@@ -133,7 +133,7 @@ function CommandItem({ className, ...props }: React.ComponentProps<typeof Comman
     <CommandPrimitive.Item
       data-slot="command-item"
       className={cn(
-        'relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-2',
+        'relative flex min-h-11 cursor-default select-none items-center gap-2 rounded-sm px-2 py-2',
         'text-[0.875rem] outline-none',
         'data-[selected=true]:outline-2 data-[selected=true]:-outline-offset-2 data-[selected=true]:outline-ring',
         'data-[selected=true]:bg-secondary data-[selected=true]:text-secondary-foreground',
