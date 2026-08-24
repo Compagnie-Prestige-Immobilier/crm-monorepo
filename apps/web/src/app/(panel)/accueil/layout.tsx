@@ -14,7 +14,7 @@ export default async function AccueilLayout({ children }: { children: ReactNode 
 
   return (
     <div className="flex flex-col gap-6">
-      <VisitesTabs />
+      <VisitesTabs role={guard.user.role} />
       {children}
     </div>
   );

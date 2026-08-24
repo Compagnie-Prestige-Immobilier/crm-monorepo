@@ -6,6 +6,7 @@ abstract final class Routes {
   static const String home = '/';
 
   static const String accueil = '/accueil';
+  static const String accueilChiffres = '/accueil/chiffres';
   static const String accueilVisiteNew = '/accueil/nouvelle-visite';
   static const String chues = '/chues';
   static const String grandPublic = '/grand-public';

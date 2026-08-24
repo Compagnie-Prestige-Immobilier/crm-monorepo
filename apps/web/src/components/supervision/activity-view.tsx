@@ -50,6 +50,7 @@ import {
   type SortDirection,
   type SupervisionGranularity,
 } from '@/lib/data/admin';
+import { downloadCsv } from '@/lib/csv';
 import { formatDecimal, formatNumber, formatRateOrNone, formatShortDate } from '@/lib/format';
 import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
 import { cn } from '@/lib/utils';
@@ -508,14 +509,4 @@ function ActivitySkeleton() {
 function ariaSort(active: boolean, direction: SortDirection): 'ascending' | 'descending' | 'none' {
   if (!active) return 'none';
   return direction === 'asc' ? 'ascending' : 'descending';
-}
-
-// Le BOM est ce qui fait lire l'UTF-8 à Excel, qui sinon casse les accents.
-function downloadCsv(text: string, fileName: string): void {
-  const url = URL.createObjectURL(new Blob([`\uFEFF${text}`], { type: 'text/csv;charset=utf-8' }));
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = fileName;
-  anchor.click();
-  URL.revokeObjectURL(url);
 }

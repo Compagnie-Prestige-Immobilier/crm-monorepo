@@ -36,6 +36,7 @@ const XLSX_ROUTES = [
   '/api/v1/export/prospects.xlsx',
   '/api/v1/export/representants.xlsx',
   '/api/v1/export/bank-cases.xlsx',
+  '/api/v1/export/visites.xlsx',
 ];
 
 describe('contrat des exports Excel', () => {
@@ -67,6 +68,31 @@ describe('contrat des exports Excel', () => {
       'dateFrom',
       'dateTo',
       'hasProspects',
+    ]) {
+      expect(names, `filtre ${present} perdu`).toContain(present);
+    }
+  });
+
+  // `visites-export.service.ts` parcourt la table en keyset sur `reference asc`
+  it('l’export des visites n’annonce ni pagination ni tri', () => {
+    const names = queryNames('/api/v1/export/visites.xlsx');
+
+    for (const absent of ['page', 'pageSize', 'sortBy', 'sortOrder']) {
+      expect(names, `${absent} est annoncé mais jamais lu`).not.toContain(absent);
+    }
+  });
+
+  it('mais garde tous ses filtres, pour que l’export des visites corresponde à l’écran', () => {
+    const names = queryNames('/api/v1/export/visites.xlsx');
+
+    for (const present of [
+      'from',
+      'to',
+      'entrepriseId',
+      'directionId',
+      'destinataireId',
+      'objetId',
+      'search',
     ]) {
       expect(names, `filtre ${present} perdu`).toContain(present);
     }

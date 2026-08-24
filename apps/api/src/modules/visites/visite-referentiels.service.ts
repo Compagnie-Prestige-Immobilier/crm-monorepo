@@ -1,4 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ApiProperty } from '@nestjs/swagger';
 import type { Prisma } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
@@ -12,6 +13,22 @@ import type {
   VisiteReferentielListDto,
   VisiteReferentielsBundleDto,
 } from './dto.js';
+
+export class VisiteReferentielUsageEntryDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ type: Number }) count!: number;
+}
+
+export class VisiteReferentielUsageDto {
+  @ApiProperty({ type: () => [VisiteReferentielUsageEntryDto] })
+  entreprises!: VisiteReferentielUsageEntryDto[];
+  @ApiProperty({ type: () => [VisiteReferentielUsageEntryDto] })
+  directions!: VisiteReferentielUsageEntryDto[];
+  @ApiProperty({ type: () => [VisiteReferentielUsageEntryDto] })
+  destinataires!: VisiteReferentielUsageEntryDto[];
+  @ApiProperty({ type: () => [VisiteReferentielUsageEntryDto] })
+  objets!: VisiteReferentielUsageEntryDto[];
+}
 
 export const VisiteReferentielError = {
   NOT_FOUND: 'VISITE_REFERENTIEL_NOT_FOUND',
@@ -190,6 +207,36 @@ export class VisiteReferentielsService {
     });
 
     return this.list(kind, false);
+  }
+
+  /** Décompte total, sans plage de dates : combien de visites désignent chaque entrée. */
+  async usage(): Promise<VisiteReferentielUsageDto> {
+    const [entreprises, directions, destinataires, objets] = await Promise.all([
+      this.usageFor('entreprises'),
+      this.usageFor('directions'),
+      this.usageFor('destinataires'),
+      this.usageFor('objets'),
+    ]);
+    return { entreprises, directions, destinataires, objets };
+  }
+
+  private async usageFor(kind: VisiteReferentielKind): Promise<VisiteReferentielUsageEntryDto[]> {
+    const entries = (await this.list(kind, false)).items;
+    const counts = await Promise.all(entries.map((entry) => this.countFor(kind, entry.id)));
+    return entries.map((entry, index) => ({ id: entry.id, count: counts[index] ?? 0 }));
+  }
+
+  private countFor(kind: VisiteReferentielKind, id: string): Promise<number> {
+    switch (kind) {
+      case 'entreprises':
+        return this.prisma.visite.count({ where: { entrepriseId: id } });
+      case 'directions':
+        return this.prisma.visite.count({ where: { directionId: id } });
+      case 'destinataires':
+        return this.prisma.visite.count({ where: { destinataireId: id } });
+      case 'objets':
+        return this.prisma.visite.count({ where: { objetId: id } });
+    }
   }
 
   private async entry(kind: VisiteReferentielKind, id: string): Promise<ReferentielRow> {

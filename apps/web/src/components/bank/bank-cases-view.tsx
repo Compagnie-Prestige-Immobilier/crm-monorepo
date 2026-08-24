@@ -1,15 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import {
-  ArrowDownIcon,
-  ArrowUpIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  ChevronsUpDownIcon,
-  FolderOpenIcon,
-  PlusIcon,
-} from 'lucide-react';
+import { ChevronLeftIcon, ChevronRightIcon, FolderOpenIcon, PlusIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -29,6 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import {
   Table,
   TableBody,
@@ -148,7 +141,7 @@ export function BankCasesView() {
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   {SORTABLE.slice(0, 2).map((column) => (
-                    <SortableHead
+                    <SortableTableHead
                       key={column.id}
                       column={column}
                       sortBy={filters.sortBy}
@@ -158,14 +151,14 @@ export function BankCasesView() {
                   ))}
                   <TableHead>Banque</TableHead>
                   <TableHead>Étape</TableHead>
-                  <SortableHead
+                  <SortableTableHead
                     column={SORTABLE[2] ?? { id: 'amountXof', label: 'Montant' }}
                     sortBy={filters.sortBy}
                     sortDir={filters.sortDir}
                     onToggle={toggleSort}
                   />
                   <TableHead>Dernier intervenant</TableHead>
-                  <SortableHead
+                  <SortableTableHead
                     column={SORTABLE[3] ?? { id: 'updatedAt', label: 'Mise à jour' }}
                     sortBy={filters.sortBy}
                     sortDir={filters.sortDir}
@@ -295,42 +288,6 @@ export function BankCasesView() {
         </>
       )}
     </div>
-  );
-}
-
-function SortableHead({
-  column,
-  sortBy,
-  sortDir,
-  onToggle,
-}: {
-  column: { id: BankCaseSortField; label: string };
-  sortBy: BankCaseSortField;
-  sortDir: 'asc' | 'desc';
-  onToggle: (id: string) => void;
-}) {
-  const active = sortBy === column.id;
-  return (
-    <TableHead aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}>
-      <button
-        type="button"
-        onClick={() => {
-          onToggle(column.id);
-        }}
-        className="inline-flex min-h-11 items-center gap-1.5 rounded-sm text-inherit hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-      >
-        {column.label}
-        {active ? (
-          sortDir === 'asc' ? (
-            <ArrowUpIcon className="size-3.5" aria-hidden="true" />
-          ) : (
-            <ArrowDownIcon className="size-3.5" aria-hidden="true" />
-          )
-        ) : (
-          <ChevronsUpDownIcon className="size-3.5 text-muted-foreground" aria-hidden="true" />
-        )}
-      </button>
-    </TableHead>
   );
 }
 

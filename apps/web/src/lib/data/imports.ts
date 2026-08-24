@@ -23,6 +23,7 @@ export const IMPORT_KIND_LABELS: Readonly<Record<ImportKind, string>> = {
   PROSPECTS: 'Prospects CHUES',
   PROSPECTS_GRAND_PUBLIC: 'Prospects Grand Public',
   VISITES: 'Visites',
+  VISITES_REGISTRE: 'Registre des visites',
 };
 
 /** Plafonds des adaptateurs d'import, annoncés avant le dépôt. */
@@ -31,6 +32,7 @@ export const IMPORT_MAX_ROWS: Readonly<Record<ImportKind, number>> = {
   PROSPECTS: 150_000,
   PROSPECTS_GRAND_PUBLIC: 50_000,
   VISITES: 20_000,
+  VISITES_REGISTRE: 20_000,
 };
 
 export const IMPORT_TEMPLATES: Readonly<
@@ -82,7 +84,8 @@ export async function applyImportJob(
   return unwrap(await client.POST('/api/v1/imports/{id}/apply', { params: { path: { id } } }));
 }
 
-const UPLOAD_PATHS: Readonly<Record<ImportKind, string>> = {
+/** `VISITES_REGISTRE` n'y figure pas : son dépôt vit dans `visites-import.ts`, sur `/api/v1/visites/import`. */
+const UPLOAD_PATHS: Readonly<Record<Exclude<ImportKind, 'VISITES_REGISTRE'>, string>> = {
   REPRESENTANTS: '/api/v1/imports/representants',
   PROSPECTS: '/api/v1/imports/prospects',
   PROSPECTS_GRAND_PUBLIC: '/api/v1/imports/prospects-grand-public',
@@ -92,7 +95,7 @@ const UPLOAD_PATHS: Readonly<Record<ImportKind, string>> = {
 // Le contrat engendré représente un fichier multipart par `string`; FormData
 // conserve ici le vrai fichier et laisse le navigateur écrire la frontière.
 export async function createImportJob(
-  kind: ImportKind,
+  kind: Exclude<ImportKind, 'VISITES_REGISTRE'>,
   file: File,
   fetchImpl: typeof globalThis.fetch = globalThis.fetch,
 ): Promise<ImportJob> {

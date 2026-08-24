@@ -16,10 +16,13 @@ import { DEMO_MODE_HEADER, demoFilenameSuffix, setDemoHeader } from './demo-mark
 import { WorkspaceContext } from '../../workspaces/workspace.js';
 import { RepresentantsExportService } from './representants-export.service.js';
 import { RepresentantExportQueryDto } from '../representants/dto.js';
+import { VisitesExportService } from './visites-export.service.js';
+import { VisiteFilterDto } from '../visites/dto.js';
+import { VISITE_REGISTRE_ROLES } from '../visites/visites.service.js';
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
-// Pas de `@Roles` de classe : les trois routes ne servent pas la meme population, une union
+// Pas de `@Roles` de classe : les routes ne servent pas la meme population, une union
 // de classe serait la regle la plus permissive et une route future en heriterait sans decision.
 @ApiTags('export')
 @ApiBearerAuth()
@@ -30,6 +33,7 @@ export class ExportController {
   constructor(
     private readonly exports: ExportService,
     private readonly representants: RepresentantsExportService,
+    private readonly visitesExport: VisitesExportService,
     private readonly demo: WorkspaceContext,
   ) {}
 
@@ -227,6 +231,52 @@ export class ExportController {
 
     try {
       await this.representants.writeRepresentants(user, query, reply.raw);
+    } catch (error) {
+      reply.raw.destroy(error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    }
+  }
+
+  // ADMIN, DIRECTION et ACCUEIL : l'accueil voit déjà chaque ligne à l'écran et peut
+  // déjà les imprimer, un export plus étroit que l'écran serait du théâtre.
+  @Get('visites.xlsx')
+  @Roles(...VISITE_REGISTRE_ROLES)
+  @ApiProduces(XLSX_MIME)
+  @ApiOperation({
+    operationId: 'exportVisitesXlsx',
+    summary: 'Export Excel du registre des visites, avec le même filtre que l’écran.',
+    description:
+      'Une feuille « Registre », onze colonnes, `N° REGISTRE` en tête. Conçu pour revenir : ' +
+      'déposé sur `POST /v1/visites/import`, l’aller-retour détecte les différences ligne ' +
+      'par ligne avant de les appliquer.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Classeur Excel à une feuille.',
+    headers: {
+      [DEMO_MODE_HEADER]: {
+        description:
+          'Vrai si le classeur provient de l’espace démo et contient des données fictives.',
+        schema: { type: 'string', enum: ['true', 'false'] },
+      },
+    },
+    content: { [XLSX_MIME]: { schema: { type: 'string', format: 'binary' } } },
+  })
+  async visitesExportRoute(
+    @Query() query: VisiteFilterDto,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    const demoEnabled = this.demo.current() === 'demo';
+    const filename = `registre-visites-cpi-${formatDakarDate(new Date())}${demoFilenameSuffix(demoEnabled)}.xlsx`;
+
+    reply.hijack();
+    reply.raw.setHeader('Content-Type', XLSX_MIME);
+    reply.raw.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    reply.raw.setHeader('Cache-Control', 'no-store');
+    setDemoHeader(reply.raw, demoEnabled);
+
+    try {
+      await this.visitesExport.writeVisites(query, reply.raw);
     } catch (error) {
       reply.raw.destroy(error instanceof Error ? error : new Error(String(error)));
       throw error;

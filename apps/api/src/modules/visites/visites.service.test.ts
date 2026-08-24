@@ -1,7 +1,9 @@
 import { BadRequestException } from '@nestjs/common';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { SortOrder } from '../../common/dto/prospect-filter.dto.js';
 import type { PrismaService } from '../../prisma/prisma.service.js';
+import { VisiteSortField } from './dto.js';
 import { FakeVisitesPrisma, fakeRef } from './fake-visites-prisma.js';
 import { VisiteError, VisitesService } from './visites.service.js';
 
@@ -137,6 +139,37 @@ describe('registre des visites', () => {
     const corrigee = await service.update(visite.id, { time: '09:05' });
     expect(corrigee.time).toBe('09:05');
     expect(corrigee.date).toBe('2026-01-06');
+  });
+
+  it('remonte la plus récente en tête par défaut', async () => {
+    await service.create({ ...base, date: '2026-01-05' }, ACCUEIL);
+    const recente = await service.create({ ...base, date: '2026-01-06' }, ACCUEIL);
+
+    const items = (await service.list({})).items;
+    expect(items[0]?.id).toBe(recente.id);
+  });
+
+  it('trie sur le nom du visiteur quand on le demande', async () => {
+    await service.create({ ...base, visitorName: 'ZOE SARR' }, ACCUEIL);
+    const premier = await service.create({ ...base, visitorName: 'AMINATA BA' }, ACCUEIL);
+
+    const items = (
+      await service.list({ sortBy: VisiteSortField.VISITOR_NAME, sortOrder: SortOrder.ASC })
+    ).items;
+    expect(items[0]?.id).toBe(premier.id);
+  });
+
+  it('trie sur le libellé de l’entreprise, une relation et non une colonne', async () => {
+    const santargile = fakeRef({ id: 'ent-santargile', code: 'SANTARGILE', label: 'SANTARGILE' });
+    prisma.entreprises.push(santargile);
+
+    const premiere = await service.create({ ...base, entrepriseId: CPI.id }, ACCUEIL);
+    await service.create({ ...base, entrepriseId: santargile.id }, ACCUEIL);
+
+    const items = (
+      await service.list({ sortBy: VisiteSortField.ENTREPRISE, sortOrder: SortOrder.ASC })
+    ).items;
+    expect(items[0]?.id).toBe(premiere.id);
   });
 
   it('efface une heure, une direction et un destinataire corrigés', async () => {

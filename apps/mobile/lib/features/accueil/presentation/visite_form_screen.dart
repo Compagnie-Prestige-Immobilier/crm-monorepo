@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:crm_api_client/crm_api_client.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -12,16 +13,11 @@ import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/ids.dart';
 import '../../../data/repositories/draft_repository.dart';
+import '../../../ui/widgets/cpi_action_bar.dart';
+import '../../../ui/widgets/local_typeahead.dart';
 import '../../auth/auth_state.dart';
 import '../../../ui/widgets/error_state.dart';
 import '../visites_repository.dart';
-
-/// `null` : le choix a été abandonné. `_Choix(null)` : l'entrée a été retirée.
-class _Choix {
-  const _Choix(this.item);
-
-  final VisiteReferentielDto? item;
-}
 
 class VisiteFormScreen extends ConsumerStatefulWidget {
   const VisiteFormScreen({super.key, this.draftId});
@@ -35,17 +31,26 @@ class VisiteFormScreen extends ConsumerStatefulWidget {
 class _VisiteFormScreenState extends ConsumerState<VisiteFormScreen>
     with DraftFormMixin<VisiteFormScreen> {
   final TextEditingController _nom = TextEditingController();
+  final TextEditingController _entreprise = TextEditingController();
+  final TextEditingController _objet = TextEditingController();
+  final TextEditingController _destinataire = TextEditingController();
+  final TextEditingController _direction = TextEditingController();
   final TextEditingController _telephone = TextEditingController();
   final TextEditingController _commentaire = TextEditingController();
+
   final FocusNode _nomFocus = FocusNode();
+  final FocusNode _entrepriseFocus = FocusNode();
+  final FocusNode _objetFocus = FocusNode();
+  final FocusNode _destinataireFocus = FocusNode();
+  final FocusNode _directionFocus = FocusNode();
 
   late DateTime _moment = ref.read(clockProvider).now();
   late final String _draftId = widget.draftId ?? Ids.newId();
 
-  VisiteReferentielDto? _entreprise;
-  VisiteReferentielDto? _objet;
-  VisiteReferentielDto? _direction;
-  VisiteReferentielDto? _destinataire;
+  String? _entrepriseId;
+  String? _objetId;
+  String? _directionId;
+  String? _destinataireId;
 
   bool _envoiEnCours = false;
   String? _echec;
@@ -68,10 +73,10 @@ class _VisiteFormScreenState extends ConsumerState<VisiteFormScreen>
       _nom.text.trim().isEmpty &&
       _telephone.text.trim().isEmpty &&
       _commentaire.text.trim().isEmpty &&
-      _entreprise == null &&
-      _objet == null &&
-      _direction == null &&
-      _destinataire == null;
+      _entrepriseId == null &&
+      _objetId == null &&
+      _directionId == null &&
+      _destinataireId == null;
 
   @override
   String? draftRouteWithId() => widget.draftId != null
@@ -84,14 +89,14 @@ class _VisiteFormScreenState extends ConsumerState<VisiteFormScreen>
     'telephone': _telephone.text,
     'commentaire': _commentaire.text,
     'moment': _moment.toIso8601String(),
-    'entrepriseId': _entreprise?.id,
-    'entrepriseLabel': _entreprise?.label,
-    'objetId': _objet?.id,
-    'objetLabel': _objet?.label,
-    'directionId': _direction?.id,
-    'directionLabel': _direction?.label,
-    'destinataireId': _destinataire?.id,
-    'destinataireLabel': _destinataire?.label,
+    'entrepriseId': _entrepriseId,
+    'entrepriseLabel': _entreprise.text,
+    'objetId': _objetId,
+    'objetLabel': _objet.text,
+    'directionId': _directionId,
+    'directionLabel': _direction.text,
+    'destinataireId': _destinataireId,
+    'destinataireLabel': _destinataire.text,
   };
 
   @override
@@ -109,11 +114,17 @@ class _VisiteFormScreenState extends ConsumerState<VisiteFormScreen>
 
   /// Seul le brouillon d'un PLANTAGE est repris d'office. À l'accueil chaque
   /// visiteur est une saisie neuve : ressortir une saisie simplement
-  /// interrompue remplirait le formulaire du visiteur précédent.
+  /// interrompue remplirait le formulaire du visiteur précédent. Une ligne
+  /// qui ne sera jamais montrée ne reste pas non plus en base sept jours avec
+  /// un nom et un numéro de visiteur en clair.
   Future<void> _restaurer() async {
     final DraftSnapshot? snapshot = await draftRepository.read(_draftId);
-    if (snapshot == null || !mounted) return;
-    if (snapshot.age != DraftAge.crash) return;
+    if (snapshot == null) return;
+    if (snapshot.age != DraftAge.crash) {
+      await draftRepository.delete(_draftId);
+      return;
+    }
+    if (!mounted) return;
     setState(() {
       _nom.text = (snapshot.values['nom'] as String?) ?? '';
       _telephone.text = (snapshot.values['telephone'] as String?) ?? '';
@@ -146,10 +157,30 @@ class _VisiteFormScreenState extends ConsumerState<VisiteFormScreen>
     }
 
     setState(() {
-      _entreprise = parmi(bundle.entreprises, 'entreprise');
-      _objet = parmi(bundle.objets, 'objet');
-      _direction = parmi(bundle.directions, 'direction');
-      _destinataire = parmi(bundle.destinataires, 'destinataire');
+      final VisiteReferentielDto? entreprise = parmi(
+        bundle.entreprises,
+        'entreprise',
+      );
+      _entrepriseId = entreprise?.id;
+      _entreprise.text = entreprise?.label ?? '';
+
+      final VisiteReferentielDto? objet = parmi(bundle.objets, 'objet');
+      _objetId = objet?.id;
+      _objet.text = objet?.label ?? '';
+
+      final VisiteReferentielDto? direction = parmi(
+        bundle.directions,
+        'direction',
+      );
+      _directionId = direction?.id;
+      _direction.text = direction?.label ?? '';
+
+      final VisiteReferentielDto? destinataire = parmi(
+        bundle.destinataires,
+        'destinataire',
+      );
+      _destinataireId = destinataire?.id;
+      _destinataire.text = destinataire?.label ?? '';
     });
   }
 
@@ -161,9 +192,27 @@ class _VisiteFormScreenState extends ConsumerState<VisiteFormScreen>
       _commentaire,
     ]) {
       c.removeListener(markDraftDirty);
+    }
+    for (final TextEditingController c in <TextEditingController>[
+      _nom,
+      _entreprise,
+      _objet,
+      _destinataire,
+      _direction,
+      _telephone,
+      _commentaire,
+    ]) {
       c.dispose();
     }
-    _nomFocus.dispose();
+    for (final FocusNode n in <FocusNode>[
+      _nomFocus,
+      _entrepriseFocus,
+      _objetFocus,
+      _destinataireFocus,
+      _directionFocus,
+    ]) {
+      n.dispose();
+    }
     super.dispose();
   }
 
@@ -189,46 +238,34 @@ class _VisiteFormScreenState extends ConsumerState<VisiteFormScreen>
     });
   }
 
-  Future<void> _choisir({
-    required String titre,
-    required List<VisiteReferentielDto> items,
-    required VisiteReferentielDto? courant,
-    required bool facultatif,
-    required ValueChanged<VisiteReferentielDto?> onChoisi,
-  }) async {
-    final _Choix? choix = await showModalBottomSheet<_Choix>(
-      context: context,
-      isScrollControlled: true,
-      builder: (BuildContext context) => _FeuilleDeChoix(
-        titre: titre,
-        items: items,
-        courant: courant,
-        facultatif: facultatif,
-      ),
-    );
-    if (choix == null || !mounted) return;
-    onChoisi(choix.item);
-    markDraftDirty();
-  }
-
   Future<void> _enregistrer() async {
     if (_envoiEnCours) return;
 
     final String nom = _nom.text.trim();
-    final VisiteReferentielDto? entreprise = _entreprise;
-    final VisiteReferentielDto? objet = _objet;
+    final String? entrepriseId = _entrepriseId;
+    final String? objetId = _objetId;
 
     setState(() {
       _erreurNom = nom.isEmpty ? 'À renseigner.' : null;
-      _erreurEntreprise = entreprise == null
+      _erreurEntreprise = entrepriseId == null
           ? 'À choisir dans la liste.'
           : null;
-      _erreurObjet = objet == null ? 'À choisir dans la liste.' : null;
+      _erreurObjet = objetId == null ? 'À choisir dans la liste.' : null;
     });
-    if (nom.isEmpty || entreprise == null || objet == null) return;
+    if (nom.isEmpty || entrepriseId == null || objetId == null) return;
 
     final String telephone = _telephone.text.trim();
     final String commentaire = _commentaire.text.trim();
+    final String entrepriseLabel = _entreprise.text.trim();
+    final String objetLabel = _objet.text.trim();
+    final String? directionId = _directionId;
+    final String? directionLabel = _directionId == null
+        ? null
+        : _direction.text.trim();
+    final String? destinataireId = _destinataireId;
+    final String? destinataireLabel = _destinataireId == null
+        ? null
+        : _destinataire.text.trim();
 
     setState(() {
       _envoiEnCours = true;
@@ -245,31 +282,33 @@ class _VisiteFormScreenState extends ConsumerState<VisiteFormScreen>
             date: jourDakar(_moment),
             time: heureDakar(_moment),
             phone: telephone.isEmpty ? null : telephone,
-            entrepriseId: entreprise.id,
-            entrepriseLabel: entreprise.label,
-            objetId: objet.id,
-            objetLabel: objet.label,
-            directionId: _direction?.id,
-            directionLabel: _direction?.label,
-            destinataireId: _destinataire?.id,
-            destinataireLabel: _destinataire?.label,
+            entrepriseId: entrepriseId,
+            entrepriseLabel: entrepriseLabel,
+            objetId: objetId,
+            objetLabel: objetLabel,
+            directionId: directionId,
+            directionLabel: directionLabel,
+            destinataireId: destinataireId,
+            destinataireLabel: destinataireLabel,
             comment: commentaire.isEmpty ? null : commentaire,
             createdById: auth.userId ?? '',
           );
       // La visite est écrite et en file : le brouillon n'a plus rien à sauver,
       // et le laisser ferait revenir ce visiteur-ci sur la saisie du suivant.
       discardDraft();
-      unawaited(draftRepository.delete(_draftId));
+      await draftRepository.delete(_draftId);
+      unawaited(HapticFeedback.mediumImpact());
       if (!mounted) return;
       ref.read(syncCoordinatorProvider.notifier).nudge();
       _nom.clear();
-      _telephone.clear();
-      _commentaire.clear();
+      _objet.clear();
+      _direction.clear();
+      _destinataire.clear();
       setState(() {
         _derniereInscrite = nom;
-        _objet = null;
-        _direction = null;
-        _destinataire = null;
+        _objetId = null;
+        _directionId = null;
+        _destinataireId = null;
         _moment = ref.read(clockProvider).now();
       });
       _nomFocus.requestFocus();
@@ -285,7 +324,6 @@ class _VisiteFormScreenState extends ConsumerState<VisiteFormScreen>
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
     final AsyncValue<VisiteReferentielsBundleDto> listes = ref.watch(
       visiteReferentielsProvider,
     );
@@ -318,8 +356,6 @@ class _VisiteFormScreenState extends ConsumerState<VisiteFormScreen>
                 children: <Widget>[
                   if (_derniereInscrite != null)
                     _Confirmation(visitorName: _derniereInscrite!),
-                  _Moment(moment: _moment, onChanger: _changerHeure),
-                  const SizedBox(height: CpiSpacing.md),
                   TextField(
                     key: const ValueKey<String>('visite-nom'),
                     controller: _nom,
@@ -344,74 +380,117 @@ class _VisiteFormScreenState extends ConsumerState<VisiteFormScreen>
                           ref.read(syncCoordinatorProvider.notifier).nudge(),
                     )
                   else ...<Widget>[
-                    _ChampChoix(
+                    LocalTypeahead(
                       key: const ValueKey<String>('champ-entreprise'),
+                      controller: _entreprise,
+                      focusNode: _entrepriseFocus,
                       label: 'Entreprise',
-                      valeur: _entreprise,
-                      erreur: _erreurEntreprise,
-                      facultatif: false,
-                      onTap: () => _choisir(
-                        titre: 'Entreprise',
-                        items: bundle.entreprises,
-                        courant: _entreprise,
-                        facultatif: false,
-                        onChoisi: (VisiteReferentielDto? item) => setState(() {
-                          _entreprise = item;
+                      selectedId: _entrepriseId,
+                      freeText: false,
+                      options: bundle.entreprises
+                          .map(
+                            (VisiteReferentielDto d) =>
+                                TypeaheadOption(id: d.id, label: d.label),
+                          )
+                          .toList(growable: false),
+                      onChanged: (String _) {
+                        if (_entrepriseId != null) {
+                          setState(() => _entrepriseId = null);
+                        }
+                        markDraftDirty();
+                      },
+                      onSelected: (TypeaheadOption option) {
+                        setState(() {
+                          _entrepriseId = option.id;
                           _erreurEntreprise = null;
-                        }),
-                      ),
+                        });
+                        markDraftDirty();
+                      },
                     ),
+                    if (_erreurEntreprise != null)
+                      _ErreurChamp(_erreurEntreprise!),
                     const SizedBox(height: CpiSpacing.md),
-                    _ChampChoix(
+                    LocalTypeahead(
                       key: const ValueKey<String>('champ-objet'),
+                      controller: _objet,
+                      focusNode: _objetFocus,
                       label: 'Objet de la visite',
-                      valeur: _objet,
-                      erreur: _erreurObjet,
-                      facultatif: false,
-                      onTap: () => _choisir(
-                        titre: 'Objet de la visite',
-                        items: bundle.objets,
-                        courant: _objet,
-                        facultatif: false,
-                        onChoisi: (VisiteReferentielDto? item) => setState(() {
-                          _objet = item;
+                      selectedId: _objetId,
+                      freeText: false,
+                      options: bundle.objets
+                          .map(
+                            (VisiteReferentielDto d) =>
+                                TypeaheadOption(id: d.id, label: d.label),
+                          )
+                          .toList(growable: false),
+                      onChanged: (String _) {
+                        if (_objetId != null) setState(() => _objetId = null);
+                        markDraftDirty();
+                      },
+                      onSelected: (TypeaheadOption option) {
+                        setState(() {
+                          _objetId = option.id;
                           _erreurObjet = null;
-                        }),
-                      ),
+                        });
+                        markDraftDirty();
+                      },
                     ),
+                    if (_erreurObjet != null) _ErreurChamp(_erreurObjet!),
                     const SizedBox(height: CpiSpacing.md),
-                    _ChampChoix(
-                      key: const ValueKey<String>('champ-direction'),
-                      label: 'Direction ou étage',
-                      valeur: _direction,
-                      erreur: null,
-                      facultatif: true,
-                      onTap: () => _choisir(
-                        titre: 'Direction ou étage',
-                        items: bundle.directions,
-                        courant: _direction,
-                        facultatif: true,
-                        onChoisi: (VisiteReferentielDto? item) =>
-                            setState(() => _direction = item),
-                      ),
-                    ),
-                    const SizedBox(height: CpiSpacing.md),
-                    _ChampChoix(
+                    LocalTypeahead(
                       key: const ValueKey<String>('champ-destinataire'),
-                      label: 'Destinataire',
-                      valeur: _destinataire,
-                      erreur: null,
-                      facultatif: true,
-                      onTap: () => _choisir(
-                        titre: 'Destinataire',
-                        items: bundle.destinataires,
-                        courant: _destinataire,
-                        facultatif: true,
-                        onChoisi: (VisiteReferentielDto? item) =>
-                            setState(() => _destinataire = item),
-                      ),
+                      controller: _destinataire,
+                      focusNode: _destinataireFocus,
+                      label: 'Destinataire (facultatif)',
+                      selectedId: _destinataireId,
+                      freeText: false,
+                      options: bundle.destinataires
+                          .map(
+                            (VisiteReferentielDto d) =>
+                                TypeaheadOption(id: d.id, label: d.label),
+                          )
+                          .toList(growable: false),
+                      onChanged: (String _) {
+                        if (_destinataireId != null) {
+                          setState(() => _destinataireId = null);
+                        }
+                        markDraftDirty();
+                      },
+                      onSelected: (TypeaheadOption option) {
+                        setState(() => _destinataireId = option.id);
+                        markDraftDirty();
+                      },
+                    ),
+                    const SizedBox(height: CpiSpacing.md),
+                    LocalTypeahead(
+                      key: const ValueKey<String>('champ-direction'),
+                      controller: _direction,
+                      focusNode: _directionFocus,
+                      label: 'Direction ou étage (facultatif)',
+                      selectedId: _directionId,
+                      freeText: false,
+                      options: bundle.directions
+                          .map(
+                            (VisiteReferentielDto d) =>
+                                TypeaheadOption(id: d.id, label: d.label),
+                          )
+                          .toList(growable: false),
+                      onChanged: (String _) {
+                        if (_directionId != null) {
+                          setState(() => _directionId = null);
+                        }
+                        markDraftDirty();
+                      },
+                      onSelected: (TypeaheadOption option) {
+                        setState(() => _directionId = option.id);
+                        markDraftDirty();
+                      },
                     ),
                   ],
+                  const SizedBox(height: CpiSpacing.md),
+                  // Juste 99 fois sur 100 : descendu ici, les trois champs
+                  // obligatoires tiennent au-dessus du pli, clavier ouvert.
+                  _Moment(moment: _moment, onChanger: _changerHeure),
                   const SizedBox(height: CpiSpacing.md),
                   // Aucune normalisation ici : un numéro étranger ou incomplet
                   // part tel quel, le serveur le garde et laisse `phoneE164` nul.
@@ -441,20 +520,7 @@ class _VisiteFormScreenState extends ConsumerState<VisiteFormScreen>
                 ],
               ),
             ),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(
-                CpiSpacing.md,
-                CpiSpacing.sm,
-                CpiSpacing.md,
-                CpiSpacing.sm,
-              ),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
-                border: Border(
-                  top: BorderSide(color: context.cpi.borderSubtle),
-                ),
-              ),
+            CpiActionBar(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
@@ -533,135 +599,19 @@ class _Moment extends StatelessWidget {
   }
 }
 
-class _ChampChoix extends StatelessWidget {
-  const _ChampChoix({
-    super.key,
-    required this.label,
-    required this.valeur,
-    required this.erreur,
-    required this.facultatif,
-    required this.onTap,
-  });
+class _ErreurChamp extends StatelessWidget {
+  const _ErreurChamp(this.message);
 
-  final String label;
-  final VisiteReferentielDto? valeur;
-  final String? erreur;
-  final bool facultatif;
-  final Future<void> Function() onTap;
+  final String message;
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final VisiteReferentielDto? choisi = valeur;
-
-    return InkWell(
-      onTap: () => onTap(),
-      borderRadius: CpiRadius.brMd,
-      child: InputDecorator(
-        isEmpty: false,
-        decoration: InputDecoration(
-          labelText: facultatif ? '$label (facultatif)' : label,
-          errorText: erreur,
-          errorMaxLines: 2,
-        ),
-        child: Row(
-          children: <Widget>[
-            Expanded(
-              child: Text(
-                choisi?.label ?? 'Choisir',
-                style: choisi == null
-                    ? theme.textTheme.bodyLarge?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      )
-                    : theme.textTheme.bodyLarge,
-              ),
-            ),
-            Icon(
-              PhosphorIconsRegular.caretDown,
-              size: CpiIconSize.md,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _FeuilleDeChoix extends StatelessWidget {
-  const _FeuilleDeChoix({
-    required this.titre,
-    required this.items,
-    required this.courant,
-    required this.facultatif,
-  });
-
-  final String titre;
-  final List<VisiteReferentielDto> items;
-  final VisiteReferentielDto? courant;
-  final bool facultatif;
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-
-    return SafeArea(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * 0.85,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                CpiSpacing.md,
-                CpiSpacing.md,
-                CpiSpacing.md,
-                CpiSpacing.xs,
-              ),
-              child: Text(titre, style: theme.textTheme.titleLarge),
-            ),
-            Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: facultatif ? items.length + 1 : items.length,
-                itemBuilder: (BuildContext context, int index) {
-                  if (facultatif && index == 0) {
-                    return ListTile(
-                      minVerticalPadding: CpiSpacing.md,
-                      title: Text(
-                        'Aucun',
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      selected: courant == null,
-                      onTap: () =>
-                          Navigator.of(context).pop(const _Choix(null)),
-                    );
-                  }
-                  final VisiteReferentielDto item =
-                      items[facultatif ? index - 1 : index];
-                  final bool actif = item.id == courant?.id;
-                  return ListTile(
-                    minVerticalPadding: CpiSpacing.md,
-                    title: Text(item.label, style: theme.textTheme.bodyLarge),
-                    selected: actif,
-                    trailing: actif
-                        ? Icon(
-                            PhosphorIconsRegular.check,
-                            size: CpiIconSize.md,
-                            color: theme.colorScheme.primary,
-                          )
-                        : null,
-                    onTap: () => Navigator.of(context).pop(_Choix(item)),
-                  );
-                },
-              ),
-            ),
-          ],
+    return Padding(
+      padding: const EdgeInsets.only(top: CpiSpacing.xxs, left: CpiSpacing.sm),
+      child: Text(
+        message,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: Theme.of(context).colorScheme.error,
         ),
       ),
     );

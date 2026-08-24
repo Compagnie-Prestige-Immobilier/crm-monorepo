@@ -49,6 +49,14 @@ const PURGE_EXEMPT = new Map<string, string>([
     'device_tokens',
     'sous-système push retiré : aucun code n’écrit plus cette table, conservée une version pour que la mise à jour reste réversible (docs/migrations-en-attente.md), et emportée en cascade avec son compte',
   ],
+  [
+    'visite_dashboard_layouts',
+    'préférence d’affichage, UNE ligne par compte, en `onDelete: Cascade` : elle décrit la façon dont quelqu’un range son écran, pas une donnée métier. La purger effacerait la composition du tableau de bord d’une directrice qui n’a rien demandé, et le compte, lui, l’emporte déjà en partant',
+  ],
+  [
+    'visite_import_changes',
+    'différentiel d’un aller-retour Excel, emporté en CASCADE avec le travail d’import qu’il décrit. `import_jobs` est lui-même dispensé pour la même raison : il décrit un GESTE d’administration et s’efface de lui-même par `expiresAt`',
+  ],
 ]);
 
 function isSubsequenceOf(
