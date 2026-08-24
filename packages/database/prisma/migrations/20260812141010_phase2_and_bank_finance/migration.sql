@@ -387,5 +387,8 @@ CREATE INDEX IF NOT EXISTS "prospects_phase2_directory"
 -- casse et aux accents.
 CREATE EXTENSION IF NOT EXISTS unaccent;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
+-- L'OPCLASS EST QUALIFIÉE : `pg_trgm` vit dans `public`, et cette migration
+-- rejouée sous `search_path = demo` échoue sinon sur « operator class
+-- gin_trgm_ops does not exist », bloquant tout le démarrage de l'API.
 CREATE INDEX IF NOT EXISTS "prospects_nom_prenom_trgm"
-  ON "prospects" USING gin ((lower("nom") || ' ' || lower("prenom")) gin_trgm_ops);
+  ON "prospects" USING gin ((lower("nom") || ' ' || lower("prenom")) public.gin_trgm_ops);
