@@ -80,6 +80,7 @@ describe('navigation d’un ADMIN', () => {
     ];
     for (const expected of [
       '/accueil',
+      '/accueil/listes',
       '/chues/tableau-de-bord',
       '/chues/statistiques',
       '/chues/prospects',
@@ -251,6 +252,20 @@ describe('registre des visites', () => {
     expect(navTitle('DIRECTION', '/accueil/tableau-de-bord')).toBe('Tableau de bord');
     expect(hrefs('DIRECTION', 'accueil')).toContain('/accueil/tableau-de-bord');
     expect(hrefs('DIRECTION', 'chues')).not.toContain('/chues/tableau-de-bord');
+  });
+
+  it('ouvre les listes à l’ADMIN et à la DIRECTION, jamais à l’ACCUEIL', () => {
+    for (const role of ['ADMIN', 'DIRECTION'] as const) {
+      expect(hrefs(role, 'accueil'), role).toContain('/accueil/listes');
+    }
+    expect(hrefs('ACCUEIL', 'accueil')).toEqual(['/accueil', '/accueil/tableau-de-bord']);
+  });
+
+  it('ouvre l’import du registre à l’ADMIN et à la DIRECTION, jamais à l’ACCUEIL', () => {
+    for (const role of ['ADMIN', 'DIRECTION'] as const) {
+      expect(hrefs(role, 'accueil'), role).toContain('/accueil/import');
+    }
+    expect(hrefs('ACCUEIL', 'accueil')).not.toContain('/accueil/import');
   });
 });
 
@@ -472,7 +487,12 @@ describe('navigation d’un compte d’ACCUEIL', () => {
 
 describe('navigation de la DIRECTION', () => {
   it('montre le registre, le pilotage et le terrain, jamais la banque', () => {
-    expect(hrefs('DIRECTION', 'accueil')).toEqual(['/accueil', '/accueil/tableau-de-bord']);
+    expect(hrefs('DIRECTION', 'accueil')).toEqual([
+      '/accueil',
+      '/accueil/tableau-de-bord',
+      '/accueil/listes',
+      '/accueil/import',
+    ]);
     expect(hrefs('DIRECTION', 'chues')).toEqual([
       '/chues/supervision',
       '/chues/statistiques',

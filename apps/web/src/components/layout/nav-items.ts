@@ -9,6 +9,7 @@ import {
   HeadsetIcon,
   LayoutDashboardIcon,
   LibraryIcon,
+  ListIcon,
   ListOrderedIcon,
   MegaphoneIcon,
   PhoneForwardedIcon,
@@ -136,6 +137,24 @@ const SECTIONS: readonly NavSection[] = [
         icon: LayoutDashboardIcon,
         description: 'Affluence et motifs de visite',
         roles: ['ADMIN', 'DIRECTION', 'ACCUEIL'],
+      },
+      {
+        // Les quatre listes qui alimentent la saisie du registre. Fermé à
+        // l'ACCUEIL : ce sont les entrées qu'il choisit, pas qu'il tient.
+        href: '/accueil/listes',
+        label: 'Listes',
+        icon: ListIcon,
+        description: 'Entreprises, directions, destinataires, objets',
+        roles: ['ADMIN', 'DIRECTION'],
+      },
+      {
+        // Modification de masse par aller-retour Excel : fermé à l'ACCUEIL,
+        // qui saisit ligne à ligne et n'a pas à corriger le registre en bloc.
+        href: '/accueil/import',
+        label: 'Import du registre',
+        icon: UploadIcon,
+        description: 'Export, correction et réimport en masse',
+        roles: ['ADMIN', 'DIRECTION'],
       },
     ],
   },
