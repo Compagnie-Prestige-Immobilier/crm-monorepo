@@ -174,6 +174,19 @@ describe('saisie d’une visite', () => {
     expect(input).not.toHaveProperty('destinataireId');
   });
 
+  // `xl:grid-cols-4` se déclenche sur la largeur de l'écran, pas celle du
+  // dialogue plafonné à `max-w-4xl` : quatre colonnes y tronquaient chaque
+  // valeur choisie au libellé long.
+  it('garde le libellé long choisi entier, sans grille à quatre colonnes', async () => {
+    renderWithQuery(<VisiteForm referentiels={referentiels} onSaved={vi.fn()} />);
+
+    await choose('DESTINATAIRES', 'MME. NDOYE');
+
+    const champ = screen.getByRole('combobox', { name: /DESTINATAIRES/u });
+    expect(champ.textContent).toContain('MME. NDOYE (RESP. COMM.)');
+    expect(champ.closest('div.grid')?.className).not.toContain('xl:grid-cols-4');
+  });
+
   it('refuse une ligne incomplète et signale chaque champ qui manque', async () => {
     renderWithQuery(<VisiteForm referentiels={referentiels} onSaved={vi.fn()} />);
 
