@@ -1,5 +1,6 @@
+import type { ApiClient } from '@crm/api-client';
 import { ApiError } from '@crm/api-client/query';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   MOIS_LABELS,
@@ -31,15 +32,17 @@ const vide: VisitesStats = {
   sansDestinataire: 0,
 };
 
-const reponse = (body: unknown, status = 200): Response =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json' },
-  });
+const fakeClient = (data: unknown): ApiClient =>
+  ({
+    GET: vi.fn().mockResolvedValue({ data, response: new Response(null, { status: 200 }) }),
+  }) as unknown as ApiClient;
 
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
+const failingClient = (status: number): ApiClient =>
+  ({
+    GET: vi
+      .fn()
+      .mockResolvedValue({ error: { message: 'panne' }, response: new Response(null, { status }) }),
+  }) as unknown as ApiClient;
 
 describe('les bornes de la periode', () => {
   it('couvre le mois entier, dernier jour compris', () => {
@@ -237,38 +240,36 @@ describe('l’export de la periode', () => {
 });
 
 describe('la lecture des statistiques de visites', () => {
-  it('interroge les bornes du mois demande', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(reponse(vide));
-    vi.stubGlobal('fetch', fetchMock);
+  it('interroge les bornes du mois demande, via le client typé', async () => {
+    const client = fakeClient(vide);
 
-    const stats = await fetchVisitesStats({ annee: 2026, mois: 2 });
+    const stats = await fetchVisitesStats({ annee: 2026, mois: 2 }, client);
 
-    expect(fetchMock.mock.calls[0]?.[0]).toBe(
-      '/api/v1/visites/statistiques?from=2026-02-01&to=2026-02-28',
-    );
+    expect(client.GET).toHaveBeenCalledWith('/api/v1/visites/statistiques', {
+      params: { query: { from: '2026-02-01', to: '2026-02-28' } },
+    });
     expect(stats.total).toBe(0);
   });
 
   it('interroge l’annee entiere pour le cumul', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(reponse({ ...vide, from: '2026-01-01' }));
-    vi.stubGlobal('fetch', fetchMock);
+    const client = fakeClient({ ...vide, from: '2026-01-01' });
 
-    await fetchVisitesStats({ annee: 2026, mois: null });
+    await fetchVisitesStats({ annee: 2026, mois: null }, client);
 
-    expect(fetchMock.mock.calls[0]?.[0]).toBe(
-      '/api/v1/visites/statistiques?from=2026-01-01&to=2026-12-31',
-    );
+    expect(client.GET).toHaveBeenCalledWith('/api/v1/visites/statistiques', {
+      params: { query: { from: '2026-01-01', to: '2026-12-31' } },
+    });
   });
 
   it('rejette une reponse en echec au lieu de rendre un tableau de bord vide', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reponse({ message: 'panne' }, 500)));
-
-    await expect(fetchVisitesStats({ annee: 2026, mois: 3 })).rejects.toBeInstanceOf(ApiError);
+    await expect(
+      fetchVisitesStats({ annee: 2026, mois: 3 }, failingClient(500)),
+    ).rejects.toBeInstanceOf(ApiError);
   });
 
   it('rejette une reponse dont la forme n’est pas celle attendue', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reponse({ total: 'quarante' })));
-
-    await expect(fetchVisitesStats({ annee: 2026, mois: 3 })).rejects.toThrow(/statistiques/u);
+    await expect(
+      fetchVisitesStats({ annee: 2026, mois: 3 }, fakeClient({ total: 'quarante' })),
+    ).rejects.toThrow(/statistiques/u);
   });
 });

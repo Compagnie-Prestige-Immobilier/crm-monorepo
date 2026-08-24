@@ -1,7 +1,8 @@
-import { ApiError } from '@crm/api-client/query';
+import type { ApiClient } from '@crm/api-client';
+import { unwrap } from '@crm/api-client/query';
 import { z } from 'zod';
 
-import { API_PREFIX } from '@/lib/api/config';
+import { getApiClient } from '@/lib/api/browser';
 import { csvRows } from '@/lib/csv';
 
 export const MOIS_LABELS = [
@@ -79,21 +80,16 @@ export function moisPrecedent(periode: VisitesPeriode): VisitesPeriode | null {
 export const visitesStatsKey = (periode: VisitesPeriode) =>
   ['visites', 'statistiques', periode.annee, periode.mois] as const;
 
-export function visitesStatsUrl(periode: VisitesPeriode): string {
-  const params = new URLSearchParams(bornes(periode));
-  return `${API_PREFIX}/visites/statistiques?${params.toString()}`;
-}
+export async function fetchVisitesStats(
+  periode: VisitesPeriode,
+  client: ApiClient = getApiClient(),
+): Promise<VisitesStats> {
+  const { from, to } = bornes(periode);
+  const data = unwrap(
+    await client.GET('/api/v1/visites/statistiques', { params: { query: { from, to } } }),
+  );
 
-export async function fetchVisitesStats(periode: VisitesPeriode): Promise<VisitesStats> {
-  const response = await fetch(visitesStatsUrl(periode), {
-    headers: { accept: 'application/json' },
-    cache: 'no-store',
-  });
-
-  const body: unknown = await response.json().catch(() => null);
-  if (!response.ok) throw new ApiError(body, response);
-
-  const parsed = statsSchema.safeParse(body);
+  const parsed = statsSchema.safeParse(data);
   if (!parsed.success) {
     throw new Error('Les statistiques de visites ne sont pas dans la forme attendue.');
   }
