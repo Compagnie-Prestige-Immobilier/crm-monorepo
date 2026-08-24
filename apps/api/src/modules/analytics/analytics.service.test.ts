@@ -289,7 +289,9 @@ describe('recherche par nom', () => {
   );
 
   it('emprunte l’expression exacte de « prospects_nom_prenom_trgm »', () => {
-    const expression = /gin \(\((.+?)\) gin_trgm_ops\)/u.exec(INDEX_SQL)?.[1];
+    // L'opclass est qualifiée `public.` depuis que la migration doit se rejouer
+    // sous `search_path = demo`. La lecture tolère les deux écritures.
+    const expression = /gin \(\((.+?)\) (?:public\.)?gin_trgm_ops\)/u.exec(INDEX_SQL)?.[1];
     expect(expression).toBe(`lower("nom") || ' ' || lower("prenom")`);
 
     const sql = rendered(prospectConditions(admin, { search: 'Ndiaye' }));
