@@ -4,7 +4,13 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { DeactivateReferentielDialog } from '@/components/referentiels/deactivate-dialog';
 
-function monter(usageCount: number | null, over: { onConfirm?: () => void } = {}) {
+type Kind = Parameters<typeof DeactivateReferentielDialog>[0]['kind'];
+type Subject = Parameters<typeof DeactivateReferentielDialog>[0]['subject'];
+
+function monter(
+  usageCount: number | null,
+  over: { onConfirm?: () => void; kind?: Kind; subject?: Subject } = {},
+) {
   const onRetryUsage = vi.fn();
   const onConfirm = over.onConfirm ?? vi.fn();
   render(
@@ -12,7 +18,8 @@ function monter(usageCount: number | null, over: { onConfirm?: () => void } = {}
       open
       onOpenChange={vi.fn()}
       label="CBAO"
-      kind="banque"
+      kind={over.kind ?? 'banque'}
+      {...(over.subject === undefined ? {} : { subject: over.subject })}
       usageCount={usageCount}
       onRetryUsage={onRetryUsage}
       pending={false}
@@ -48,5 +55,17 @@ describe('désactivation d’un référentiel', () => {
     expect(screen.getByRole('dialog').textContent).toContain('0 prospects référencent');
     expect(screen.getByRole('button', { name: 'Désactiver' })).toBeTruthy();
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('compte des visites, pas des prospects, pour un référentiel du registre des visites', () => {
+    monter(2, { kind: 'entreprise', subject: 'visite' });
+    const text = screen.getByRole('dialog').textContent;
+    expect(text).toContain('2 visites référencent cette entreprise.');
+    expect(text).toContain('Aucune visite n’est supprimée.');
+  });
+
+  it('accorde l’article de chaque liste, y compris devant une voyelle', () => {
+    monter(1, { kind: 'objet de visite', subject: 'visite' });
+    expect(screen.getByRole('dialog').textContent).toContain('cet objet de visite');
   });
 });
