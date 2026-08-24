@@ -133,6 +133,7 @@ const MODULES: Record<string, string[]> = {
     'downloadProspectsGrandPublicTemplateXlsx',
     'downloadRepresentantsTemplateXlsx',
     'exportRepresentantsXlsx',
+    'exportVisitesXlsx',
   ],
 };
 

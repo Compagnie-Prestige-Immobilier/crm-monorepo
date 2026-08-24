@@ -41,6 +41,18 @@ export const queryKeys = {
   regions: ['referentiels', 'regions'] as const,
   referentielUsage: ['referentiels', 'usage'] as const,
 
+  // ─── Registre des visites ─────────────────────────────────────────────────
+  visitesRoot: ['visites'] as const,
+  visiteReferentielsRoot: ['visites', 'referentiels'] as const,
+  /** Une liste entière, entrées retirées comprises : l'écran d'administration. */
+  visiteReferentiel: (kind: string) => ['visites', 'referentiels', kind] as const,
+  visiteReferentielUsage: ['visites', 'referentiels', 'usage'] as const,
+  visitesStats: (du: string, au: string) => ['visites', 'stats', du, au] as const,
+  visitesDisposition: ['visites', 'disposition'] as const,
+  visitesImport: (id: string) => ['visites', 'import', id] as const,
+  visitesImportRevue: (id: string, page: number) =>
+    ['visites', 'import', id, 'revue', page] as const,
+
   // ─── Phase 2 ──────────────────────────────────────────────────────────────
   campaignsRoot: ['campaigns'] as const,
   campaigns: (filters: CampaignFilters) => ['campaigns', campaignFiltersQueryKey(filters)] as const,

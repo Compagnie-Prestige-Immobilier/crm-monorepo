@@ -27,6 +27,7 @@ const PANEL_ROUTES: readonly (readonly [path: string, heading: string, marker: s
   ['/statistiques', 'Statistiques', null],
   ['/prospects', 'Prospects', null],
   ['/prospects/nouveau', 'Nouveau prospect', 'Enregistrer et suivant'],
+  ['/accueil/tableau-de-bord', 'Tableau de bord', 'Organiser'],
   ['/campagnes', 'Campagnes', 'Appels prospects'],
   ['/campagnes/representants', 'Campagnes', 'Appels représentants'],
   ['/console', 'Console d’appel', 'Carte clavier'],
@@ -99,4 +100,20 @@ test('aucune violation axe sur la fiche représentant et le volet des comptes', 
   await page.getByRole('tab', { name: 'Comptes' }).click();
   await expect(page.getByText('Présence et dernière activité des comptes.')).toBeVisible();
   await analyze(page, '/supervision?volet=comptes');
+});
+
+/**
+ * Les poignées de glisser-déposer sont la source classique de violations
+ * `aria-*` : ce passage n'est couvert qu'ici, pas dans la boucle du dessus.
+ */
+test('aucune violation axe sur le mode Organiser du tableau de bord des visites', async ({
+  page,
+}) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+
+  await page.goto('/accueil/tableau-de-bord');
+  await expect(page.getByRole('heading', { name: 'Tableau de bord', level: 1 })).toBeVisible();
+  await page.getByRole('button', { name: 'Organiser' }).click();
+  await expect(page.getByRole('button', { name: 'Enregistrer' })).toBeVisible();
+  await analyze(page, '/accueil/tableau-de-bord (Organiser)');
 });
