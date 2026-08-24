@@ -44,6 +44,12 @@ export class ImportJobReportDto {
 
   @ApiProperty({
     type: Number,
+    description: 'Lignes RÉÉCRITES. Seul l’aller-retour Excel du registre des visites en produit.',
+  })
+  updatedRows!: number;
+
+  @ApiProperty({
+    type: Number,
     description: 'Lignes écartées : doublons dans le fichier, ou déjà présentes en base.',
   })
   skippedRows!: number;
@@ -104,6 +110,13 @@ export class ImportJobDto {
 
   @ApiProperty({ type: Number }) processedRows!: number;
   @ApiProperty({ type: Number }) createdRows!: number;
+
+  @ApiProperty({
+    type: Number,
+    description: 'Lignes RÉÉCRITES. Seul l’aller-retour Excel du registre des visites en produit.',
+  })
+  updatedRows!: number;
+
   @ApiProperty({ type: Number }) skippedRows!: number;
   @ApiProperty({ type: Number }) errorRows!: number;
 
