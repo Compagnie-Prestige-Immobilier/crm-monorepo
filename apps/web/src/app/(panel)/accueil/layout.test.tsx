@@ -67,4 +67,18 @@ describe('garde du registre des visites', () => {
       screen.getByRole('link', { name: 'Tableau de bord' }).getAttribute('aria-current'),
     ).toBeNull();
   });
+
+  it('n’ouvre l’onglet des listes qu’à l’ADMIN et à la DIRECTION', async () => {
+    guardRoles.mockResolvedValue({ status: 'allowed', user: { id: 'u-1', role: 'ACCUEIL' } });
+    await render_();
+    expect(screen.queryByRole('link', { name: 'Listes' })).toBeNull();
+  });
+
+  it('propose les listes à la direction', async () => {
+    guardRoles.mockResolvedValue({ status: 'allowed', user: { id: 'u-1', role: 'DIRECTION' } });
+    await render_();
+    expect(screen.getByRole('link', { name: 'Listes' }).getAttribute('href')).toBe(
+      '/accueil/listes',
+    );
+  });
 });
