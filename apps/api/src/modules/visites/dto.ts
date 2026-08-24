@@ -4,8 +4,11 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   ArrayUnique,
+  IsArray,
   IsBoolean,
   IsDateString,
+  IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -15,10 +18,23 @@ import {
   MaxLength,
   Min,
   MinLength,
+  Validate,
+  ValidateNested,
+  ValidatorConstraint,
+  type ValidatorConstraintInterface,
 } from 'class-validator';
 
-import { PageMetaDto } from '../../common/dto/prospect-filter.dto.js';
+import { PageMetaDto, SortOrder } from '../../common/dto/prospect-filter.dto.js';
 import { queryBoolean } from '../../common/dto/query-boolean.js';
+
+export enum VisiteSortField {
+  VISITED_AT = 'visitedAt',
+  VISITOR_NAME = 'visitorName',
+  ENTREPRISE = 'entreprise',
+  DIRECTION = 'direction',
+  DESTINATAIRE = 'destinataire',
+  OBJET = 'objet',
+}
 
 export const VISITE_REFERENTIEL_KINDS = [
   'entreprises',
@@ -297,7 +313,12 @@ export class UpdateVisiteDto {
   comment?: string | null;
 }
 
-export class VisiteQueryDto {
+/**
+ * Les sept filtres du registre, communs à la liste et à l'export : ce qui est
+ * exporté doit être exactement ce qui est affiché. `VisiteQueryDto` y ajoute
+ * la pagination et le tri, que l'export ne lit pas.
+ */
+export class VisiteFilterDto {
   @ApiPropertyOptional({ example: '2026-01-01' })
   @IsOptional()
   @IsString()
@@ -341,7 +362,9 @@ export class VisiteQueryDto {
   @MinLength(2)
   @MaxLength(120)
   search?: string;
+}
 
+export class VisiteQueryDto extends VisiteFilterDto {
   @ApiPropertyOptional({ minimum: 1, default: 1 })
   @IsOptional()
   @Type(() => Number)
@@ -356,6 +379,16 @@ export class VisiteQueryDto {
   @Min(1)
   @Max(200)
   pageSize?: number;
+
+  @ApiPropertyOptional({ enum: VisiteSortField, enumName: 'VisiteSortField' })
+  @IsOptional()
+  @IsEnum(VisiteSortField)
+  sortBy?: VisiteSortField;
+
+  @ApiPropertyOptional({ enum: SortOrder, enumName: 'SortOrder' })
+  @IsOptional()
+  @IsEnum(SortOrder)
+  sortOrder?: SortOrder;
 }
 
 export class VisiteStatsQueryDto {
@@ -387,6 +420,50 @@ export class VisiteStatMoisDto {
 export class VisiteStatJourDto {
   @ApiProperty({ example: '2025-01-06' }) date!: string;
   @ApiProperty({ type: Number }) count!: number;
+}
+
+export class VisiteStatHeureDto {
+  @ApiProperty({ minimum: 0, maximum: 23 }) hour!: number;
+  @ApiProperty({ type: Number }) count!: number;
+}
+
+export class VisiteStatJourSemaineDto {
+  @ApiProperty({ minimum: 1, maximum: 7, description: 'ISO : lundi = 1.' }) weekday!: number;
+  @ApiProperty({ type: Number }) count!: number;
+}
+
+export class VisiteStatHeureJourSemaineDto {
+  @ApiProperty({ minimum: 1, maximum: 7 }) weekday!: number;
+  @ApiProperty({ minimum: 0, maximum: 23 }) hour!: number;
+  @ApiProperty({ type: Number }) count!: number;
+}
+
+export class VisiteStatAgentDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ description: 'L’agent d’accueil qui a saisi la visite.' }) label!: string;
+  @ApiProperty({ type: Number }) count!: number;
+}
+
+export class VisiteStatCroisementDto {
+  @ApiProperty({ description: 'Identifiant de la dimension en ligne.' }) ligneId!: string;
+  @ApiProperty({ description: 'Identifiant de la dimension en colonne.' }) colonneId!: string;
+  @ApiProperty({ type: Number }) count!: number;
+}
+
+export class VisiteStatRecurrentDto {
+  @ApiProperty() nom!: string;
+  @ApiProperty({ type: Number }) visites!: number;
+  @ApiProperty({ example: '2026-01-06' }) derniereVisite!: string;
+}
+
+export class VisiteStatSaisieDto {
+  @ApiProperty({ type: Number, description: 'Saisies faites le jour même de la visite.' })
+  memeJour!: number;
+  @ApiProperty({ type: Number, description: 'Saisies faites le lendemain de la visite.' })
+  lendemain!: number;
+  @ApiProperty({ type: Number, description: 'Saisies faites deux jours après la visite ou plus.' })
+  plusTard!: number;
+  @ApiProperty({ type: Number, nullable: true }) delaiMedianHeures!: number | null;
 }
 
 export class VisiteStatsDto {
@@ -421,4 +498,215 @@ export class VisiteStatsDto {
 
   @ApiProperty({ type: Number }) sansDirection!: number;
   @ApiProperty({ type: Number }) sansDestinataire!: number;
+
+  @ApiProperty({
+    type: () => [VisiteStatHeureDto],
+    description:
+      'Les 24 heures de la journée, à Dakar. Les visites sans heure relevée en sont exclues.',
+  })
+  parHeure!: VisiteStatHeureDto[];
+
+  @ApiProperty({ type: Number, description: 'Visites sans heure relevée.' }) sansHeure!: number;
+
+  @ApiProperty({
+    type: () => [VisiteStatJourSemaineDto],
+    description: 'Les 7 jours de la semaine ISO (lundi = 1), toutes visites comprises.',
+  })
+  parJourSemaine!: VisiteStatJourSemaineDto[];
+
+  @ApiProperty({
+    type: () => [VisiteStatHeureJourSemaineDto],
+    description: 'Croisement heure × jour de semaine, cellules non nulles seulement, 168 au plus.',
+  })
+  parHeureJourSemaine!: VisiteStatHeureJourSemaineDto[];
+
+  @ApiProperty({
+    type: () => [VisiteStatAgentDto],
+    description: 'L’agent d’accueil qui a saisi chaque visite.',
+  })
+  parAgent!: VisiteStatAgentDto[];
+
+  @ApiProperty({ type: () => [VisiteStatCroisementDto] })
+  parEntrepriseObjet!: VisiteStatCroisementDto[];
+  @ApiProperty({ type: () => [VisiteStatCroisementDto] })
+  parDestinataireDirection!: VisiteStatCroisementDto[];
+  @ApiProperty({ type: () => [VisiteStatCroisementDto] }) parObjetMois!: VisiteStatCroisementDto[];
+
+  @ApiProperty({
+    type: () => [VisiteStatRecurrentDto],
+    description:
+      'Visiteurs vus au moins deux fois sur la période, dix au plus. Regroupés par téléphone, sinon par nom : jamais le numéro.',
+  })
+  recurrents!: VisiteStatRecurrentDto[];
+
+  @ApiProperty({
+    type: Number,
+    description: 'Part des visites faites par des visiteurs récurrents.',
+  })
+  partRecurrents!: number;
+
+  @ApiProperty({ type: Number, description: 'Visites portant un numéro de téléphone.' })
+  avecTelephone!: number;
+
+  @ApiProperty({
+    type: () => VisiteStatSaisieDto,
+    description: 'Délai entre la visite et sa saisie.',
+  })
+  saisieDifferee!: VisiteStatSaisieDto;
+}
+
+export const DASHBOARD_SOURCES = [
+  'total-visites',
+  'moyenne-journaliere',
+  'jour-le-plus-charge',
+  'par-entreprise',
+  'par-objet',
+  'par-direction',
+  'par-destinataire',
+  'par-jour',
+  'par-mois',
+  'par-heure',
+  'par-jour-semaine',
+  'par-heure-jour-semaine',
+  'par-agent',
+  'par-entreprise-objet',
+  'par-destinataire-direction',
+  'par-objet-mois',
+  'visiteurs-recurrents',
+  'avec-telephone',
+  'qualite-de-saisie',
+] as const;
+
+export type DashboardSource = (typeof DASHBOARD_SOURCES)[number];
+
+export const DASHBOARD_MARQUES = [
+  'barres-verticales',
+  'barres-horizontales',
+  'barres-empilees',
+  'barres-100',
+  'barres-groupees',
+  'courbe',
+  'aire',
+  'escalier',
+  'anneau',
+  'camembert',
+  'aire-polaire',
+  'radar',
+  'nuage',
+  'bulles',
+  'mixte',
+  'jauge',
+  'carte-de-chaleur',
+  'tableau',
+  'tuile',
+  'tuile-courbe',
+] as const;
+
+export type DashboardMarque = (typeof DASHBOARD_MARQUES)[number];
+
+export const DASHBOARD_TAILLES = ['demi', 'pleine'] as const;
+export type DashboardTaille = (typeof DASHBOARD_TAILLES)[number];
+
+export const DASHBOARD_PRESETS = ['essentiel', 'affluence', 'organisation', 'complet'] as const;
+export type DashboardPreset = (typeof DASHBOARD_PRESETS)[number];
+
+@ValidatorConstraint({ name: 'uniqueDispositionSources', async: false })
+export class UniqueDispositionSourcesConstraint implements ValidatorConstraintInterface {
+  validate(widgets: unknown): boolean {
+    if (!Array.isArray(widgets)) return true;
+    const sources = new Set<string>();
+    for (const widget of widgets as { source?: unknown }[]) {
+      if (typeof widget.source === 'string') sources.add(widget.source);
+    }
+    return sources.size === widgets.length;
+  }
+
+  defaultMessage(): string {
+    return 'Chaque source ne peut apparaître qu’une seule fois dans la disposition.';
+  }
+}
+
+export class DispositionPresentationDto {
+  @ApiPropertyOptional({ enum: ['neutre', 'serie', 'categorielle'] })
+  @IsOptional()
+  @IsIn(['neutre', 'serie', 'categorielle'])
+  palette?: string;
+
+  @ApiPropertyOptional({ type: Boolean })
+  @IsOptional()
+  @IsBoolean()
+  valeurs?: boolean;
+
+  @ApiPropertyOptional({ type: Boolean })
+  @IsOptional()
+  @IsBoolean()
+  legende?: boolean;
+
+  @ApiPropertyOptional({ enum: ['valeur-desc', 'valeur-asc', 'alphabetique'] })
+  @IsOptional()
+  @IsIn(['valeur-desc', 'valeur-asc', 'alphabetique'])
+  tri?: string;
+
+  @ApiPropertyOptional({ type: Number, minimum: 1, maximum: 50 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  autresApres?: number;
+}
+
+export class DispositionWidgetDto {
+  @ApiProperty({ enum: DASHBOARD_SOURCES, enumName: 'DashboardSource' })
+  @IsIn(DASHBOARD_SOURCES)
+  source!: DashboardSource;
+
+  @ApiPropertyOptional({ enum: DASHBOARD_MARQUES, enumName: 'DashboardMarque' })
+  @IsOptional()
+  @IsIn(DASHBOARD_MARQUES)
+  marque?: DashboardMarque;
+
+  @ApiPropertyOptional({ enum: DASHBOARD_TAILLES, enumName: 'DashboardTaille' })
+  @IsOptional()
+  @IsIn(DASHBOARD_TAILLES)
+  taille?: DashboardTaille;
+
+  @ApiPropertyOptional({ type: () => DispositionPresentationDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DispositionPresentationDto)
+  presentation?: DispositionPresentationDto;
+}
+
+export class UpdateDispositionDto {
+  @ApiPropertyOptional({ enum: DASHBOARD_PRESETS, enumName: 'DashboardPreset' })
+  @IsOptional()
+  @IsIn(DASHBOARD_PRESETS)
+  preset?: DashboardPreset;
+
+  @ApiProperty({
+    type: () => [DispositionWidgetDto],
+    description:
+      'Les éléments du tableau de bord. `version` est fixé par le serveur et refusé s’il est transmis.',
+  })
+  @IsArray()
+  @ArrayMaxSize(40)
+  @ValidateNested({ each: true })
+  @Type(() => DispositionWidgetDto)
+  @Validate(UniqueDispositionSourcesConstraint)
+  widgets!: DispositionWidgetDto[];
+}
+
+export class DispositionResponseDto {
+  @ApiProperty({ type: () => [DispositionWidgetDto] }) widgets!: DispositionWidgetDto[];
+  @ApiProperty({ enum: DASHBOARD_PRESETS, enumName: 'DashboardPreset' }) preset!: DashboardPreset;
+
+  @ApiProperty({
+    enum: ['utilisateur', 'defaut', 'usine'],
+    description:
+      'D’où vient la disposition rendue : la sienne, celle fixée par l’administrateur, ou celle d’usine.',
+  })
+  source!: 'utilisateur' | 'defaut' | 'usine';
+
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) updatedAt!: string | null;
 }

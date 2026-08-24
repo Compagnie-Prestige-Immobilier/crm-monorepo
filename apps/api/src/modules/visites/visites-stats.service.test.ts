@@ -16,6 +16,7 @@ const SUIVI = fakeRef({ id: 'obj-suivi', code: 'SUIVI_DOSSIER', sortOrder: 1 });
 const ACHAT = fakeRef({ id: 'obj-achat', code: 'ACHAT_TERRAIN', sortOrder: 2 });
 
 const ACCUEIL = 'usr-accueil';
+const AUTRE_ACCUEIL = 'usr-accueil-2';
 
 const labelled = (buckets: { code: string; count: number }[]): Record<string, number> =>
   Object.fromEntries(buckets.map((bucket) => [bucket.code, bucket.count]));
@@ -31,6 +32,10 @@ describe('statistiques du registre', () => {
     prisma.directions = [COMMERCIALE, FONCIERE];
     prisma.destinataires = [NDOYE];
     prisma.objets = [SUIVI, ACHAT];
+    prisma.users = [
+      { id: ACCUEIL, fullName: 'Awa Sy' },
+      { id: AUTRE_ACCUEIL, fullName: 'Moussa Diop' },
+    ];
 
     visites = new VisitesService(prisma as unknown as PrismaService);
     stats = new VisitesStatsService(prisma as unknown as PrismaService);
@@ -134,5 +139,103 @@ describe('statistiques du registre', () => {
     await expect(stats.compute({ from: '2020-01-01', to: '2026-01-01' })).rejects.toThrow(
       BadRequestException,
     );
+  });
+
+  it('range une visite de 23h45 le 31 décembre dans la bonne heure et le bon jour, à Dakar', async () => {
+    await inscrire({ date: '2025-12-31', time: '23:45' });
+
+    const result = await stats.compute({ from: '2025-12-01', to: '2026-01-01' });
+
+    expect(result.parHeure.find((bucket) => bucket.hour === 23)?.count).toBe(1);
+    expect(result.parJourSemaine.find((bucket) => bucket.weekday === 3)?.count).toBe(1);
+  });
+
+  it('exclut du parHeure les visites sans heure relevée, et les compte à part', async () => {
+    await inscrire({ date: '2026-01-06', time: '09:00' });
+    await inscrire({ date: '2026-01-06' });
+
+    const result = await stats.compute({ from: '2026-01-01', to: '2026-01-31' });
+
+    expect(result.parHeure.reduce((sum, bucket) => sum + bucket.count, 0)).toBe(1);
+    expect(result.sansHeure).toBe(1);
+  });
+
+  it('lundi vaut 1, dans parJourSemaine', async () => {
+    await inscrire({ date: '2026-01-05' });
+
+    const result = await stats.compute({ from: '2026-01-01', to: '2026-01-11' });
+
+    expect(result.parJourSemaine.find((bucket) => bucket.count > 0)?.weekday).toBe(1);
+  });
+
+  it('la somme d’un croisement égale le total moins les dimensions nulles', async () => {
+    await inscrire({ directionId: COMMERCIALE.id, destinataireId: NDOYE.id });
+    await inscrire({ directionId: COMMERCIALE.id });
+    await inscrire({});
+
+    const result = await stats.compute({ from: '2026-01-01', to: '2026-01-31' });
+
+    const total = result.parDestinataireDirection.reduce((sum, cell) => sum + cell.count, 0);
+    expect(total).toBe(result.total - 2);
+  });
+
+  it('compte les visites par agent d’accueil, avec son nom', async () => {
+    await inscrire({});
+    await inscrire({});
+    await visites.create(
+      { date: '2026-01-06', visitorName: 'AUTRE', entrepriseId: CPI.id, objetId: SUIVI.id },
+      AUTRE_ACCUEIL,
+    );
+
+    const result = await stats.compute({ from: '2026-01-01', to: '2026-01-31' });
+
+    const parAgent = Object.fromEntries(result.parAgent.map((agent) => [agent.label, agent.count]));
+    expect(parAgent).toEqual({ 'Awa Sy': 2, 'Moussa Diop': 1 });
+  });
+
+  it('regroupe les récurrents par téléphone puis par nom normalisé, sans jamais rendre de numéro', async () => {
+    await inscrire({ date: '2026-01-05', visitorName: 'Fatou Ndiaye', phone: '77 123 45 67' });
+    await inscrire({ date: '2026-01-12', visitorName: 'Fatou Ndiaye', phone: '77 123 45 67' });
+    await inscrire({ date: '2026-01-06', visitorName: 'Modou Fall' });
+    await inscrire({ date: '2026-01-20', visitorName: 'MODOU   FALL' });
+    await inscrire({ date: '2026-01-07', visitorName: 'Visiteur Seul' });
+
+    const result = await stats.compute({ from: '2026-01-01', to: '2026-01-31' });
+
+    expect(result.recurrents).toHaveLength(2);
+    const noms = result.recurrents.map((entry) => entry.nom).sort();
+    expect(noms).toEqual(['Fatou Ndiaye', 'MODOU   FALL']);
+    expect(JSON.stringify(result)).not.toMatch(/77.?123.?45.?67|\+221771234567/);
+  });
+
+  it('compte les visites portant un numéro, sans l’exposer', async () => {
+    await inscrire({ phone: '77 123 45 67' });
+    await inscrire({});
+
+    const result = await stats.compute({ from: '2026-01-01', to: '2026-01-31' });
+    expect(result.avecTelephone).toBe(1);
+  });
+
+  it('classe la saisie différée : le jour même, le lendemain, plus tard', async () => {
+    await inscrire({ date: '2026-01-06' });
+    await inscrire({ date: '2026-01-06' });
+    await inscrire({ date: '2026-01-06' });
+
+    const createdAts = [
+      new Date('2026-01-06T10:00:00Z'),
+      new Date('2026-01-07T10:00:00Z'),
+      new Date('2026-01-10T10:00:00Z'),
+    ];
+    prisma.visites.forEach((row, index) => {
+      const createdAt = createdAts[index];
+      if (createdAt !== undefined) row.createdAt = createdAt;
+    });
+
+    const result = await stats.compute({ from: '2026-01-01', to: '2026-01-31' });
+
+    expect(result.saisieDifferee.memeJour).toBe(1);
+    expect(result.saisieDifferee.lendemain).toBe(1);
+    expect(result.saisieDifferee.plusTard).toBe(1);
+    expect(result.saisieDifferee.delaiMedianHeures).not.toBeNull();
   });
 });
