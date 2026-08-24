@@ -4,11 +4,6 @@ import { v7 as uuidv7 } from 'uuid';
 
 import { tryNormalizePhone } from '../../common/phone.js';
 import { normalizeKey } from '../representants/representants-import.service.js';
-import {
-  formatVisiteReference,
-  nextVisiteSequence,
-  visiteReferencePrefix,
-} from '../visites/reference.js';
 import { visiteInstant } from '../visites/visites.service.js';
 import type {
   ChunkOutcome,
@@ -19,7 +14,19 @@ import type {
   ParsedRow,
   SheetLayout,
 } from './import-adapter.js';
+import {
+  VisiteImportError,
+  allocateVisiteReferences,
+  loadVisiteReferentiels,
+  readSheetDate,
+  readSheetTime,
+  referentielMissReason,
+  resolveReferentiel,
+  type VisiteReferentiels,
+} from './visites-referentiels.js';
 import { SHEET_CELL } from './xlsx-rows.js';
+
+export { VisiteImportError, readSheetDate, readSheetTime };
 
 /**
  * Reprise du classeur de visites tenu à l'accueil depuis des années.
@@ -31,21 +38,6 @@ import { SHEET_CELL } from './xlsx-rows.js';
  */
 
 export const VISITES_MAX_ROWS = 20_000;
-
-export const VisiteImportError = {
-  DATE_ABSENTE: 'VISITE_IMPORT_DATE_ABSENTE',
-  DATE_ILLISIBLE: 'VISITE_IMPORT_DATE_ILLISIBLE',
-  HEURE_ILLISIBLE: 'VISITE_IMPORT_HEURE_ILLISIBLE',
-  NOM_ABSENT: 'VISITE_IMPORT_NOM_ABSENT',
-  ENTREPRISE_INCONNUE: 'VISITE_IMPORT_ENTREPRISE_INCONNUE',
-  OBJET_INCONNU: 'VISITE_IMPORT_OBJET_INCONNU',
-  DIRECTION_INCONNUE: 'VISITE_IMPORT_DIRECTION_INCONNUE',
-  DESTINATAIRE_INCONNU: 'VISITE_IMPORT_DESTINATAIRE_INCONNU',
-  COLONNES_DECALEES: 'VISITE_IMPORT_COLONNES_DECALEES',
-  DOUBLON_DANS_LE_FICHIER: 'VISITE_IMPORT_DOUBLON_DANS_LE_FICHIER',
-  DEJA_AU_REGISTRE: 'VISITE_IMPORT_DEJA_AU_REGISTRE',
-  REFERENCE_EPUISEE: 'VISITE_IMPORT_REFERENCE_EPUISEE',
-} as const;
 
 export const VISITE_IMPORT_HEADERS = {
   date: 'DATE VISITE',
@@ -155,20 +147,10 @@ export interface VisiteImportRow {
   readonly comment: string | null;
 }
 
-interface Entry {
-  readonly id: string;
-  readonly label: string;
-}
-
 /** Référentiels chargés et visites déjà vues, LE TEMPS D'UNE EXÉCUTION. */
 export interface VisiteImportRun {
   readonly seen: Map<string, VisiteImportRow>;
-  readonly entreprises: ReadonlyMap<string, Entry>;
-  readonly directions: ReadonlyMap<string, Entry>;
-  readonly destinataires: ReadonlyMap<string, Entry>;
-  readonly objets: ReadonlyMap<string, Entry>;
-  /** Où une valeur se trouve VRAIMENT, pour nommer un décalage de colonnes. */
-  readonly owners: ReadonlyMap<string, string>;
+  readonly refs: VisiteReferentiels;
 }
 
 /**
@@ -179,44 +161,6 @@ export interface VisiteImportRun {
 const LIBELLES_DU_CLASSEUR: ReadonlyMap<string, string> = new Map([
   [normalizeKey('ACHAT PRODUITS SANTARGILE ET/OU MAK'), 'ACHAT_PRODUITS'],
 ]);
-
-const EXCEL_EPOCH_UTC = Date.UTC(1899, 11, 30);
-const FIRST_UNAMBIGUOUS_SERIAL = 61;
-const LAST_SERIAL = 2_958_465;
-
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}/;
-const HOUR_MINUTE = /^(\d{1,2})\s*[h:]\s*(\d{2})\s*h?$/i;
-const HOUR_ALONE = /^(\d{1,2})\s*h?$/i;
-const PHONE_LIKE = /^\+?\d[\d\s.-]{5,}$/;
-
-const pad2 = (value: number): string => String(value).padStart(2, '0');
-
-/** Le classeur porte des dates numériques : styles ignorés, le flux rend le rang brut. */
-export function readSheetDate(raw: string): string | null {
-  if (ISO_DATE.test(raw)) return raw.slice(0, 10);
-
-  const serial = Number(raw);
-  if (!Number.isInteger(serial) || serial < FIRST_UNAMBIGUOUS_SERIAL || serial > LAST_SERIAL) {
-    return null;
-  }
-  return new Date(EXCEL_EPOCH_UTC + serial * 86_400_000).toISOString().slice(0, 10);
-}
-
-/** `11H08`, `11h45`, `12H`, `15` et `14H15H` se lisent. `17H5` ne se devine pas. */
-export function readSheetTime(raw: string): string | null {
-  const both = HOUR_MINUTE.exec(raw);
-  if (both !== null) {
-    const hour = Number(both[1]);
-    const minute = Number(both[2]);
-    return hour < 24 && minute < 60 ? `${pad2(hour)}:${pad2(minute)}` : null;
-  }
-
-  const alone = HOUR_ALONE.exec(raw);
-  if (alone === null) return null;
-
-  const hour = Number(alone[1]);
-  return hour < 24 ? `${pad2(hour)}:00` : null;
-}
 
 export const visiteDedupKey = (row: {
   date: string;
@@ -248,48 +192,15 @@ export class VisitesImportAdapter implements ImportAdapter<VisiteImportRow, Visi
   readonly layout = VISITES_SHEET_LAYOUT;
 
   async prepare(ctx: ImportRunContext): Promise<VisiteImportRun> {
-    const select = { id: true, code: true, label: true } as const;
-    const where = { isActive: true } as const;
-
-    const [entreprises, directions, destinataires, objets] = await Promise.all([
-      ctx.tx.visiteEntreprise.findMany({ where, select }),
-      ctx.tx.visiteDirection.findMany({ where, select }),
-      ctx.tx.visiteDestinataire.findMany({ where, select }),
-      ctx.tx.visiteObjet.findMany({ where, select }),
-    ]);
-
-    const owners = new Map<string, string>();
-    const index = (
-      rows: readonly { id: string; code: string; label: string }[],
-      owner: string,
-    ): ReadonlyMap<string, Entry> => {
-      const map = new Map<string, Entry>();
-      for (const row of rows) {
-        const entry = { id: row.id, label: row.label };
-        for (const key of [normalizeKey(row.label), normalizeKey(row.code)]) {
-          if (key === '') continue;
-          map.set(key, entry);
-          if (!owners.has(key)) owners.set(key, owner);
-        }
-      }
-      return map;
-    };
-
-    return {
-      seen: new Map(),
-      entreprises: index(entreprises, 'entreprises'),
-      directions: index(directions, 'directions'),
-      destinataires: index(destinataires, 'destinataires'),
-      objets: index(objets, 'objets de visite'),
-      owners,
-    };
+    return { seen: new Map(), refs: await loadVisiteReferentiels(ctx.tx) };
   }
 
   parseRow(
     cells: Record<string, string>,
     rowNumber: number,
-    refs: VisiteImportRun,
+    run: VisiteImportRun,
   ): ParsedRow<VisiteImportRow> {
+    const refs = run.refs;
     const sheet = cells[SHEET_CELL] ?? '';
     const refuse = (column: string, code: string, detail: string): ParsedRow<VisiteImportRow> => ({
       ok: false,
@@ -330,30 +241,45 @@ export class VisitesImportAdapter implements ImportAdapter<VisiteImportRow, Visi
       return refuse(H.nom, VisiteImportError.NOM_ABSENT, 'le nom du visiteur manque.');
     }
 
-    const entreprise = this.resolve(refs.entreprises, cells[H.entreprise]);
+    const entreprise = resolveReferentiel(
+      refs.entreprises,
+      cells[H.entreprise],
+      LIBELLES_DU_CLASSEUR,
+    );
     if (entreprise === null) {
       return refuse(
         H.entreprise,
-        ...this.missReason(refs, (cells[H.entreprise] ?? '').trim(), 'entreprise'),
+        ...referentielMissReason(refs, (cells[H.entreprise] ?? '').trim(), 'entreprise'),
       );
     }
 
     const rawDirection = (cells[H.direction] ?? '').trim();
-    const direction = rawDirection === '' ? null : this.resolve(refs.directions, rawDirection);
+    const direction =
+      rawDirection === ''
+        ? null
+        : resolveReferentiel(refs.directions, rawDirection, LIBELLES_DU_CLASSEUR);
     if (rawDirection !== '' && direction === null) {
-      return refuse(H.direction, ...this.missReason(refs, rawDirection, 'direction'));
+      return refuse(H.direction, ...referentielMissReason(refs, rawDirection, 'direction'));
     }
 
     const rawDestinataire = (cells[H.destinataire] ?? '').trim();
     const destinataire =
-      rawDestinataire === '' ? null : this.resolve(refs.destinataires, rawDestinataire);
+      rawDestinataire === ''
+        ? null
+        : resolveReferentiel(refs.destinataires, rawDestinataire, LIBELLES_DU_CLASSEUR);
     if (rawDestinataire !== '' && destinataire === null) {
-      return refuse(H.destinataire, ...this.missReason(refs, rawDestinataire, 'destinataire'));
+      return refuse(
+        H.destinataire,
+        ...referentielMissReason(refs, rawDestinataire, 'destinataire'),
+      );
     }
 
-    const objet = this.resolve(refs.objets, cells[H.objet]);
+    const objet = resolveReferentiel(refs.objets, cells[H.objet], LIBELLES_DU_CLASSEUR);
     if (objet === null) {
-      return refuse(H.objet, ...this.missReason(refs, (cells[H.objet] ?? '').trim(), 'objet'));
+      return refuse(
+        H.objet,
+        ...referentielMissReason(refs, (cells[H.objet] ?? '').trim(), 'objet'),
+      );
     }
 
     const phone = (cells[H.telephone] ?? '').trim();
@@ -436,7 +362,7 @@ export class VisitesImportAdapter implements ImportAdapter<VisiteImportRow, Visi
     }
     if (retained.length === 0) return { created: 0, skipped, errors };
 
-    const references = await this.allocateReferences(retained, ctx);
+    const references = await allocateVisiteReferences(retained, (row) => row.date, ctx.tx);
     const written = await ctx.tx.visite.createMany({
       data: retained.map((row) => ({
         id: uuidv7(),
@@ -467,92 +393,5 @@ export class VisitesImportAdapter implements ImportAdapter<VisiteImportRow, Visi
     }
 
     return { created: written.count, skipped, errors };
-  }
-
-  /** Le rang du registre court par ANNÉE, et le classeur en couvre deux. */
-  private async allocateReferences(
-    rows: readonly VisiteImportRow[],
-    ctx: ImportRunContext,
-  ): Promise<Map<VisiteImportRow, string>> {
-    const years = [...new Set(rows.map((row) => Number(row.date.slice(0, 4))))];
-    const next = new Map<number, number>();
-
-    for (const year of years) {
-      const last = await ctx.tx.visite.findFirst({
-        where: { reference: { startsWith: visiteReferencePrefix(year) } },
-        orderBy: { reference: 'desc' },
-        select: { reference: true },
-      });
-      next.set(year, nextVisiteSequence(last?.reference, year));
-    }
-
-    const references = new Map<VisiteImportRow, string>();
-    for (const row of rows) {
-      const year = Number(row.date.slice(0, 4));
-      const sequence = next.get(year) ?? 1;
-      next.set(year, sequence + 1);
-      references.set(row, formatVisiteReference(year, sequence));
-    }
-    return references;
-  }
-
-  private resolve(index: ReadonlyMap<string, Entry>, raw: string | undefined): Entry | null {
-    const key = normalizeKey((raw ?? '').trim());
-    if (key === '') return null;
-
-    const direct = index.get(key);
-    if (direct !== undefined) return direct;
-
-    const code = LIBELLES_DU_CLASSEUR.get(key);
-    return code === undefined ? null : (index.get(normalizeKey(code)) ?? null);
-  }
-
-  /**
-   * Ce que la cellule contient VRAIMENT, quand elle ne contient pas ce qu'on
-   * attend. Le classeur porte des téléphones sous ENTREPRISE et des
-   * destinataires sous OBJECT VISITE : dire « inconnu » ferait chercher une
-   * entrée à ajouter, alors que la ligne est décalée d'un cran.
-   */
-  private missReason(
-    refs: VisiteImportRun,
-    raw: string,
-    attendu: 'entreprise' | 'direction' | 'destinataire' | 'objet',
-  ): [string, string] {
-    const codes = {
-      entreprise: VisiteImportError.ENTREPRISE_INCONNUE,
-      direction: VisiteImportError.DIRECTION_INCONNUE,
-      destinataire: VisiteImportError.DESTINATAIRE_INCONNU,
-      objet: VisiteImportError.OBJET_INCONNU,
-    } as const;
-    const listes = {
-      entreprise: 'ENTREPRISES',
-      direction: 'DIRECTIONS &/OU NIVEAU',
-      destinataire: 'DESTINATAIRES',
-      objet: 'OBJECT VISITE',
-    } as const;
-
-    if (raw === '') {
-      return [codes[attendu], `la colonne ${listes[attendu]} est vide, elle est obligatoire.`];
-    }
-
-    if (PHONE_LIKE.test(raw)) {
-      return [
-        VisiteImportError.COLONNES_DECALEES,
-        `« ${raw} » est un numéro de téléphone, pas ${attendu === 'objet' ? 'un objet de visite' : `une ${attendu}`}. Les colonnes de cette ligne sont décalées.`,
-      ];
-    }
-
-    const owner = refs.owners.get(normalizeKey(raw));
-    if (owner !== undefined) {
-      return [
-        VisiteImportError.COLONNES_DECALEES,
-        `« ${raw} » appartient à la liste des ${owner}, pas à ${listes[attendu]}. Les colonnes de cette ligne sont décalées.`,
-      ];
-    }
-
-    return [
-      codes[attendu],
-      `« ${raw} » ne figure pas dans la liste ${listes[attendu]}. Corrigez la cellule, ou ajoutez l’entrée à la liste avant de relancer.`,
-    ];
   }
 }

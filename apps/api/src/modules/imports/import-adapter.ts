@@ -19,6 +19,27 @@ export interface ChunkOutcome {
   created: number;
   skipped: number;
   errors: readonly ImportRowError[];
+  /**
+   * Lignes RÉÉCRITES, optionnel : les trois autres adaptateurs ne peuvent
+   * structurellement pas corriger une fiche existante, leur faire écrire
+   * `updated: 0` laisserait croire qu'ils le pourraient.
+   */
+  updated?: number;
+}
+
+/**
+ * Un adaptateur refuse le TRAVAIL entier, pas une ligne : plafond métier
+ * dépassé, fichier incohérent avec ce que l'application attend. Distinct
+ * d'`ImportRowError`, qui refuse une ligne et laisse les autres continuer.
+ */
+export class ImportAdapterFailure extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ImportAdapterFailure';
+  }
 }
 
 export interface ImportRunContext {

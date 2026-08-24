@@ -61,6 +61,7 @@ export interface FakeJobSeed {
   mode?: ImportMode;
   processedRows?: number;
   createdRows?: number;
+  updatedRows?: number;
   skippedRows?: number;
   errorRows?: number;
   claimToken?: string | null;
@@ -82,6 +83,7 @@ export const fakeJob = (seed: FakeJobSeed = {}): ImportJob => ({
   totalRows: null,
   processedRows: seed.processedRows ?? 0,
   createdRows: seed.createdRows ?? 0,
+  updatedRows: seed.updatedRows ?? 0,
   skippedRows: seed.skippedRows ?? 0,
   errorRows: seed.errorRows ?? 0,
   report: seed.report ?? null,
