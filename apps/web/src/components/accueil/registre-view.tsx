@@ -12,23 +12,24 @@ import {
 } from 'lucide-react';
 import { useId, useState } from 'react';
 
+import { ImpressionDialog } from '@/components/accueil/impression-dialog';
 import { VisiteForm } from '@/components/accueil/visite-form';
 import { EmptyState } from '@/components/empty-state';
+import { AdvancedPanel } from '@/components/filters/advanced-panel';
 import { DatePicker } from '@/components/filters/date-picker';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { SearchField } from '@/components/filters/search-field';
 import { useUrlFilters, type UrlFilterAdapter } from '@/components/filters/use-url-filters';
+import {
+  VISITE_ADVANCED_FILTER_KEYS,
+  buildVisiteAdvancedChips,
+  type VisiteAdvancedFilterKey,
+} from '@/components/filters/visite-advanced-chips';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import {
   Table,
   TableBody,
@@ -39,23 +40,43 @@ import {
 } from '@/components/ui/table';
 import {
   EMPTY_VISITE_FILTERS,
+  IMPRESSION_COLONNES_PAR_DEFAUT,
   VISITE_COLONNES,
   VISITE_REFERENTIELS_QUERY_KEY,
+  VISITE_SORT_FIELDS,
   countActiveVisiteFilters,
   dakarNow,
   fetchVisiteReferentiels,
   fetchVisites,
+  impressionColonneVisible,
   orderVisites,
   parseVisiteFilters,
   serializeVisiteFilters,
   visitesQueryKey,
+  type ImpressionColonne,
   type Visite,
   type VisiteFilters,
   type VisiteReferentielItem,
+  type VisiteSortField,
 } from '@/lib/data/visites';
 import { formatDate, formatNumber } from '@/lib/format';
 import type { FilterOption } from '@/lib/types';
 import { useDebouncedSearch } from '@/lib/use-debounced-search';
+import { cn } from '@/lib/utils';
+
+/** Le libellé du classeur porte aussi le champ de tri : les deux voisinent naturellement. */
+const SORT_FIELD_OF: Partial<Record<string, VisiteSortField>> = {
+  [VISITE_COLONNES.date]: 'visitedAt',
+  [VISITE_COLONNES.visitorName]: 'visitorName',
+  [VISITE_COLONNES.entreprise]: 'entreprise',
+  [VISITE_COLONNES.direction]: 'direction',
+  [VISITE_COLONNES.destinataire]: 'destinataire',
+  [VISITE_COLONNES.objet]: 'objet',
+};
+
+function isVisiteSortField(value: string): value is VisiteSortField {
+  return (VISITE_SORT_FIELDS as readonly string[]).includes(value);
+}
 
 const ADAPTER: UrlFilterAdapter<VisiteFilters> = {
   parse: parseVisiteFilters,
@@ -89,7 +110,9 @@ export function RegistreView() {
   const [ajoutOuvert, setAjoutOuvert] = useState(false);
   const [impressionOuverte, setImpressionOuverte] = useState(false);
   const [orientation, setOrientation] = useState<'landscape' | 'portrait'>('landscape');
-  const [commentairesImprimes, setCommentairesImprimes] = useState(true);
+  const [colonnesImprimees, setColonnesImprimees] = useState<ReadonlySet<ImpressionColonne>>(
+    IMPRESSION_COLONNES_PAR_DEFAUT,
+  );
 
   const { draft: searchDraft, setDraft: setSearchDraft } = useDebouncedSearch(
     filters.search,
@@ -110,16 +133,38 @@ export function RegistreView() {
     placeholderData: (previous) => previous,
   });
 
-  const visites = orderVisites(registre.data?.items ?? []);
+  // Le classement du serveur fait foi dès qu'on trie sur autre chose que la
+  // date : le re-tri client, pensé pour « le plus récent en haut », le
+  // contredirait sur un tri par nom ou par entreprise.
+  const items = registre.data?.items ?? [];
+  const visites = filters.sortBy === 'visitedAt' ? orderVisites(items) : items;
   const total = registre.data?.total ?? 0;
   const page = registre.data?.page ?? 1;
   const pageCount = registre.data?.pageCount ?? 1;
   const premiere = total === 0 ? 0 : (page - 1) * filters.pageSize + 1;
   const derniere = Math.min(page * filters.pageSize, total);
   const jourSeul = !filters.toutePeriode && filters.dateFrom === null && filters.dateTo === null;
+  const chips = buildVisiteAdvancedChips(filters, referentiels.data);
 
   function rafraichir(): void {
     void queryClient.invalidateQueries({ queryKey: ['visites'] });
+  }
+
+  function removeAdvanced(key: VisiteAdvancedFilterKey): void {
+    setFilters({ [key]: null });
+  }
+
+  function clearAdvanced(): void {
+    setFilters(Object.fromEntries(VISITE_ADVANCED_FILTER_KEYS.map((key) => [key, null])));
+  }
+
+  function toggleSort(columnId: string): void {
+    if (!isVisiteSortField(columnId)) return;
+    if (filters.sortBy === columnId) {
+      setFilters({ sortDir: filters.sortDir === 'asc' ? 'desc' : 'asc' });
+    } else {
+      setFilters({ sortBy: columnId, sortDir: 'asc' });
+    }
   }
 
   return (
@@ -192,53 +237,59 @@ export function RegistreView() {
           />
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <FilterCombobox
-            label={VISITE_COLONNES.entreprise}
-            placeholder="Toutes"
-            options={options(referentiels.data?.entreprises)}
-            value={filters.entrepriseId}
-            onChange={(value) => {
-              setFilters({ entrepriseId: value });
-            }}
-          />
-          <FilterCombobox
-            label={VISITE_COLONNES.direction}
-            placeholder="Toutes"
-            options={options(referentiels.data?.directions)}
-            value={filters.directionId}
-            onChange={(value) => {
-              setFilters({ directionId: value });
-            }}
-          />
-          <FilterCombobox
-            label={VISITE_COLONNES.destinataire}
-            placeholder="Tous"
-            options={options(referentiels.data?.destinataires)}
-            value={filters.destinataireId}
-            onChange={(value) => {
-              setFilters({ destinataireId: value });
-            }}
-          />
-          <FilterCombobox
-            label={VISITE_COLONNES.objet}
-            placeholder="Tous"
-            options={options(referentiels.data?.objets)}
-            value={filters.objetId}
-            onChange={(value) => {
-              setFilters({ objetId: value });
-            }}
-          />
-        </div>
-
-        {countActiveVisiteFilters(filters) > 0 ? (
-          <div>
-            <Button type="button" variant="outline" onClick={resetFilters}>
-              <RotateCcwIcon aria-hidden="true" />
-              Retirer les filtres
-            </Button>
+        <AdvancedPanel
+          module="registre"
+          chips={chips}
+          onRemove={removeAdvanced}
+          onClearAll={clearAdvanced}
+          actions={
+            countActiveVisiteFilters(filters) > 0 ? (
+              <Button type="button" variant="outline" onClick={resetFilters}>
+                <RotateCcwIcon aria-hidden="true" />
+                Retirer les filtres
+              </Button>
+            ) : null
+          }
+        >
+          <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2">
+            <FilterCombobox
+              label={VISITE_COLONNES.entreprise}
+              placeholder="Toutes"
+              options={options(referentiels.data?.entreprises)}
+              value={filters.entrepriseId}
+              onChange={(value) => {
+                setFilters({ entrepriseId: value });
+              }}
+            />
+            <FilterCombobox
+              label={VISITE_COLONNES.direction}
+              placeholder="Toutes"
+              options={options(referentiels.data?.directions)}
+              value={filters.directionId}
+              onChange={(value) => {
+                setFilters({ directionId: value });
+              }}
+            />
+            <FilterCombobox
+              label={VISITE_COLONNES.destinataire}
+              placeholder="Tous"
+              options={options(referentiels.data?.destinataires)}
+              value={filters.destinataireId}
+              onChange={(value) => {
+                setFilters({ destinataireId: value });
+              }}
+            />
+            <FilterCombobox
+              label={VISITE_COLONNES.objet}
+              placeholder="Tous"
+              options={options(referentiels.data?.objets)}
+              value={filters.objetId}
+              onChange={(value) => {
+                setFilters({ objetId: value });
+              }}
+            />
           </div>
-        ) : null}
+        </AdvancedPanel>
       </section>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -314,19 +365,35 @@ export function RegistreView() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>N° REGISTRE</TableHead>
-                {COLONNES.map((colonne) => (
-                  <TableHead
-                    key={colonne}
-                    className={
-                      colonne === VISITE_COLONNES.comment && !commentairesImprimes
-                        ? 'print:hidden'
-                        : undefined
-                    }
-                  >
-                    {colonne}
-                  </TableHead>
-                ))}
+                <TableHead
+                  className={
+                    impressionColonneVisible('N° REGISTRE', colonnesImprimees)
+                      ? undefined
+                      : 'print:hidden'
+                  }
+                >
+                  N° REGISTRE
+                </TableHead>
+                {COLONNES.map((colonne) => {
+                  const sortField = SORT_FIELD_OF[colonne];
+                  const printClassName = impressionColonneVisible(colonne, colonnesImprimees)
+                    ? undefined
+                    : 'print:hidden';
+                  return sortField === undefined ? (
+                    <TableHead key={colonne} className={printClassName}>
+                      {colonne}
+                    </TableHead>
+                  ) : (
+                    <SortableTableHead
+                      key={colonne}
+                      column={{ id: sortField, label: colonne }}
+                      sortBy={filters.sortBy}
+                      sortDir={filters.sortDir}
+                      onToggle={toggleSort}
+                      className={printClassName}
+                    />
+                  );
+                })}
                 <TableHead className="print:hidden">CORRIGER</TableHead>
               </TableRow>
             </TableHeader>
@@ -352,7 +419,7 @@ export function RegistreView() {
                   <LigneVisite
                     key={visite.id}
                     visite={visite}
-                    commentairesImprimes={commentairesImprimes}
+                    colonnesImprimees={colonnesImprimees}
                     onCorriger={() => {
                       setCorrigeeId(visite.id);
                     }}
@@ -414,111 +481,62 @@ export function RegistreView() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={impressionOuverte} onOpenChange={setImpressionOuverte}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Préparer l’impression</DialogTitle>
-            <DialogDescription>
-              Les filtres et la période affichés seront conservés.
-            </DialogDescription>
-          </DialogHeader>
-
-          <fieldset className="flex flex-col gap-2">
-            <legend className="pb-1 text-[0.8125rem] font-[600]">Orientation</legend>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {(
-                [
-                  ['landscape', 'Paysage', 'Recommandé pour toutes les colonnes'],
-                  ['portrait', 'Portrait', 'Pour une liste plus étroite'],
-                ] as const
-              ).map(([value, label, description]) => (
-                <label
-                  key={value}
-                  className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 ${
-                    orientation === value ? 'border-primary bg-secondary' : 'border-border'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="orientation-impression"
-                    value={value}
-                    checked={orientation === value}
-                    className="mt-0.5 size-4 accent-[var(--primary)]"
-                    onChange={() => {
-                      setOrientation(value);
-                    }}
-                  />
-                  <span>
-                    <span className="block text-[0.875rem] font-[600]">{label}</span>
-                    <span className="block text-[0.75rem] text-muted-foreground">
-                      {description}
-                    </span>
-                  </span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
-
-          <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md border border-border p-3 text-[0.875rem]">
-            <input
-              type="checkbox"
-              checked={commentairesImprimes}
-              className="size-4 accent-[var(--primary)]"
-              onChange={(event) => {
-                setCommentairesImprimes(event.target.checked);
-              }}
-            />
-            Inclure la colonne commentaires
-          </label>
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setImpressionOuverte(false);
-              }}
-            >
-              Annuler
-            </Button>
-            <Button
-              type="button"
-              onClick={() => {
-                setImpressionOuverte(false);
-                window.print();
-              }}
-            >
-              <PrinterIcon aria-hidden="true" />
-              Ouvrir l’impression
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ImpressionDialog
+        open={impressionOuverte}
+        onOpenChange={setImpressionOuverte}
+        orientation={orientation}
+        onOrientationChange={setOrientation}
+        colonnesImprimees={colonnesImprimees}
+        onColonnesImpriméesChange={setColonnesImprimees}
+        filters={filters}
+        today={today}
+        total={total}
+        pageItemsCount={visites.length}
+      />
     </div>
   );
 }
 
 function LigneVisite({
   visite,
-  commentairesImprimes,
+  colonnesImprimees,
   onCorriger,
 }: {
   visite: Visite;
-  commentairesImprimes: boolean;
+  colonnesImprimees: ReadonlySet<ImpressionColonne>;
   onCorriger: () => void;
 }) {
+  const printClassName = (colonne: ImpressionColonne): string | undefined =>
+    impressionColonneVisible(colonne, colonnesImprimees) ? undefined : 'print:hidden';
+
   return (
     <TableRow>
-      <TableCell className="font-[600] whitespace-nowrap">{visite.reference}</TableCell>
-      <TableCell className="whitespace-nowrap">{formatDate(visite.date)}</TableCell>
-      <TableCell className="whitespace-nowrap">{visite.time ?? ''}</TableCell>
-      <TableCell className="font-[600]">{visite.visitorName}</TableCell>
-      <TableCell className="whitespace-nowrap">{visite.phone ?? ''}</TableCell>
-      <TableCell>{visite.entreprise.label}</TableCell>
-      <TableCell>{visite.direction?.label ?? ''}</TableCell>
-      <TableCell>{visite.destinataire?.label ?? ''}</TableCell>
-      <TableCell>{visite.objet.label}</TableCell>
-      <TableCell className={`max-w-[20rem] ${commentairesImprimes ? '' : 'print:hidden'}`}>
+      <TableCell className={cn('font-[600] whitespace-nowrap', printClassName('N° REGISTRE'))}>
+        {visite.reference}
+      </TableCell>
+      <TableCell className={cn('whitespace-nowrap', printClassName(VISITE_COLONNES.date))}>
+        {formatDate(visite.date)}
+      </TableCell>
+      <TableCell className={cn('whitespace-nowrap', printClassName(VISITE_COLONNES.time))}>
+        {visite.time ?? ''}
+      </TableCell>
+      <TableCell className={cn('font-[600]', printClassName(VISITE_COLONNES.visitorName))}>
+        {visite.visitorName}
+      </TableCell>
+      <TableCell className={cn('whitespace-nowrap', printClassName(VISITE_COLONNES.phone))}>
+        {visite.phone ?? ''}
+      </TableCell>
+      <TableCell className={printClassName(VISITE_COLONNES.entreprise)}>
+        {visite.entreprise.label}
+      </TableCell>
+      <TableCell className={printClassName(VISITE_COLONNES.direction)}>
+        {visite.direction?.label ?? ''}
+      </TableCell>
+      <TableCell className={printClassName(VISITE_COLONNES.destinataire)}>
+        {visite.destinataire?.label ?? ''}
+      </TableCell>
+      <TableCell className={printClassName(VISITE_COLONNES.objet)}>{visite.objet.label}</TableCell>
+      <TableCell className={cn('max-w-[20rem]', printClassName(VISITE_COLONNES.comment))}>
         {visite.comment ?? ''}
       </TableCell>
       <TableCell className="print:hidden">

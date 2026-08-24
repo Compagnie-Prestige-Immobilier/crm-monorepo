@@ -80,6 +80,7 @@ beforeEach(() => {
   fetchReferentiels.mockResolvedValue(referentiels);
   updateVisite.mockResolvedValue(visite({ visitorName: 'Awa Ndiaye Sow' }));
   setUrl('/accueil');
+  window.localStorage.clear();
 });
 
 describe('registre du jour', () => {
@@ -185,10 +186,17 @@ describe('registre du jour', () => {
   });
 });
 
+async function openAdvanced(): Promise<void> {
+  const bouton = await screen.findByRole('button', { name: /Filtres avancés/u });
+  if (bouton.getAttribute('aria-expanded') === 'true') return;
+  await userEvent.setup().click(bouton);
+}
+
 describe('filtres du registre, dans l’adresse', () => {
   it('porte l’objet de visite dans l’URL', async () => {
     renderWithQuery(<RegistreView />);
 
+    await openAdvanced();
     const user = userEvent.setup();
     const filtres = await screen.findByRole('region', { name: 'Rechercher dans le registre' });
     await user.click(within(filtres).getByRole('combobox', { name: /OBJET VISITE/u }));
@@ -267,6 +275,51 @@ describe('filtres du registre, dans l’adresse', () => {
     expect(
       screen.getByRole('button', { name: 'Tout le registre' }).getAttribute('aria-pressed'),
     ).toBe('true');
+  });
+});
+
+describe('filtres avancés du registre', () => {
+  it('replie ENTREPRISE, DIRECTION, DESTINATAIRES et OBJET, laissant recherche et période visibles', async () => {
+    renderWithQuery(<RegistreView />);
+
+    await screen.findByRole('table');
+    expect(screen.getByRole('textbox', { name: /Recherche/u })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Aujourd’hui' })).toBeTruthy();
+    expect(screen.queryByRole('combobox', { name: /ENTREPRISE/u })).toBeNull();
+
+    await openAdvanced();
+    expect(screen.getByRole('combobox', { name: /ENTREPRISE/u })).toBeTruthy();
+  });
+
+  it('rappelle un filtre avancé actif par une puce une fois le panneau refermé, et le retire au clic', async () => {
+    setUrl('/accueil?objetId=o-achat');
+    renderWithQuery(<RegistreView />);
+
+    // Un filtre avancé actif ouvre le panneau : la puce n'apparaît qu'une fois refermé.
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /Filtres avancés/u }));
+
+    const puce = await screen.findByRole('button', {
+      name: /Retirer le filtre OBJET VISITE : ACHAT TERRAIN/u,
+    });
+    await user.click(puce);
+
+    expect(routerMock.push).toHaveBeenCalledWith('/accueil', { scroll: false });
+  });
+});
+
+describe('tri des colonnes du registre', () => {
+  it('trie par nom au premier clic, inverse au second', async () => {
+    renderWithQuery(<RegistreView />);
+
+    const table = await screen.findByRole('table');
+    const entete = within(table).getByRole('columnheader', { name: /PRENOM ET NOMS/u });
+    const bouton = within(entete).getByRole('button');
+
+    await userEvent.setup().click(bouton);
+    expect(routerMock.push).toHaveBeenLastCalledWith('/accueil?sortBy=visitorName&sortDir=asc', {
+      scroll: false,
+    });
   });
 });
 
