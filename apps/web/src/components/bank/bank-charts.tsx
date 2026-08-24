@@ -1,71 +1,15 @@
 'use client';
 
-import { BarController, LineController, type ChartData, type ChartOptions } from 'chart.js';
+import type { ChartData, ChartOptions } from 'chart.js';
 import { Bar, Chart as MixedChart, Doughnut } from 'react-chartjs-2';
 
-import { Chart } from '@/components/dashboard/chart-setup';
+import '@/components/dashboard/chart-setup';
 
-Chart.register(BarController, LineController);
-
-import { seriesBorderColor, seriesColor, useChartTheme, type ChartTheme } from '@/lib/chart-theme';
+import { axisScales, baseOptions } from '@/components/dashboard/chart-options';
+import { seriesBorderColor, seriesColor, useChartTheme } from '@/lib/chart-theme';
 import { formatNumber, formatShortDate } from '@/lib/format';
 import { formatXof, formatXofAxisTick, xofToChartNumber } from '@/lib/money';
 import { usePrefersReducedMotion } from '@/lib/use-prefers-reduced-motion';
-
-function baseOptions(
-  theme: ChartTheme,
-  reducedMotion: boolean,
-  onSelect?: (index: number) => void,
-) {
-  return {
-    responsive: true,
-    maintainAspectRatio: false,
-    animation: reducedMotion ? (false as const) : { duration: 220 },
-    ...(onSelect === undefined
-      ? {}
-      : {
-          onClick: (_event: unknown, elements: readonly { index: number }[]): void => {
-            const first = elements[0];
-            if (first !== undefined) onSelect(first.index);
-          },
-          onHover: (event: { native?: Event | null }, elements: readonly unknown[]): void => {
-            const target = event.native?.target;
-            if (target instanceof HTMLElement) {
-              target.style.cursor = elements.length > 0 ? 'pointer' : 'default';
-            }
-          },
-        }),
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        backgroundColor: theme.tooltipBackground,
-        titleColor: theme.tooltipForeground,
-        bodyColor: theme.tooltipForeground,
-        borderColor: theme.border,
-        borderWidth: 1,
-        padding: 10,
-        cornerRadius: 8,
-        displayColors: true,
-        boxPadding: 4,
-      },
-    },
-  };
-}
-
-function axisScales(theme: ChartTheme, horizontal: boolean) {
-  const value = {
-    beginAtZero: true,
-    grid: { color: theme.grid, drawTicks: false },
-    border: { display: false },
-    ticks: { color: theme.tick, font: { size: 11 }, padding: 6 },
-  };
-  const category = {
-    grid: { display: false },
-    border: { color: theme.border },
-    ticks: { color: theme.tick, font: { size: 11 }, autoSkipPadding: 12 },
-  };
-  return horizontal ? { x: value, y: category } : { x: category, y: value };
-}
 
 export interface ClickableSlice {
   label: string;
@@ -88,7 +32,7 @@ export function BankRankChart({
       items[index]?.onSelect?.();
     }),
     indexAxis: 'y',
-    scales: axisScales(theme, true),
+    scales: axisScales(theme, { horizontal: true }),
   };
 
   return (
@@ -269,7 +213,7 @@ export function MeanDelayChart({ items }: { items: readonly { label: string; hou
   const options: ChartOptions<'bar'> = {
     ...baseOptions(theme, reducedMotion),
     indexAxis: 'y',
-    scales: axisScales(theme, true),
+    scales: axisScales(theme, { horizontal: true }),
     plugins: {
       ...baseOptions(theme, reducedMotion).plugins,
       tooltip: {

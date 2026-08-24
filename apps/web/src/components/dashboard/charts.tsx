@@ -5,47 +5,11 @@ import { Bar, Doughnut, Line } from 'react-chartjs-2';
 
 import '@/components/dashboard/chart-setup';
 
-import { seriesBorderColor, seriesColor, useChartTheme, type ChartTheme } from '@/lib/chart-theme';
+import { axisScales, baseOptions } from '@/components/dashboard/chart-options';
+import { seriesBorderColor, seriesColor, useChartTheme } from '@/lib/chart-theme';
 import { formatNumber, formatShortDate } from '@/lib/format';
 import type { NamedCount, TimeSeriePoint } from '@/lib/types';
 import { usePrefersReducedMotion } from '@/lib/use-prefers-reduced-motion';
-
-function baseOptions(theme: ChartTheme, reducedMotion: boolean) {
-  return {
-    responsive: true,
-    maintainAspectRatio: false,
-    animation: reducedMotion ? (false as const) : { duration: 220 },
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        backgroundColor: theme.tooltipBackground,
-        titleColor: theme.tooltipForeground,
-        bodyColor: theme.tooltipForeground,
-        borderColor: theme.border,
-        borderWidth: 1,
-        padding: 10,
-        cornerRadius: 8,
-        displayColors: true,
-        boxPadding: 4,
-      },
-    },
-  };
-}
-
-function axisScales(theme: ChartTheme, horizontal: boolean) {
-  const value = {
-    beginAtZero: true,
-    grid: { color: theme.grid, drawTicks: false },
-    border: { display: false },
-    ticks: { color: theme.tick, font: { size: 11 }, padding: 6 },
-  };
-  const category = {
-    grid: { display: false },
-    border: { color: theme.border },
-    ticks: { color: theme.tick, font: { size: 11 }, autoSkipPadding: 12 },
-  };
-  return horizontal ? { x: value, y: category } : { x: category, y: value };
-}
 
 export function ProspectsTrendChart({ points }: { points: readonly TimeSeriePoint[] }) {
   const theme = useChartTheme();
@@ -54,7 +18,7 @@ export function ProspectsTrendChart({ points }: { points: readonly TimeSeriePoin
 
   const options: ChartOptions<'line'> = {
     ...baseOptions(theme, reducedMotion),
-    scales: axisScales(theme, false),
+    scales: axisScales(theme),
     interaction: { mode: 'index', intersect: false },
     elements: { point: { radius: 0, hitRadius: 12, hoverRadius: 4 } },
   };
@@ -87,7 +51,7 @@ export function RankBarChart({ items, label }: { items: readonly NamedCount[]; l
   const options: ChartOptions<'bar'> = {
     ...baseOptions(theme, reducedMotion),
     indexAxis: 'y',
-    scales: axisScales(theme, true),
+    scales: axisScales(theme, { horizontal: true }),
   };
 
   return (
@@ -126,7 +90,7 @@ export function CategoryBarChart({
 
   const options: ChartOptions<'bar'> = {
     ...baseOptions(theme, reducedMotion),
-    scales: axisScales(theme, false),
+    scales: axisScales(theme),
   };
 
   return (

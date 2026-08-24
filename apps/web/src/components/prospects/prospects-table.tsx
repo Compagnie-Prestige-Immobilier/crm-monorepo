@@ -2,14 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
-import {
-  ArrowDownIcon,
-  ArrowUpIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  ChevronsUpDownIcon,
-  InboxIcon,
-} from 'lucide-react';
+import { ChevronLeftIcon, ChevronRightIcon, InboxIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -36,6 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import {
   Table,
   TableBody,
@@ -159,41 +153,17 @@ export function ProspectsTable({
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="hover:bg-transparent">
                 {headerGroup.headers.map((header) => {
-                  const sortable = isSortField(header.column.id);
-                  const active = filters.sortBy === header.column.id;
-                  return (
-                    <TableHead
+                  const label = flexRender(header.column.columnDef.header, header.getContext());
+                  return isSortField(header.column.id) ? (
+                    <SortableTableHead
                       key={header.id}
-                      aria-sort={
-                        active ? (filters.sortDir === 'asc' ? 'ascending' : 'descending') : 'none'
-                      }
-                    >
-                      {sortable ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            toggleSort(header.column.id);
-                          }}
-                          className="inline-flex min-h-11 items-center gap-1.5 rounded-sm text-inherit hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                        >
-                          {flexRender(header.column.columnDef.header, header.getContext())}
-                          {active ? (
-                            filters.sortDir === 'asc' ? (
-                              <ArrowUpIcon className="size-3.5" aria-hidden="true" />
-                            ) : (
-                              <ArrowDownIcon className="size-3.5" aria-hidden="true" />
-                            )
-                          ) : (
-                            <ChevronsUpDownIcon
-                              className="size-3.5 text-muted-foreground"
-                              aria-hidden="true"
-                            />
-                          )}
-                        </button>
-                      ) : (
-                        flexRender(header.column.columnDef.header, header.getContext())
-                      )}
-                    </TableHead>
+                      column={{ id: header.column.id, label }}
+                      sortBy={filters.sortBy}
+                      sortDir={filters.sortDir}
+                      onToggle={toggleSort}
+                    />
+                  ) : (
+                    <TableHead key={header.id}>{label}</TableHead>
                   );
                 })}
               </TableRow>

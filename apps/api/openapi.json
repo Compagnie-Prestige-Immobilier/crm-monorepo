@@ -6019,6 +6019,62 @@
         "tags": ["visites"]
       }
     },
+    "/api/v1/visites/referentiels/usage": {
+      "get": {
+        "description": "Total toutes dates confondues, à distinguer du décompte borné de /statistiques.",
+        "operationId": "getVisiteReferentielUsage",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisiteReferentielUsageDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Combien de visites désignent chaque entrée des quatre listes.",
+        "tags": ["visites"]
+      }
+    },
     "/api/v1/visites/referentiels/{kind}": {
       "get": {
         "operationId": "listVisiteReferentiel",
@@ -6591,6 +6647,22 @@
               "default": 25,
               "type": "number"
             }
+          },
+          {
+            "name": "sortBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/VisiteSortField"
+            }
+          },
+          {
+            "name": "sortOrder",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/SortOrder"
+            }
           }
         ],
         "responses": {
@@ -6705,6 +6777,244 @@
           }
         ],
         "summary": "Inscrit un visiteur au registre.",
+        "tags": ["visites"]
+      }
+    },
+    "/api/v1/visites/tableau-de-bord/disposition": {
+      "get": {
+        "operationId": "getVisiteDashboardLayout",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DispositionResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "La disposition du tableau de bord : la sienne, sinon celle par défaut, sinon celle d’usine.",
+        "tags": ["visites"]
+      },
+      "put": {
+        "description": "La version de la disposition est fixée par le serveur ; la transmettre est refusé.",
+        "operationId": "putVisiteDashboardLayout",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDispositionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DispositionResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Enregistre sa propre disposition du tableau de bord.",
+        "tags": ["visites"]
+      },
+      "delete": {
+        "operationId": "deleteVisiteDashboardLayout",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Efface sa propre disposition ; retombe sur celle par défaut, puis celle d’usine.",
+        "tags": ["visites"]
+      }
+    },
+    "/api/v1/visites/tableau-de-bord/disposition-par-defaut": {
+      "put": {
+        "description": "La version de la disposition est fixée par le serveur ; la transmettre est refusé.",
+        "operationId": "putVisiteDashboardDefaultLayout",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDispositionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DispositionResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fixe la disposition proposée par défaut à tous les comptes du registre.",
         "tags": ["visites"]
       }
     },
@@ -6865,6 +7175,1068 @@
         ],
         "summary": "Corrige une ligne du registre.",
         "tags": ["visites"]
+      }
+    },
+    "/api/v1/visites/import": {
+      "post": {
+        "description": "NE BLOQUE PAS : le classeur est écrit sur le volume, un travail `queued` est inscrit en `DRY_RUN`, et la réponse part. Le travail court en arrière-plan et détecte les différences ligne par ligne ; l’écran les lit par `GET /visites/import/{id}/revue`. Une ligne sans `N° REGISTRE` est une création ; un numéro renseigné et inconnu est refusé.",
+        "operationId": "createVisitesRegistreImport",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJobDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "IMPORT_FILE_TOO_LARGE · le classeur dépasse le plafond de taille.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Trop de requêtes : réessayez plus tard.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Dépose le classeur du registre exporté puis corrigé, et inscrit le travail.",
+        "tags": ["visites"]
+      }
+    },
+    "/api/v1/visites/import/{id}": {
+      "get": {
+        "operationId": "getVisitesRegistreImport",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJobDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "IMPORT_JOB_NOT_FOUND · ce travail n’existe pas, ou n’est pas un aller-retour du registre.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "État du travail, et son rapport quand il est terminé.",
+        "tags": ["visites"]
+      }
+    },
+    "/api/v1/visites/import/{id}/revue": {
+      "get": {
+        "description": "Une ligne par différence : `CREATE` pour une ligne sans numéro, `UPDATE` pour un numéro dont le contenu diverge. Les lignes identiques ne sont pas écrites, elles ne figurent pas ici.",
+        "operationId": "getVisitesRegistreImportRevue",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 500,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisiteImportChangeListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "IMPORT_JOB_NOT_FOUND · ce travail n’existe pas, ou n’est pas un aller-retour du registre.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Les différences détectées, page par page.",
+        "tags": ["visites"]
+      },
+      "patch": {
+        "description": "Coché par défaut à la détection : la directrice a exporté, corrigé et redéposé, son intention est d’appliquer. Cette route sert à RETIRER ce qu’elle ne veut pas.",
+        "operationId": "setVisitesRegistreImportSelection",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetVisiteImportChangeSelectionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "IMPORT_JOB_NOT_FOUND · ce travail n’existe pas, ou n’est pas un aller-retour du registre.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Coche ou décoche les lignes désignées.",
+        "tags": ["visites"]
+      }
+    },
+    "/api/v1/visites/import/{id}/apply": {
+      "post": {
+        "description": "Une correction faite au comptoir depuis la revue n’est jamais écrasée en silence : la ligne concernée est refusée et nommée dans le rapport, les autres s’appliquent quand même.",
+        "operationId": "applyVisitesRegistreImport",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJobDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "IMPORT_JOB_NOT_FOUND · ce travail n’existe pas, ou n’est pas un aller-retour du registre.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "IMPORT_NOT_APPLICABLE · le travail n’est pas une simulation terminée, ou son échéance est passée.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Applique la revue : le même fichier est relu, et ce qui reste coché est écrit.",
+        "tags": ["visites"]
+      }
+    },
+    "/api/v1/imports": {
+      "get": {
+        "operationId": "listImportJobs",
+        "parameters": [
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/ImportKind"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/ImportStatus"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 25,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJobListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Liste paginée des travaux d’import, filtrable par entité et par état.",
+        "tags": ["imports"]
+      }
+    },
+    "/api/v1/imports/representants": {
+      "post": {
+        "description": "NE BLOQUE PAS : le classeur est écrit sur le volume, un travail `queued` est inscrit, et la réponse part. Le travail court en arrière-plan ; l’écran sonde `GET /imports/{id}`, dont `processedRows` sur `totalRows` donne l’avancement. Le travail naît TOUJOURS en `DRY_RUN` : rien n’est écrit tant que `POST /imports/{id}/apply` n’a pas été appelé. Le modèle de classeur se télécharge par `GET /export/representants-template.xlsx`.",
+        "operationId": "createRepresentantsImport",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJobDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "IMPORT_FILE_TOO_LARGE · le classeur dépasse le plafond de taille.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Trop de requêtes : réessayez plus tard.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Dépose un classeur de représentants et inscrit le travail. Rend immédiatement.",
+        "tags": ["imports"]
+      }
+    },
+    "/api/v1/imports/prospects": {
+      "post": {
+        "description": "NE BLOQUE PAS : le classeur est écrit sur le volume, un travail `queued` est inscrit, et la réponse part. Le travail court en arrière-plan ; l’écran sonde `GET /imports/{id}`, dont `processedRows` sur `totalRows` donne l’avancement. Le travail naît TOUJOURS en `DRY_RUN` : rien n’est écrit tant que `POST /imports/{id}/apply` n’a pas été appelé. Le modèle de classeur se télécharge par `GET /export/prospects-modele.xlsx`, dont les colonnes Banque et Syndicat sont des listes déroulantes tirées des référentiels vivants. CET IMPORT NE CRÉE AUCUN REPRÉSENTANT : chaque ligne doit désigner, par son numéro, un représentant déjà en base.",
+        "operationId": "createProspectsImport",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJobDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "IMPORT_FILE_TOO_LARGE · le classeur dépasse le plafond de taille.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Trop de requêtes : réessayez plus tard.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Dépose un classeur de prospects et inscrit le travail. Rend immédiatement.",
+        "tags": ["imports"]
+      }
+    },
+    "/api/v1/imports/prospects-grand-public": {
+      "post": {
+        "description": "NE BLOQUE PAS : le classeur est écrit sur le volume, un travail `queued` est inscrit, et la réponse part. Le travail naît TOUJOURS en `DRY_RUN` : rien n’est écrit tant que `POST /imports/{id}/apply` n’a pas été appelé. Les colonnes sont retrouvées par le TEXTE de leur en-tête, en ligne 1, jamais par leur rang. SEULS le nom et le téléphone sont exigés : profession, syndicat, banque, fonctionnaire, durée du système et canal de provenance se lisent vides sans faire refuser la ligne, et leur colonne peut même manquer du fichier. « Fonctionnaire » à « oui » range la fiche en FONCTIONNAIRE ; à « non », le type reste vide, car le fichier ne dit pas lequel des trois autres il serait. Le modèle de classeur se télécharge par `GET /export/prospects-grand-public-modele.xlsx`.",
+        "operationId": "createProspectsGrandPublicImport",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJobDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "IMPORT_FILE_TOO_LARGE · le classeur dépasse le plafond de taille.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Trop de requêtes : réessayez plus tard.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Dépose un classeur de prospects Grand Public et inscrit le travail. Rend immédiatement.",
+        "tags": ["imports"]
+      }
+    },
+    "/api/v1/imports/visites": {
+      "post": {
+        "description": "NE BLOQUE PAS : le classeur est écrit sur le volume, un travail `queued` est inscrit, et la réponse part. Le travail naît TOUJOURS en `DRY_RUN` : rien n’est écrit tant que `POST /imports/{id}/apply` n’a pas été appelé. Seuls les onglets « BDD VISITES » sont lus, en-tête en ligne 3, données à partir de la colonne C. La colonne « N° » n’est pas reprise : elle repart à 1 chaque mois. CET IMPORT NE CRÉE AUCUNE ENTRÉE DE RÉFÉRENTIEL : une entreprise, une direction, un destinataire ou un objet absent des quatre listes fait refuser la ligne, avec sa valeur exacte, son onglet et son numéro de ligne au rapport.",
+        "operationId": "createVisitesImport",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file"],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJobDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "IMPORT_FILE_TOO_LARGE · le classeur dépasse le plafond de taille.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Trop de requêtes : réessayez plus tard.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Dépose le classeur des visites de l’accueil et inscrit le travail. Rend immédiatement.",
+        "tags": ["imports"]
+      }
+    },
+    "/api/v1/imports/{id}": {
+      "get": {
+        "description": "Route de SONDAGE. `processedRows` avance à chaque tranche écrite, sans qu’aucun mécanisme de progression n’ait eu à être inventé : c’est le compteur que la transaction de la tranche avance elle-même.",
+        "operationId": "getImportJob",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJobDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "IMPORT_JOB_NOT_FOUND · ce travail d’import n’existe pas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "État d’un travail d’import, et son rapport quand il est terminé.",
+        "tags": ["imports"]
+      }
+    },
+    "/api/v1/imports/{id}/apply": {
+      "post": {
+        "description": "Remet le MÊME travail en file, en mode `APPLY`. Les compteurs et le rapport de la simulation sont remplacés par ceux de l’application. Refusé si le travail n’est pas une simulation terminée, ou si son échéance est passée — le classeur a alors été détruit.",
+        "operationId": "applyImportJob",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportJobDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "IMPORT_JOB_NOT_FOUND · ce travail d’import n’existe pas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "IMPORT_NOT_APPLICABLE · le travail n’est pas une simulation terminée, ou son échéance est passée.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Applique une simulation terminée : le même fichier est réécrit en base.",
+        "tags": ["imports"]
       }
     },
     "/api/v1/phase2/callbacks": {
@@ -16602,6 +17974,137 @@
         "tags": ["export"]
       }
     },
+    "/api/v1/export/visites.xlsx": {
+      "get": {
+        "description": "Une feuille « Registre », onze colonnes, `N° REGISTRE` en tête. Conçu pour revenir : déposé sur `POST /v1/visites/import`, l’aller-retour détecte les différences ligne par ligne avant de les appliquer.",
+        "operationId": "exportVisitesXlsx",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-01-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "entrepriseId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "directionId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "destinataireId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "objetId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Nom du visiteur, ou référence du registre.",
+            "schema": {
+              "maxLength": 120,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Classeur Excel à une feuille.",
+            "headers": {
+              "X-Demo-Mode": {
+                "description": "Vrai si le classeur provient de l’espace démo et contient des données fictives.",
+                "schema": {
+                  "type": "string",
+                  "enum": ["true", "false"]
+                }
+              }
+            },
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Export Excel du registre des visites, avec le même filtre que l’écran.",
+        "tags": ["export"]
+      }
+    },
     "/api/v1/app-updates/android/current": {
       "get": {
         "operationId": "getAndroidUpdate",
@@ -16949,633 +18452,6 @@
         ],
         "summary": "Télécharge l’export prêt, puis le détruit.",
         "tags": ["admin"]
-      }
-    },
-    "/api/v1/imports": {
-      "get": {
-        "operationId": "listImportJobs",
-        "parameters": [
-          {
-            "name": "kind",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "$ref": "#/components/schemas/ImportKind"
-            }
-          },
-          {
-            "name": "status",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "$ref": "#/components/schemas/ImportStatus"
-            }
-          },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "maximum": 200,
-              "default": 25,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ImportJobListDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Liste paginée des travaux d’import, filtrable par entité et par état.",
-        "tags": ["imports"]
-      }
-    },
-    "/api/v1/imports/representants": {
-      "post": {
-        "description": "NE BLOQUE PAS : le classeur est écrit sur le volume, un travail `queued` est inscrit, et la réponse part. Le travail court en arrière-plan ; l’écran sonde `GET /imports/{id}`, dont `processedRows` sur `totalRows` donne l’avancement. Le travail naît TOUJOURS en `DRY_RUN` : rien n’est écrit tant que `POST /imports/{id}/apply` n’a pas été appelé. Le modèle de classeur se télécharge par `GET /export/representants-template.xlsx`.",
-        "operationId": "createRepresentantsImport",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "required": ["file"],
-                "properties": {
-                  "file": {
-                    "type": "string",
-                    "format": "binary"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ImportJobDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "IMPORT_FILE_TOO_LARGE · le classeur dépasse le plafond de taille.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Trop de requêtes : réessayez plus tard.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Dépose un classeur de représentants et inscrit le travail. Rend immédiatement.",
-        "tags": ["imports"]
-      }
-    },
-    "/api/v1/imports/prospects": {
-      "post": {
-        "description": "NE BLOQUE PAS : le classeur est écrit sur le volume, un travail `queued` est inscrit, et la réponse part. Le travail court en arrière-plan ; l’écran sonde `GET /imports/{id}`, dont `processedRows` sur `totalRows` donne l’avancement. Le travail naît TOUJOURS en `DRY_RUN` : rien n’est écrit tant que `POST /imports/{id}/apply` n’a pas été appelé. Le modèle de classeur se télécharge par `GET /export/prospects-modele.xlsx`, dont les colonnes Banque et Syndicat sont des listes déroulantes tirées des référentiels vivants. CET IMPORT NE CRÉE AUCUN REPRÉSENTANT : chaque ligne doit désigner, par son numéro, un représentant déjà en base.",
-        "operationId": "createProspectsImport",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "required": ["file"],
-                "properties": {
-                  "file": {
-                    "type": "string",
-                    "format": "binary"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ImportJobDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "IMPORT_FILE_TOO_LARGE · le classeur dépasse le plafond de taille.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Trop de requêtes : réessayez plus tard.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Dépose un classeur de prospects et inscrit le travail. Rend immédiatement.",
-        "tags": ["imports"]
-      }
-    },
-    "/api/v1/imports/prospects-grand-public": {
-      "post": {
-        "description": "NE BLOQUE PAS : le classeur est écrit sur le volume, un travail `queued` est inscrit, et la réponse part. Le travail naît TOUJOURS en `DRY_RUN` : rien n’est écrit tant que `POST /imports/{id}/apply` n’a pas été appelé. Les colonnes sont retrouvées par le TEXTE de leur en-tête, en ligne 1, jamais par leur rang. SEULS le nom et le téléphone sont exigés : profession, syndicat, banque, fonctionnaire, durée du système et canal de provenance se lisent vides sans faire refuser la ligne, et leur colonne peut même manquer du fichier. « Fonctionnaire » à « oui » range la fiche en FONCTIONNAIRE ; à « non », le type reste vide, car le fichier ne dit pas lequel des trois autres il serait. Le modèle de classeur se télécharge par `GET /export/prospects-grand-public-modele.xlsx`.",
-        "operationId": "createProspectsGrandPublicImport",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "required": ["file"],
-                "properties": {
-                  "file": {
-                    "type": "string",
-                    "format": "binary"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ImportJobDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "IMPORT_FILE_TOO_LARGE · le classeur dépasse le plafond de taille.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Trop de requêtes : réessayez plus tard.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Dépose un classeur de prospects Grand Public et inscrit le travail. Rend immédiatement.",
-        "tags": ["imports"]
-      }
-    },
-    "/api/v1/imports/visites": {
-      "post": {
-        "description": "NE BLOQUE PAS : le classeur est écrit sur le volume, un travail `queued` est inscrit, et la réponse part. Le travail naît TOUJOURS en `DRY_RUN` : rien n’est écrit tant que `POST /imports/{id}/apply` n’a pas été appelé. Seuls les onglets « BDD VISITES » sont lus, en-tête en ligne 3, données à partir de la colonne C. La colonne « N° » n’est pas reprise : elle repart à 1 chaque mois. CET IMPORT NE CRÉE AUCUNE ENTRÉE DE RÉFÉRENTIEL : une entreprise, une direction, un destinataire ou un objet absent des quatre listes fait refuser la ligne, avec sa valeur exacte, son onglet et son numéro de ligne au rapport.",
-        "operationId": "createVisitesImport",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "required": ["file"],
-                "properties": {
-                  "file": {
-                    "type": "string",
-                    "format": "binary"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ImportJobDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "IMPORT_FILE_TOO_LARGE · le classeur dépasse le plafond de taille.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Trop de requêtes : réessayez plus tard.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Dépose le classeur des visites de l’accueil et inscrit le travail. Rend immédiatement.",
-        "tags": ["imports"]
-      }
-    },
-    "/api/v1/imports/{id}": {
-      "get": {
-        "description": "Route de SONDAGE. `processedRows` avance à chaque tranche écrite, sans qu’aucun mécanisme de progression n’ait eu à être inventé : c’est le compteur que la transaction de la tranche avance elle-même.",
-        "operationId": "getImportJob",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ImportJobDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "IMPORT_JOB_NOT_FOUND · ce travail d’import n’existe pas.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "État d’un travail d’import, et son rapport quand il est terminé.",
-        "tags": ["imports"]
-      }
-    },
-    "/api/v1/imports/{id}/apply": {
-      "post": {
-        "description": "Remet le MÊME travail en file, en mode `APPLY`. Les compteurs et le rapport de la simulation sont remplacés par ceux de l’application. Refusé si le travail n’est pas une simulation terminée, ou si son échéance est passée — le classeur a alors été détruit.",
-        "operationId": "applyImportJob",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ImportJobDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "IMPORT_JOB_NOT_FOUND · ce travail d’import n’existe pas.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "IMPORT_NOT_APPLICABLE · le travail n’est pas une simulation terminée, ou son échéance est passée.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Applique une simulation terminée : le même fichier est réécrit en base.",
-        "tags": ["imports"]
       }
     }
   },
@@ -21545,6 +22421,49 @@
         },
         "required": ["entreprises", "directions", "destinataires", "objets"]
       },
+      "VisiteReferentielUsageEntryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": ["id", "count"]
+      },
+      "VisiteReferentielUsageDto": {
+        "type": "object",
+        "properties": {
+          "entreprises": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteReferentielUsageEntryDto"
+            }
+          },
+          "directions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteReferentielUsageEntryDto"
+            }
+          },
+          "destinataires": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteReferentielUsageEntryDto"
+            }
+          },
+          "objets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteReferentielUsageEntryDto"
+            }
+          }
+        },
+        "required": ["entreprises", "directions", "destinataires", "objets"]
+      },
       "VisiteReferentielListDto": {
         "type": "object",
         "properties": {
@@ -21656,6 +22575,126 @@
         },
         "required": ["date", "count"]
       },
+      "VisiteStatHeureDto": {
+        "type": "object",
+        "properties": {
+          "hour": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 23
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": ["hour", "count"]
+      },
+      "VisiteStatJourSemaineDto": {
+        "type": "object",
+        "properties": {
+          "weekday": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 7,
+            "description": "ISO : lundi = 1."
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": ["weekday", "count"]
+      },
+      "VisiteStatHeureJourSemaineDto": {
+        "type": "object",
+        "properties": {
+          "weekday": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 7
+          },
+          "hour": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 23
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": ["weekday", "hour", "count"]
+      },
+      "VisiteStatAgentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "label": {
+            "type": "string",
+            "description": "L’agent d’accueil qui a saisi la visite."
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": ["id", "label", "count"]
+      },
+      "VisiteStatCroisementDto": {
+        "type": "object",
+        "properties": {
+          "ligneId": {
+            "type": "string",
+            "description": "Identifiant de la dimension en ligne."
+          },
+          "colonneId": {
+            "type": "string",
+            "description": "Identifiant de la dimension en colonne."
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": ["ligneId", "colonneId", "count"]
+      },
+      "VisiteStatRecurrentDto": {
+        "type": "object",
+        "properties": {
+          "nom": {
+            "type": "string"
+          },
+          "visites": {
+            "type": "number"
+          },
+          "derniereVisite": {
+            "type": "string",
+            "example": "2026-01-06"
+          }
+        },
+        "required": ["nom", "visites", "derniereVisite"]
+      },
+      "VisiteStatSaisieDto": {
+        "type": "object",
+        "properties": {
+          "memeJour": {
+            "type": "number",
+            "description": "Saisies faites le jour même de la visite."
+          },
+          "lendemain": {
+            "type": "number",
+            "description": "Saisies faites le lendemain de la visite."
+          },
+          "plusTard": {
+            "type": "number",
+            "description": "Saisies faites deux jours après la visite ou plus."
+          },
+          "delaiMedianHeures": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": ["memeJour", "lendemain", "plusTard", "delaiMedianHeures"]
+      },
       "VisiteStatsDto": {
         "type": "object",
         "properties": {
@@ -21715,6 +22754,79 @@
           },
           "sansDestinataire": {
             "type": "number"
+          },
+          "parHeure": {
+            "description": "Les 24 heures de la journée, à Dakar. Les visites sans heure relevée en sont exclues.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteStatHeureDto"
+            }
+          },
+          "sansHeure": {
+            "type": "number",
+            "description": "Visites sans heure relevée."
+          },
+          "parJourSemaine": {
+            "description": "Les 7 jours de la semaine ISO (lundi = 1), toutes visites comprises.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteStatJourSemaineDto"
+            }
+          },
+          "parHeureJourSemaine": {
+            "description": "Croisement heure × jour de semaine, cellules non nulles seulement, 168 au plus.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteStatHeureJourSemaineDto"
+            }
+          },
+          "parAgent": {
+            "description": "L’agent d’accueil qui a saisi chaque visite.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteStatAgentDto"
+            }
+          },
+          "parEntrepriseObjet": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteStatCroisementDto"
+            }
+          },
+          "parDestinataireDirection": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteStatCroisementDto"
+            }
+          },
+          "parObjetMois": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteStatCroisementDto"
+            }
+          },
+          "recurrents": {
+            "description": "Visiteurs vus au moins deux fois sur la période, dix au plus. Regroupés par téléphone, sinon par nom : jamais le numéro.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteStatRecurrentDto"
+            }
+          },
+          "partRecurrents": {
+            "type": "number",
+            "description": "Part des visites faites par des visiteurs récurrents."
+          },
+          "avecTelephone": {
+            "type": "number",
+            "description": "Visites portant un numéro de téléphone."
+          },
+          "saisieDifferee": {
+            "description": "Délai entre la visite et sa saisie.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VisiteStatSaisieDto"
+              }
+            ]
           }
         },
         "required": [
@@ -21728,8 +22840,24 @@
           "parMois",
           "parJour",
           "sansDirection",
-          "sansDestinataire"
+          "sansDestinataire",
+          "parHeure",
+          "sansHeure",
+          "parJourSemaine",
+          "parHeureJourSemaine",
+          "parAgent",
+          "parEntrepriseObjet",
+          "parDestinataireDirection",
+          "parObjetMois",
+          "recurrents",
+          "partRecurrents",
+          "avecTelephone",
+          "saisieDifferee"
         ]
+      },
+      "VisiteSortField": {
+        "type": "string",
+        "enum": ["visitedAt", "visitorName", "entreprise", "direction", "destinataire", "objet"]
       },
       "VisiteDto": {
         "type": "object",
@@ -21836,6 +22964,166 @@
         },
         "required": ["items", "meta"]
       },
+      "DashboardSource": {
+        "type": "string",
+        "enum": [
+          "total-visites",
+          "moyenne-journaliere",
+          "jour-le-plus-charge",
+          "par-entreprise",
+          "par-objet",
+          "par-direction",
+          "par-destinataire",
+          "par-jour",
+          "par-mois",
+          "par-heure",
+          "par-jour-semaine",
+          "par-heure-jour-semaine",
+          "par-agent",
+          "par-entreprise-objet",
+          "par-destinataire-direction",
+          "par-objet-mois",
+          "visiteurs-recurrents",
+          "avec-telephone",
+          "qualite-de-saisie"
+        ]
+      },
+      "DashboardMarque": {
+        "type": "string",
+        "enum": [
+          "barres-verticales",
+          "barres-horizontales",
+          "barres-empilees",
+          "barres-100",
+          "barres-groupees",
+          "courbe",
+          "aire",
+          "escalier",
+          "anneau",
+          "camembert",
+          "aire-polaire",
+          "radar",
+          "nuage",
+          "bulles",
+          "mixte",
+          "jauge",
+          "carte-de-chaleur",
+          "tableau",
+          "tuile",
+          "tuile-courbe"
+        ]
+      },
+      "DashboardTaille": {
+        "type": "string",
+        "enum": ["demi", "pleine"]
+      },
+      "DispositionPresentationDto": {
+        "type": "object",
+        "properties": {
+          "palette": {
+            "type": "string",
+            "enum": ["neutre", "serie", "categorielle"]
+          },
+          "valeurs": {
+            "type": "boolean"
+          },
+          "legende": {
+            "type": "boolean"
+          },
+          "tri": {
+            "type": "string",
+            "enum": ["valeur-desc", "valeur-asc", "alphabetique"]
+          },
+          "autresApres": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 50
+          }
+        }
+      },
+      "DispositionWidgetDto": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DashboardSource"
+              }
+            ]
+          },
+          "marque": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DashboardMarque"
+              }
+            ]
+          },
+          "taille": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DashboardTaille"
+              }
+            ]
+          },
+          "presentation": {
+            "$ref": "#/components/schemas/DispositionPresentationDto"
+          }
+        },
+        "required": ["source"]
+      },
+      "DashboardPreset": {
+        "type": "string",
+        "enum": ["essentiel", "affluence", "organisation", "complet"]
+      },
+      "DispositionResponseDto": {
+        "type": "object",
+        "properties": {
+          "widgets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DispositionWidgetDto"
+            }
+          },
+          "preset": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DashboardPreset"
+              }
+            ]
+          },
+          "source": {
+            "type": "string",
+            "enum": ["utilisateur", "defaut", "usine"],
+            "description": "D’où vient la disposition rendue : la sienne, celle fixée par l’administrateur, ou celle d’usine."
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": ["widgets", "preset", "source", "updatedAt"]
+      },
+      "UpdateDispositionDto": {
+        "type": "object",
+        "properties": {
+          "preset": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DashboardPreset"
+              }
+            ]
+          },
+          "widgets": {
+            "description": "Les éléments du tableau de bord. `version` est fixé par le serveur et refusé s’il est transmis.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DispositionWidgetDto"
+            }
+          }
+        },
+        "required": ["widgets"]
+      },
       "CreateVisiteDto": {
         "type": "object",
         "properties": {
@@ -21921,6 +23209,373 @@
             "nullable": true
           }
         }
+      },
+      "ImportKind": {
+        "type": "string",
+        "enum": [
+          "REPRESENTANTS",
+          "PROSPECTS",
+          "VISITES",
+          "PROSPECTS_GRAND_PUBLIC",
+          "VISITES_REGISTRE"
+        ]
+      },
+      "ImportStatus": {
+        "type": "string",
+        "enum": ["queued", "running", "succeeded", "failed", "expired"],
+        "description": "`queued` : le travail attend un travailleur. `running` : il court, `processedRows` avance. `succeeded` : terminé, le rapport est là. `failed` : le motif est dans `failureCode`. `expired` : le fichier déposé et le rapport ont été détruits à l’échéance ; ce n’est pas une erreur."
+      },
+      "ImportMode": {
+        "type": "string",
+        "enum": ["DRY_RUN", "APPLY"],
+        "description": "DRY_RUN simule et n’écrit rien. APPLY écrit. Un import naît TOUJOURS en DRY_RUN : appliquer cinquante mille lignes sans les avoir vues ne se rattrape pas."
+      },
+      "ImportJobErrorDto": {
+        "type": "object",
+        "properties": {
+          "rowNumber": {
+            "type": "number",
+            "description": "Numéro de ligne DANS LE FICHIER, en-tête compris : ce qu’Excel affiche."
+          },
+          "column": {
+            "type": "string",
+            "nullable": true,
+            "description": "En-tête de la colonne fautive, quand le refus en désigne une."
+          },
+          "code": {
+            "type": "string",
+            "description": "Code stable du motif, pour que l’interface puisse le traduire."
+          },
+          "message": {
+            "type": "string",
+            "description": "Motif lisible, prêt à afficher."
+          }
+        },
+        "required": ["rowNumber", "column", "code", "message"]
+      },
+      "ImportJobReportDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ImportKind"
+              }
+            ]
+          },
+          "mode": {
+            "description": "Le mode sous lequel ce rapport a été produit. En DRY_RUN, `createdRows` compte les lignes qui SERAIENT créées ; rien n’a été écrit.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ImportMode"
+              }
+            ]
+          },
+          "totalRows": {
+            "type": "number",
+            "description": "Lignes de données lues, en-tête et exemple exclus."
+          },
+          "processedRows": {
+            "type": "number"
+          },
+          "createdRows": {
+            "type": "number"
+          },
+          "updatedRows": {
+            "type": "number",
+            "description": "Lignes RÉÉCRITES. Seul l’aller-retour Excel du registre des visites en produit."
+          },
+          "skippedRows": {
+            "type": "number",
+            "description": "Lignes écartées : doublons dans le fichier, ou déjà présentes en base."
+          },
+          "errorRows": {
+            "type": "number",
+            "description": "Lignes refusées à l’analyse. Compte EXACT."
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "Vrai quand `errors` ne montre qu’une partie des refus. Le compteur `errorRows`, lui, reste exact."
+          },
+          "maxReportedErrors": {
+            "type": "number",
+            "description": "Longueur maximale de `errors`."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportJobErrorDto"
+            }
+          }
+        },
+        "required": [
+          "kind",
+          "mode",
+          "totalRows",
+          "processedRows",
+          "createdRows",
+          "updatedRows",
+          "skippedRows",
+          "errorRows",
+          "truncated",
+          "maxReportedErrors",
+          "errors"
+        ]
+      },
+      "ImportJobDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ImportKind"
+              }
+            ]
+          },
+          "status": {
+            "description": "`queued` : le travail attend un travailleur. `running` : il court, `processedRows` avance. `succeeded` : terminé, le rapport est là. `failed` : le motif est dans `failureCode`. `expired` : le fichier déposé et le rapport ont été détruits à l’échéance ; ce n’est pas une erreur.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ImportStatus"
+              }
+            ]
+          },
+          "mode": {
+            "description": "DRY_RUN simule et n’écrit rien. APPLY écrit. Un import naît TOUJOURS en DRY_RUN : appliquer cinquante mille lignes sans les avoir vues ne se rattrape pas.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ImportMode"
+              }
+            ]
+          },
+          "requestedById": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fileName": {
+            "type": "string",
+            "description": "Nom du fichier tel que téléversé. JAMAIS utilisé comme chemin."
+          },
+          "fileBytes": {
+            "type": "number"
+          },
+          "totalRows": {
+            "type": "number",
+            "nullable": true,
+            "description": "Dénominateur de l’avancement. NUL tant que le travail n’a pas lu l’en-tête du classeur, et nul aussi quand la feuille ne déclare pas ses dimensions."
+          },
+          "processedRows": {
+            "type": "number"
+          },
+          "createdRows": {
+            "type": "number"
+          },
+          "updatedRows": {
+            "type": "number",
+            "description": "Lignes RÉÉCRITES. Seul l’aller-retour Excel du registre des visites en produit."
+          },
+          "skippedRows": {
+            "type": "number"
+          },
+          "errorRows": {
+            "type": "number"
+          },
+          "report": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ImportJobReportDto"
+              }
+            ]
+          },
+          "failureCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "failureMsg": {
+            "type": "string",
+            "nullable": true
+          },
+          "startedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Au-delà, le classeur déposé et le rapport sont détruits."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "mode",
+          "requestedById",
+          "fileName",
+          "fileBytes",
+          "totalRows",
+          "processedRows",
+          "createdRows",
+          "updatedRows",
+          "skippedRows",
+          "errorRows",
+          "report",
+          "failureCode",
+          "failureMsg",
+          "startedAt",
+          "finishedAt",
+          "expiresAt",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "VisiteImportChangeKind": {
+        "type": "string",
+        "enum": ["CREATE", "UPDATE"]
+      },
+      "VisiteImportChangeFieldDto": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string",
+            "description": "Clé machine de la colonne, ex. `entreprise`."
+          },
+          "label": {
+            "type": "string",
+            "description": "En-tête de la colonne, tel qu’affiché."
+          },
+          "before": {
+            "type": "string"
+          },
+          "after": {
+            "type": "string"
+          }
+        },
+        "required": ["field", "label", "before", "after"]
+      },
+      "VisiteImportChangeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sheet": {
+            "type": "string"
+          },
+          "rowNumber": {
+            "type": "number"
+          },
+          "kind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VisiteImportChangeKind"
+              }
+            ]
+          },
+          "reference": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nul pour une création."
+          },
+          "visiteId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "label": {
+            "type": "string",
+            "description": "« MME LY SEYNABOU, 12/08 14:30 », sans avoir à relire la visite."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteImportChangeFieldDto"
+            }
+          },
+          "selected": {
+            "type": "boolean",
+            "description": "Coché par défaut : décocher retire la ligne de l’application."
+          }
+        },
+        "required": [
+          "id",
+          "sheet",
+          "rowNumber",
+          "kind",
+          "reference",
+          "visiteId",
+          "label",
+          "fields",
+          "selected"
+        ]
+      },
+      "VisiteImportChangeListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisiteImportChangeDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMetaDto"
+          }
+        },
+        "required": ["items", "meta"]
+      },
+      "SetVisiteImportChangeSelectionDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "description": "Les lignes visées par ce geste.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "selected": {
+            "type": "boolean"
+          }
+        },
+        "required": ["ids", "selected"]
+      },
+      "ImportJobListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportJobDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMetaDto"
+          }
+        },
+        "required": ["items", "meta"]
       },
       "CallbackScope": {
         "type": "string",
@@ -25832,243 +27487,6 @@
           "noticeDetail",
           "downloadable"
         ]
-      },
-      "ImportKind": {
-        "type": "string",
-        "enum": ["REPRESENTANTS", "PROSPECTS", "VISITES", "PROSPECTS_GRAND_PUBLIC"]
-      },
-      "ImportStatus": {
-        "type": "string",
-        "enum": ["queued", "running", "succeeded", "failed", "expired"]
-      },
-      "ImportMode": {
-        "type": "string",
-        "enum": ["DRY_RUN", "APPLY"],
-        "description": "DRY_RUN simule et n’écrit rien. APPLY écrit. Un import naît TOUJOURS en DRY_RUN : appliquer cinquante mille lignes sans les avoir vues ne se rattrape pas."
-      },
-      "ImportJobErrorDto": {
-        "type": "object",
-        "properties": {
-          "rowNumber": {
-            "type": "number",
-            "description": "Numéro de ligne DANS LE FICHIER, en-tête compris : ce qu’Excel affiche."
-          },
-          "column": {
-            "type": "string",
-            "nullable": true,
-            "description": "En-tête de la colonne fautive, quand le refus en désigne une."
-          },
-          "code": {
-            "type": "string",
-            "description": "Code stable du motif, pour que l’interface puisse le traduire."
-          },
-          "message": {
-            "type": "string",
-            "description": "Motif lisible, prêt à afficher."
-          }
-        },
-        "required": ["rowNumber", "column", "code", "message"]
-      },
-      "ImportJobReportDto": {
-        "type": "object",
-        "properties": {
-          "kind": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/ImportKind"
-              }
-            ]
-          },
-          "mode": {
-            "description": "Le mode sous lequel ce rapport a été produit. En DRY_RUN, `createdRows` compte les lignes qui SERAIENT créées ; rien n’a été écrit.",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/ImportMode"
-              }
-            ]
-          },
-          "totalRows": {
-            "type": "number",
-            "description": "Lignes de données lues, en-tête et exemple exclus."
-          },
-          "processedRows": {
-            "type": "number"
-          },
-          "createdRows": {
-            "type": "number"
-          },
-          "skippedRows": {
-            "type": "number",
-            "description": "Lignes écartées : doublons dans le fichier, ou déjà présentes en base."
-          },
-          "errorRows": {
-            "type": "number",
-            "description": "Lignes refusées à l’analyse. Compte EXACT."
-          },
-          "truncated": {
-            "type": "boolean",
-            "description": "Vrai quand `errors` ne montre qu’une partie des refus. Le compteur `errorRows`, lui, reste exact."
-          },
-          "maxReportedErrors": {
-            "type": "number",
-            "description": "Longueur maximale de `errors`."
-          },
-          "errors": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ImportJobErrorDto"
-            }
-          }
-        },
-        "required": [
-          "kind",
-          "mode",
-          "totalRows",
-          "processedRows",
-          "createdRows",
-          "skippedRows",
-          "errorRows",
-          "truncated",
-          "maxReportedErrors",
-          "errors"
-        ]
-      },
-      "ImportJobDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "kind": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/ImportKind"
-              }
-            ]
-          },
-          "status": {
-            "description": "`queued` : le travail attend un travailleur. `running` : il court, `processedRows` avance. `succeeded` : terminé, le rapport est là. `failed` : le motif est dans `failureCode`. `expired` : le fichier déposé et le rapport ont été détruits à l’échéance ; ce n’est pas une erreur.",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/ImportStatus"
-              }
-            ]
-          },
-          "mode": {
-            "description": "DRY_RUN simule et n’écrit rien. APPLY écrit. Un import naît TOUJOURS en DRY_RUN : appliquer cinquante mille lignes sans les avoir vues ne se rattrape pas.",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/ImportMode"
-              }
-            ]
-          },
-          "requestedById": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "fileName": {
-            "type": "string",
-            "description": "Nom du fichier tel que téléversé. JAMAIS utilisé comme chemin."
-          },
-          "fileBytes": {
-            "type": "number"
-          },
-          "totalRows": {
-            "type": "number",
-            "nullable": true,
-            "description": "Dénominateur de l’avancement. NUL tant que le travail n’a pas lu l’en-tête du classeur, et nul aussi quand la feuille ne déclare pas ses dimensions."
-          },
-          "processedRows": {
-            "type": "number"
-          },
-          "createdRows": {
-            "type": "number"
-          },
-          "skippedRows": {
-            "type": "number"
-          },
-          "errorRows": {
-            "type": "number"
-          },
-          "report": {
-            "nullable": true,
-            "type": "object",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/ImportJobReportDto"
-              }
-            ]
-          },
-          "failureCode": {
-            "type": "string",
-            "nullable": true
-          },
-          "failureMsg": {
-            "type": "string",
-            "nullable": true
-          },
-          "startedAt": {
-            "type": "string",
-            "nullable": true,
-            "format": "date-time"
-          },
-          "finishedAt": {
-            "type": "string",
-            "nullable": true,
-            "format": "date-time"
-          },
-          "expiresAt": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Au-delà, le classeur déposé et le rapport sont détruits."
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "id",
-          "kind",
-          "status",
-          "mode",
-          "requestedById",
-          "fileName",
-          "fileBytes",
-          "totalRows",
-          "processedRows",
-          "createdRows",
-          "skippedRows",
-          "errorRows",
-          "report",
-          "failureCode",
-          "failureMsg",
-          "startedAt",
-          "finishedAt",
-          "expiresAt",
-          "createdAt",
-          "updatedAt"
-        ]
-      },
-      "ImportJobListDto": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ImportJobDto"
-            }
-          },
-          "meta": {
-            "$ref": "#/components/schemas/PageMetaDto"
-          }
-        },
-        "required": ["items", "meta"]
       }
     }
   }

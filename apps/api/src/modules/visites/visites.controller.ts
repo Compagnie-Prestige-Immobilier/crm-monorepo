@@ -1,12 +1,14 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseEnumPipe,
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -14,6 +16,7 @@ import { Role } from '@crm/database';
 
 import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
 import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
+import { OkDto } from '../../common/dto/ok.dto.js';
 import { ANY_AUTHENTICATED, Roles } from '../../common/decorators/roles.decorator.js';
 import {
   CurrentUser,
@@ -21,12 +24,18 @@ import {
 } from '../../common/decorators/current-user.decorator.js';
 import { VISITE_REGISTRE_ROLES, VisitesService } from './visites.service.js';
 import { VisitesStatsService } from './visites-stats.service.js';
-import { VisiteReferentielsService } from './visite-referentiels.service.js';
+import { VisiteDashboardService } from './visite-dashboard.service.js';
+import {
+  VisiteReferentielsService,
+  VisiteReferentielUsageDto,
+} from './visite-referentiels.service.js';
 import {
   CreateVisiteDto,
   CreateVisiteReferentielDto,
+  DispositionResponseDto,
   ReorderVisiteReferentielDto,
   SetVisiteReferentielActiveDto,
+  UpdateDispositionDto,
   UpdateVisiteDto,
   UpdateVisiteReferentielDto,
   VISITE_REFERENTIEL_KINDS,
@@ -55,6 +64,7 @@ export class VisitesController {
     private readonly visites: VisitesService,
     private readonly stats: VisitesStatsService,
     private readonly referentiels: VisiteReferentielsService,
+    private readonly dashboard: VisiteDashboardService,
   ) {}
 
   @Roles(...ANY_AUTHENTICATED)
@@ -66,6 +76,18 @@ export class VisitesController {
   @ApiResponse({ status: 200, type: VisiteReferentielsBundleDto })
   bundle(@Query() query: VisiteReferentielQueryDto): Promise<VisiteReferentielsBundleDto> {
     return this.referentiels.bundle(query.activeOnly ?? true);
+  }
+
+  @Roles(...LISTES_ROLES)
+  @Get('referentiels/usage')
+  @ApiOperation({
+    operationId: 'getVisiteReferentielUsage',
+    summary: 'Combien de visites désignent chaque entrée des quatre listes.',
+    description: 'Total toutes dates confondues, à distinguer du décompte borné de /statistiques.',
+  })
+  @ApiResponse({ status: 200, type: VisiteReferentielUsageDto })
+  usage(): Promise<VisiteReferentielUsageDto> {
+    return this.referentiels.usage();
   }
 
   @Roles(...LISTES_ROLES)
@@ -183,6 +205,62 @@ export class VisitesController {
   @ApiResponse({ status: 200, type: VisiteListDto })
   list(@Query() query: VisiteQueryDto): Promise<VisiteListDto> {
     return this.visites.list(query);
+  }
+
+  @Roles(...VISITE_REGISTRE_ROLES)
+  @Get('tableau-de-bord/disposition')
+  @ApiOperation({
+    operationId: 'getVisiteDashboardLayout',
+    summary:
+      'La disposition du tableau de bord : la sienne, sinon celle par défaut, sinon celle d’usine.',
+  })
+  @ApiResponse({ status: 200, type: DispositionResponseDto })
+  getDashboardLayout(@CurrentUser() user: AuthenticatedUser): Promise<DispositionResponseDto> {
+    return this.dashboard.get(user.id);
+  }
+
+  @Roles(...VISITE_REGISTRE_ROLES)
+  @Put('tableau-de-bord/disposition')
+  @ApiOperation({
+    operationId: 'putVisiteDashboardLayout',
+    summary: 'Enregistre sa propre disposition du tableau de bord.',
+    description:
+      'La version de la disposition est fixée par le serveur ; la transmettre est refusé.',
+  })
+  @ApiResponse({ status: 200, type: DispositionResponseDto })
+  putDashboardLayout(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: UpdateDispositionDto,
+  ): Promise<DispositionResponseDto> {
+    return this.dashboard.put(user.id, body);
+  }
+
+  @Roles(...VISITE_REGISTRE_ROLES)
+  @Delete('tableau-de-bord/disposition')
+  @ApiOperation({
+    operationId: 'deleteVisiteDashboardLayout',
+    summary: 'Efface sa propre disposition ; retombe sur celle par défaut, puis celle d’usine.',
+  })
+  @ApiResponse({ status: 200, type: OkDto })
+  async deleteDashboardLayout(@CurrentUser() user: AuthenticatedUser): Promise<OkDto> {
+    await this.dashboard.remove(user.id);
+    return { ok: true };
+  }
+
+  @Roles(Role.ADMIN)
+  @Put('tableau-de-bord/disposition-par-defaut')
+  @ApiOperation({
+    operationId: 'putVisiteDashboardDefaultLayout',
+    summary: 'Fixe la disposition proposée par défaut à tous les comptes du registre.',
+    description:
+      'La version de la disposition est fixée par le serveur ; la transmettre est refusé.',
+  })
+  @ApiResponse({ status: 200, type: DispositionResponseDto })
+  putDefaultDashboardLayout(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: UpdateDispositionDto,
+  ): Promise<DispositionResponseDto> {
+    return this.dashboard.putDefault(user.id, body);
   }
 
   @Roles(...VISITE_REGISTRE_ROLES)

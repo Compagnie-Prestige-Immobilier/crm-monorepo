@@ -54,6 +54,35 @@ function options(
   return list;
 }
 
+function validateNom(value: string): string | undefined {
+  const nom = value.trim();
+  if (nom === '') return 'À renseigner.';
+  if (nom.length < NOM_MIN) return 'Au moins deux caractères.';
+  if (nom.length > NOM_MAX) return `${String(NOM_MAX)} caractères au maximum.`;
+  return undefined;
+}
+
+function validatePhone(value: string): string | undefined {
+  if (value.trim().length > TELEPHONE_MAX) return `${String(TELEPHONE_MAX)} caractères au maximum.`;
+  return undefined;
+}
+
+function validateComment(value: string): string | undefined {
+  if (value.trim().length > COMMENTAIRE_MAX) {
+    return `${String(COMMENTAIRE_MAX)} caractères au maximum.`;
+  }
+  return undefined;
+}
+
+/** `exactOptionalPropertyTypes` refuse `{ key: undefined }` : la clé doit disparaître, pas valoir vide. */
+function withFieldError(prev: Errors, key: keyof Errors, message: string | undefined): Errors {
+  if (message === undefined) {
+    const entries = Object.entries(prev).filter(([field]) => field !== key);
+    return Object.fromEntries(entries);
+  }
+  return { ...prev, [key]: message };
+}
+
 function ChoiceError({ message }: { message: string | undefined }): ReactNode {
   if (message === undefined) return null;
   return (
@@ -128,16 +157,12 @@ export function VisiteForm({
     if (save.isPending) return;
 
     const found: Errors = {};
-    const nom = visitorName.trim();
-    if (nom === '') found.visitorName = 'À renseigner.';
-    else if (nom.length < NOM_MIN) found.visitorName = 'Au moins deux caractères.';
-    else if (nom.length > NOM_MAX) found.visitorName = `${String(NOM_MAX)} caractères au maximum.`;
-    if (phone.trim().length > TELEPHONE_MAX) {
-      found.phone = `${String(TELEPHONE_MAX)} caractères au maximum.`;
-    }
-    if (comment.trim().length > COMMENTAIRE_MAX) {
-      found.comment = `${String(COMMENTAIRE_MAX)} caractères au maximum.`;
-    }
+    const nomErreur = validateNom(visitorName);
+    if (nomErreur !== undefined) found.visitorName = nomErreur;
+    const phoneErreur = validatePhone(phone);
+    if (phoneErreur !== undefined) found.phone = phoneErreur;
+    const commentErreur = validateComment(comment);
+    if (commentErreur !== undefined) found.comment = commentErreur;
     if (entrepriseId === null) found.entrepriseId = 'À choisir dans la liste.';
     if (objetId === null) found.objetId = 'À choisir dans la liste.';
     // La date effacée par la croix du sélecteur ne remplissait AUCUNE entrée :
@@ -172,7 +197,10 @@ export function VisiteForm({
       }}
       className="flex flex-col gap-4"
     >
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      {/* Deux colonnes au maximum : le dialogue est plafonné à `max-w-4xl`, et
+          `xl:grid-cols-4` se déclenche sur la largeur de l'écran, pas celle du
+          dialogue — quatre colonnes y tronquaient chaque valeur choisie. */}
+      <div className="grid gap-4 md:grid-cols-2">
         {correction ? (
           // L'API refuse de déplacer une ligne d'un jour à l'autre : la date
           // fixe la ligne dans le registre. On la montre, on ne la propose pas.
@@ -218,6 +246,9 @@ export function VisiteForm({
               onChange={(event) => {
                 setVisitorName(event.target.value);
               }}
+              onBlur={() => {
+                setErrors((prev) => withFieldError(prev, 'visitorName', validateNom(visitorName)));
+              }}
             />
           )}
         </Field>
@@ -233,6 +264,9 @@ export function VisiteForm({
               onChange={(event) => {
                 setPhone(event.target.value);
               }}
+              onBlur={() => {
+                setErrors((prev) => withFieldError(prev, 'phone', validatePhone(phone)));
+              }}
             />
           )}
         </Field>
@@ -244,6 +278,15 @@ export function VisiteForm({
             options={options(referentiels?.entreprises, visite?.entreprise ?? null)}
             value={entrepriseId}
             onChange={setEntrepriseId}
+            onBlur={() => {
+              setErrors((prev) =>
+                withFieldError(
+                  prev,
+                  'entrepriseId',
+                  entrepriseId === null ? 'À choisir dans la liste.' : undefined,
+                ),
+              );
+            }}
             required
           />
           <ChoiceError message={errors.entrepriseId} />
@@ -272,6 +315,15 @@ export function VisiteForm({
             options={options(referentiels?.objets, visite?.objet ?? null)}
             value={objetId}
             onChange={setObjetId}
+            onBlur={() => {
+              setErrors((prev) =>
+                withFieldError(
+                  prev,
+                  'objetId',
+                  objetId === null ? 'À choisir dans la liste.' : undefined,
+                ),
+              );
+            }}
             required
           />
           <ChoiceError message={errors.objetId} />
@@ -291,6 +343,9 @@ export function VisiteForm({
             value={comment}
             onChange={(event) => {
               setComment(event.target.value);
+            }}
+            onBlur={() => {
+              setErrors((prev) => withFieldError(prev, 'comment', validateComment(comment)));
             }}
           />
         )}

@@ -13,6 +13,7 @@ import '../../../core/router/single_push.dart';
 import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../ui/widgets/activity_chart.dart';
+import '../../../ui/widgets/cpi_action_bar.dart';
 import '../../../ui/widgets/cpi_pressable.dart';
 import '../../../ui/widgets/offline_indicator.dart';
 import '../../../ui/widgets/summary_card.dart';
@@ -306,19 +307,7 @@ class _PrimaryAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(
-        CpiSpacing.md,
-        CpiSpacing.xs,
-        CpiSpacing.md,
-        CpiSpacing.sm,
-      ),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        border: Border(top: BorderSide(color: context.cpi.borderSubtle)),
-      ),
+    return CpiActionBar(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[

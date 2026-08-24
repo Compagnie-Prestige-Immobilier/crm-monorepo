@@ -54,4 +54,5 @@ export const AuditAction = {
   PROSPECT_DELETE: 'prospect.delete',
   JOURNEY_CLOSE: 'prospect_journey.close',
   PORTFOLIO_HANDOVER: 'portfolio.handover',
+  VISITE_REGISTRE_CORRECTION: 'visite.registre_correction',
 } as const;

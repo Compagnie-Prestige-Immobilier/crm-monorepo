@@ -9,11 +9,16 @@ export function ChartCard({
   description,
   children,
   className,
+  hauteur = 'normale',
+  actions,
 }: {
   title: string;
   description?: string | undefined;
   children: ReactNode;
   className?: string | undefined;
+  /** Une carte pleine largeur mérite plus de hauteur qu'une demi-carte. */
+  hauteur?: 'normale' | 'haute';
+  actions?: ReactNode | undefined;
 }) {
   const chartRegion = useRef<HTMLDivElement>(null);
 
@@ -21,15 +26,18 @@ export function ChartCard({
 
   return (
     <Card className={cn('animate-rise', className)}>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        {description !== undefined ? <CardDescription>{description}</CardDescription> : null}
+      <CardHeader className={actions === undefined ? undefined : 'flex-row items-start gap-3'}>
+        <div className="min-w-0 flex-1">
+          <CardTitle>{title}</CardTitle>
+          {description !== undefined ? <CardDescription>{description}</CardDescription> : null}
+        </div>
+        {actions}
       </CardHeader>
       {/* Hauteur fixe : Chart.js mesure son conteneur, et un parent
           auto-dimensionné produit une boucle de redimensionnement. */}
       <div
         ref={chartRegion}
-        className="h-64 px-5 pb-1"
+        className={cn('px-5 pb-1', hauteur === 'haute' ? 'h-80' : 'h-64')}
         role="group"
         aria-label={`${title} graphique`}
       >

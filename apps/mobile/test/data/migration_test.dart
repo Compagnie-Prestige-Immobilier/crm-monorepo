@@ -18,6 +18,7 @@ import 'generated_migrations/schema_v10.dart' as v10;
 import 'generated_migrations/schema_v11.dart' as v11;
 import 'generated_migrations/schema_v13.dart' as v13;
 import 'generated_migrations/schema_v14.dart' as v14;
+import 'generated_migrations/schema_v15.dart' as v15;
 
 /// Test doré de migration.
 ///
@@ -1697,6 +1698,73 @@ void main() {
     await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
     await db.close();
   });
+
+  // ── v15 → v16 : l'index du filtre entreprise sur « Tout » ─────────────────
+  //
+  // Palier purement additif, un index sur une table déjà pleine de visites non
+  // synchronisées : la seule chose à prouver est que la file et le registre ne
+  // bougent pas, et que l'index promis existe réellement.
+
+  test(
+    'v15 -> v16 pose l\'index sans toucher au registre ni à la file',
+    () async {
+      final schema = await verifier.schemaAt(15);
+
+      final v15.DatabaseAtV15 old = v15.DatabaseAtV15(schema.newConnection());
+      await old.customStatement('PRAGMA foreign_keys = ON;');
+      await old.customStatement(
+        'INSERT INTO visites '
+        '(id, date, visitor_name, entreprise_id, entreprise_label, objet_id, '
+        ' objet_label, created_by_id, created_at, updated_at) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        <Object?>[
+          'v-1',
+          '2026-08-12',
+          'Awa Ndiaye',
+          'e-1',
+          'CPI',
+          'o-1',
+          'Achat terrain',
+          'me',
+          _iso,
+          _iso,
+        ],
+      );
+      await old.customStatement(
+        'INSERT INTO outbox '
+        '(id, entity_type, entity_id, op, payload, next_attempt_at, created_at) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?)',
+        <Object?>['op-visite-16', 'visite', 'v-1', 'create', '{}', _iso, _iso],
+      );
+      await old.close();
+
+      final AppDatabase db = AppDatabase(schema.newConnection());
+      await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
+
+      final List<QueryRow> visites = await db
+          .customSelect('SELECT id FROM visites')
+          .get();
+      expect(visites.single.read<String>('id'), 'v-1');
+
+      final List<QueryRow> file = await db
+          .customSelect('SELECT id FROM outbox')
+          .get();
+      expect(file.single.read<String>('id'), 'op-visite-16');
+
+      final List<QueryRow> indexes = await db
+          .customSelect(
+            'SELECT name FROM sqlite_master '
+            'WHERE type = \'index\' AND tbl_name = \'visites\'',
+          )
+          .get();
+      expect(
+        indexes.map((QueryRow r) => r.read<String>('name')),
+        contains('visites_entreprise_date_idx'),
+      );
+
+      await db.close();
+    },
+  );
 }
 
 /// Instant fixe, en texte ISO-8601 : c'est ainsi que drift stocke les DATETIME

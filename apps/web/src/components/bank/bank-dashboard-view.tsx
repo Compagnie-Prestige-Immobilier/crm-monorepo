@@ -25,6 +25,7 @@ import { useLive } from '@/components/live/use-live';
 import { BankFiltersBar } from '@/components/bank/bank-filters-bar';
 import { useBankFilters } from '@/components/bank/use-bank-filters';
 import { ChartCard } from '@/components/dashboard/chart-card';
+import { EmptyChart } from '@/components/dashboard/empty-chart';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -271,14 +272,6 @@ export function BankDashboardView() {
           </Card>
         </>
       )}
-    </div>
-  );
-}
-
-function EmptyChart({ message }: { message: string }) {
-  return (
-    <div className="flex h-full items-center justify-center px-4 text-center">
-      <p className="text-[0.8125rem] text-muted-foreground">{message}</p>
     </div>
   );
 }

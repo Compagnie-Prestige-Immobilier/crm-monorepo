@@ -3,12 +3,15 @@ import { Role, type Prisma } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { dakarWallClock, inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
+import { SortOrder } from '../../common/dto/prospect-filter.dto.js';
 import { tryNormalizePhone } from '../../common/phone.js';
 import { formatVisiteReference, nextVisiteSequence, visiteReferencePrefix } from './reference.js';
+import { VisiteSortField } from './dto.js';
 import type {
   CreateVisiteDto,
   UpdateVisiteDto,
   VisiteDto,
+  VisiteFilterDto,
   VisiteListDto,
   VisiteQueryDto,
 } from './dto.js';
@@ -38,6 +41,27 @@ const VISITE_INCLUDE = {
 } as const;
 
 type VisiteRow = Prisma.VisiteGetPayload<{ include: typeof VISITE_INCLUDE }>;
+
+/** La référence départage : deux visites de la même minute gardent un ordre stable. */
+function visiteOrderBy(
+  sortBy: VisiteSortField,
+  sortOrder: SortOrder,
+): Prisma.VisiteOrderByWithRelationInput[] {
+  switch (sortBy) {
+    case VisiteSortField.VISITED_AT:
+      return [{ visitedAt: sortOrder }, { reference: 'desc' }];
+    case VisiteSortField.VISITOR_NAME:
+      return [{ visitorName: sortOrder }, { reference: 'desc' }];
+    case VisiteSortField.ENTREPRISE:
+      return [{ entreprise: { label: sortOrder } }, { reference: 'desc' }];
+    case VisiteSortField.DIRECTION:
+      return [{ direction: { label: sortOrder } }, { reference: 'desc' }];
+    case VisiteSortField.DESTINATAIRE:
+      return [{ destinataire: { label: sortOrder } }, { reference: 'desc' }];
+    case VisiteSortField.OBJET:
+      return [{ objet: { label: sortOrder } }, { reference: 'desc' }];
+  }
+}
 
 /** Une collision de référence n'arrive qu'entre deux saisies simultanées, rare à un guichet. */
 const REFERENCE_ATTEMPTS = 5;
@@ -86,13 +110,15 @@ export class VisitesService {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 25;
     const where = this.buildWhere(query);
+    const sortBy = query.sortBy ?? VisiteSortField.VISITED_AT;
+    const sortOrder = query.sortOrder ?? SortOrder.DESC;
 
     const [total, rows] = await Promise.all([
       this.prisma.visite.count({ where }),
       this.prisma.visite.findMany({
         where,
         include: VISITE_INCLUDE,
-        orderBy: [{ visitedAt: 'desc' }, { reference: 'desc' }],
+        orderBy: visiteOrderBy(sortBy, sortOrder),
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
@@ -218,7 +244,7 @@ export class VisitesService {
     return toDto(updated);
   }
 
-  buildWhere(query: VisiteQueryDto): Prisma.VisiteWhereInput {
+  buildWhere(query: VisiteFilterDto): Prisma.VisiteWhereInput {
     const search = query.search?.trim();
     return {
       ...(query.from === undefined && query.to === undefined

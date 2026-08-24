@@ -29,6 +29,7 @@ export function FilterCombobox({
   onSearchChange,
   onCreate,
   filterOptions = true,
+  onBlur,
 }: {
   label: string;
   placeholder: string;
@@ -40,6 +41,7 @@ export function FilterCombobox({
   onSearchChange?: ((search: string) => void) | undefined;
   onCreate?: ((search: string) => void) | undefined;
   filterOptions?: boolean | undefined;
+  onBlur?: (() => void) | undefined;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -62,9 +64,7 @@ export function FilterCombobox({
       <Label id={labelId} htmlFor={triggerId}>
         {label}
         {required ? (
-          <span className="text-destructive" aria-label="obligatoire">
-            *
-          </span>
+          <span className="text-[0.8125rem] font-[500] text-destructive">Obligatoire</span>
         ) : null}
       </Label>
 
@@ -77,10 +77,11 @@ export function FilterCombobox({
                 ref={triggerRef}
                 variant="outline"
                 role="combobox"
+                onBlur={onBlur}
                 aria-labelledby={`${labelId} ${triggerId}`}
                 aria-haspopup="listbox"
                 aria-required={required || undefined}
-                className={cn('h-11 w-full justify-between gap-2 font-[400]', hasValue && 'pr-16')}
+                className={cn('h-11 w-full justify-between gap-2 font-[400]', hasValue && 'pr-24')}
               />
             }
           >
@@ -90,7 +91,12 @@ export function FilterCombobox({
             <ChevronsUpDownIcon className="size-4 shrink-0 opacity-50" aria-hidden="true" />
           </PopoverTrigger>
 
-          <PopoverContent className="w-(--anchor-width) p-0">
+          {/*
+            La largeur par défaut du popover (`w-72`) s'écrasait sur celle du
+            bouton déclencheur : un champ étroit ouvrait un menu tout aussi
+            étroit, tronquant les libellés longs du référentiel.
+          */}
+          <PopoverContent className="w-max min-w-(--anchor-width) max-w-[min(28rem,90vw)] p-0">
             {/*
               `shouldFilter={false}` : cmdk filtre par défaut avec son propre
               score, qui ignore les accents autant qu'il ignore le français.
@@ -185,9 +191,9 @@ export function FilterCombobox({
               onChange(null);
               triggerRef.current?.focus();
             }}
-            className="absolute top-1/2 right-8 flex size-6 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition-colors duration-(--dur-1) ease-(--ease-out-cpi) hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            className="absolute top-1/2 right-8 flex size-11 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition-colors duration-(--dur-1) ease-(--ease-out-cpi) hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           >
-            <XIcon className="size-3.5" aria-hidden="true" />
+            <XIcon className="size-4" aria-hidden="true" />
           </button>
         ) : null}
       </div>
