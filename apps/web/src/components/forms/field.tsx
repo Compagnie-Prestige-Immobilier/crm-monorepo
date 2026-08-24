@@ -35,9 +35,7 @@ export function Field({
       <Label htmlFor={id}>
         {label}
         {required ? (
-          <span className="text-destructive" aria-label="obligatoire">
-            *
-          </span>
+          <span className="text-[0.8125rem] font-[500] text-destructive">Obligatoire</span>
         ) : null}
       </Label>
       {children({ id, 'aria-invalid': error !== undefined, 'aria-describedby': describedBy })}
