@@ -11,6 +11,7 @@ import '../../data/local/database.dart';
 import '../../data/local/refresh_mutex_db.dart';
 import '../../data/repositories/draft_repository.dart';
 import '../../data/repositories/reference_repository.dart';
+import '../../data/repositories/visites_repository.dart';
 import '../../data/repositories/write_repository.dart';
 import '../../data/secure/secure_token_store.dart';
 import '../../features/auth/auth_controller.dart';
@@ -390,4 +391,70 @@ final StreamProvider<int> phase2PendingCountProvider = StreamProvider<int>((
 final StreamProvider<List<CallReason>> callReasonsProvider =
     StreamProvider<List<CallReason>>((Ref ref) {
       return ref.watch(referenceRepositoryProvider).watchCallReasons();
+    });
+
+final Provider<VisitesRepository> visitesRepositoryProvider =
+    Provider<VisitesRepository>((Ref ref) {
+      return VisitesRepository(ref.watch(appDatabaseProvider));
+    });
+
+final NotifierProvider<RegistreSearch, String> registreSearchProvider =
+    NotifierProvider<RegistreSearch, String>(RegistreSearch.new);
+
+class RegistreSearch extends Notifier<String> {
+  @override
+  String build() => '';
+
+  void set(String value) => state = value;
+}
+
+final NotifierProvider<RegistrePeriode, PeriodeRegistre>
+registrePeriodeProvider = NotifierProvider<RegistrePeriode, PeriodeRegistre>(
+  RegistrePeriode.new,
+);
+
+class RegistrePeriode extends Notifier<PeriodeRegistre> {
+  @override
+  PeriodeRegistre build() => PeriodeRegistre.jour;
+
+  void set(PeriodeRegistre value) => state = value;
+}
+
+final StreamProvider<VisitesPage> registreProvider =
+    StreamProvider<VisitesPage>((Ref ref) {
+      return ref
+          .watch(visitesRepositoryProvider)
+          .watch(
+            search: ref.watch(registreSearchProvider),
+            periode: ref.watch(registrePeriodeProvider),
+            maintenant: ref.watch(clockProvider).now(),
+          );
+    });
+
+final StreamProvider<CompteursAccueil> compteursAccueilProvider =
+    StreamProvider<CompteursAccueil>((Ref ref) {
+      return ref
+          .watch(visitesRepositoryProvider)
+          .watchCompteurs(ref.watch(clockProvider).now());
+    });
+
+final StreamProvider<List<ActivityDay>> activiteVisites7JoursProvider =
+    StreamProvider<List<ActivityDay>>((Ref ref) {
+      return ref
+          .watch(visitesRepositoryProvider)
+          .watchActivite7Jours(ref.watch(clockProvider).now());
+    });
+
+final StreamProvider<TopLabels> topLabelsVisitesProvider =
+    StreamProvider<TopLabels>((Ref ref) {
+      return ref
+          .watch(visitesRepositoryProvider)
+          .watchTopLabels(ref.watch(clockProvider).now());
+    });
+
+final StreamProvider<HeureDePointe?> heureDePointeVisitesProvider =
+    StreamProvider<HeureDePointe?>((Ref ref) {
+      return ref
+          .watch(visitesRepositoryProvider)
+          .watchHeureDePointe(ref.watch(clockProvider).now());
     });

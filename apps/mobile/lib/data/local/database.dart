@@ -14,7 +14,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 15;
+  int get schemaVersion => 16;
 
   /// L'effet d'une tentative saisie avant la v10, déduit de son issue. Sans
   /// cette dérivation, la recopie de table poserait le défaut `KEEP_OPEN`
@@ -189,6 +189,11 @@ class AppDatabase extends _$AppDatabase {
           'INSERT INTO prospect_journeys (prospect_id, projet, statut) '
           'SELECT id, projet, statut FROM prospects WHERE deleted_at IS NULL',
         );
+      }
+      if (from < 16 && to >= 16) {
+        // Sert le filtre par entreprise sur la période « Tout » de
+        // l'historique de l'accueil. Additif : rien à recopier.
+        await m.createIndex(visitesEntrepriseDateIdx);
       }
     },
     beforeOpen: (OpeningDetails details) async {
