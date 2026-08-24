@@ -14,11 +14,39 @@ import {
 import { formatNumber } from '@/lib/format';
 import { RETIRED_SUFFIX } from '@/lib/types';
 
+type Kind =
+  | 'banque'
+  | 'syndicat'
+  | 'département'
+  | 'entreprise'
+  | 'direction'
+  | 'destinataire'
+  | 'objet de visite';
+
+const ARTICLES: Readonly<Record<Kind, string>> = {
+  banque: 'cette',
+  syndicat: 'ce',
+  département: 'ce',
+  entreprise: 'cette',
+  direction: 'cette',
+  destinataire: 'ce',
+  'objet de visite': 'cet',
+};
+
+type Subject = 'prospect' | 'visite';
+
+const SUBJECTS: Readonly<Record<Subject, { singular: string; plural: string; feminine: boolean }>> =
+  {
+    prospect: { singular: 'prospect', plural: 'prospects', feminine: false },
+    visite: { singular: 'visite', plural: 'visites', feminine: true },
+  };
+
 export function DeactivateReferentielDialog({
   open,
   onOpenChange,
   label,
   kind,
+  subject = 'prospect',
   usageCount,
   onRetryUsage,
   pending,
@@ -27,7 +55,9 @@ export function DeactivateReferentielDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   label: string;
-  kind: 'banque' | 'syndicat' | 'département';
+  kind: Kind;
+  /** Ce que compte `usageCount`. Les référentiels du registre des visites comptent des visites, pas des prospects. */
+  subject?: Subject;
   /** `null` : le décompte n'est pas revenu. Ce n'est PAS zéro. */
   usageCount: number | null;
   onRetryUsage: () => void;
@@ -35,6 +65,8 @@ export function DeactivateReferentielDialog({
   onConfirm: () => void;
 }) {
   const unknown = usageCount === null;
+  const noun = SUBJECTS[subject];
+  const genre = noun.feminine ? 'e' : '';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -69,16 +101,19 @@ export function DeactivateReferentielDialog({
               <span className="font-display text-[1.5rem] font-[800] tabular-nums">
                 {formatNumber(usageCount)}
               </span>{' '}
-              {usageCount === 1 ? 'prospect référence' : 'prospects référencent'}{' '}
-              {kind === 'département' ? 'ce' : 'cette'} {kind}.
+              {usageCount === 1 ? `${noun.singular} référence` : `${noun.plural} référencent`}{' '}
+              {ARTICLES[kind]} {kind}.
             </p>
           )}
 
           <p className="flex items-start gap-2 rounded-md border border-accent-border/30 bg-accent-surface px-3 py-2.5 text-[0.8125rem]">
             <InfoIcon className="mt-0.5 size-4 shrink-0 text-accent-text" aria-hidden="true" />
             <span>
-              <strong>Aucun prospect n’est supprimé.</strong> Les fiches existantes conservent cette
-              valeur et l’affichent suivie de «&nbsp;{RETIRED_SUFFIX}&nbsp;».
+              <strong>
+                Aucun{genre} {noun.singular} n’est supprimé{genre}.
+              </strong>{' '}
+              Les fiches existantes conservent cette valeur et l’affichent suivie de «&nbsp;
+              {RETIRED_SUFFIX}&nbsp;».
             </span>
           </p>
         </div>

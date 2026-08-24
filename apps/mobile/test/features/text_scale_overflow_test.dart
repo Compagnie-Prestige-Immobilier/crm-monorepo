@@ -6,6 +6,8 @@ import 'package:cpi_go/core/theme/app_theme.dart';
 import 'package:cpi_go/data/local/database.dart';
 import 'package:cpi_go/data/repositories/draft_repository.dart';
 import 'package:cpi_go/core/updates/app_update_controller.dart';
+import 'package:cpi_go/data/repositories/visites_repository.dart'
+    show PeriodeRegistre;
 import 'package:cpi_go/features/auth/auth_controller.dart';
 import 'package:cpi_go/features/campagnes/presentation/campagne_file_screen.dart';
 import 'package:cpi_go/features/campagnes/presentation/campagnes_screen.dart';
@@ -15,6 +17,7 @@ import 'package:cpi_go/features/notifications/presentation/notifications_screen.
 import 'package:cpi_go/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:cpi_go/features/updates/presentation/app_update_screen.dart';
 import 'package:cpi_go/features/about/presentation/about_screen.dart';
+import 'package:cpi_go/features/accueil/presentation/chiffres_screen.dart';
 import 'package:cpi_go/features/accueil/presentation/registre_screen.dart';
 import 'package:cpi_go/features/accueil/presentation/visite_form_screen.dart';
 import 'package:cpi_go/features/corrections/presentation/corrections_screen.dart';
@@ -313,7 +316,11 @@ void main() {
   ///   `_AlreadyClosed` de la phase 2, `showOwnershipSheet`, la boîte de
   ///   déconnexion avec saisies en attente. Le choix de l'heure de rappel, lui,
   ///   est peint directement : ses six puces sont la forme la plus large de la
-  ///   feuille, et elles sont arrivées avec un `Wrap` à prouver.
+  ///   feuille, et elles sont arrivées avec un `Wrap` à prouver ;
+  /// * l'overlay de `LocalTypeahead` (la liste d'options qui s'ouvre sous un
+  ///   champ) : c'est une `OverlayEntry` posée par `RawAutocomplete`, hors de
+  ///   l'arbre que ce balayage peint, et il n'existe qu'après un `tap`, ce
+  ///   qu'un balayage de construction ne joue pas.
   ///
   /// Ce sont des formes à risque, pas des oublis anodins : une feuille modale
   /// empile des boutons pleine largeur dans une colonne contrainte, c'est-à-dire
@@ -384,6 +391,22 @@ void main() {
       child: const RegistreScreen(),
     ),
     'Inscrire un visiteur': VisiteFormScreen.new,
+    // L'état le plus haut du registre : recherche active sans résultat,
+    // période « Tout », qui empile champ de recherche, puces, état vide et
+    // barre d'action épinglée. L'overlay de `LocalTypeahead` ne se peint pas
+    // sous ce balayage : il reste hors de sa couverture, voir plus bas.
+    'Registre des visites (recherche sans résultat, Tout)': () => ProviderScope(
+      overrides: [
+        authControllerProvider.overrideWith(_AccueilController.new),
+        registreSearchProvider.overrideWith(_RechercheSansResultat.new),
+        registrePeriodeProvider.overrideWith(_PeriodeTout.new),
+      ],
+      child: const RegistreScreen(),
+    ),
+    'Les chiffres de l\'accueil': () => ProviderScope(
+      overrides: [authControllerProvider.overrideWith(_AccueilController.new)],
+      child: const ChiffresScreen(),
+    ),
     'Connexion': LoginScreen.new,
     'Premier lancement': OnboardingScreen.new,
     'Notifications': NotificationsScreen.new,
@@ -520,6 +543,16 @@ class _AccueilController extends AuthController {
     role: 'ACCUEIL',
     email: 'fatou.sarr@cpi.sn',
   );
+}
+
+class _RechercheSansResultat extends RegistreSearch {
+  @override
+  String build() => 'zzz-aucune-correspondance';
+}
+
+class _PeriodeTout extends RegistrePeriode {
+  @override
+  PeriodeRegistre build() => PeriodeRegistre.tout;
 }
 
 /// Des motifs aussi longs que ce que l'équipe du client peut écrire, sur les

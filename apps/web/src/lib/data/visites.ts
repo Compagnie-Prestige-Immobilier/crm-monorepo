@@ -3,8 +3,8 @@ import { unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
 import { flattenPage } from '@/lib/api/query-params';
-import { readIsoDate, readPositiveInt, readString } from '@/lib/search-params';
-import type { Paginated } from '@/lib/types';
+import { readEnum, readIsoDate, readPositiveInt, readString } from '@/lib/search-params';
+import type { Paginated, SortDirection } from '@/lib/types';
 
 export type Visite = components['schemas']['VisiteDto'];
 export type VisiteRef = components['schemas']['VisiteReferentielRefDto'];
@@ -13,6 +13,17 @@ export type VisiteReferentiels = components['schemas']['VisiteReferentielsBundle
 export type CreateVisiteInput = components['schemas']['CreateVisiteDto'];
 export type UpdateVisiteInput = components['schemas']['UpdateVisiteDto'];
 export type VisitesQuery = NonNullable<operations['listVisites']['parameters']['query']>;
+
+export const VISITE_SORT_FIELDS = [
+  'visitedAt',
+  'visitorName',
+  'entreprise',
+  'direction',
+  'destinataire',
+  'objet',
+] as const satisfies readonly components['schemas']['VisiteSortField'][];
+
+export type VisiteSortField = (typeof VISITE_SORT_FIELDS)[number];
 
 /** Les intitulés du classeur Excel tenu depuis des années. On n'y touche pas. */
 export const VISITE_COLONNES = {
@@ -29,6 +40,50 @@ export const VISITE_COLONNES = {
 
 export const VISITE_PAGE_SIZE = 100;
 
+/** Le classeur, colonne à colonne, dans l'ordre où l'accueil le lit — et où il s'imprime. */
+export const IMPRESSION_COLONNES = [
+  'N° REGISTRE',
+  VISITE_COLONNES.date,
+  VISITE_COLONNES.time,
+  VISITE_COLONNES.visitorName,
+  VISITE_COLONNES.phone,
+  VISITE_COLONNES.entreprise,
+  VISITE_COLONNES.direction,
+  VISITE_COLONNES.destinataire,
+  VISITE_COLONNES.objet,
+  VISITE_COLONNES.comment,
+] as const;
+
+export type ImpressionColonne = (typeof IMPRESSION_COLONNES)[number];
+
+/** Sans elles, la feuille n'identifie plus ni le jour ni la personne : ce n'est plus un registre. */
+export const IMPRESSION_COLONNES_VERROUILLEES: readonly ImpressionColonne[] = [
+  VISITE_COLONNES.date,
+  VISITE_COLONNES.visitorName,
+];
+
+export const IMPRESSION_COLONNES_PAR_DEFAUT: ReadonlySet<ImpressionColonne> = new Set(
+  IMPRESSION_COLONNES,
+);
+
+export function impressionColonneVisible(
+  colonne: ImpressionColonne,
+  colonnesImprimees: ReadonlySet<ImpressionColonne>,
+): boolean {
+  return colonnesImprimees.has(colonne);
+}
+
+export function toggleImpressionColonne(
+  colonnesImprimees: ReadonlySet<ImpressionColonne>,
+  colonne: ImpressionColonne,
+): ReadonlySet<ImpressionColonne> {
+  if (IMPRESSION_COLONNES_VERROUILLEES.includes(colonne)) return colonnesImprimees;
+  const next = new Set(colonnesImprimees);
+  if (next.has(colonne)) next.delete(colonne);
+  else next.add(colonne);
+  return next;
+}
+
 /** `VisiteQueryDto.search` exige deux caractères ; en dessous l'API répond 400. */
 export const SEARCH_MIN_LENGTH = 2;
 
@@ -43,6 +98,8 @@ export interface VisiteFilters {
   toutePeriode: boolean;
   page: number;
   pageSize: number;
+  sortBy: VisiteSortField;
+  sortDir: SortDirection;
 }
 
 export const EMPTY_VISITE_FILTERS: VisiteFilters = {
@@ -56,6 +113,8 @@ export const EMPTY_VISITE_FILTERS: VisiteFilters = {
   toutePeriode: false,
   page: 1,
   pageSize: VISITE_PAGE_SIZE,
+  sortBy: 'visitedAt',
+  sortDir: 'desc',
 };
 
 export function parseVisiteFilters(params: URLSearchParams): VisiteFilters {
@@ -70,6 +129,8 @@ export function parseVisiteFilters(params: URLSearchParams): VisiteFilters {
     toutePeriode: readString(params, 'periode') === 'tout',
     page: readPositiveInt(params, 'page', 1),
     pageSize: VISITE_PAGE_SIZE,
+    sortBy: readEnum(params, 'sortBy', VISITE_SORT_FIELDS) ?? EMPTY_VISITE_FILTERS.sortBy,
+    sortDir: readString(params, 'sortDir') === 'asc' ? 'asc' : 'desc',
   };
 }
 
@@ -88,6 +149,8 @@ export function serializeVisiteFilters(filters: VisiteFilters): URLSearchParams 
   put('dateTo', filters.dateTo);
   if (filters.toutePeriode) params.set('periode', 'tout');
   if (filters.page !== 1) params.set('page', String(filters.page));
+  if (filters.sortBy !== EMPTY_VISITE_FILTERS.sortBy) put('sortBy', filters.sortBy);
+  if (filters.sortDir !== EMPTY_VISITE_FILTERS.sortDir) put('sortDir', filters.sortDir);
 
   return params;
 }
@@ -124,7 +187,12 @@ export function visiteDateRange(
 
 export function visitesQuery(filters: VisiteFilters, today: string): VisitesQuery {
   const range = visiteDateRange(filters, today);
-  const query: VisitesQuery = { page: filters.page, pageSize: filters.pageSize };
+  const query: VisitesQuery = {
+    page: filters.page,
+    pageSize: filters.pageSize,
+    sortBy: filters.sortBy,
+    sortOrder: filters.sortDir,
+  };
 
   if (range.dateFrom !== null) query.from = range.dateFrom;
   if (range.dateTo !== null) query.to = range.dateTo;

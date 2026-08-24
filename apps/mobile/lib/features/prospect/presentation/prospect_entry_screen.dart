@@ -19,6 +19,7 @@ import '../../../data/local/database.dart';
 import '../../../data/repositories/draft_repository.dart';
 import '../../../data/repositories/write_repository.dart';
 import '../../../ui/widgets/local_typeahead.dart';
+import '../../../ui/widgets/cpi_resume_banner.dart';
 import '../../../ui/widgets/offline_indicator.dart';
 import '../../../ui/widgets/phone_field.dart';
 import '../../../ui/widgets/referentials_banner.dart';
@@ -438,7 +439,7 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
                       ),
                     if (_pendingRestore != null)
                       SliverToBoxAdapter(
-                        child: _ResumeStrip(
+                        child: CpiResumeBanner(
                           onResume: () => _apply(_pendingRestore!),
                           onDiscard: () async {
                             await ref
@@ -807,45 +808,6 @@ class _ChampSecteur extends StatelessWidget {
               .toList(growable: false),
         ),
       ],
-    );
-  }
-}
-
-class _ResumeStrip extends StatelessWidget {
-  const _ResumeStrip({required this.onResume, required this.onDiscard});
-
-  final VoidCallback onResume;
-  final VoidCallback onDiscard;
-
-  @override
-  Widget build(BuildContext context) {
-    final CpiColors cpi = context.cpi;
-    return Container(
-      width: double.infinity,
-      color: cpi.infoSurface,
-      padding: const EdgeInsets.symmetric(
-        horizontal: CpiSpacing.md,
-        vertical: CpiSpacing.xxs,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          Text(
-            'Saisie non terminée',
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: cpi.info),
-          ),
-          Wrap(
-            alignment: WrapAlignment.end,
-            children: <Widget>[
-              TextButton(onPressed: onResume, child: const Text('Reprendre')),
-              TextButton(onPressed: onDiscard, child: const Text('Supprimer')),
-            ],
-          ),
-        ],
-      ),
     );
   }
 }

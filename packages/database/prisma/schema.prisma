@@ -293,7 +293,8 @@ model User {
 
   heartbeat AgentHeartbeat?
 
-  visitesEnregistrees Visite[] @relation("VisiteCreatedBy")
+  visitesEnregistrees Visite[]               @relation("VisiteCreatedBy")
+  visiteDashboard     VisiteDashboardLayout? @relation("VisiteDashboardLayoutUser")
 
   @@index([role, isActive])
   @@index([deletedAt])
@@ -1760,6 +1761,7 @@ enum ImportKind {
   PROSPECTS
   VISITES
   PROSPECTS_GRAND_PUBLIC
+  VISITES_REGISTRE
 }
 
 /// `expired` n'est PAS un échec : le fichier et le rapport ont simplement passé
@@ -1803,6 +1805,8 @@ model ImportJob {
   totalRows     Int?
   processedRows Int  @default(0)
   createdRows   Int  @default(0)
+  /// Lignes RÉÉCRITES. Seul l'aller-retour Excel du registre en produit.
+  updatedRows   Int  @default(0)
   skippedRows   Int  @default(0)
   errorRows     Int  @default(0)
 
@@ -1827,6 +1831,8 @@ model ImportJob {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  visiteChanges VisiteImportChange[]
 
   @@index([kind, status, createdAt])
   @@index([requestedById, createdAt])
@@ -2213,4 +2219,67 @@ model Visite {
   // `orderBy: [updatedAt, id]`. Sans lui, chaque page balaie la table.
   @@index([updatedAt, id])
   @@map("visites")
+}
+
+/// La disposition du tableau de bord des visites, telle que l'utilisateur l'a
+/// composée. L'absence de ligne veut dire « suivre la disposition par défaut »,
+/// posée par l'administrateur dans `AppSetting`.
+///
+/// `userId` est la clé primaire : une ligne par utilisateur par construction.
+model VisiteDashboardLayout {
+  userId String @id
+  user   User   @relation("VisiteDashboardLayoutUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  layout Json
+
+  updatedAt DateTime @updatedAt
+
+  @@map("visite_dashboard_layouts")
+}
+
+enum VisiteImportChangeKind {
+  CREATE
+  UPDATE
+}
+
+/// Le différentiel d'un aller-retour Excel, entre la SIMULATION et
+/// l'APPLICATION.
+///
+/// Il ne tient pas dans `ImportJob.report` : celui-ci est effacé par `apply()`,
+/// borné à deux cents entrées, et n'a nulle part où porter la case que la
+/// directrice coche. Les lignes INCHANGÉES ne sont pas écrites : sur un export
+/// d'un mois, elles sont l'immense majorité.
+model VisiteImportChange {
+  id          String    @id @default(uuid(7))
+  importJobId String
+  importJob   ImportJob @relation(fields: [importJobId], references: [id], onDelete: Cascade)
+
+  sheet     String
+  rowNumber Int
+
+  kind VisiteImportChangeKind
+
+  /// Nulle pour une création : la ligne du classeur n'en portait pas.
+  reference String?
+  visiteId  String?
+
+  /// De quoi écrire « MME LY SEYNABOU, 12/08 14:30 » sans relire la visite.
+  label String
+
+  /// `[{ field, label, before, after }]`, `label` étant l'en-tête de colonne.
+  fields Json
+
+  /// Empreinte des champs comparables de la visite AU MOMENT DE LA REVUE.
+  /// Relue à l'application : si elle a changé, la ligne est refusée au lieu
+  /// d'écraser une correction faite entre-temps à l'accueil.
+  rowHash String?
+
+  selected  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  /// La jointure entre la simulation et l'application : celle-ci relit le même
+  /// fichier et retrouve les mêmes numéros de ligne.
+  @@unique([importJobId, sheet, rowNumber])
+  @@index([importJobId, kind])
+  @@map("visite_import_changes")
 }

@@ -17,6 +17,7 @@ class RouteMemory {
   static const List<String> allowList = <String>[
     Routes.home,
     Routes.accueil,
+    Routes.accueilChiffres,
     Routes.accueilVisiteNew,
     Routes.chues,
     Routes.grandPublic,

@@ -9,8 +9,10 @@ import type { AuthenticatedUser } from '../../common/decorators/current-user.dec
 import type { AnalyticsService } from '../analytics/analytics.service.js';
 import { fakeWorkspace } from '../../workspaces/fake-workspace.js';
 import { BankCasesExportService } from '../bank-cases/bank-cases-export.service.js';
+import type { VisitesService } from '../visites/visites.service.js';
 import { ExportService } from './export.service.js';
 import { RepresentantsExportService } from './representants-export.service.js';
+import { VisitesExportService } from './visites-export.service.js';
 import { ExportMode } from './dto.js';
 import { DEMO_FILENAME_SUFFIX, demoFilenameSuffix } from './demo-marking.js';
 
@@ -183,6 +185,30 @@ const bankPrisma = (): PrismaService =>
     $queryRawUnsafe: () => Promise.resolve([]),
   }) as unknown as PrismaService;
 
+const visiteRow = (): Record<string, unknown> => ({
+  id: 'v-1',
+  reference: 'V-2026-000001',
+  visitedAt: new Date('2026-03-03T09:00:00.000Z'),
+  timeKnown: true,
+  visitorName: 'Fatou Ndiaye',
+  phone: '77 123 45 67',
+  phoneE164: '+221771234567',
+  comment: null,
+  createdAt: new Date('2026-03-03T09:05:00.000Z'),
+  entreprise: { label: 'CPI' },
+  direction: null,
+  destinataire: null,
+  objet: { label: 'SUIVI DE DOSSIER' },
+});
+
+const visitePrisma = (): PrismaService =>
+  ({
+    visite: { findMany: () => Promise.resolve([visiteRow()]) },
+  }) as unknown as PrismaService;
+
+const visitesServiceStub = (): VisitesService =>
+  ({ buildWhere: () => ({}) }) as unknown as VisitesService;
+
 const EXPORTS: { nom: string; rendre: (demo: boolean, stream: PassThrough) => Promise<void> }[] = [
   {
     nom: 'prospects (mode filtré)',
@@ -220,6 +246,15 @@ const EXPORTS: { nom: string; rendre: (demo: boolean, stream: PassThrough) => Pr
         {},
         stream,
       ),
+  },
+  {
+    nom: 'visites (registre)',
+    rendre: (demo, stream) =>
+      new VisitesExportService(
+        visitePrisma(),
+        visitesServiceStub(),
+        fakeWorkspace(demo),
+      ).writeVisites({}, stream),
   },
 ];
 
