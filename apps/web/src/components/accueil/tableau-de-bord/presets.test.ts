@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { marquesCompatibles } from '@/components/accueil/tableau-de-bord/recommandation';
 import { PRESETS } from '@/components/accueil/tableau-de-bord/presets';
-import { SOURCES } from '@/components/accueil/tableau-de-bord/sources';
+import { SOURCES, type Forme } from '@/components/accueil/tableau-de-bord/sources';
 
 const SOURCE_IDS = Object.keys(SOURCES).sort();
 
@@ -13,7 +13,7 @@ describe('les préréglages', () => {
         expect(SOURCE_IDS, `${preset} : source « ${widget.source} » inconnue`).toContain(
           widget.source,
         );
-        const compatibles = marquesCompatibles(SOURCES[widget.source].forme);
+        const compatibles = marquesCompatibles(SOURCES[widget.source].forme as Forme);
         expect(
           compatibles,
           `${preset} : « ${widget.marque} » n’est pas compatible avec ${widget.source}`,

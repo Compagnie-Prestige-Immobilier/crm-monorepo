@@ -1,7 +1,8 @@
 import {
   DASHBOARD_MARQUES,
   DASHBOARD_PRESETS,
-  DASHBOARD_SOURCES,
+  SOURCES_PAR_ECRAN,
+  type DashboardEcran,
   type DashboardMarque,
   type DashboardPreset,
   type DashboardSource,
@@ -32,7 +33,6 @@ export interface DispositionLayout {
 const LAYOUT_VERSION = 1;
 const MAX_WIDGETS = 40;
 
-const SOURCE_SET = new Set<string>(DASHBOARD_SOURCES);
 const MARQUE_SET = new Set<string>(DASHBOARD_MARQUES);
 const PRESET_SET = new Set<string>(DASHBOARD_PRESETS);
 const PALETTES = new Set(['neutre', 'serie', 'categorielle']);
@@ -57,19 +57,40 @@ const SERIE_TEMPORELLE_MARQUES: readonly DashboardMarque[] = [
   'tuile-courbe',
 ];
 
+const COMPOSITION_MARQUES: readonly DashboardMarque[] = [
+  'barres-100',
+  'barres-empilees',
+  'camembert',
+  'anneau',
+  'tableau',
+];
+
+const MATRICE_MARQUES: readonly DashboardMarque[] = ['carte-de-chaleur', 'tableau'];
+
+interface ReglesDeMarque {
+  defaut: DashboardMarque;
+  compatibles: readonly DashboardMarque[];
+}
+
+const CHIFFRE: ReglesDeMarque = { defaut: 'tuile', compatibles: CHIFFRE_MARQUES };
+const TAUX: ReglesDeMarque = { defaut: 'tuile', compatibles: CHIFFRE_MARQUES };
+const CLASSEMENT: ReglesDeMarque = {
+  defaut: 'barres-horizontales',
+  compatibles: CATEGORIE_MARQUES,
+};
+const COMPOSITION: ReglesDeMarque = { defaut: 'barres-100', compatibles: COMPOSITION_MARQUES };
+const MATRICE: ReglesDeMarque = { defaut: 'carte-de-chaleur', compatibles: MATRICE_MARQUES };
+
 /** La marque par défaut de chaque source, et les marques compatibles avec sa forme de données. */
-const SOURCE_MARQUES: Record<
-  DashboardSource,
-  { defaut: DashboardMarque; compatibles: readonly DashboardMarque[] }
-> = {
-  'total-visites': { defaut: 'tuile', compatibles: CHIFFRE_MARQUES },
-  'moyenne-journaliere': { defaut: 'tuile', compatibles: CHIFFRE_MARQUES },
+const SOURCE_MARQUES: Record<DashboardSource, ReglesDeMarque> = {
+  'total-visites': CHIFFRE,
+  'moyenne-journaliere': CHIFFRE,
   'jour-le-plus-charge': { defaut: 'tuile', compatibles: ['tuile'] },
-  'par-entreprise': { defaut: 'barres-horizontales', compatibles: CATEGORIE_MARQUES },
-  'par-objet': { defaut: 'barres-horizontales', compatibles: CATEGORIE_MARQUES },
-  'par-direction': { defaut: 'barres-horizontales', compatibles: CATEGORIE_MARQUES },
-  'par-destinataire': { defaut: 'barres-horizontales', compatibles: CATEGORIE_MARQUES },
-  'par-agent': { defaut: 'barres-horizontales', compatibles: CATEGORIE_MARQUES },
+  'par-entreprise': CLASSEMENT,
+  'par-objet': CLASSEMENT,
+  'par-direction': CLASSEMENT,
+  'par-destinataire': CLASSEMENT,
+  'par-agent': CLASSEMENT,
   'par-jour': { defaut: 'courbe', compatibles: SERIE_TEMPORELLE_MARQUES },
   'par-mois': {
     defaut: 'courbe',
@@ -83,39 +104,18 @@ const SOURCE_MARQUES: Record<
     defaut: 'barres-verticales',
     compatibles: ['barres-verticales', 'radar', 'aire-polaire', 'camembert'],
   },
-  'par-heure-jour-semaine': {
-    defaut: 'carte-de-chaleur',
-    compatibles: ['carte-de-chaleur', 'tableau'],
-  },
+  'par-heure-jour-semaine': MATRICE,
   'par-entreprise-objet': {
     defaut: 'carte-de-chaleur',
-    compatibles: [
-      'carte-de-chaleur',
-      'tableau',
-      'barres-empilees',
-      'barres-groupees',
-      'barres-100',
-    ],
+    compatibles: [...MATRICE_MARQUES, 'barres-empilees', 'barres-groupees', 'barres-100'],
   },
   'par-destinataire-direction': {
     defaut: 'carte-de-chaleur',
-    compatibles: [
-      'carte-de-chaleur',
-      'tableau',
-      'barres-empilees',
-      'barres-groupees',
-      'barres-100',
-    ],
+    compatibles: [...MATRICE_MARQUES, 'barres-empilees', 'barres-groupees', 'barres-100'],
   },
   'par-objet-mois': {
     defaut: 'carte-de-chaleur',
-    compatibles: [
-      'carte-de-chaleur',
-      'tableau',
-      'barres-empilees',
-      'barres-groupees',
-      'barres-100',
-    ],
+    compatibles: [...MATRICE_MARQUES, 'barres-empilees', 'barres-groupees', 'barres-100'],
   },
   'visiteurs-recurrents': { defaut: 'tableau', compatibles: ['tableau', 'barres-horizontales'] },
   'avec-telephone': { defaut: 'jauge', compatibles: ['jauge', 'anneau', 'tuile'] },
@@ -123,6 +123,21 @@ const SOURCE_MARQUES: Record<
     defaut: 'barres-100',
     compatibles: ['barres-100', 'camembert', 'anneau', 'tableau'],
   },
+
+  'appels-de-qualification': { defaut: 'tuile-courbe', compatibles: CHIFFRE_MARQUES },
+  'taux-de-contact': TAUX,
+  'a-rappeler': TAUX,
+  'taux-de-qualification': TAUX,
+  'prospects-notes': { defaut: 'tuile-courbe', compatibles: CHIFFRE_MARQUES },
+  adhesions: CHIFFRE,
+  'reste-a-appeler': { defaut: 'tuile', compatibles: ['tuile'] },
+  'par-teleconseiller': { defaut: 'tableau', compatibles: ['tableau'] },
+  encaisse: CHIFFRE,
+  'de-l-appel-a-l-encaissement': COMPOSITION,
+  'methodes-d-adhesion': { defaut: 'anneau', compatibles: COMPOSITION_MARQUES },
+  'par-banque': { defaut: 'anneau', compatibles: COMPOSITION_MARQUES },
+  'delais-medians': CLASSEMENT,
+  'rendement-par-departement': CLASSEMENT,
 };
 
 function toPresentation(raw: Record<string, unknown>): DispositionPresentation | undefined {
@@ -180,17 +195,21 @@ export function parseLayout(value: unknown): DispositionLayout | null {
 }
 
 /**
- * Retire les sources inconnues, déduplique, plafonne. Une marque inconnue ou
- * devenue incompatible retombe sur la marque par défaut de sa source : elle
- * ne fait jamais disparaître l'élément, sous peine d'un écran cassé en silence
- * chez qui l'a choisi.
+ * Retire les sources étrangères à l'écran, déduplique, plafonne. Une marque
+ * inconnue ou devenue incompatible retombe sur la marque par défaut de sa
+ * source : elle ne fait jamais disparaître l'élément, sous peine d'un écran
+ * cassé en silence chez qui l'a choisi.
  */
-export function sanitize(widgets: readonly DispositionWidget[]): DispositionWidget[] {
+export function sanitize(
+  ecran: DashboardEcran,
+  widgets: readonly DispositionWidget[],
+): DispositionWidget[] {
+  const admises = new Set<string>(SOURCES_PAR_ECRAN[ecran]);
   const seen = new Set<DashboardSource>();
   const cleaned: DispositionWidget[] = [];
 
   for (const widget of widgets) {
-    if (!SOURCE_SET.has(widget.source)) continue;
+    if (!admises.has(widget.source)) continue;
     if (seen.has(widget.source)) continue;
     seen.add(widget.source);
 
@@ -216,28 +235,61 @@ export function sanitize(widgets: readonly DispositionWidget[]): DispositionWidg
 }
 
 /**
- * Une lecture bout en bout : version acceptée, sources connues, marques
- * cohérentes. `null` si, une fois nettoyée, il ne reste plus rien à montrer —
- * le chaînon appelant passe alors au repli suivant.
+ * Une lecture bout en bout : version acceptée, sources connues de l'écran,
+ * marques cohérentes. `null` si, une fois nettoyée, il ne reste plus rien à
+ * montrer : le chaînon appelant passe alors au repli suivant.
  */
-export function resolveLayout(value: unknown): DispositionLayout | null {
+export function resolveLayout(ecran: DashboardEcran, value: unknown): DispositionLayout | null {
   const parsed = parseLayout(value);
   if (parsed === null) return null;
-  const widgets = sanitize(parsed.widgets);
+  const widgets = sanitize(ecran, parsed.widgets);
   if (widgets.length === 0) return null;
   return { version: 1, preset: parsed.preset, widgets };
 }
 
-export const DISPOSITION_USINE: DispositionLayout = {
-  version: 1,
-  preset: 'essentiel',
-  widgets: sanitize([
-    { source: 'total-visites' },
-    { source: 'moyenne-journaliere' },
-    { source: 'jour-le-plus-charge' },
-    { source: 'par-jour' },
-    { source: 'par-entreprise' },
-    { source: 'par-objet' },
-    { source: 'qualite-de-saisie' },
-  ]),
+/**
+ * Ce qu'un compte voit à sa première ouverture : le travail d'appel d'abord, le
+ * tableau par téléconseiller en pied. Courte à dessein, et tout y est
+ * déplaçable et retirable comme le reste.
+ */
+const USINE: Record<DashboardEcran, readonly DashboardSource[]> = {
+  visites: [
+    'total-visites',
+    'moyenne-journaliere',
+    'jour-le-plus-charge',
+    'par-jour',
+    'par-entreprise',
+    'par-objet',
+    'qualite-de-saisie',
+  ],
+  chues: [
+    'appels-de-qualification',
+    'taux-de-contact',
+    'a-rappeler',
+    'taux-de-qualification',
+    'prospects-notes',
+    'adhesions',
+    'reste-a-appeler',
+    'par-teleconseiller',
+  ],
+  'grand-public': ['prospects-notes', 'adhesions', 'reste-a-appeler', 'par-teleconseiller'],
 };
+
+/** Ce que la direction voit EN PLUS, ajouté après le tableau d'équipe. */
+const USINE_DIRECTION: readonly DashboardSource[] = ['encaisse', 'de-l-appel-a-l-encaissement'];
+
+export function dispositionUsine(
+  ecran: DashboardEcran,
+  voitLesMontants = false,
+): DispositionLayout {
+  const sources =
+    voitLesMontants && ecran !== 'visites' ? [...USINE[ecran], ...USINE_DIRECTION] : USINE[ecran];
+  return {
+    version: 1,
+    preset: 'essentiel',
+    widgets: sanitize(
+      ecran,
+      sources.map((source) => ({ source })),
+    ),
+  };
+}

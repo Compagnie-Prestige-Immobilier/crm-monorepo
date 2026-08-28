@@ -34,19 +34,6 @@ export interface FakeUserRow {
   fullName: string;
 }
 
-export interface FakeAppSettingRow {
-  key: string;
-  value: string;
-  updatedById: string | null;
-  updatedAt: Date;
-}
-
-export interface FakeDashboardLayoutRow {
-  userId: string;
-  layout: unknown;
-  updatedAt: Date;
-}
-
 export const fakeRef = (over: Partial<FakeRefRow> & { id: string; code: string }): FakeRefRow => ({
   label: over.code,
   isActive: true,
@@ -121,8 +108,6 @@ export class FakeVisitesPrisma {
   destinataires: FakeRefRow[] = [];
   objets: FakeRefRow[] = [];
   users: FakeUserRow[] = [];
-  appSettings: FakeAppSettingRow[] = [];
-  dashboardLayouts: FakeDashboardLayoutRow[] = [];
 
   failNextCreateWithP2002 = false;
   private sequence = 0;
@@ -137,76 +122,6 @@ export class FakeVisitesPrisma {
       Promise.resolve(
         this.users.filter((row) => where?.id?.in === undefined || where.id.in.includes(row.id)),
       ),
-  };
-
-  readonly visiteDashboardLayout = {
-    findUnique: ({
-      where,
-    }: {
-      where: { userId: string };
-    }): Promise<FakeDashboardLayoutRow | null> =>
-      Promise.resolve(this.dashboardLayouts.find((row) => row.userId === where.userId) ?? null),
-
-    upsert: ({
-      where,
-      create,
-      update,
-    }: {
-      where: { userId: string };
-      create: { userId: string; layout: unknown };
-      update: { layout: unknown };
-    }): Promise<FakeDashboardLayoutRow> => {
-      const existing = this.dashboardLayouts.find((row) => row.userId === where.userId);
-      if (existing) {
-        existing.layout = update.layout;
-        existing.updatedAt = new Date();
-        return Promise.resolve(existing);
-      }
-      const row: FakeDashboardLayoutRow = {
-        userId: create.userId,
-        layout: create.layout,
-        updatedAt: new Date(),
-      };
-      this.dashboardLayouts.push(row);
-      return Promise.resolve(row);
-    },
-
-    deleteMany: ({ where }: { where: { userId: string } }): Promise<{ count: number }> => {
-      const before = this.dashboardLayouts.length;
-      this.dashboardLayouts = this.dashboardLayouts.filter((row) => row.userId !== where.userId);
-      return Promise.resolve({ count: before - this.dashboardLayouts.length });
-    },
-  };
-
-  readonly appSetting = {
-    findUnique: ({ where }: { where: { key: string } }): Promise<FakeAppSettingRow | null> =>
-      Promise.resolve(this.appSettings.find((row) => row.key === where.key) ?? null),
-
-    upsert: ({
-      where,
-      create,
-      update,
-    }: {
-      where: { key: string };
-      create: { key: string; value: string; updatedById?: string | null };
-      update: { value: string; updatedById?: string | null };
-    }): Promise<FakeAppSettingRow> => {
-      const existing = this.appSettings.find((row) => row.key === where.key);
-      if (existing) {
-        existing.value = update.value;
-        existing.updatedById = update.updatedById ?? null;
-        existing.updatedAt = new Date();
-        return Promise.resolve(existing);
-      }
-      const row: FakeAppSettingRow = {
-        key: create.key,
-        value: create.value,
-        updatedById: create.updatedById ?? null,
-        updatedAt: new Date(),
-      };
-      this.appSettings.push(row);
-      return Promise.resolve(row);
-    },
   };
 
   readonly visite = {

@@ -28,6 +28,9 @@ const COMPATIBLES: Record<Forme, DashboardMarque[]> = {
   cyclique: ['aire-polaire', 'radar', 'barres-verticales', 'tableau'],
   matrice: ['carte-de-chaleur', 'tableau'],
   composition: ['barres-empilees', 'barres-100', 'anneau', 'camembert', 'tableau'],
+  // Des colonnes d'unités différentes sur une même personne : aucun graphique
+  // ne les met sur le même axe sans mentir.
+  equipe: ['tableau'],
 };
 
 export function marquesCompatibles(forme: Forme): DashboardMarque[] {

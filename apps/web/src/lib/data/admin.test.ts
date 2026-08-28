@@ -245,6 +245,16 @@ function row(overrides: Partial<ActivityRow> = {}): ActivityRow {
     prospectsCreated: 2,
     representantsContacted: 2,
     tasksClosed: 1,
+    repCalls: 0,
+    repReached: 0,
+    repCallback: 0,
+    repUnreachable: 0,
+    repOther: 0,
+    repContactRate: null,
+    repCallbackRate: null,
+    repQuestioned: 0,
+    repQualified: 0,
+    repQualificationRate: null,
     ...overrides,
   };
 }

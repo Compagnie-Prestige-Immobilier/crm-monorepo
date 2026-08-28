@@ -17,7 +17,7 @@ import { plageComparaison, plageTropLarge } from '@/components/accueil/tableau-d
 import {
   SOURCES,
   mesurerDonnees,
-  type DashboardSource,
+  type VisiteSource,
   type DonneesSource,
   type VisiteStats,
 } from '@/components/accueil/tableau-de-bord/sources';
@@ -103,8 +103,8 @@ export function DashboardVisitesView({ role }: { role: Role }) {
   });
 
   const dispositionQuery = useQuery({
-    queryKey: queryKeys.visitesDisposition,
-    queryFn: () => fetchDisposition(),
+    queryKey: queryKeys.disposition('visites'),
+    queryFn: () => fetchDisposition('visites'),
   });
 
   const [brouillon, setBrouillon] = useState<DashboardWidget[] | null>(null);
@@ -124,34 +124,34 @@ export function DashboardVisitesView({ role }: { role: Role }) {
 
   const saveMutation = useMutation({
     mutationFn: (widgets: DashboardWidget[]) =>
-      saveDisposition(widgets, dispositionQuery.data?.preset, undefined),
+      saveDisposition('visites', widgets, dispositionQuery.data?.preset, undefined),
     onSuccess: async () => {
       setBrouillon(null);
       if (pausedByEditionRef.current) {
         live.togglePause();
         pausedByEditionRef.current = false;
       }
-      await queryClient.invalidateQueries({ queryKey: queryKeys.visitesDisposition });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.disposition('visites') });
     },
   });
 
   const setDefaultMutation = useMutation({
     mutationFn: (widgets: DashboardWidget[]) =>
-      saveDefaultDisposition(widgets, dispositionQuery.data?.preset, undefined),
+      saveDefaultDisposition('visites', widgets, dispositionQuery.data?.preset, undefined),
   });
 
   const resetMutation = useMutation({
-    mutationFn: () => resetDisposition(),
+    mutationFn: () => resetDisposition('visites'),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.visitesDisposition });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.disposition('visites') });
     },
   });
 
   const widgets = editing ? brouillon : (dispositionQuery.data?.widgets ?? []);
 
-  const donneesParSource = new Map<DashboardSource, DonneesSource>();
+  const donneesParSource = new Map<string, DonneesSource>();
   if (statsQuery.data !== undefined) {
-    for (const source of Object.keys(SOURCES) as DashboardSource[]) {
+    for (const source of Object.keys(SOURCES) as VisiteSource[]) {
       donneesParSource.set(source, SOURCES[source].extraire(statsQuery.data));
     }
   }
@@ -205,10 +205,11 @@ export function DashboardVisitesView({ role }: { role: Role }) {
               donnees={donneesParSource}
               onAdd={(source) => {
                 const donneesSource = donneesParSource.get(source);
+                const forme = SOURCES[source as VisiteSource]?.forme;
                 const marque =
-                  donneesSource === undefined
+                  donneesSource === undefined || forme === undefined
                     ? undefined
-                    : marqueRecommandee(SOURCES[source].forme, mesurerDonnees(donneesSource));
+                    : marqueRecommandee(forme, mesurerDonnees(donneesSource));
                 const id = `${source}-${String(Date.now())}`;
                 setBrouillon((current) => [
                   ...(current ?? []),

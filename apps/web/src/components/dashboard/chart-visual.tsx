@@ -567,10 +567,10 @@ export function marqueTexte(marque: DashboardMarque): { nom: string; usage: stri
   return MARQUE_TEXTES[marque];
 }
 
-/** Une phrase complète pour un bouton : « Anneau — voir la part de chacun ». */
+/** Une phrase complète pour un bouton : « Anneau : voir la part de chacun ». */
 export function marquePhrase(marque: DashboardMarque): string {
   const texte = MARQUE_TEXTES[marque];
-  return `${texte.nom} — ${texte.usage.charAt(0).toLowerCase()}${texte.usage.slice(1)}`;
+  return `${texte.nom} : ${texte.usage.charAt(0).toLowerCase()}${texte.usage.slice(1)}`;
 }
 
 const MARQUE_PAR_KIND: Record<'trend' | 'rank' | 'share' | 'category', DashboardMarque> = {

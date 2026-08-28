@@ -220,7 +220,8 @@ describe('DashboardVisitesView', () => {
     await waitFor(() => {
       expect(saveDispositionMock).toHaveBeenCalled();
     });
-    const [sentWidgets] = saveDispositionMock.mock.calls[0] as [DashboardWidget[]];
+    const [ecran, sentWidgets] = saveDispositionMock.mock.calls[0] as [string, DashboardWidget[]];
+    expect(ecran).toBe('visites');
     expect(sentWidgets.map((widget) => ({ source: widget.source, marque: widget.marque }))).toEqual(
       [
         { source: 'total-visites', marque: 'tuile' },

@@ -18,6 +18,8 @@ import {
   mesurerDonnees,
   reglagesHonores,
   spanClass,
+  type Catalogue,
+  type CatalogueEntree,
   type DashboardMarque,
   type DashboardTaille,
   type DispositionPresentation,
@@ -39,10 +41,16 @@ import {
 import { cn } from '@/lib/utils';
 import type { DashboardWidget } from '@/lib/data/visites-dashboard';
 
+/** Un widget dont la source a quitté le catalogue reste nommé, jamais anonyme. */
+function entreeDe(catalogue: Catalogue, source: string): CatalogueEntree {
+  return catalogue[source] ?? { label: source, forme: 'classement' };
+}
+
 export function CarteWidget({
   widget,
   donnees,
   editing,
+  catalogue = SOURCES,
   peutMonter,
   peutDescendre,
   onRemove,
@@ -56,6 +64,7 @@ export function CarteWidget({
   widget: DashboardWidget;
   donnees: DonneesSource | undefined;
   editing: boolean;
+  catalogue?: Catalogue;
   peutMonter: boolean;
   peutDescendre: boolean;
   onRemove: () => void;
@@ -76,8 +85,7 @@ export function CarteWidget({
     isDragging,
   } = useSortable({ id: widget.id, disabled: !editing });
 
-  const titre = SOURCES[widget.source].label;
-  const forme = SOURCES[widget.source].forme;
+  const { label: titre, forme } = entreeDe(catalogue, widget.source);
   const evaluees = donnees === undefined ? [] : evaluerMarques(forme, mesurerDonnees(donnees));
   const taille: DashboardTaille = widget.taille ?? 'demi';
   const honors = reglagesHonores(widget.marque);

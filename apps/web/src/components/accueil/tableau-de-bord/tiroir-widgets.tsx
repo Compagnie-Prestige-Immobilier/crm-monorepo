@@ -7,6 +7,7 @@ import { evaluerMarques } from '@/components/accueil/tableau-de-bord/recommandat
 import {
   SOURCES,
   mesurerDonnees,
+  type Catalogue,
   type DashboardSource,
   type DonneesSource,
 } from '@/components/accueil/tableau-de-bord/sources';
@@ -23,15 +24,15 @@ import { Button } from '@/components/ui/button';
 export function TiroirWidgets({
   placees,
   donnees,
+  catalogue = SOURCES,
   onAdd,
 }: {
-  placees: ReadonlySet<DashboardSource>;
-  donnees: Map<DashboardSource, DonneesSource>;
+  placees: ReadonlySet<string>;
+  donnees: Map<string, DonneesSource>;
+  catalogue?: Catalogue;
   onAdd: (source: DashboardSource) => void;
 }) {
-  const disponibles = (Object.keys(SOURCES) as DashboardSource[]).filter(
-    (source) => !placees.has(source),
-  );
+  const disponibles = Object.keys(catalogue).filter((source) => !placees.has(source));
 
   return (
     <Sheet>
@@ -57,22 +58,28 @@ export function TiroirWidgets({
             </p>
           ) : (
             disponibles.map((source) => {
+              const entree = catalogue[source];
+              if (entree === undefined) return null;
               const donneesSource = donnees.get(source);
-              const tete =
+              // Sans données chargées, la mesure vaut zéro : le classement des
+              // marques reste celui de la FORME, jamais un repli muet.
+              const tete = evaluerMarques(
+                entree.forme,
                 donneesSource === undefined
-                  ? undefined
-                  : evaluerMarques(SOURCES[source].forme, mesurerDonnees(donneesSource))[0];
+                  ? { nombreCategories: 0, nombrePoints: 0, partZero: 0 }
+                  : mesurerDonnees(donneesSource),
+              )[0];
               const marque = tete?.marque ?? 'tableau';
               return (
                 <ChoixGraphique
                   key={source}
                   marque={marque}
-                  titre={SOURCES[source].label}
+                  titre={entree.label}
                   phrase={marquePhrase(marque)}
                   conseille={tete?.recommandee === true}
                   raison={tete?.recommandee === true ? tete.raison : null}
                   onSelect={() => {
-                    onAdd(source);
+                    onAdd(source as DashboardSource);
                   }}
                 />
               );

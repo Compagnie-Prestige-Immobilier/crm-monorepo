@@ -25,6 +25,7 @@ import { Card } from '@/components/ui/card';
 import {
   SOURCES,
   appliquerPresentation,
+  type Catalogue,
   type DashboardMarque,
   type DashboardTaille,
   type DispositionPresentation,
@@ -48,6 +49,7 @@ import {
   MixteChart,
   NuageChart,
   RadarChart,
+  TableauEquipe,
   TableauWidget,
   TuileCourbeWidget,
   TuileWidget,
@@ -56,12 +58,18 @@ import { EmptyChart } from '@/components/dashboard/empty-chart';
 import type { DashboardWidget } from '@/lib/data/visites-dashboard';
 
 export function renderMark(
-  source: DashboardWidget['source'],
+  source: string,
   marque: DashboardMarque | undefined,
   donnees: DonneesSource,
   presentation: DashboardWidget['presentation'],
+  catalogue: Catalogue = SOURCES,
+  messageVide = 'Aucune visite sur la période.',
 ): ReactNode {
-  const titre = SOURCES[source].label;
+  const titre = catalogue[source]?.label ?? source;
+
+  if (donnees.forme === 'equipe') {
+    return <TableauEquipe donnee={donnees.donnee} caption={titre} />;
+  }
 
   if (donnees.forme === 'scalaire') {
     const { valeur, libelle, serie } = donnees.donnee;
@@ -82,7 +90,7 @@ export function renderMark(
   if (donnees.forme === 'matrice') {
     const { donnee } = donnees;
     if (donnee.cellules.every((cellule) => cellule.value === 0)) {
-      return <EmptyChart message="Aucune visite sur la période." />;
+      return <EmptyChart message={messageVide} />;
     }
     if (marque === 'nuage') return <NuageChart matrice={donnee} presentation={presentation} />;
     if (marque === 'bulles') return <BullesChart matrice={donnee} presentation={presentation} />;
@@ -92,8 +100,7 @@ export function renderMark(
   if (donnees.forme === 'composition') {
     const lignes = donnees.donnee;
     const items = lignes[0]?.segments ?? [];
-    if (items.every((item) => item.value === 0))
-      return <EmptyChart message="Aucune visite sur la période." />;
+    if (items.every((item) => item.value === 0)) return <EmptyChart message={messageVide} />;
     if (marque === 'barres-empilees')
       return <BarresEmpileesChart lignes={lignes} presentation={presentation} />;
     if (marque === 'anneau') return <AnneauChart items={items} presentation={presentation} />;
@@ -110,7 +117,7 @@ export function renderMark(
       ? appliquerPresentation(donnees.donnee, presentation)
       : donnees.donnee;
   if (items.length === 0 || items.every((item) => item.value === 0)) {
-    return <EmptyChart message="Aucune visite sur la période." />;
+    return <EmptyChart message={messageVide} />;
   }
 
   switch (marque) {
@@ -169,6 +176,8 @@ export function WidgetGrid({
   widgets,
   donnees,
   editing,
+  catalogue = SOURCES,
+  messageVide = 'Aucune visite sur la période.',
   onReorder,
   onRemove,
   onMove,
@@ -179,6 +188,8 @@ export function WidgetGrid({
   widgets: readonly DashboardWidget[];
   donnees: Map<string, DonneesSource>;
   editing: boolean;
+  catalogue?: Catalogue;
+  messageVide?: string;
   onReorder: (fromId: string, toId: string) => void;
   onRemove: (id: string) => void;
   onMove: (id: string, direction: -1 | 1) => void;
@@ -193,7 +204,8 @@ export function WidgetGrid({
 
   const titreDe = (id: string): string => {
     const widget = widgets.find((w) => w.id === id);
-    return widget === undefined ? '' : SOURCES[widget.source].label;
+    if (widget === undefined) return '';
+    return catalogue[widget.source]?.label ?? widget.source;
   };
 
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -217,6 +229,7 @@ export function WidgetGrid({
         widget={widget}
         donnees={source}
         editing={editing}
+        catalogue={catalogue}
         peutMonter={index > 0}
         peutDescendre={index < widgets.length - 1}
         onRemove={() => {
@@ -240,7 +253,14 @@ export function WidgetGrid({
       >
         {source === undefined
           ? null
-          : renderMark(widget.source, widget.marque, source, widget.presentation)}
+          : renderMark(
+              widget.source,
+              widget.marque,
+              source,
+              widget.presentation,
+              catalogue,
+              messageVide,
+            )}
       </CarteWidget>
     );
   });

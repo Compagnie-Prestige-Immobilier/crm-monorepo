@@ -95,9 +95,9 @@ export const STAT_EXPLANATIONS: Record<StatKey, string> = {
   campaignContactRate:
     'Part des fiches de la campagne ayant reçu au moins un appel. Elle mesure l’avancement du travail, pas son résultat.',
   campaignReachRate:
-    'Part des appels qui ont abouti à quelqu’un. Les numéros injoignables et les faux numéros en sont exclus : ils disent la qualité de la base, pas celle du téléconseil.',
+    'Part des appels de conversion qui ont abouti à quelqu’un. Les numéros injoignables et les faux numéros en sont exclus : ils disent la qualité de la liste, pas celle du téléconseil.',
   campaignAttemptsPerMethod:
-    'Nombre moyen d’appels nécessaires pour obtenir une méthode d’enrôlement. Plus il monte, plus la base résiste.',
+    'Nombre moyen d’appels de conversion nécessaires pour qu’un prospect dise comment il adhère. Plus il monte, plus la liste résiste.',
   campaignRemaining:
     'Fiches encore à appeler, et date de fin projetée à la cadence des sept derniers jours. Sans cadence observée, aucune date n’est annoncée.',
   campaignClosedPerDay:
