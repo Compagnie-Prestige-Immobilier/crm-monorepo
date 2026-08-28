@@ -460,7 +460,13 @@ function cellText(value: ExcelJS.CellValue): string {
 
 /** Analyse une ligne. Rend soit la ligne prête à écrire, soit son motif de refus. */
 function parseRow(raw: RawRow, referentiels: Referentiels): ParsedRow | ImportRowErrorDto {
-  const [fullName = '', phone = '', departement = '', ief = '', notes = ''] = raw.cells;
+  const [fullName, phone, departement, ief, notes] = [...raw.cells, '', '', '', '', ''] as [
+    string,
+    string,
+    string,
+    string,
+    string,
+  ];
 
   if (fullName.length < 2) {
     return {

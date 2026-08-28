@@ -232,6 +232,7 @@ describe('modèle de la colonne « Méthode d’enrôlement »', () => {
       'Plateforme',
       'Physique',
       'Vocal ou messagerie électronique',
+      'Prise de rendez-vous',
     ]);
 
     const colonne = PROSPECTS_IMPORT_COLUMNS.find((column) => column.header === H.enrollmentMethod);

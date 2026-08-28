@@ -39,6 +39,12 @@ interface JourneyState {
   enrollmentCapturedAt: Date | null;
 }
 
+interface ActiveTask {
+  id: string;
+  campaignId: string;
+  campaign: { projet: Projet };
+}
+
 const PROSPECT_STATE_SELECT = {
   id: true,
   projet: true,
@@ -101,14 +107,7 @@ export class Phase2SyncService {
     });
 
     if (known) {
-      const current = await this.loadProspect(tx, op.prospectId);
-      return {
-        status: CallAttemptApplyStatus.DUPLICATE,
-        attemptId: known.id,
-        taskId: known.taskId,
-        taskStatus: known.task?.status ?? null,
-        state: toState(current, await this.loadJourney(tx, op.prospectId, current.projet)),
-      };
+      return this.duplicateResult(tx, op, known.id, known.taskId, known.task?.status ?? null);
     }
 
     const prospect = await this.loadProspect(tx, op.prospectId);
@@ -144,6 +143,11 @@ export class Phase2SyncService {
           reasonId: attempt.reasonId,
           method: attempt.method,
           comment: attempt.comment,
+          email: attempt.email,
+          fonctionnaire: attempt.fonctionnaire,
+          engagementEnCours: attempt.engagementEnCours,
+          dureeEtablissementMois: attempt.dureeEtablissementMois,
+          rendezVousAt: attempt.rendezVousAt,
           clientCreatedAt: new Date(op.clientCreatedAt),
         },
       ],
@@ -151,38 +155,11 @@ export class Phase2SyncService {
     });
 
     if (inserted.count === 0) {
-      const current = await this.loadProspect(tx, op.prospectId);
-      return {
-        status: CallAttemptApplyStatus.DUPLICATE,
-        attemptId: op.id,
-        taskId: activeTask?.id ?? null,
-        taskStatus: null,
-        state: toState(current, await this.loadJourney(tx, op.prospectId, projet)),
-      };
+      return this.duplicateResult(tx, op, op.id, activeTask?.id ?? null, null, projet);
     }
 
-    if (attempt.callbackAt) {
-      // L'index unique partiel n'admet qu'un seul rappel PENDING par prospect :
-      // sans cette dépose, l'insertion échouerait sur un appel réel.
-      await tx.scheduledCallback.updateMany({
-        where: { prospectId: op.prospectId, status: ScheduledCallbackStatus.PENDING },
-        data: { status: ScheduledCallbackStatus.SUPERSEDED },
-      });
-      await tx.scheduledCallback.createMany({
-        data: [
-          {
-            prospectId: op.prospectId,
-            taskId: activeTask?.id ?? null,
-            campaignId: activeTask?.campaignId ?? null,
-            assignedToId: userId,
-            scheduledAt: attempt.callbackAt,
-            comment: attempt.comment,
-            sourceAttemptId: op.id,
-          },
-        ],
-        skipDuplicates: true,
-      });
-    }
+    const corrige = await this.correctProspect(tx, op, prospect);
+    await this.scheduleCallback(tx, userId, op, attempt, activeTask);
 
     if (!attempt.terminal || attempt.phase2Status === null) {
       return {
@@ -190,15 +167,106 @@ export class Phase2SyncService {
         attemptId: op.id,
         taskId: activeTask?.id ?? null,
         taskStatus: activeTask ? CallTaskStatus.OPEN : null,
-        state: toState(prospect, journey),
+        state: toState(corrige, journey),
       };
     }
 
-    const completedAt = new Date();
-    const nextStatus = attempt.phase2Status;
+    return this.completeAttempt(tx, userId, op, attempt, activeTask, corrige, journey, projet);
+  }
 
-    // Compare-and-swap sur le PARCOURS : c'est lui qui arbitre désormais « la
-    // première transition terminale validée gagne ».
+  private async duplicateResult(
+    tx: Phase2TransactionClient,
+    op: CallAttemptOpDto,
+    attemptId: string,
+    taskId: string | null,
+    taskStatus: CallTaskStatus | null,
+    projet?: Projet,
+  ): Promise<CallAttemptResultDto> {
+    const current = await this.loadProspect(tx, op.prospectId);
+    const journey = await this.loadJourney(tx, op.prospectId, projet ?? current.projet);
+    return {
+      status: CallAttemptApplyStatus.DUPLICATE,
+      attemptId,
+      taskId,
+      taskStatus,
+      state: toState(current, journey),
+    };
+  }
+
+  /**
+   * Le formulaire de conversion rouvre l'identité du prospect. Ces champs-là
+   * n'ont PAS de copie sur la tentative : la fiche en reste la seule vérité, et
+   * c'est elle qu'on réécrit.
+   *
+   * Un champ absent laisse la valeur en place. Aucun effacement : le mobile omet
+   * ce qu'il n'a pas, et interpréter ce silence comme un vidage effacerait des
+   * banques et des syndicats déjà obtenus.
+   */
+  private async correctProspect(
+    tx: Phase2TransactionClient,
+    op: CallAttemptOpDto,
+    current: ProspectState,
+  ): Promise<ProspectState> {
+    // Un nom vidé n'est pas une correction : la colonne est obligatoire, et
+    // l'écraser rendrait la fiche illisible dans toutes les listes.
+    const nom = op.nom?.trim() ?? '';
+    const data = {
+      ...(nom === '' ? {} : { nom }),
+      ...(op.prenom === undefined ? {} : { prenom: op.prenom.trim() }),
+      ...(op.profession === undefined ? {} : { profession: op.profession.trim() }),
+      ...(op.banqueId === undefined ? {} : { banqueId: op.banqueId }),
+      ...(op.syndicatId === undefined ? {} : { syndicatId: op.syndicatId }),
+    };
+    if (Object.keys(data).length === 0) return current;
+
+    const row = await tx.prospect.update({
+      where: { id: current.id },
+      data: { ...data, rev: { increment: 1 } },
+      select: PROSPECT_STATE_SELECT,
+    });
+    return row;
+  }
+
+  private async scheduleCallback(
+    tx: Phase2TransactionClient,
+    userId: string,
+    op: CallAttemptOpDto,
+    attempt: ReturnType<typeof normalizeAttempt>,
+    task: ActiveTask | null,
+  ): Promise<void> {
+    if (attempt.callbackAt === null) return;
+    await tx.scheduledCallback.updateMany({
+      where: { prospectId: op.prospectId, status: ScheduledCallbackStatus.PENDING },
+      data: { status: ScheduledCallbackStatus.SUPERSEDED },
+    });
+    await tx.scheduledCallback.createMany({
+      data: [
+        {
+          prospectId: op.prospectId,
+          taskId: task?.id ?? null,
+          campaignId: task?.campaignId ?? null,
+          assignedToId: userId,
+          scheduledAt: attempt.callbackAt,
+          comment: attempt.comment,
+          sourceAttemptId: op.id,
+        },
+      ],
+      skipDuplicates: true,
+    });
+  }
+
+  private async completeAttempt(
+    tx: Phase2TransactionClient,
+    userId: string,
+    op: CallAttemptOpDto,
+    attempt: ReturnType<typeof normalizeAttempt>,
+    task: ActiveTask | null,
+    prospect: ProspectState,
+    journey: JourneyState,
+    projet: Projet,
+  ): Promise<CallAttemptResultDto> {
+    const completedAt = new Date();
+    const nextStatus = attempt.phase2Status as Phase2Status;
     const applied = await tx.prospectJourney.updateMany({
       where: { id: journey.id, phase2Status: Phase2Status.PENDING },
       data: {
@@ -208,15 +276,10 @@ export class Phase2SyncService {
         enrollmentCapturedById: userId,
       },
     });
-
     if (applied.count === 0) {
-      const relu = await this.loadProspect(tx, op.prospectId);
-      throw alreadyCompleted(toState(relu, await this.loadJourney(tx, op.prospectId, projet)));
+      const current = await this.loadProspect(tx, op.prospectId);
+      throw alreadyCompleted(toState(current, await this.loadJourney(tx, op.prospectId, projet)));
     }
-
-    // La fiche reste le REFLET du parcours d'entrée : le contrat de
-    // synchronisation l'expose encore et un APK déployé le lit. Elle n'est plus
-    // l'autorité.
     if (projet === prospect.projet) {
       await tx.prospect.updateMany({
         where: { id: op.prospectId },
@@ -229,22 +292,19 @@ export class Phase2SyncService {
         },
       });
     }
-
     await tx.callTask.updateMany({
       where: { prospectId: op.prospectId, isActive: true },
       data: { status: CallTaskStatus.DONE, isActive: false, completedAt },
     });
-
     await tx.scheduledCallback.updateMany({
       where: { prospectId: op.prospectId, status: ScheduledCallbackStatus.PENDING },
       data: { status: ScheduledCallbackStatus.DONE, closedAttemptId: op.id },
     });
-
     return {
       status: CallAttemptApplyStatus.APPLIED,
       attemptId: op.id,
-      taskId: activeTask?.id ?? null,
-      taskStatus: activeTask ? CallTaskStatus.DONE : null,
+      taskId: task?.id ?? null,
+      taskStatus: task === null ? null : CallTaskStatus.DONE,
       state: toState(
         await this.loadProspect(tx, op.prospectId),
         await this.loadJourney(tx, op.prospectId, projet),

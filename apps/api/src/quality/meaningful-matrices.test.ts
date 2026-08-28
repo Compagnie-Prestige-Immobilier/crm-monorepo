@@ -73,6 +73,12 @@ const banks = [
 const segmentCases = syndicates.flatMap((syndicatSigle) =>
   banks.map((banqueShortName) => [syndicatSigle, banqueShortName] as const),
 );
+const expectedSegments: Record<string, BddSegment> = {
+  'true:true': 'BDD1',
+  'true:false': 'BDD2',
+  'false:true': 'BDD3',
+  'false:false': 'BDD4',
+};
 
 describe('segmentation BDD, chaque combinaison réelle a un seul segment', () => {
   it.each(segmentCases)('%s × %s est classé et filtré de façon cohérente', (syndicat, banque) => {
@@ -85,15 +91,28 @@ describe('segmentation BDD, chaque combinaison réelle a un seul segment', () =>
     expect(axes.banque).toBeDefined();
     const isChues = syndicat === 'CHUES';
     const isCbao = banque === 'CBAO';
-    expect(segment).toBe(isChues ? (isCbao ? 'BDD1' : 'BDD2') : isCbao ? 'BDD3' : 'BDD4');
+    expect(segment).toBe(expectedSegments[`${String(isChues)}:${String(isCbao)}`]);
   });
 });
 
 const outcomes = Object.values(CallOutcome);
 const methods = [null, ...Object.values(EnrollmentMethod)];
 const comments = [null, '', '  rappel demandé  ', 'motif opérationnel', 'x'.repeat(2000)];
+// La prise de rendez-vous exige sa date : sans elle, la matrice ne mesurerait
+// plus le croisement issue × méthode × commentaire mais ce seul manque.
+const APPEL = '2026-08-18T10:00:00.000Z';
+const RENDEZ_VOUS = '2026-08-25T09:00:00.000Z';
 const attemptCases = outcomes.flatMap((outcome) =>
-  methods.flatMap((method) => comments.map((comment) => ({ outcome, method, comment }))),
+  methods.flatMap((method) =>
+    comments.map((comment) => ({
+      outcome,
+      method,
+      comment,
+      ...(method === EnrollmentMethod.APPOINTMENT
+        ? { rendezVousAt: RENDEZ_VOUS, clientCreatedAt: APPEL }
+        : {}),
+    })),
+  ),
 );
 
 describe('tentatives phase 2, matrice issue × méthode × commentaire', () => {

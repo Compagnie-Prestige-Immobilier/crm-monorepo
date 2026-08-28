@@ -35,6 +35,45 @@ const ARGON2_OPTIONS = {
   parallelism: 1,
 } as const;
 
+const FIXTURE_USERS = [
+  {
+    email: 'fixture.awa@cpi.sn',
+    username: 'fixture.awa',
+    fullName: 'Awa Fixture',
+    role: Role.COMMERCIAL,
+  },
+  {
+    email: 'fixture.fatou@cpi.sn',
+    username: 'fixture.fatou',
+    fullName: 'Fatou Fixture',
+    role: Role.COMMERCIAL,
+  },
+  {
+    email: 'fixture.banque@cpi.sn',
+    username: 'fixture.banque',
+    fullName: 'Moussa Fixture',
+    role: Role.BANQUE_FINANCE,
+  },
+  {
+    email: 'fixture.superviseur@cpi.sn',
+    username: 'fixture.superviseur',
+    fullName: 'Superviseur Fixture',
+    role: Role.SUPERVISEUR,
+  },
+  {
+    email: 'fixture.direction@cpi.sn',
+    username: 'fixture.direction',
+    fullName: 'Direction Fixture',
+    role: Role.DIRECTION,
+  },
+  {
+    email: 'fixture.accueil@cpi.sn',
+    username: 'fixture.accueil',
+    fullName: 'Accueil Fixture',
+    role: Role.ACCUEIL,
+  },
+] as const;
+
 async function seedGeography(): Promise<void> {
   for (const region of REGIONS_SENEGAL) {
     const saved = await prisma.region.upsert({
@@ -292,6 +331,31 @@ async function seedAdmin(): Promise<void> {
   console.info(`  admin : ${email} créé`);
 }
 
+async function seedFixtureUsers(): Promise<void> {
+  const password = process.env.SEED_FIXTURE_PASSWORD ?? 'ChangeMoi123456';
+  if (password.length < 12) {
+    throw new Error('SEED_FIXTURE_PASSWORD doit faire au moins 12 caractères.');
+  }
+
+  const passwordHash = String(await hash(password, ARGON2_OPTIONS));
+
+  for (const fixture of FIXTURE_USERS) {
+    await prisma.user.upsert({
+      where: { email: fixture.email },
+      create: { ...fixture, passwordHash, isActive: true },
+      update: {
+        username: fixture.username,
+        fullName: fixture.fullName,
+        role: fixture.role,
+        passwordHash,
+        isActive: true,
+      },
+    });
+  }
+
+  console.info(`  fixtures : ${String(FIXTURE_USERS.length)} comptes prêts`);
+}
+
 async function main(): Promise<void> {
   console.info('Seed CPI GO');
   await seedGeography();
@@ -303,6 +367,7 @@ async function main(): Promise<void> {
   await seedCallOutcomes();
   await seedVisiteReferentiels();
   await seedAdmin();
+  await seedFixtureUsers();
   console.info('Seed terminé.');
 }
 

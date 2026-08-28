@@ -2,7 +2,7 @@ import { segmentWhere } from '@crm/database';
 import type { Prisma } from '@crm/database';
 
 import type { AuthenticatedUser } from './decorators/current-user.decorator.js';
-import { isAdmin, readScope, readsEveryone } from './scope.js';
+import { isAdmin, readableOwnerId, readScope } from './scope.js';
 import { tryNormalizePhone } from './phone.js';
 import type { ProspectFilterDto } from './dto/prospect-filter.dto.js';
 import { inclusiveDateFrom, inclusiveDateTo } from './date-bounds.js';
@@ -11,86 +11,95 @@ export function buildProspectWhere(
   user: Pick<AuthenticatedUser, 'id' | 'role'>,
   filter: ProspectFilterDto,
 ): Prisma.ProspectWhereInput {
-  const where: Prisma.ProspectWhereInput = {
-    ...readScope(user),
-  };
+  const where: Prisma.ProspectWhereInput = { ...readScope(user) };
+  applyDirectFilters(where, user, filter);
 
-  if (filter.commercialId) {
-    where.createdById = readsEveryone(user)
-      ? filter.commercialId
-      : filter.commercialId === user.id
-        ? user.id
-        : '__aucun__';
-  }
+  const and = relationFilters(filter);
+  if (and.length) where.AND = and;
 
-  if (!(filter.includeDeleted && isAdmin(user))) {
-    where.deletedAt = null;
-  }
+  const clientCreatedAt = dateFilter(filter);
+  if (clientCreatedAt) where.clientCreatedAt = clientCreatedAt;
 
-  if (filter.type) where.type = filter.type;
-  if (filter.canalProvenanceId) where.canalProvenanceId = filter.canalProvenanceId;
-  if (filter.representantId) where.representantId = filter.representantId;
-  if (filter.banqueId) where.banqueId = filter.banqueId;
-  if (filter.syndicatId) where.syndicatId = filter.syndicatId;
+  const search = searchFilters(filter.search);
+  if (search) where.OR = search;
+
+  return where;
+}
+
+function applyDirectFilters(
+  where: Prisma.ProspectWhereInput,
+  user: Pick<AuthenticatedUser, 'id' | 'role'>,
+  filter: ProspectFilterDto,
+): void {
+  if (filter.commercialId) where.createdById = readableOwnerId(user, filter.commercialId);
+  if (!(filter.includeDeleted && isAdmin(user))) where.deletedAt = null;
+  Object.assign(
+    where,
+    Object.fromEntries(
+      Object.entries({
+        type: filter.type,
+        canalProvenanceId: filter.canalProvenanceId,
+        representantId: filter.representantId,
+        banqueId: filter.banqueId,
+        syndicatId: filter.syndicatId,
+        origin: filter.origin,
+        phase2Status: filter.phase2Status,
+        enrollmentMethod: filter.enrollmentMethod,
+        enrollmentCapturedById: filter.enrollmentCapturedById,
+      }).filter(([, value]) => value !== undefined),
+    ),
+  );
+
   if (!filter.projet && filter.statut) where.statut = filter.statut;
-  if (filter.origin) where.origin = filter.origin;
-  if (filter.phase2Status) where.phase2Status = filter.phase2Status;
-  if (filter.enrollmentMethod) where.enrollmentMethod = filter.enrollmentMethod;
-  if (filter.enrollmentCapturedById) {
-    where.enrollmentCapturedById = filter.enrollmentCapturedById;
-  }
   if (filter.departementId) {
     where.representant = { departementId: filter.departementId };
   }
+}
 
+function relationFilters(filter: ProspectFilterDto): Prisma.ProspectWhereInput[] {
   const and: Prisma.ProspectWhereInput[] = [];
-
   if (filter.projet) {
+    const journey: Prisma.ProspectJourneyWhereInput = { projet: filter.projet };
+    if (filter.statut) journey.statut = filter.statut;
     and.push({
       journeys: {
-        some: {
-          projet: filter.projet,
-          ...(filter.statut ? { statut: filter.statut } : {}),
-        },
+        some: journey,
       },
     });
   }
-
   if (filter.segment) and.push(segmentWhere(filter.segment));
-
   if (filter.campaignId ?? filter.assignedToId) {
+    const callTask: Prisma.CallTaskWhereInput = {};
+    if (filter.campaignId) callTask.campaignId = filter.campaignId;
+    if (filter.assignedToId) callTask.assignedToId = filter.assignedToId;
     and.push({
       callTasks: {
-        some: {
-          ...(filter.campaignId ? { campaignId: filter.campaignId } : {}),
-          ...(filter.assignedToId ? { assignedToId: filter.assignedToId } : {}),
-        },
+        some: callTask,
       },
     });
   }
+  return and;
+}
 
-  if (and.length) where.AND = and;
+function dateFilter(filter: ProspectFilterDto): Prisma.DateTimeFilter | undefined {
+  if (!(filter.dateFrom ?? filter.dateTo)) return undefined;
+  const clientCreatedAt: Prisma.DateTimeFilter = {};
+  if (filter.dateFrom) clientCreatedAt.gte = inclusiveDateFrom(filter.dateFrom);
+  if (filter.dateTo) clientCreatedAt.lte = inclusiveDateTo(filter.dateTo);
+  return clientCreatedAt;
+}
 
-  if (filter.dateFrom ?? filter.dateTo) {
-    where.clientCreatedAt = {
-      ...(filter.dateFrom ? { gte: inclusiveDateFrom(filter.dateFrom) } : {}),
-      ...(filter.dateTo ? { lte: inclusiveDateTo(filter.dateTo) } : {}),
-    };
+function searchFilters(rawSearch: string | undefined): Prisma.ProspectWhereInput[] | undefined {
+  const search = rawSearch?.trim();
+  if (!search) return undefined;
+  const asPhone = tryNormalizePhone(search);
+  const digits = search.replace(/[^\d+]/g, '');
+  const clauses: Prisma.ProspectWhereInput[] = [
+    { nom: { contains: search, mode: 'insensitive' } },
+    { prenom: { contains: search, mode: 'insensitive' } },
+  ];
+  if (digits.replace(/\D/g, '').length >= 3) {
+    clauses.push({ phoneE164: { contains: asPhone ?? digits } });
   }
-
-  const search = filter.search?.trim();
-  if (search) {
-    const asPhone = tryNormalizePhone(search);
-    const digits = search.replace(/[^\d+]/g, '');
-
-    where.OR = [
-      { nom: { contains: search, mode: 'insensitive' } },
-      { prenom: { contains: search, mode: 'insensitive' } },
-      ...(digits.replace(/\D/g, '').length >= 3
-        ? [{ phoneE164: { contains: asPhone ?? digits } }]
-        : []),
-    ];
-  }
-
-  return where;
+  return clauses;
 }

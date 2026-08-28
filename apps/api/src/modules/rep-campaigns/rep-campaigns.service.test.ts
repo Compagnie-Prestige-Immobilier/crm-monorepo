@@ -18,15 +18,17 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
-import { shortCode } from '../../common/short-code.js';
 import { RepresentantsService } from '../representants/representants.service.js';
-import { REP_CHECKBOX_GROUPS, RepCampaignsService } from './rep-campaigns.service.js';
+import { RepCampaignsService } from './rep-campaigns.service.js';
 import { RepCallAttemptApplyStatus } from './dto.js';
 
 type MockFn = ReturnType<typeof vi.fn>;
 
 type MockDb = {
-  repCallCampaign: Record<'count' | 'findMany' | 'findFirst' | 'create' | 'update', MockFn>;
+  repCallCampaign: Record<
+    'count' | 'findMany' | 'findFirst' | 'findUnique' | 'create' | 'update',
+    MockFn
+  >;
   repCallCampaignCommercial: Record<'findUnique' | 'createMany', MockFn>;
   repCallTask: Record<
     'groupBy' | 'findMany' | 'findFirst' | 'count' | 'updateMany' | 'createMany' | 'update',
@@ -68,6 +70,7 @@ function prismaStub(): MockDb {
       count: vi.fn(),
       findMany: vi.fn(),
       findFirst: vi.fn(),
+      findUnique: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
     },
@@ -466,7 +469,7 @@ describe('RepCampaignsService : clôture', () => {
 });
 
 describe('RepCampaignsService : programme', () => {
-  it('rend les lignes dans la position persistée, SANS aucun nom', async () => {
+  it('rend les noms et téléphones dans la position persistée', async () => {
     const db = prismaStub();
     db.repCallCampaignCommercial.findUnique.mockResolvedValue({
       campaign: {
@@ -479,18 +482,56 @@ describe('RepCampaignsService : programme', () => {
       user: { fullName: 'Awa' },
     });
     db.repCallTask.findMany.mockResolvedValue([
-      { position: 1, representant: { id: 'rep-1', phoneE164: '+221771234567' } },
-      { position: 2, representant: { id: 'rep-2', phoneE164: '+221770000002' } },
+      { position: 1, representant: { fullName: 'Awa Sy', phoneE164: '+221771234567' } },
+      { position: 2, representant: { fullName: 'Moussa Fall', phoneE164: '+221770000002' } },
     ]);
 
     const result = await build(db).programme('camp-1', 'com-1');
 
     expect(result.rows).toEqual([
-      { position: 1, shortCode: shortCode('rep-1'), phoneE164: '+221771234567' },
-      { position: 2, shortCode: shortCode('rep-2'), phoneE164: '+221770000002' },
+      { position: 1, fullName: 'Awa Sy', phoneE164: '+221771234567' },
+      { position: 2, fullName: 'Moussa Fall', phoneE164: '+221770000002' },
     ]);
-    expect(result.rows[0]).not.toHaveProperty('fullName');
     expect(result.dayNumber).toBeUndefined();
+  });
+
+  it('prépare un programme par téléconseiller et par jour pour le ZIP', async () => {
+    const db = prismaStub();
+    db.repCallCampaign.findUnique.mockResolvedValue({
+      name: 'Relance CHUES',
+      spreadDays: 2,
+      onlyWithoutProspects: false,
+      departement: null,
+      ief: null,
+      commerciaux: [{ position: 1, user: { id: 'com-1', fullName: 'Awa Sy', username: 'awa' } }],
+      tasks: [
+        {
+          assignedToId: 'com-1',
+          position: 1,
+          dayIndex: 0,
+          representant: { fullName: 'Moussa Fall', phoneE164: '+221770000001' },
+        },
+        {
+          assignedToId: 'com-1',
+          position: 2,
+          dayIndex: 1,
+          representant: { fullName: 'Aminata Diop', phoneE164: '+221770000002' },
+        },
+      ],
+    });
+
+    const result = await build(db).programmes('camp-1');
+
+    expect(result.map(({ fileName }) => fileName)).toEqual([
+      '01-awa-jour-1.pdf',
+      '01-awa-jour-2.pdf',
+    ]);
+    expect(result[1]?.data).toMatchObject({
+      commercialName: 'Awa Sy',
+      dayNumber: 2,
+      dayCount: 2,
+      rows: [{ position: 2, fullName: 'Aminata Diop', phoneE164: '+221770000002' }],
+    });
   });
 
   it('filtre sur la journée demandée et porte le « Jour N sur M »', async () => {
@@ -634,7 +675,11 @@ describe('RepCampaignsService : tentatives', () => {
       db.representant.findFirst.mockResolvedValue({ id: 'rep-1' });
       db.repCallTask.findFirst.mockResolvedValue({ id: 'task-1', campaignId: 'camp-1' });
 
-      const result = await build(db).recordAttempt(COMMERCIAL, { ...attempt, outcome });
+      const result = await build(db).recordAttempt(COMMERCIAL, {
+        ...attempt,
+        outcome,
+        ...(outcome === RepCallOutcome.CALLBACK ? { callbackAt: date.toISOString() } : {}),
+      });
 
       expect(result.taskClosed).toBe(false);
       expect(db.repCallTask.update).not.toHaveBeenCalled();
@@ -677,7 +722,7 @@ describe('RepCampaignsService : tentatives', () => {
     return db;
   };
 
-  it('pose le statut de relation appris pendant l’appel, source WEB', async () => {
+  it('pose le statut de relation appris pendant l’appel, source MOBILE', async () => {
     const db = readyFor(RepresentantRelation.INCONNU);
 
     await build(db).recordAttempt(COMMERCIAL, {
@@ -701,7 +746,7 @@ describe('RepCampaignsService : tentatives', () => {
       fromStatus: RepresentantRelation.INCONNU,
       toStatus: RepresentantRelation.AMBASSADEUR,
       changedById: COMMERCIAL.id,
-      source: ChangeSource.WEB,
+      source: ChangeSource.MOBILE,
     });
   });
 
@@ -790,6 +835,38 @@ describe('RepCampaignsService : tentatives', () => {
     await expect(
       service.recordAttempt(COMMERCIAL, { ...attempt, promisedProspects: 12 }),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('exige une date de rappel sur CALLBACK, refuse callbackAt hors CALLBACK', async () => {
+    const db = prismaStub();
+    const service = build(db);
+
+    await expect(
+      service.recordAttempt(COMMERCIAL, { ...attempt, outcome: RepCallOutcome.CALLBACK }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    await expect(
+      service.recordAttempt(COMMERCIAL, { ...attempt, callbackAt: date.toISOString() }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('enregistre la date de rappel sur CALLBACK', async () => {
+    const db = prismaStub();
+    db.repCallAttempt.findUnique.mockResolvedValue(null);
+    db.representant.findFirst.mockResolvedValue({ id: 'rep-1' });
+    db.repCallTask.findFirst.mockResolvedValue(null);
+
+    const callbackAt = new Date('2026-09-01T09:00:00.000Z').toISOString();
+    await build(db).recordAttempt(COMMERCIAL, {
+      ...attempt,
+      outcome: RepCallOutcome.CALLBACK,
+      callbackAt,
+    });
+
+    const created = (
+      db.repCallAttempt.createMany.mock.calls[0] as [{ data: [Record<string, unknown>] }]
+    )[0].data[0];
+    expect(created).toMatchObject({ callbackAt: new Date(callbackAt) });
   });
 
   it('refuse une tentative sur un représentant inconnu', async () => {
@@ -963,40 +1040,6 @@ describe('RepCampaignsService : numéro suggéré', () => {
 
     expect(db.repCallAttempt.createMany).not.toHaveBeenCalled();
     expect(db.representantSuggestion.create).not.toHaveBeenCalled();
-  });
-});
-
-describe('REP_CHECKBOX_GROUPS', () => {
-  const ATTENDUS: Record<RepCallOutcome, string> = {
-    [RepCallOutcome.REACHED]: 'Échange fait',
-    [RepCallOutcome.PROSPECTS_PROMISED]: 'Fiches promises',
-    [RepCallOutcome.UNREACHABLE]: 'Injoignable',
-    [RepCallOutcome.CALLBACK]: 'Rappeler',
-    [RepCallOutcome.REFUSED]: 'Refus',
-    [RepCallOutcome.WRONG_NUMBER]: 'Faux numéro',
-    [RepCallOutcome.OTHER]: 'Autre',
-  };
-
-  const labels = (): string[] => REP_CHECKBOX_GROUPS.flatMap((group) => group.options);
-
-  it.each(Object.entries(ATTENDUS))('%s porte le libellé « %s »', (_issue, libelle) => {
-    expect(labels()).toContain(libelle);
-  });
-
-  it('n’imprime AUCUNE case qui ne corresponde à une issue', () => {
-    expect(labels().sort()).toEqual(Object.values(ATTENDUS).sort());
-  });
-
-  it('la table de correspondance couvre l’énumération en ENTIER', () => {
-    expect(Object.keys(ATTENDUS).sort()).toEqual(Object.keys(RepCallOutcome).sort());
-  });
-
-  it('sépare ce que l’appel a DONNÉ de ce qui l’a empêché', () => {
-    expect(REP_CHECKBOX_GROUPS.map((group) => group.caption)).toEqual(['Résultat', 'Autre']);
-    expect(REP_CHECKBOX_GROUPS[0]?.options).toEqual([
-      ATTENDUS[RepCallOutcome.REACHED],
-      ATTENDUS[RepCallOutcome.PROSPECTS_PROMISED],
-    ]);
   });
 });
 

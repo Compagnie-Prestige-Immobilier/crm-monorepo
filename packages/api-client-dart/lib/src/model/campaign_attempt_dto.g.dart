@@ -21,6 +21,16 @@ abstract class _$CampaignAttemptDtoCWProxy {
 
   CampaignAttemptDto comment(String? comment);
 
+  CampaignAttemptDto email(String? email);
+
+  CampaignAttemptDto fonctionnaire(bool? fonctionnaire);
+
+  CampaignAttemptDto engagementEnCours(bool? engagementEnCours);
+
+  CampaignAttemptDto dureeEtablissementMois(num? dureeEtablissementMois);
+
+  CampaignAttemptDto rendezVousAt(DateTime? rendezVousAt);
+
   CampaignAttemptDto performedById(String performedById);
 
   CampaignAttemptDto performedByName(String performedByName);
@@ -43,6 +53,11 @@ abstract class _$CampaignAttemptDtoCWProxy {
     CallOutcome outcome,
     EnrollmentMethod? method,
     String? comment,
+    String? email,
+    bool? fonctionnaire,
+    bool? engagementEnCours,
+    num? dureeEtablissementMois,
+    DateTime? rendezVousAt,
     String performedById,
     String performedByName,
     String? assignedToId,
@@ -79,6 +94,25 @@ class _$CampaignAttemptDtoCWProxyImpl implements _$CampaignAttemptDtoCWProxy {
   CampaignAttemptDto comment(String? comment) => this(comment: comment);
 
   @override
+  CampaignAttemptDto email(String? email) => this(email: email);
+
+  @override
+  CampaignAttemptDto fonctionnaire(bool? fonctionnaire) =>
+      this(fonctionnaire: fonctionnaire);
+
+  @override
+  CampaignAttemptDto engagementEnCours(bool? engagementEnCours) =>
+      this(engagementEnCours: engagementEnCours);
+
+  @override
+  CampaignAttemptDto dureeEtablissementMois(num? dureeEtablissementMois) =>
+      this(dureeEtablissementMois: dureeEtablissementMois);
+
+  @override
+  CampaignAttemptDto rendezVousAt(DateTime? rendezVousAt) =>
+      this(rendezVousAt: rendezVousAt);
+
+  @override
   CampaignAttemptDto performedById(String performedById) =>
       this(performedById: performedById);
 
@@ -109,6 +143,11 @@ class _$CampaignAttemptDtoCWProxyImpl implements _$CampaignAttemptDtoCWProxy {
     Object? outcome = const $CopyWithPlaceholder(),
     Object? method = const $CopyWithPlaceholder(),
     Object? comment = const $CopyWithPlaceholder(),
+    Object? email = const $CopyWithPlaceholder(),
+    Object? fonctionnaire = const $CopyWithPlaceholder(),
+    Object? engagementEnCours = const $CopyWithPlaceholder(),
+    Object? dureeEtablissementMois = const $CopyWithPlaceholder(),
+    Object? rendezVousAt = const $CopyWithPlaceholder(),
     Object? performedById = const $CopyWithPlaceholder(),
     Object? performedByName = const $CopyWithPlaceholder(),
     Object? assignedToId = const $CopyWithPlaceholder(),
@@ -143,6 +182,27 @@ class _$CampaignAttemptDtoCWProxyImpl implements _$CampaignAttemptDtoCWProxy {
           ? _value.comment
           // ignore: cast_nullable_to_non_nullable
           : comment as String?,
+      email: email == const $CopyWithPlaceholder()
+          ? _value.email
+          // ignore: cast_nullable_to_non_nullable
+          : email as String?,
+      fonctionnaire: fonctionnaire == const $CopyWithPlaceholder()
+          ? _value.fonctionnaire
+          // ignore: cast_nullable_to_non_nullable
+          : fonctionnaire as bool?,
+      engagementEnCours: engagementEnCours == const $CopyWithPlaceholder()
+          ? _value.engagementEnCours
+          // ignore: cast_nullable_to_non_nullable
+          : engagementEnCours as bool?,
+      dureeEtablissementMois:
+          dureeEtablissementMois == const $CopyWithPlaceholder()
+          ? _value.dureeEtablissementMois
+          // ignore: cast_nullable_to_non_nullable
+          : dureeEtablissementMois as num?,
+      rendezVousAt: rendezVousAt == const $CopyWithPlaceholder()
+          ? _value.rendezVousAt
+          // ignore: cast_nullable_to_non_nullable
+          : rendezVousAt as DateTime?,
       performedById: performedById == const $CopyWithPlaceholder()
           ? _value.performedById
           // ignore: cast_nullable_to_non_nullable
@@ -174,56 +234,70 @@ extension $CampaignAttemptDtoCopyWith on CampaignAttemptDto {
 // JsonSerializableGenerator
 // **************************************************************************
 
-CampaignAttemptDto _$CampaignAttemptDtoFromJson(Map<String, dynamic> json) =>
-    $checkedCreate('CampaignAttemptDto', json, ($checkedConvert) {
-      $checkKeys(
-        json,
-        requiredKeys: const [
-          'id',
-          'prospectId',
-          'shortCode',
-          'phoneE164',
-          'outcome',
-          'method',
-          'comment',
-          'performedById',
-          'performedByName',
-          'assignedToId',
-          'createdAt',
-        ],
-      );
-      final val = CampaignAttemptDto(
-        id: $checkedConvert('id', (v) => v as String),
-        prospectId: $checkedConvert('prospectId', (v) => v as String),
-        shortCode: $checkedConvert('shortCode', (v) => v as String),
-        phoneE164: $checkedConvert('phoneE164', (v) => v as String),
-        outcome: $checkedConvert(
-          'outcome',
-          (v) => $enumDecode(
-            _$CallOutcomeEnumMap,
-            v,
-            unknownValue: CallOutcome.unknownDefaultOpenApi,
-          ),
-        ),
-        method: $checkedConvert(
-          'method',
-          (v) => $enumDecodeNullable(
-            _$EnrollmentMethodEnumMap,
-            v,
-            unknownValue: EnrollmentMethod.unknownDefaultOpenApi,
-          ),
-        ),
-        comment: $checkedConvert('comment', (v) => v as String?),
-        performedById: $checkedConvert('performedById', (v) => v as String),
-        performedByName: $checkedConvert('performedByName', (v) => v as String),
-        assignedToId: $checkedConvert('assignedToId', (v) => v as String?),
-        createdAt: $checkedConvert(
-          'createdAt',
-          (v) => DateTime.parse(v as String),
-        ),
-      );
-      return val;
-    });
+CampaignAttemptDto _$CampaignAttemptDtoFromJson(
+  Map<String, dynamic> json,
+) => $checkedCreate('CampaignAttemptDto', json, ($checkedConvert) {
+  $checkKeys(
+    json,
+    requiredKeys: const [
+      'id',
+      'prospectId',
+      'shortCode',
+      'phoneE164',
+      'outcome',
+      'method',
+      'comment',
+      'email',
+      'fonctionnaire',
+      'engagementEnCours',
+      'dureeEtablissementMois',
+      'rendezVousAt',
+      'performedById',
+      'performedByName',
+      'assignedToId',
+      'createdAt',
+    ],
+  );
+  final val = CampaignAttemptDto(
+    id: $checkedConvert('id', (v) => v as String),
+    prospectId: $checkedConvert('prospectId', (v) => v as String),
+    shortCode: $checkedConvert('shortCode', (v) => v as String),
+    phoneE164: $checkedConvert('phoneE164', (v) => v as String),
+    outcome: $checkedConvert(
+      'outcome',
+      (v) => $enumDecode(
+        _$CallOutcomeEnumMap,
+        v,
+        unknownValue: CallOutcome.unknownDefaultOpenApi,
+      ),
+    ),
+    method: $checkedConvert(
+      'method',
+      (v) => $enumDecodeNullable(
+        _$EnrollmentMethodEnumMap,
+        v,
+        unknownValue: EnrollmentMethod.unknownDefaultOpenApi,
+      ),
+    ),
+    comment: $checkedConvert('comment', (v) => v as String?),
+    email: $checkedConvert('email', (v) => v as String?),
+    fonctionnaire: $checkedConvert('fonctionnaire', (v) => v as bool?),
+    engagementEnCours: $checkedConvert('engagementEnCours', (v) => v as bool?),
+    dureeEtablissementMois: $checkedConvert(
+      'dureeEtablissementMois',
+      (v) => v as num?,
+    ),
+    rendezVousAt: $checkedConvert(
+      'rendezVousAt',
+      (v) => v == null ? null : DateTime.parse(v as String),
+    ),
+    performedById: $checkedConvert('performedById', (v) => v as String),
+    performedByName: $checkedConvert('performedByName', (v) => v as String),
+    assignedToId: $checkedConvert('assignedToId', (v) => v as String?),
+    createdAt: $checkedConvert('createdAt', (v) => DateTime.parse(v as String)),
+  );
+  return val;
+});
 
 Map<String, dynamic> _$CampaignAttemptDtoToJson(CampaignAttemptDto instance) =>
     <String, dynamic>{
@@ -234,6 +308,11 @@ Map<String, dynamic> _$CampaignAttemptDtoToJson(CampaignAttemptDto instance) =>
       'outcome': _$CallOutcomeEnumMap[instance.outcome]!,
       'method': _$EnrollmentMethodEnumMap[instance.method],
       'comment': instance.comment,
+      'email': instance.email,
+      'fonctionnaire': instance.fonctionnaire,
+      'engagementEnCours': instance.engagementEnCours,
+      'dureeEtablissementMois': instance.dureeEtablissementMois,
+      'rendezVousAt': instance.rendezVousAt?.toIso8601String(),
       'performedById': instance.performedById,
       'performedByName': instance.performedByName,
       'assignedToId': instance.assignedToId,
@@ -255,5 +334,6 @@ const _$EnrollmentMethodEnumMap = {
   EnrollmentMethod.PHYSICAL: 'PHYSICAL',
   EnrollmentMethod.VOICE_OR_ELECTRONIC_MESSAGING:
       'VOICE_OR_ELECTRONIC_MESSAGING',
+  EnrollmentMethod.APPOINTMENT: 'APPOINTMENT',
   EnrollmentMethod.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

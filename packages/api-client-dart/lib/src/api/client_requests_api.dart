@@ -23,7 +23,7 @@ class ClientRequestsApi {
   const ClientRequestsApi(this._dio);
 
   /// Approuve la demande et crée le prospect, en une seule transaction.
-  /// Le prospect naît en METHOD_OBTAINED avec sa provenance (origin&#x3D;BANQUE, libellé &#x3D; nom de la banque demandeuse) : c’est la condition exacte du filtre de recherche bancaire, donc le dossier peut lui être rattaché immédiatement.
+  /// Le prospect naît avec sa provenance (origin&#x3D;BANQUE, libellé &#x3D; nom de la banque demandeuse), puis sa qualification CHUES continue côté panel.
   ///
   /// Parameters:
   /// * [id]

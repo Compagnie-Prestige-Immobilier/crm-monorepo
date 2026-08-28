@@ -21,6 +21,8 @@ export const SYNC_STREAMS = [
   'prospects',
   'callCampaigns',
   'callTasks',
+  'repCallCampaigns',
+  'repCallTasks',
   'visites',
 ] as const;
 

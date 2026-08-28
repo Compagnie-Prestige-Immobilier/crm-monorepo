@@ -430,10 +430,35 @@ describe('la file d’une campagne descend sur le téléphone de qui elle est', 
   it('une tâche retirée de la file cesse de tirer la fiche', async () => {
     const { prospectId } = await ficheDeBobConfieeA(alice);
     await prisma.callTask.updateMany({ where: { prospectId }, data: { isActive: false } });
+    await backdate();
 
     const page = await sync.pull(alice, { limit: 500 });
 
     expect(page.changes.prospects.map((row) => row.id)).not.toContain(prospectId);
+  });
+
+  it('la tâche retirée descend une DERNIÈRE fois, marquée inactive', async () => {
+    const { prospectId } = await ficheDeBobConfieeA(alice);
+    await prisma.callTask.updateMany({ where: { prospectId }, data: { isActive: false } });
+    await backdate();
+
+    const page = await sync.pull(alice, { limit: 500 });
+
+    // Filtrée, elle ne descendait plus du tout : le téléphone gardait la file
+    // pour toujours et continuait d'appeler des fiches qu'on lui avait reprises.
+    const tache = page.changes.callTasks.find((row) => row.prospectId === prospectId);
+    expect(tache).toBeDefined();
+    expect(tache?.isActive).toBe(false);
+  });
+
+  it('une tâche encore confiée descend active', async () => {
+    const { prospectId } = await ficheDeBobConfieeA(alice);
+
+    const page = await sync.pull(alice, { limit: 500 });
+
+    expect(page.changes.callTasks.find((row) => row.prospectId === prospectId)?.isActive).toBe(
+      true,
+    );
   });
 
   it('QUALIFIER une fiche confiée n’est plus un conflit', async () => {

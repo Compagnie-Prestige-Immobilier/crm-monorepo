@@ -12,7 +12,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { ClientRequestStatus, EnrollmentMethod } from '@crm/database';
+import { ClientRequestStatus } from '@crm/database';
 
 import { PageMetaDto } from '../../common/dto/prospect-filter.dto.js';
 
@@ -60,8 +60,7 @@ export class CreateClientRequestDto {
   note?: string;
 }
 
-// `representantId` et `syndicatId` sont obligatoires en base sur `Prospect`, et `enrollmentMethod`
-// l'est parce que le prospect naît en `METHOD_OBTAINED` et qu'une contrainte CHECK lie les deux.
+// `representantId` et `syndicatId` sont obligatoires en base sur `Prospect`.
 export class ApproveClientRequestDto {
   @ApiProperty({ format: 'uuid', description: 'Représentant de rattachement du prospect créé.' })
   @IsUUID()
@@ -70,15 +69,6 @@ export class ApproveClientRequestDto {
   @ApiProperty({ format: 'uuid' })
   @IsUUID()
   syndicatId!: string;
-
-  @ApiProperty({
-    enum: EnrollmentMethod,
-    enumName: 'EnrollmentMethod',
-    description:
-      'Méthode d’enrôlement du prospect créé. Obligatoire : le prospect naît en METHOD_OBTAINED, et une contrainte CHECK lie les deux colonnes.',
-  })
-  @IsEnum(EnrollmentMethod)
-  enrollmentMethod!: EnrollmentMethod;
 
   @ApiPropertyOptional({
     format: 'uuid',

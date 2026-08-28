@@ -15,6 +15,10 @@ abstract class _$TopCommercialDtoCWProxy {
 
   TopCommercialDto representants(num representants);
 
+  TopCommercialDto methodObtained(num methodObtained);
+
+  TopCommercialDto conversionRate(num? conversionRate);
+
   TopCommercialDto share(num share);
 
   TopCommercialDto derniereSaisie(DateTime? derniereSaisie);
@@ -30,6 +34,8 @@ abstract class _$TopCommercialDtoCWProxy {
     String label,
     num prospects,
     num representants,
+    num methodObtained,
+    num? conversionRate,
     num share,
     DateTime? derniereSaisie,
   });
@@ -55,6 +61,14 @@ class _$TopCommercialDtoCWProxyImpl implements _$TopCommercialDtoCWProxy {
       this(representants: representants);
 
   @override
+  TopCommercialDto methodObtained(num methodObtained) =>
+      this(methodObtained: methodObtained);
+
+  @override
+  TopCommercialDto conversionRate(num? conversionRate) =>
+      this(conversionRate: conversionRate);
+
+  @override
   TopCommercialDto share(num share) => this(share: share);
 
   @override
@@ -73,6 +87,8 @@ class _$TopCommercialDtoCWProxyImpl implements _$TopCommercialDtoCWProxy {
     Object? label = const $CopyWithPlaceholder(),
     Object? prospects = const $CopyWithPlaceholder(),
     Object? representants = const $CopyWithPlaceholder(),
+    Object? methodObtained = const $CopyWithPlaceholder(),
+    Object? conversionRate = const $CopyWithPlaceholder(),
     Object? share = const $CopyWithPlaceholder(),
     Object? derniereSaisie = const $CopyWithPlaceholder(),
   }) {
@@ -93,6 +109,14 @@ class _$TopCommercialDtoCWProxyImpl implements _$TopCommercialDtoCWProxy {
           ? _value.representants
           // ignore: cast_nullable_to_non_nullable
           : representants as num,
+      methodObtained: methodObtained == const $CopyWithPlaceholder()
+          ? _value.methodObtained
+          // ignore: cast_nullable_to_non_nullable
+          : methodObtained as num,
+      conversionRate: conversionRate == const $CopyWithPlaceholder()
+          ? _value.conversionRate
+          // ignore: cast_nullable_to_non_nullable
+          : conversionRate as num?,
       share: share == const $CopyWithPlaceholder()
           ? _value.share
           // ignore: cast_nullable_to_non_nullable
@@ -124,6 +148,8 @@ TopCommercialDto _$TopCommercialDtoFromJson(Map<String, dynamic> json) =>
           'label',
           'prospects',
           'representants',
+          'methodObtained',
+          'conversionRate',
           'share',
           'derniereSaisie',
         ],
@@ -133,6 +159,8 @@ TopCommercialDto _$TopCommercialDtoFromJson(Map<String, dynamic> json) =>
         label: $checkedConvert('label', (v) => v as String),
         prospects: $checkedConvert('prospects', (v) => v as num),
         representants: $checkedConvert('representants', (v) => v as num),
+        methodObtained: $checkedConvert('methodObtained', (v) => v as num),
+        conversionRate: $checkedConvert('conversionRate', (v) => v as num?),
         share: $checkedConvert('share', (v) => v as num),
         derniereSaisie: $checkedConvert(
           'derniereSaisie',
@@ -148,6 +176,8 @@ Map<String, dynamic> _$TopCommercialDtoToJson(TopCommercialDto instance) =>
       'label': instance.label,
       'prospects': instance.prospects,
       'representants': instance.representants,
+      'methodObtained': instance.methodObtained,
+      'conversionRate': instance.conversionRate,
       'share': instance.share,
       'derniereSaisie': instance.derniereSaisie?.toIso8601String(),
     };

@@ -84,16 +84,21 @@ export function bankCaseOrderBy(
   sortBy: BankCaseSortField | undefined,
   sortOrder: SortOrder | undefined,
 ): Prisma.Sql {
-  const column =
-    sortBy === BankCaseSortField.UPDATED_AT
-      ? Prisma.sql`c."updatedAt"`
-      : sortBy === BankCaseSortField.REFERENCE
-        ? Prisma.sql`c."referenceKey"`
-        : sortBy === BankCaseSortField.CUSTOMER_NAME
-          ? Prisma.sql`c."customerName"`
-          : sortBy === BankCaseSortField.AMOUNT
-            ? Prisma.sql`c."amountXof"`
-            : Prisma.sql`c."createdAt"`;
+  let column = Prisma.sql`c."createdAt"`;
+  switch (sortBy) {
+    case BankCaseSortField.UPDATED_AT:
+      column = Prisma.sql`c."updatedAt"`;
+      break;
+    case BankCaseSortField.REFERENCE:
+      column = Prisma.sql`c."referenceKey"`;
+      break;
+    case BankCaseSortField.CUSTOMER_NAME:
+      column = Prisma.sql`c."customerName"`;
+      break;
+    case BankCaseSortField.AMOUNT:
+      column = Prisma.sql`c."amountXof"`;
+      break;
+  }
 
   const direction = sortOrder === SortOrder.ASC ? Prisma.sql`ASC` : Prisma.sql`DESC`;
 

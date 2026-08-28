@@ -12,6 +12,7 @@ import type {
   ImportRunContext,
   ParsedRow,
 } from './import-adapter.js';
+import { importCell, unresolvedImportValue } from './import-adapter.js';
 import {
   DUREE_SYSTEME_MAX_MOIS,
   GRAND_PUBLIC_IMPORT_COLUMNS,
@@ -143,7 +144,7 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<
       error: { rowNumber, column, code, message },
     });
 
-    const nom = (cells[H.nom] ?? '').trim();
+    const nom = importCell(cells, H.nom);
     if (nom === '') {
       return refuse(
         H.nom,
@@ -152,7 +153,7 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<
       );
     }
 
-    const rawPhone = (cells[H.phone] ?? '').trim();
+    const rawPhone = importCell(cells, H.phone);
     const phoneE164 = tryNormalizePhone(rawPhone);
     if (phoneE164 === undefined) {
       return refuse(
@@ -164,10 +165,10 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<
       );
     }
 
-    const rawBanque = (cells[H.banque] ?? '').trim();
+    const rawBanque = importCell(cells, H.banque);
     const banqueId =
       rawBanque === '' ? null : (refs.banques.get(referentialKey(rawBanque)) ?? null);
-    if (rawBanque !== '' && banqueId === null) {
+    if (unresolvedImportValue(rawBanque, banqueId)) {
       return refuse(
         H.banque,
         GrandPublicImportError.BANQUE_INCONNUE,
@@ -175,10 +176,10 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<
       );
     }
 
-    const rawSyndicat = (cells[H.syndicat] ?? '').trim();
+    const rawSyndicat = importCell(cells, H.syndicat);
     const syndicatId =
       rawSyndicat === '' ? null : (refs.syndicats.get(referentialKey(rawSyndicat)) ?? null);
-    if (rawSyndicat !== '' && syndicatId === null) {
+    if (unresolvedImportValue(rawSyndicat, syndicatId)) {
       return refuse(
         H.syndicat,
         GrandPublicImportError.SYNDICAT_INCONNU,
@@ -186,10 +187,10 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<
       );
     }
 
-    const rawCanal = (cells[H.canal] ?? '').trim();
+    const rawCanal = importCell(cells, H.canal);
     const canalProvenanceId =
       rawCanal === '' ? null : (refs.canaux.get(normalizeKey(rawCanal)) ?? null);
-    if (rawCanal !== '' && canalProvenanceId === null) {
+    if (unresolvedImportValue(rawCanal, canalProvenanceId)) {
       return refuse(
         H.canal,
         GrandPublicImportError.CANAL_INCONNU,
@@ -197,7 +198,7 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<
       );
     }
 
-    const rawFonctionnaire = (cells[H.fonctionnaire] ?? '').trim();
+    const rawFonctionnaire = importCell(cells, H.fonctionnaire);
     const fonctionnaire = readFonctionnaire(rawFonctionnaire);
     if (fonctionnaire === 'illisible') {
       return refuse(
@@ -207,9 +208,9 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<
       );
     }
 
-    const rawDuree = (cells[H.dureeSysteme] ?? '').trim();
+    const rawDuree = importCell(cells, H.dureeSysteme);
     const dureeSystemeMois = readDureeMois(rawDuree);
-    if (rawDuree !== '' && dureeSystemeMois === null) {
+    if (unresolvedImportValue(rawDuree, dureeSystemeMois)) {
       return refuse(
         H.dureeSysteme,
         GrandPublicImportError.DUREE_ILLISIBLE,
@@ -217,14 +218,14 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<
       );
     }
 
-    const profession = (cells[H.profession] ?? '').trim();
+    const profession = importCell(cells, H.profession);
 
     return {
       ok: true,
       row: {
         rowNumber,
         nom,
-        prenom: (cells[H.prenom] ?? '').trim(),
+        prenom: importCell(cells, H.prenom),
         phoneE164,
         profession: profession === '' ? null : profession.slice(0, PROFESSION_MAX),
         syndicatId,

@@ -17,6 +17,7 @@ import type {
   SheetLayout,
 } from './import-adapter.js';
 import { ImportAdapterFailure } from './import-adapter.js';
+import { importCell, unresolvedImportValue } from './import-adapter.js';
 import {
   VisiteImportError,
   allocateVisiteReferences,
@@ -234,7 +235,7 @@ export class VisitesRegistreAdapter implements ImportAdapter<VisiteRegistreRow, 
     run: VisiteRegistreRun,
   ): ParsedRow<VisiteRegistreRow> {
     const refs = run.refs;
-    const sheet = cells[SHEET_CELL] ?? '';
+    const sheet = importCell(cells, SHEET_CELL);
     const refuse = (
       column: string,
       code: string,
@@ -244,9 +245,9 @@ export class VisitesRegistreAdapter implements ImportAdapter<VisiteRegistreRow, 
       error: { rowNumber, column, code, message: detail },
     });
 
-    const reference = (cells[H.numero] ?? '').trim();
+    const reference = importCell(cells, H.numero);
 
-    const rawDate = (cells[H.date] ?? '').trim();
+    const rawDate = importCell(cells, H.date);
     if (rawDate === '') {
       return refuse(H.date, VisiteImportError.DATE_ABSENTE, 'la date de la visite manque.');
     }
@@ -259,9 +260,9 @@ export class VisitesRegistreAdapter implements ImportAdapter<VisiteRegistreRow, 
       );
     }
 
-    const rawTime = (cells[H.heure] ?? '').trim();
+    const rawTime = importCell(cells, H.heure);
     const time = rawTime === '' ? null : readRegistreTime(rawTime);
-    if (rawTime !== '' && time === null) {
+    if (unresolvedImportValue(rawTime, time)) {
       return refuse(
         H.heure,
         VisiteImportError.HEURE_ILLISIBLE,
@@ -269,7 +270,7 @@ export class VisitesRegistreAdapter implements ImportAdapter<VisiteRegistreRow, 
       );
     }
 
-    const visitorName = (cells[H.nom] ?? '').trim();
+    const visitorName = importCell(cells, H.nom);
     if (visitorName.length < 2) {
       return refuse(H.nom, VisiteImportError.NOM_ABSENT, 'le nom du visiteur manque.');
     }
@@ -278,21 +279,21 @@ export class VisitesRegistreAdapter implements ImportAdapter<VisiteRegistreRow, 
     if (entreprise === null) {
       return refuse(
         H.entreprise,
-        ...referentielMissReason(refs, (cells[H.entreprise] ?? '').trim(), 'entreprise'),
+        ...referentielMissReason(refs, importCell(cells, H.entreprise), 'entreprise'),
       );
     }
 
-    const rawDirection = (cells[H.direction] ?? '').trim();
+    const rawDirection = importCell(cells, H.direction);
     const direction =
       rawDirection === '' ? null : resolveReferentiel(refs.directions, rawDirection);
-    if (rawDirection !== '' && direction === null) {
+    if (unresolvedImportValue(rawDirection, direction)) {
       return refuse(H.direction, ...referentielMissReason(refs, rawDirection, 'direction'));
     }
 
-    const rawDestinataire = (cells[H.destinataire] ?? '').trim();
+    const rawDestinataire = importCell(cells, H.destinataire);
     const destinataire =
       rawDestinataire === '' ? null : resolveReferentiel(refs.destinataires, rawDestinataire);
-    if (rawDestinataire !== '' && destinataire === null) {
+    if (unresolvedImportValue(rawDestinataire, destinataire)) {
       return refuse(
         H.destinataire,
         ...referentielMissReason(refs, rawDestinataire, 'destinataire'),
@@ -301,14 +302,11 @@ export class VisitesRegistreAdapter implements ImportAdapter<VisiteRegistreRow, 
 
     const objet = resolveReferentiel(refs.objets, cells[H.objet]);
     if (objet === null) {
-      return refuse(
-        H.objet,
-        ...referentielMissReason(refs, (cells[H.objet] ?? '').trim(), 'objet'),
-      );
+      return refuse(H.objet, ...referentielMissReason(refs, importCell(cells, H.objet), 'objet'));
     }
 
-    const phone = (cells[H.telephone] ?? '').trim();
-    const comment = (cells[H.commentaire] ?? '').trim();
+    const phone = importCell(cells, H.telephone);
+    const comment = importCell(cells, H.commentaire);
 
     return {
       ok: true,
@@ -575,40 +573,49 @@ export class VisitesRegistreAdapter implements ImportAdapter<VisiteRegistreRow, 
       updated += 1;
     }
 
-    if (toCreate.length > 0) {
-      const references = await allocateVisiteReferences(toCreate, (row) => row.date, ctx.tx);
-      const written = await ctx.tx.visite.createMany({
-        data: toCreate.map((row) => ({
-          id: uuidv7(),
-          reference: references.get(row) ?? '',
-          visitedAt: visiteInstant(row.date, row.time ?? undefined),
-          timeKnown: row.time !== null,
-          visitorName: row.visitorName,
-          phone: row.phone,
-          phoneE164: row.phoneE164,
-          entrepriseId: row.entreprise.id,
-          objetId: row.objet.id,
-          directionId: row.direction?.id ?? null,
-          destinataireId: row.destinataire?.id ?? null,
-          comment: row.comment,
-          createdById: ctx.requestedById,
-        })),
-        skipDuplicates: true,
-      });
-      created += written.count;
-
-      if (written.count < toCreate.length) {
-        const perdues = toCreate.length - written.count;
-        skipped += perdues;
-        errors.push({
-          rowNumber: toCreate[0]?.rowNumber ?? 0,
-          code: VisiteImportError.REFERENCE_EPUISEE,
-          message: `${String(perdues)} ligne(s) n’ont pas été écrites : leur référence a été prise par une saisie faite à l’accueil pendant l’import.`,
-        });
-      }
-    }
+    const creation = await this.createSelected(toCreate, ctx);
+    created += creation.created;
+    skipped += creation.skipped;
+    if (creation.error !== undefined) errors.push(creation.error);
 
     return { created, updated, skipped, errors };
+  }
+
+  private async createSelected(
+    rows: readonly VisiteRegistreRow[],
+    ctx: ImportRunContext,
+  ): Promise<{ created: number; skipped: number; error?: ImportRowError }> {
+    if (rows.length === 0) return { created: 0, skipped: 0 };
+    const references = await allocateVisiteReferences(rows, (row) => row.date, ctx.tx);
+    const written = await ctx.tx.visite.createMany({
+      data: rows.map((row) => ({
+        id: uuidv7(),
+        reference: references.get(row) ?? '',
+        visitedAt: visiteInstant(row.date, row.time ?? undefined),
+        timeKnown: row.time !== null,
+        visitorName: row.visitorName,
+        phone: row.phone,
+        phoneE164: row.phoneE164,
+        entrepriseId: row.entreprise.id,
+        objetId: row.objet.id,
+        directionId: row.direction?.id ?? null,
+        destinataireId: row.destinataire?.id ?? null,
+        comment: row.comment,
+        createdById: ctx.requestedById,
+      })),
+      skipDuplicates: true,
+    });
+    const skipped = rows.length - written.count;
+    if (skipped === 0) return { created: written.count, skipped: 0 };
+    return {
+      created: written.count,
+      skipped,
+      error: {
+        rowNumber: rows[0]?.rowNumber ?? 0,
+        code: VisiteImportError.REFERENCE_EPUISEE,
+        message: `${String(skipped)} ligne(s) n’ont pas été écrites : leur référence a été prise par une saisie faite à l’accueil pendant l’import.`,
+      },
+    };
   }
 }
 

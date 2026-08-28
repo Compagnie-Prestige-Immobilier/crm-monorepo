@@ -21,8 +21,10 @@ import {
   shuffleInPostgres,
 } from '../phase2/distribution.js';
 import { COMMENT_MAX_LENGTH } from '../phase2/attempt-rules.js';
-import type { CheckboxGroup, ProgrammeRow } from '../phase2/programme-pdf.js';
+import type { RepProgrammeData, RepProgrammeRow } from '../phase2/programme-pdf.js';
 import {
+  callbackAtNotAllowed,
+  callbackAtRequired,
   commentRequired,
   commercialInactive,
   commercialNotFound,
@@ -67,11 +69,6 @@ const TERMINAL_OUTCOMES: readonly RepCallOutcome[] = [
   RepCallOutcome.PROSPECTS_PROMISED,
   RepCallOutcome.REFUSED,
   RepCallOutcome.WRONG_NUMBER,
-];
-
-export const REP_CHECKBOX_GROUPS: readonly CheckboxGroup[] = [
-  { caption: 'Résultat', options: ['Échange fait', 'Fiches promises'] },
-  { caption: 'Autre', options: ['Injoignable', 'Rappeler', 'Refus', 'Faux numéro', 'Autre'] },
 ];
 
 const emptyProgress = (): RepCampaignProgressDto => ({ total: 0, open: 0, done: 0, cancelled: 0 });
@@ -459,7 +456,7 @@ export class RepCampaignsService {
     campaignName: string;
     commercialName: string;
     segmentLabel: string;
-    rows: ProgrammeRow[];
+    rows: RepProgrammeRow[];
     dayNumber?: number;
     dayCount?: number;
   }> {
@@ -496,7 +493,7 @@ export class RepCampaignsService {
         ...(jour === undefined ? {} : { dayIndex: jour - 1 }),
       },
       orderBy: { position: 'asc' },
-      select: { position: true, representant: { select: { id: true, phoneE164: true } } },
+      select: { position: true, representant: { select: { fullName: true, phoneE164: true } } },
     });
 
     return {
@@ -509,26 +506,92 @@ export class RepCampaignsService {
       ),
       rows: tasks.map((task) => ({
         position: task.position,
-        shortCode: shortCode(task.representant.id),
+        fullName: task.representant.fullName,
         phoneE164: task.representant.phoneE164,
       })),
       ...(jour === undefined ? {} : { dayNumber: jour, dayCount: effectiveDays }),
     };
   }
 
+  async programmes(campaignId: string): Promise<
+    {
+      fileName: string;
+      data: Omit<RepProgrammeData, 'generatedAt'>;
+    }[]
+  > {
+    const campaign = await this.prisma.repCallCampaign.findUnique({
+      where: { id: campaignId },
+      select: {
+        name: true,
+        spreadDays: true,
+        onlyWithoutProspects: true,
+        departement: { select: { name: true } },
+        ief: { select: { name: true } },
+        commerciaux: {
+          orderBy: { position: 'asc' },
+          select: {
+            position: true,
+            user: { select: { id: true, fullName: true, username: true } },
+          },
+        },
+        tasks: {
+          orderBy: [{ assignedToId: 'asc' }, { position: 'asc' }],
+          select: {
+            assignedToId: true,
+            position: true,
+            dayIndex: true,
+            representant: { select: { fullName: true, phoneE164: true } },
+          },
+        },
+      },
+    });
+    if (!campaign) throw repCampaignNotFound();
+
+    const segmentLabel = composeScopeLabel(
+      campaign.departement?.name ?? null,
+      campaign.ief?.name ?? null,
+      campaign.onlyWithoutProspects,
+    );
+    const byUser = Map.groupBy(campaign.tasks, (task) => task.assignedToId);
+
+    return campaign.commerciaux.flatMap((membership) => {
+      const tasks = byUser.get(membership.user.id) ?? [];
+      if (tasks.length === 0) return [];
+      const dayCount = Math.max(1, Math.min(campaign.spreadDays, tasks.length));
+      const days =
+        campaign.spreadDays > 1 ? Array.from({ length: dayCount }, (_, day) => day) : [null];
+
+      return days.flatMap((dayIndex) => {
+        const selected =
+          dayIndex === null ? tasks : tasks.filter((task) => task.dayIndex === dayIndex);
+        if (selected.length === 0) return [];
+        const dayNumber = dayIndex === null ? undefined : dayIndex + 1;
+        const suffix = dayNumber === undefined ? '' : `-jour-${String(dayNumber)}`;
+        return [
+          {
+            fileName: `${String(membership.position).padStart(2, '0')}-${membership.user.username}${suffix}.pdf`,
+            data: {
+              campaignName: campaign.name,
+              commercialName: membership.user.fullName,
+              segmentLabel,
+              rows: selected.map((task) => ({
+                position: task.position,
+                fullName: task.representant.fullName,
+                phoneE164: task.representant.phoneE164,
+              })),
+              ...(dayNumber === undefined ? {} : { dayNumber, dayCount }),
+            },
+          },
+        ];
+      });
+    });
+  }
+
   async recordAttempt(
     user: AuthenticatedUser,
     body: CreateRepCallAttemptDto,
   ): Promise<RepCallAttemptResultDto> {
-    const comment = body.comment?.trim() || null;
-    if (body.outcome === RepCallOutcome.OTHER && comment === null) throw commentRequired();
-    if (
-      body.promisedProspects !== undefined &&
-      body.outcome !== RepCallOutcome.PROSPECTS_PROMISED
-    ) {
-      throw promisedNotAllowed();
-    }
-    if (comment !== null && comment.length > COMMENT_MAX_LENGTH) throw commentRequired();
+    const comment = validatedComment(body);
 
     const suggested = await this.resolveSuggested(user, body.suggestedPhone);
 
@@ -537,13 +600,13 @@ export class RepCampaignsService {
       select: { id: true, taskId: true },
     });
     if (existing) {
-      return {
-        status: RepCallAttemptApplyStatus.DUPLICATE,
-        attemptId: existing.id,
-        taskId: existing.taskId,
-        taskClosed: false,
-        suggestion: suggested?.lookup ?? null,
-      };
+      return attemptResult(
+        RepCallAttemptApplyStatus.DUPLICATE,
+        existing.id,
+        existing.taskId,
+        false,
+        suggested,
+      );
     }
 
     // Sans cette clause, poster le `representantId` d'un collègue suffisait à
@@ -591,6 +654,7 @@ export class RepCampaignsService {
             outcome: body.outcome,
             promisedProspects: body.promisedProspects ?? null,
             comment,
+            callbackAt: body.callbackAt ? new Date(body.callbackAt) : null,
             clientCreatedAt: new Date(body.clientCreatedAt),
           },
         ],
@@ -633,7 +697,7 @@ export class RepCampaignsService {
           fromStatus: representant.relationStatus,
           toStatus: body.relationStatus,
           changedById: user.id,
-          source: ChangeSource.WEB,
+          source: ChangeSource.MOBILE,
         });
       }
 
@@ -652,22 +716,22 @@ export class RepCampaignsService {
     });
 
     if (!applied) {
-      return {
-        status: RepCallAttemptApplyStatus.DUPLICATE,
-        attemptId: body.id,
-        taskId: task?.id ?? null,
-        taskClosed: false,
-        suggestion: suggested?.lookup ?? null,
-      };
+      return attemptResult(
+        RepCallAttemptApplyStatus.DUPLICATE,
+        body.id,
+        task?.id ?? null,
+        false,
+        suggested,
+      );
     }
 
-    return {
-      status: RepCallAttemptApplyStatus.APPLIED,
-      attemptId: body.id,
-      taskId: task?.id ?? null,
-      taskClosed: Boolean(task) && terminal,
-      suggestion: suggested?.lookup ?? null,
-    };
+    return attemptResult(
+      RepCallAttemptApplyStatus.APPLIED,
+      body.id,
+      task?.id ?? null,
+      task !== null && terminal,
+      suggested,
+    );
   }
 
   /**
@@ -712,6 +776,32 @@ export class RepCampaignsService {
       scope.onlyWithoutProspects ?? false,
     );
   }
+}
+
+function validatedComment(body: CreateRepCallAttemptDto): string | null {
+  const comment = body.comment?.trim() || null;
+  if (body.outcome === RepCallOutcome.OTHER && comment === null) throw commentRequired();
+  if (body.promisedProspects !== undefined && body.outcome !== RepCallOutcome.PROSPECTS_PROMISED) {
+    throw promisedNotAllowed();
+  }
+  if (comment !== null && comment.length > COMMENT_MAX_LENGTH) throw commentRequired();
+  if (body.outcome === RepCallOutcome.CALLBACK && body.callbackAt === undefined) {
+    throw callbackAtRequired();
+  }
+  if (body.callbackAt !== undefined && body.outcome !== RepCallOutcome.CALLBACK) {
+    throw callbackAtNotAllowed();
+  }
+  return comment;
+}
+
+function attemptResult(
+  status: RepCallAttemptApplyStatus,
+  attemptId: string,
+  taskId: string | null,
+  taskClosed: boolean,
+  suggested: { lookup: RepresentantLookupDto } | null,
+): RepCallAttemptResultDto {
+  return { status, attemptId, taskId, taskClosed, suggestion: suggested?.lookup ?? null };
 }
 
 function eligibleWhere(scope: ScopeInput): Prisma.RepresentantWhereInput {

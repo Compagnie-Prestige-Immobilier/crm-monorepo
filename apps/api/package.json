@@ -7,7 +7,7 @@
     "dev": "tsc -p tsconfig.gen.json --watch --preserveWatchOutput & node --watch --enable-source-maps dist/main.js",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
-    "lint": "eslint src",
+    "lint": "oxlint --config ../../.oxlintrc.json --report-unused-disable-directives src",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -36,6 +36,7 @@
     "exceljs": "catalog:",
     "fastify": "catalog:",
     "libphonenumber-js": "catalog:",
+    "jszip": "catalog:",
     "nestjs-pino": "catalog:",
     "pdfkit": "catalog:",
     "pino": "catalog:",
@@ -47,15 +48,12 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@crm/eslint-config": "workspace:*",
     "@crm/typescript-config": "workspace:*",
     "@nestjs/testing": "catalog:",
     "@types/node": "catalog:",
     "@types/pdfkit": "catalog:",
     "@vitest/coverage-v8": "catalog:",
-    "eslint": "catalog:",
     "prettier": "catalog:",
-    "tsx": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }
