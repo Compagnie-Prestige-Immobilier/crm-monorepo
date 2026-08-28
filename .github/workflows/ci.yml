@@ -101,6 +101,7 @@ jobs:
 
       - run: pnpm format:check
       - run: pnpm lint
+      - run: pnpm dead-code
       - run: pnpm typecheck
       - run: pnpm test:coverage
 
