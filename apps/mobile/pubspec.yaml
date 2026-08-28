@@ -126,6 +126,7 @@ flutter:
   assets:
     - assets/brand/
     - assets/sounds/
+    - shorebird.yaml
 
   # Polices EMPAQUETÉES dans l'APK. Pas de `google_fonts` : un premier lancement
   # sur réseau faible afficherait une police de repli pendant dix secondes.
