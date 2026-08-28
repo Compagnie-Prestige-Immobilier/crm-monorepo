@@ -37,6 +37,7 @@ export const ENROLLMENT_METHOD_LABELS: Readonly<Record<EnrollmentMethod, string>
   [EnrollmentMethod.PLATFORM]: 'Plateforme',
   [EnrollmentMethod.PHYSICAL]: 'Physique',
   [EnrollmentMethod.VOICE_OR_ELECTRONIC_MESSAGING]: 'Vocal ou messagerie électronique',
+  [EnrollmentMethod.APPOINTMENT]: 'Prise de rendez-vous',
 };
 
 export const CALL_OUTCOME_LABELS: Readonly<Record<CallOutcome, string>> = {
@@ -59,4 +60,5 @@ export const ENROLLMENT_METHOD_ORDER: readonly EnrollmentMethod[] = [
   EnrollmentMethod.PLATFORM,
   EnrollmentMethod.PHYSICAL,
   EnrollmentMethod.VOICE_OR_ELECTRONIC_MESSAGING,
+  EnrollmentMethod.APPOINTMENT,
 ];

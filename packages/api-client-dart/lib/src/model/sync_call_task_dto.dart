@@ -32,6 +32,8 @@ class SyncCallTaskDto {
 
     required this.status,
 
+    required this.isActive,
+
     required this.updatedAt,
   });
 
@@ -60,6 +62,10 @@ class SyncCallTaskDto {
   )
   final CallTaskStatus status;
 
+  /// Faux quand la file a été retirée au commercial. La ligne descend alors une dernière fois pour que le téléphone la retire de son programme : sans elle, il continuerait d’appeler des fiches qui ne lui sont plus confiées.
+  @JsonKey(name: r'isActive', required: true, includeIfNull: false)
+  final bool isActive;
+
   @JsonKey(name: r'updatedAt', required: true, includeIfNull: false)
   final DateTime updatedAt;
 
@@ -75,6 +81,7 @@ class SyncCallTaskDto {
                 position,
                 dayIndex,
                 status,
+                isActive,
                 updatedAt,
               ],
               [
@@ -84,6 +91,7 @@ class SyncCallTaskDto {
                 other.position,
                 other.dayIndex,
                 other.status,
+                other.isActive,
                 other.updatedAt,
               ],
             );
@@ -99,6 +107,7 @@ class SyncCallTaskDto {
         position,
         dayIndex,
         status,
+        isActive,
         updatedAt,
       ]);
 

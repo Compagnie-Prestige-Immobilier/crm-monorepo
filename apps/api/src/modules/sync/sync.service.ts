@@ -118,6 +118,38 @@ const FROM_DB_RESULT: Record<OperationResult, SyncOpStatus> = {
   [OperationResult.SKIPPED_DEPENDENCY_FAILED]: SyncOpStatus.SKIPPED_DEPENDENCY_FAILED,
 };
 
+// Voir `defined` dans prospects.service.ts : `Partial<T>` seul ne retire pas
+// `undefined` du type de la valeur, ce qu'exige `exactOptionalPropertyTypes`.
+function definedValues<T extends Record<string, unknown>>(
+  values: T,
+): { [K in keyof T]?: Exclude<T[K], undefined> } {
+  return Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined)) as {
+    [K in keyof T]?: Exclude<T[K], undefined>;
+  };
+}
+
+function clearableValue(
+  key: string,
+  value: unknown,
+  cleared: ReadonlySet<string>,
+  empty: unknown,
+): Record<string, unknown> {
+  if (cleared.has(key)) return { [key]: empty };
+  if (value === undefined) return {};
+  return { [key]: value };
+}
+
+const valueOrNull = <T>(value: T | undefined): T | null => value ?? null;
+const textOrEmpty = (value: string | undefined): string => value?.trim() ?? '';
+
+function existingOutcome(
+  entityId: string,
+  existing: { rev: number; updatedAt: Date } | null,
+): OperationOutcome {
+  if (existing === null) return applied(entityId, null, null);
+  return applied(entityId, existing.rev, existing.updatedAt);
+}
+
 /**
  * Lit les anciennes valeurs de base avec prudence : un verdict inconnu ne doit
  * jamais ressembler à un rejeu réussi.
@@ -171,7 +203,11 @@ const mineOrAssignedRepresentant = (
   isAdmin(user)
     ? {}
     : {
-        OR: [{ createdById: user.id }, { prospects: { some: { callTasks: assignedTo(user.id) } } }],
+        OR: [
+          { createdById: user.id },
+          { prospects: { some: { callTasks: assignedTo(user.id) } } },
+          { repCallTasks: { some: { assignedToId: user.id } } },
+        ],
       };
 
 @Injectable()
@@ -568,35 +604,12 @@ export class SyncService {
 
     // GARDE ANTI-SQUAT D'IDENTIFIANT. Le client choisit l'UUID : sans ce
     // contrôle, poster l'identifiant d'un collègue écraserait sa fiche.
-    if (existing && !isAdmin(user) && existing.createdById !== user.id) {
-      // Une campagne confie des fiches que le teleconseiller n'a pas saisies.
-      // Sans cette porte, il tirait la file sur son telephone et chaque
-      // qualification repartait en CONFLIT, sans qu'il puisse rien y faire.
-      //
-      // `existing` est un REPRÉSENTANT : la tâche se cherche par le prospect
-      // qui lui est rattaché. Comparée à `prospectId`, la condition ne pouvait
-      // jamais être vraie et la porte restait murée.
-      const assigned = await tx.callTask.findFirst({
-        where: {
-          assignedToId: user.id,
-          isActive: true,
-          prospect: { representantId: existing.id },
-        },
-        select: { id: true },
-      });
-      if (!assigned) {
-        throw new OperationError(
-          SyncOpStatus.CONFLICT,
-          'ENTITY_ID_OWNED_BY_ANOTHER_USER',
-          'Cet identifiant appartient à un autre commercial.',
-        );
-      }
-    }
+    await this.assertRepresentantWritable(tx, user, existing);
 
     if (operation.op === SyncOp.DELETE) {
       if (!existing || existing.deletedAt) {
         // Supprimer ce qui n'existe plus est le résultat voulu.
-        return applied(operation.entityId, existing?.rev ?? null, existing?.updatedAt ?? null);
+        return existingOutcome(operation.entityId, existing);
       }
       assertRev(operation, existing.rev);
       const now = new Date();
@@ -611,7 +624,7 @@ export class SyncService {
       return applied(row.id, row.rev, row.updatedAt);
     }
 
-    const data = operation.data ?? {};
+    const data = operation.data || {};
     const phoneE164 = requirePhone(data);
 
     if (!existing || existing.deletedAt) {
@@ -628,7 +641,7 @@ export class SyncService {
           id: operation.entityId,
           fullName: data.fullName.trim(),
           phoneE164,
-          ...(data.notes ? { notes: data.notes } : {}),
+          ...definedValues({ notes: data.notes || undefined }),
           // Une fiche neuve part de `NON_DEMANDE`: le resolveur applique la
           // meme regle que le panneau, donc le CHECK ne peut pas etre viole
           // par le chemin hors ligne.
@@ -637,16 +650,16 @@ export class SyncService {
             whatsappE164: null,
           }),
           departementId: data.departementId,
-          ...(data.iefId ? { iefId: data.iefId } : {}),
+          ...definedValues({ iefId: data.iefId || undefined }),
           createdById: user.id,
           clientCreatedAt: clientDate(data.clientCreatedAt, operation.clientUpdatedAt),
         },
         update: {
           fullName: data.fullName.trim(),
           phoneE164,
-          notes: data.notes ?? null,
+          notes: valueOrNull(data.notes),
           departementId: data.departementId,
-          ...(data.iefId ? { iefId: data.iefId } : {}),
+          ...definedValues({ iefId: data.iefId || undefined }),
           deletedAt: null,
           rev: { increment: 1 },
         },
@@ -673,20 +686,12 @@ export class SyncService {
     const row = await tx.representant.update({
       where: { id: existing.id },
       data: {
-        ...(data.fullName ? { fullName: data.fullName.trim() } : {}),
+        ...definedValues({ fullName: data.fullName?.trim() }),
         phoneE164,
-        ...(cleared.has('notes')
-          ? { notes: null }
-          : data.notes !== undefined
-            ? { notes: data.notes || null }
-            : {}),
+        ...clearableValue('notes', data.notes === '' ? null : data.notes, cleared, null),
         ...resolveWhatsappPatch(this.whatsappInputFor(data, cleared), existing),
-        ...(data.departementId ? { departementId: data.departementId } : {}),
-        ...(cleared.has('iefId')
-          ? { iefId: null }
-          : data.iefId === undefined
-            ? {}
-            : { iefId: data.iefId }),
+        ...definedValues({ departementId: data.departementId || undefined }),
+        ...clearableValue('iefId', data.iefId, cleared, null),
         rev: { increment: 1 },
       },
     });
@@ -706,6 +711,28 @@ export class SyncService {
     return applied(row.id, row.rev, row.updatedAt);
   }
 
+  private async assertRepresentantWritable(
+    tx: Prisma.TransactionClient,
+    user: AuthenticatedUser,
+    existing: { id: string; createdById: string } | null,
+  ): Promise<void> {
+    if (existing === null || isAdmin(user) || existing.createdById === user.id) return;
+    const assigned = await tx.callTask.findFirst({
+      where: {
+        assignedToId: user.id,
+        isActive: true,
+        prospect: { representantId: existing.id },
+      },
+      select: { id: true },
+    });
+    if (assigned !== null) return;
+    throw new OperationError(
+      SyncOpStatus.CONFLICT,
+      'ENTITY_ID_OWNED_BY_ANOTHER_USER',
+      'Cet identifiant appartient à un autre commercial.',
+    );
+  }
+
   /**
    * Un champ VIDE se declare par `clearedFields`, pas par une cle absente: le
    * transport JSON supprime les `null`, donc l'absence et le vidage arrivent
@@ -722,28 +749,16 @@ export class SyncService {
     etablissement?: string;
   } {
     return {
-      ...(data.whatsappStatus === undefined ? {} : { whatsappStatus: data.whatsappStatus }),
-      ...(cleared.has('whatsappE164') || data.whatsappE164 === undefined
-        ? {}
-        : { whatsappE164: data.whatsappE164 }),
-      ...(cleared.has('profession')
-        ? { profession: '' }
-        : data.profession === undefined
-          ? {}
-          : { profession: data.profession }),
+      ...definedValues({ whatsappStatus: data.whatsappStatus }),
+      ...definedValues({
+        whatsappE164: cleared.has('whatsappE164') ? undefined : data.whatsappE164,
+      }),
+      ...clearableValue('profession', data.profession, cleared, ''),
       // `prenom` sert au prospect ailleurs : c'est l'entite de l'operation qui
       // leve l'ambiguite, pas une seconde cle qu'un ancien telephone n'enverrait
       // jamais.
-      ...(cleared.has('prenom')
-        ? { prenom: '' }
-        : data.prenom === undefined
-          ? {}
-          : { prenom: data.prenom }),
-      ...(cleared.has('etablissement')
-        ? { etablissement: '' }
-        : data.etablissement === undefined
-          ? {}
-          : { etablissement: data.etablissement }),
+      ...clearableValue('prenom', data.prenom, cleared, ''),
+      ...clearableValue('etablissement', data.etablissement, cleared, ''),
     };
   }
 
@@ -805,6 +820,20 @@ export class SyncService {
         ...(data.method === undefined ? {} : { method: data.method }),
         ...(data.comment === undefined ? {} : { comment: data.comment }),
         ...(data.callbackAt === undefined ? {} : { callbackAt: data.callbackAt }),
+        // Renseignements de conversion (phase 3). Les cinq premiers vont sur la
+        // tentative, les cinq suivants sur le prospect : voir `CallAttemptOpDto`.
+        ...definedValues({
+          email: data.email,
+          fonctionnaire: data.fonctionnaire,
+          engagementEnCours: data.engagementEnCours,
+          dureeEtablissementMois: data.dureeEtablissementMois,
+          rendezVousAt: data.rendezVousAt,
+          nom: data.nom,
+          prenom: data.prenom,
+          profession: data.profession,
+          banqueId: data.banqueId,
+          syndicatId: data.syndicatId,
+        }),
         clientCreatedAt: data.clientCreatedAt,
       });
 
@@ -853,30 +882,11 @@ export class SyncService {
   ): Promise<OperationOutcome> {
     const existing = await tx.prospect.findUnique({ where: { id: operation.entityId } });
 
-    if (existing && !isAdmin(user) && existing.createdById !== user.id) {
-      // Une campagne confie des fiches que le teleconseiller n'a pas saisies.
-      // Sans cette porte, il tirait la file sur son telephone et chaque
-      // qualification repartait en CONFLIT, sans qu'il puisse rien y faire.
-      const assigned = await tx.callTask.findFirst({
-        where: {
-          prospectId: existing.id,
-          assignedToId: user.id,
-          isActive: true,
-        },
-        select: { id: true },
-      });
-      if (!assigned) {
-        throw new OperationError(
-          SyncOpStatus.CONFLICT,
-          'ENTITY_ID_OWNED_BY_ANOTHER_USER',
-          'Cet identifiant appartient à un autre commercial.',
-        );
-      }
-    }
+    await this.assertProspectWritable(tx, user, existing);
 
     if (operation.op === SyncOp.DELETE) {
       if (!existing || existing.deletedAt) {
-        return applied(operation.entityId, existing?.rev ?? null, existing?.updatedAt ?? null);
+        return existingOutcome(operation.entityId, existing);
       }
       assertRev(operation, existing.rev);
       const row = await tx.prospect.update({
@@ -886,7 +896,7 @@ export class SyncService {
       return applied(row.id, row.rev, row.updatedAt);
     }
 
-    const data = operation.data ?? {};
+    const data = operation.data || {};
     const phoneE164 = requirePhone(data);
 
     if (!existing || existing.deletedAt) {
@@ -907,41 +917,37 @@ export class SyncService {
         create: {
           id: operation.entityId,
           nom: data.nom.trim(),
-          prenom: data.prenom?.trim() ?? '',
+          prenom: textOrEmpty(data.prenom),
           phoneE164,
-          banqueId: data.banqueId ?? null,
-          syndicatId: data.syndicatId ?? null,
-          representantId: data.representantId ?? null,
+          banqueId: valueOrNull(data.banqueId),
+          syndicatId: valueOrNull(data.syndicatId),
+          representantId: valueOrNull(data.representantId),
           createdById: user.id,
-          ...(data.projet ? { projet: data.projet } : {}),
-          ...(data.type ? { type: data.type } : {}),
-          ...(data.profession === undefined ? {} : { profession: data.profession }),
-          ...(data.dureeSystemeMois === undefined
-            ? {}
-            : { dureeSystemeMois: data.dureeSystemeMois }),
-          ...(data.canalProvenanceId === undefined
-            ? {}
-            : { canalProvenanceId: data.canalProvenanceId }),
-          ...(data.statut ? { statut: data.statut } : {}),
+          ...definedValues({
+            projet: data.projet,
+            type: data.type,
+            profession: data.profession,
+            dureeSystemeMois: data.dureeSystemeMois,
+            canalProvenanceId: data.canalProvenanceId,
+            statut: data.statut,
+          }),
           clientCreatedAt: clientDate(data.clientCreatedAt, operation.clientUpdatedAt),
         },
         update: {
           nom: data.nom.trim(),
-          prenom: data.prenom?.trim() ?? '',
+          prenom: textOrEmpty(data.prenom),
           phoneE164,
-          banqueId: data.banqueId ?? null,
-          syndicatId: data.syndicatId ?? null,
-          representantId: data.representantId ?? null,
-          ...(data.projet ? { projet: data.projet } : {}),
-          ...(data.type ? { type: data.type } : {}),
-          ...(data.profession === undefined ? {} : { profession: data.profession }),
-          ...(data.dureeSystemeMois === undefined
-            ? {}
-            : { dureeSystemeMois: data.dureeSystemeMois }),
-          ...(data.canalProvenanceId === undefined
-            ? {}
-            : { canalProvenanceId: data.canalProvenanceId }),
-          ...(data.statut ? { statut: data.statut } : {}),
+          banqueId: valueOrNull(data.banqueId),
+          syndicatId: valueOrNull(data.syndicatId),
+          representantId: valueOrNull(data.representantId),
+          ...definedValues({
+            projet: data.projet,
+            type: data.type,
+            profession: data.profession,
+            dureeSystemeMois: data.dureeSystemeMois,
+            canalProvenanceId: data.canalProvenanceId,
+            statut: data.statut,
+          }),
           deletedAt: null,
           rev: { increment: 1 },
         },
@@ -963,13 +969,12 @@ export class SyncService {
     // identique au silence d'une application ancienne.
     const videe = new Set(operation.clearedFields ?? []);
     const lien = (champ: 'banqueId' | 'syndicatId' | 'representantId'): object =>
-      videe.has(champ) ? { [champ]: null } : data[champ] ? { [champ]: data[champ] } : {};
+      clearableValue(champ, data[champ], videe, null);
 
     const row = await tx.prospect.update({
       where: { id: existing.id },
       data: {
-        ...(data.nom ? { nom: data.nom.trim() } : {}),
-        ...(data.prenom ? { prenom: data.prenom.trim() } : {}),
+        ...definedValues({ nom: data.nom?.trim(), prenom: data.prenom?.trim() }),
         phoneE164,
         ...lien('banqueId'),
         ...lien('syndicatId'),
@@ -978,18 +983,36 @@ export class SyncService {
         // par où elle est ENTRÉE, et ça ne se réécrit pas. Rejoindre un second
         // projet lui ouvre un parcours, plus bas. Le réécrire ici la retirait du
         // projet d'origine, avec son historique et ses appels.
-        ...(data.type ? { type: data.type } : {}),
-        ...(data.profession === undefined ? {} : { profession: data.profession }),
-        ...(data.dureeSystemeMois === undefined ? {} : { dureeSystemeMois: data.dureeSystemeMois }),
-        ...(data.canalProvenanceId === undefined
-          ? {}
-          : { canalProvenanceId: data.canalProvenanceId }),
-        ...(data.statut ? { statut: data.statut } : {}),
+        ...definedValues({
+          type: data.type,
+          profession: data.profession,
+          dureeSystemeMois: data.dureeSystemeMois,
+          canalProvenanceId: data.canalProvenanceId,
+          statut: data.statut,
+        }),
         rev: { increment: 1 },
       },
     });
     if (data.projet) await openJourney(tx, row.id, data.projet, data.statut);
     return applied(row.id, row.rev, row.updatedAt);
+  }
+
+  private async assertProspectWritable(
+    tx: Prisma.TransactionClient,
+    user: AuthenticatedUser,
+    existing: { id: string; createdById: string } | null,
+  ): Promise<void> {
+    if (existing === null || isAdmin(user) || existing.createdById === user.id) return;
+    const assigned = await tx.callTask.findFirst({
+      where: { prospectId: existing.id, assignedToId: user.id, isActive: true },
+      select: { id: true },
+    });
+    if (assigned !== null) return;
+    throw new OperationError(
+      SyncOpStatus.CONFLICT,
+      'ENTITY_ID_OWNED_BY_ANOTHER_USER',
+      'Cet identifiant appartient à un autre commercial.',
+    );
   }
 
   // PULL
@@ -1001,7 +1024,7 @@ export class SyncService {
     const safeNow = new Date(serverTime.getTime() - PULL_SAFETY_LAG_MS);
 
     let cursor: SyncCursor = incoming;
-    let hasMore = false;
+    const pageLengths: number[] = [];
 
     // ─ Référentiels : mêmes règles de pagination, position indépendante ─
     const departements = await this.prisma.departement.findMany({
@@ -1011,7 +1034,7 @@ export class SyncService {
       take: limit,
     });
     cursor = advance(cursor, 'departements', lastPosition(departements));
-    hasMore ||= departements.length === limit;
+    pageLengths.push(departements.length);
 
     // Les IEF voyagent avec les autres référentiels : le sélecteur de saisie
     // doit fonctionner hors ligne, sinon la fiche s'arrête à la première coupure.
@@ -1022,7 +1045,7 @@ export class SyncService {
       take: limit,
     });
     cursor = advance(cursor, 'iefs', lastPosition(iefs));
-    hasMore ||= iefs.length === limit;
+    pageLengths.push(iefs.length);
 
     const banques = await this.prisma.banque.findMany({
       where: keyset(cursor.streams.banques, safeNow),
@@ -1030,7 +1053,7 @@ export class SyncService {
       take: limit,
     });
     cursor = advance(cursor, 'banques', lastPosition(banques));
-    hasMore ||= banques.length === limit;
+    pageLengths.push(banques.length);
 
     // Le canal de provenance descend comme les autres référentiels : sans lui
     // en local, une fiche Grand Public saisie hors réseau n'a rien à choisir.
@@ -1040,7 +1063,7 @@ export class SyncService {
       take: limit,
     });
     cursor = advance(cursor, 'canauxProvenance', lastPosition(canauxProvenance));
-    hasMore ||= canauxProvenance.length === limit;
+    pageLengths.push(canauxProvenance.length);
 
     // Les quatre listes du registre. Sans elles en local, l'accueil ne pouvait
     // pas inscrire un visiteur hors réseau : la lecture du registre tenait, sa
@@ -1069,11 +1092,7 @@ export class SyncService {
     cursor = advance(cursor, 'visiteObjets', lastPosition(objets));
     cursor = advance(cursor, 'visiteDirections', lastPosition(directions));
     cursor = advance(cursor, 'visiteDestinataires', lastPosition(destinataires));
-    hasMore ||=
-      entreprises.length === limit ||
-      objets.length === limit ||
-      directions.length === limit ||
-      destinataires.length === limit;
+    pageLengths.push(entreprises.length, objets.length, directions.length, destinataires.length);
     const listesDuRegistre: SyncVisiteReferentielDto[] = [
       ...entreprises.map(toRegistreDto('entreprises')),
       ...objets.map(toRegistreDto('objets')),
@@ -1087,7 +1106,7 @@ export class SyncService {
       take: limit,
     });
     cursor = advance(cursor, 'syndicats', lastPosition(syndicats));
-    hasMore ||= syndicats.length === limit;
+    pageLengths.push(syndicats.length);
 
     // ─ Métier : ce que le compte a saisi, ET ce qu'une campagne lui a confié ─
     const representants = await this.prisma.representant.findMany({
@@ -1100,7 +1119,7 @@ export class SyncService {
       take: limit,
     });
     cursor = advance(cursor, 'representants', lastPosition(representants));
-    hasMore ||= representants.length === limit;
+    pageLengths.push(representants.length);
 
     const prospects = await this.prisma.prospect.findMany({
       where: { ...keyset(cursor.streams.prospects, safeNow), ...mineOrAssignedProspect(user) },
@@ -1109,7 +1128,7 @@ export class SyncService {
       take: limit,
     });
     cursor = advance(cursor, 'prospects', lastPosition(prospects));
-    hasMore ||= prospects.length === limit;
+    pageLengths.push(prospects.length);
 
     // Les campagnes AVANT les files : une file qui arrive sans sa campagne
     // n'aurait pas de nom à afficher, et le terrain verrait une liste anonyme.
@@ -1122,19 +1141,44 @@ export class SyncService {
       take: limit,
     });
     cursor = advance(cursor, 'callCampaigns', lastPosition(callCampaigns));
-    hasMore ||= callCampaigns.length === limit;
+    pageLengths.push(callCampaigns.length);
 
+    // `isActive` n'est PAS filtré ici : une file retirée au commercial doit
+    // descendre une dernière fois, sinon le téléphone la garde pour toujours et
+    // continue de proposer des fiches qui ne lui sont plus confiées. C'est le
+    // client qui l'efface, sur la foi du drapeau.
     const callTasks = await this.prisma.callTask.findMany({
       where: {
         ...keyset(cursor.streams.callTasks, safeNow),
-        isActive: true,
         ...(isAdmin(user) ? {} : { assignedToId: user.id }),
       },
       orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
       take: limit,
     });
     cursor = advance(cursor, 'callTasks', lastPosition(callTasks));
-    hasMore ||= callTasks.length === limit;
+    pageLengths.push(callTasks.length);
+
+    const repCallCampaigns = await this.prisma.repCallCampaign.findMany({
+      where: {
+        ...keyset(cursor.streams.repCallCampaigns, safeNow),
+        ...(isAdmin(user) ? {} : { commerciaux: { some: { userId: user.id } } }),
+      },
+      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+    });
+    cursor = advance(cursor, 'repCallCampaigns', lastPosition(repCallCampaigns));
+    pageLengths.push(repCallCampaigns.length);
+
+    const repCallTasks = await this.prisma.repCallTask.findMany({
+      where: {
+        ...keyset(cursor.streams.repCallTasks, safeNow),
+        ...(isAdmin(user) ? {} : { assignedToId: user.id }),
+      },
+      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+    });
+    cursor = advance(cursor, 'repCallTasks', lastPosition(repCallTasks));
+    pageLengths.push(repCallTasks.length);
 
     // Le registre n'est pas un référentiel : il porte des noms et des numéros de
     // visiteurs, hors du périmètre des rôles qui ne le tiennent pas. Un compte
@@ -1154,7 +1198,7 @@ export class SyncService {
         })
       : [];
     cursor = advance(cursor, 'visites', lastPosition(visites));
-    hasMore ||= visites.length === limit;
+    pageLengths.push(visites.length);
 
     // Une ligne supprimée logiquement voyage dans le MÊME flux que les autres
     // (son `updatedAt` a bougé) : elle est simplement aiguillée vers
@@ -1245,6 +1289,25 @@ export class SyncService {
           position: row.position,
           dayIndex: row.dayIndex,
           status: row.status,
+          isActive: row.isActive,
+          updatedAt: row.updatedAt.toISOString(),
+        })),
+        repCallCampaigns: repCallCampaigns.map((row) => ({
+          id: row.id,
+          name: row.name,
+          status: row.status,
+          spreadDays: row.spreadDays,
+          updatedAt: row.updatedAt.toISOString(),
+          closedAt: row.closedAt?.toISOString() ?? null,
+        })),
+        repCallTasks: repCallTasks.map((row) => ({
+          id: row.id,
+          campaignId: row.campaignId,
+          representantId: row.representantId,
+          position: row.position,
+          dayIndex: row.dayIndex,
+          status: row.status,
+          isActive: row.isActive,
           updatedAt: row.updatedAt.toISOString(),
         })),
         visites: visites.map((row): SyncVisiteDto => ({
@@ -1267,7 +1330,7 @@ export class SyncService {
       },
       deletions,
       nextCursor: encodeCursor(cursor),
-      hasMore,
+      hasMore: pageLengths.includes(limit),
       serverTime: serverTime.toISOString(),
     };
   }

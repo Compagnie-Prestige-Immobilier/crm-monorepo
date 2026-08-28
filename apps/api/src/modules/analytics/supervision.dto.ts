@@ -86,6 +86,12 @@ export class SupervisionTeleconseillerDto {
   openTasks!: number;
 }
 
+export class SupervisionHistogramBarDto {
+  @ApiProperty({ type: String, format: 'uuid', nullable: true }) id!: string | null;
+  @ApiProperty() label!: string;
+  @ApiProperty({ type: Number }) prospects!: number;
+}
+
 export class SupervisionActivityDto {
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) from!: string | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) to!: string | null;
@@ -105,4 +111,16 @@ export class SupervisionActivityDto {
     description: 'Tous les téléconseillers, y compris ceux sans aucun acte sur la fenêtre.',
   })
   teleconseillers!: SupervisionTeleconseillerDto[];
+
+  @ApiProperty({
+    type: () => [SupervisionHistogramBarDto],
+    description: 'Stock courant de prospects rattachés à chaque téléconseiller.',
+  })
+  prospectsByTeleconseiller!: SupervisionHistogramBarDto[];
+
+  @ApiProperty({
+    type: () => [SupervisionHistogramBarDto],
+    description: 'Stock courant de prospects rattachés à chaque représentant.',
+  })
+  prospectsByRepresentant!: SupervisionHistogramBarDto[];
 }

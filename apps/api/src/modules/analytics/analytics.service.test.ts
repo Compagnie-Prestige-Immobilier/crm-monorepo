@@ -177,6 +177,7 @@ describe('séries de phase 2', () => {
       'PLATFORM',
       'PHYSICAL',
       'VOICE_OR_ELECTRONIC_MESSAGING',
+      'APPOINTMENT',
     ]);
     expect(result.total).toBe(4);
     expect(result.items[0]?.share).toBe(100);

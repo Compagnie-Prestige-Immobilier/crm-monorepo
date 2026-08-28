@@ -25,6 +25,14 @@ export const readScope = (
   user: Pick<AuthenticatedUser, 'id' | 'role'>,
 ): { createdById?: string } => (readsEveryone(user) ? {} : { createdById: user.id });
 
+export function readableOwnerId(
+  user: Pick<AuthenticatedUser, 'id' | 'role'>,
+  requestedId: string,
+): string {
+  if (readsEveryone(user) || requestedId === user.id) return requestedId;
+  return '__aucun__';
+}
+
 /**
  * Qui ENCADRE : peut agir sur le travail d'un autre depuis le PANNEAU.
  *

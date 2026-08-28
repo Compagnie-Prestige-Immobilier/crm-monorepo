@@ -4,6 +4,8 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsBoolean,
+  IsEmail,
   IsEnum,
   IsISO8601,
   IsIn,
@@ -40,6 +42,10 @@ import {
   IefDto,
   SyndicatDto,
 } from '../referentiels/dto.js';
+import {
+  DUREE_ETABLISSEMENT_MAX_MOIS as PHASE2_DUREE_ETABLISSEMENT_MAX_MOIS,
+  EMAIL_MAX_LENGTH as PHASE2_EMAIL_MAX_LENGTH,
+} from '../phase2/attempt-rules.js';
 import { ProspectDto } from '../prospects/dto.js';
 import { RepresentantDto } from '../representants/dto.js';
 import {
@@ -324,6 +330,55 @@ export class SyncEntityDataDto {
   @IsOptional()
   @IsISO8601()
   callbackAt?: string;
+
+  @ApiPropertyOptional({
+    maxLength: PHASE2_EMAIL_MAX_LENGTH,
+    description: 'Tentative d’appel : adresse électronique recueillie pendant l’appel.',
+  })
+  @IsOptional()
+  @IsEmail()
+  @MaxLength(PHASE2_EMAIL_MAX_LENGTH)
+  email?: string;
+
+  @ApiPropertyOptional({
+    type: Boolean,
+    description: 'Tentative d’appel : le prospect est-il fonctionnaire.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  fonctionnaire?: boolean;
+
+  @ApiPropertyOptional({
+    type: Boolean,
+    description: 'Tentative d’appel : un engagement bancaire est-il en cours.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  engagementEnCours?: boolean;
+
+  @ApiPropertyOptional({
+    type: Number,
+    minimum: 0,
+    maximum: PHASE2_DUREE_ETABLISSEMENT_MAX_MOIS,
+    description:
+      'Tentative d’appel : ancienneté dans l’établissement, en MOIS. Distincte de ' +
+      '`dureeSystemeMois`, qui est la durée du système de paiement du prospect.',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(PHASE2_DUREE_ETABLISSEMENT_MAX_MOIS)
+  dureeEtablissementMois?: number;
+
+  @ApiPropertyOptional({
+    format: 'date-time',
+    description:
+      'Tentative d’appel : date du rendez-vous pris. Obligatoire si et seulement si method vaut ' +
+      'APPOINTMENT.',
+  })
+  @IsOptional()
+  @IsISO8601()
+  rendezVousAt?: string;
 
   @ApiPropertyOptional({ maxLength: 160, description: 'Visite : nom et prénom du visiteur.' })
   @IsOptional()
@@ -637,6 +692,31 @@ export class SyncCallTaskDto {
   @ApiProperty({ type: Number, description: 'Journee d’etalement, a partir de 0.' })
   dayIndex!: number;
   @ApiProperty({ enum: CallTaskStatus, enumName: 'CallTaskStatus' }) status!: CallTaskStatus;
+  @ApiProperty({
+    type: Boolean,
+    description:
+      'Faux quand la file a été retirée au commercial. La ligne descend alors ' +
+      'une dernière fois pour que le téléphone la retire de son programme : ' +
+      'sans elle, il continuerait d’appeler des fiches qui ne lui sont plus ' +
+      'confiées.',
+  })
+  isActive!: boolean;
+  @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
+}
+
+export class SyncRepCallCampaignDto extends SyncCallCampaignDto {}
+
+export class SyncRepCallTaskDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ format: 'uuid' }) campaignId!: string;
+  @ApiProperty({ format: 'uuid' }) representantId!: string;
+  @ApiProperty({ type: Number, description: 'Rang dans le programme, à partir de 1.' })
+  position!: number;
+  @ApiProperty({ type: Number, description: 'Journée d’étalement, à partir de 0.' })
+  dayIndex!: number;
+  @ApiProperty({ enum: CallTaskStatus, enumName: 'CallTaskStatus' }) status!: CallTaskStatus;
+  @ApiProperty({ type: Boolean, description: 'Voir `SyncCallTaskDto.isActive`.' })
+  isActive!: boolean;
   @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
 }
 
@@ -697,6 +777,9 @@ export class SyncChangesDto {
   @ApiProperty({ type: () => [ProspectDto] }) prospects!: ProspectDto[];
   @ApiProperty({ type: () => [SyncCallCampaignDto] }) callCampaigns!: SyncCallCampaignDto[];
   @ApiProperty({ type: () => [SyncCallTaskDto] }) callTasks!: SyncCallTaskDto[];
+  @ApiProperty({ type: () => [SyncRepCallCampaignDto] })
+  repCallCampaigns!: SyncRepCallCampaignDto[];
+  @ApiProperty({ type: () => [SyncRepCallTaskDto] }) repCallTasks!: SyncRepCallTaskDto[];
   @ApiProperty({ type: () => [SyncVisiteDto] }) visites!: SyncVisiteDto[];
 }
 

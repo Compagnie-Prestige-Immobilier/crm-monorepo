@@ -190,6 +190,11 @@ const MATRICE_NOUVEAUX: {
   },
   {
     controller: RepCampaignsController,
+    method: 'downloadProgrammes',
+    roles: [Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION],
+  },
+  {
+    controller: RepCampaignsController,
     method: 'recordAttempt',
     roles: [Role.ADMIN, Role.COMMERCIAL],
   },

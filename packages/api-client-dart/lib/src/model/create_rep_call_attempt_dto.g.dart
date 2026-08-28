@@ -33,6 +33,8 @@ abstract class _$CreateRepCallAttemptDtoCWProxy {
 
   CreateRepCallAttemptDto clientCreatedAt(DateTime clientCreatedAt);
 
+  CreateRepCallAttemptDto callbackAt(DateTime? callbackAt);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `CreateRepCallAttemptDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -53,6 +55,7 @@ abstract class _$CreateRepCallAttemptDtoCWProxy {
     String? whatsappE164,
     String? profession,
     DateTime clientCreatedAt,
+    DateTime? callbackAt,
   });
 }
 
@@ -115,6 +118,10 @@ class _$CreateRepCallAttemptDtoCWProxyImpl
       this(clientCreatedAt: clientCreatedAt);
 
   @override
+  CreateRepCallAttemptDto callbackAt(DateTime? callbackAt) =>
+      this(callbackAt: callbackAt);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `CreateRepCallAttemptDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -135,6 +142,7 @@ class _$CreateRepCallAttemptDtoCWProxyImpl
     Object? whatsappE164 = const $CopyWithPlaceholder(),
     Object? profession = const $CopyWithPlaceholder(),
     Object? clientCreatedAt = const $CopyWithPlaceholder(),
+    Object? callbackAt = const $CopyWithPlaceholder(),
   }) {
     return CreateRepCallAttemptDto(
       id: id == const $CopyWithPlaceholder()
@@ -189,6 +197,10 @@ class _$CreateRepCallAttemptDtoCWProxyImpl
           ? _value.clientCreatedAt
           // ignore: cast_nullable_to_non_nullable
           : clientCreatedAt as DateTime,
+      callbackAt: callbackAt == const $CopyWithPlaceholder()
+          ? _value.callbackAt
+          // ignore: cast_nullable_to_non_nullable
+          : callbackAt as DateTime?,
     );
   }
 }
@@ -249,6 +261,10 @@ CreateRepCallAttemptDto _$CreateRepCallAttemptDtoFromJson(
       'clientCreatedAt',
       (v) => DateTime.parse(v as String),
     ),
+    callbackAt: $checkedConvert(
+      'callbackAt',
+      (v) => v == null ? null : DateTime.parse(v as String),
+    ),
   );
   return val;
 });
@@ -271,6 +287,8 @@ Map<String, dynamic> _$CreateRepCallAttemptDtoToJson(
   if (instance.whatsappE164 case final value?) 'whatsappE164': value,
   if (instance.profession case final value?) 'profession': value,
   'clientCreatedAt': instance.clientCreatedAt.toIso8601String(),
+  if (instance.callbackAt?.toIso8601String() case final value?)
+    'callbackAt': value,
 };
 
 const _$RepCallOutcomeEnumMap = {

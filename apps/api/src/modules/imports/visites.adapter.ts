@@ -14,6 +14,7 @@ import type {
   ParsedRow,
   SheetLayout,
 } from './import-adapter.js';
+import { importCell, unresolvedImportValue } from './import-adapter.js';
 import {
   VisiteImportError,
   allocateVisiteReferences,
@@ -201,7 +202,7 @@ export class VisitesImportAdapter implements ImportAdapter<VisiteImportRow, Visi
     run: VisiteImportRun,
   ): ParsedRow<VisiteImportRow> {
     const refs = run.refs;
-    const sheet = cells[SHEET_CELL] ?? '';
+    const sheet = importCell(cells, SHEET_CELL);
     const refuse = (column: string, code: string, detail: string): ParsedRow<VisiteImportRow> => ({
       ok: false,
       error: {
@@ -212,7 +213,7 @@ export class VisitesImportAdapter implements ImportAdapter<VisiteImportRow, Visi
       },
     });
 
-    const rawDate = (cells[H.date] ?? '').trim();
+    const rawDate = importCell(cells, H.date);
     if (rawDate === '') {
       return refuse(H.date, VisiteImportError.DATE_ABSENTE, 'la date de la visite manque.');
     }
@@ -226,9 +227,9 @@ export class VisitesImportAdapter implements ImportAdapter<VisiteImportRow, Visi
       );
     }
 
-    const rawTime = (cells[H.heure] ?? '').trim();
+    const rawTime = importCell(cells, H.heure);
     const time = rawTime === '' ? null : readSheetTime(rawTime);
-    if (rawTime !== '' && time === null) {
+    if (unresolvedImportValue(rawTime, time)) {
       return refuse(
         H.heure,
         VisiteImportError.HEURE_ILLISIBLE,
@@ -236,7 +237,7 @@ export class VisitesImportAdapter implements ImportAdapter<VisiteImportRow, Visi
       );
     }
 
-    const visitorName = (cells[H.nom] ?? '').trim();
+    const visitorName = importCell(cells, H.nom);
     if (visitorName.length < 2) {
       return refuse(H.nom, VisiteImportError.NOM_ABSENT, 'le nom du visiteur manque.');
     }
@@ -249,25 +250,25 @@ export class VisitesImportAdapter implements ImportAdapter<VisiteImportRow, Visi
     if (entreprise === null) {
       return refuse(
         H.entreprise,
-        ...referentielMissReason(refs, (cells[H.entreprise] ?? '').trim(), 'entreprise'),
+        ...referentielMissReason(refs, importCell(cells, H.entreprise), 'entreprise'),
       );
     }
 
-    const rawDirection = (cells[H.direction] ?? '').trim();
+    const rawDirection = importCell(cells, H.direction);
     const direction =
       rawDirection === ''
         ? null
         : resolveReferentiel(refs.directions, rawDirection, LIBELLES_DU_CLASSEUR);
-    if (rawDirection !== '' && direction === null) {
+    if (unresolvedImportValue(rawDirection, direction)) {
       return refuse(H.direction, ...referentielMissReason(refs, rawDirection, 'direction'));
     }
 
-    const rawDestinataire = (cells[H.destinataire] ?? '').trim();
+    const rawDestinataire = importCell(cells, H.destinataire);
     const destinataire =
       rawDestinataire === ''
         ? null
         : resolveReferentiel(refs.destinataires, rawDestinataire, LIBELLES_DU_CLASSEUR);
-    if (rawDestinataire !== '' && destinataire === null) {
+    if (unresolvedImportValue(rawDestinataire, destinataire)) {
       return refuse(
         H.destinataire,
         ...referentielMissReason(refs, rawDestinataire, 'destinataire'),
@@ -276,14 +277,11 @@ export class VisitesImportAdapter implements ImportAdapter<VisiteImportRow, Visi
 
     const objet = resolveReferentiel(refs.objets, cells[H.objet], LIBELLES_DU_CLASSEUR);
     if (objet === null) {
-      return refuse(
-        H.objet,
-        ...referentielMissReason(refs, (cells[H.objet] ?? '').trim(), 'objet'),
-      );
+      return refuse(H.objet, ...referentielMissReason(refs, importCell(cells, H.objet), 'objet'));
     }
 
-    const phone = (cells[H.telephone] ?? '').trim();
-    const comment = (cells[H.commentaire] ?? '').trim();
+    const phone = importCell(cells, H.telephone);
+    const comment = importCell(cells, H.commentaire);
 
     return {
       ok: true,

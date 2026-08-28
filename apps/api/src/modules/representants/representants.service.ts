@@ -13,8 +13,8 @@ import {
   assertOwnership,
   assertReadable,
   isAdmin,
+  readableOwnerId,
   readScope,
-  readsEveryone,
 } from '../../common/scope.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { OkDto } from '../../common/dto/ok.dto.js';
@@ -152,11 +152,7 @@ export class RepresentantsService {
       ...readScope(user),
     };
     if (query.commercialId) {
-      where.createdById = readsEveryone(user)
-        ? query.commercialId
-        : query.commercialId === user.id
-          ? user.id
-          : '__aucun__';
+      where.createdById = readableOwnerId(user, query.commercialId);
     }
     if (query.departementId) where.departementId = query.departementId;
     if (query.iefId) where.iefId = query.iefId;

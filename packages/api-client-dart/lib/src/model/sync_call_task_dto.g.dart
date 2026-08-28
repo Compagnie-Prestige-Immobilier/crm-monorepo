@@ -19,6 +19,8 @@ abstract class _$SyncCallTaskDtoCWProxy {
 
   SyncCallTaskDto status(CallTaskStatus status);
 
+  SyncCallTaskDto isActive(bool isActive);
+
   SyncCallTaskDto updatedAt(DateTime updatedAt);
 
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SyncCallTaskDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
@@ -34,6 +36,7 @@ abstract class _$SyncCallTaskDtoCWProxy {
     num position,
     num dayIndex,
     CallTaskStatus status,
+    bool isActive,
     DateTime updatedAt,
   });
 }
@@ -63,6 +66,9 @@ class _$SyncCallTaskDtoCWProxyImpl implements _$SyncCallTaskDtoCWProxy {
   SyncCallTaskDto status(CallTaskStatus status) => this(status: status);
 
   @override
+  SyncCallTaskDto isActive(bool isActive) => this(isActive: isActive);
+
+  @override
   SyncCallTaskDto updatedAt(DateTime updatedAt) => this(updatedAt: updatedAt);
 
   @override
@@ -79,6 +85,7 @@ class _$SyncCallTaskDtoCWProxyImpl implements _$SyncCallTaskDtoCWProxy {
     Object? position = const $CopyWithPlaceholder(),
     Object? dayIndex = const $CopyWithPlaceholder(),
     Object? status = const $CopyWithPlaceholder(),
+    Object? isActive = const $CopyWithPlaceholder(),
     Object? updatedAt = const $CopyWithPlaceholder(),
   }) {
     return SyncCallTaskDto(
@@ -106,6 +113,10 @@ class _$SyncCallTaskDtoCWProxyImpl implements _$SyncCallTaskDtoCWProxy {
           ? _value.status
           // ignore: cast_nullable_to_non_nullable
           : status as CallTaskStatus,
+      isActive: isActive == const $CopyWithPlaceholder()
+          ? _value.isActive
+          // ignore: cast_nullable_to_non_nullable
+          : isActive as bool,
       updatedAt: updatedAt == const $CopyWithPlaceholder()
           ? _value.updatedAt
           // ignore: cast_nullable_to_non_nullable
@@ -135,6 +146,7 @@ SyncCallTaskDto _$SyncCallTaskDtoFromJson(Map<String, dynamic> json) =>
           'position',
           'dayIndex',
           'status',
+          'isActive',
           'updatedAt',
         ],
       );
@@ -152,6 +164,7 @@ SyncCallTaskDto _$SyncCallTaskDtoFromJson(Map<String, dynamic> json) =>
             unknownValue: CallTaskStatus.unknownDefaultOpenApi,
           ),
         ),
+        isActive: $checkedConvert('isActive', (v) => v as bool),
         updatedAt: $checkedConvert(
           'updatedAt',
           (v) => DateTime.parse(v as String),
@@ -168,6 +181,7 @@ Map<String, dynamic> _$SyncCallTaskDtoToJson(SyncCallTaskDto instance) =>
       'position': instance.position,
       'dayIndex': instance.dayIndex,
       'status': _$CallTaskStatusEnumMap[instance.status]!,
+      'isActive': instance.isActive,
       'updatedAt': instance.updatedAt.toIso8601String(),
     };
 

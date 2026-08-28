@@ -43,6 +43,8 @@ class ImportJobDto {
 
     required this.createdRows,
 
+    required this.updatedRows,
+
     required this.skippedRows,
 
     required this.errorRows,
@@ -113,6 +115,10 @@ class ImportJobDto {
   @JsonKey(name: r'createdRows', required: true, includeIfNull: false)
   final num createdRows;
 
+  /// Lignes RÉÉCRITES. Seul l’aller-retour Excel du registre des visites en produit.
+  @JsonKey(name: r'updatedRows', required: true, includeIfNull: false)
+  final num updatedRows;
+
   @JsonKey(name: r'skippedRows', required: true, includeIfNull: false)
   final num skippedRows;
 
@@ -160,6 +166,7 @@ class ImportJobDto {
                 totalRows,
                 processedRows,
                 createdRows,
+                updatedRows,
                 skippedRows,
                 errorRows,
                 report,
@@ -182,6 +189,7 @@ class ImportJobDto {
                 other.totalRows,
                 other.processedRows,
                 other.createdRows,
+                other.updatedRows,
                 other.skippedRows,
                 other.errorRows,
                 other.report,
@@ -210,6 +218,7 @@ class ImportJobDto {
         totalRows,
         processedRows,
         createdRows,
+        updatedRows,
         skippedRows,
         errorRows,
         report,

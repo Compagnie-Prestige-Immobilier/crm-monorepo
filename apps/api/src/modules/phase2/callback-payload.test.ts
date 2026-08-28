@@ -1,5 +1,5 @@
 import { CallOutcome } from '@crm/database';
-import { ValidationPipe, type BadRequestException } from '@nestjs/common';
+import { BadRequestException, ValidationPipe } from '@nestjs/common';
 import { describe, expect, it } from 'vitest';
 
 import { CallAttemptOpDto } from './dto.js';
@@ -48,7 +48,53 @@ describe('compatibilité du champ callbackAt', () => {
   });
 
   it('une date de rappel illisible est refusée à la porte', async () => {
-    await expect(validate({ ...ANCIEN_LOT, callbackAt: 'demain' })).rejects.toThrow();
+    await expect(validate({ ...ANCIEN_LOT, callbackAt: 'demain' })).rejects.toThrow(
+      BadRequestException,
+    );
+  });
+});
+
+describe('renseignements de conversion à la porte du DTO', () => {
+  const RENSEIGNEMENTS = {
+    email: 'awa@cpi.sn',
+    fonctionnaire: true,
+    engagementEnCours: false,
+    dureeEtablissementMois: 84,
+    rendezVousAt: '2026-09-10T09:00:00.000Z',
+    nom: 'Diop',
+    prenom: 'Awa',
+    profession: 'Enseignante',
+    banqueId: '018f2a1c-0000-7000-8000-000000000003',
+    syndicatId: '018f2a1c-0000-7000-8000-000000000004',
+  };
+
+  it('un lot d’une version antérieure, sans aucun d’eux, reste accepté', async () => {
+    await expect(validate({ ...ANCIEN_LOT })).resolves.toMatchObject({ email: undefined });
+  });
+
+  it('les dix champs traversent le DTO', async () => {
+    await expect(validate({ ...ANCIEN_LOT, ...RENSEIGNEMENTS })).resolves.toMatchObject(
+      RENSEIGNEMENTS,
+    );
+  });
+
+  it('une adresse électronique malformée est refusée à la porte', async () => {
+    await expect(validate({ ...ANCIEN_LOT, email: 'awa' })).rejects.toThrow(BadRequestException);
+  });
+
+  it('une durée hors bornes est refusée à la porte', async () => {
+    await expect(validate({ ...ANCIEN_LOT, dureeEtablissementMois: 601 })).rejects.toThrow(
+      BadRequestException,
+    );
+    await expect(validate({ ...ANCIEN_LOT, dureeEtablissementMois: -1 })).rejects.toThrow(
+      BadRequestException,
+    );
+  });
+
+  it('une date de rendez-vous illisible est refusée à la porte', async () => {
+    await expect(validate({ ...ANCIEN_LOT, rendezVousAt: 'jeudi' })).rejects.toThrow(
+      BadRequestException,
+    );
   });
 });
 
@@ -64,6 +110,8 @@ describe('compatibilité du champ reasonCode', () => {
   });
 
   it('un motif plus long que le code du référentiel est refusé à la porte', async () => {
-    await expect(validate({ ...ANCIEN_LOT, reasonCode: 'X'.repeat(41) })).rejects.toThrow();
+    await expect(validate({ ...ANCIEN_LOT, reasonCode: 'X'.repeat(41) })).rejects.toThrow(
+      BadRequestException,
+    );
   });
 });

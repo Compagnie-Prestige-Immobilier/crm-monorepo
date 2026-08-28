@@ -96,23 +96,31 @@ export class PilotageService {
       `,
     ]);
 
-    const row = totals[0];
-    const tasks = row?.taches ?? 0;
-    const attempts = row?.tentatives ?? 0;
-    const methods = row?.methodes ?? 0;
-    const remaining = row?.restantes ?? 0;
+    const row = totals[0] ?? {
+      taches: 0,
+      contactees: 0,
+      restantes: 0,
+      closes7: 0,
+      tentatives: 0,
+      joignables: 0,
+      methodes: 0,
+    };
+    const tasks = row.taches;
+    const attempts = row.tentatives;
+    const methods = row.methodes;
+    const remaining = row.restantes;
     // Cadence sur une fenêtre glissante de 7 jours : une moyenne depuis l'ouverture
     // resterait plombée par les premiers jours de rodage.
-    const observedPace = Math.round(((row?.closes7 ?? 0) / 7) * 10) / 10;
+    const observedPace = Math.round((row.closes7 / 7) * 10) / 10;
 
     return {
       campaignId: filter.campaignId ?? null,
       tasks,
-      tasksContacted: row?.contactees ?? 0,
-      contactRate: rate(row?.contactees ?? 0, tasks),
+      tasksContacted: row.contactees,
+      contactRate: rate(row.contactees, tasks),
       attempts,
-      reachableAttempts: row?.joignables ?? 0,
-      reachRate: rate(row?.joignables ?? 0, attempts),
+      reachableAttempts: row.joignables,
+      reachRate: rate(row.joignables, attempts),
       methodsObtained: methods,
       attemptsPerMethodObtained: methods === 0 ? 0 : Math.round((attempts / methods) * 10) / 10,
       closedPerDay: perDay.map((day) => ({

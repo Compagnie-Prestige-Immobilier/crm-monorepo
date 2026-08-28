@@ -112,6 +112,7 @@ const MODULES: Record<string, string[]> = {
     'getRepCampaign',
     'closeRepCampaign',
     'downloadRepProgrammePdf',
+    'downloadRepProgrammesZip',
   ],
   representants: [
     'listRepresentants',

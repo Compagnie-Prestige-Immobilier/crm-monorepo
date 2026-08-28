@@ -14,6 +14,8 @@ enum ImportKind {
   VISITES(r'VISITES'),
   @JsonValue(r'PROSPECTS_GRAND_PUBLIC')
   PROSPECTS_GRAND_PUBLIC(r'PROSPECTS_GRAND_PUBLIC'),
+  @JsonValue(r'VISITES_REGISTRE')
+  VISITES_REGISTRE(r'VISITES_REGISTRE'),
   @JsonValue(r'unknown_default_open_api')
   unknownDefaultOpenApi(r'unknown_default_open_api');
 

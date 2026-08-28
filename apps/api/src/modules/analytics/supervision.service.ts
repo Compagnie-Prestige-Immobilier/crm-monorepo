@@ -7,6 +7,7 @@ import { UNUSABLE_OUTCOMES, ALL_ROWS, rate } from './pilotage.sql.js';
 import { SupervisionGranularity } from './supervision.dto.js';
 import type {
   SupervisionActivityDto,
+  SupervisionHistogramBarDto,
   SupervisionActivityRowDto,
   SupervisionQueryDto,
   SupervisionTeleconseillerDto,
@@ -36,6 +37,12 @@ interface RosterRow {
   ouvertes: number;
 }
 
+interface HistogramRow {
+  id: string | null;
+  label: string;
+  prospects: number;
+}
+
 @Injectable()
 export class SupervisionActivityService {
   constructor(private readonly prisma: PrismaService) {}
@@ -51,7 +58,7 @@ export class SupervisionActivityService {
     const userScope = ALL_ROWS;
     const teleconseiller = Prisma.sql`u."role" = ${Role.COMMERCIAL}::"Role" AND u."deletedAt" IS NULL AND ${userScope}`;
 
-    const [rows, roster] = await Promise.all([
+    const [rows, roster, prospectsByTeleconseiller, prospectsByRepresentant] = await Promise.all([
       this.prisma.$queryRaw<ActivityRow[]>`
         WITH faits AS (
           SELECT
@@ -129,6 +136,33 @@ export class SupervisionActivityService {
         GROUP BY u."id", u."fullName", u."isActive"
         ORDER BY u."fullName" ASC
       `,
+      this.prisma.$queryRaw<HistogramRow[]>`
+        SELECT
+          u."id"                   AS id,
+          u."fullName"             AS label,
+          COUNT(p."id")::int       AS prospects
+        FROM "users" u
+        LEFT JOIN "prospects" p
+          ON p."createdById" = u."id"
+          AND p."deletedAt" IS NULL
+          AND ${withinWindow(Prisma.sql`p."clientCreatedAt"`, query)}
+        WHERE ${teleconseiller}
+        GROUP BY u."id", u."fullName"
+        ORDER BY prospects DESC, label ASC
+      `,
+      this.prisma.$queryRaw<HistogramRow[]>`
+        SELECT
+          r."id"                   AS id,
+          r."fullName"             AS label,
+          COUNT(p."id")::int       AS prospects
+        FROM "representants" r
+        INNER JOIN "prospects" p
+          ON p."representantId" = r."id"
+          AND p."deletedAt" IS NULL
+          AND ${withinWindow(Prisma.sql`p."clientCreatedAt"`, query)}
+        GROUP BY r."id", r."fullName"
+        ORDER BY prospects DESC, label ASC
+      `,
     ]);
 
     return {
@@ -157,8 +191,14 @@ export class SupervisionActivityService {
         isActive: row.actif,
         openTasks: row.ouvertes,
       })),
+      prospectsByTeleconseiller: prospectsByTeleconseiller.map(toHistogramBar),
+      prospectsByRepresentant: prospectsByRepresentant.map(toHistogramBar),
     };
   }
+}
+
+function toHistogramBar(row: HistogramRow): SupervisionHistogramBarDto {
+  return { id: row.id, label: row.label, prospects: row.prospects };
 }
 
 function withinWindow(column: Prisma.Sql, query: SupervisionQueryDto): Prisma.Sql {

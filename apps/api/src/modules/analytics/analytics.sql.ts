@@ -1,7 +1,7 @@
 import { ALL_SEGMENTS, CBAO_SHORT_NAME, CHUES_SIGLE, Prisma, segmentAxes } from '@crm/database';
 import type { BddSegment } from '@crm/database';
 
-import { isAdmin, readsEveryone } from '../../common/scope.js';
+import { isAdmin, readableOwnerId, readsEveryone } from '../../common/scope.js';
 import { tryNormalizePhone } from '../../common/phone.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { ProspectFilterDto } from '../../common/dto/prospect-filter.dto.js';
@@ -18,11 +18,7 @@ export function prospectConditions(
   }
 
   if (filter.commercialId) {
-    const target = readsEveryone(user)
-      ? filter.commercialId
-      : filter.commercialId === user.id
-        ? user.id
-        : '__aucun__';
+    const target = readableOwnerId(user, filter.commercialId);
     conditions.push(Prisma.sql`p."createdById" = ${target}`);
   }
 
@@ -33,15 +29,41 @@ export function prospectConditions(
   // `IS NULL` couvre les deux cas : le représentant supprimé est écarté, et la
   // fiche SANS représentant — tout le Grand Public — reste comptée.
   conditions.push(Prisma.sql`r."deletedAt" IS NULL`);
+  conditions.push(...prospectFilterConditions(filter));
 
-  if (filter.representantId)
-    conditions.push(Prisma.sql`p."representantId" = ${filter.representantId}`);
-  if (filter.banqueId) conditions.push(Prisma.sql`p."banqueId" = ${filter.banqueId}`);
-  if (filter.syndicatId) conditions.push(Prisma.sql`p."syndicatId" = ${filter.syndicatId}`);
+  if (!conditions.length) return Prisma.sql`TRUE`;
+  return Prisma.join(conditions, ' AND ');
+}
+
+function prospectFilterConditions(filter: ProspectFilterDto): Prisma.Sql[] {
+  const conditions: Prisma.Sql[] = [];
+  const directConditions: Array<[unknown, Prisma.Sql]> = [
+    [filter.representantId, Prisma.sql`p."representantId" = ${filter.representantId}`],
+    [filter.banqueId, Prisma.sql`p."banqueId" = ${filter.banqueId}`],
+    [filter.syndicatId, Prisma.sql`p."syndicatId" = ${filter.syndicatId}`],
+    [filter.type, Prisma.sql`p."type" = ${filter.type}::"ProspectType"`],
+    [filter.canalProvenanceId, Prisma.sql`p."canalProvenanceId" = ${filter.canalProvenanceId}`],
+    [filter.origin, Prisma.sql`p."origin" = ${filter.origin}`],
+    [filter.departementId, Prisma.sql`r."departementId" = ${filter.departementId}`],
+    [filter.phase2Status, Prisma.sql`p."phase2Status" = ${filter.phase2Status}::"Phase2Status"`],
+    [
+      filter.enrollmentMethod,
+      Prisma.sql`p."enrollmentMethod" = ${filter.enrollmentMethod}::"EnrollmentMethod"`,
+    ],
+    [
+      filter.enrollmentCapturedById,
+      Prisma.sql`p."enrollmentCapturedById" = ${filter.enrollmentCapturedById}`,
+    ],
+  ];
+  for (const [value, condition] of directConditions) {
+    if (value) conditions.push(condition);
+  }
+
   if (filter.projet) {
-    const statut = filter.statut
-      ? Prisma.sql`AND pj."statut" = ${filter.statut}::"ProspectStatut"`
-      : Prisma.empty;
+    let statut = Prisma.empty;
+    if (filter.statut) {
+      statut = Prisma.sql`AND pj."statut" = ${filter.statut}::"ProspectStatut"`;
+    }
     conditions.push(
       Prisma.sql`EXISTS (
         SELECT 1 FROM "prospect_journeys" pj
@@ -51,46 +73,12 @@ export function prospectConditions(
       )`,
     );
   }
-  if (filter.type) conditions.push(Prisma.sql`p."type" = ${filter.type}::"ProspectType"`);
-  if (filter.canalProvenanceId) {
-    conditions.push(Prisma.sql`p."canalProvenanceId" = ${filter.canalProvenanceId}`);
-  }
   if (filter.statut && !filter.projet) {
     conditions.push(Prisma.sql`p."statut" = ${filter.statut}::"ProspectStatut"`);
   }
-  if (filter.origin) conditions.push(Prisma.sql`p."origin" = ${filter.origin}`);
-  if (filter.departementId) {
-    conditions.push(Prisma.sql`r."departementId" = ${filter.departementId}`);
-  }
-  if (filter.phase2Status) {
-    conditions.push(Prisma.sql`p."phase2Status" = ${filter.phase2Status}::"Phase2Status"`);
-  }
-  if (filter.enrollmentMethod) {
-    conditions.push(
-      Prisma.sql`p."enrollmentMethod" = ${filter.enrollmentMethod}::"EnrollmentMethod"`,
-    );
-  }
-  if (filter.enrollmentCapturedById) {
-    conditions.push(Prisma.sql`p."enrollmentCapturedById" = ${filter.enrollmentCapturedById}`);
-  }
   if (filter.segment) conditions.push(segmentCondition(filter.segment));
-  if (filter.campaignId ?? filter.assignedToId) {
-    const campagne = filter.campaignId
-      ? Prisma.sql`AND ct."campaignId" = ${filter.campaignId}`
-      : Prisma.empty;
-    const attribuee = filter.assignedToId
-      ? Prisma.sql`AND ct."assignedToId" = ${filter.assignedToId}`
-      : Prisma.empty;
-    conditions.push(
-      Prisma.sql`EXISTS (
-        SELECT 1 FROM "call_tasks" ct
-        WHERE ct."prospectId" = p."id"
-          ${campagne}
-          ${attribuee}
-          AND TRUE
-      )`,
-    );
-  }
+  const campaign = campaignCondition(filter);
+  if (campaign) conditions.push(campaign);
   if (filter.dateFrom) {
     conditions.push(Prisma.sql`p."clientCreatedAt" >= ${inclusiveDateFrom(filter.dateFrom)}`);
   }
@@ -98,26 +86,36 @@ export function prospectConditions(
     conditions.push(Prisma.sql`p."clientCreatedAt" <= ${inclusiveDateTo(filter.dateTo)}`);
   }
 
-  const search = filter.search?.trim();
-  if (search) {
-    // L'EXPRESSION EST CELLE DE L'INDEX `prospects_nom_prenom_trgm`, au caractère
-    // près : `nom ILIKE … OR prenom ILIKE …` sont deux prédicats que l'index ne
-    // couvre pas, et chaque frappe balayait les 500 000 lignes.
-    const like = `%${search.toLowerCase()}%`;
-    const compact = search.replace(/[^\d+]/gu, '');
-    // Sans ce seuil, une recherche sans chiffre produisait `phoneE164 LIKE '%%'`,
-    // vrai partout : le filtre de recherche ne filtrait plus rien.
-    const phone =
-      compact.replace(/\D/gu, '').length >= 3
-        ? Prisma.sql`OR p."phoneE164" LIKE ${`%${tryNormalizePhone(search) ?? compact}%`}`
-        : Prisma.empty;
-    conditions.push(
-      Prisma.sql`((lower(p."nom") || ' ' || lower(p."prenom")) LIKE ${like} ${phone})`,
-    );
-  }
+  const search = searchCondition(filter.search);
+  if (search) conditions.push(search);
+  return conditions;
+}
 
-  if (!conditions.length) return Prisma.sql`TRUE`;
-  return Prisma.join(conditions, ' AND ');
+function campaignCondition(filter: ProspectFilterDto): Prisma.Sql | undefined {
+  if (!(filter.campaignId ?? filter.assignedToId)) return undefined;
+  let campagne = Prisma.empty;
+  let attribuee = Prisma.empty;
+  if (filter.campaignId) campagne = Prisma.sql`AND ct."campaignId" = ${filter.campaignId}`;
+  if (filter.assignedToId) attribuee = Prisma.sql`AND ct."assignedToId" = ${filter.assignedToId}`;
+  return Prisma.sql`EXISTS (
+    SELECT 1 FROM "call_tasks" ct
+    WHERE ct."prospectId" = p."id"
+      ${campagne}
+      ${attribuee}
+      AND TRUE
+  )`;
+}
+
+function searchCondition(rawSearch: string | undefined): Prisma.Sql | undefined {
+  const search = rawSearch?.trim();
+  if (!search) return undefined;
+  const like = `%${search.toLowerCase()}%`;
+  const compact = search.replace(/[^\d+]/gu, '');
+  let phone = Prisma.empty;
+  if (compact.replace(/\D/gu, '').length >= 3) {
+    phone = Prisma.sql`OR p."phoneE164" LIKE ${`%${tryNormalizePhone(search) ?? compact}%`}`;
+  }
+  return Prisma.sql`((lower(p."nom") || ' ' || lower(p."prenom")) LIKE ${like} ${phone})`;
 }
 
 /**
@@ -136,11 +134,7 @@ export function representantConditions(
     conditions.push(Prisma.sql`r."createdById" = ${user.id}`);
   }
   if (filter.commercialId) {
-    const target = readsEveryone(user)
-      ? filter.commercialId
-      : filter.commercialId === user.id
-        ? user.id
-        : '__aucun__';
+    const target = readableOwnerId(user, filter.commercialId);
     conditions.push(Prisma.sql`r."createdById" = ${target}`);
   }
 

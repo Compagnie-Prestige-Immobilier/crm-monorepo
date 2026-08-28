@@ -286,7 +286,7 @@ export class ExportService {
     }
 
     summary.addRow({}).commit();
-    addSection('Avancement phase 2');
+    addSection('Avancement phase 3 (conversion)');
     for (const item of byStatus.items) {
       summary.addRow({ label: item.label, value: item.prospects, share: item.share }).commit();
     }
@@ -367,21 +367,7 @@ export class ExportService {
 
         // Une fiche sans representant ne peuple pas l'onglet Representants : il
         // n'y a personne a y nommer. Elle reste comptee dans l'onglet Prospects.
-        const representant = row.representant;
-        if (representant) {
-          const known = representants.get(representant.id);
-          if (known) known.prospects += 1;
-          else {
-            representants.set(representant.id, {
-              fullName: representant.fullName,
-              phoneE164: representant.phoneE164,
-              departement: representant.departement.name,
-              commercial: representant.createdBy.fullName,
-              clientCreatedAt: representant.clientCreatedAt,
-              prospects: 1,
-            });
-          }
-        }
+        countRepresentant(representants, row);
       }
       if (page.length < PAGE_SIZE) break;
       page = await this.page(where, page.at(-1)?.id);
@@ -412,6 +398,25 @@ export class ExportService {
       page.map((row) => row.id),
     );
   }
+}
+
+function countRepresentant(representants: Map<string, RepresentantTally>, row: ExportRow): void {
+  const representant = row.representant;
+  if (representant === null) return;
+
+  const known = representants.get(representant.id);
+  if (known !== undefined) {
+    known.prospects += 1;
+    return;
+  }
+  representants.set(representant.id, {
+    fullName: representant.fullName,
+    phoneE164: representant.phoneE164,
+    departement: representant.departement.name,
+    commercial: representant.createdBy.fullName,
+    clientCreatedAt: representant.clientCreatedAt,
+    prospects: 1,
+  });
 }
 
 // `Object.assign` et non la diffusion : le filtre est une instance de classe, `...` perdrait son prototype.

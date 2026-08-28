@@ -427,6 +427,16 @@ export class CreateRepCallAttemptDto {
   })
   @IsISO8601()
   clientCreatedAt!: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    format: 'date-time',
+    description:
+      'Date du rappel promis. Obligatoire si et seulement si l’issue vaut CALLBACK : c’est elle qui arme la notification côté mobile.',
+  })
+  @IsOptional()
+  @IsISO8601()
+  callbackAt?: string;
 }
 
 export enum RepCallAttemptApplyStatus {
