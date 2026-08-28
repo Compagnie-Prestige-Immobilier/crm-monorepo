@@ -2,7 +2,7 @@ import { segmentWhere } from '@crm/database';
 import type { Prisma } from '@crm/database';
 
 import type { AuthenticatedUser } from './decorators/current-user.decorator.js';
-import { isAdmin, readableOwnerId, readScope } from './scope.js';
+import { isAdmin, prospectReadScope } from './scope.js';
 import { tryNormalizePhone } from './phone.js';
 import type { ProspectFilterDto } from './dto/prospect-filter.dto.js';
 import { inclusiveDateFrom, inclusiveDateTo } from './date-bounds.js';
@@ -11,10 +11,14 @@ export function buildProspectWhere(
   user: Pick<AuthenticatedUser, 'id' | 'role'>,
   filter: ProspectFilterDto,
 ): Prisma.ProspectWhereInput {
-  const where: Prisma.ProspectWhereInput = { ...readScope(user) };
+  const where: Prisma.ProspectWhereInput = {};
   applyDirectFilters(where, user, filter);
 
+  // Le cloisonnement voyage dans `AND`, jamais à la racine : `where.OR` sert
+  // déjà à la recherche libre, et l'y poser le ferait écraser en silence.
   const and = relationFilters(filter);
+  const portee = prospectReadScope(user);
+  if (portee.OR) and.unshift(portee);
   if (and.length) where.AND = and;
 
   const clientCreatedAt = dateFilter(filter);
@@ -31,7 +35,10 @@ function applyDirectFilters(
   user: Pick<AuthenticatedUser, 'id' | 'role'>,
   filter: ProspectFilterDto,
 ): void {
-  if (filter.commercialId) where.createdById = readableOwnerId(user, filter.commercialId);
+  // Filtrer sur un collègue ne donne PAS ses fiches : le cloisonnement posé
+  // dans `AND` s'applique par-dessus, et ne laisse que ce que l'appelant a déjà
+  // en main.
+  if (filter.commercialId) where.createdById = filter.commercialId;
   if (!(filter.includeDeleted && isAdmin(user))) where.deletedAt = null;
   Object.assign(
     where,

@@ -14,12 +14,13 @@ export function prospectConditions(
   const conditions: Prisma.Sql[] = [];
 
   if (!readsEveryone(user)) {
-    conditions.push(Prisma.sql`p."createdById" = ${user.id}`);
+    conditions.push(porteeProspect(user.id));
   }
 
+  // Le filtre passe tel quel : la portée ci-dessus reste en AND et ne laisse
+  // remonter que ce que l'appelant a déjà en main.
   if (filter.commercialId) {
-    const target = readableOwnerId(user, filter.commercialId);
-    conditions.push(Prisma.sql`p."createdById" = ${target}`);
+    conditions.push(Prisma.sql`p."createdById" = ${filter.commercialId}`);
   }
 
   if (!(filter.includeDeleted && isAdmin(user))) {
@@ -33,6 +34,18 @@ export function prospectConditions(
 
   if (!conditions.length) return Prisma.sql`TRUE`;
   return Prisma.join(conditions, ' AND ');
+}
+
+/**
+ * `prospectReadScope` en SQL : ses propres fiches, ou celles qu'une campagne lui
+ * a confiées. Les agrégats sont écrits en SQL brut, une clause Prisma ne s'y
+ * réemploie pas ; c'est la même règle, elle doit bouger en même temps.
+ */
+function porteeProspect(userId: string): Prisma.Sql {
+  return Prisma.sql`(p."createdById" = ${userId} OR EXISTS (
+    SELECT 1 FROM "call_tasks" ct
+    WHERE ct."prospectId" = p."id" AND ct."assignedToId" = ${userId} AND ct."isActive"
+  ))`;
 }
 
 function prospectFilterConditions(filter: ProspectFilterDto): Prisma.Sql[] {

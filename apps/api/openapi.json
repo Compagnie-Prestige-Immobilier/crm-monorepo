@@ -3075,7 +3075,7 @@
             "bearer": []
           }
         ],
-        "summary": "Liste paginée. Un COMMERCIAL ne voit que ses propres représentants.",
+        "summary": "Liste paginée de l’annuaire, commun à tous les téléconseillers.",
         "tags": ["representants"]
       },
       "post": {
@@ -3359,7 +3359,17 @@
             }
           },
           "403": {
-            "description": "La fiche appartient à un autre commercial.",
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "REPRESENTANT_NOT_FOUND.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5014,7 +5024,7 @@
     },
     "/api/v1/sync/pull": {
       "get": {
-        "description": "Pagination keyset sur (updatedAt, id) et retard de sécurité de 2 secondes. Un COMMERCIAL ne reçoit que ses propres lignes ; les référentiels sont communs.",
+        "description": "Pagination keyset sur (updatedAt, id) et retard de sécurité de 2 secondes. Un COMMERCIAL ne reçoit que ses propres prospects ; l’annuaire des représentants et les référentiels sont communs.",
         "operationId": "pullSyncChanges",
         "parameters": [
           {
@@ -8429,6 +8439,18 @@
             "schema": {
               "default": false,
               "type": "boolean"
+            }
+          },
+          {
+            "name": "relationStatuses",
+            "required": false,
+            "in": "query",
+            "description": "Mêmes états de relation que `createRepCampaign`, pour compter avant de créer.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/RepresentantRelation"
+              }
             }
           },
           {
@@ -24312,6 +24334,13 @@
           "onlyWithoutProspects": {
             "type": "boolean"
           },
+          "relationStatuses": {
+            "type": "array",
+            "description": "États de relation retenus par le tirage. Vide : aucun filtre.",
+            "items": {
+              "$ref": "#/components/schemas/RepresentantRelation"
+            }
+          },
           "createdById": {
             "type": "string",
             "format": "uuid"
@@ -24348,6 +24377,7 @@
           "departementId",
           "iefId",
           "onlyWithoutProspects",
+          "relationStatuses",
           "createdById",
           "createdByName",
           "commercialCount",
@@ -24404,6 +24434,14 @@
             "type": "boolean",
             "default": false,
             "description": "Ne retenir que les représentants n’ayant apporté aucun prospect vivant. C’est la campagne de relance des dormants."
+          },
+          "relationStatuses": {
+            "type": "array",
+            "maxItems": 4,
+            "description": "Ne retenir que les représentants dans ces états de relation. Absente ou vide : aucun filtre. `AMBASSADEUR` seul donne les qualifiés ; une liste qui l’exclut donne les non qualifiés.",
+            "items": {
+              "$ref": "#/components/schemas/RepresentantRelation"
+            }
           },
           "spreadDays": {
             "type": "number",
@@ -24550,6 +24588,13 @@
           "onlyWithoutProspects": {
             "type": "boolean"
           },
+          "relationStatuses": {
+            "type": "array",
+            "description": "États de relation retenus par le tirage. Vide : aucun filtre.",
+            "items": {
+              "$ref": "#/components/schemas/RepresentantRelation"
+            }
+          },
           "createdById": {
             "type": "string",
             "format": "uuid"
@@ -24607,6 +24652,7 @@
           "departementId",
           "iefId",
           "onlyWithoutProspects",
+          "relationStatuses",
           "createdById",
           "createdByName",
           "commercialCount",

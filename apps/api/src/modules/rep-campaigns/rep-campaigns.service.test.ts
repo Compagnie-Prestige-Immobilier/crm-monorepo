@@ -126,6 +126,7 @@ const campaignRow = (over: Record<string, unknown> = {}): Record<string, unknown
   departementId: null,
   iefId: null,
   onlyWithoutProspects: false,
+  relationStatuses: [],
   createdById: ADMIN.id,
   createdAt: date,
   closedAt: null,
@@ -212,6 +213,77 @@ describe('RepCampaignsService : création', () => {
     expect(terminal).toContain(RepCallOutcome.REACHED);
     expect(terminal).not.toContain(RepCallOutcome.CALLBACK);
     expect(terminal).not.toContain(RepCallOutcome.UNREACHABLE);
+  });
+
+  const ANNUAIRE = [
+    { id: 'rep-ambassadeur', relationStatus: RepresentantRelation.AMBASSADEUR },
+    { id: 'rep-inconnu', relationStatus: RepresentantRelation.INCONNU },
+    { id: 'rep-refus', relationStatus: RepresentantRelation.REFUS },
+  ];
+
+  const tirage = async (relationStatuses?: RepresentantRelation[]): Promise<string[]> => {
+    const db = prismaStub();
+    db.user.findMany.mockResolvedValue([
+      { id: 'com-1', fullName: 'Awa', username: 'awa', role: Role.COMMERCIAL, isActive: true },
+    ]);
+    db.repCallCampaign.create.mockResolvedValue({ id: 'camp-1' });
+    db.repCallCampaign.findFirst.mockResolvedValue(campaignRow());
+    db.representant.findMany.mockImplementation(
+      ({ where }: { where: { relationStatus?: { in: RepresentantRelation[] } } }) => {
+        const retenus = where.relationStatus?.in;
+        return Promise.resolve(
+          ANNUAIRE.filter((rep) => !retenus || retenus.includes(rep.relationStatus)).map(
+            ({ id }) => ({ id }),
+          ),
+        );
+      },
+    );
+    db.$queryRawUnsafe.mockImplementation((_sql: string, ids: string) =>
+      Promise.resolve((JSON.parse(ids) as string[]).map((id) => ({ id }))),
+    );
+
+    await build(db).create(ADMIN, {
+      name: 'Qualification',
+      commercialIds: ['com-1'],
+      ...(relationStatuses === undefined ? {} : { relationStatuses }),
+    });
+
+    return (
+      db.repCallTask.createMany.mock.calls[0] as [{ data: { representantId: string }[] }]
+    )[0].data.map((row) => row.representantId);
+  };
+
+  it('relationStatuses = [AMBASSADEUR] ne retient QUE les ambassadeurs', async () => {
+    expect(await tirage([RepresentantRelation.AMBASSADEUR])).toEqual(['rep-ambassadeur']);
+  });
+
+  it('sans relationStatuses, le tirage garde qualifiés ET non qualifiés', async () => {
+    expect(await tirage()).toEqual(['rep-ambassadeur', 'rep-inconnu', 'rep-refus']);
+  });
+
+  it('persiste les statuts demandés sur la campagne', async () => {
+    const db = prismaStub();
+    db.user.findMany.mockResolvedValue([
+      { id: 'com-1', fullName: 'Awa', username: 'awa', role: Role.COMMERCIAL, isActive: true },
+    ]);
+    db.repCallCampaign.create.mockResolvedValue({ id: 'camp-1' });
+    db.repCallCampaign.findFirst.mockResolvedValue(campaignRow());
+    db.representant.findMany.mockResolvedValue([{ id: 'rep-1' }]);
+    db.$queryRawUnsafe.mockResolvedValue([{ id: 'rep-1' }]);
+
+    await build(db).create(ADMIN, {
+      name: 'Qualification',
+      commercialIds: ['com-1'],
+      relationStatuses: [RepresentantRelation.INCONNU, RepresentantRelation.CONTACTE],
+    });
+
+    const created = (
+      db.repCallCampaign.create.mock.calls[0] as [{ data: Record<string, unknown> }]
+    )[0].data;
+    expect(created.relationStatuses).toEqual([
+      RepresentantRelation.INCONNU,
+      RepresentantRelation.CONTACTE,
+    ]);
   });
 
   it('ÉTALE la file de chaque commercial en tranches contiguës', async () => {
@@ -409,6 +481,29 @@ describe('RepCampaignsService : lecture', () => {
     expect(result.scopeLabel).toBe('Département Dakar, IEF Almadies, sans prospect');
   });
 
+  const libelleAvec = async (relationStatuses: RepresentantRelation[]): Promise<string> => {
+    const db = prismaStub();
+    db.repCallCampaign.findFirst.mockResolvedValue(campaignRow({ relationStatuses }));
+    db.repCallTask.groupBy.mockResolvedValue([]);
+    return (await build(db).get('camp-1')).scopeLabel;
+  };
+
+  it('dit « qualifiés » pour les seuls ambassadeurs', async () => {
+    expect(await libelleAvec([RepresentantRelation.AMBASSADEUR])).toBe('qualifiés');
+  });
+
+  it('dit « non qualifiés » pour une liste qui exclut les ambassadeurs', async () => {
+    expect(await libelleAvec([RepresentantRelation.INCONNU, RepresentantRelation.CONTACTE])).toBe(
+      'non qualifiés',
+    );
+  });
+
+  it('énumère les statuts quand la liste mêle ambassadeurs et autres', async () => {
+    expect(await libelleAvec([RepresentantRelation.AMBASSADEUR, RepresentantRelation.REFUS])).toBe(
+      'ambassadeurs ou refus',
+    );
+  });
+
   it('annonce « tous les représentants » quand aucune borne n’est posée', async () => {
     const db = prismaStub();
     db.representant.count.mockResolvedValue(100);
@@ -476,6 +571,7 @@ describe('RepCampaignsService : programme', () => {
         name: 'Relance',
         spreadDays: 1,
         onlyWithoutProspects: false,
+        relationStatuses: [],
         departement: null,
         ief: null,
       },
@@ -501,6 +597,7 @@ describe('RepCampaignsService : programme', () => {
       name: 'Relance CHUES',
       spreadDays: 2,
       onlyWithoutProspects: false,
+      relationStatuses: [],
       departement: null,
       ief: null,
       commerciaux: [{ position: 1, user: { id: 'com-1', fullName: 'Awa Sy', username: 'awa' } }],
@@ -541,6 +638,7 @@ describe('RepCampaignsService : programme', () => {
         name: 'Relance',
         spreadDays: 7,
         onlyWithoutProspects: false,
+        relationStatuses: [],
         departement: null,
         ief: null,
       },
@@ -563,6 +661,7 @@ describe('RepCampaignsService : programme', () => {
         name: 'Relance',
         spreadDays: 2,
         onlyWithoutProspects: false,
+        relationStatuses: [],
         departement: null,
         ief: null,
       },
@@ -581,6 +680,7 @@ describe('RepCampaignsService : programme', () => {
         name: 'Relance',
         spreadDays: 7,
         onlyWithoutProspects: false,
+        relationStatuses: [],
         departement: null,
         ief: null,
       },
@@ -609,6 +709,7 @@ describe('RepCampaignsService : programme', () => {
         name: 'Relance',
         spreadDays: 7,
         onlyWithoutProspects: false,
+        relationStatuses: [],
         departement: null,
         ief: null,
       },
@@ -975,8 +1076,8 @@ describe('RepCampaignsService : numéro suggéré', () => {
       phoneE164: SUGGESTED_E164,
       ownedByCommercialName: 'Moussa Sarr',
     });
-    // Fiche d'autrui : la bannière nomme le propriétaire, pas le représentant.
-    expect(result.suggestion?.representant).toBeNull();
+    // L'annuaire est commun : la fiche d'autrui remonte entière, propriétaire nommé.
+    expect(result.suggestion?.representant?.id).toBe('rep-9');
   });
 
   it('ramène trois écritures du même numéro à une seule clé', async () => {

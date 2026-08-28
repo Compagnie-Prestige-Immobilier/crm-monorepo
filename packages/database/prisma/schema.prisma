@@ -1176,6 +1176,10 @@ model RepCallCampaign {
   /// C'est la campagne de relance des dormants, celle qui a motivé le module.
   onlyWithoutProspects Boolean @default(false)
 
+  /// Statuts de relation retenus par le tirage. Liste VIDE : aucun filtre, la
+  /// campagne prend qualifiés et non qualifiés.
+  relationStatuses RepresentantRelation[] @default([])
+
   createdById String
   createdBy   User   @relation("RepCallCampaignCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
 

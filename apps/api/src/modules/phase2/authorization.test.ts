@@ -45,7 +45,7 @@ const admitted = (method: string): Role[] =>
   );
 
 const MATRICE: { method: string; roles: Role[] }[] = [
-  { method: 'pullDirectory', roles: [Role.ADMIN, Role.COMMERCIAL] },
+  { method: 'pullDirectory', roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR] },
   { method: 'listCampaigns', roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR] },
   { method: 'createCampaign', roles: [Role.ADMIN] },
   { method: 'getCampaign', roles: [Role.ADMIN, Role.SUPERVISEUR] },
@@ -57,9 +57,9 @@ const MATRICE: { method: string; roles: Role[] }[] = [
     method: 'downloadRecording',
     roles: [Role.ADMIN, Role.SUPERVISEUR, Role.COMMERCIAL],
   },
-  // Le televersement est reserve au teleconseiller qui a passe l'appel: la
-  // direction ecoute, elle ne depose pas a la place du terrain.
-  { method: 'uploadRecording', roles: [Role.COMMERCIAL] },
+  // Ouverte a qui mene les trois etapes; le service exige ensuite d'etre
+  // l'auteur de la tentative, personne ne depose a la place d'un autre.
+  { method: 'uploadRecording', roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR] },
 ];
 
 describe('matrice d’autorisation des campagnes d’appels', () => {
@@ -82,9 +82,10 @@ describe('matrice d’autorisation des campagnes d’appels', () => {
     }
   });
 
-  it('le SUPERVISEUR lit et imprime, mais ne crée ni ne clôt', () => {
-    for (const method of ['createCampaign', 'closeCampaign', 'pullDirectory']) {
+  it('le SUPERVISEUR lit, imprime et appelle, mais ne crée ni ne clôt de campagne', () => {
+    for (const method of ['createCampaign', 'closeCampaign', 'pauseCampaign', 'resumeCampaign']) {
       expect(allows(method, Role.SUPERVISEUR), method).toBe(false);
     }
+    expect(allows('pullDirectory', Role.SUPERVISEUR)).toBe(true);
   });
 });

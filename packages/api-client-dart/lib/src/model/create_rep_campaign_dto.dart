@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:crm_api_client/src/model/representant_relation.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/src/equatable_utils.dart';
@@ -28,6 +29,8 @@ class CreateRepCampaignDto {
     this.iefId,
 
     this.onlyWithoutProspects = false,
+
+    this.relationStatuses,
 
     this.spreadDays = 1,
   });
@@ -56,6 +59,10 @@ class CreateRepCampaignDto {
   )
   final bool? onlyWithoutProspects;
 
+  /// Ne retenir que les représentants dans ces états de relation. Absente ou vide : aucun filtre. `AMBASSADEUR` seul donne les qualifiés ; une liste qui l’exclut donne les non qualifiés.
+  @JsonKey(name: r'relationStatuses', required: false, includeIfNull: false)
+  final List<RepresentantRelation>? relationStatuses;
+
   /// Étale la file de chaque commercial sur N journées. À 1 (défaut), un seul programme par commercial.
   // minimum: 1
   // maximum: 31
@@ -78,6 +85,7 @@ class CreateRepCampaignDto {
                 departementId,
                 iefId,
                 onlyWithoutProspects,
+                relationStatuses,
                 spreadDays,
               ],
               [
@@ -86,6 +94,7 @@ class CreateRepCampaignDto {
                 other.departementId,
                 other.iefId,
                 other.onlyWithoutProspects,
+                other.relationStatuses,
                 other.spreadDays,
               ],
             );
@@ -100,6 +109,7 @@ class CreateRepCampaignDto {
         departementId,
         iefId,
         onlyWithoutProspects,
+        relationStatuses,
         spreadDays,
       ]);
 

@@ -5,12 +5,12 @@ import {
   ChangeSource,
   Prisma,
   RepCallOutcome,
+  RepresentantRelation,
   Role,
 } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { shortCode } from '../../common/short-code.js';
-import { isAdmin } from '../../common/scope.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import {
   MIN_SPREAD_DAYS,
@@ -94,6 +94,7 @@ interface ScopeInput {
   readonly departementId?: string | null;
   readonly iefId?: string | null;
   readonly onlyWithoutProspects?: boolean | null;
+  readonly relationStatuses?: readonly RepresentantRelation[] | null;
 }
 
 @Injectable()
@@ -120,6 +121,7 @@ export class RepCampaignsService {
               departementId: body.departementId ?? null,
               iefId: body.iefId ?? null,
               onlyWithoutProspects: body.onlyWithoutProspects ?? false,
+              relationStatuses: body.relationStatuses ?? [],
               createdById: user.id,
             },
           });
@@ -277,10 +279,12 @@ export class RepCampaignsService {
           row.departement?.name ?? null,
           row.ief?.name ?? null,
           row.onlyWithoutProspects,
+          row.relationStatuses,
         ),
         departementId: row.departementId,
         iefId: row.iefId,
         onlyWithoutProspects: row.onlyWithoutProspects,
+        relationStatuses: row.relationStatuses,
         createdById: row.createdById,
         createdByName: row.createdBy.fullName,
         commercialCount: row._count.commerciaux,
@@ -344,10 +348,12 @@ export class RepCampaignsService {
         campaign.departement?.name ?? null,
         campaign.ief?.name ?? null,
         campaign.onlyWithoutProspects,
+        campaign.relationStatuses,
       ),
       departementId: campaign.departementId,
       iefId: campaign.iefId,
       onlyWithoutProspects: campaign.onlyWithoutProspects,
+      relationStatuses: campaign.relationStatuses,
       createdById: campaign.createdById,
       createdByName: campaign.createdBy.fullName,
       commercialCount: campaign.commerciaux.length,
@@ -468,6 +474,7 @@ export class RepCampaignsService {
             name: true,
             spreadDays: true,
             onlyWithoutProspects: true,
+            relationStatuses: true,
             departement: { select: { name: true } },
             ief: { select: { name: true } },
           },
@@ -503,6 +510,7 @@ export class RepCampaignsService {
         membership.campaign.departement?.name ?? null,
         membership.campaign.ief?.name ?? null,
         membership.campaign.onlyWithoutProspects,
+        membership.campaign.relationStatuses,
       ),
       rows: tasks.map((task) => ({
         position: task.position,
@@ -525,6 +533,7 @@ export class RepCampaignsService {
         name: true,
         spreadDays: true,
         onlyWithoutProspects: true,
+        relationStatuses: true,
         departement: { select: { name: true } },
         ief: { select: { name: true } },
         commerciaux: {
@@ -551,6 +560,7 @@ export class RepCampaignsService {
       campaign.departement?.name ?? null,
       campaign.ief?.name ?? null,
       campaign.onlyWithoutProspects,
+      campaign.relationStatuses,
     );
     const byUser = Map.groupBy(campaign.tasks, (task) => task.assignedToId);
 
@@ -593,7 +603,7 @@ export class RepCampaignsService {
   ): Promise<RepCallAttemptResultDto> {
     const comment = validatedComment(body);
 
-    const suggested = await this.resolveSuggested(user, body.suggestedPhone);
+    const suggested = await this.resolveSuggested(body.suggestedPhone);
 
     const existing = await this.prisma.repCallAttempt.findUnique({
       where: { id: body.id },
@@ -609,19 +619,13 @@ export class RepCampaignsService {
       );
     }
 
-    // Sans cette clause, poster le `representantId` d'un collègue suffisait à
-    // écrire sa relation, son WhatsApp, et à clore SA tâche de campagne. La
-    // tâche confiée est cherchée sans `isActive` : une tentative peut arriver
-    // après que la file a été soldée, et elle reste légitime.
+    // N'IMPORTE QUEL représentant vivant de l'annuaire : il descend sur tous les
+    // téléphones, et la qualification est justement le geste que l'on porte sur
+    // une fiche trouvée à l'annuaire, sans campagne qui la confie.
     const representant = await this.prisma.representant.findFirst({
       where: {
         id: body.representantId,
         deletedAt: null,
-        ...(isAdmin(user)
-          ? {}
-          : {
-              OR: [{ createdById: user.id }, { repCallTasks: { some: { assignedToId: user.id } } }],
-            }),
       },
       select: {
         id: true,
@@ -740,12 +744,11 @@ export class RepCampaignsService {
    * au téléconseiller qui rencontrerait un jour cette personne pour de vrai.
    */
   private async resolveSuggested(
-    user: AuthenticatedUser,
     phone: string | undefined,
   ): Promise<{ lookup: RepresentantLookupDto; resolvedRepresentantId: string | null } | null> {
     if (phone === undefined) return null;
 
-    const lookup = await this.representants.lookup(user, phone);
+    const lookup = await this.representants.lookup(phone);
     const known = await this.prisma.representant.findFirst({
       where: {
         phoneE164: lookup.phoneE164,
@@ -774,6 +777,7 @@ export class RepCampaignsService {
       departement?.name ?? null,
       ief?.name ?? null,
       scope.onlyWithoutProspects ?? false,
+      scope.relationStatuses ?? [],
     );
   }
 }
@@ -805,25 +809,44 @@ function attemptResult(
 }
 
 function eligibleWhere(scope: ScopeInput): Prisma.RepresentantWhereInput {
+  const relationStatuses = scope.relationStatuses ?? [];
   return {
     deletedAt: null,
     ...(scope.departementId ? { departementId: scope.departementId } : {}),
     ...(scope.iefId ? { iefId: scope.iefId } : {}),
     ...(scope.onlyWithoutProspects ? { prospects: { none: { deletedAt: null } } } : {}),
+    ...(relationStatuses.length > 0 ? { relationStatus: { in: [...relationStatuses] } } : {}),
     repCallTasks: { none: { isActive: true } },
     repCallAttempts: { none: { outcome: { in: [...TERMINAL_OUTCOMES] } } },
   };
+}
+
+const RELATION_LABELS: Record<RepresentantRelation, string> = {
+  [RepresentantRelation.INCONNU]: 'inconnus',
+  [RepresentantRelation.CONTACTE]: 'contactés',
+  [RepresentantRelation.AMBASSADEUR]: 'ambassadeurs',
+  [RepresentantRelation.REFUS]: 'refus',
+};
+
+function relationLabel(statuses: readonly RepresentantRelation[]): string | null {
+  if (statuses.length === 0) return null;
+  if (statuses.length === 1 && statuses[0] === RepresentantRelation.AMBASSADEUR) return 'qualifiés';
+  if (!statuses.includes(RepresentantRelation.AMBASSADEUR)) return 'non qualifiés';
+  return statuses.map((status) => RELATION_LABELS[status]).join(' ou ');
 }
 
 function composeScopeLabel(
   departement: string | null,
   ief: string | null,
   onlyWithoutProspects: boolean,
+  relationStatuses: readonly RepresentantRelation[],
 ): string {
   const parts: string[] = [];
   if (departement) parts.push(`Département ${departement}`);
   if (ief) parts.push(`IEF ${ief}`);
   if (onlyWithoutProspects) parts.push('sans prospect');
+  const relation = relationLabel(relationStatuses);
+  if (relation) parts.push(relation);
   return parts.length ? parts.join(', ') : 'Tous les représentants';
 }
 

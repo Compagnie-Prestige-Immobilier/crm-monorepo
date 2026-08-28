@@ -30,7 +30,7 @@ import {
   CurrentUser,
   type AuthenticatedUser,
 } from '../../common/decorators/current-user.decorator.js';
-import { Roles } from '../../common/decorators/roles.decorator.js';
+import { PARCOURS_ROLES, Roles } from '../../common/decorators/roles.decorator.js';
 import {
   programmeFilename,
   writeRepProgrammePdf,
@@ -81,7 +81,7 @@ export class RepCampaignsController {
   }
 
   @Post('attempts')
-  @Roles(Role.COMMERCIAL, Role.ADMIN)
+  @Roles(...PARCOURS_ROLES)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     operationId: 'recordRepCallAttempt',

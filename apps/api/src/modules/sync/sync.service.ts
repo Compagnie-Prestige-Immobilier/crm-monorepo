@@ -13,14 +13,14 @@ import {
   Prisma,
   Projet,
   type ProspectStatut,
-  type Role,
+  Role,
   WhatsappStatus,
 } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { readEnv } from '../../env.js';
 import { normalizePhone } from '../../common/phone.js';
-import { isAdmin, ownerScope } from '../../common/scope.js';
+import { isAdmin, prospectSyncScope } from '../../common/scope.js';
 import { dakarWallClock } from '../../common/date-bounds.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { PROSPECT_INCLUDE, toProspectDto } from '../prospects/prospects.service.js';
@@ -177,12 +177,7 @@ function errorMessageOf(error: { getResponse: () => unknown; message: string }):
 }
 
 /**
- * Ce qu'un téléphone tire, et ce sur quoi il a le droit d'écrire.
- *
- * `createdById` seul ne suffit pas : les fiches importées par un administrateur
- * lui appartiennent, et une campagne qui les confie à un téléconseiller ne les
- * faisait pas descendre sur son appareil. Le terrain voyait sa propre saisie et
- * jamais la file qu'on lui avait attribuée.
+ * La file confiée par une campagne, telle que le téléphone la voit.
  *
  * `isActive` et non `status` : une tâche retirée de la file ne doit plus rien
  * tirer, mais une tâche déjà traitée reste visible, sinon la fiche disparaît de
@@ -192,15 +187,22 @@ const assignedTo = (userId: string): Prisma.CallTaskListRelationFilter => ({
   some: { assignedToId: userId, isActive: true },
 });
 
-const mineOrAssignedProspect = (
-  user: Pick<AuthenticatedUser, 'id' | 'role'>,
-): Prisma.ProspectWhereInput =>
-  isAdmin(user) ? {} : { OR: [{ createdById: user.id }, { callTasks: assignedTo(user.id) }] };
+/**
+ * Les représentants sont l'ANNUAIRE de l'entreprise : un téléconseiller les
+ * reçoit tous, sans qu'une campagne les lui confie. Les prospects, eux, restent
+ * cloisonnés par `prospectSyncScope`.
+ */
+const ANNUAIRE_ROLES: readonly Role[] = [
+  Role.ADMIN,
+  Role.COMMERCIAL,
+  Role.SUPERVISEUR,
+  Role.DIRECTION,
+];
 
 const mineOrAssignedRepresentant = (
   user: Pick<AuthenticatedUser, 'id' | 'role'>,
 ): Prisma.RepresentantWhereInput =>
-  isAdmin(user)
+  ANNUAIRE_ROLES.includes(user.role)
     ? {}
     : {
         OR: [
@@ -400,10 +402,11 @@ export class SyncService {
               operation.entity === SyncEntity.REPRESENTANT &&
               outcome.status !== SyncOpStatus.APPLIED
             ) {
-              // Un « déjà présent et à moi » n'est pas une indisponibilité :
-              // seule l'absence effective de la ligne condamne ses prospects.
+              // Un « déjà présent », même sous un autre créateur, n'est pas une
+              // indisponibilité : seule l'absence effective de la ligne de
+              // l'annuaire condamne ses prospects.
               const exists = await tx.representant.findFirst({
-                where: { id: operation.entityId, deletedAt: null, ...ownerScope(user) },
+                where: { id: operation.entityId, deletedAt: null },
                 select: { id: true },
               });
               parentUnavailable = !exists;
@@ -490,8 +493,11 @@ export class SyncService {
       return applied(existing.id, null, existing.createdAt);
     }
 
+    // N'IMPORTE QUEL représentant vivant de l'annuaire : le flux le fait
+    // descendre sur tous les téléphones, le refuser ici rendait introuvable la
+    // fiche que le téléconseiller venait d'y choisir.
     const representant = await tx.representant.findFirst({
-      where: { id: data.representantId, deletedAt: null, ...ownerScope(user) },
+      where: { id: data.representantId, deletedAt: null },
     });
     if (!representant) {
       throw new OperationError(
@@ -908,7 +914,7 @@ export class SyncService {
       // telephone ne les obtient pas toujours, et une fiche Grand Public n'en a
       // aucun : les exiger faisait abandonner la saisie entiere.
       if (data.representantId) {
-        await assertRepresentantUsable(tx, user, data.representantId);
+        await assertRepresentantUsable(tx, data.representantId);
       }
       await assertProspectPhoneFree(tx, phoneE164, operation.entityId);
 
@@ -961,7 +967,7 @@ export class SyncService {
       await assertProspectPhoneFree(tx, phoneE164, operation.entityId);
     }
     if (data.representantId && data.representantId !== existing.representantId) {
-      await assertRepresentantUsable(tx, user, data.representantId);
+      await assertRepresentantUsable(tx, data.representantId);
     }
 
     // Un lien VIDÉ se déclare, il ne se devine pas : `includeIfNull: false`
@@ -1108,7 +1114,6 @@ export class SyncService {
     cursor = advance(cursor, 'syndicats', lastPosition(syndicats));
     pageLengths.push(syndicats.length);
 
-    // ─ Métier : ce que le compte a saisi, ET ce qu'une campagne lui a confié ─
     const representants = await this.prisma.representant.findMany({
       where: {
         ...keyset(cursor.streams.representants, safeNow),
@@ -1122,7 +1127,7 @@ export class SyncService {
     pageLengths.push(representants.length);
 
     const prospects = await this.prisma.prospect.findMany({
-      where: { ...keyset(cursor.streams.prospects, safeNow), ...mineOrAssignedProspect(user) },
+      where: { ...keyset(cursor.streams.prospects, safeNow), ...prospectSyncScope(user) },
       include: PROSPECT_INCLUDE,
       orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
       take: limit,
@@ -1527,27 +1532,24 @@ interface BatchAuthority {
   readonly user: AuthenticatedUser;
 }
 
+/**
+ * L'ANNUAIRE est commun : tout représentant vivant sert de rattachement, quel
+ * que soit son créateur. La fiche du représentant, elle, reste protégée par
+ * `assertRepresentantWritable`.
+ */
 async function assertRepresentantUsable(
   tx: Prisma.TransactionClient,
-  user: AuthenticatedUser,
   representantId: string,
 ): Promise<void> {
   const representant = await tx.representant.findFirst({
     where: { id: representantId, deletedAt: null },
-    select: { id: true, createdById: true },
+    select: { id: true },
   });
   if (!representant) {
     throw new OperationError(
       SyncOpStatus.SKIPPED_DEPENDENCY_FAILED,
       'REPRESENTANT_NOT_FOUND',
       'Représentant de rattachement introuvable.',
-    );
-  }
-  if (!isAdmin(user) && representant.createdById !== user.id) {
-    throw new OperationError(
-      SyncOpStatus.CONFLICT,
-      'REPRESENTANT_OWNED_BY_ANOTHER_USER',
-      'Ce représentant appartient à un autre commercial.',
     );
   }
 }
