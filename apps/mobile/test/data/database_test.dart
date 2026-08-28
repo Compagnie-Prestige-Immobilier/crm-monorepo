@@ -521,6 +521,56 @@ void main() {
     );
   });
 
+  test(
+    'la file représentants garde seulement les tâches ouvertes dans l’ordre',
+    () async {
+      await _insertRepresentant(db, id: 'r1', phone: '+221770000001');
+      await _insertRepresentant(db, id: 'r2', phone: '+221770000002');
+      await db
+          .into(db.repCallCampaigns)
+          .insert(
+            RepCallCampaignsCompanion.insert(
+              id: 'camp-1',
+              name: 'Relance CHUES',
+              updatedAt: t0,
+            ),
+          );
+      await db
+          .into(db.repCallTasks)
+          .insert(
+            RepCallTasksCompanion.insert(
+              id: 'task-2',
+              campaignId: 'camp-1',
+              representantId: 'r2',
+              position: 2,
+              updatedAt: t0,
+            ),
+          );
+      await db
+          .into(db.repCallTasks)
+          .insert(
+            RepCallTasksCompanion.insert(
+              id: 'task-1',
+              campaignId: 'camp-1',
+              representantId: 'r1',
+              position: 1,
+              status: const Value<String>('DONE'),
+              updatedAt: t0,
+            ),
+          );
+
+      final List<RepCampaignQueueResult> queue = await db
+          .repCampaignQueue(campaignId: 'camp-1')
+          .get();
+
+      expect(
+        queue.map((RepCampaignQueueResult row) => row.representantId),
+        <String>['r2'],
+      );
+      expect(queue.single.fullName, 'Représentant r2');
+    },
+  );
+
   group('compteurs', () {
     test('les lignes supprimées logiquement ne comptent pas', () async {
       await _insertRepresentant(db, id: 'r1', phone: '+221770000050');

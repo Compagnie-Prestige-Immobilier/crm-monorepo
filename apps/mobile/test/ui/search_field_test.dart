@@ -70,15 +70,21 @@ void main() {
       ),
     );
 
+    final SemanticsHandle handle = tester.ensureSemantics();
+
     await tester.enterText(find.byType(TextField), 'Ousmane');
     await tester.pump(const Duration(milliseconds: 400));
-    await tester.tap(find.byTooltip('Effacer la recherche'));
-    await tester.pump();
+    await tester.tap(find.bySemanticsLabel('Effacer la recherche'));
+    // Le bouton ForUI tient son état « pressé » 100 ms : sans cette attente, le
+    // minuteur survit à l'arbre et le test échoue sur un invariant.
+    await tester.pump(const Duration(milliseconds: 200));
 
     expect(emitted, <String>['Ousmane', '']);
     expect(
       tester.widget<TextField>(find.byType(TextField)).controller?.text,
       isEmpty,
     );
+
+    handle.dispose();
   });
 }

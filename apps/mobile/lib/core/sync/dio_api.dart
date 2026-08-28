@@ -18,6 +18,35 @@ class ResponseFormatException extends FormatException {
   bool get isJson => (contentType ?? '').toLowerCase().contains('json');
 }
 
+/// Le corps du `PATCH` d'une visite, écrit champ par champ.
+///
+/// `UpdateVisiteDto` est engendré avec `includeIfNull: false` : ses champs nuls
+/// disparaissent du JSON. Or le serveur distingue ABSENT (inchangé) de NUL
+/// (effacé) — un destinataire mis par erreur ne se retirerait jamais. La
+/// correction énonce donc les sept champs à chaque fois.
+class _CorpsCorrectionVisite extends UpdateVisiteDto {
+  _CorpsCorrectionVisite({
+    required super.visitorName,
+    required super.entrepriseId,
+    required super.objetId,
+    required super.phone,
+    required super.directionId,
+    required super.destinataireId,
+    required super.comment,
+  });
+
+  @override
+  Map<String, dynamic> toJson() => <String, dynamic>{
+    'visitorName': visitorName,
+    'phone': phone,
+    'entrepriseId': entrepriseId,
+    'objetId': objetId,
+    'directionId': directionId,
+    'destinataireId': destinataireId,
+    'comment': comment,
+  };
+}
+
 class DioApi implements ApiPort {
   DioApi(this._client);
 
@@ -26,8 +55,10 @@ class DioApi implements ApiPort {
   AuthApi get _auth => _client.getAuthApi();
   SyncApi get _sync => _client.getSyncApi();
   Phase2Api get _phase2 => _client.getPhase2Api();
+  RepCampaignsApi get _repCampaigns => _client.getRepCampaignsApi();
   RepresentantsApi get _representants => _client.getRepresentantsApi();
   CallOutcomeReasonsApi get _reasons => _client.getCallOutcomeReasonsApi();
+  VisitesApi get _visites => _client.getVisitesApi();
 
   @override
   Future<AuthTokens> login({
@@ -138,6 +169,20 @@ class DioApi implements ApiPort {
   }
 
   @override
+  Future<RepCallAttemptResultDto> recordRepCallAttempt(
+    CreateRepCallAttemptDto attempt,
+  ) async {
+    return _guard('repCallAttempt', () async {
+      final Response<RepCallAttemptResultDto> response = await _repCampaigns
+          .recordRepCallAttempt(
+            createRepCallAttemptDto: attempt,
+            extra: TimeoutProfile.push.extra,
+          );
+      return _body('repCallAttempt', response);
+    });
+  }
+
+  @override
   Future<void> uploadCallRecording({
     required String attemptId,
     required String path,
@@ -205,6 +250,38 @@ class DioApi implements ApiPort {
     });
   }
 
+  /// `activeOnly: false` : le miroir local doit contenir AUSSI les référentiels
+  /// désactivés, sinon une fiche ancienne perdrait le libellé de sa banque. La
+  /// désactivation voyage dans `isActive` ; l'absence de la liste, elle, vaut
+  /// suppression.
+  @override
+  Future<ReferentielsSnapshot> pullReferentiels() async {
+    return _guard('referentiels', () async {
+      final ReferentielsApi api = _client.getReferentielsApi();
+      final Response<ReferentielsBundleDto> bundle = await api.getReferentiels(
+        activeOnly: false,
+        extra: TimeoutProfile.read.extra,
+      );
+      final Response<List<IefDto>> iefs = await api.listIefs(
+        activeOnly: false,
+        extra: TimeoutProfile.read.extra,
+      );
+      final Response<List<CanalProvenanceDto>> canaux = await api
+          .listCanauxProvenance(
+            activeOnly: false,
+            extra: TimeoutProfile.read.extra,
+          );
+      final ReferentielsBundleDto body = _body('referentiels', bundle);
+      return ReferentielsSnapshot(
+        departements: body.departements,
+        iefs: _body('iefs', iefs),
+        banques: body.banques,
+        syndicats: body.syndicats,
+        canauxProvenance: _body('canauxProvenance', canaux),
+      );
+    });
+  }
+
   @override
   Future<RepresentantLookup> lookupRepresentantByPhone(String phone) async {
     return _guard('lookup', () async {
@@ -220,6 +297,43 @@ class DioApi implements ApiPort {
         representant: body.representant,
         ownedByCommercialId: body.ownedByCommercialId,
         ownedByCommercialName: body.ownedByCommercialName,
+      );
+    });
+  }
+
+  @override
+  Future<VisiteReferentielsBundleDto> pullVisiteReferentiels() async {
+    return _guard('visiteReferentiels', () async {
+      final Response<VisiteReferentielsBundleDto> response = await _visites
+          .listVisiteReferentiels(extra: TimeoutProfile.read.extra);
+      return _body('visiteReferentiels', response);
+    });
+  }
+
+  @override
+  Future<void> updateVisite({
+    required String id,
+    required String visitorName,
+    required String entrepriseId,
+    required String objetId,
+    String? phone,
+    String? directionId,
+    String? destinataireId,
+    String? comment,
+  }) async {
+    await _guard('updateVisite', () async {
+      await _visites.updateVisite(
+        id: id,
+        updateVisiteDto: _CorpsCorrectionVisite(
+          visitorName: visitorName,
+          entrepriseId: entrepriseId,
+          objetId: objetId,
+          phone: phone,
+          directionId: directionId,
+          destinataireId: destinataireId,
+          comment: comment,
+        ),
+        extra: TimeoutProfile.push.extra,
       );
     });
   }

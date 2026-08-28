@@ -125,7 +125,7 @@ export const PROSPECT_COLUMNS: readonly ColumnSpec[] = [
     value: (row) => (row.enrollmentMethod ? ENROLLMENT_METHOD_LABELS[row.enrollmentMethod] : ''),
   },
   {
-    header: 'Statut phase 2',
+    header: 'Statut phase 3 (conversion)',
     key: 'phase2Status',
     value: (row) => PHASE2_STATUS_LABELS[row.phase2Status],
   },

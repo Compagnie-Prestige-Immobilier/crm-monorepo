@@ -15,6 +15,12 @@ export interface ImportRowError {
 
 export type ParsedRow<T> = { ok: true; row: T } | { ok: false; error: ImportRowError };
 
+export const importCell = (cells: Record<string, string>, column: string): string =>
+  cells[column]?.trim() ?? '';
+
+export const unresolvedImportValue = (raw: string, value: unknown): boolean =>
+  raw !== '' && value === null;
+
 export interface ChunkOutcome {
   created: number;
   skipped: number;

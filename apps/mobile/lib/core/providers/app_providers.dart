@@ -1,6 +1,12 @@
 import 'package:crm_api_client/crm_api_client.dart';
 import 'package:dio/dio.dart';
-import 'package:drift/drift.dart' show QueryRow, ResultSetImplementation;
+import 'package:drift/drift.dart'
+    show
+        OrderClauseGenerator,
+        OrderingTerm,
+        QueryRow,
+        ResultSetImplementation,
+        Variable;
 import 'package:flutter/material.dart' show DateUtils;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -327,6 +333,155 @@ final representantDetailProvider =
       return ref
           .watch(referenceRepositoryProvider)
           .watchRepresentant(representantId);
+    });
+
+final prospectDetailProvider =
+    StreamProvider.family<ProspectSyncViewData?, String>((
+      Ref ref,
+      String prospectId,
+    ) {
+      return ref.watch(referenceRepositoryProvider).watchProspect(prospectId);
+    });
+
+/// Où en est la conversion de ce prospect : ce que le serveur en sait
+/// (l'annuaire) et ce que le dernier appel saisi sur CE téléphone en dit.
+typedef ProspectCallState = ({
+  String? status,
+  String? method,
+  DateTime? callbackAt,
+  DateTime? lastAttemptAt,
+});
+
+final prospectCallStateProvider =
+    StreamProvider.family<ProspectCallState, String>((
+      Ref ref,
+      String prospectId,
+    ) {
+      final AppDatabase db = ref.watch(appDatabaseProvider);
+      return db
+          .customSelect(
+            'SELECT d.phase2_status AS status, '
+            '       COALESCE(a.method, d.enrollment_method) AS method, '
+            '       a.callback_at AS callback_at, '
+            '       a.client_created_at AS attempt_at '
+            'FROM (SELECT ?1 AS id) AS q '
+            'LEFT JOIN phase2_directory d ON d.prospect_id = q.id '
+            'LEFT JOIN call_attempts a ON a.prospect_id = q.id '
+            '  AND a.client_created_at = ('
+            '    SELECT MAX(client_created_at) FROM call_attempts '
+            '    WHERE prospect_id = q.id)',
+            variables: <Variable<Object>>[Variable<String>(prospectId)],
+            readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+              db.phase2Directory,
+              db.callAttempts,
+            },
+          )
+          .watchSingle()
+          .map(
+            (QueryRow row) => (
+              status: row.read<String?>('status'),
+              method: row.read<String?>('method'),
+              callbackAt: row.read<DateTime?>('callback_at'),
+              lastAttemptAt: row.read<DateTime?>('attempt_at'),
+            ),
+          );
+    });
+
+/// Un rappel promis : la liste des rappels et le compteur des deux accueils
+/// lisent la même forme, qu'il porte sur un prospect ou sur un représentant.
+typedef Rappel = ({
+  String id,
+  String sujetId,
+  String nom,
+  String phoneE164,
+  DateTime at,
+});
+
+/// Les rappels promis pendant un appel Grand Public, du plus proche au plus
+/// lointain. Ne sont retenus que ceux d'aujourd'hui et d'après : un rappel de la
+/// semaine dernière ne se rattrape plus, il se rappelle.
+///
+/// Un rappel n'est en attente que tant qu'AUCUN appel plus récent n'a été saisi
+/// sur la fiche : rappeler quelqu'un, c'est saisir un appel de plus, et c'est ce
+/// qui honore la promesse. Sans cette clause, le rappel tenu restait compté pour
+/// toujours et le nombre de l'accueil ne redescendait jamais.
+final StreamProvider<List<Rappel>> grandPublicRappelsProvider =
+    StreamProvider<List<Rappel>>((Ref ref) {
+      final AppDatabase db = ref.watch(appDatabaseProvider);
+      final Clock clock = ref.watch(clockProvider);
+      return db
+          .customSelect(
+            'SELECT a.id AS id, a.prospect_id AS prospect_id, '
+            '       a.callback_at AS callback_at, p.nom AS nom, '
+            '       p.prenom AS prenom, p.phone_e164 AS phone_e164 '
+            'FROM call_attempts AS a '
+            'JOIN prospect_journeys AS j ON j.prospect_id = a.prospect_id '
+            '  AND j.projet = \'GRAND_PUBLIC\' '
+            'JOIN prospects AS p ON p.id = a.prospect_id '
+            '  AND p.deleted_at IS NULL '
+            'WHERE a.callback_at IS NOT NULL '
+            '  AND NOT EXISTS (SELECT 1 FROM call_attempts AS b '
+            '    WHERE b.prospect_id = a.prospect_id AND b.id <> a.id '
+            '      AND b.client_created_at >= a.client_created_at) '
+            'ORDER BY a.callback_at ASC',
+            readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+              db.callAttempts,
+              db.prospectJourneys,
+              db.prospects,
+            },
+          )
+          .watch()
+          .map((List<QueryRow> rows) {
+            final DateTime debut = DateUtils.dateOnly(clock.now());
+            return rows
+                .where(
+                  (QueryRow r) =>
+                      !r.read<DateTime>('callback_at').isBefore(debut),
+                )
+                .map(
+                  (QueryRow r) => (
+                    id: r.read<String>('id'),
+                    sujetId: r.read<String>('prospect_id'),
+                    nom: '${r.read<String>('prenom')} ${r.read<String>('nom')}'
+                        .trim(),
+                    phoneE164: r.read<String>('phone_e164'),
+                    at: r.read<DateTime>('callback_at'),
+                  ),
+                )
+                .toList(growable: false);
+          });
+    });
+
+/// Les rappels promis pendant un appel de qualification (phase 1). La table est
+/// vidée de la promesse dès qu'un appel de plus est saisi sur le représentant :
+/// c'est `WriteRepository.recordRepCallAttempt` qui l'honore, ici il n'y a rien
+/// à filtrer d'autre que la date.
+final StreamProvider<List<Rappel>> representantRappelsProvider =
+    StreamProvider<List<Rappel>>((Ref ref) {
+      final AppDatabase db = ref.watch(appDatabaseProvider);
+      final Clock clock = ref.watch(clockProvider);
+      return (db.select(db.repCallbackReminders)
+            ..orderBy(<OrderClauseGenerator<RepCallbackReminders>>[
+              (RepCallbackReminders t) => OrderingTerm.asc(t.scheduledAt),
+            ]))
+          .watch()
+          .map((List<RepCallbackReminder> rows) {
+            final DateTime debut = DateUtils.dateOnly(clock.now());
+            return rows
+                .where(
+                  (RepCallbackReminder r) => !r.scheduledAt.isBefore(debut),
+                )
+                .map(
+                  (RepCallbackReminder r) => (
+                    id: r.id,
+                    sujetId: r.representantId,
+                    nom: r.fullName,
+                    phoneE164: r.phoneE164,
+                    at: r.scheduledAt,
+                  ),
+                )
+                .toList(growable: false);
+          });
     });
 
 final prospectsForRepresentantProvider =

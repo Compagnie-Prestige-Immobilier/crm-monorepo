@@ -30,19 +30,26 @@ export const EMPTY_USER_FILTERS: UserFilters = {
 
 export type { RawSearchParams };
 
+function parseRole(role: string | null): Role | null {
+  if (role === 'tous') return null;
+  if (role !== null && (ROLES as readonly string[]).includes(role)) return role as Role;
+  return EMPTY_USER_FILTERS.role;
+}
+
+function parseActive(value: string | null): boolean | null {
+  if (value === 'oui') return true;
+  if (value === 'non') return false;
+  return null;
+}
+
 export function parseUserFilters(params: RawSearchParams | URLSearchParams): UserFilters {
   const role = readString(params, 'role');
   const isActive = readString(params, 'isActive');
 
   return {
     search: readString(params, 'search') ?? '',
-    role:
-      role === 'tous'
-        ? null
-        : role !== null && (ROLES as readonly string[]).includes(role)
-          ? (role as Role)
-          : EMPTY_USER_FILTERS.role,
-    isActive: isActive === 'oui' ? true : isActive === 'non' ? false : null,
+    role: parseRole(role),
+    isActive: parseActive(isActive),
     page: readPositiveInt(params, 'page', 1),
     pageSize: USER_PAGE_SIZE,
   };

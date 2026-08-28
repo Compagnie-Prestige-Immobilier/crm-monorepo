@@ -124,114 +124,94 @@ const matches = (
 ): boolean => {
   if (!where) return true;
   for (const [key, expected] of Object.entries(where)) {
-    if (expected === undefined) continue;
-
-    if (key === 'OR') {
-      const branches = expected as Record<string, unknown>[];
-      if (!branches.some((branch) => matches(row, branch, db))) return false;
-      continue;
-    }
-
-    if (key === 'user') {
-      const user = db.users.find((candidate) => candidate.id === row.userId);
-      if (
-        !user ||
-        !matches(
-          user as unknown as Record<string, unknown>,
-          expected as Record<string, unknown>,
-          db,
-        )
-      ) {
-        return false;
-      }
-      continue;
-    }
-    if (key === 'notification') {
-      const notification = db.notifications.find(
-        (candidate) => candidate.id === row.notificationId,
-      );
-      if (
-        !notification ||
-        !matches(
-          notification as unknown as Record<string, unknown>,
-          expected as Record<string, unknown>,
-          db,
-        )
-      ) {
-        return false;
-      }
-      continue;
-    }
-    if (key === 'deliveries') {
-      const clause = expected as { none?: Record<string, unknown> };
-      if (clause.none !== undefined) {
-        const id = row.id;
-        const found = db.deliveries.some(
-          (delivery) =>
-            delivery.notificationId === id &&
-            matches(delivery as unknown as Record<string, unknown>, clause.none, db),
-        );
-        if (found) return false;
-      }
-      continue;
-    }
-    if (key === 'campaign') {
-      const clause = expected as { status?: unknown };
-      if (clause.status !== undefined && row.campaignStatus !== clause.status) return false;
-      continue;
-    }
-    if (key === 'currentStage') {
-      const clause = expected as { type?: unknown };
-      if (clause.type !== undefined && row.stageType !== clause.type) return false;
-      continue;
-    }
-    if (key === 'transitions') {
-      const clause = expected as { none?: { createdAt?: { gt?: Date } } };
-      const after = clause.none?.createdAt?.gt;
-      if (after !== undefined) {
-        const last = row.lastTransitionAt;
-        if (last instanceof Date && last.getTime() > after.getTime()) return false;
-      }
-      continue;
-    }
-
-    const actual = row[key];
-    if (expected === null) {
-      if (actual !== null && actual !== undefined) return false;
-      continue;
-    }
-    if (expected instanceof Date) {
-      if (!(actual instanceof Date) || actual.getTime() !== expected.getTime()) return false;
-      continue;
-    }
-    if (typeof expected === 'object') {
-      const filter = expected as {
-        in?: unknown[];
-        lte?: Date;
-        lt?: Date;
-        gte?: Date;
-        gt?: number;
-        not?: unknown;
-      };
-      if (filter.in && !filter.in.includes(actual)) return false;
-      if (filter.lte !== undefined) {
-        if (!(actual instanceof Date) || actual.getTime() > filter.lte.getTime()) return false;
-      }
-      if (filter.gte !== undefined) {
-        if (!(actual instanceof Date) || actual.getTime() < filter.gte.getTime()) return false;
-      }
-      if (filter.lt !== undefined) {
-        if (!(actual instanceof Date) || actual.getTime() >= filter.lt.getTime()) return false;
-      }
-      if (filter.gt !== undefined && !(typeof actual === 'number' && actual > filter.gt))
-        return false;
-      if ('not' in filter && actual === filter.not) return false;
-      continue;
-    }
-    if (actual !== expected) return false;
+    if (!matchesClause(row, key, expected, db)) return false;
   }
   return true;
 };
+
+function matchesClause(
+  row: Record<string, unknown>,
+  key: string,
+  expected: unknown,
+  db: FakePrisma,
+): boolean {
+  if (expected === undefined) return true;
+  if (key === 'OR') {
+    return (expected as Record<string, unknown>[]).some((branch) => matches(row, branch, db));
+  }
+  if (key === 'user') return matchesRelated(db.users, row.userId, expected, db);
+  if (key === 'notification') {
+    return matchesRelated(db.notifications, row.notificationId, expected, db);
+  }
+  if (key === 'deliveries') return matchesDeliveries(row.id, expected, db);
+  if (key === 'campaign') return matchesProperty(row.campaignStatus, expected, 'status');
+  if (key === 'currentStage') return matchesProperty(row.stageType, expected, 'type');
+  if (key === 'transitions') return matchesTransitions(row.lastTransitionAt, expected);
+  return matchesValue(row[key], expected);
+}
+
+function matchesRelated(
+  candidates: readonly { id: string }[],
+  id: unknown,
+  expected: unknown,
+  db: FakePrisma,
+): boolean {
+  const found = candidates.find((candidate) => candidate.id === id);
+  return (
+    found !== undefined &&
+    matches(found as unknown as Record<string, unknown>, expected as Record<string, unknown>, db)
+  );
+}
+
+function matchesDeliveries(id: unknown, expected: unknown, db: FakePrisma): boolean {
+  const none = (expected as { none?: Record<string, unknown> }).none;
+  if (none === undefined) return true;
+  return !db.deliveries.some(
+    (delivery) =>
+      delivery.notificationId === id &&
+      matches(delivery as unknown as Record<string, unknown>, none, db),
+  );
+}
+
+function matchesProperty(actual: unknown, expected: unknown, key: string): boolean {
+  const value = (expected as Record<string, unknown>)[key];
+  return value === undefined || actual === value;
+}
+
+function matchesTransitions(actual: unknown, expected: unknown): boolean {
+  const after = (expected as { none?: { createdAt?: { gt?: Date } } }).none?.createdAt?.gt;
+  return after === undefined || !(actual instanceof Date) || actual.getTime() <= after.getTime();
+}
+
+function matchesValue(actual: unknown, expected: unknown): boolean {
+  if (expected === null) return actual === null || actual === undefined;
+  if (expected instanceof Date)
+    return actual instanceof Date && actual.getTime() === expected.getTime();
+  if (typeof expected !== 'object') return actual === expected;
+  const filter = expected as {
+    in?: unknown[];
+    lte?: Date;
+    lt?: Date;
+    gte?: Date;
+    gt?: number;
+    not?: unknown;
+  };
+  if (filter.in !== undefined && !filter.in.includes(actual)) return false;
+  if (!matchesDateFilter(actual, filter)) return false;
+  if (filter.gt !== undefined && !(typeof actual === 'number' && actual > filter.gt)) return false;
+  return !('not' in filter) || actual !== filter.not;
+}
+
+function matchesDateFilter(
+  actual: unknown,
+  filter: { lte?: Date; lt?: Date; gte?: Date },
+): boolean {
+  if (filter.lte === undefined && filter.gte === undefined && filter.lt === undefined) return true;
+  if (!(actual instanceof Date)) return false;
+  if (filter.lte !== undefined && actual > filter.lte) return false;
+  if (filter.gte !== undefined && actual < filter.gte) return false;
+  return filter.lt === undefined || actual < filter.lt;
+}
 
 type OrderBy = Record<string, string> | Record<string, string>[] | undefined;
 
@@ -243,7 +223,10 @@ const compare = (left: unknown, right: unknown): number => {
 };
 
 const sorted = <T extends Record<string, unknown>>(rows: readonly T[], orderBy: OrderBy): T[] => {
-  const clauses = orderBy === undefined ? [] : Array.isArray(orderBy) ? orderBy : [orderBy];
+  let clauses: Record<string, string>[];
+  if (orderBy === undefined) clauses = [];
+  else if (Array.isArray(orderBy)) clauses = orderBy;
+  else clauses = [orderBy];
   return [...rows].sort((left, right) => {
     for (const clause of clauses) {
       for (const [field, direction] of Object.entries(clause)) {
@@ -469,30 +452,7 @@ export class FakePrisma {
           return Promise.reject(uniqueViolation(['reminderKey', 'period']));
         }
 
-        const row: NotificationRow = {
-          id: nextId('ntf'),
-          title: String(data.title),
-          body: String(data.body),
-          category:
-            (data.category as NotificationCategory | undefined) ?? NotificationCategory.ANNONCE,
-          route: (data.route as string | null | undefined) ?? null,
-          audience: (data.audience as NotificationAudience | undefined) ?? NotificationAudience.ALL,
-          audienceRole: (data.audienceRole as Role | null | undefined) ?? null,
-          audienceDepartementId: (data.audienceDepartementId as string | null | undefined) ?? null,
-          audienceUserIds: (data.audienceUserIds as string[] | undefined) ?? [],
-          status: (data.status as NotificationStatus | undefined) ?? NotificationStatus.SENT,
-          scheduledFor: (data.scheduledFor as Date | null | undefined) ?? null,
-          sentAt: null,
-          cancelledAt: null,
-          transportStatus: null,
-          templateId: (data.templateId as string | null | undefined) ?? null,
-          createdById: (data.createdById as string | null | undefined) ?? null,
-          reminderKey,
-          period,
-          createdAt: this.clock(),
-          updatedAt: this.clock(),
-          dispatchClaim: (data.dispatchClaim as string | null | undefined) ?? null,
-        };
+        const row = this.buildNotification(data);
 
         const nested = data.deliveries as
           | { createMany?: { data: Record<string, unknown>[] }; create?: Record<string, unknown>[] }
@@ -501,22 +461,7 @@ export class FakePrisma {
 
         const prepared: DeliveryRow[] = [];
         for (const seed of seeds) {
-          const delivery: DeliveryRow = {
-            id: nextId('dlv'),
-            notificationId: row.id,
-            userId: String(seed.userId),
-            status:
-              (seed.status as NotificationDeliveryStatus | undefined) ??
-              NotificationDeliveryStatus.PENDING,
-            error: null,
-            sentAt: null,
-            deliveredAt: null,
-            readAt: null,
-            failedAt: null,
-            reminderKey: (seed.reminderKey as string | null | undefined) ?? null,
-            period: (seed.period as string | null | undefined) ?? null,
-            createdAt: new Date(),
-          };
+          const delivery = this.buildDelivery(row.id, seed);
 
           const clash =
             delivery.reminderKey !== null &&
@@ -798,6 +743,9 @@ export const countingPrisma = (db: FakePrisma): { prisma: PrismaService; calls: 
 export class FakeActivity {
   readonly items: SupervisionActivityRowDto[] = [];
   readonly teleconseillers: SupervisionTeleconseillerDto[] = [];
+  readonly prospectsByTeleconseiller: { id: string | null; label: string; prospects: number }[] =
+    [];
+  readonly prospectsByRepresentant: { id: string | null; label: string; prospects: number }[] = [];
   readonly windows: { from: string | undefined; to: string | undefined }[] = [];
 
   addRow(row: Partial<SupervisionActivityRowDto> & { teleconseillerId: string }): void {
@@ -836,6 +784,8 @@ export class FakeActivity {
       granularity: SupervisionGranularity.DAY,
       items: this.items,
       teleconseillers: this.teleconseillers,
+      prospectsByTeleconseiller: this.prospectsByTeleconseiller,
+      prospectsByRepresentant: this.prospectsByRepresentant,
     });
   }
 

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers/app_providers.dart';
 import '../../../data/repositories/write_repository.dart';
+import '../../../ui/widgets/cpi_kit.dart';
 
 Future<bool> confirmDiscard({
   required BuildContext context,
@@ -13,22 +14,12 @@ Future<bool> confirmDiscard({
       .read(writeRepositoryProvider)
       .previewDiscard(seq);
   if (!context.mounted) return false;
-  final bool? ok = await showDialog<bool>(
-    context: context,
-    builder: (BuildContext context) => AlertDialog(
-      title: const Text('Abandonner cet envoi ?'),
-      content: Text(discardWarning(preview)),
-      actions: <Widget>[
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Annuler'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(true),
-          child: const Text('Supprimer'),
-        ),
-      ],
-    ),
+  final bool? ok = await cpiConfirm(
+    context,
+    title: 'Abandonner cet envoi ?',
+    message: discardWarning(preview),
+    confirmLabel: 'Supprimer',
+    danger: true,
   );
   return ok == true;
 }

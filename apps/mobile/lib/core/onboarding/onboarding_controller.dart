@@ -14,8 +14,14 @@ class OnboardingController extends Notifier<bool> {
   bool build() =>
       ref.read(sharedPreferencesProvider).getBool(_completedKey) ?? false;
 
+  /// Le sas s'ouvre même si le réglage ne s'écrit pas : un stockage en panne ne
+  /// doit pas enfermer le téléphone sur l'écran de bienvenue. L'échec remonte
+  /// quand même, pour que l'écran le dise.
   Future<void> complete() async {
-    await ref.read(sharedPreferencesProvider).setBool(_completedKey, true);
-    state = true;
+    try {
+      await ref.read(sharedPreferencesProvider).setBool(_completedKey, true);
+    } finally {
+      state = true;
+    }
   }
 }

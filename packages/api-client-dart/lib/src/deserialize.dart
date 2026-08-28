@@ -82,6 +82,9 @@ import 'package:crm_api_client/src/model/departement_yield_dto.dart';
 import 'package:crm_api_client/src/model/departement_yield_list_dto.dart';
 import 'package:crm_api_client/src/model/directory_entry_dto.dart';
 import 'package:crm_api_client/src/model/directory_page_dto.dart';
+import 'package:crm_api_client/src/model/disposition_presentation_dto.dart';
+import 'package:crm_api_client/src/model/disposition_response_dto.dart';
+import 'package:crm_api_client/src/model/disposition_widget_dto.dart';
 import 'package:crm_api_client/src/model/enrollment_method_count_dto.dart';
 import 'package:crm_api_client/src/model/enrollment_method_list_dto.dart';
 import 'package:crm_api_client/src/model/funnel_stage_dto.dart';
@@ -170,13 +173,17 @@ import 'package:crm_api_client/src/model/segment_list_dto.dart';
 import 'package:crm_api_client/src/model/set_active_dto.dart';
 import 'package:crm_api_client/src/model/set_bank_case_stage_active_dto.dart';
 import 'package:crm_api_client/src/model/set_call_outcome_reason_active_dto.dart';
+import 'package:crm_api_client/src/model/set_visite_import_change_selection_dto.dart';
 import 'package:crm_api_client/src/model/set_visite_referentiel_active_dto.dart';
+import 'package:crm_api_client/src/model/stats_layout_dto.dart';
+import 'package:crm_api_client/src/model/stats_layout_widget_dto.dart';
 import 'package:crm_api_client/src/model/suggestion_dto.dart';
 import 'package:crm_api_client/src/model/suggestion_list_dto.dart';
 import 'package:crm_api_client/src/model/supervised_user_dto.dart';
 import 'package:crm_api_client/src/model/supervision_activity_dto.dart';
 import 'package:crm_api_client/src/model/supervision_activity_row_dto.dart';
 import 'package:crm_api_client/src/model/supervision_dto.dart';
+import 'package:crm_api_client/src/model/supervision_histogram_bar_dto.dart';
 import 'package:crm_api_client/src/model/supervision_teleconseiller_dto.dart';
 import 'package:crm_api_client/src/model/switch_workspace_dto.dart';
 import 'package:crm_api_client/src/model/sync_call_campaign_dto.dart';
@@ -189,6 +196,8 @@ import 'package:crm_api_client/src/model/sync_operation_result_dto.dart';
 import 'package:crm_api_client/src/model/sync_pull_response_dto.dart';
 import 'package:crm_api_client/src/model/sync_push_dto.dart';
 import 'package:crm_api_client/src/model/sync_push_response_dto.dart';
+import 'package:crm_api_client/src/model/sync_rep_call_campaign_dto.dart';
+import 'package:crm_api_client/src/model/sync_rep_call_task_dto.dart';
 import 'package:crm_api_client/src/model/sync_visite_dto.dart';
 import 'package:crm_api_client/src/model/sync_visite_referentiel_dto.dart';
 import 'package:crm_api_client/src/model/syndicat_dto.dart';
@@ -203,6 +212,7 @@ import 'package:crm_api_client/src/model/update_banque_dto.dart';
 import 'package:crm_api_client/src/model/update_call_outcome_reason_dto.dart';
 import 'package:crm_api_client/src/model/update_canal_provenance_dto.dart';
 import 'package:crm_api_client/src/model/update_departement_dto.dart';
+import 'package:crm_api_client/src/model/update_disposition_dto.dart';
 import 'package:crm_api_client/src/model/update_grand_public_consent_dto.dart';
 import 'package:crm_api_client/src/model/update_income_band_dto.dart';
 import 'package:crm_api_client/src/model/update_notification_template_dto.dart';
@@ -210,6 +220,7 @@ import 'package:crm_api_client/src/model/update_offer_dto.dart';
 import 'package:crm_api_client/src/model/update_profession_dto.dart';
 import 'package:crm_api_client/src/model/update_prospect_dto.dart';
 import 'package:crm_api_client/src/model/update_representant_dto.dart';
+import 'package:crm_api_client/src/model/update_stats_layout_dto.dart';
 import 'package:crm_api_client/src/model/update_suggestion_status_dto.dart';
 import 'package:crm_api_client/src/model/update_syndicat_dto.dart';
 import 'package:crm_api_client/src/model/update_user_dto.dart';
@@ -218,14 +229,26 @@ import 'package:crm_api_client/src/model/update_visite_referentiel_dto.dart';
 import 'package:crm_api_client/src/model/user_dto.dart';
 import 'package:crm_api_client/src/model/user_list_dto.dart';
 import 'package:crm_api_client/src/model/visite_dto.dart';
+import 'package:crm_api_client/src/model/visite_import_change_dto.dart';
+import 'package:crm_api_client/src/model/visite_import_change_field_dto.dart';
+import 'package:crm_api_client/src/model/visite_import_change_list_dto.dart';
 import 'package:crm_api_client/src/model/visite_list_dto.dart';
 import 'package:crm_api_client/src/model/visite_referentiel_dto.dart';
 import 'package:crm_api_client/src/model/visite_referentiel_list_dto.dart';
 import 'package:crm_api_client/src/model/visite_referentiel_ref_dto.dart';
+import 'package:crm_api_client/src/model/visite_referentiel_usage_dto.dart';
+import 'package:crm_api_client/src/model/visite_referentiel_usage_entry_dto.dart';
 import 'package:crm_api_client/src/model/visite_referentiels_bundle_dto.dart';
+import 'package:crm_api_client/src/model/visite_stat_agent_dto.dart';
 import 'package:crm_api_client/src/model/visite_stat_bucket_dto.dart';
+import 'package:crm_api_client/src/model/visite_stat_croisement_dto.dart';
+import 'package:crm_api_client/src/model/visite_stat_heure_dto.dart';
+import 'package:crm_api_client/src/model/visite_stat_heure_jour_semaine_dto.dart';
 import 'package:crm_api_client/src/model/visite_stat_jour_dto.dart';
+import 'package:crm_api_client/src/model/visite_stat_jour_semaine_dto.dart';
 import 'package:crm_api_client/src/model/visite_stat_mois_dto.dart';
+import 'package:crm_api_client/src/model/visite_stat_recurrent_dto.dart';
+import 'package:crm_api_client/src/model/visite_stat_saisie_dto.dart';
 import 'package:crm_api_client/src/model/visite_stats_dto.dart';
 import 'package:crm_api_client/src/model/weekly_cohort_dto.dart';
 import 'package:crm_api_client/src/model/weekly_cohort_list_dto.dart';
@@ -482,6 +505,10 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'CreateVisiteReferentielDto':
       return CreateVisiteReferentielDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'DashboardMarque':
+    case 'DashboardPreset':
+    case 'DashboardSource':
+    case 'DashboardTaille':
     case 'DataQualityDto':
       return DataQualityDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -514,6 +541,15 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'DirectoryPageDto':
       return DirectoryPageDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'DispositionPresentationDto':
+      return DispositionPresentationDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'DispositionResponseDto':
+      return DispositionResponseDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'DispositionWidgetDto':
+      return DispositionWidgetDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'EnrollmentMethod':
     case 'EnrollmentMethodCountDto':
@@ -800,12 +836,24 @@ ReturnType deserialize<ReturnType, BaseType>(
             value as Map<String, dynamic>,
           )
           as ReturnType;
+    case 'SetVisiteImportChangeSelectionDto':
+      return SetVisiteImportChangeSelectionDto.fromJson(
+            value as Map<String, dynamic>,
+          )
+          as ReturnType;
     case 'SetVisiteReferentielActiveDto':
       return SetVisiteReferentielActiveDto.fromJson(
             value as Map<String, dynamic>,
           )
           as ReturnType;
     case 'SortOrder':
+    case 'StatsLayoutDto':
+      return StatsLayoutDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'StatsLayoutScreen':
+    case 'StatsLayoutWidgetDto':
+      return StatsLayoutWidgetDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'SuggestionDto':
       return SuggestionDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -826,6 +874,9 @@ ReturnType deserialize<ReturnType, BaseType>(
       return SupervisionDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'SupervisionGranularity':
+    case 'SupervisionHistogramBarDto':
+      return SupervisionHistogramBarDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'SupervisionTeleconseillerDto':
       return SupervisionTeleconseillerDto.fromJson(
             value as Map<String, dynamic>,
@@ -865,6 +916,12 @@ ReturnType deserialize<ReturnType, BaseType>(
       return SyncPushDto.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'SyncPushResponseDto':
       return SyncPushResponseDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'SyncRepCallCampaignDto':
+      return SyncRepCallCampaignDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'SyncRepCallTaskDto':
+      return SyncRepCallTaskDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'SyncVisiteDto':
       return SyncVisiteDto.fromJson(value as Map<String, dynamic>)
@@ -908,6 +965,9 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'UpdateDepartementDto':
       return UpdateDepartementDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'UpdateDispositionDto':
+      return UpdateDispositionDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'UpdateGrandPublicConsentDto':
       return UpdateGrandPublicConsentDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -931,6 +991,9 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'UpdateRepresentantDto':
       return UpdateRepresentantDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'UpdateStatsLayoutDto':
+      return UpdateStatsLayoutDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'UpdateSuggestionStatusDto':
       return UpdateSuggestionStatusDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -952,6 +1015,16 @@ ReturnType deserialize<ReturnType, BaseType>(
       return UserListDto.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'VisiteDto':
       return VisiteDto.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'VisiteImportChangeDto':
+      return VisiteImportChangeDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'VisiteImportChangeFieldDto':
+      return VisiteImportChangeFieldDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'VisiteImportChangeKind':
+    case 'VisiteImportChangeListDto':
+      return VisiteImportChangeListDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'VisiteListDto':
       return VisiteListDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -965,17 +1038,49 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'VisiteReferentielRefDto':
       return VisiteReferentielRefDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'VisiteReferentielUsageDto':
+      return VisiteReferentielUsageDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'VisiteReferentielUsageEntryDto':
+      return VisiteReferentielUsageEntryDto.fromJson(
+            value as Map<String, dynamic>,
+          )
+          as ReturnType;
     case 'VisiteReferentielsBundleDto':
       return VisiteReferentielsBundleDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'VisiteSortField':
+    case 'VisiteStatAgentDto':
+      return VisiteStatAgentDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'VisiteStatBucketDto':
       return VisiteStatBucketDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'VisiteStatCroisementDto':
+      return VisiteStatCroisementDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'VisiteStatHeureDto':
+      return VisiteStatHeureDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'VisiteStatHeureJourSemaineDto':
+      return VisiteStatHeureJourSemaineDto.fromJson(
+            value as Map<String, dynamic>,
+          )
+          as ReturnType;
     case 'VisiteStatJourDto':
       return VisiteStatJourDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'VisiteStatJourSemaineDto':
+      return VisiteStatJourSemaineDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'VisiteStatMoisDto':
       return VisiteStatMoisDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'VisiteStatRecurrentDto':
+      return VisiteStatRecurrentDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'VisiteStatSaisieDto':
+      return VisiteStatSaisieDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'VisiteStatsDto':
       return VisiteStatsDto.fromJson(value as Map<String, dynamic>)

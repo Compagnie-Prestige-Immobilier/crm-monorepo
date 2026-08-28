@@ -33,7 +33,7 @@ void main() {
     await tester.pump();
   }
 
-  // « Bloqué par le représentant » fait 27 caractères dans un Row en
+  // « À corriger » fait 27 caractères dans un Row en
   // MainAxisSize.min : le seul débordement réel du dépôt Flutter.
   testWidgets('le plus long libellé ne déborde pas, même à 1,76x', (
     WidgetTester tester,
@@ -54,9 +54,7 @@ void main() {
     await monte(tester, const SyncStatusIcon(status: SyncStatus.blocked));
 
     expect(
-      find.bySemanticsLabel(
-        'État de synchronisation : Bloqué par le représentant',
-      ),
+      find.bySemanticsLabel('État de synchronisation : À corriger'),
       findsOneWidget,
     );
 
@@ -69,7 +67,7 @@ void main() {
 
     // Le libellé est déjà écrit et la puce porte sa propre étiquette : une
     // seconde sur l'icône ferait annoncer l'état deux fois de suite.
-    expect(find.text('Bloqué par le représentant'), findsOneWidget);
+    expect(find.text('À corriger'), findsOneWidget);
     expect(
       tester.widget<SyncStatusIcon>(find.byType(SyncStatusIcon)).labelled,
       isFalse,

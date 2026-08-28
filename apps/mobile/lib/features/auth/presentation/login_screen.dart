@@ -3,11 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:forui/forui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/providers/app_providers.dart';
-import '../../../core/theme/cpi_colors.dart';
+import '../../../core/providers/connectivity.dart';
 import '../../../core/theme/cpi_tokens.dart';
+import '../../../ui/widgets/cpi_action_bar.dart';
+import '../../../ui/widgets/cpi_kit.dart';
 import '../auth_state.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -50,252 +53,206 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final AuthState auth = ref.watch(authControllerProvider);
+    final bool offline =
+        ref.watch(connectivityProvider) != CpiConnectivity.online;
     final ThemeData theme = Theme.of(context);
-    final CpiColors cpi = context.cpi;
-    // Le bordeaux était écrit en dur : sous la coque CHUES, noire et bleue,
-    // l'écran de connexion rendait quand même un fond CPI.
-    final Color brand = theme.colorScheme.primary;
+    final bool dark = theme.brightness == Brightness.dark;
+    final String? error = auth.errorMessage;
 
-    final TextStyle errorStyle =
-        (theme.textTheme.bodyMedium ?? const TextStyle()).copyWith(
-          color: theme.colorScheme.error,
-          fontWeight: FontWeight.w600,
-        );
-    final OutlineInputBorder errorBorder = OutlineInputBorder(
-      borderRadius: CpiRadius.brMd,
-      borderSide: BorderSide(color: theme.colorScheme.error, width: 2),
-    );
+    // Un seul compte rendu à la fois : l'échec du dernier envoi prime sur la
+    // note de réseau, qui n'en serait que la cause probable.
+    final Widget? banner = switch ((error, offline)) {
+      (final String message, _) => CpiStatusBand(
+        text: message,
+        tone: CpiTone.danger,
+      ),
+      (null, true) => const CpiStatusBand(
+        text: 'Pas de réseau. Il en faut pour la première connexion.',
+        tone: CpiTone.warning,
+      ),
+      _ => null,
+    };
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
+      // L'écran n'est plus peint en marque : les icônes système doivent
+      // contraster avec la surface neutre, claire ou sombre (WCAG 1.4.11).
       value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        statusBarBrightness: Brightness.dark,
-        systemNavigationBarColor: brand,
-        systemNavigationBarIconBrightness: Brightness.light,
+        statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: dark ? Brightness.dark : Brightness.light,
+        systemNavigationBarColor: theme.colorScheme.surface,
+        systemNavigationBarIconBrightness: dark
+            ? Brightness.light
+            : Brightness.dark,
       ),
-      child: Scaffold(
-        backgroundColor: brand,
-        body: DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: cpiBrandGradient(brand),
-            ),
+      child: CpiScaffold(
+        title: 'Connexion',
+        showTitle: false,
+        banner: banner,
+        footer: CpiActionBar(
+          child: CpiButton(
+            'Se connecter',
+            loading: auth.isSubmitting,
+            onPressed: () => unawaited(_submit()),
           ),
-          child: SafeArea(
-            child: LayoutBuilder(
-              builder: (BuildContext context, BoxConstraints constraints) {
-                return SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: CpiSpacing.xl,
-                    vertical: CpiSpacing.xxl,
+        ),
+        body: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) =>
+              SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(
+                  CpiSpacing.md,
+                  CpiSpacing.lg,
+                  CpiSpacing.md,
+                  CpiSpacing.xl,
+                ),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: constraints.maxHeight - CpiSpacing.huge,
                   ),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: constraints.maxHeight - CpiSpacing.giant,
-                    ),
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 480),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: <Widget>[
-                            Center(
-                              child: Image.asset(
-                                'assets/brand/cpi-header.png',
-                                width: 196,
-                                height: 80,
-                                cacheWidth: 392,
-                                fit: BoxFit.contain,
-                                filterQuality: FilterQuality.medium,
-                                semanticLabel: 'CPI',
-                              ),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 480),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: <Widget>[
+                          Center(
+                            child: Image.asset(
+                              // Le logo couleur est sur fond blanc opaque :
+                              // sur la surface sombre il ferait une plaque.
+                              // Le fichier d'en-tête est le même dessin
+                              // détouré, en blanc.
+                              dark
+                                  ? 'assets/brand/cpi-header.png'
+                                  : 'assets/brand/cpi-logo.png',
+                              width: 120,
+                              cacheWidth: 240,
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.medium,
+                              semanticLabel: 'CPI',
                             ),
-                            const SizedBox(height: CpiSpacing.xs),
-                            Text(
+                          ),
+                          const SizedBox(height: CpiSpacing.lg),
+                          Semantics(
+                            header: true,
+                            child: Text(
                               'CPI GO',
                               textAlign: TextAlign.center,
-                              style: theme.textTheme.headlineSmall?.copyWith(
-                                color: cpi.navForeground,
-                                fontWeight: FontWeight.w800,
-                              ),
+                              style: theme.textTheme.titleLarge,
                             ),
-                            const SizedBox(height: CpiSpacing.xs),
-                            Text(
-                              'Accédez à vos espaces de travail',
-                              textAlign: TextAlign.center,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: cpi.navForeground.withValues(
-                                  alpha: 0.82,
-                                ),
-                              ),
+                          ),
+                          const SizedBox(height: CpiSpacing.xxs),
+                          Text(
+                            'Connectez-vous pour commencer',
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
                             ),
-                            const SizedBox(height: CpiSpacing.xl),
-
-                            Card(
-                              color: theme.colorScheme.surface,
-                              child: Padding(
-                                padding: const EdgeInsets.all(CpiSpacing.xl),
-                                child: Form(
-                                  key: _formKey,
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: <Widget>[
-                                      const _FieldLabel(text: 'Identifiant'),
-                                      const SizedBox(height: CpiSpacing.xs),
-                                      TextFormField(
-                                        controller: _identifier,
-                                        autofillHints: const <String>[
-                                          AutofillHints.username,
-                                        ],
-                                        textInputAction: TextInputAction.next,
-                                        keyboardType: TextInputType.text,
-                                        autocorrect: false,
-                                        enableSuggestions: false,
-                                        textCapitalization:
-                                            TextCapitalization.none,
-                                        style: theme.textTheme.bodyLarge,
-                                        decoration: InputDecoration(
-                                          hintText: 'nom.prenom ou e-mail',
-                                          prefixIcon: const Icon(
-                                            PhosphorIconsRegular.user,
-                                          ),
-                                          fillColor: cpi.inputBackground,
-                                          errorStyle: errorStyle,
-                                          errorBorder: errorBorder,
-                                          focusedErrorBorder: errorBorder,
-                                        ),
-                                        validator: (String? value) =>
-                                            (value == null ||
-                                                value.trim().isEmpty)
-                                            ? 'Saisissez l\'identifiant.'
-                                            : null,
-                                        onFieldSubmitted: (_) =>
-                                            _passwordFocus.requestFocus(),
-                                      ),
-                                      const SizedBox(height: CpiSpacing.md),
-
-                                      const _FieldLabel(text: 'Mot de passe'),
-                                      const SizedBox(height: CpiSpacing.xs),
-                                      TextFormField(
-                                        controller: _password,
-                                        focusNode: _passwordFocus,
-                                        autofillHints: const <String>[
-                                          AutofillHints.password,
-                                        ],
-                                        obscureText: _obscure,
-                                        textInputAction: TextInputAction.done,
-                                        style: theme.textTheme.bodyLarge,
-                                        decoration: InputDecoration(
-                                          hintText: '••••••••',
-                                          prefixIcon: const Icon(
-                                            PhosphorIconsRegular.lockKey,
-                                          ),
-                                          fillColor: cpi.inputBackground,
-                                          suffixIcon: IconButton(
-                                            onPressed: () => setState(
-                                              () => _obscure = !_obscure,
-                                            ),
-                                            tooltip: _obscure
-                                                ? 'Afficher le mot de passe'
-                                                : 'Masquer le mot de passe',
-                                            icon: Icon(
-                                              _obscure
-                                                  ? PhosphorIconsRegular.eye
-                                                  : PhosphorIconsRegular
-                                                        .eyeSlash,
-                                            ),
-                                          ),
-                                          errorStyle: errorStyle,
-                                          errorBorder: errorBorder,
-                                          focusedErrorBorder: errorBorder,
-                                        ),
-                                        validator: (String? value) =>
-                                            (value == null || value.isEmpty)
-                                            ? 'Saisissez le mot de passe.'
-                                            : null,
-                                        onFieldSubmitted: (_) =>
-                                            unawaited(_submit()),
-                                      ),
-
-                                      const SizedBox(height: CpiSpacing.xs),
-                                      _StaySignedInToggle(
-                                        value: _staySignedIn,
-                                        onChanged: (bool value) => setState(
-                                          () => _staySignedIn = value,
-                                        ),
-                                      ),
-
-                                      if (auth.errorMessage !=
-                                          null) ...<Widget>[
-                                        const SizedBox(height: CpiSpacing.md),
-                                        _ErrorBanner(
-                                          message: auth.errorMessage!,
-                                        ),
-                                      ],
-
-                                      const SizedBox(height: CpiSpacing.xl),
-                                      FilledButton(
-                                        onPressed: auth.isSubmitting
-                                            ? null
-                                            : _submit,
-                                        style: FilledButton.styleFrom(
-                                          backgroundColor: cpi.accent,
-                                          foregroundColor: cpi.accentForeground,
-                                          disabledBackgroundColor: cpi.accent
-                                              .withValues(
-                                                alpha: CpiStateOpacity
-                                                    .disabledContainer,
-                                              ),
-                                          disabledForegroundColor:
-                                              cpi.navForeground,
-                                        ),
-                                        child: auth.isSubmitting
-                                            ? SizedBox(
-                                                height: 20,
-                                                width: 20,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                      strokeWidth: 2.5,
-                                                      color:
-                                                          cpi.accentForeground,
-                                                    ),
-                                              )
-                                            : const Text('Se connecter'),
-                                      ),
-                                    ],
+                          ),
+                          const SizedBox(height: CpiSpacing.xxl),
+                          Form(
+                            key: _formKey,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: <Widget>[
+                                FTextFormField(
+                                  control: FTextFieldControl.managed(
+                                    controller: _identifier,
                                   ),
+                                  label: const Text('Identifiant'),
+                                  hint: 'Votre identifiant',
+                                  autofillHints: const <String>[
+                                    AutofillHints.username,
+                                  ],
+                                  textInputAction: TextInputAction.next,
+                                  keyboardType: TextInputType.text,
+                                  autocorrect: false,
+                                  enableSuggestions: false,
+                                  validator: (String? value) =>
+                                      (value == null || value.trim().isEmpty)
+                                      ? 'Écrivez votre identifiant.'
+                                      : null,
+                                  onSubmit: (_) =>
+                                      _passwordFocus.requestFocus(),
                                 ),
-                              ),
+                                const SizedBox(height: CpiSpacing.md),
+                                FTextFormField(
+                                  control: FTextFieldControl.managed(
+                                    controller: _password,
+                                  ),
+                                  focusNode: _passwordFocus,
+                                  label: const Text('Mot de passe'),
+                                  hint: '••••••••',
+                                  autofillHints: const <String>[
+                                    AutofillHints.password,
+                                  ],
+                                  obscureText: _obscure,
+                                  textInputAction: TextInputAction.done,
+                                  suffixBuilder:
+                                      (
+                                        BuildContext _,
+                                        FTextFieldStyle _,
+                                        Set<FTextFieldVariant> _,
+                                      ) => _ObscureToggle(
+                                        obscured: _obscure,
+                                        onPress: () => setState(
+                                          () => _obscure = !_obscure,
+                                        ),
+                                      ),
+                                  validator: (String? value) =>
+                                      (value == null || value.isEmpty)
+                                      ? 'Écrivez votre mot de passe.'
+                                      : null,
+                                  onSubmit: (_) => unawaited(_submit()),
+                                ),
+                                const SizedBox(height: CpiSpacing.xs),
+                                _StaySignedInToggle(
+                                  value: _staySignedIn,
+                                  onChanged: (bool value) =>
+                                      setState(() => _staySignedIn = value),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                );
-              },
-            ),
-          ),
+                ),
+              ),
         ),
       ),
     );
   }
 }
 
-class _FieldLabel extends StatelessWidget {
-  const _FieldLabel({required this.text});
+/// Œil de révélation du mot de passe, posé dans le champ ForUI.
+class _ObscureToggle extends StatelessWidget {
+  const _ObscureToggle({required this.obscured, required this.onPress});
 
-  final String text;
+  final bool obscured;
+  final VoidCallback onPress;
 
   @override
-  Widget build(BuildContext context) {
-    return Text(text, style: Theme.of(context).textTheme.labelLarge);
-  }
+  Widget build(BuildContext context) => Semantics(
+    label: obscured ? 'Afficher le mot de passe' : 'Masquer le mot de passe',
+    button: true,
+    excludeSemantics: true,
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(
+        minWidth: kCpiMinTouchTarget,
+        minHeight: kCpiMinTouchTarget,
+      ),
+      child: FButton.icon(
+        variant: FButtonVariant.ghost,
+        onPress: onPress,
+        child: Icon(
+          obscured ? PhosphorIconsRegular.eye : PhosphorIconsRegular.eyeSlash,
+          size: CpiIconSize.md,
+        ),
+      ),
+    ),
+  );
 }
 
 class _StaySignedInToggle extends StatelessWidget {
@@ -306,81 +263,12 @@ class _StaySignedInToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final CpiColors cpi = context.cpi;
-    return InkWell(
-      onTap: () => onChanged(!value),
-      borderRadius: CpiRadius.brSm,
-      child: Container(
-        constraints: const BoxConstraints(minHeight: kCpiMinTouchTarget),
-        padding: const EdgeInsets.symmetric(vertical: CpiSpacing.xs),
-        child: Row(
-          children: <Widget>[
-            SizedBox.square(
-              dimension: 24,
-              child: Checkbox(
-                value: value,
-                onChanged: (bool? v) => onChanged(v ?? false),
-                side: BorderSide(
-                  color: Theme.of(context).colorScheme.outline,
-                  width: 2,
-                ),
-                fillColor: WidgetStateProperty.resolveWith<Color>((
-                  Set<WidgetState> states,
-                ) {
-                  return states.contains(WidgetState.selected)
-                      ? cpi.accent
-                      : Colors.transparent;
-                }),
-                checkColor: cpi.accentForeground,
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-            ),
-            const SizedBox(width: CpiSpacing.sm),
-            Expanded(
-              child: Text(
-                'Rester connecté sur cet appareil',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ErrorBanner extends StatelessWidget {
-  const _ErrorBanner({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(CpiSpacing.sm),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.errorContainer,
-        borderRadius: CpiRadius.brMd,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Icon(
-            PhosphorIconsRegular.warningCircle,
-            size: CpiIconSize.sm,
-            color: theme.colorScheme.onErrorContainer,
-          ),
-          const SizedBox(width: CpiSpacing.xs),
-          Expanded(
-            child: Text(
-              message,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onErrorContainer,
-              ),
-            ),
-          ),
-        ],
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: kCpiMinTouchTarget),
+      child: FCheckbox(
+        value: value,
+        onChange: onChanged,
+        label: const Text('Rester connecté sur cet appareil'),
       ),
     );
   }

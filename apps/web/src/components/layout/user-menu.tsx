@@ -21,6 +21,9 @@ import { ROLE_LABELS, type SessionUser } from '@/lib/types';
 export function UserMenu({ user }: { user: SessionUser }) {
   const router = useRouter();
   const [pending, setPending] = useState<'workspace' | 'logout' | null>(null);
+  let workspaceLabel = 'Ouvrir l’espace démo';
+  if (user.workspace === 'demo') workspaceLabel = 'Quitter l’espace démo';
+  if (pending === 'workspace') workspaceLabel = 'Changement d’espace…';
 
   async function switchWorkspace(): Promise<void> {
     setPending('workspace');
@@ -93,11 +96,7 @@ export function UserMenu({ user }: { user: SessionUser }) {
           }}
         >
           <FlaskConicalIcon aria-hidden="true" />
-          {pending === 'workspace'
-            ? 'Changement d’espace…'
-            : user.workspace === 'demo'
-              ? 'Quitter l’espace démo'
-              : 'Ouvrir l’espace démo'}
+          {workspaceLabel}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem

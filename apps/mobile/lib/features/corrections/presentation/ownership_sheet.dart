@@ -2,16 +2,17 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:forui/forui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/providers/app_providers.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/router/single_push.dart';
 import '../../../core/sync/api_port.dart';
-import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../data/local/database.dart';
 import '../../../data/repositories/write_repository.dart';
+import '../../../ui/widgets/cpi_kit.dart';
 import 'discard_confirmation.dart';
 
 Future<void> showOwnershipSheet({
@@ -19,10 +20,9 @@ Future<void> showOwnershipSheet({
   required OutboxData row,
   required RepresentantLookup lookup,
 }) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
+  return showCpiSheet<void>(
+    context,
+    title: 'Numéro déjà enregistré',
     builder: (BuildContext context) =>
         _OwnershipSheet(row: row, lookup: lookup),
   );
@@ -40,6 +40,7 @@ class _OwnershipSheet extends ConsumerStatefulWidget {
 
 class _OwnershipSheetState extends ConsumerState<_OwnershipSheet> {
   bool _busy = false;
+  String? _refus;
 
   OutboxData get row => widget.row;
   RepresentantLookup get lookup => widget.lookup;
@@ -47,84 +48,54 @@ class _OwnershipSheetState extends ConsumerState<_OwnershipSheet> {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    final CpiColors cpi = context.cpi;
     final String owner =
         lookup.ownedByCommercialName ?? 'un autre téléconseiller';
     final String? departement = lookup.representant?.departementName;
     final String where = departement == null ? '' : ' ($departement)';
 
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          CpiSpacing.md,
-          0,
-          CpiSpacing.md,
-          CpiSpacing.md,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Text(
+          'Ce numéro est déjà enregistré par $owner$where.',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Row(
-              children: <Widget>[
-                Icon(
-                  PhosphorIconsRegular.userCircle,
-                  size: CpiIconSize.lg,
-                  color: cpi.accentText,
-                ),
-                const SizedBox(width: CpiSpacing.xs),
-                Expanded(
-                  child: Text(
-                    'Numéro déjà enregistré',
-                    style: theme.textTheme.titleMedium,
-                  ),
-                ),
-              ],
+        if (_refus != null) ...<Widget>[
+          const SizedBox(height: CpiSpacing.md),
+          Semantics(
+            liveRegion: true,
+            child: FAlert(
+              variant: FAlertVariant.destructive,
+              icon: const Icon(PhosphorIconsRegular.warningCircle),
+              title: Text(_refus!),
             ),
-            const SizedBox(height: CpiSpacing.xs),
-            Text(
-              'Ce numéro est déjà enregistré par $owner$where.',
-              style: theme.textTheme.bodyMedium,
-            ),
-            const SizedBox(height: CpiSpacing.lg),
-            FilledButton.icon(
-              onPressed: _busy ? null : () => unawaited(_attach()),
-              icon: _busy
-                  ? const SizedBox.square(
-                      dimension: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(
-                      PhosphorIconsRegular.linkSimple,
-                      size: CpiIconSize.md,
-                    ),
-              label: const Text('Rattacher mes prospects'),
-            ),
-            const SizedBox(height: CpiSpacing.xs),
-            OutlinedButton.icon(
-              onPressed: _busy ? null : _correct,
-              icon: const Icon(
-                PhosphorIconsRegular.pencilSimple,
-                size: CpiIconSize.md,
-              ),
-              label: const Text('Corriger le numéro'),
-            ),
-            const SizedBox(height: CpiSpacing.xs),
-            TextButton.icon(
-              onPressed: _busy ? null : () => unawaited(_discard()),
-              icon: Icon(
-                PhosphorIconsRegular.trash,
-                size: CpiIconSize.md,
-                color: cpi.syncFailed,
-              ),
-              label: Text(
-                'Supprimer cette saisie',
-                style: TextStyle(color: cpi.syncFailed),
-              ),
-            ),
-          ],
+          ),
+        ],
+        const SizedBox(height: CpiSpacing.lg),
+        CpiButton(
+          'Rattacher mes prospects',
+          icon: PhosphorIconsRegular.linkSimple,
+          loading: _busy,
+          onPressed: () => unawaited(_attach()),
         ),
-      ),
+        const SizedBox(height: CpiSpacing.xs),
+        CpiButton(
+          'Corriger le numéro',
+          variant: CpiButtonVariant.secondary,
+          icon: PhosphorIconsRegular.pencilSimple,
+          onPressed: _busy ? null : _correct,
+        ),
+        const SizedBox(height: CpiSpacing.xs),
+        CpiButton(
+          'Supprimer cette saisie',
+          variant: CpiButtonVariant.danger,
+          icon: PhosphorIconsRegular.trash,
+          onPressed: _busy ? null : () => unawaited(_discard()),
+        ),
+      ],
     );
   }
 
@@ -135,6 +106,10 @@ class _OwnershipSheetState extends ConsumerState<_OwnershipSheet> {
     );
   }
 
+  /// Le refus reste dans la feuille, à côté du bouton qui vient d'échouer : un
+  /// message posé ailleurs disparaît sous la feuille encore ouverte.
+  void _refuse(String message) => setState(() => _refus = message);
+
   Future<void> _discard() async {
     final bool ok = await confirmDiscard(
       context: context,
@@ -142,7 +117,10 @@ class _OwnershipSheetState extends ConsumerState<_OwnershipSheet> {
       seq: row.seq,
     );
     if (!ok || !mounted) return;
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _refus = null;
+    });
     final DiscardResult result;
     try {
       result = await ref
@@ -153,11 +131,7 @@ class _OwnershipSheetState extends ConsumerState<_OwnershipSheet> {
     }
     if (!mounted) return;
     if (result.outcome == DiscardOutcome.claimed) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Envoi en cours : réessayez dans quelques instants.'),
-        ),
-      );
+      _refuse('Envoi en cours : réessayez dans quelques instants.');
       return;
     }
     Navigator.of(context).pop();
@@ -166,7 +140,10 @@ class _OwnershipSheetState extends ConsumerState<_OwnershipSheet> {
   Future<void> _attach() async {
     final String? serverId = lookup.representant?.id;
     if (serverId == null) return;
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _refus = null;
+    });
     final DiscardResult result;
     try {
       await ref.read(syncEngineProvider).remapEntityId(row.entityId, serverId);
@@ -178,13 +155,9 @@ class _OwnershipSheetState extends ConsumerState<_OwnershipSheet> {
     }
     if (!mounted) return;
     if (result.outcome == DiscardOutcome.claimed) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Envoi en cours : impossible de rattacher tout de suite. '
-            'Réessayez dans quelques instants.',
-          ),
-        ),
+      _refuse(
+        'Envoi en cours : impossible de rattacher tout de suite. '
+        'Réessayez dans quelques instants.',
       );
       return;
     }

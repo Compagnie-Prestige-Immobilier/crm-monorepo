@@ -23,14 +23,20 @@ import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
 import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
 import type { FastifyReply } from 'fastify';
 import { Role } from '@crm/database';
+import { PassThrough } from 'node:stream';
+import JSZip from 'jszip';
 
 import {
   CurrentUser,
   type AuthenticatedUser,
 } from '../../common/decorators/current-user.decorator.js';
-import { Roles } from '../../common/decorators/roles.decorator.js';
-import { programmeFilename, writeProgrammePdf } from '../phase2/programme-pdf.js';
-import { REP_CHECKBOX_GROUPS, RepCampaignsService } from './rep-campaigns.service.js';
+import { PARCOURS_ROLES, Roles } from '../../common/decorators/roles.decorator.js';
+import {
+  programmeFilename,
+  writeRepProgrammePdf,
+  type RepProgrammeData,
+} from '../phase2/programme-pdf.js';
+import { RepCampaignsService } from './rep-campaigns.service.js';
 import {
   CreateRepCallAttemptDto,
   CreateRepCampaignDto,
@@ -44,6 +50,15 @@ import {
 } from './dto.js';
 
 const PDF_MIME = 'application/pdf';
+const ZIP_MIME = 'application/zip';
+
+async function renderProgramme(data: RepProgrammeData): Promise<Buffer> {
+  const sink = new PassThrough();
+  const chunks: Buffer[] = [];
+  sink.on('data', (chunk: Buffer) => chunks.push(chunk));
+  await writeRepProgrammePdf(sink, data);
+  return Buffer.concat(chunks);
+}
 
 @ApiTags('rep-campaigns')
 @ApiBearerAuth()
@@ -66,7 +81,7 @@ export class RepCampaignsController {
   }
 
   @Post('attempts')
-  @Roles(Role.COMMERCIAL, Role.ADMIN)
+  @Roles(...PARCOURS_ROLES)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     operationId: 'recordRepCallAttempt',
@@ -79,7 +94,8 @@ export class RepCampaignsController {
     status: 400,
     type: ApiErrorDto,
     description:
-      'REP_CAMPAIGN_COMMENT_REQUIRED · REP_CAMPAIGN_PROMISED_NOT_ALLOWED · PHONE_INVALID.',
+      'REP_CAMPAIGN_COMMENT_REQUIRED · REP_CAMPAIGN_PROMISED_NOT_ALLOWED · ' +
+      'REP_CAMPAIGN_CALLBACK_AT_REQUIRED · REP_CAMPAIGN_CALLBACK_AT_NOT_ALLOWED · PHONE_INVALID.',
   })
   @ApiResponse({
     status: 404,
@@ -167,7 +183,7 @@ export class RepCampaignsController {
     operationId: 'downloadRepProgrammePdf',
     summary: 'Programme d’appels représentants, imprimable.',
     description:
-      'Même maquette que le programme de prospection, seules changent les cases à cocher : le même commercial reçoit les deux liasses le même matin. AUCUN nom n’y figure, chaque ligne se rapproche de sa fiche par son code court.',
+      'A4 portrait, 25 représentants par page. Chaque ligne ne contient que le nom complet et le téléphone.',
   })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiParam({ name: 'userId', format: 'uuid' })
@@ -202,16 +218,59 @@ export class RepCampaignsController {
     reply.raw.setHeader('Cache-Control', 'no-store');
 
     try {
-      await writeProgrammePdf(reply.raw, {
+      await writeRepProgrammePdf(reply.raw, {
         ...programme,
         generatedAt,
-        title: 'Programme d’appels représentants',
-        scopeCaption: 'Périmètre',
-        checkboxGroups: REP_CHECKBOX_GROUPS,
       });
     } catch (error) {
       reply.raw.destroy(error instanceof Error ? error : new Error(String(error)));
       throw error;
     }
+  }
+
+  @Get(':id/programmes.zip')
+  @Roles(Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
+  @ApiProduces(ZIP_MIME)
+  @ApiOperation({
+    operationId: 'downloadRepProgrammesZip',
+    summary: 'Télécharge tous les programmes représentants dans une archive ZIP.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({
+    status: 200,
+    description: 'Un PDF non vide par téléconseiller et par journée.',
+    content: { [ZIP_MIME]: { schema: { type: 'string', format: 'binary' } } },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'REP_CAMPAIGN_NOT_FOUND.',
+    content: { 'application/json': { schema: { $ref: getSchemaPath(ApiErrorDto) } } },
+  })
+  async downloadProgrammes(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    const generatedAt = new Date();
+    const programmes = await this.campaigns.programmes(id);
+    const zip = new JSZip();
+    for (const programme of programmes) {
+      zip.file(programme.fileName, await renderProgramme({ ...programme.data, generatedAt }));
+    }
+
+    reply.hijack();
+    reply.raw.setHeader('Content-Type', ZIP_MIME);
+    reply.raw.setHeader(
+      'Content-Disposition',
+      `attachment; filename="programmes-representants-${id}.zip"`,
+    );
+    reply.raw.setHeader('Cache-Control', 'no-store');
+
+    await new Promise<void>((resolve, reject) => {
+      const stream = zip.generateNodeStream({ streamFiles: true, compression: 'DEFLATE' });
+      stream.on('error', reject);
+      reply.raw.on('error', reject);
+      reply.raw.on('finish', resolve);
+      stream.pipe(reply.raw);
+    });
   }
 }

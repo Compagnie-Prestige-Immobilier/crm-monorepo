@@ -351,6 +351,22 @@ export interface ProgrammePdfOptions {
   readonly compress?: boolean;
 }
 
+export interface RepProgrammeRow {
+  readonly position: number;
+  readonly fullName: string;
+  readonly phoneE164: string;
+}
+
+export interface RepProgrammeData {
+  readonly campaignName: string;
+  readonly commercialName: string;
+  readonly segmentLabel: string;
+  readonly generatedAt: Date;
+  readonly rows: readonly RepProgrammeRow[];
+  readonly dayNumber?: number;
+  readonly dayCount?: number;
+}
+
 export function writeProgrammePdf(
   out: Writable,
   data: ProgrammeData,
@@ -447,3 +463,154 @@ export function writeProgrammePdf(
 
 const capacity = (bottom: number, top: number, rowHeight: number): number =>
   Math.max(1, Math.floor((bottom - top - COLUMN_HEADER_HEIGHT) / rowHeight));
+
+const REP_ROWS_PER_PAGE = 25;
+const REP_ROW_HEIGHT = 25;
+const REP_HEADER_TOP = 92;
+const REP_NAME_LEFT = MARGIN + 42;
+const REP_PHONE_LEFT = 410;
+
+function drawRepHeader(doc: Doc, data: RepProgrammeData): void {
+  const width = doc.page.width;
+  doc.rect(0, 0, width, 80).fill(CPI_BURGUNDY);
+
+  let textLeft = MARGIN;
+  const logo = cpiLogo();
+  if (logo) {
+    doc.image(logo, MARGIN, 15, { height: 40 });
+    textLeft = 150;
+  }
+
+  doc.font('Helvetica-Bold').fontSize(18).fillColor('#ffffff');
+  doc.text('Programme représentants', textLeft, 16, {
+    width: width - textLeft - MARGIN,
+    height: 22,
+    ellipsis: true,
+  });
+
+  const day =
+    data.dayNumber === undefined || data.dayCount === undefined
+      ? ''
+      : ` · Jour ${String(data.dayNumber)} sur ${String(data.dayCount)}`;
+  doc.font('Helvetica').fontSize(10).fillColor('#f3e4e7');
+  doc.text(`${data.campaignName} · ${data.commercialName}${day}`, textLeft, 43, {
+    width: width - textLeft - MARGIN,
+    height: 13,
+    ellipsis: true,
+  });
+  doc.text(data.segmentLabel, textLeft, 58, {
+    width: width - textLeft - MARGIN,
+    height: 13,
+    ellipsis: true,
+  });
+}
+
+function drawRepColumns(doc: Doc): void {
+  const right = doc.page.width - MARGIN;
+  doc.rect(MARGIN, REP_HEADER_TOP, right - MARGIN, 24).fill('#ede7e8');
+  doc.font('Helvetica-Bold').fontSize(10).fillColor(CPI_BURGUNDY);
+  doc.text('N°', MARGIN + TEXT_PAD, REP_HEADER_TOP + 7, { lineBreak: false });
+  doc.text('Nom et prénom', REP_NAME_LEFT + TEXT_PAD, REP_HEADER_TOP + 7, {
+    lineBreak: false,
+  });
+  doc.text('Téléphone', REP_PHONE_LEFT + TEXT_PAD, REP_HEADER_TOP + 7, {
+    lineBreak: false,
+  });
+}
+
+function drawRepRow(doc: Doc, row: RepProgrammeRow, index: number): void {
+  const y = REP_HEADER_TOP + 24 + index * REP_ROW_HEIGHT;
+  const right = doc.page.width - MARGIN;
+  if (index % 2 === 1) doc.rect(MARGIN, y, right - MARGIN, REP_ROW_HEIGHT).fill(CPI_ZEBRA);
+
+  doc.lineWidth(0.5).strokeColor(CPI_RULE_GREY);
+  for (const x of [MARGIN, REP_NAME_LEFT, REP_PHONE_LEFT, right]) {
+    doc
+      .moveTo(x, y)
+      .lineTo(x, y + REP_ROW_HEIGHT)
+      .stroke();
+  }
+  doc
+    .moveTo(MARGIN, y + REP_ROW_HEIGHT)
+    .lineTo(right, y + REP_ROW_HEIGHT)
+    .stroke();
+
+  doc.font('Helvetica').fontSize(10.5).fillColor('#111111');
+  doc.text(String(row.position), MARGIN + TEXT_PAD, y + 7, { lineBreak: false });
+  doc.text(row.fullName, REP_NAME_LEFT + TEXT_PAD, y + 7, {
+    width: REP_PHONE_LEFT - REP_NAME_LEFT - 2 * TEXT_PAD,
+    height: 13,
+    ellipsis: true,
+  });
+  doc.text(
+    row.phoneE164.replace(/^(\+221)(\d{2})(\d{3})(\d{2})(\d{2})$/, '$1 $2 $3 $4 $5'),
+    REP_PHONE_LEFT + TEXT_PAD,
+    y + 7,
+    {
+      width: right - REP_PHONE_LEFT - 2 * TEXT_PAD,
+      height: 13,
+      ellipsis: true,
+    },
+  );
+}
+
+export function writeRepProgrammePdf(
+  out: Writable,
+  data: RepProgrammeData,
+  options: ProgrammePdfOptions = {},
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({
+      size: 'A4',
+      layout: 'portrait',
+      margin: MARGIN,
+      compress: options.compress ?? true,
+      info: {
+        Title: `Programme représentants : ${data.campaignName} / ${data.commercialName}`,
+        Author: 'CRM Prospection CPI',
+        CreationDate: data.generatedAt,
+      },
+    });
+    const pageCount = Math.max(1, Math.ceil(data.rows.length / REP_ROWS_PER_PAGE));
+
+    doc.on('error', reject);
+    out.on('error', reject);
+    out.on('finish', resolve);
+    doc.pipe(out);
+
+    for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
+      if (pageIndex > 0) doc.addPage();
+      drawRepHeader(doc, data);
+      drawRepColumns(doc);
+
+      const pageRows = data.rows.slice(
+        pageIndex * REP_ROWS_PER_PAGE,
+        (pageIndex + 1) * REP_ROWS_PER_PAGE,
+      );
+      for (const [rowIndex, row] of pageRows.entries()) drawRepRow(doc, row, rowIndex);
+
+      if (pageRows.length === 0) {
+        doc
+          .font('Helvetica-Oblique')
+          .fontSize(12)
+          .fillColor('#7a6b6e')
+          .text('Aucun représentant affecté.', MARGIN + TEXT_PAD, REP_HEADER_TOP + 42, {
+            lineBreak: false,
+          });
+      }
+
+      doc
+        .font('Helvetica')
+        .fontSize(9)
+        .fillColor('#8a8a8a')
+        .text(
+          `Page ${String(pageIndex + 1)} / ${String(pageCount)}`,
+          MARGIN,
+          doc.page.height - 36,
+          { lineBreak: false },
+        );
+    }
+
+    doc.end();
+  });
+}

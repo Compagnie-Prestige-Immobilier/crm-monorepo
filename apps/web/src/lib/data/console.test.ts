@@ -6,8 +6,11 @@ import {
   bucketOf,
   buildAttemptBatch,
   buildQueue,
+  callbackHalfHours,
   callbackSlots,
   COMMENT_MAX_LENGTH,
+  conversionErrorFor,
+  conversionFrom,
   daysSince,
   fetchCallbacks,
   fetchConsoleQueue,
@@ -22,8 +25,10 @@ import {
   undatedCallbacks,
   uuidV7,
   validateAttempt,
+  validateConversion,
   type AttemptInput,
   type Callback,
+  type ConversionDraft,
 } from '@/lib/data/console';
 import type { CallOutcome, Phase2Status, ProspectRow } from '@/lib/types';
 
@@ -293,6 +298,193 @@ describe('buildAttemptBatch', () => {
     expect(batch.operations[0]?.data).not.toHaveProperty('method');
     expect(batch.operations[0]?.data?.comment).toBe('rappeler lundi');
   });
+
+  it('porte les renseignements de conversion sous les noms du contrat', () => {
+    const batch = buildAttemptBatch({
+      ...input,
+      draft: {
+        outcome: 'METHOD_OBTAINED',
+        method: 'APPOINTMENT',
+        comment: 'rappelé par son représentant',
+        conversion: {
+          ...conversion(),
+          method: 'APPOINTMENT',
+          rendezVousAt: '2026-09-01T10:30',
+        },
+      },
+    });
+
+    expect(batch.operations[0]?.data).toMatchObject({
+      nom: 'Diallo',
+      prenom: 'Mamadou',
+      email: 'mamadou@example.sn',
+      profession: 'Instituteur',
+      syndicatId: 's-1',
+      banqueId: 'b-1',
+      dureeEtablissementMois: 36,
+      fonctionnaire: true,
+      engagementEnCours: false,
+      rendezVousAt: '2026-09-01T10:30:00.000Z',
+      comment: 'rappelé par son représentant',
+    });
+  });
+
+  it('n’envoie ni champ vide ni question non posée', () => {
+    const batch = buildAttemptBatch({
+      ...input,
+      draft: {
+        outcome: 'METHOD_OBTAINED',
+        method: 'PLATFORM',
+        comment: '',
+        conversion: {
+          ...conversion(),
+          prenom: '  ',
+          email: '',
+          profession: '',
+          dureeEtablissementMois: '',
+          fonctionnaire: null,
+          engagementEnCours: null,
+          syndicatId: '',
+          banqueId: '',
+        },
+      },
+    });
+    const data = batch.operations[0]?.data ?? {};
+
+    for (const field of [
+      'prenom',
+      'email',
+      'profession',
+      'dureeEtablissementMois',
+      'fonctionnaire',
+      'engagementEnCours',
+      'syndicatId',
+      'banqueId',
+      'rendezVousAt',
+    ]) {
+      expect(data).not.toHaveProperty(field);
+    }
+    expect(data.nom).toBe('Diallo');
+  });
+
+  it('n’envoie aucun rendez-vous quand la méthode n’est pas la prise de rendez-vous', () => {
+    const batch = buildAttemptBatch({
+      ...input,
+      draft: {
+        outcome: 'METHOD_OBTAINED',
+        method: 'PLATFORM',
+        comment: '',
+        conversion: { ...conversion(), method: 'PLATFORM', rendezVousAt: '2026-09-01T10:30' },
+      },
+    });
+
+    expect(batch.operations[0]?.data).not.toHaveProperty('rendezVousAt');
+  });
+});
+
+function conversion(over: Partial<ConversionDraft> = {}): ConversionDraft {
+  return {
+    nom: 'Diallo',
+    prenom: 'Mamadou',
+    email: 'mamadou@example.sn',
+    profession: 'Instituteur',
+    dureeEtablissementMois: '36',
+    fonctionnaire: true,
+    syndicatId: 's-1',
+    banqueId: 'b-1',
+    engagementEnCours: false,
+    method: 'PLATFORM',
+    rendezVousAt: '',
+    ...over,
+  };
+}
+
+describe('conversionFrom', () => {
+  it('reprend ce que la fiche sait déjà, et ne devine rien du reste', () => {
+    const draft = conversionFrom(
+      prospect({ id: 'p-1', profession: 'Professeur', banqueId: 'b-9', syndicatId: 's-9' }),
+      'APPOINTMENT',
+    );
+
+    expect(draft).toMatchObject({
+      nom: 'Diallo',
+      prenom: 'Mamadou',
+      profession: 'Professeur',
+      banqueId: 'b-9',
+      syndicatId: 's-9',
+      method: 'APPOINTMENT',
+    });
+    expect(draft.email).toBe('');
+    expect(draft.fonctionnaire).toBeNull();
+    expect(draft.engagementEnCours).toBeNull();
+    expect(draft.rendezVousAt).toBe('');
+  });
+});
+
+describe('validateConversion', () => {
+  it('laisse passer un formulaire rempli comme il faut', () => {
+    expect(validateConversion(conversion(), NOW)).toEqual({});
+  });
+
+  it('exige le nom', () => {
+    expect(validateConversion(conversion({ nom: '  ' }), NOW).nom).toMatch(/obligatoire/i);
+  });
+
+  it('refuse une adresse qui n’en est pas une', () => {
+    expect(validateConversion(conversion({ email: 'mamadou' }), NOW).email).toMatch(/adresse/i);
+    expect(validateConversion(conversion({ email: 'a@b.sn' }), NOW).email).toBeUndefined();
+  });
+
+  it('borne la durée à des mois entiers de 0 à 600', () => {
+    for (const mois of ['601', '-1', '12,5']) {
+      expect(
+        validateConversion(conversion({ dureeEtablissementMois: mois }), NOW)
+          .dureeEtablissementMois,
+      ).toMatch(/mois entiers/);
+    }
+    expect(
+      validateConversion(conversion({ dureeEtablissementMois: '600' }), NOW).dureeEtablissementMois,
+    ).toBeUndefined();
+  });
+
+  it('exige la date du rendez-vous, et elle seule, sur APPOINTMENT', () => {
+    const sansDate = conversion({ method: 'APPOINTMENT' });
+    expect(validateConversion(sansDate, NOW).rendezVousAt).toMatch(/exige la date/);
+
+    const passee = conversion({ method: 'APPOINTMENT', rendezVousAt: '2026-08-16T11:00' });
+    expect(validateConversion(passee, NOW).rendezVousAt).toMatch(/précéder l’appel/);
+
+    const venir = conversion({ method: 'APPOINTMENT', rendezVousAt: '2026-08-20T09:00' });
+    expect(validateConversion(venir, NOW).rendezVousAt).toBeUndefined();
+  });
+
+  it('refuse une date de rendez-vous sur toute autre méthode', () => {
+    const draft = conversion({ method: 'PLATFORM', rendezVousAt: '2026-08-20T09:00' });
+    expect(validateConversion(draft, NOW).rendezVousAt).toMatch(/Prise de rendez-vous/);
+  });
+});
+
+describe('conversionErrorFor', () => {
+  it('range chaque refus du serveur sous le champ fautif', () => {
+    expect(conversionErrorFor('PHASE2_RENDEZ_VOUS_REQUIRED')?.field).toBe('rendezVousAt');
+    expect(conversionErrorFor('PHASE2_RENDEZ_VOUS_NOT_ALLOWED')?.field).toBe('rendezVousAt');
+    expect(conversionErrorFor('PHASE2_RENDEZ_VOUS_INVALID')?.field).toBe('rendezVousAt');
+    expect(conversionErrorFor('PHASE2_RENDEZ_VOUS_PAST')?.field).toBe('rendezVousAt');
+    expect(conversionErrorFor('PHASE2_EMAIL_INVALID')?.field).toBe('email');
+    expect(conversionErrorFor('PHASE2_DUREE_ETABLISSEMENT_INVALID')?.field).toBe(
+      'dureeEtablissementMois',
+    );
+  });
+
+  it('donne un message français, jamais le code brut', () => {
+    for (const code of ['PHASE2_EMAIL_INVALID', 'PHASE2_RENDEZ_VOUS_PAST']) {
+      expect(conversionErrorFor(code)?.message).not.toMatch(/PHASE2_/);
+    }
+  });
+
+  it('ne connaît pas les codes qui ne visent aucun champ', () => {
+    expect(conversionErrorFor(ALREADY_COMPLETED)).toBeNull();
+  });
 });
 
 function fakeSyncClient(result: {
@@ -419,6 +611,28 @@ describe('callbackSlots', () => {
 
     expect(sunday.filter((slot) => slot.at === '2026-08-17T09:00:00.000Z')).toHaveLength(1);
     expect(sunday.map((slot) => slot.label)).not.toContain('Lundi 9 h');
+  });
+});
+
+describe('callbackHalfHours', () => {
+  it('couvre les demi-heures ouvrées, de 08 h 00 à 19 h 00', () => {
+    const heures = callbackHalfHours(THURSDAY, '2026-08-14');
+
+    expect(heures).toHaveLength(23);
+    expect(heures[0]).toEqual({ key: '1', label: '08 h 00', at: '2026-08-14T08:00:00.000Z' });
+    expect(heures[1]?.label).toBe('08 h 30');
+    expect(heures.at(-1)).toEqual({ key: '23', label: '19 h 00', at: '2026-08-14T19:00:00.000Z' });
+  });
+
+  it('retire les heures déjà passées du jour même', () => {
+    const heures = callbackHalfHours(THURSDAY, '2026-08-13');
+
+    expect(heures[0]?.label).toBe('10 h 30');
+    expect(heures.map((heure) => heure.label)).not.toContain('08 h 00');
+  });
+
+  it('ne propose rien sur un jour entièrement écoulé', () => {
+    expect(callbackHalfHours(THURSDAY, '2026-08-12')).toEqual([]);
   });
 });
 

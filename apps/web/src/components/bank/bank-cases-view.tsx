@@ -87,206 +87,215 @@ export function BankCasesView() {
 
       <BankFiltersBar />
 
-      {isPending ? (
-        <BankCasesSkeleton />
-      ) : isError ? (
-        <QueryErrorState
-          error={error}
-          onRetry={() => {
-            void refetch();
-          }}
-          fallback="La liste des dossiers n’a pas pu être chargée."
-        />
-      ) : data.items.length === 0 ? (
-        <EmptyState
-          icon={FolderOpenIcon}
-          title={
-            countActiveBankFilters(filters) === 0
-              ? 'Aucun dossier bancaire'
-              : 'Aucun dossier ne correspond à ces filtres'
-          }
-          description={
-            countActiveBankFilters(filters) === 0
-              ? 'Ouvrez un dossier depuis « Nouveau dossier ».'
-              : 'Élargissez la période ou retirez un critère.'
-          }
-          action={
-            countActiveBankFilters(filters) === 0 ? (
-              <Link href="/chues/dossiers/nouveau" className={buttonVariants()}>
-                <PlusIcon aria-hidden="true" />
-                Nouveau dossier
-              </Link>
-            ) : null
-          }
-        />
-      ) : (
-        <>
-          {/* ─── Cartes : sous 1024 px ────────────────────────────────── */}
-          <ul className={cn('flex flex-col gap-3 lg:hidden', isFetching && 'opacity-80')}>
-            {data.items.map((bankCase) => (
-              <li key={bankCase.id}>
-                <BankCaseCard bankCase={bankCase} />
-              </li>
-            ))}
-          </ul>
-
-          {/* ─── Tableau : à partir de 1024 px ────────────────────────── */}
-          <div
-            className={cn(
-              'hidden overflow-hidden rounded-lg border border-border bg-card shadow-elev-sm transition-opacity lg:block',
-              isFetching && 'opacity-80',
-            )}
-          >
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  {SORTABLE.slice(0, 2).map((column) => (
-                    <SortableTableHead
-                      key={column.id}
-                      column={column}
-                      sortBy={filters.sortBy}
-                      sortDir={filters.sortDir}
-                      onToggle={toggleSort}
-                    />
-                  ))}
-                  <TableHead>Banque</TableHead>
-                  <TableHead>Étape</TableHead>
-                  <SortableTableHead
-                    column={SORTABLE[2] ?? { id: 'amountXof', label: 'Montant' }}
-                    sortBy={filters.sortBy}
-                    sortDir={filters.sortDir}
-                    onToggle={toggleSort}
-                  />
-                  <TableHead>Dernier intervenant</TableHead>
-                  <SortableTableHead
-                    column={SORTABLE[3] ?? { id: 'updatedAt', label: 'Mise à jour' }}
-                    sortBy={filters.sortBy}
-                    sortDir={filters.sortDir}
-                    onToggle={toggleSort}
-                  />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.items.map((bankCase) => (
-                  <TableRow
-                    key={bankCase.id}
-                    className="cursor-pointer focus-within:bg-muted/60"
-                    onClick={(event) => {
-                      if (isTextSelected() || !isPlainAreaClick(event.target)) return;
-                      router.push(`/chues/dossiers/${bankCase.id}`);
-                    }}
-                  >
-                    <TableCell>
-                      <Link
-                        href={`/chues/dossiers/${bankCase.id}`}
-                        className="rounded-sm font-[600] tabular-nums hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                      >
-                        {bankCase.reference}
+      {(() => {
+        if (isPending) return <BankCasesSkeleton />;
+        return (() => {
+          if (isError)
+            return (
+              <QueryErrorState
+                error={error}
+                onRetry={() => {
+                  void refetch();
+                }}
+                fallback="La liste des dossiers n’a pas pu être chargée."
+              />
+            );
+          return (() => {
+            if (data.items.length === 0)
+              return (
+                <EmptyState
+                  icon={FolderOpenIcon}
+                  title={
+                    countActiveBankFilters(filters) === 0
+                      ? 'Aucun dossier bancaire'
+                      : 'Aucun dossier ne correspond à ces filtres'
+                  }
+                  description={
+                    countActiveBankFilters(filters) === 0
+                      ? 'Ouvrez un dossier depuis « Nouveau dossier ».'
+                      : 'Élargissez la période ou retirez un critère.'
+                  }
+                  action={
+                    countActiveBankFilters(filters) === 0 ? (
+                      <Link href="/chues/dossiers/nouveau" className={buttonVariants()}>
+                        <PlusIcon aria-hidden="true" />
+                        Nouveau dossier
                       </Link>
-                    </TableCell>
-                    <TableCell>
-                      <div className="min-w-0">
-                        <p className="truncate">{bankCase.customerName}</p>
-                        <p className="truncate text-[0.75rem] text-muted-foreground tabular-nums">
-                          {formatPhone(bankCase.customerPhoneE164)}
-                        </p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="truncate">{bankCase.processingBankName}</span>
-                    </TableCell>
-                    <TableCell>
-                      <StageBadge stage={bankCase.currentStage} />
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap tabular-nums">
-                      {/* « : » et non « 0 FCFA » : un dossier en instruction n'a
+                    ) : null
+                  }
+                />
+              );
+            return (
+              <>
+                {/* ─── Cartes : sous 1024 px ────────────────────────────────── */}
+                <ul className={cn('flex flex-col gap-3 lg:hidden', isFetching && 'opacity-80')}>
+                  {data.items.map((bankCase) => (
+                    <li key={bankCase.id}>
+                      <BankCaseCard bankCase={bankCase} />
+                    </li>
+                  ))}
+                </ul>
+
+                {/* ─── Tableau : à partir de 1024 px ────────────────────────── */}
+                <div
+                  className={cn(
+                    'hidden overflow-hidden rounded-lg border border-border bg-card shadow-elev-sm transition-opacity lg:block',
+                    isFetching && 'opacity-80',
+                  )}
+                >
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        {SORTABLE.slice(0, 2).map((column) => (
+                          <SortableTableHead
+                            key={column.id}
+                            column={column}
+                            sortBy={filters.sortBy}
+                            sortDir={filters.sortDir}
+                            onToggle={toggleSort}
+                          />
+                        ))}
+                        <TableHead>Banque</TableHead>
+                        <TableHead>Étape</TableHead>
+                        <SortableTableHead
+                          column={SORTABLE[2] ?? { id: 'amountXof', label: 'Montant' }}
+                          sortBy={filters.sortBy}
+                          sortDir={filters.sortDir}
+                          onToggle={toggleSort}
+                        />
+                        <TableHead>Dernier intervenant</TableHead>
+                        <SortableTableHead
+                          column={SORTABLE[3] ?? { id: 'updatedAt', label: 'Mise à jour' }}
+                          sortBy={filters.sortBy}
+                          sortDir={filters.sortDir}
+                          onToggle={toggleSort}
+                        />
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {data.items.map((bankCase) => (
+                        <TableRow
+                          key={bankCase.id}
+                          className="cursor-pointer focus-within:bg-muted/60"
+                          onClick={(event) => {
+                            if (isTextSelected() || !isPlainAreaClick(event.target)) return;
+                            router.push(`/chues/dossiers/${bankCase.id}`);
+                          }}
+                        >
+                          <TableCell>
+                            <Link
+                              href={`/chues/dossiers/${bankCase.id}`}
+                              className="rounded-sm font-[600] tabular-nums hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                            >
+                              {bankCase.reference}
+                            </Link>
+                          </TableCell>
+                          <TableCell>
+                            <div className="min-w-0">
+                              <p className="truncate">{bankCase.customerName}</p>
+                              <p className="truncate text-[0.75rem] text-muted-foreground tabular-nums">
+                                {formatPhone(bankCase.customerPhoneE164)}
+                              </p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="truncate">{bankCase.processingBankName}</span>
+                          </TableCell>
+                          <TableCell>
+                            <StageBadge stage={bankCase.currentStage} />
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap tabular-nums">
+                            {/* « : » et non « 0 FCFA » : un dossier en instruction n'a
                           AUCUN montant, ce qui n'est pas la même information
                           qu'un montant nul (celui d'un rejet). */}
-                      {formatXof(bankCase.amountXof)}
-                    </TableCell>
-                    <TableCell>
-                      <span className="truncate">
-                        {bankCase.updatedByName ?? bankCase.createdByName}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <time
-                        dateTime={bankCase.updatedAt}
-                        className="whitespace-nowrap tabular-nums"
+                            {formatXof(bankCase.amountXof)}
+                          </TableCell>
+                          <TableCell>
+                            <span className="truncate">
+                              {bankCase.updatedByName ?? bankCase.createdByName}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <time
+                              dateTime={bankCase.updatedAt}
+                              className="whitespace-nowrap tabular-nums"
+                            >
+                              {formatDateTime(bankCase.updatedAt)}
+                            </time>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-[0.8125rem] text-muted-foreground" role="status">
+                    <span className="sr-only">Dossiers affichés&nbsp;: </span>
+                    {data.total === 0
+                      ? 'Aucun résultat'
+                      : `${formatNumber((data.page - 1) * filters.pageSize + 1)}–${formatNumber(
+                          Math.min(data.page * filters.pageSize, data.total),
+                        )} sur ${formatNumber(data.total)}`}
+                  </p>
+
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-2 text-[0.8125rem] text-muted-foreground">
+                      <span className="hidden sm:inline">Lignes</span>
+                      <Select
+                        value={String(filters.pageSize)}
+                        onValueChange={(value) => {
+                          if (value === null) return;
+                          setFilters({ pageSize: Number(value), page: 1 });
+                        }}
                       >
-                        {formatDateTime(bankCase.updatedAt)}
-                      </time>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                        <SelectTrigger size="sm" className="w-20">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {BANK_PAGE_SIZE_OPTIONS.map((size) => (
+                            <SelectItem key={size} value={String(size)}>
+                              {size}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </label>
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-[0.8125rem] text-muted-foreground" role="status">
-              <span className="sr-only">Dossiers affichés&nbsp;: </span>
-              {data.total === 0
-                ? 'Aucun résultat'
-                : `${formatNumber((data.page - 1) * filters.pageSize + 1)}–${formatNumber(
-                    Math.min(data.page * filters.pageSize, data.total),
-                  )} sur ${formatNumber(data.total)}`}
-            </p>
-
-            <div className="flex items-center gap-3">
-              <label className="flex items-center gap-2 text-[0.8125rem] text-muted-foreground">
-                <span className="hidden sm:inline">Lignes</span>
-                <Select
-                  value={String(filters.pageSize)}
-                  onValueChange={(value) => {
-                    if (value === null) return;
-                    setFilters({ pageSize: Number(value), page: 1 });
-                  }}
-                >
-                  <SelectTrigger size="sm" className="w-20">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {BANK_PAGE_SIZE_OPTIONS.map((size) => (
-                      <SelectItem key={size} value={String(size)}>
-                        {size}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </label>
-
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  aria-label="Page précédente"
-                  disabled={data.page <= 1}
-                  onClick={() => {
-                    setFilters({ page: data.page - 1 });
-                  }}
-                >
-                  <ChevronLeftIcon className="size-4" aria-hidden="true" />
-                </Button>
-                <span className="min-w-20 text-center text-[0.8125rem] tabular-nums">
-                  {data.page} / {data.pageCount}
-                </span>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  aria-label="Page suivante"
-                  disabled={data.page >= data.pageCount}
-                  onClick={() => {
-                    setFilters({ page: data.page + 1 });
-                  }}
-                >
-                  <ChevronRightIcon className="size-4" aria-hidden="true" />
-                </Button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        aria-label="Page précédente"
+                        disabled={data.page <= 1}
+                        onClick={() => {
+                          setFilters({ page: data.page - 1 });
+                        }}
+                      >
+                        <ChevronLeftIcon className="size-4" aria-hidden="true" />
+                      </Button>
+                      <span className="min-w-20 text-center text-[0.8125rem] tabular-nums">
+                        {data.page} / {data.pageCount}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        aria-label="Page suivante"
+                        disabled={data.page >= data.pageCount}
+                        onClick={() => {
+                          setFilters({ page: data.page + 1 });
+                        }}
+                      >
+                        <ChevronRightIcon className="size-4" aria-hidden="true" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            );
+          })();
+        })();
+      })()}
     </div>
   );
 }

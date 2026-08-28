@@ -134,82 +134,91 @@ export function InboxView({
         </Button>
       </div>
 
-      {inbox.isPending ? (
-        <InboxSkeleton />
-      ) : inbox.isError ? (
-        <QueryErrorState
-          error={inbox.error}
-          onRetry={() => {
-            void inbox.refetch();
-          }}
-          fallback="Votre boîte de réception n’a pas pu être chargée."
-        />
-      ) : inbox.data.items.length === 0 ? (
-        <EmptyState
-          icon={InboxIcon}
-          title={unreadOnly ? 'Aucune notification non lue' : 'Aucune notification'}
-          description={
-            unreadOnly
-              ? 'Tout est à jour.'
-              : 'Les annonces, les rappels et les demandes à traiter apparaîtront ici.'
-          }
-        />
-      ) : (
-        <>
-          <Card className={cn('transition-opacity', inbox.isFetching && 'opacity-80')}>
-            <CardContent className="p-0">
-              <ul className="divide-y divide-border">
-                {inbox.data.items.map((item) => (
-                  <li key={item.id}>
-                    <InboxRow
-                      item={item}
-                      onActivate={() => {
-                        activate(item);
-                      }}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
+      {(() => {
+        if (inbox.isPending) return <InboxSkeleton />;
+        return (() => {
+          if (inbox.isError)
+            return (
+              <QueryErrorState
+                error={inbox.error}
+                onRetry={() => {
+                  void inbox.refetch();
+                }}
+                fallback="Votre boîte de réception n’a pas pu être chargée."
+              />
+            );
+          return (() => {
+            if (inbox.data.items.length === 0)
+              return (
+                <EmptyState
+                  icon={InboxIcon}
+                  title={unreadOnly ? 'Aucune notification non lue' : 'Aucune notification'}
+                  description={
+                    unreadOnly
+                      ? 'Tout est à jour.'
+                      : 'Les annonces, les rappels et les demandes à traiter apparaîtront ici.'
+                  }
+                />
+              );
+            return (
+              <>
+                <Card className={cn('transition-opacity', inbox.isFetching && 'opacity-80')}>
+                  <CardContent className="p-0">
+                    <ul className="divide-y divide-border">
+                      {inbox.data.items.map((item) => (
+                        <li key={item.id}>
+                          <InboxRow
+                            item={item}
+                            onActivate={() => {
+                              activate(item);
+                            }}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
 
-          {meta === undefined ? null : (
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-[0.8125rem] text-muted-foreground" role="status">
-                <span className="sr-only">Notifications affichées&nbsp;: </span>
-                {formatNumber(meta.total)} notification{meta.total > 1 ? 's' : ''}
-              </p>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  aria-label="Page précédente"
-                  disabled={meta.page <= 1}
-                  onClick={() => {
-                    onPageChange(meta.page - 1);
-                  }}
-                >
-                  <ChevronLeftIcon className="size-4" aria-hidden="true" />
-                </Button>
-                <span className="min-w-20 text-center text-[0.8125rem] tabular-nums">
-                  {meta.page} / {Math.max(1, meta.pageCount)}
-                </span>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  aria-label="Page suivante"
-                  disabled={meta.page >= meta.pageCount}
-                  onClick={() => {
-                    onPageChange(meta.page + 1);
-                  }}
-                >
-                  <ChevronRightIcon className="size-4" aria-hidden="true" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </>
-      )}
+                {meta === undefined ? null : (
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-[0.8125rem] text-muted-foreground" role="status">
+                      <span className="sr-only">Notifications affichées&nbsp;: </span>
+                      {formatNumber(meta.total)} notification{meta.total > 1 ? 's' : ''}
+                    </p>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        aria-label="Page précédente"
+                        disabled={meta.page <= 1}
+                        onClick={() => {
+                          onPageChange(meta.page - 1);
+                        }}
+                      >
+                        <ChevronLeftIcon className="size-4" aria-hidden="true" />
+                      </Button>
+                      <span className="min-w-20 text-center text-[0.8125rem] tabular-nums">
+                        {meta.page} / {Math.max(1, meta.pageCount)}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        aria-label="Page suivante"
+                        disabled={meta.page >= meta.pageCount}
+                        onClick={() => {
+                          onPageChange(meta.page + 1);
+                        }}
+                      >
+                        <ChevronRightIcon className="size-4" aria-hidden="true" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })();
+        })();
+      })()}
     </div>
   );
 }

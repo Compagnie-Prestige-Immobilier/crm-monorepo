@@ -337,12 +337,18 @@ export class ReferentielsService {
     model: 'banque' | 'syndicat' | 'departement',
     id: string,
   ): Promise<void> {
-    const found =
-      model === 'banque'
-        ? await this.prisma.banque.findUnique({ where: { id }, select: { id: true } })
-        : model === 'syndicat'
-          ? await this.prisma.syndicat.findUnique({ where: { id }, select: { id: true } })
-          : await this.prisma.departement.findUnique({ where: { id }, select: { id: true } });
+    let found: { id: string } | null;
+    switch (model) {
+      case 'banque':
+        found = await this.prisma.banque.findUnique({ where: { id }, select: { id: true } });
+        break;
+      case 'syndicat':
+        found = await this.prisma.syndicat.findUnique({ where: { id }, select: { id: true } });
+        break;
+      case 'departement':
+        found = await this.prisma.departement.findUnique({ where: { id }, select: { id: true } });
+        break;
+    }
     if (!found) {
       throw new NotFoundException({
         code: 'REFERENTIEL_NOT_FOUND',

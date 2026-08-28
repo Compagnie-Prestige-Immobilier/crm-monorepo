@@ -49,6 +49,7 @@ export interface TeleconseilStats {
   };
   overTime: { date: string; count: number; cumulative: number }[];
   topTeleconseillers: NamedCount[];
+  topTeleconseillerConversion: NamedCount[];
   parStatutPhase2: StatusCount[];
   parMethode: MethodCount[];
   parSegment: SegmentCount[];
@@ -118,7 +119,9 @@ export async function fetchTeleconseilStats(
     client.GET('/api/v1/analytics/prospects-over-time', {
       params: { query: { ...query, granularity: 'day' } },
     }),
-    client.GET('/api/v1/analytics/top-commercials', { params: { query } }),
+    client.GET('/api/v1/analytics/top-commercials', {
+      params: { query: { ...query, limit: 100 } },
+    }),
     client.GET('/api/v1/analytics/by-phase2-status', { params: { query } }),
     client.GET('/api/v1/analytics/by-enrollment-method', { params: { query } }),
     client.GET('/api/v1/analytics/by-segment', { params: { query } }),
@@ -147,6 +150,22 @@ export async function fetchTeleconseilStats(
         label: item.label,
         value: item.prospects,
       })),
+    ),
+    topTeleconseillerConversion: groupTail(
+      [
+        ...(unwrap(top).items as Array<{
+          id: string;
+          label: string;
+          prospects: number;
+          conversionRate?: number | null;
+        }>),
+      ]
+        .map((item) => ({
+          id: item.id,
+          label: item.label,
+          value: item.conversionRate ?? 0,
+        }))
+        .sort((left, right) => right.value - left.value || left.label.localeCompare(right.label)),
     ),
     parStatutPhase2: unwrap(phase2).items.map((item) => ({
       status: item.status,

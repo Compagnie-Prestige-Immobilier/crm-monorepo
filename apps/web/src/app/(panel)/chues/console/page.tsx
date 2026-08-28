@@ -9,13 +9,14 @@ import { consoleKeys, fetchConsoleQueue } from '@/lib/data/console';
 import { getQueryClient } from '@/lib/query-client';
 import { guardRoles } from '@/lib/session';
 
-export const metadata: Metadata = { title: 'Console d’appel' };
+export const metadata: Metadata = { title: 'Convertir un prospect' };
 
+/** Étape 3 du projet CHUES : obtenir l'adhésion, prospect par prospect. */
 export default async function ConsolePage() {
-  const guard = await guardRoles(['ADMIN', 'COMMERCIAL']);
+  const guard = await guardRoles(['ADMIN', 'COMMERCIAL', 'SUPERVISEUR', 'DIRECTION']);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
-    return <PermissionDenied role={guard.user.role} what="La console d’appel" />;
+    return <PermissionDenied role={guard.user.role} what="La file d’appel des prospects" />;
   }
 
   const queryClient = getQueryClient();

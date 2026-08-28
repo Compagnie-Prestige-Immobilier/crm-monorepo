@@ -3,7 +3,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangleIcon, LoaderIcon } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
@@ -59,7 +58,6 @@ export function ProspectCreateForm({
   representantId: string | null;
   onSaved?: () => void;
 }) {
-  const router = useRouter();
   const queryClient = useQueryClient();
   const prenomRef = useRef<HTMLInputElement>(null);
 
@@ -104,12 +102,10 @@ export function ProspectCreateForm({
       setSaved((previous) => [...previous, `${prospect.prenom} ${prospect.nom}`]);
       toast.success(`${prospect.prenom} ${prospect.nom} enregistré.`);
 
+      // « Enregistrer et terminer » n'existe que dans la boîte de dialogue, qui
+      // se ferme dessus. Sur l'écran de saisie, on reste : la tournée continue.
       if (!variables.andNext) {
-        if (onSaved !== undefined) {
-          onSaved();
-          return;
-        }
-        router.push(`/chues/prospects?search=${encodeURIComponent(prospect.phoneE164)}`);
+        onSaved?.();
         return;
       }
 
@@ -160,7 +156,6 @@ export function ProspectCreateForm({
     });
   }
 
-  const last = saved.at(-1);
   const plural = saved.length > 1 ? 's' : '';
   const searchedOptions = (searchedRepresentants.data?.items ?? []).map((item) => ({
     value: item.id,
@@ -173,6 +168,11 @@ export function ProspectCreateForm({
   ].filter(
     (option, index, options) => options.findIndex((item) => item.value === option.value) === index,
   );
+
+  // Le libellé porte « Nom - téléphone » ; sous le formulaire, seul le nom se lit.
+  const representantLabel = representantOptions
+    .find((option) => option.value === repId)
+    ?.label.split(' - ')[0];
 
   return (
     <form
@@ -310,22 +310,25 @@ export function ProspectCreateForm({
         </div>
       </div>
 
+      {/* UNE action : enregistrer. Le formulaire se vide, le représentant, la
+          banque et le syndicat restent : la tournée s'enchaîne sans un clic de
+          plus, et sortir de l'écran est un lien, pas un second bouton. */}
       <div className="flex flex-wrap items-center justify-end gap-3">
-        <p aria-live="polite" className="mr-auto text-[0.8125rem] text-muted-foreground">
-          {last === undefined
-            ? 'Ctrl + Entrée enregistre et enchaîne. La banque et le syndicat restent en place.'
-            : `${String(saved.length)} prospect${plural} enregistré${plural}. Dernier : ${last}.`}
+        <p className="mr-auto text-[0.8125rem] text-muted-foreground">
+          Ctrl + Entrée enregistre et enchaîne.
         </p>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={save.isPending}
-          onClick={() => {
-            submit(false);
-          }}
-        >
-          Enregistrer et terminer
-        </Button>
+        {onSaved === undefined ? null : (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={save.isPending}
+            onClick={() => {
+              submit(false);
+            }}
+          >
+            Enregistrer et terminer
+          </Button>
+        )}
         <Button type="submit" disabled={save.isPending}>
           {save.isPending ? (
             <>
@@ -333,10 +336,28 @@ export function ProspectCreateForm({
               Enregistrement…
             </>
           ) : (
-            'Enregistrer et suivant'
+            'Enregistrer ce prospect'
           )}
         </Button>
       </div>
+
+      {onSaved === undefined ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+          <p aria-live="polite" className="text-[0.875rem] text-muted-foreground">
+            {saved.length === 0
+              ? 'Aucun prospect noté pour l’instant.'
+              : `${String(saved.length)} prospect${plural} noté${plural}${
+                  representantLabel === undefined ? '' : ` pour ${representantLabel}`
+                } aujourd’hui`}
+          </p>
+          <Link
+            href="/chues"
+            className="rounded-sm text-[0.875rem] font-[600] underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            Terminé, revenir au projet
+          </Link>
+        </div>
+      ) : null}
 
       <RepresentantFormDialog
         open={repPrefill !== null}

@@ -63,6 +63,8 @@ class StubApi implements ApiPort {
         prospects: const <ProspectDto>[],
         callCampaigns: const <SyncCallCampaignDto>[],
         callTasks: const <SyncCallTaskDto>[],
+        repCallCampaigns: const <SyncRepCallCampaignDto>[],
+        repCallTasks: const <SyncRepCallTaskDto>[],
         visites: const <SyncVisiteDto>[],
       ),
       deletions: const <SyncDeletionDto>[],
@@ -83,6 +85,13 @@ class StubApi implements ApiPort {
       message: 'Aucun serveur configuré : ce transport ne pousse rien.',
       kind: FailureKind.retryable,
     );
+  }
+
+  @override
+  Future<RepCallAttemptResultDto> recordRepCallAttempt(
+    CreateRepCallAttemptDto attempt,
+  ) async {
+    throw const ApiException('api_not_configured', kind: FailureKind.retryable);
   }
 
   @override
@@ -111,8 +120,48 @@ class StubApi implements ApiPort {
     required int payloadVersion,
   }) async => const <CallOutcomeReasonDto>[];
 
+  /// Même raison que [pullVisiteReferentiels] : un refus, jamais des listes
+  /// vides.
+  @override
+  Future<ReferentielsSnapshot> pullReferentiels() async {
+    throw const ApiException(
+      'api_not_configured',
+      message: 'Aucun serveur configuré : les référentiels ne sont pas relus.',
+      kind: FailureKind.retryable,
+    );
+  }
+
   @override
   Future<RepresentantLookup> lookupRepresentantByPhone(String phone) async {
     return RepresentantLookup(found: false, phoneE164: phone);
+  }
+
+  /// Surtout pas des listes vides : le miroir les prendrait pour la vérité du
+  /// serveur et effacerait celles du téléphone.
+  @override
+  Future<VisiteReferentielsBundleDto> pullVisiteReferentiels() async {
+    throw const ApiException(
+      'api_not_configured',
+      message: 'Aucun serveur configuré : les listes ne sont pas relues.',
+      kind: FailureKind.retryable,
+    );
+  }
+
+  @override
+  Future<void> updateVisite({
+    required String id,
+    required String visitorName,
+    required String entrepriseId,
+    required String objetId,
+    String? phone,
+    String? directionId,
+    String? destinataireId,
+    String? comment,
+  }) async {
+    throw const ApiException(
+      'api_not_configured',
+      message: 'Aucun serveur configuré : la correction ne part pas.',
+      kind: FailureKind.retryable,
+    );
   }
 }

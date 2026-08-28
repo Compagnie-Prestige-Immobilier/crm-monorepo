@@ -186,7 +186,21 @@ describe('registre du jour', () => {
   });
 });
 
+/**
+ * La recherche est repliée derrière « Rechercher ». jsdom n'applique pas la
+ * feuille de style qui masque le contenu d'un `<details>` fermé : sans ce clic,
+ * le test atteindrait des champs qu'un vrai navigateur cache.
+ */
+async function openRecherche(): Promise<void> {
+  const resume = await screen.findByText('Rechercher');
+  const bloc = resume.closest('details');
+  if (bloc === null) throw new Error('Le bloc de recherche n’est pas repliable.');
+  if (bloc.open) return;
+  await userEvent.setup().click(resume);
+}
+
 async function openAdvanced(): Promise<void> {
+  await openRecherche();
   const bouton = await screen.findByRole('button', { name: /Filtres avancés/u });
   if (bouton.getAttribute('aria-expanded') === 'true') return;
   await userEvent.setup().click(bouton);
@@ -208,6 +222,7 @@ describe('filtres du registre, dans l’adresse', () => {
   it('porte la recherche par nom ou n° de registre dans l’URL', async () => {
     renderWithQuery(<RegistreView />);
 
+    await openRecherche();
     const filtres = await screen.findByRole('region', { name: 'Rechercher dans le registre' });
     await userEvent
       .setup()
@@ -279,13 +294,18 @@ describe('filtres du registre, dans l’adresse', () => {
 });
 
 describe('filtres avancés du registre', () => {
-  it('replie ENTREPRISE, DIRECTION, DESTINATAIRES et OBJET, laissant recherche et période visibles', async () => {
+  it('replie la recherche ET les critères, laissant la période et l’ajout visibles', async () => {
     renderWithQuery(<RegistreView />);
 
     await screen.findByRole('table');
-    expect(screen.getByRole('textbox', { name: /Recherche/u })).toBeTruthy();
+    // Ce qui reste sous les yeux : le geste du comptoir et la période.
+    expect(screen.getByRole('button', { name: 'Ajouter une visite' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Aujourd’hui' })).toBeTruthy();
+    expect(screen.getByText('Rechercher').closest('details')?.open).toBe(false);
     expect(screen.queryByRole('combobox', { name: /ENTREPRISE/u })).toBeNull();
+
+    await openRecherche();
+    expect(screen.getByRole('textbox', { name: /Recherche/u })).toBeTruthy();
 
     await openAdvanced();
     expect(screen.getByRole('combobox', { name: /ENTREPRISE/u })).toBeTruthy();

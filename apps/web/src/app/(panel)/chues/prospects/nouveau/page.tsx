@@ -11,14 +11,14 @@ import { queryKeys } from '@/lib/query-keys';
 import { readString, type RawSearchParams } from '@/lib/search-params';
 import { guardRoles } from '@/lib/session';
 
-export const metadata: Metadata = { title: 'Nouveau prospect' };
+export const metadata: Metadata = { title: 'Ajouter un prospect' };
 
 export default async function NouveauProspectPage({
   searchParams,
 }: {
   searchParams: Promise<RawSearchParams>;
 }) {
-  const guard = await guardRoles(['ADMIN', 'COMMERCIAL']);
+  const guard = await guardRoles(['ADMIN', 'COMMERCIAL', 'SUPERVISEUR', 'DIRECTION']);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
     return <PermissionDenied role={guard.user.role} what="La saisie d’un prospect" />;

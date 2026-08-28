@@ -6,7 +6,7 @@ export function canonicalize(value: unknown): unknown {
   if (typeof value === 'object' && value !== null) {
     const entries = Object.entries(value as Record<string, unknown>)
       .filter(([, item]) => item !== undefined)
-      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
+      .sort(([left], [right]) => left.localeCompare(right));
     return Object.fromEntries(entries.map(([key, item]) => [key, canonicalize(item)]));
   }
   return value;

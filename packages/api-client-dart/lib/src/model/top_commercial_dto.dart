@@ -27,6 +27,10 @@ class TopCommercialDto {
 
     required this.representants,
 
+    required this.methodObtained,
+
+    required this.conversionRate,
+
     required this.share,
 
     required this.derniereSaisie,
@@ -44,6 +48,12 @@ class TopCommercialDto {
   @JsonKey(name: r'representants', required: true, includeIfNull: false)
   final num representants;
 
+  @JsonKey(name: r'methodObtained', required: true, includeIfNull: false)
+  final num methodObtained;
+
+  @JsonKey(name: r'conversionRate', required: true, includeIfNull: true)
+  final num? conversionRate;
+
   @JsonKey(name: r'share', required: true, includeIfNull: false)
   final num share;
 
@@ -55,12 +65,23 @@ class TopCommercialDto {
         other is TopCommercialDto &&
             runtimeType == other.runtimeType &&
             equals(
-              [id, label, prospects, representants, share, derniereSaisie],
+              [
+                id,
+                label,
+                prospects,
+                representants,
+                methodObtained,
+                conversionRate,
+                share,
+                derniereSaisie,
+              ],
               [
                 other.id,
                 other.label,
                 other.prospects,
                 other.representants,
+                other.methodObtained,
+                other.conversionRate,
                 other.share,
                 other.derniereSaisie,
               ],
@@ -75,6 +96,8 @@ class TopCommercialDto {
         label,
         prospects,
         representants,
+        methodObtained,
+        conversionRate,
         share,
         derniereSaisie,
       ]);

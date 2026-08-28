@@ -71,18 +71,29 @@ export class AnalyticsService {
       WHERE ${where}
     `;
 
-    const row = rows[0];
+    const row = rows[0] ?? {
+      prospects: 0,
+      representants: 0,
+      commerciaux: 0,
+      departements: 0,
+      nouveau: 0,
+      contacte: 0,
+      converti: 0,
+      perdu: 0,
+      j7: 0,
+      j30: 0,
+    };
     return {
-      prospects: row?.prospects ?? 0,
-      representants: row?.representants ?? 0,
-      commerciauxActifs: row?.commerciaux ?? 0,
-      departementsCouverts: row?.departements ?? 0,
-      nouveau: row?.nouveau ?? 0,
-      contacte: row?.contacte ?? 0,
-      converti: row?.converti ?? 0,
-      perdu: row?.perdu ?? 0,
-      prospects7Jours: row?.j7 ?? 0,
-      prospects30Jours: row?.j30 ?? 0,
+      prospects: row.prospects,
+      representants: row.representants,
+      commerciauxActifs: row.commerciaux,
+      departementsCouverts: row.departements,
+      nouveau: row.nouveau,
+      contacte: row.contacte,
+      converti: row.converti,
+      perdu: row.perdu,
+      prospects7Jours: row.j7,
+      prospects30Jours: row.j30,
     };
   }
 
@@ -90,12 +101,12 @@ export class AnalyticsService {
     const where = prospectConditions(user, query);
     // `date_trunc` exige un littéral, jamais un paramètre : l'unité vient d'une
     // énumération fermée, toute autre valeur retombant sur 'day'.
-    const unit =
-      query.granularity === TimeGranularity.MONTH
-        ? Prisma.sql`'month'`
-        : query.granularity === TimeGranularity.WEEK
-          ? Prisma.sql`'week'`
-          : Prisma.sql`'day'`;
+    const units: Record<TimeGranularity, Prisma.Sql> = {
+      [TimeGranularity.DAY]: Prisma.sql`'day'`,
+      [TimeGranularity.WEEK]: Prisma.sql`'week'`,
+      [TimeGranularity.MONTH]: Prisma.sql`'month'`,
+    };
+    const unit = units[query.granularity ?? TimeGranularity.DAY];
 
     const rows = await this.prisma.$queryRaw<
       { bucket: Date; prospects: number; representants: number }[]
@@ -127,6 +138,7 @@ export class AnalyticsService {
         label: string;
         prospects: number;
         representants: number;
+        methodes: number;
         derniere: Date | null;
       }[]
     >`
@@ -135,6 +147,7 @@ export class AnalyticsService {
         u."fullName"                             AS label,
         COUNT(*)::int                            AS prospects,
         COUNT(DISTINCT p."representantId")::int  AS representants,
+        COUNT(*) FILTER (WHERE p."phase2Status" = 'METHOD_OBTAINED')::int AS methodes,
         MAX(p."clientCreatedAt")                 AS derniere
       ${PROSPECT_FROM}
       INNER JOIN "users" u ON u."id" = p."createdById"
@@ -151,6 +164,8 @@ export class AnalyticsService {
         label: row.label,
         prospects: row.prospects,
         representants: row.representants,
+        methodObtained: row.methodes,
+        conversionRate: share(row.methodes, row.prospects),
         share: share(row.prospects, total),
         derniereSaisie: row.derniere?.toISOString() ?? null,
       })),

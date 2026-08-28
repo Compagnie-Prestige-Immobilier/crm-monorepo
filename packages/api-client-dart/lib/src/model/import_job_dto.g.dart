@@ -27,6 +27,8 @@ abstract class _$ImportJobDtoCWProxy {
 
   ImportJobDto createdRows(num createdRows);
 
+  ImportJobDto updatedRows(num updatedRows);
+
   ImportJobDto skippedRows(num skippedRows);
 
   ImportJobDto errorRows(num errorRows);
@@ -64,6 +66,7 @@ abstract class _$ImportJobDtoCWProxy {
     num? totalRows,
     num processedRows,
     num createdRows,
+    num updatedRows,
     num skippedRows,
     num errorRows,
     ImportJobReportDto? report,
@@ -116,6 +119,9 @@ class _$ImportJobDtoCWProxyImpl implements _$ImportJobDtoCWProxy {
   ImportJobDto createdRows(num createdRows) => this(createdRows: createdRows);
 
   @override
+  ImportJobDto updatedRows(num updatedRows) => this(updatedRows: updatedRows);
+
+  @override
   ImportJobDto skippedRows(num skippedRows) => this(skippedRows: skippedRows);
 
   @override
@@ -164,6 +170,7 @@ class _$ImportJobDtoCWProxyImpl implements _$ImportJobDtoCWProxy {
     Object? totalRows = const $CopyWithPlaceholder(),
     Object? processedRows = const $CopyWithPlaceholder(),
     Object? createdRows = const $CopyWithPlaceholder(),
+    Object? updatedRows = const $CopyWithPlaceholder(),
     Object? skippedRows = const $CopyWithPlaceholder(),
     Object? errorRows = const $CopyWithPlaceholder(),
     Object? report = const $CopyWithPlaceholder(),
@@ -216,6 +223,10 @@ class _$ImportJobDtoCWProxyImpl implements _$ImportJobDtoCWProxy {
           ? _value.createdRows
           // ignore: cast_nullable_to_non_nullable
           : createdRows as num,
+      updatedRows: updatedRows == const $CopyWithPlaceholder()
+          ? _value.updatedRows
+          // ignore: cast_nullable_to_non_nullable
+          : updatedRows as num,
       skippedRows: skippedRows == const $CopyWithPlaceholder()
           ? _value.skippedRows
           // ignore: cast_nullable_to_non_nullable
@@ -286,6 +297,7 @@ ImportJobDto _$ImportJobDtoFromJson(
       'totalRows',
       'processedRows',
       'createdRows',
+      'updatedRows',
       'skippedRows',
       'errorRows',
       'report',
@@ -330,6 +342,7 @@ ImportJobDto _$ImportJobDtoFromJson(
     totalRows: $checkedConvert('totalRows', (v) => v as num?),
     processedRows: $checkedConvert('processedRows', (v) => v as num),
     createdRows: $checkedConvert('createdRows', (v) => v as num),
+    updatedRows: $checkedConvert('updatedRows', (v) => v as num),
     skippedRows: $checkedConvert('skippedRows', (v) => v as num),
     errorRows: $checkedConvert('errorRows', (v) => v as num),
     report: $checkedConvert(
@@ -367,6 +380,7 @@ Map<String, dynamic> _$ImportJobDtoToJson(ImportJobDto instance) =>
       'totalRows': instance.totalRows,
       'processedRows': instance.processedRows,
       'createdRows': instance.createdRows,
+      'updatedRows': instance.updatedRows,
       'skippedRows': instance.skippedRows,
       'errorRows': instance.errorRows,
       'report': instance.report?.toJson(),
@@ -384,6 +398,7 @@ const _$ImportKindEnumMap = {
   ImportKind.PROSPECTS: 'PROSPECTS',
   ImportKind.VISITES: 'VISITES',
   ImportKind.PROSPECTS_GRAND_PUBLIC: 'PROSPECTS_GRAND_PUBLIC',
+  ImportKind.VISITES_REGISTRE: 'VISITES_REGISTRE',
   ImportKind.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 

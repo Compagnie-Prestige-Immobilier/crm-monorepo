@@ -113,6 +113,9 @@ const cellAt = (cells: Record<string, string>, index: number): string => {
   return header === undefined ? '' : (cells[header] ?? '');
 };
 
+const columnAt = (index: number, fallback: string): string =>
+  IMPORT_COLUMNS[index]?.header ?? fallback;
+
 @Injectable()
 export class RepresentantsImportAdapter implements ImportAdapter<
   RepresentantImportRow,
@@ -190,7 +193,7 @@ export class RepresentantsImportAdapter implements ImportAdapter<
         ok: false,
         error: {
           rowNumber,
-          column: IMPORT_COLUMNS[0]?.header ?? 'Nom complet',
+          column: columnAt(0, 'Nom complet'),
           code: 'NAME_INVALID',
           message: 'Le nom complet est obligatoire (2 caractères au minimum).',
         },
@@ -203,7 +206,7 @@ export class RepresentantsImportAdapter implements ImportAdapter<
         ok: false,
         error: {
           rowNumber,
-          column: IMPORT_COLUMNS[1]?.header ?? 'Téléphone',
+          column: columnAt(1, 'Téléphone'),
           code: 'PHONE_INVALID',
           message: 'Numéro de téléphone inexploitable.',
         },
@@ -216,7 +219,7 @@ export class RepresentantsImportAdapter implements ImportAdapter<
         ok: false,
         error: {
           rowNumber,
-          column: IMPORT_COLUMNS[2]?.header ?? 'Département',
+          column: columnAt(2, 'Département'),
           code: 'DEPARTEMENT_UNKNOWN',
           message: 'Département inconnu. Reprenez exactement un libellé de la liste déroulante.',
         },
@@ -231,7 +234,7 @@ export class RepresentantsImportAdapter implements ImportAdapter<
           ok: false,
           error: {
             rowNumber,
-            column: IMPORT_COLUMNS[3]?.header ?? 'IEF',
+            column: columnAt(3, 'IEF'),
             code: 'IEF_UNKNOWN',
             message: 'IEF inconnue. Laissez la cellule vide si elle n’est pas connue.',
           },
@@ -246,7 +249,7 @@ export class RepresentantsImportAdapter implements ImportAdapter<
           ok: false,
           error: {
             rowNumber,
-            column: IMPORT_COLUMNS[3]?.header ?? 'IEF',
+            column: columnAt(3, 'IEF'),
             code: 'IEF_DEPARTEMENT_MISMATCH',
             message: `L’IEF « ${iefRow.name} » n’appartient pas au département « ${departementRow.name} ».`,
           },

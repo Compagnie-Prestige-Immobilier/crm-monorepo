@@ -86,7 +86,7 @@ describe('RepresentantDetailView', () => {
     renderWithQuery(<RepresentantDetailView representantId="rep-1" author={AUTHOR} />);
 
     expect(await screen.findByText('Ndeye Fall')).toBeTruthy();
-    expect(screen.getByText('Ambassadeur')).toBeTruthy();
+    expect(screen.getByText('A accepté')).toBeTruthy();
   });
 
   it('rend la chronologie dans l’ordre servi par l’API, du plus récent au plus ancien', async () => {
@@ -103,7 +103,7 @@ describe('RepresentantDetailView', () => {
       .map((item) => item.textContent);
 
     expect(bascules).toHaveLength(3);
-    expect(bascules[0]).toContain('Ambassadeur');
+    expect(bascules[0]).toContain('A accepté');
     expect(bascules[1]).toContain('Contacté');
     expect(bascules[2]).toContain('Pas encore contacté');
   });

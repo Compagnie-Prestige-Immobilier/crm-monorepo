@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:forui/forui.dart';
 
-import '../../core/theme/cpi_colors.dart';
 import '../../core/theme/cpi_tokens.dart';
+import 'cpi_forui.dart';
 
 /// La barre d'action épinglée en bas d'un écran de liste ou de formulaire.
 ///
@@ -14,21 +15,32 @@ class CpiActionBar extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(
-        CpiSpacing.md,
-        CpiSpacing.xs,
-        CpiSpacing.md,
-        CpiSpacing.sm,
+  Widget build(BuildContext context) => CpiForui(
+    builder: (BuildContext context) => ColoredBox(
+      color: Theme.of(context).colorScheme.surface,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          const FDivider(
+            style: FDividerStyleDelta.delta(
+              padding: EdgeInsetsGeometryDelta.value(EdgeInsets.zero),
+            ),
+          ),
+          Padding(
+            // Posée en pied de `FScaffold`, la barre est le dernier widget de
+            // l'écran : c'est à elle d'écarter la barre de gestes. Sous un
+            // `SafeArea` qui l'a déjà fait, `paddingOf` vaut zéro.
+            padding: EdgeInsets.fromLTRB(
+              CpiSpacing.md,
+              CpiSpacing.xs,
+              CpiSpacing.md,
+              CpiSpacing.sm + MediaQuery.paddingOf(context).bottom,
+            ),
+            child: child,
+          ),
+        ],
       ),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        border: Border(top: BorderSide(color: context.cpi.borderSubtle)),
-      ),
-      child: Column(mainAxisSize: MainAxisSize.min, children: <Widget>[child]),
-    );
-  }
+    ),
+  );
 }

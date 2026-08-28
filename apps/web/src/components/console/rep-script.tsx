@@ -1,92 +1,101 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CopyIcon, PencilIcon } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { ArrowLeftIcon, CalendarIcon, CopyIcon, PencilIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 
-import { copyPhone, Kbd } from '@/components/console/console-ui';
+import { copyPhone } from '@/components/console/console-ui';
 import { useShortcuts } from '@/components/console/use-shortcuts';
 import { useLive } from '@/components/live/use-live';
 import { QueryErrorState } from '@/components/query-error-state';
 import { RelationBadge } from '@/components/representants/relation-badge';
 import { RepresentantFormDialog } from '@/components/representants/representant-form-dialog';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import {
   buildRepAttempt,
   buildRepQueue,
+  callbackHalfHours,
   callbackSlots,
+  fetchRepScriptQueue,
   formatCallbackAt,
-  nextAfter,
   pushRepCallAttempt,
   repRelationSettled,
   repScriptKeys,
-  fetchRepScriptQueue,
   type RepAnswer,
 } from '@/lib/data/console';
-import { PROFESSIONS, scriptOf, whatsappLabel } from '@/lib/data/representants';
-import { formatNumber, formatPhone } from '@/lib/format';
+import { fetchRepresentants, type ScriptedRepresentant } from '@/lib/data/representants';
+import { formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
-import { REPRESENTANT_RELATION_LABELS } from '@/lib/representant-filters';
+import { queryKeys } from '@/lib/query-keys';
+import { EMPTY_REPRESENTANT_FILTERS, type RepresentantFilters } from '@/lib/representant-filters';
+import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { cn } from '@/lib/utils';
 
-type Step =
-  'identite' | 'ambassadeur' | 'whatsapp' | 'profession' | 'echeance' | 'suggestion' | 'fin';
+/**
+ * Ce que l'appel a donné : les TROIS issues du mobile, et rien d'autre.
+ * `WRONG_NUMBER` reste lisible sur les appels déjà consignés — il n'est
+ * simplement plus proposé à la saisie ; corriger un numéro faux se fait sur la
+ * fiche, ce n'est pas le résultat d'un appel.
+ */
+type Resultat = 'JOIGNABLE' | 'RAPPEL' | 'INJOIGNABLE';
 
-const QUESTIONS: Record<Step, string> = {
-  identite: '',
-  ambassadeur: 'Souhaitez-vous être ambassadeur CPI ?',
-  whatsapp: 'Son WhatsApp ?',
-  profession: 'Sa profession ?',
-  echeance: 'Quand rappeler ?',
-  suggestion: 'Connaissez-vous quelqu’un qui pourrait l’être ?',
-  fin: 'Appel consigné.',
-};
-
-const KEYBOARD_MAP: readonly (readonly [string, string])[] = [
-  ['1 … 8', 'La réponse qui porte ce chiffre'],
-  ['Entrée', 'Passer la question, ou la fiche'],
-  ['Échap', 'Revenir à la question précédente'],
-  ['↑ ↓', 'Parcourir la file'],
-  ['Espace', 'Ouvrir la fiche sélectionnée'],
-  ['C', 'Copier le numéro'],
-  ['E', 'Corriger la fiche'],
-  ['R', 'Ouvrir la fiche du représentant'],
-  ['M', 'Changer de volet'],
-  ['?', 'Afficher cette carte'],
+const RESULTATS: readonly { valeur: Resultat; label: string }[] = [
+  { valeur: 'JOIGNABLE', label: 'Joignable' },
+  { valeur: 'RAPPEL', label: 'À rappeler' },
+  { valeur: 'INJOIGNABLE', label: 'Injoignable' },
 ];
 
-interface Choice {
-  readonly key: string;
-  readonly label: string;
-  readonly hint?: string;
-  readonly run: () => void;
-}
+const KEYBOARD_MAP: readonly (readonly [string, string])[] = [
+  ['C', 'Copier le numéro'],
+  ['E', 'Corriger la fiche'],
+  ['Échap', 'Revenir en arrière'],
+];
 
 const digitsOf = (value: string): number => value.replace(/\D/gu, '').length;
 
+/** Apparition d'une question qui n'était pas là : douce, et coupée si l'on préfère. */
+const REVELE = 'animate-in fade-in-0 slide-in-from-top-1 duration-200 motion-reduce:animate-none';
+
+/**
+ * L'annuaire, cherché par le SERVEUR : il compare le nom et le numéro réduit à
+ * ses chiffres, donc « 77 123 45 67 » trouve la même fiche que « 771234567 ».
+ */
+const annuaireFilters = (search: string): RepresentantFilters => ({
+  ...EMPTY_REPRESENTANT_FILTERS,
+  search,
+  sortBy: 'fullName',
+  sortDir: 'asc',
+  pageSize: 20,
+});
+
+/**
+ * Étape 1 : qualifier un représentant, dans l'ordre et les mots de
+ * l'application mobile.
+ *
+ * Rien n'est choisi d'office : l'écran ouvre sur la liste. La qualification ne
+ * part au serveur qu'à « Enregistrer », en UNE tentative — c'est ce qui permet
+ * de revenir sur chaque réponse jusqu'au bout.
+ */
 export function RepScript() {
-  const router = useRouter();
   const queryClient = useQueryClient();
   const live = useLive();
-  const freeRef = useRef<HTMLInputElement>(null);
 
-  const [openedId, setOpenedId] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [done, setDone] = useState<readonly string[]>([]);
-  const [step, setStep] = useState<Step>('identite');
-  const [freeEntry, setFreeEntry] = useState(false);
-  const [text, setText] = useState('');
-  const [sugName, setSugName] = useState('');
-  const [sugPhone, setSugPhone] = useState('');
-  const [sugNote, setSugNote] = useState('');
-  const [edit, setEdit] = useState(false);
-  const [helpOpen, setHelpOpen] = useState(false);
-  const [sent, setSent] = useState(0);
-  const [ambassadeurs, setAmbassadeurs] = useState(0);
+  const [choisi, setChoisi] = useState<ScriptedRepresentant | null>(null);
+  const [search, setSearch] = useState('');
+  const [confirme, setConfirme] = useState<string | null>(null);
+  const cherche = useDebouncedValue(search).trim();
 
   const queue = useQuery({
     queryKey: repScriptKeys.queue,
@@ -94,342 +103,29 @@ export function RepScript() {
     refetchInterval: live.refetchInterval,
   });
 
-  const loaded = useMemo(() => queue.data?.items ?? [], [queue.data]);
-  const items = useMemo(
-    () => buildRepQueue(loaded).filter((row) => !done.includes(row.id)),
-    [loaded, done],
-  );
-
-  const current = useMemo(
-    () => items.find((row) => row.id === openedId) ?? items[0],
-    [items, openedId],
-  );
-  const selected = useMemo(
-    () => items.find((row) => row.id === selectedId) ?? current,
-    [items, selectedId, current],
-  );
-
-  const send = useMutation({
-    mutationFn: (input: { representantId: string; answer: RepAnswer }) =>
-      pushRepCallAttempt(buildRepAttempt(input.representantId, input.answer)),
-    onSuccess: (_result, input) => {
-      setSent((count) => count + 1);
-      if (input.answer.relationStatus === 'AMBASSADEUR') setAmbassadeurs((count) => count + 1);
-      void queryClient.invalidateQueries({ queryKey: repScriptKeys.root });
-    },
-    onError: (error) => {
-      toastApiError(error, 'La réponse n’a pas été enregistrée.');
-    },
+  const annuaire = useQuery({
+    queryKey: queryKeys.representants(annuaireFilters(cherche)),
+    queryFn: () => fetchRepresentants(annuaireFilters(cherche)),
+    enabled: choisi === null,
+    placeholderData: (previous) => previous,
   });
 
-  /**
-   * Une réponse tapée mais pas encore validée. Elle part au changement de fiche
-   * ou à la fermeture du volet : aucun écran ne doit exiger un bouton final.
-   */
-  const pending = useRef<{ representantId: string; answer: RepAnswer } | null>(null);
-  const sendRef = useRef(send);
-  useEffect(() => {
-    sendRef.current = send;
-  });
+  const file = useMemo(() => buildRepQueue(queue.data?.items ?? []), [queue.data]);
+  // Sans recherche, la liste confiée passe devant l'annuaire : c'est le travail
+  // du jour. Elle ne choisit personne pour autant.
+  const liste = cherche === '' && file.length > 0 ? file : (annuaire.data?.items ?? []);
+  const listeEstFile = cherche === '' && file.length > 0;
 
-  useEffect(() => {
-    return () => {
-      const draft = pending.current;
-      pending.current = null;
-      if (draft !== null) sendRef.current.mutate(draft);
-    };
-  }, [current?.id]);
+  const ouvrir = useCallback((row: ScriptedRepresentant) => {
+    setConfirme(null);
+    setChoisi(row);
+  }, []);
 
-  const answer = useCallback(
-    (value: RepAnswer) => {
-      if (current === undefined) return;
-      pending.current = null;
-      send.mutate({ representantId: current.id, answer: value });
-    },
-    [current, send],
-  );
+  const revenir = useCallback(() => {
+    setChoisi(null);
+  }, []);
 
-  const stage = useCallback(
-    (value: RepAnswer | null) => {
-      pending.current =
-        current === undefined || value === null
-          ? null
-          : { representantId: current.id, answer: value };
-    },
-    [current],
-  );
-
-  const nextFiche = useCallback(() => {
-    if (current === undefined) return;
-    const at = current.id;
-    setDone((ids) => (ids.includes(at) ? ids : [...ids, at]));
-    const next = nextAfter(items, at);
-    setOpenedId(next);
-    setSelectedId(next);
-  }, [current, items]);
-
-  const move = useCallback(
-    (stepBy: number) => {
-      if (items.length === 0) return;
-      const at = items.findIndex((row) => row.id === selected?.id);
-      const next = items[Math.min(items.length - 1, Math.max(0, at + stepBy))];
-      if (next !== undefined) setSelectedId(next.id);
-    },
-    [items, selected],
-  );
-
-  useEffect(() => {
-    setStep('identite');
-    setFreeEntry(false);
-    setText('');
-    setSugName('');
-    setSugPhone('');
-    setSugNote('');
-  }, [current?.id]);
-
-  useEffect(() => {
-    if (freeEntry) freeRef.current?.focus();
-  }, [freeEntry, step]);
-
-  const settled = current !== undefined && repRelationSettled(current);
-  const now = queue.dataUpdatedAt === 0 ? Date.now() : queue.dataUpdatedAt;
-
-  const openFree = useCallback(() => {
-    setText('');
-    stage(null);
-    setFreeEntry(true);
-  }, [stage]);
-
-  const choices = useMemo<readonly Choice[]>(() => {
-    if (current === undefined || settled) return [];
-
-    if (step === 'identite') {
-      return [
-        {
-          key: '1',
-          label: 'Oui',
-          run: () => {
-            setStep('ambassadeur');
-          },
-        },
-        {
-          key: '2',
-          label: 'Injoignable',
-          run: () => {
-            answer({ outcome: 'UNREACHABLE' });
-            setStep('fin');
-          },
-        },
-        {
-          key: '3',
-          label: 'Mauvais numéro',
-          run: () => {
-            answer({ outcome: 'WRONG_NUMBER' });
-            setStep('fin');
-          },
-        },
-        {
-          key: '4',
-          label: 'Corriger la fiche',
-          run: () => {
-            setEdit(true);
-          },
-        },
-      ];
-    }
-
-    if (step === 'ambassadeur') {
-      return [
-        {
-          key: '1',
-          label: 'Oui',
-          run: () => {
-            answer({ outcome: 'REACHED', relationStatus: 'AMBASSADEUR' });
-            setStep('whatsapp');
-          },
-        },
-        {
-          key: '2',
-          label: 'Non',
-          run: () => {
-            answer({ outcome: 'REFUSED', relationStatus: 'REFUS' });
-            setStep('suggestion');
-          },
-        },
-        {
-          key: '3',
-          label: 'Pas maintenant',
-          run: () => {
-            answer({ outcome: 'CALLBACK', relationStatus: 'CONTACTE' });
-            setStep('echeance');
-          },
-        },
-      ];
-    }
-
-    if (step === 'whatsapp') {
-      return [
-        {
-          key: '1',
-          label: 'Le même que son téléphone',
-          run: () => {
-            answer({ outcome: 'REACHED', whatsappStatus: 'MEME_NUMERO' });
-            setStep('profession');
-          },
-        },
-        { key: '2', label: 'Un autre numéro', run: openFree },
-        {
-          key: '3',
-          label: 'Pas de WhatsApp',
-          run: () => {
-            answer({ outcome: 'REACHED', whatsappStatus: 'AUCUN' });
-            setStep('profession');
-          },
-        },
-      ];
-    }
-
-    if (step === 'profession') {
-      return [
-        ...PROFESSIONS.map((profession, index) => ({
-          key: String(index + 1),
-          label: profession,
-          run: () => {
-            answer({ outcome: 'REACHED', profession });
-            setStep('fin');
-          },
-        })),
-        { key: String(PROFESSIONS.length + 1), label: 'Autre', run: openFree },
-      ];
-    }
-
-    if (step === 'echeance') {
-      return callbackSlots(Date.now()).map((slot) => ({
-        key: slot.key,
-        label: slot.label,
-        hint: formatCallbackAt(slot.at, now),
-        run: () => {
-          answer({ outcome: 'CALLBACK', comment: `Rappeler ${formatCallbackAt(slot.at, now)}` });
-          setStep('fin');
-        },
-      }));
-    }
-
-    if (step === 'suggestion') {
-      return [
-        { key: '1', label: 'Oui', run: openFree },
-        {
-          key: '2',
-          label: 'Non',
-          run: () => {
-            setStep('fin');
-          },
-        },
-      ];
-    }
-
-    return [];
-  }, [current, settled, step, answer, openFree, now]);
-
-  const commitWhatsapp = useCallback(() => {
-    if (digitsOf(text) < 9) return;
-    answer({ outcome: 'REACHED', whatsappStatus: 'AUTRE_NUMERO', whatsappE164: text.trim() });
-    setStep('profession');
-  }, [answer, text]);
-
-  const commitProfession = useCallback(() => {
-    const value = text.trim();
-    if (value === '') return;
-    answer({ outcome: 'REACHED', profession: value });
-    setStep('fin');
-  }, [answer, text]);
-
-  const suggestionAnswer = useCallback(
-    (phone: string, name: string, note: string): RepAnswer | null => {
-      if (digitsOf(phone) < 9) return null;
-      return {
-        outcome: 'REFUSED',
-        suggestedPhone: phone.trim(),
-        ...(name.trim() === '' ? {} : { suggestedName: name.trim() }),
-        ...(note.trim() === '' ? {} : { suggestedNote: note.trim() }),
-      };
-    },
-    [],
-  );
-
-  const commitSuggestion = useCallback(() => {
-    const value = suggestionAnswer(sugPhone, sugName, sugNote);
-    if (value === null) return;
-    answer(value);
-    setStep('fin');
-  }, [answer, suggestionAnswer, sugPhone, sugName, sugNote]);
-
-  const back = useCallback(() => {
-    stage(null);
-    setText('');
-    if (freeEntry) {
-      setFreeEntry(false);
-      return;
-    }
-    if (step === 'ambassadeur') setStep('identite');
-    if (step === 'whatsapp') setStep('ambassadeur');
-    if (step === 'profession') setStep('whatsapp');
-    if (step === 'echeance' || step === 'suggestion') setStep('ambassadeur');
-  }, [freeEntry, step, stage]);
-
-  const onEnter = useCallback(() => {
-    if (step === 'whatsapp') {
-      setStep('profession');
-      return;
-    }
-    if (step === 'profession') {
-      setStep('fin');
-      return;
-    }
-    nextFiche();
-  }, [step, nextFiche]);
-
-  useShortcuts(
-    {
-      ...Object.fromEntries(choices.map((choice) => [choice.key, choice.run])),
-      Enter: onEnter,
-      Escape: back,
-      ArrowDown: () => {
-        move(1);
-      },
-      ArrowUp: () => {
-        move(-1);
-      },
-      Space: () => {
-        if (selected !== undefined) setOpenedId(selected.id);
-      },
-      c: () => {
-        if (current !== undefined) copyPhone(current.phoneE164);
-      },
-      e: () => {
-        if (current !== undefined) setEdit(true);
-      },
-      r: () => {
-        if (current !== undefined) {
-          router.push(`/chues/representants/${encodeURIComponent(current.id)}`);
-        }
-      },
-      '?': () => {
-        setHelpOpen((open) => !open);
-      },
-    },
-    !edit,
-  );
-
-  if (queue.isPending) {
-    return (
-      <div className="grid gap-4 lg:grid-cols-[20rem_minmax(0,1fr)_22.5rem]">
-        <Skeleton className="h-96" />
-        <Skeleton className="h-96" />
-        <Skeleton className="h-96" />
-      </div>
-    );
-  }
+  if (queue.isPending) return <Skeleton className="h-96 w-full" />;
 
   if (queue.isError) {
     return (
@@ -443,372 +139,706 @@ export function RepScript() {
     );
   }
 
-  const script = current === undefined ? null : scriptOf(current);
-  const total = queue.data.total;
+  if (choisi !== null) {
+    return (
+      <Qualification
+        key={choisi.id}
+        representant={choisi}
+        onAbandon={revenir}
+        onEnregistre={(nom) => {
+          setConfirme(nom);
+          setChoisi(null);
+          void queryClient.invalidateQueries({ queryKey: repScriptKeys.root });
+        }}
+      />
+    );
+  }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[20rem_minmax(0,1fr)_22.5rem]">
-      <section aria-label="File des représentants" className="flex flex-col gap-3">
-        <p className="text-[0.875rem] font-[600]">{formatNumber(items.length)} à appeler</p>
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
+      {confirme === null ? null : (
+        <p role="status" className={cn('text-[0.875rem] font-[600] text-accent-text', REVELE)}>
+          Appel enregistré pour {confirme}.
+        </p>
+      )}
 
-        <ol className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto scrollbar-thin">
-          {items.map((row, index) => (
+      <ChampAnnuaire value={search} onChange={setSearch} />
+
+      <p className="text-[0.8125rem] text-muted-foreground">
+        {listeEstFile
+          ? 'Votre liste d’appel. Choisissez qui vous venez d’appeler.'
+          : 'Choisissez qui vous venez d’appeler.'}
+      </p>
+
+      {annuaire.isError && !listeEstFile ? (
+        <QueryErrorState
+          error={annuaire.error}
+          fallback="L’annuaire n’a pas pu être lu."
+          onRetry={() => {
+            void annuaire.refetch();
+          }}
+        />
+      ) : annuaire.isPending && !listeEstFile ? (
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-14" />
+          <Skeleton className="h-14" />
+          <Skeleton className="h-14" />
+        </div>
+      ) : liste.length === 0 ? (
+        <p className="text-[0.9375rem]">Aucun résultat. Vérifiez le nom ou le numéro.</p>
+      ) : (
+        <ol className="flex flex-col gap-2">
+          {liste.map((row) => (
             <li key={row.id}>
               <button
                 type="button"
-                data-highlighted={row.id === selected?.id ? '' : undefined}
-                aria-current={row.id === current?.id ? 'true' : undefined}
                 onClick={() => {
-                  setSelectedId(row.id);
-                  setOpenedId(row.id);
+                  ouvrir(row);
                 }}
                 className={cn(
-                  'flex w-full flex-col items-start gap-0.5 rounded-md border border-transparent px-2 py-2 text-left',
-                  'hover:bg-secondary',
-                  'data-highlighted:outline-2 data-highlighted:-outline-offset-2 data-highlighted:outline-ring',
-                  row.id === current?.id && 'border-border bg-secondary',
+                  'flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-md border border-border px-3 py-3 text-left',
+                  'hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
                 )}
               >
-                <span className="flex w-full items-baseline gap-2">
-                  <span className="text-[0.75rem] text-muted-foreground">{index + 1}</span>
-                  <span className="min-w-0 flex-1 truncate text-[0.875rem] font-[600]">
-                    {row.fullName}
+                <span className="flex min-w-0 flex-col">
+                  <span className="truncate text-[0.9375rem] font-[600]">{row.fullName}</span>
+                  <span className="text-[0.8125rem] text-muted-foreground">
+                    <span className="tabular-nums">{formatPhone(row.phoneE164)}</span>
+                    {row.departementName === null ? '' : ` · ${row.departementName}`}
                   </span>
                 </span>
-                <span className="pl-5 text-[0.75rem] text-muted-foreground">
-                  {REPRESENTANT_RELATION_LABELS[row.relationStatus].toLowerCase()}
-                </span>
+                <RelationBadge status={row.relationStatus} />
               </button>
             </li>
           ))}
         </ol>
+      )}
+    </div>
+  );
+}
 
-        {total > loaded.length ? (
-          <p className="text-[0.75rem] text-muted-foreground">
-            {formatNumber(loaded.length)} fiches chargées sur {formatNumber(total)}. La suite arrive
-            au fur et à mesure que celles-ci sont traitées.
-          </p>
-        ) : null}
-      </section>
+/** Le champ de recherche, en tête de la liste et jamais replié. */
+function ChampAnnuaire({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const champ = useRef<HTMLInputElement>(null);
 
-      <section aria-label="Appel en cours" className="flex flex-col gap-5">
-        {current === undefined || script === null ? (
-          <p className="text-[0.9375rem]">
-            Plus aucun représentant à appeler dans cette file. Revenez quand une nouvelle campagne
-            d’appels représentants aura été tirée.
-          </p>
-        ) : (
-          <>
-            <div className="flex items-center gap-3">
-              <span className="select-all font-display text-[2rem] font-[700] tracking-[-0.02em] tabular-nums">
-                {formatPhone(current.phoneE164)}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  copyPhone(current.phoneE164);
-                }}
-              >
-                <CopyIcon aria-hidden="true" />
-                Copier
-                <Kbd>C</Kbd>
-              </Button>
-            </div>
+  useEffect(() => {
+    champ.current?.focus();
+  }, []);
 
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">
-                  {current.fullName}
-                </h2>
-                <p className="text-[0.875rem] text-muted-foreground">
-                  {current.departementName}
-                  {current.iefName === null ? '' : ` · ${current.iefName}`}
-                </p>
-              </div>
-              <RelationBadge status={current.relationStatus} />
-            </div>
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor="rep-annuaire" className="text-[0.875rem] font-[600]">
+        Qui avez-vous appelé ?
+      </label>
+      <Input
+        id="rep-annuaire"
+        ref={champ}
+        type="search"
+        autoComplete="off"
+        placeholder="Chercher un représentant : nom ou numéro"
+        className="h-12 text-[1rem]"
+        value={value}
+        onChange={(event) => {
+          onChange(event.target.value);
+        }}
+      />
+    </div>
+  );
+}
 
-            {settled ? (
-              <div
-                role="status"
-                className="rounded-md border border-border bg-warning-surface px-3 py-2 text-[0.875rem] text-warning"
-              >
-                Relation déjà tranchée (
-                {REPRESENTANT_RELATION_LABELS[current.relationStatus].toLowerCase()}). Rien à
-                consigner ici. Entrée passe à la suivante.
-              </div>
-            ) : (
-              <fieldset className="flex flex-col gap-3">
-                <legend className="pb-2 text-[1rem] font-[600]">
-                  {step === 'identite' ? `C’est bien ${current.fullName} ?` : QUESTIONS[step]}
-                </legend>
+/**
+ * La qualification elle-même : deux étapes, comme sur mobile. Aucune réponse ne
+ * part avant « Enregistrer », donc chacune reste modifiable jusque-là.
+ */
+function Qualification({
+  representant,
+  onAbandon,
+  onEnregistre,
+}: {
+  representant: ScriptedRepresentant;
+  onAbandon: () => void;
+  onEnregistre: (nom: string) => void;
+}) {
+  const [etape, setEtape] = useState<1 | 2>(1);
+  const [resultat, setResultat] = useState<Resultat | null>(null);
+  const [estRepresentant, setEstRepresentant] = useState<boolean | null>(null);
+  const [memeWhatsapp, setMemeWhatsapp] = useState<boolean | null>(null);
+  const [whatsapp, setWhatsapp] = useState('');
+  const [rappelAt, setRappelAt] = useState<string | null>(null);
+  const [sugPhone, setSugPhone] = useState('');
+  const [sugName, setSugName] = useState('');
+  const [sugNote, setSugNote] = useState('');
+  const [commentaire, setCommentaire] = useState('');
+  const [edit, setEdit] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  // La garde du mobile : une relation DÉJÀ TRANCHÉE, acceptation comme refus,
+  // ne se requalifie pas sans qu'on l'ait dit.
+  const [avertiTranchee, setAvertiTranchee] = useState(repRelationSettled(representant));
 
-                <div className="flex flex-wrap gap-2">
-                  {choices.map((choice) => (
-                    <Button
-                      key={choice.key}
-                      variant="outline"
-                      className={
-                        choice.hint === undefined ? '' : 'h-auto flex-col items-start py-2'
-                      }
-                      onClick={choice.run}
-                    >
-                      <span className="flex items-center gap-2">
-                        <Kbd>{choice.key}</Kbd>
-                        {choice.label}
-                      </span>
-                      {choice.hint === undefined ? null : (
-                        <span className="pl-7 text-[0.75rem] font-[400] text-muted-foreground">
-                          {choice.hint}
-                        </span>
-                      )}
-                    </Button>
-                  ))}
-                </div>
+  const now = useMemo(() => Date.now(), []);
 
-                {step === 'echeance' ? (
-                  <p className="text-[0.75rem] text-muted-foreground">
-                    L’heure convenue part dans le commentaire de l’appel : une campagne d’appels
-                    représentants ne porte pas encore d’échéance datée.
-                  </p>
-                ) : null}
+  const send = useMutation({
+    mutationFn: (answer: RepAnswer) => pushRepCallAttempt(buildRepAttempt(representant.id, answer)),
+    onSuccess: () => {
+      toast.success(`Appel enregistré pour ${representant.fullName}.`);
+      onEnregistre(representant.fullName);
+    },
+    onError: (error) => {
+      toastApiError(error, 'La réponse n’a pas été enregistrée.');
+    },
+  });
 
-                {freeEntry && step === 'whatsapp' ? (
-                  <div className="flex max-w-80 flex-col gap-1.5">
-                    <label htmlFor="rep-whatsapp" className="text-[0.875rem] font-[600]">
-                      Numéro WhatsApp
-                    </label>
-                    <Input
-                      id="rep-whatsapp"
-                      ref={freeRef}
-                      inputMode="tel"
-                      autoComplete="off"
-                      placeholder="77 123 45 67"
-                      value={text}
-                      onChange={(event) => {
-                        const value = event.target.value;
-                        setText(value);
-                        stage(
-                          digitsOf(value) < 9
-                            ? null
-                            : {
-                                outcome: 'REACHED',
-                                whatsappStatus: 'AUTRE_NUMERO',
-                                whatsappE164: value.trim(),
-                              },
-                        );
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key !== 'Enter') return;
-                        event.preventDefault();
-                        commitWhatsapp();
-                      }}
-                    />
-                    <p className="text-[0.75rem] text-muted-foreground">
-                      Le serveur remet le numéro en forme. Un numéro illisible fait refuser l’appel
-                      entier.
-                    </p>
-                  </div>
-                ) : null}
+  /** Une personne proposée n'a de sens que si l'appelé a dit non. */
+  const proposeQuelquUn = resultat === 'JOIGNABLE' && estRepresentant === false;
+  const suggestionCommencee =
+    sugPhone.trim() !== '' || sugName.trim() !== '' || sugNote.trim() !== '';
 
-                {freeEntry && step === 'profession' ? (
-                  <div className="flex max-w-80 flex-col gap-1.5">
-                    <label htmlFor="rep-profession" className="text-[0.875rem] font-[600]">
-                      Autre profession
-                    </label>
-                    <Input
-                      id="rep-profession"
-                      ref={freeRef}
-                      autoComplete="off"
-                      maxLength={120}
-                      value={text}
-                      onChange={(event) => {
-                        const value = event.target.value;
-                        setText(value);
-                        stage(
-                          value.trim() === ''
-                            ? null
-                            : { outcome: 'REACHED', profession: value.trim() },
-                        );
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key !== 'Enter') return;
-                        event.preventDefault();
-                        commitProfession();
-                      }}
-                    />
-                  </div>
-                ) : null}
+  const manque = ((): string | null => {
+    if (resultat === null) return 'Choisissez d’abord le résultat';
+    if (resultat === 'JOIGNABLE' && estRepresentant === null) {
+      return 'Dites s’il est représentant CPI CHUES';
+    }
+    if (resultat === 'JOIGNABLE' && estRepresentant === true && memeWhatsapp === null) {
+      return 'Dites s’il a WhatsApp sur ce numéro';
+    }
+    if (
+      resultat === 'JOIGNABLE' &&
+      estRepresentant === true &&
+      memeWhatsapp === false &&
+      digitsOf(whatsapp) < 9
+    ) {
+      return 'Écrivez le numéro WhatsApp';
+    }
+    if (resultat === 'RAPPEL' && rappelAt === null) return 'Choisissez quand rappeler';
+    // Le serveur jette une suggestion sans numéro : plutôt que d'effacer en
+    // silence ce qui vient d'être dicté, l'enregistrement attend le numéro.
+    if (proposeQuelquUn && suggestionCommencee && digitsOf(sugPhone) < 9) {
+      return 'Écrivez le numéro de la personne proposée';
+    }
+    return null;
+  })();
 
-                {freeEntry && step === 'suggestion' ? (
-                  <div className="flex max-w-96 flex-col gap-3">
-                    <div className="flex flex-col gap-1.5">
-                      <label htmlFor="rep-sug-phone" className="text-[0.875rem] font-[600]">
-                        Numéro du contact
-                      </label>
-                      <Input
-                        id="rep-sug-phone"
-                        ref={freeRef}
-                        inputMode="tel"
-                        autoComplete="off"
-                        placeholder="77 123 45 67"
-                        value={sugPhone}
-                        onChange={(event) => {
-                          const value = event.target.value;
-                          setSugPhone(value);
-                          stage(suggestionAnswer(value, sugName, sugNote));
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key !== 'Enter') return;
-                          event.preventDefault();
-                          commitSuggestion();
-                        }}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label htmlFor="rep-sug-name" className="text-[0.875rem] font-[600]">
-                        Nom du contact
-                      </label>
-                      <Input
-                        id="rep-sug-name"
-                        autoComplete="off"
-                        maxLength={160}
-                        value={sugName}
-                        onChange={(event) => {
-                          const value = event.target.value;
-                          setSugName(value);
-                          stage(suggestionAnswer(sugPhone, value, sugNote));
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key !== 'Enter') return;
-                          event.preventDefault();
-                          commitSuggestion();
-                        }}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label htmlFor="rep-sug-note" className="text-[0.875rem] font-[600]">
-                        Ce qu’il en dit
-                      </label>
-                      <Textarea
-                        id="rep-sug-note"
-                        rows={2}
-                        maxLength={2000}
-                        value={sugNote}
-                        onChange={(event) => {
-                          const value = event.target.value;
-                          setSugNote(value);
-                          stage(suggestionAnswer(sugPhone, sugName, value));
-                        }}
-                      />
-                    </div>
-                    <Button className="self-start" onClick={commitSuggestion}>
-                      Enregistrer le contact
-                    </Button>
-                  </div>
-                ) : null}
+  const enregistrer = (): void => {
+    if (manque !== null || resultat === null || send.isPending) return;
+    const chuesOui = resultat === 'JOIGNABLE' && estRepresentant === true;
 
-                {step === 'fin' ? (
-                  <p className="text-[0.875rem] text-muted-foreground">
-                    Entrée passe au représentant suivant.
-                  </p>
-                ) : null}
-              </fieldset>
-            )}
-          </>
-        )}
-      </section>
+    send.mutate({
+      outcome:
+        resultat === 'JOIGNABLE'
+          ? chuesOui
+            ? 'REACHED'
+            : 'REFUSED'
+          : resultat === 'RAPPEL'
+            ? 'CALLBACK'
+            : 'UNREACHABLE',
+      ...(resultat === 'JOIGNABLE'
+        ? { relationStatus: chuesOui ? ('AMBASSADEUR' as const) : ('REFUS' as const) }
+        : {}),
+      ...(chuesOui
+        ? {
+            whatsappStatus:
+              memeWhatsapp === true ? ('MEME_NUMERO' as const) : ('AUTRE_NUMERO' as const),
+            ...(memeWhatsapp === true ? {} : { whatsappE164: whatsapp.trim() }),
+          }
+        : {}),
+      ...(rappelAt === null ? {} : { callbackAt: rappelAt }),
+      ...(proposeQuelquUn && suggestionCommencee
+        ? {
+            suggestedPhone: sugPhone.trim(),
+            ...(sugName.trim() === '' ? {} : { suggestedName: sugName.trim() }),
+            ...(sugNote.trim() === '' ? {} : { suggestedNote: sugNote.trim() }),
+          }
+        : {}),
+      ...(commentaire.trim() === '' ? {} : { comment: commentaire.trim() }),
+    });
+  };
 
-      <section aria-label="Contexte" className="flex flex-col gap-5 text-[0.875rem]">
-        {script === null ? null : (
-          <div className="flex flex-col gap-1">
-            <h3 className="text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
-              Ce que la fiche sait
-            </h3>
-            <dl className="flex flex-col gap-1">
-              <div className="flex justify-between gap-2">
-                <dt className="text-muted-foreground">WhatsApp</dt>
-                <dd
-                  className={cn(
-                    'text-right',
-                    script.whatsappStatus === 'NON_DEMANDE' && 'text-muted-foreground italic',
-                  )}
-                >
-                  {whatsappLabel(script)}
-                </dd>
-              </div>
-              <div className="flex justify-between gap-2">
-                <dt className="text-muted-foreground">Profession</dt>
-                <dd
-                  className={cn(
-                    'text-right',
-                    script.profession === null && 'text-muted-foreground italic',
-                  )}
-                >
-                  {script.profession ?? 'Non demandée'}
-                </dd>
-              </div>
-              <div className="flex justify-between gap-2">
-                <dt className="text-muted-foreground">Prospects apportés</dt>
-                <dd>{formatNumber(current?.prospectCount ?? 0)}</dd>
-              </div>
-            </dl>
+  const reculer = useCallback(() => {
+    setEtape((courante) => {
+      if (courante === 2) return 1;
+      onAbandon();
+      return 1;
+    });
+  }, [onAbandon]);
+
+  useShortcuts(
+    {
+      Escape: reculer,
+      c: () => {
+        copyPhone(representant.phoneE164);
+      },
+      e: () => {
+        setEdit(true);
+      },
+      '?': () => {
+        setHelpOpen((open) => !open);
+      },
+    },
+    !edit,
+  );
+
+  /*
+    La question passe AVANT tout : ni nom, ni numéro, ni question tant qu'on n'a
+    pas répondu. C'est la boîte que le mobile ouvre par-dessus l'écran avant
+    toute saisie. Le titre dit LEQUEL des deux cas on a sous les yeux.
+  */
+  if (avertiTranchee) {
+    return (
+      <Dialog open onOpenChange={onAbandon}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {representant.relationStatus === 'AMBASSADEUR'
+                ? 'Cette personne a déjà accepté d’être représentant CPI CHUES.'
+                : 'Cette personne a déjà refusé.'}
+            </DialogTitle>
+            <DialogDescription>
+              Voulez-vous quand même consigner un nouvel appel ?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={onAbandon}>
+              <ArrowLeftIcon aria-hidden="true" />
+              Revenir à la liste
+            </Button>
             <Button
-              variant="outline"
-              size="sm"
-              className="mt-2 self-start"
               onClick={() => {
-                setEdit(true);
+                setAvertiTranchee(false);
               }}
             >
-              <PencilIcon aria-hidden="true" />
-              Corriger la fiche
-              <Kbd>E</Kbd>
+              Continuer
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  return (
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
+      <Button variant="ghost" className="self-start px-0" onClick={reculer}>
+        <ArrowLeftIcon aria-hidden="true" />
+        {etape === 1 ? 'Revenir à la liste' : 'Étape précédente'}
+      </Button>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">
+          {representant.fullName}
+        </h2>
+        <RelationBadge status={representant.relationStatus} />
+      </div>
+
+      <div className="flex items-center gap-3">
+        <span className="select-all font-display text-[2rem] font-[700] tracking-[-0.02em] tabular-nums">
+          {formatPhone(representant.phoneE164)}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            copyPhone(representant.phoneE164);
+          }}
+        >
+          <CopyIcon aria-hidden="true" />
+          Copier
+        </Button>
+      </div>
+
+      <p className="text-[0.8125rem] font-[600] text-muted-foreground">
+        Étape {etape} sur 2 ·{' '}
+        {etape === 1 ? 'Comment s’est passé l’appel ?' : 'Quelque chose à ajouter ?'}
+      </p>
+
+      {etape === 1 ? (
+        <div className="flex flex-col gap-5">
+          <Question titre="Comment s’est passé l’appel ?">
+            <Choix
+              options={RESULTATS.map(({ valeur, label }) => ({ valeur, label }))}
+              value={resultat}
+              onChange={(valeur) => {
+                setResultat(valeur);
+                if (valeur !== 'JOIGNABLE') {
+                  setEstRepresentant(null);
+                  setMemeWhatsapp(null);
+                }
+                if (valeur !== 'RAPPEL') setRappelAt(null);
+              }}
+            />
+          </Question>
+
+          {resultat === 'JOIGNABLE' ? (
+            <Question titre="Est-il représentant CPI CHUES ?" anime>
+              <Choix
+                options={[
+                  { valeur: true, label: 'Oui' },
+                  { valeur: false, label: 'Non' },
+                ]}
+                value={estRepresentant}
+                onChange={(valeur) => {
+                  setEstRepresentant(valeur);
+                  if (!valeur) setMemeWhatsapp(null);
+                }}
+              />
+            </Question>
+          ) : null}
+
+          {resultat === 'JOIGNABLE' && estRepresentant === true ? (
+            <Question titre="A-t-il WhatsApp sur ce numéro ?" anime>
+              <Choix
+                options={[
+                  { valeur: true, label: 'Oui' },
+                  { valeur: false, label: 'Non' },
+                ]}
+                value={memeWhatsapp}
+                onChange={setMemeWhatsapp}
+              />
+              {memeWhatsapp === false ? (
+                <div className={cn('flex max-w-80 flex-col gap-1.5', REVELE)}>
+                  <label htmlFor="rep-whatsapp" className="text-[0.875rem] font-[600]">
+                    Numéro WhatsApp
+                  </label>
+                  <Input
+                    id="rep-whatsapp"
+                    inputMode="tel"
+                    autoComplete="off"
+                    placeholder="77 123 45 67"
+                    value={whatsapp}
+                    onChange={(event) => {
+                      setWhatsapp(event.target.value);
+                    }}
+                  />
+                </div>
+              ) : null}
+            </Question>
+          ) : null}
+
+          {proposeQuelquUn ? (
+            <Question titre="Il propose quelqu’un d’autre ? (facultatif)" anime>
+              <div className="flex max-w-96 flex-col gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="rep-sug-phone" className="text-[0.875rem] font-[600]">
+                    Son numéro
+                  </label>
+                  <Input
+                    id="rep-sug-phone"
+                    inputMode="tel"
+                    autoComplete="off"
+                    placeholder="77 123 45 67"
+                    value={sugPhone}
+                    onChange={(event) => {
+                      setSugPhone(event.target.value);
+                    }}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="rep-sug-name" className="text-[0.875rem] font-[600]">
+                    Son nom et prénom
+                  </label>
+                  <Input
+                    id="rep-sug-name"
+                    autoComplete="off"
+                    maxLength={160}
+                    value={sugName}
+                    onChange={(event) => {
+                      setSugName(event.target.value);
+                    }}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="rep-sug-note" className="text-[0.875rem] font-[600]">
+                    Sa remarque
+                  </label>
+                  <Textarea
+                    id="rep-sug-note"
+                    rows={2}
+                    maxLength={2000}
+                    value={sugNote}
+                    onChange={(event) => {
+                      setSugNote(event.target.value);
+                    }}
+                  />
+                </div>
+              </div>
+            </Question>
+          ) : null}
+
+          {resultat === 'RAPPEL' ? (
+            <Question titre="Quand rappeler ?" anime>
+              <ChoixEcheance now={now} value={rappelAt} onChange={setRappelAt} />
+            </Question>
+          ) : null}
+
+          <div className="flex flex-col gap-1.5">
+            <Button
+              className="self-start"
+              disabled={manque !== null}
+              onClick={() => {
+                setEtape(2);
+              }}
+            >
+              Continuer
+            </Button>
+            {manque === null ? null : (
+              <p className="text-[0.8125rem] text-muted-foreground">{manque}</p>
+            )}
           </div>
-        )}
-
-        <div className="flex flex-col gap-1">
-          <h3 className="text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
-            Session
-          </h3>
-          <p>
-            {formatNumber(sent)} réponse{sent > 1 ? 's' : ''} consignée{sent > 1 ? 's' : ''} ·{' '}
-            {formatNumber(ambassadeurs)} ambassadeur{ambassadeurs > 1 ? 's' : ''}
-          </p>
         </div>
+      ) : (
+        <div className="flex flex-col gap-5">
+          <Question titre="Quelque chose à ajouter ?">
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="rep-commentaire" className="text-[0.875rem] font-[600]">
+                Commentaire
+              </label>
+              <Textarea
+                id="rep-commentaire"
+                rows={3}
+                maxLength={2000}
+                placeholder="En une phrase"
+                value={commentaire}
+                onChange={(event) => {
+                  setCommentaire(event.target.value);
+                }}
+              />
+            </div>
+          </Question>
 
-        <div className="flex flex-col gap-2">
+          <dl className="flex flex-col gap-1 rounded-lg border border-border bg-card px-4 py-3 text-[0.875rem]">
+            <Recap intitule="Personne appelée" valeur={representant.fullName} />
+            <Recap intitule="Téléphone" valeur={formatPhone(representant.phoneE164)} />
+            <Recap
+              intitule="Résultat"
+              valeur={RESULTATS.find((item) => item.valeur === resultat)?.label ?? null}
+            />
+            {resultat === 'JOIGNABLE' ? (
+              <Recap
+                intitule="Représentant CPI CHUES"
+                valeur={estRepresentant === null ? null : estRepresentant ? 'Oui' : 'Non'}
+              />
+            ) : null}
+            {rappelAt === null ? null : (
+              <Recap intitule="Rappel" valeur={formatCallbackAt(rappelAt, now)} />
+            )}
+            {proposeQuelquUn && suggestionCommencee ? (
+              <Recap
+                intitule="Personne proposée"
+                valeur={[sugPhone.trim(), sugName.trim()].filter(Boolean).join(' · ')}
+              />
+            ) : null}
+          </dl>
+
+          {/* Un seul retour à l'écran, en tête : deux boutons du même nom
+              rendraient le chemin ambigu. */}
           <Button
-            variant="ghost"
-            size="sm"
-            className="justify-start px-0"
+            className="self-start"
+            disabled={manque !== null || send.isPending}
+            onClick={enregistrer}
+          >
+            Enregistrer
+          </Button>
+        </div>
+      )}
+
+      <details
+        open={helpOpen}
+        onToggle={(event) => {
+          setHelpOpen(event.currentTarget.open);
+        }}
+      >
+        <summary className="cursor-pointer list-none text-[0.8125rem] text-muted-foreground">
+          Carte clavier
+        </summary>
+        <dl className="mt-2 flex flex-col gap-1 text-[0.8125rem]">
+          {KEYBOARD_MAP.map(([touche, quoi]) => (
+            <div key={touche} className="flex items-baseline gap-2">
+              <dt className="w-24 shrink-0 font-[600]">{touche}</dt>
+              <dd className="text-muted-foreground">{quoi}</dd>
+            </div>
+          ))}
+        </dl>
+      </details>
+
+      <Button
+        variant="ghost"
+        className="self-start px-0 text-[0.8125rem]"
+        onClick={() => {
+          setEdit(true);
+        }}
+      >
+        <PencilIcon aria-hidden="true" />
+        Corriger la fiche
+      </Button>
+
+      {edit ? (
+        <RepresentantFormDialog
+          open
+          onOpenChange={setEdit}
+          representant={representant}
+          pendantAppel
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/** Une question posée, et qui LE RESTE une fois répondue. */
+function Question({
+  titre,
+  anime = false,
+  children,
+}: {
+  titre: string;
+  anime?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <fieldset className={cn('flex flex-col gap-2', anime && REVELE)}>
+      <legend className="pb-2 text-[1rem] font-[600]">{titre}</legend>
+      {children}
+    </fieldset>
+  );
+}
+
+/** Tuiles à réponse unique. Retoucher une réponse déjà prise reste possible. */
+function Choix<T extends string | boolean>({
+  options,
+  value,
+  onChange,
+}: {
+  options: readonly { valeur: T; label: string }[];
+  value: T | null;
+  onChange: (valeur: T) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map((option) => {
+        const actif = value === option.valeur;
+        return (
+          <Button
+            key={String(option.valeur)}
+            type="button"
+            variant={actif ? 'default' : 'outline'}
+            aria-pressed={actif}
             onClick={() => {
-              setHelpOpen((open) => !open);
+              onChange(option.valeur);
             }}
           >
-            Carte clavier
-            <Kbd>?</Kbd>
+            {option.label}
           </Button>
-          {helpOpen ? (
-            <dl className="flex flex-col gap-1">
-              {KEYBOARD_MAP.map(([keys, what]) => (
-                <div key={keys} className="flex items-baseline gap-2">
-                  <dt className="w-24 shrink-0">
-                    <Kbd>{keys}</Kbd>
-                  </dt>
-                  <dd className="text-muted-foreground">{what}</dd>
-                </div>
-              ))}
-            </dl>
-          ) : null}
-        </div>
-      </section>
+        );
+      })}
+    </div>
+  );
+}
 
-      {edit && current !== undefined ? (
-        <RepresentantFormDialog open onOpenChange={setEdit} representant={current} />
+/**
+ * Les créneaux d'un clic, puis « Choisir une date » : calendrier natif du
+ * navigateur, puis les demi-heures ouvrées du jour retenu. Même découpage que
+ * la feuille du mobile, sans embarquer de bibliothèque de calendrier.
+ */
+function ChoixEcheance({
+  now,
+  value,
+  onChange,
+}: {
+  now: number;
+  value: string | null;
+  onChange: (at: string | null) => void;
+}) {
+  const [jour, setJour] = useState('');
+  const [ouvert, setOuvert] = useState(false);
+
+  const slots = useMemo(() => callbackSlots(now), [now]);
+  const heures = useMemo(() => (jour === '' ? [] : callbackHalfHours(now, jour)), [now, jour]);
+  const surMesure = value !== null && !slots.some((slot) => slot.at === value);
+  const minimum = new Date(now).toISOString().slice(0, 10);
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap gap-2">
+        {slots.map((slot) => (
+          <Button
+            key={slot.key}
+            type="button"
+            variant={value === slot.at ? 'default' : 'outline'}
+            aria-pressed={value === slot.at}
+            onClick={() => {
+              setOuvert(false);
+              onChange(value === slot.at ? null : slot.at);
+            }}
+          >
+            {slot.label}
+          </Button>
+        ))}
+        <Button
+          type="button"
+          variant={surMesure ? 'default' : 'outline'}
+          aria-pressed={surMesure}
+          onClick={() => {
+            setOuvert((open) => !open);
+          }}
+        >
+          <CalendarIcon aria-hidden="true" />
+          {surMesure ? formatCallbackAt(value, now) : 'Choisir une date'}
+        </Button>
+      </div>
+
+      {ouvert ? (
+        <div className={cn('flex flex-col gap-3 rounded-lg border border-border p-3', REVELE)}>
+          <div className="flex max-w-64 flex-col gap-1.5">
+            <label htmlFor="rep-rappel-jour" className="text-[0.875rem] font-[600]">
+              Quel jour ?
+            </label>
+            <Input
+              id="rep-rappel-jour"
+              type="date"
+              min={minimum}
+              value={jour}
+              onChange={(event) => {
+                setJour(event.target.value);
+                onChange(null);
+              }}
+            />
+          </div>
+
+          {jour === '' ? null : heures.length === 0 ? (
+            <p className="text-[0.875rem]">
+              Plus d’heure disponible ce jour-là. Choisissez un autre jour.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              <p className="text-[0.875rem] font-[600]">À quelle heure ?</p>
+              <div className="flex max-h-48 flex-wrap gap-2 overflow-y-auto scrollbar-thin">
+                {heures.map((heure) => (
+                  <Button
+                    key={heure.key}
+                    type="button"
+                    size="sm"
+                    variant={value === heure.at ? 'default' : 'outline'}
+                    aria-pressed={value === heure.at}
+                    onClick={() => {
+                      onChange(heure.at);
+                    }}
+                  >
+                    {heure.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       ) : null}
+    </div>
+  );
+}
+
+function Recap({ intitule, valeur }: { intitule: string; valeur: string | null }) {
+  return (
+    <div className="flex justify-between gap-3">
+      <dt className="text-muted-foreground">{intitule}</dt>
+      <dd className={cn('text-right', valeur === null && 'text-muted-foreground italic')}>
+        {valeur ?? 'Non renseigné'}
+      </dd>
     </div>
   );
 }

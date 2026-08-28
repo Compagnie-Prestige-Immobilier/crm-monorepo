@@ -7,6 +7,7 @@ import { PilotageService } from './pilotage.service.js';
 import { PortfolioService } from './portfolio.service.js';
 import { QualityService } from './quality.service.js';
 import { SegmentConversionsService } from './segment-conversions.service.js';
+import { StatsLayoutService } from './stats-layout.service.js';
 import { SupervisionController } from './supervision.controller.js';
 import { SupervisionActivityService } from './supervision.service.js';
 
@@ -19,6 +20,7 @@ import { SupervisionActivityService } from './supervision.service.js';
     PortfolioService,
     QualityService,
     SegmentConversionsService,
+    StatsLayoutService,
     SupervisionActivityService,
   ],
   exports: [
@@ -28,6 +30,7 @@ import { SupervisionActivityService } from './supervision.service.js';
     PortfolioService,
     QualityService,
     SegmentConversionsService,
+    StatsLayoutService,
     SupervisionActivityService,
   ],
 })

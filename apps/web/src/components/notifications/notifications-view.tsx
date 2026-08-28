@@ -551,63 +551,75 @@ function NotificationDetailDialog({ id, onClose }: { id: string | null; onClose:
           <DialogDescription>Une ligne par destinataire.</DialogDescription>
         </DialogHeader>
 
-        {detail.isPending && id !== null ? (
-          <div className="flex flex-col gap-2">
-            <Skeleton className="h-11 w-full" />
-            <Skeleton className="h-11 w-full" />
-            <Skeleton className="h-11 w-full" />
-          </div>
-        ) : detail.isError ? (
-          <QueryErrorState
-            error={detail.error}
-            onRetry={() => {
-              void detail.refetch();
-            }}
-            fallback="Le détail n’a pas pu être chargé."
-          />
-        ) : detail.data ? (
-          <>
-            <p className="text-[0.9375rem] text-muted-foreground">
-              {detail.data.notification.body}
-            </p>
-            <div className="overflow-hidden rounded-lg border border-border">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead>Destinataire</TableHead>
-                    <TableHead>État</TableHead>
-                    <TableHead>Lue le</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {detail.data.recipients.map((recipient) => (
-                    <TableRow key={recipient.userId}>
-                      <TableCell>
-                        <span className="block font-[600]">{recipient.fullName}</span>
-                        <span className="block text-[0.75rem] text-muted-foreground">
-                          {ROLE_LABELS[recipient.role]}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={DELIVERY_VARIANT[recipient.status]}>
-                          {DELIVERY_LABELS[recipient.status]}
-                        </Badge>
-                        {recipient.error !== null ? (
-                          <span className="mt-1 block font-mono text-[0.6875rem] text-muted-foreground">
-                            {recipient.error}
-                          </span>
-                        ) : null}
-                      </TableCell>
-                      <TableCell className="text-[0.8125rem] text-muted-foreground">
-                        {dateTime(recipient.readAt)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </>
-        ) : null}
+        {(() => {
+          if (detail.isPending && id !== null)
+            return (
+              <div className="flex flex-col gap-2">
+                <Skeleton className="h-11 w-full" />
+                <Skeleton className="h-11 w-full" />
+                <Skeleton className="h-11 w-full" />
+              </div>
+            );
+          return (() => {
+            if (detail.isError)
+              return (
+                <QueryErrorState
+                  error={detail.error}
+                  onRetry={() => {
+                    void detail.refetch();
+                  }}
+                  fallback="Le détail n’a pas pu être chargé."
+                />
+              );
+            return (() => {
+              if (detail.data)
+                return (
+                  <>
+                    <p className="text-[0.9375rem] text-muted-foreground">
+                      {detail.data.notification.body}
+                    </p>
+                    <div className="overflow-hidden rounded-lg border border-border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="hover:bg-transparent">
+                            <TableHead>Destinataire</TableHead>
+                            <TableHead>État</TableHead>
+                            <TableHead>Lue le</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {detail.data.recipients.map((recipient) => (
+                            <TableRow key={recipient.userId}>
+                              <TableCell>
+                                <span className="block font-[600]">{recipient.fullName}</span>
+                                <span className="block text-[0.75rem] text-muted-foreground">
+                                  {ROLE_LABELS[recipient.role]}
+                                </span>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={DELIVERY_VARIANT[recipient.status]}>
+                                  {DELIVERY_LABELS[recipient.status]}
+                                </Badge>
+                                {recipient.error !== null ? (
+                                  <span className="mt-1 block font-mono text-[0.6875rem] text-muted-foreground">
+                                    {recipient.error}
+                                  </span>
+                                ) : null}
+                              </TableCell>
+                              <TableCell className="text-[0.8125rem] text-muted-foreground">
+                                {dateTime(recipient.readAt)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </>
+                );
+              return null;
+            })();
+          })();
+        })()}
       </DialogContent>
     </Dialog>
   );

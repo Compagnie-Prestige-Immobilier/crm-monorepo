@@ -212,33 +212,36 @@ export class VisitesService {
     // relevee par erreur ou un destinataire faux ne se corrigent jamais: le
     // registre garderait une valeur que personne ne peut retirer.
     const jour = dakarDate(existing.visitedAt);
-    const heure =
-      input.time === undefined
-        ? {}
-        : input.time === null
-          ? { visitedAt: this.instantOf(jour, '00:00'), timeKnown: false }
-          : { visitedAt: this.instantOf(jour, input.time), timeKnown: true };
+    const data: Prisma.VisiteUncheckedUpdateInput = {};
+    if (input.time === null) {
+      data.visitedAt = this.instantOf(jour, '00:00');
+      data.timeKnown = false;
+    } else if (input.time !== undefined) {
+      data.visitedAt = this.instantOf(jour, input.time);
+      data.timeKnown = true;
+    }
+
+    if (input.visitorName !== undefined) data.visitorName = input.visitorName.trim();
+    if (input.phone === null || input.phone?.trim() === '') {
+      data.phone = null;
+      data.phoneE164 = null;
+    } else if (input.phone !== undefined) {
+      data.phone = input.phone.trim();
+      data.phoneE164 = tryNormalizePhone(input.phone) ?? null;
+    }
+    if (input.entrepriseId !== undefined) data.entrepriseId = input.entrepriseId;
+    if (input.objetId !== undefined) data.objetId = input.objetId;
+    if (input.directionId !== undefined) data.directionId = input.directionId;
+    if (input.destinataireId !== undefined) data.destinataireId = input.destinataireId;
+    if (input.comment === null || input.comment?.trim() === '') {
+      data.comment = null;
+    } else if (input.comment !== undefined) {
+      data.comment = input.comment.trim();
+    }
 
     const updated = await this.prisma.visite.update({
       where: { id },
-      data: {
-        ...heure,
-        ...(input.visitorName === undefined ? {} : { visitorName: input.visitorName.trim() }),
-        ...(input.phone === undefined
-          ? {}
-          : input.phone === null || input.phone.trim() === ''
-            ? { phone: null, phoneE164: null }
-            : { phone: input.phone.trim(), phoneE164: tryNormalizePhone(input.phone) ?? null }),
-        ...(input.entrepriseId === undefined ? {} : { entrepriseId: input.entrepriseId }),
-        ...(input.objetId === undefined ? {} : { objetId: input.objetId }),
-        ...(input.directionId === undefined ? {} : { directionId: input.directionId }),
-        ...(input.destinataireId === undefined ? {} : { destinataireId: input.destinataireId }),
-        ...(input.comment === undefined
-          ? {}
-          : input.comment === null || input.comment.trim() === ''
-            ? { comment: null }
-            : { comment: input.comment.trim() }),
-      },
+      data,
       include: VISITE_INCLUDE,
     });
     return toDto(updated);

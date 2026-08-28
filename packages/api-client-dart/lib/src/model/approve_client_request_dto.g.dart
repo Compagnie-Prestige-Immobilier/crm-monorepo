@@ -11,8 +11,6 @@ abstract class _$ApproveClientRequestDtoCWProxy {
 
   ApproveClientRequestDto syndicatId(String syndicatId);
 
-  ApproveClientRequestDto enrollmentMethod(EnrollmentMethod enrollmentMethod);
-
   ApproveClientRequestDto banqueId(String? banqueId);
 
   ApproveClientRequestDto clientCreatedAt(DateTime? clientCreatedAt);
@@ -26,7 +24,6 @@ abstract class _$ApproveClientRequestDtoCWProxy {
   ApproveClientRequestDto call({
     String representantId,
     String syndicatId,
-    EnrollmentMethod enrollmentMethod,
     String? banqueId,
     DateTime? clientCreatedAt,
   });
@@ -48,10 +45,6 @@ class _$ApproveClientRequestDtoCWProxyImpl
       this(syndicatId: syndicatId);
 
   @override
-  ApproveClientRequestDto enrollmentMethod(EnrollmentMethod enrollmentMethod) =>
-      this(enrollmentMethod: enrollmentMethod);
-
-  @override
   ApproveClientRequestDto banqueId(String? banqueId) =>
       this(banqueId: banqueId);
 
@@ -69,7 +62,6 @@ class _$ApproveClientRequestDtoCWProxyImpl
   ApproveClientRequestDto call({
     Object? representantId = const $CopyWithPlaceholder(),
     Object? syndicatId = const $CopyWithPlaceholder(),
-    Object? enrollmentMethod = const $CopyWithPlaceholder(),
     Object? banqueId = const $CopyWithPlaceholder(),
     Object? clientCreatedAt = const $CopyWithPlaceholder(),
   }) {
@@ -82,10 +74,6 @@ class _$ApproveClientRequestDtoCWProxyImpl
           ? _value.syndicatId
           // ignore: cast_nullable_to_non_nullable
           : syndicatId as String,
-      enrollmentMethod: enrollmentMethod == const $CopyWithPlaceholder()
-          ? _value.enrollmentMethod
-          // ignore: cast_nullable_to_non_nullable
-          : enrollmentMethod as EnrollmentMethod,
       banqueId: banqueId == const $CopyWithPlaceholder()
           ? _value.banqueId
           // ignore: cast_nullable_to_non_nullable
@@ -112,21 +100,10 @@ extension $ApproveClientRequestDtoCopyWith on ApproveClientRequestDto {
 ApproveClientRequestDto _$ApproveClientRequestDtoFromJson(
   Map<String, dynamic> json,
 ) => $checkedCreate('ApproveClientRequestDto', json, ($checkedConvert) {
-  $checkKeys(
-    json,
-    requiredKeys: const ['representantId', 'syndicatId', 'enrollmentMethod'],
-  );
+  $checkKeys(json, requiredKeys: const ['representantId', 'syndicatId']);
   final val = ApproveClientRequestDto(
     representantId: $checkedConvert('representantId', (v) => v as String),
     syndicatId: $checkedConvert('syndicatId', (v) => v as String),
-    enrollmentMethod: $checkedConvert(
-      'enrollmentMethod',
-      (v) => $enumDecode(
-        _$EnrollmentMethodEnumMap,
-        v,
-        unknownValue: EnrollmentMethod.unknownDefaultOpenApi,
-      ),
-    ),
     banqueId: $checkedConvert('banqueId', (v) => v as String?),
     clientCreatedAt: $checkedConvert(
       'clientCreatedAt',
@@ -141,16 +118,7 @@ Map<String, dynamic> _$ApproveClientRequestDtoToJson(
 ) => <String, dynamic>{
   'representantId': instance.representantId,
   'syndicatId': instance.syndicatId,
-  'enrollmentMethod': _$EnrollmentMethodEnumMap[instance.enrollmentMethod]!,
   if (instance.banqueId case final value?) 'banqueId': value,
   if (instance.clientCreatedAt?.toIso8601String() case final value?)
     'clientCreatedAt': value,
-};
-
-const _$EnrollmentMethodEnumMap = {
-  EnrollmentMethod.PLATFORM: 'PLATFORM',
-  EnrollmentMethod.PHYSICAL: 'PHYSICAL',
-  EnrollmentMethod.VOICE_OR_ELECTRONIC_MESSAGING:
-      'VOICE_OR_ELECTRONIC_MESSAGING',
-  EnrollmentMethod.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

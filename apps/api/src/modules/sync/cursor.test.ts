@@ -80,6 +80,16 @@ describe('curseur de pull', () => {
     expect(next.streams.prospects).toEqual({ t: 9_000, id: 'p-1' });
   });
 
+  it('conserve les campagnes et tâches représentants', () => {
+    const cursor = advance(
+      advance(EMPTY_CURSOR, 'repCallCampaigns', { t: 5_000, id: 'camp-1' }),
+      'repCallTasks',
+      { t: 9_000, id: 'task-1' },
+    );
+
+    expect(decodeCursor(encodeCursor(cursor))).toEqual(cursor);
+  });
+
   it('convertit millisecondes et microsecondes sans dérive', () => {
     const date = new Date('2026-08-12T10:00:00.123Z');
     expect(toMicros(date)).toBe(date.getTime() * 1000);

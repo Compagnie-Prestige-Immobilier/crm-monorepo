@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:forui/forui.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -14,10 +15,18 @@ import '../../../core/utils/relative_time.dart';
 import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/phone.dart';
+import '../../../core/utils/whatsapp.dart' show kProfessionMaxLength;
 import '../../../data/local/database.dart';
 import '../../../data/repositories/write_repository.dart';
-import '../../../ui/widgets/cpi_pressable.dart';
+import '../../../ui/widgets/cpi_action_bar.dart';
+import '../../../ui/widgets/cpi_choice_group.dart';
+import '../../../ui/widgets/cpi_forui.dart';
+import '../../../ui/widgets/cpi_kit.dart';
+import '../../../ui/widgets/cpi_steps.dart';
+import '../../../ui/widgets/local_typeahead.dart';
 import '../../../ui/widgets/phone_field.dart';
+import '../../representant/presentation/representant_form_screen.dart'
+    show kProfessionsFrequentes;
 import '../phase2_controller.dart';
 import 'callback_picker.dart';
 import 'call_audio_recorder.dart';
@@ -38,10 +47,38 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
   final TextEditingController _phone = TextEditingController();
   final FocusNode _phoneFocus = FocusNode();
 
+  final Phase2FormFields _form = Phase2FormFields();
+  final TextEditingController _comment = TextEditingController();
+
   String? _lastSearched;
   String? _recordingPath;
   String? _activeRecordingPath;
   bool _savingRecording = false;
+
+  /// 1 : qui a été appelé. 2 à 4 : ce qu'on a appris de lui, par bloc de trois
+  /// ou quatre questions. 5 : ce que l'appel a donné.
+  int _step = 1;
+
+  static const int _etapes = 5;
+
+  static const List<String> _questions = <String>[
+    'Qui avez-vous appelé ?',
+    'Qui est-ce ?',
+    'Son travail',
+    'Sa banque, son syndicat',
+    'Comment la personne s\'inscrit-elle ?',
+  ];
+
+  /// Ce que la flèche du bandeau ramène, dit par sa destination.
+  static const List<String> _retours = <String>[
+    '',
+    '',
+    'Revenir au numéro',
+    'Revenir à la personne',
+    'Revenir à son travail',
+    'Revenir à sa banque',
+  ];
+  bool _noteOuverte = false;
 
   bool get _recordingActive => _activeRecordingPath != null;
 
@@ -49,8 +86,15 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
   void initState() {
     super.initState();
     final String? prefill = widget.prefillPhone;
-    if (prefill != null && prefill.isNotEmpty) _phone.text = prefill;
+    // La file passe un numéro E.164 ; le champ, lui, porte déjà « +221 » en
+    // préfixe. Sans conversion, l'écran affichait « +221 +221781001004 ».
+    if (prefill != null && prefill.isNotEmpty) {
+      _phone.text = Phone.editable(prefill);
+    }
     _phone.addListener(_onPhoneChanged);
+    _form.watch(() {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -59,6 +103,8 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
     _phone.removeListener(_onPhoneChanged);
     _phone.dispose();
     _phoneFocus.dispose();
+    _comment.dispose();
+    _form.dispose();
     super.dispose();
   }
 
@@ -69,6 +115,7 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
       if (_lastSearched != null) {
         _discardRecording();
         _lastSearched = null;
+        _noteOuverte = false;
         ref.read(phase2ControllerProvider.notifier).next();
       }
       return;
@@ -76,6 +123,11 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
     if (_lastSearched == parsed.e164) return;
     _discardRecording();
     _lastSearched = parsed.e164;
+    _noteOuverte = false;
+    // Un autre numéro, c'est une autre personne : ses renseignements ne se
+    // reprennent pas de l'appel précédent.
+    _form.clear();
+    _comment.clear();
     unawaited(_runSearch(parsed.e164));
   }
 
@@ -91,6 +143,12 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
     _discardRecording();
     _lastSearched = null;
     _phone.clear();
+    _comment.clear();
+    _form.clear();
+    setState(() {
+      _step = 1;
+      _noteOuverte = false;
+    });
     ref.read(phase2ControllerProvider.notifier).next();
     _phoneFocus.requestFocus();
   }
@@ -113,6 +171,7 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
     String? method,
     String? comment,
     DateTime? callbackAt,
+    DateTime? rendezVousAt,
   }) async {
     bool ok = false;
     _savingRecording = true;
@@ -125,6 +184,8 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
             comment: comment,
             callbackAt: callbackAt,
             recordingPath: _recordingPath,
+            renseignements: _form.read(),
+            rendezVousAt: rendezVousAt,
           );
       if (ok) _recordingPath = null;
     } finally {
@@ -139,6 +200,18 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
     await HapticFeedback.mediumImpact();
   }
 
+  bool get _peutReculer => !_recordingActive;
+
+  /// Le rang réellement peint. Les états qui ne parlent que du numéro (absent,
+  /// dossier déjà clos) ramènent à l'étape 1 quoi qu'ait choisi l'écran.
+  int get _etape {
+    final Phase2Stage stage = ref.read(phase2ControllerProvider).stage;
+    if (stage == Phase2Stage.capture || stage == Phase2Stage.confirmed) {
+      return _step;
+    }
+    return 1;
+  }
+
   @override
   Widget build(BuildContext context) {
     final Phase2State phase2 = ref.watch(phase2ControllerProvider);
@@ -147,103 +220,706 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
     // six motifs système : la saisie ne dépend jamais du réseau.
     final List<CallReason> reasons =
         ref.watch(callReasonsProvider).value ?? SystemCallReasons.all;
+    // Suivis ici et non dans l'étape 2 : le pré-remplissage lit ces listes au
+    // moment où l'on quitte l'étape 1, il faut donc qu'elles soient déjà là.
+    final List<Banque> banques = ref.watch(banquesProvider).value ?? const [];
+    final List<Syndicat> syndicats =
+        ref.watch(syndicatsProvider).value ?? const [];
+    final int etape = _etape;
 
-    return CpiPopScope(
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Phase 2'),
-          leading: const CpiBackButton(),
+    final Widget screen = CpiScaffold(
+      title: 'Consigner un appel',
+      showTitle: false,
+      leading: etape == 1
+          ? const CpiBackButton()
+          : CpiHeaderAction(
+              icon: PhosphorIconsRegular.arrowLeft,
+              label: _retours[etape],
+              onPressed: _peutReculer && !phase2.saving && !_confirme
+                  ? _precedent
+                  : null,
+            ),
+      footer: switch (etape) {
+        1 => _EtapeUnAction(
+          onContinue: () => _versLesRenseignements(banques, syndicats),
         ),
-        body: SafeArea(
-          child: Column(
-            children: <Widget>[
-              const _StatusStrip(),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(
-                    CpiSpacing.md,
-                    CpiSpacing.sm,
-                    CpiSpacing.md,
-                    CpiSpacing.xl,
-                  ),
-                  children: <Widget>[
-                    _PhoneBlock(
-                      controller: _phone,
-                      focusNode: _phoneFocus,
-                      enabled:
-                          phase2.stage != Phase2Stage.confirmed &&
-                          !phase2.saving &&
-                          !_recordingActive,
-                    ),
-                    const SizedBox(height: CpiSpacing.md),
-                    AnimatedSwitcher(
-                      duration: motion.component,
-                      switchInCurve: motion.easeOut,
-                      switchOutCurve: motion.easeOut,
-                      child: KeyedSubtree(
-                        key: ValueKey<String>(
-                          '${phase2.stage.name}:${phase2.entry?.prospectId ?? ''}',
-                        ),
-                        child: switch (phase2.stage) {
-                          Phase2Stage.search => _SearchHint(
-                            message: phase2.errorMessage,
-                          ),
-                          Phase2Stage.notFound => _NotFound(
-                            phone: phase2.searchedPhone,
-                            onClear: _resetForNext,
-                          ),
-                          Phase2Stage.alreadyClosed => _AlreadyClosed(
-                            entry: phase2.entry!,
-                            onNext: _resetForNext,
-                          ),
-                          Phase2Stage.capture => _Capture(
-                            state: phase2,
-                            recording: _recordingActive,
-                            onRecordingChanged: (String? path) =>
-                                _recordingPath = path,
-                            onRecordingStateChanged: (String? path) {
-                              setState(() => _activeRecordingPath = path);
-                            },
-                            onMethod: (String method) => _record(
-                              reason: methodReasonOf(reasons),
-                              method: method,
-                            ),
-                            onNegative: () => _openNegativeSheet(reasons),
-                          ),
-                          Phase2Stage.confirmed => _Confirmed(
-                            label: phase2.confirmation,
-                            onNext: _resetForNext,
-                          ),
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const _DownloadBar(),
-            ],
+        _ when etape == _etapes => null,
+        _ => _EtapeAction(
+          manque: _form.manqueEtape(etape),
+          onContinue: _suivant,
+        ),
+      },
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(
+          CpiSpacing.md,
+          0,
+          CpiSpacing.md,
+          CpiSpacing.xl,
+        ),
+        children: <Widget>[
+          CpiStepHeader(
+            step: etape,
+            total: _etapes,
+            question: _questions[etape - 1],
           ),
-        ),
+          AnimatedSwitcher(
+            duration: motion.component,
+            switchInCurve: motion.easeOut,
+            switchOutCurve: motion.easeOut,
+            child: KeyedSubtree(
+              key: ValueKey<String>(
+                '$etape:${phase2.stage.name}:${phase2.entry?.prospectId ?? ''}',
+              ),
+              child: switch (etape) {
+                1 => _EtapeQui(
+                  state: phase2,
+                  controller: _phone,
+                  focusNode: _phoneFocus,
+                  onClear: _resetForNext,
+                  onNext: _resetForNext,
+                ),
+                2 || 3 || 4 => _EtapeRenseignements(
+                  etape: etape,
+                  fields: _form,
+                  banques: banques,
+                  syndicats: syndicats,
+                  onChanged: () => setState(() {}),
+                ),
+                _ => _EtapeResultat(
+                  state: phase2,
+                  comment: _comment,
+                  recap: _form.recap,
+                  recording: _recordingActive,
+                  noteOuverte: _noteOuverte,
+                  onOuvrirNote: () => setState(() => _noteOuverte = true),
+                  onRecordingChanged: (String? path) => _recordingPath = path,
+                  onRecordingStateChanged: (String? path) {
+                    setState(() => _activeRecordingPath = path);
+                  },
+                  onMethod: (String method) => _record(
+                    reason: methodReasonOf(reasons),
+                    method: method,
+                    comment: _comment.text,
+                  ),
+                  onRendezVous: () => _openRendezVousSheet(reasons),
+                  onNegative: () => _openNegativeSheet(reasons),
+                  onNext: _resetForNext,
+                ),
+              },
+            ),
+          ),
+        ],
       ),
+    );
+
+    // Le retour système recule d'une étape : il ne quitte l'écran que depuis
+    // l'étape 1, comme la flèche du bandeau.
+    return CpiStepScope(
+      first: etape == 1,
+      onBack: _peutReculer && !_confirme ? _precedent : null,
+      child: screen,
+    );
+  }
+
+  void _precedent() => setState(() => _step = _etape - 1);
+
+  void _suivant() => setState(() => _step = _etape + 1);
+
+  bool get _confirme =>
+      ref.read(phase2ControllerProvider).stage == Phase2Stage.confirmed;
+
+  void _versLesRenseignements(List<Banque> banques, List<Syndicat> syndicats) {
+    final Phase2State phase2 = ref.read(phase2ControllerProvider);
+    _form.prefill(
+      phase2.prospect,
+      phoneE164: phase2.entry?.phoneE164 ?? '',
+      banques: banques,
+      syndicats: syndicats,
+    );
+    setState(() => _step = 2);
+  }
+
+  Future<void> _openRendezVousSheet(List<CallReason> reasons) async {
+    final DateTime? at = await showCpiSheet<DateTime>(
+      context,
+      title: 'Prise de rendez-vous',
+      builder: (BuildContext context) =>
+          RendezVousSheet(now: ref.read(clockProvider).now()),
+    );
+    if (at == null || !mounted) return;
+    await _record(
+      reason: methodReasonOf(reasons),
+      method: EnrollmentMethods.appointment,
+      comment: _comment.text,
+      rendezVousAt: at,
     );
   }
 
   Future<void> _openNegativeSheet(List<CallReason> reasons) async {
-    final CallOutcomeChoice? result =
-        await showModalBottomSheet<CallOutcomeChoice>(
-          context: context,
-          isScrollControlled: true,
-          useSafeArea: true,
-          builder: (BuildContext context) => CallOutcomeSheet(
-            now: ref.read(clockProvider).now(),
-            reasons: reasons,
-          ),
-        );
+    final CallOutcomeChoice? result = await showCpiSheet<CallOutcomeChoice>(
+      context,
+      title: 'L\'appel n\'a pas abouti',
+      builder: (BuildContext context) => CallOutcomeSheet(
+        now: ref.read(clockProvider).now(),
+        reasons: reasons,
+      ),
+    );
     if (result == null || !mounted) return;
     await _record(
       reason: result.reason,
       comment: result.comment,
       callbackAt: result.callbackAt,
+    );
+  }
+}
+
+/// Les champs de l'étape « Renseignements », tenus hors du `State` de l'écran :
+/// treize contrôleurs et deux tri-états y noieraient le pilotage des étapes.
+class Phase2FormFields {
+  final TextEditingController nom = TextEditingController();
+  final TextEditingController prenom = TextEditingController();
+  final TextEditingController telephone = TextEditingController();
+  final TextEditingController email = TextEditingController();
+  final TextEditingController profession = TextEditingController();
+  final TextEditingController duree = TextEditingController();
+  final TextEditingController banque = TextEditingController();
+  final TextEditingController syndicat = TextEditingController();
+
+  final FocusNode nomFocus = FocusNode();
+  final FocusNode prenomFocus = FocusNode();
+  final FocusNode emailFocus = FocusNode();
+  final FocusNode professionFocus = FocusNode();
+  final FocusNode dureeFocus = FocusNode();
+  final FocusNode banqueFocus = FocusNode();
+  final FocusNode syndicatFocus = FocusNode();
+
+  String? banqueId;
+  String? syndicatId;
+  Tri fonctionnaire = Tri.nonDemande;
+  Tri engagementEnCours = Tri.nonDemande;
+
+  /// Redessine l'étape à chaque frappe des DEUX champs qui peuvent la retenir.
+  ///
+  /// Sur l'écouteur du contrôleur et non sur `onChanged` du champ : ForUI
+  /// notifie le changement AVANT de poser le texte, si bien que le reproche et
+  /// le bouton étaient en retard d'une frappe : la dernière lettre, celle qui
+  /// invalide l'adresse, laissait « Continuer » allumé.
+  void watch(VoidCallback onChanged) {
+    email.addListener(onChanged);
+    duree.addListener(onChanged);
+  }
+
+  String? get erreurEmail {
+    final String value = email.text.trim();
+    if (value.isEmpty) return null;
+    return WriteRepository.validateCallAttemptEmail(value) == null
+        ? null
+        : 'Adresse invalide. Exemple : awa.sy@exemple.sn';
+  }
+
+  String? get erreurDuree {
+    final String value = duree.text.trim();
+    if (value.isEmpty) return null;
+    final int? mois = int.tryParse(value);
+    return mois != null && mois >= 0 && mois <= kDureeEtablissementMaxMois
+        ? null
+        : 'De 0 à $kDureeEtablissementMaxMois mois';
+  }
+
+  /// Ce qui empêche de continuer, nommé. Tout le reste est facultatif : un
+  /// renseignement qu'on n'a pas obtenu ne doit pas retenir l'appel.
+  String? get manque {
+    if (erreurEmail != null) return 'Vérifiez l\'e-mail';
+    if (erreurDuree != null) return 'Vérifiez la durée en mois';
+    return null;
+  }
+
+  /// Le même reproche, ramené à l'étape qui porte le champ fautif : une étape
+  /// ne retient jamais sur une saisie qu'elle ne montre pas.
+  String? manqueEtape(int etape) => switch (etape) {
+    2 => erreurEmail == null ? null : 'Vérifiez l\'e-mail',
+    3 => erreurDuree == null ? null : 'Vérifiez la durée en mois',
+    _ => null,
+  };
+
+  /// Ce que la dernière étape rappelle avant de consigner l'appel.
+  List<CpiRecapLine> get recap => <CpiRecapLine>[
+    CpiRecapLine('Nom complet', '${prenom.text} ${nom.text}'.trim()),
+    CpiRecapLine('Téléphone', telephone.text),
+    CpiRecapLine('Profession', profession.text),
+  ];
+
+  Phase2Renseignements read() => Phase2Renseignements(
+    nom: _texte(nom),
+    prenom: _texte(prenom),
+    email: _texte(email),
+    profession: _texte(profession),
+    dureeEtablissementMois: int.tryParse(duree.text.trim()),
+    fonctionnaire: fonctionnaire.value,
+    syndicatId: syndicatId,
+    banqueId: banqueId,
+    engagementEnCours: engagementEnCours.value,
+  );
+
+  /// Reprend ce que la fiche locale sait déjà, sans jamais écraser une saisie.
+  /// L'annuaire ne porte qu'un numéro : sans fiche descendue par le pull, il
+  /// n'y a rien à reprendre et les champs restent vides.
+  void prefill(
+    Prospect? prospect, {
+    required String phoneE164,
+    required List<Banque> banques,
+    required List<Syndicat> syndicats,
+  }) {
+    telephone.text = phoneE164.isEmpty ? '' : Phone.format(phoneE164);
+    if (prospect == null) return;
+    _fill(nom, prospect.nom);
+    _fill(prenom, prospect.prenom);
+    _fill(profession, prospect.profession);
+    if (banqueId == null && banque.text.isEmpty) {
+      final Banque? found = banques
+          .where((Banque b) => b.id == prospect.banqueId)
+          .firstOrNull;
+      if (found != null) {
+        banque.text = found.name;
+        banqueId = found.id;
+      }
+    }
+    if (syndicatId == null && syndicat.text.isEmpty) {
+      final Syndicat? found = syndicats
+          .where((Syndicat s) => s.id == prospect.syndicatId)
+          .firstOrNull;
+      if (found != null) {
+        syndicat.text = found.name;
+        syndicatId = found.id;
+      }
+    }
+  }
+
+  void clear() {
+    for (final TextEditingController c in _controllers) {
+      c.clear();
+    }
+    banqueId = null;
+    syndicatId = null;
+    fonctionnaire = Tri.nonDemande;
+    engagementEnCours = Tri.nonDemande;
+  }
+
+  void dispose() {
+    for (final TextEditingController c in _controllers) {
+      c.dispose();
+    }
+    for (final FocusNode f in _focusNodes) {
+      f.dispose();
+    }
+  }
+
+  List<TextEditingController> get _controllers => <TextEditingController>[
+    nom,
+    prenom,
+    telephone,
+    email,
+    profession,
+    duree,
+    banque,
+    syndicat,
+  ];
+
+  List<FocusNode> get _focusNodes => <FocusNode>[
+    nomFocus,
+    prenomFocus,
+    emailFocus,
+    professionFocus,
+    dureeFocus,
+    banqueFocus,
+    syndicatFocus,
+  ];
+
+  static void _fill(TextEditingController controller, String? value) {
+    if (controller.text.isEmpty && value != null && value.isNotEmpty) {
+      controller.text = value;
+    }
+  }
+
+  static String? _texte(TextEditingController controller) {
+    final String value = controller.text.trim();
+    return value.isEmpty ? null : value;
+  }
+}
+
+/// Oui, non, ou question non posée. `null` n'est PAS « non » : le serveur
+/// distingue les deux, et douze mille fiches sont dans le troisième état.
+enum Tri {
+  oui('Oui', true),
+  non('Non', false),
+  nonDemande('Non demandé', null);
+
+  const Tri(this.label, this.value);
+
+  final String label;
+  final bool? value;
+}
+
+/// Étape 1 : le numéro, ce que la liste en dit, et la phrase sur la liste.
+class _EtapeQui extends StatelessWidget {
+  const _EtapeQui({
+    required this.state,
+    required this.controller,
+    required this.focusNode,
+    required this.onClear,
+    required this.onNext,
+  });
+
+  final Phase2State state;
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final VoidCallback onClear;
+  final VoidCallback onNext;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: <Widget>[
+      _PhoneBlock(
+        controller: controller,
+        focusNode: focusNode,
+        enabled: !state.saving,
+      ),
+      const SizedBox(height: CpiSpacing.md),
+      switch (state.stage) {
+        Phase2Stage.notFound => _NotFound(
+          phone: state.searchedPhone,
+          onClear: onClear,
+        ),
+        Phase2Stage.alreadyClosed => _AlreadyClosed(
+          entry: state.entry!,
+          onNext: onNext,
+        ),
+        Phase2Stage.capture => _Trouve(entry: state.entry!),
+        _ => _SearchHint(message: state.errorMessage),
+      },
+      const SizedBox(height: CpiSpacing.lg),
+      const _PhraseListe(),
+    ],
+  );
+}
+
+/// Étapes 2 à 4 : ce que l'appel a appris de la personne, trois ou quatre
+/// questions à la fois. Tout y est facultatif.
+class _EtapeRenseignements extends StatelessWidget {
+  const _EtapeRenseignements({
+    required this.etape,
+    required this.fields,
+    required this.banques,
+    required this.syndicats,
+    required this.onChanged,
+  });
+
+  final int etape;
+  final Phase2FormFields fields;
+  final List<Banque> banques;
+  final List<Syndicat> syndicats;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    spacing: CpiSpacing.md,
+    children: switch (etape) {
+      2 => _qui(),
+      3 => _travail(),
+      _ => _banqueEtSyndicat(),
+    },
+  );
+
+  List<Widget> _qui() => <Widget>[
+    CpiField(
+      label: 'Nom',
+      controller: fields.nom,
+      focusNode: fields.nomFocus,
+      hint: 'Ex. Sarr',
+      textCapitalization: TextCapitalization.words,
+      textInputAction: TextInputAction.next,
+      maxLength: kProfessionMaxLength,
+    ),
+    CpiField(
+      label: 'Prénom',
+      controller: fields.prenom,
+      focusNode: fields.prenomFocus,
+      hint: 'Ex. Fatou',
+      textCapitalization: TextCapitalization.words,
+      textInputAction: TextInputAction.next,
+      maxLength: kProfessionMaxLength,
+    ),
+    // Le numéro vient de l'annuaire et ne se corrige pas depuis un appel :
+    // le serveur refuse de l'écrire ici. Il est là pour être relu.
+    CpiField(
+      label: 'Téléphone',
+      controller: fields.telephone,
+      readOnly: true,
+      description: 'Numéro de l\'annuaire',
+    ),
+    CpiField(
+      label: 'E-mail',
+      controller: fields.email,
+      focusNode: fields.emailFocus,
+      hint: 'Ex. awa.sy@exemple.sn',
+      keyboardType: TextInputType.emailAddress,
+      textInputAction: TextInputAction.next,
+      maxLength: kCallAttemptEmailMaxLength,
+      error: fields.erreurEmail,
+    ),
+  ];
+
+  List<Widget> _travail() => <Widget>[
+    LocalTypeahead(
+      controller: fields.profession,
+      focusNode: fields.professionFocus,
+      label: 'Profession',
+      hint: 'Ex. Instituteur',
+      freeText: true,
+      maxLength: kProfessionMaxLength,
+      options: kProfessionsFrequentes
+          .map((String m) => TypeaheadOption(id: m, label: m))
+          .toList(growable: false),
+      onSelected: (TypeaheadOption _) {},
+    ),
+    CpiField(
+      label: 'Ancienneté',
+      controller: fields.duree,
+      focusNode: fields.dureeFocus,
+      hint: 'Ex. 36',
+      keyboardType: TextInputType.number,
+      textInputAction: TextInputAction.next,
+      inputFormatters: <TextInputFormatter>[
+        FilteringTextInputFormatter.digitsOnly,
+        LengthLimitingTextInputFormatter(3),
+      ],
+      suffix: const Text('mois'),
+      description: 'Dans l\'établissement, en mois',
+      error: fields.erreurDuree,
+    ),
+    _ChoixTri(
+      label: 'Fonctionnaire',
+      value: fields.fonctionnaire,
+      onChanged: (Tri choix) {
+        fields.fonctionnaire = choix;
+        onChanged();
+      },
+    ),
+  ];
+
+  List<Widget> _banqueEtSyndicat() => <Widget>[
+    LocalTypeahead(
+      controller: fields.syndicat,
+      focusNode: fields.syndicatFocus,
+      label: 'Syndicat',
+      hint: 'Ex. SAEMSS',
+      selectedId: fields.syndicatId,
+      emptyHint: syndicats.isEmpty
+          ? 'La liste n\'est pas encore arrivée.'
+          : 'Aucun résultat',
+      options: syndicats
+          .map(
+            (Syndicat s) => TypeaheadOption(
+              id: s.id,
+              label: s.name,
+              secondary: s.sigle,
+              keywords: <String>[s.sigle, if (s.secteur != null) s.secteur!],
+            ),
+          )
+          .toList(growable: false),
+      onChanged: (String _) {
+        if (fields.syndicatId == null) return;
+        fields.syndicatId = null;
+        onChanged();
+      },
+      onSelected: (TypeaheadOption o) {
+        fields.syndicatId = o.id;
+        onChanged();
+      },
+    ),
+    LocalTypeahead(
+      controller: fields.banque,
+      focusNode: fields.banqueFocus,
+      label: 'Banque',
+      hint: 'Ex. BICIS',
+      selectedId: fields.banqueId,
+      textInputAction: TextInputAction.done,
+      emptyHint: banques.isEmpty
+          ? 'La liste n\'est pas encore arrivée.'
+          : 'Aucun résultat',
+      options: banques
+          .map(
+            (Banque b) => TypeaheadOption(
+              id: b.id,
+              label: b.name,
+              secondary: b.shortName,
+              keywords: <String>[b.shortName],
+            ),
+          )
+          .toList(growable: false),
+      onChanged: (String _) {
+        if (fields.banqueId == null) return;
+        fields.banqueId = null;
+        onChanged();
+      },
+      onSelected: (TypeaheadOption o) {
+        fields.banqueId = o.id;
+        onChanged();
+      },
+    ),
+    _ChoixTri(
+      label: 'Engagement en cours à la banque',
+      value: fields.engagementEnCours,
+      onChanged: (Tri choix) {
+        fields.engagementEnCours = choix;
+        onChanged();
+      },
+    ),
+  ];
+}
+
+/// Une question à trois réponses : oui, non, et « on ne l'a pas demandé ».
+class _ChoixTri extends StatelessWidget {
+  const _ChoixTri({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final Tri value;
+  final ValueChanged<Tri> onChanged;
+
+  @override
+  Widget build(BuildContext context) => CpiChoiceGroup<Tri>(
+    label: label,
+    value: value,
+    options: <CpiChoice<Tri>>[
+      for (final Tri choix in Tri.values)
+        CpiChoice<Tri>(value: choix, label: choix.label),
+    ],
+    onChanged: (Tri choix) {
+      if (choix == value) return;
+      unawaited(HapticFeedback.selectionClick());
+      onChanged(choix);
+    },
+  );
+}
+
+/// Le pied des étapes de renseignements : rien n'y est obligatoire, seule une
+/// saisie fautive retient le passage, et le bouton dit laquelle.
+class _EtapeAction extends StatelessWidget {
+  const _EtapeAction({required this.manque, required this.onContinue});
+
+  final String? manque;
+  final VoidCallback onContinue;
+
+  @override
+  Widget build(BuildContext context) => CpiActionBar(
+    child: CpiButton(
+      'Continuer',
+      icon: PhosphorIconsRegular.arrowRight,
+      subtitle: manque,
+      onPressed: manque == null ? onContinue : null,
+    ),
+  );
+}
+
+/// Dernière étape : ce que l'appel a donné, ou sa confirmation.
+class _EtapeResultat extends StatelessWidget {
+  const _EtapeResultat({
+    required this.state,
+    required this.comment,
+    required this.recap,
+    required this.onRendezVous,
+    required this.recording,
+    required this.noteOuverte,
+    required this.onOuvrirNote,
+    required this.onMethod,
+    required this.onNegative,
+    required this.onRecordingChanged,
+    required this.onRecordingStateChanged,
+    required this.onNext,
+  });
+
+  final Phase2State state;
+  final TextEditingController comment;
+  final List<CpiRecapLine> recap;
+  final VoidCallback onRendezVous;
+  final bool recording;
+  final bool noteOuverte;
+  final VoidCallback onOuvrirNote;
+  final ValueChanged<String> onMethod;
+  final VoidCallback onNegative;
+  final ValueChanged<String?> onRecordingChanged;
+  final ValueChanged<String?> onRecordingStateChanged;
+  final VoidCallback onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    if (state.stage == Phase2Stage.confirmed) {
+      return _Confirmed(label: state.confirmation, onNext: onNext);
+    }
+    return _Capture(
+      state: state,
+      comment: comment,
+      recap: recap,
+      recording: recording,
+      noteOuverte: noteOuverte,
+      onOuvrirNote: onOuvrirNote,
+      onRecordingChanged: onRecordingChanged,
+      onRecordingStateChanged: onRecordingStateChanged,
+      onMethod: onMethod,
+      onRendezVous: onRendezVous,
+      onNegative: onNegative,
+    );
+  }
+}
+
+/// Le pied de l'étape 1 : recevoir la liste tant qu'elle manque, sinon
+/// continuer vers le résultat. Les états qui portent déjà leurs propres
+/// boutons — numéro absent, dossier clos — n'en reçoivent aucun.
+class _EtapeUnAction extends ConsumerWidget {
+  const _EtapeUnAction({required this.onContinue});
+
+  final VoidCallback onContinue;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final int directory = ref.watch(phase2DirectoryCountProvider).value ?? 0;
+    final Phase2State phase2 = ref.watch(phase2ControllerProvider);
+
+    // Le numéro déjà retrouvé passe avant l'état de la liste : sinon l'écran
+    // proposait un téléchargement au lieu de continuer sur un dossier ouvert.
+    if (directory == 0 && phase2.stage != Phase2Stage.capture) {
+      return CpiActionBar(
+        child: CpiButton(
+          'Recevoir la liste des numéros',
+          icon: PhosphorIconsRegular.cloudArrowDown,
+          loading: phase2.downloading,
+          onPressed: () {
+            unawaited(HapticFeedback.selectionClick());
+            unawaited(ref.read(phase2ControllerProvider.notifier).download());
+          },
+        ),
+      );
+    }
+    if (phase2.stage == Phase2Stage.notFound ||
+        phase2.stage == Phase2Stage.alreadyClosed) {
+      // Pas de barre, mais la place de la barre de gestes : `CpiScaffold` rend
+      // le bas du corps au pied dès qu'il en reçoit un.
+      return SizedBox(height: MediaQuery.viewPaddingOf(context).bottom);
+    }
+    final bool pret = phase2.stage == Phase2Stage.capture;
+    return CpiActionBar(
+      child: CpiButton(
+        'Continuer',
+        icon: PhosphorIconsRegular.arrowRight,
+        subtitle: 'Tapez d\'abord le numéro appelé',
+        onPressed: pret ? onContinue : null,
+      ),
     );
   }
 }
@@ -255,8 +931,12 @@ CallReason methodReasonOf(List<CallReason> reasons) => reasons.firstWhere(
   orElse: () => SystemCallReasons.byCode[CallOutcomes.methodObtained]!,
 );
 
-class _StatusStrip extends ConsumerWidget {
-  const _StatusStrip();
+/// La seule phrase gardée sur l'état de la liste des numéros : d'où elle vient
+/// et de quand elle date. Les compteurs de la journée sont dans Réglages.
+class _PhraseListe extends ConsumerWidget {
+  const _PhraseListe();
+
+  static final NumberFormat _number = NumberFormat.decimalPattern('fr');
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -264,185 +944,10 @@ class _StatusStrip extends ConsumerWidget {
     final CpiColors cpi = context.cpi;
     final Phase2State phase2 = ref.watch(phase2ControllerProvider);
     final int directory = ref.watch(phase2DirectoryCountProvider).value ?? 0;
-    final SyncStateData? syncState = ref
+    final DateTime? lastPulledAt = ref
         .watch(phase2DirectoryStateProvider)
-        .value;
-    final int pending = ref.watch(phase2PendingCountProvider).value ?? 0;
-    final ({int attempts, int closed, int methods})? progress = ref
-        .watch(phase2ProgressProvider)
-        .value;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(
-        CpiSpacing.md,
-        CpiSpacing.sm,
-        CpiSpacing.md,
-        CpiSpacing.sm,
-      ),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLowest,
-        border: Border(bottom: BorderSide(color: cpi.borderSubtle)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Semantics(
-            label:
-                'Mes saisies : ${progress?.attempts ?? 0} appels consignés, '
-                '${progress?.methods ?? 0} méthodes obtenues. '
-                '$pending en attente d\'envoi.',
-            child: ExcludeSemantics(
-              child: Row(
-                children: <Widget>[
-                  _Metric(
-                    icon: PhosphorIconsRegular.phoneCall,
-                    value: '${progress?.attempts ?? 0}',
-                    label: 'appels consignés',
-                    color: theme.colorScheme.primary,
-                  ),
-                  _Metric(
-                    icon: PhosphorIconsRegular.checkCircle,
-                    value: '${progress?.methods ?? 0}',
-                    label: 'méthodes obtenues',
-                    color: cpi.success,
-                  ),
-                  _Metric(
-                    icon: pending == 0
-                        ? PhosphorIconsRegular.cloudCheck
-                        : PhosphorIconsRegular.cloudSlash,
-                    value: '$pending',
-                    label: 'à envoyer',
-                    color: pending == 0 ? cpi.syncSynced : cpi.accentText,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: CpiSpacing.xs),
-          _DirectoryLine(
-            directory: directory,
-            lastPulledAt: syncState?.lastPulledAt,
-            phase2: phase2,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DownloadBar extends ConsumerWidget {
-  const _DownloadBar();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final int directory = ref.watch(phase2DirectoryCountProvider).value ?? 0;
-    final bool downloading = ref.watch(phase2ControllerProvider).downloading;
-    if (directory > 0) return const SizedBox.shrink();
-
-    final ThemeData theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(
-        CpiSpacing.md,
-        CpiSpacing.xs,
-        CpiSpacing.md,
-        CpiSpacing.sm,
-      ),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        border: Border(top: BorderSide(color: context.cpi.borderSubtle)),
-      ),
-      child: FilledButton.icon(
-        onPressed: downloading
-            ? null
-            : () {
-                unawaited(HapticFeedback.selectionClick());
-                unawaited(
-                  ref.read(phase2ControllerProvider.notifier).download(),
-                );
-              },
-        icon: downloading
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Icon(
-                PhosphorIconsRegular.cloudArrowDown,
-                size: CpiIconSize.md,
-              ),
-        label: const Text('Télécharger l\'annuaire'),
-      ),
-    );
-  }
-}
-
-class _Metric extends StatelessWidget {
-  const _Metric({
-    required this.icon,
-    required this.value,
-    required this.label,
-    required this.color,
-  });
-
-  final IconData icon;
-  final String value;
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              Icon(icon, size: CpiIconSize.sm, color: color),
-              const SizedBox(width: CpiSpacing.xxs),
-              Flexible(
-                child: Text(
-                  value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleMedium?.copyWith(color: color),
-                ),
-              ),
-            ],
-          ),
-          Text(
-            label,
-            maxLines: 2,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w500,
-              height: 1.2,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DirectoryLine extends ConsumerWidget {
-  const _DirectoryLine({
-    required this.directory,
-    required this.lastPulledAt,
-    required this.phase2,
-  });
-
-  final int directory;
-  final DateTime? lastPulledAt;
-  final Phase2State phase2;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final ThemeData theme = Theme.of(context);
-    final CpiColors cpi = context.cpi;
+        .value
+        ?.lastPulledAt;
 
     if (phase2.downloading) {
       return Semantics(
@@ -451,7 +956,7 @@ class _DirectoryLine extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            const LinearProgressIndicator(minHeight: 3),
+            const FProgress(),
             const SizedBox(height: CpiSpacing.xxs),
             Text(
               '${_number.format(phase2.downloaded)} numéros',
@@ -462,49 +967,27 @@ class _DirectoryLine extends ConsumerWidget {
       );
     }
 
+    // Un dossier déjà trouvé prime sur l'état de la liste : annoncer les deux
+    // en même temps disait « c'est bon » et « il manque tout » sur un écran.
+    if (directory == 0 && phase2.stage != Phase2Stage.capture) {
+      return Text(
+        'La liste des numéros n\'est pas encore sur ce téléphone.',
+        style: theme.textTheme.bodySmall?.copyWith(color: cpi.accentText),
+      );
+    }
+    if (directory == 0) return const SizedBox.shrink();
+
     final DateTime? when = lastPulledAt;
     final String freshness = when == null
-        ? 'jamais téléchargé'
-        : 'mis à jour ${relativeTime(when)}';
-
-    return Row(
-      children: <Widget>[
-        Icon(
-          directory == 0
-              ? PhosphorIconsRegular.cloudArrowDown
-              : PhosphorIconsRegular.addressBook,
-          size: CpiIconSize.sm,
-          color: directory == 0
-              ? cpi.accentText
-              : theme.colorScheme.onSurfaceVariant,
-        ),
-        const SizedBox(width: CpiSpacing.xxs),
-        Expanded(
-          child: Text(
-            directory == 0
-                ? 'Annuaire non téléchargé'
-                : 'Annuaire : ${_number.format(directory)} numéros · $freshness',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: directory == 0
-                  ? cpi.accentText
-                  : theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ),
-        if (directory > 0)
-          ConstrainedBox(
-            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-            child: TextButton(
-              onPressed: () =>
-                  ref.read(phase2ControllerProvider.notifier).download(),
-              child: const Text('Mettre à jour'),
-            ),
-          ),
-      ],
+        ? 'jamais reçue'
+        : 'reçue ${relativeTime(when)}';
+    return Text(
+      'Liste de ${_number.format(directory)} numéros · $freshness',
+      style: theme.textTheme.bodySmall?.copyWith(
+        color: theme.colorScheme.onSurfaceVariant,
+      ),
     );
   }
-
-  static final NumberFormat _number = NumberFormat.decimalPattern('fr');
 }
 
 class _PhoneBlock extends ConsumerWidget {
@@ -547,8 +1030,6 @@ class _PhoneBlock extends ConsumerWidget {
             padding: const EdgeInsets.only(top: CpiSpacing.xs),
             child: _Notice(
               icon: PhosphorIconsRegular.warningCircle,
-              color: context.cpi.syncFailed,
-              surface: context.cpi.warningSurface,
               message: downloadError,
             ),
           ),
@@ -565,12 +1046,9 @@ class _SearchHint extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    final CpiColors cpi = context.cpi;
     if (message != null) {
       return _Notice(
         icon: PhosphorIconsRegular.warningCircle,
-        color: cpi.syncFailed,
-        surface: cpi.warningSurface,
         message: message!,
       );
     }
@@ -587,26 +1065,73 @@ class _SearchHint extends StatelessWidget {
   }
 }
 
-class _NotFound extends StatelessWidget {
+/// Le numéro est dans la liste et le dossier est ouvert : l'étape 1 le confirme
+/// avant de laisser passer à l'étape 2.
+class _Trouve extends StatelessWidget {
+  const _Trouve({required this.entry});
+
+  final Phase2DirectoryData entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final CpiColors cpi = context.cpi;
+    return Semantics(
+      label:
+          'Numéro trouvé : ${Phone.format(entry.phoneE164)}. '
+          'Dossier à traiter.',
+      child: ExcludeSemantics(
+        child: CpiCard(
+          child: Row(
+            spacing: CpiSpacing.sm,
+            children: <Widget>[
+              Icon(
+                PhosphorIconsFill.checkCircle,
+                size: CpiIconSize.xl,
+                color: cpi.success,
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text(
+                      Phone.format(entry.phoneE164),
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    Text(
+                      'Numéro trouvé. Le dossier est à traiter.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NotFound extends ConsumerWidget {
   const _NotFound({required this.phone, required this.onClear});
 
   final String? phone;
   final VoidCallback onClear;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final ThemeData theme = Theme.of(context);
-    final CpiColors cpi = context.cpi;
+    final bool downloading = ref.watch(phase2ControllerProvider).downloading;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        _Notice(
+        const _Notice(
           icon: PhosphorIconsRegular.magnifyingGlass,
-          color: cpi.syncFailed,
-          surface: cpi.warningSurface,
-          message:
-              'Numéro absent de l\'annuaire. Vérifiez la saisie ou mettez '
-              'l\'annuaire à jour.',
+          message: 'Ce numéro n\'est pas dans la liste.',
         ),
         const SizedBox(height: CpiSpacing.xs),
         if (phone != null)
@@ -616,10 +1141,20 @@ class _NotFound extends StatelessWidget {
             style: theme.textTheme.titleMedium,
           ),
         const SizedBox(height: CpiSpacing.md),
-        OutlinedButton.icon(
+        CpiButton(
+          'Effacer et recommencer',
+          variant: CpiButtonVariant.secondary,
+          icon: PhosphorIconsRegular.eraser,
           onPressed: onClear,
-          icon: const Icon(PhosphorIconsRegular.eraser, size: CpiIconSize.md),
-          label: const Text('Effacer et recommencer'),
+        ),
+        const SizedBox(height: CpiSpacing.xs),
+        CpiButton(
+          'Mettre la liste à jour',
+          variant: CpiButtonVariant.ghost,
+          icon: PhosphorIconsRegular.cloudArrowDown,
+          loading: downloading,
+          onPressed: () =>
+              unawaited(ref.read(phase2ControllerProvider.notifier).download()),
         ),
       ],
     );
@@ -641,20 +1176,14 @@ class _AlreadyClosed extends StatelessWidget {
 
     return Semantics(
       label:
-          'Dossier déjà traité : ${Phase2Controller.labelForStatus(entry.phase2Status)}.'
+          'Déjà traité : ${Phase2Controller.labelForStatus(entry.phase2Status)}.'
           '${obtained && entry.enrollmentMethod != null ? ' Méthode ${Phase2Controller.labelForMethod(entry.enrollmentMethod!)}.' : ''} '
           'Lecture seule.',
       child: ExcludeSemantics(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            Container(
-              padding: const EdgeInsets.all(CpiSpacing.md),
-              decoration: BoxDecoration(
-                color: obtained ? cpi.successSurface : cpi.infoSurface,
-                borderRadius: CpiRadius.brLg,
-                border: Border.all(color: tone.withValues(alpha: 0.3)),
-              ),
+            CpiCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
@@ -670,10 +1199,8 @@ class _AlreadyClosed extends StatelessWidget {
                       const SizedBox(width: CpiSpacing.xs),
                       Expanded(
                         child: Text(
-                          'Dossier déjà traité',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            color: tone,
-                          ),
+                          'Déjà traité',
+                          style: theme.textTheme.titleMedium,
                         ),
                       ),
                     ],
@@ -702,20 +1229,16 @@ class _AlreadyClosed extends StatelessWidget {
               ),
             ),
             const SizedBox(height: CpiSpacing.sm),
-            _Notice(
+            const _Notice(
               icon: PhosphorIconsRegular.lockSimple,
-              color: cpi.accentText,
-              surface: cpi.accentSurface,
-              message: 'Modifiable par un administrateur uniquement.',
+              message: 'Seul un responsable peut le rouvrir.',
+              danger: false,
             ),
             const SizedBox(height: CpiSpacing.md),
-            FilledButton.icon(
+            CpiButton(
+              'Numéro suivant',
+              icon: PhosphorIconsRegular.arrowRight,
               onPressed: onNext,
-              icon: const Icon(
-                PhosphorIconsRegular.arrowRight,
-                size: CpiIconSize.md,
-              ),
-              label: const Text('Numéro suivant'),
             ),
           ],
         ),
@@ -727,16 +1250,26 @@ class _AlreadyClosed extends StatelessWidget {
 class _Capture extends StatelessWidget {
   const _Capture({
     required this.state,
+    required this.comment,
+    required this.recap,
     required this.recording,
+    required this.noteOuverte,
+    required this.onOuvrirNote,
     required this.onMethod,
+    required this.onRendezVous,
     required this.onNegative,
     required this.onRecordingChanged,
     required this.onRecordingStateChanged,
   });
 
   final Phase2State state;
+  final TextEditingController comment;
+  final List<CpiRecapLine> recap;
   final bool recording;
+  final bool noteOuverte;
+  final VoidCallback onOuvrirNote;
   final ValueChanged<String> onMethod;
+  final VoidCallback onRendezVous;
   final VoidCallback onNegative;
   final ValueChanged<String?> onRecordingChanged;
   final ValueChanged<String?> onRecordingStateChanged;
@@ -744,28 +1277,39 @@ class _Capture extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    final CpiColors cpi = context.cpi;
     final bool enabled = !state.saving && !recording;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        CallAudioRecorder(
-          enabled: !state.saving,
-          onChanged: onRecordingChanged,
-          onRecordingStateChanged: onRecordingStateChanged,
+        // Ce qui a été recueilli aux trois étapes précédentes, relu avant la
+        // seule décision qui ferme le dossier.
+        CpiRecap(lines: recap, title: 'L\'appel'),
+        const SizedBox(height: CpiSpacing.md),
+        CpiField(
+          label: 'Commentaire',
+          controller: comment,
+          hint: 'En une phrase',
+          maxLines: 3,
+          maxLength: kCallAttemptCommentMaxLength,
+          textCapitalization: TextCapitalization.sentences,
+          enabled: enabled,
         ),
         const SizedBox(height: CpiSpacing.md),
-        Text(
-          'Méthode d\'enrôlement obtenue',
-          style: theme.textTheme.titleMedium,
-        ),
-        const SizedBox(height: CpiSpacing.xxs),
         Text(
           'Une seule réponse.',
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
+        ),
+        const SizedBox(height: CpiSpacing.sm),
+        _MethodCard(
+          method: EnrollmentMethods.appointment,
+          title: 'Prise de rendez-vous',
+          subtitle: 'Choisir la date et l\'heure',
+          icon: PhosphorIconsRegular.calendarPlus,
+          enabled: enabled,
+          onTap: (String _) => onRendezVous(),
         ),
         const SizedBox(height: CpiSpacing.sm),
         _MethodCard(
@@ -776,39 +1320,49 @@ class _Capture extends StatelessWidget {
           enabled: enabled,
           onTap: onMethod,
         ),
-        const SizedBox(height: CpiSpacing.xs),
+        const SizedBox(height: CpiSpacing.sm),
         _MethodCard(
           method: EnrollmentMethods.physical,
           title: 'Physique',
-          subtitle: 'Dossier signé en présence',
+          subtitle: 'Dossier signé sur place',
           icon: PhosphorIconsRegular.handshake,
           enabled: enabled,
           onTap: onMethod,
         ),
-        const SizedBox(height: CpiSpacing.xs),
+        const SizedBox(height: CpiSpacing.sm),
         _MethodCard(
           method: EnrollmentMethods.voiceOrElectronicMessaging,
-          title: 'Voix / messagerie électronique',
-          subtitle: 'Accord par appel, SMS ou message',
+          title: 'Par appel ou message',
+          subtitle: 'Au téléphone ou par SMS',
           icon: PhosphorIconsRegular.chatCircleText,
           enabled: enabled,
           onTap: onMethod,
         ),
         const SizedBox(height: CpiSpacing.md),
-        SizedBox(
-          height: 52,
-          child: OutlinedButton.icon(
-            onPressed: enabled ? onNegative : null,
-            icon: const Icon(PhosphorIconsRegular.phoneX, size: CpiIconSize.md),
-            label: const Text('Méthode non obtenue'),
-          ),
+        CpiButton(
+          'L\'appel n\'a pas abouti',
+          variant: CpiButtonVariant.secondary,
+          icon: PhosphorIconsRegular.phoneX,
+          onPressed: enabled ? onNegative : null,
         ),
+        const SizedBox(height: CpiSpacing.md),
+        if (noteOuverte)
+          CallAudioRecorder(
+            enabled: !state.saving,
+            onChanged: onRecordingChanged,
+            onRecordingStateChanged: onRecordingStateChanged,
+          )
+        else
+          CpiButton(
+            'Ajouter une note vocale',
+            variant: CpiButtonVariant.ghost,
+            icon: PhosphorIconsRegular.microphone,
+            onPressed: state.saving ? null : onOuvrirNote,
+          ),
         if (state.errorMessage != null) ...<Widget>[
           const SizedBox(height: CpiSpacing.sm),
           _Notice(
             icon: PhosphorIconsRegular.warningCircle,
-            color: cpi.syncFailed,
-            surface: cpi.warningSurface,
             message: state.errorMessage!,
           ),
         ],
@@ -837,7 +1391,6 @@ class _MethodCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    final CpiColors cpi = context.cpi;
 
     void choose() {
       unawaited(HapticFeedback.selectionClick());
@@ -850,39 +1403,33 @@ class _MethodCard extends StatelessWidget {
       onTap: enabled ? choose : null,
       label: 'Méthode obtenue : $title. $subtitle',
       child: ExcludeSemantics(
-        child: CpiPressable(
+        child: CpiCard(
           onTap: enabled ? choose : null,
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 72),
-            padding: const EdgeInsets.all(CpiSpacing.md),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerLowest,
-              borderRadius: CpiRadius.brLg,
-              border: Border.all(color: cpi.borderSubtle),
-            ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: kCpiMinTouchTarget),
             child: Row(
+              spacing: CpiSpacing.sm,
               children: <Widget>[
-                Container(
-                  width: 44,
-                  height: 44,
+                DecoratedBox(
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.secondary,
-                    borderRadius: CpiRadius.brMd,
+                    color: theme.colorScheme.surfaceContainerHigh,
+                    shape: BoxShape.circle,
                   ),
-                  child: Icon(
-                    icon,
-                    size: CpiIconSize.lg,
-                    color: theme.colorScheme.primary,
+                  child: Padding(
+                    padding: const EdgeInsets.all(CpiSpacing.sm),
+                    child: Icon(
+                      icon,
+                      size: CpiIconSize.xl,
+                      color: theme.colorScheme.primary,
+                    ),
                   ),
                 ),
-                const SizedBox(width: CpiSpacing.sm),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
                       Text(title, style: theme.textTheme.titleMedium),
-                      const SizedBox(height: 2),
                       Text(
                         subtitle,
                         style: theme.textTheme.bodySmall?.copyWith(
@@ -923,13 +1470,9 @@ class _Confirmed extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            Container(
-              padding: const EdgeInsets.all(CpiSpacing.md),
-              decoration: BoxDecoration(
-                color: cpi.successSurface,
-                borderRadius: CpiRadius.brLg,
-              ),
+            CpiCard(
               child: Row(
+                spacing: CpiSpacing.sm,
                 children: <Widget>[
                   _SpringIn(
                     child: Icon(
@@ -938,18 +1481,12 @@ class _Confirmed extends StatelessWidget {
                       color: cpi.success,
                     ),
                   ),
-                  const SizedBox(width: CpiSpacing.sm),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: <Widget>[
-                        Text(
-                          'Enregistré',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            color: cpi.success,
-                          ),
-                        ),
+                        Text('Enregistré', style: theme.textTheme.titleMedium),
                         if (label != null)
                           Text(label!, style: theme.textTheme.bodyMedium),
                       ],
@@ -959,19 +1496,263 @@ class _Confirmed extends StatelessWidget {
               ),
             ),
             const SizedBox(height: CpiSpacing.md),
-            FilledButton.icon(
+            CpiButton(
+              'Numéro suivant',
+              icon: PhosphorIconsRegular.arrowRight,
               onPressed: onNext,
-              icon: const Icon(
-                PhosphorIconsRegular.arrowRight,
-                size: CpiIconSize.md,
-              ),
-              label: const Text('Numéro suivant'),
             ),
           ],
         ),
       ),
     );
   }
+}
+
+/// Le contenu de la feuille « Prise de rendez-vous » : un jour au calendrier,
+/// une heure à la roue, et rien d'autre.
+///
+/// Le serveur EXIGE la date sur cette méthode et la refuse sur les autres :
+/// la feuille ne rend donc jamais un rendez-vous vide, elle se ferme sur
+/// « Annuler » ou sur un instant complet.
+///
+/// Publique comme [CallOutcomeSheet] : le balayage de débordement la peint
+/// directement, une feuille modale n'étant pas atteignable par construction.
+class RendezVousSheet extends StatefulWidget {
+  const RendezVousSheet({required this.now, super.key});
+
+  final DateTime now;
+
+  @override
+  State<RendezVousSheet> createState() => _RendezVousSheetState();
+}
+
+class _RendezVousSheetState extends State<RendezVousSheet> {
+  late final DateTime _aujourdhui = DateTime.utc(
+    widget.now.toUtc().year,
+    widget.now.toUtc().month,
+    widget.now.toUtc().day,
+  );
+
+  late DateTime _jour = _aujourdhui;
+  FTime _heure = const FTime(9, 0);
+
+  /// Le jour se choisit à la roue plutôt qu'à la puce.
+  bool _roulette = false;
+  int _index = 0;
+
+  /// Tenu ici et non par la roue : c'est ce qui permet de la déplacer sans
+  /// glisser, depuis le lecteur d'écran.
+  final FPickerController _roue = FPickerController(indexes: <int>[0]);
+
+  /// Deux mois : au-delà, un rendez-vous de conversion ne se prend pas au
+  /// téléphone.
+  static const int _horizonJours = 60;
+
+  static const List<(int, String)> _joursProches = <(int, String)>[
+    (0, 'Aujourd\'hui'),
+    (1, 'Demain'),
+    (2, 'Après-demain'),
+  ];
+
+  static final DateFormat _jourLong = DateFormat('EEEE d MMMM yyyy', 'fr');
+  static final DateFormat _jourCourt = DateFormat('EEE d MMMM', 'fr');
+
+  @override
+  void dispose() {
+    _roue.dispose();
+    super.dispose();
+  }
+
+  DateTime _jourDe(int offset) =>
+      _aujourdhui.add(Duration(days: offset.clamp(0, _horizonJours - 1)));
+
+  void _choisirJour(DateTime jour, {int? index}) {
+    unawaited(HapticFeedback.selectionClick());
+    setState(() {
+      _jour = jour;
+      _roulette = index != null;
+      if (index != null) _index = index;
+    });
+  }
+
+  void _ouvrirLaRoulette() {
+    if (_roulette) {
+      _choisirJour(_aujourdhui);
+      return;
+    }
+    _roue.value = <int>[_index];
+    _choisirJour(_jourDe(_index), index: _index);
+  }
+
+  void _glisserVers(int index) {
+    if (index < 0 || index >= _horizonJours) return;
+    _choisirJour(_jourDe(index), index: index);
+    unawaited(_roue.animateTo(<int>[index]));
+  }
+
+  static String _deuxChiffres(int value) => value.toString().padLeft(2, '0');
+
+  String get _heureTexte =>
+      '${_deuxChiffres(_heure.hour)}:${_deuxChiffres(_heure.minute)}';
+
+  FTime _decalee(int minutes) {
+    const int jour = 24 * 60;
+    final int total =
+        (_heure.hour * 60 + _heure.minute + minutes + jour) % jour;
+    return FTime(total ~/ 60, total % 60);
+  }
+
+  DateTime get _instant => DateTime.utc(
+    _jour.year,
+    _jour.month,
+    _jour.day,
+    _heure.hour,
+    _heure.minute,
+  );
+
+  /// Africa/Dakar est sur UTC+0 toute l'année : l'heure murale se construit
+  /// donc directement en UTC, comme pour les rappels.
+  bool get _passe =>
+      _instant.isBefore(widget.now.toUtc().subtract(kRendezVousSkew));
+
+  @override
+  Widget build(BuildContext context) => CpiForui(
+    builder: (BuildContext context) {
+      final ThemeData theme = Theme.of(context);
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Text('Quel jour ?', style: theme.textTheme.titleSmall),
+          const SizedBox(height: CpiSpacing.xs),
+          // Des puces et une roue, comme pour l'heure d'un rappel, et non le
+          // calendrier de ForUI : son en-tête est enfermé dans une grille de
+          // sept tuiles de largeur fixe, et il déborde dès « Grand ».
+          Wrap(
+            spacing: CpiSpacing.xs,
+            runSpacing: CpiSpacing.xs,
+            children: <Widget>[
+              for (final (int offset, String label) in _joursProches)
+                CallbackPill(
+                  label: label,
+                  selected: !_roulette && _jour == _jourDe(offset),
+                  onPress: () => _choisirJour(_jourDe(offset)),
+                ),
+              CallbackPill(
+                label: 'Un autre jour',
+                icon: PhosphorIconsRegular.calendarBlank,
+                selected: _roulette,
+                onPress: _ouvrirLaRoulette,
+              ),
+            ],
+          ),
+          if (_roulette) ...<Widget>[
+            const SizedBox(height: CpiSpacing.xs),
+            Semantics(
+              container: true,
+              label: 'Jour du rendez-vous',
+              value: _jourLong.format(_jour),
+              increasedValue: _jourLong.format(_jourDe(_index + 1)),
+              decreasedValue: _jourLong.format(_jourDe(_index - 1)),
+              onIncrease: () => _glisserVers(_index + 1),
+              onDecrease: () => _glisserVers(_index - 1),
+              excludeSemantics: true,
+              child: SizedBox(
+                height:
+                    MediaQuery.textScalerOf(context).scale(CpiSpacing.huge) * 3,
+                child: FPicker(
+                  control: FPickerControl.managed(
+                    controller: _roue,
+                    onChange: (List<int> indexes) => _choisirJour(
+                      _jourDe(indexes.first),
+                      index: indexes.first,
+                    ),
+                  ),
+                  children: <Widget>[
+                    FPickerWheel(
+                      children: <Widget>[
+                        for (int i = 0; i < _horizonJours; i++)
+                          Text(
+                            _jourCourt.format(_jourDe(i)),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: CpiSpacing.md),
+          Text('À quelle heure ?', style: theme.textTheme.titleSmall),
+          const SizedBox(height: CpiSpacing.xs),
+          // La roue ne se règle qu'au glissé, geste qu'un lecteur d'écran ne
+          // produit pas : elle porte son nom, sa valeur et de quoi passer d'une
+          // minute à l'autre sans glisser.
+          Semantics(
+            container: true,
+            label: 'Heure du rendez-vous',
+            value: _heureTexte,
+            increasedValue:
+                '${_deuxChiffres(_decalee(1).hour)}:'
+                '${_deuxChiffres(_decalee(1).minute)}',
+            decreasedValue:
+                '${_deuxChiffres(_decalee(-1).hour)}:'
+                '${_deuxChiffres(_decalee(-1).minute)}',
+            onIncrease: () => setState(() => _heure = _decalee(1)),
+            onDecrease: () => setState(() => _heure = _decalee(-1)),
+            excludeSemantics: true,
+            child: SizedBox(
+              // `ListWheelScrollView` prend toute la hauteur qu'on lui donne :
+              // dans une feuille qui se dimensionne sur son contenu, il n'en
+              // reçoit aucune.
+              height:
+                  MediaQuery.textScalerOf(context).scale(CpiSpacing.huge) * 3,
+              child: FTimePicker(
+                hour24: true,
+                control: FTimePickerControl.lifted(
+                  time: _heure,
+                  onChange: (FTime heure) => setState(() => _heure = heure),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: CpiSpacing.md),
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              '${_jourLong.format(_jour)} à $_heureTexte',
+              style: theme.textTheme.titleMedium,
+            ),
+          ),
+          if (_passe) ...<Widget>[
+            const SizedBox(height: CpiSpacing.sm),
+            const _Notice(
+              icon: PhosphorIconsRegular.warningCircle,
+              message: 'Ce rendez-vous est déjà passé.',
+              live: true,
+            ),
+          ],
+          const SizedBox(height: CpiSpacing.md),
+          CpiButton(
+            'Enregistrer le rendez-vous',
+            icon: PhosphorIconsRegular.calendarCheck,
+            subtitle: 'Choisissez une date à venir',
+            onPressed: _passe
+                ? null
+                : () => Navigator.of(context).pop(_instant),
+          ),
+          const SizedBox(height: CpiSpacing.xs),
+          CpiButton(
+            'Annuler',
+            variant: CpiButtonVariant.ghost,
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
+      );
+    },
+  );
 }
 
 class CallOutcomeChoice {
@@ -982,11 +1763,13 @@ class CallOutcomeChoice {
   final DateTime? callbackAt;
 }
 
-/// La feuille des issues autres qu'une méthode obtenue.
+/// Le contenu de la feuille des issues autres qu'une méthode obtenue.
 ///
 /// Elle ne cite aucun motif : elle rend ce que porte la table locale, groupé par
 /// EFFET, parce que c'est l'effet qui dit au téléconseiller ce que sa réponse
 /// fait au dossier, et trié par l'ordre que l'équipe du client a choisi.
+///
+/// La coque — poignée, titre, défilement — vient de `showCpiSheet`.
 class CallOutcomeSheet extends StatefulWidget {
   const CallOutcomeSheet({required this.now, required this.reasons, super.key});
 
@@ -1053,6 +1836,18 @@ class _CallOutcomeSheetState extends State<CallOutcomeSheet> {
 
   bool get _needsComment => _reason?.requiresComment ?? false;
 
+  void _choisir(CallReason reason) {
+    unawaited(HapticFeedback.selectionClick());
+    setState(() {
+      // L'heure ne se remet à zéro que si le sélecteur disparaît : entre deux
+      // motifs qui programment tous deux un rappel il n'est pas démonté, sa
+      // puce restait allumée sur une heure qui venait d'être effacée.
+      if (_reason?.effect != reason.effect) _callbackAt = null;
+      _reason = reason;
+      _error = null;
+    });
+  }
+
   void _submit() {
     final CallReason? reason = _reason;
     if (reason == null) {
@@ -1073,205 +1868,95 @@ class _CallOutcomeSheetState extends State<CallOutcomeSheet> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final CpiColors cpi = context.cpi;
+  Widget build(BuildContext context) => CpiForui(
+    builder: (BuildContext context) {
+      final ThemeData theme = Theme.of(context);
 
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * 0.9,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                CpiSpacing.md,
-                CpiSpacing.sm,
-                CpiSpacing.md,
-                0,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      margin: const EdgeInsets.only(bottom: CpiSpacing.sm),
-                      decoration: BoxDecoration(
-                        color: cpi.borderSubtle,
-                        borderRadius: CpiRadius.brFull,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    'Méthode non obtenue',
-                    style: theme.textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: CpiSpacing.xxs),
-                  Text(
-                    'Pourquoi l\'appel n\'a pas abouti à une méthode.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: CpiSpacing.sm),
-                ],
-              ),
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Text(
+            'Pourquoi l\'appel n\'a pas abouti à une méthode.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
-            Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: CpiSpacing.md),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    for (final ({String header, List<CallReason> items}) group
-                        in _groups()) ...<Widget>[
-                      Padding(
-                        padding: const EdgeInsets.only(
-                          top: CpiSpacing.xs,
-                          bottom: CpiSpacing.xxs,
-                        ),
-                        child: Text(
-                          group.header,
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                      for (final CallReason reason in group.items)
-                        Padding(
-                          padding: const EdgeInsets.only(
-                            bottom: CpiSpacing.xxs,
-                          ),
-                          child: _OutcomeTile(
-                            reason: reason,
-                            selected: _reason == reason,
-                            onTap: () {
-                              unawaited(HapticFeedback.selectionClick());
-                              setState(() {
-                                // L'heure ne se remet à zéro que si le
-                                // sélecteur disparaît : entre deux motifs qui
-                                // programment tous deux un rappel il n'est pas
-                                // démonté, sa puce restait allumée sur une
-                                // heure qui venait d'être effacée.
-                                if (_reason?.effect != reason.effect) {
-                                  _callbackAt = null;
-                                }
-                                _reason = reason;
-                                _error = null;
-                              });
-                            },
-                          ),
-                        ),
-                    ],
-                    if (_reason?.effect ==
-                        CallEffects.scheduleCallback) ...<Widget>[
-                      const SizedBox(height: CpiSpacing.sm),
-                      CallbackPicker(
-                        key: const ValueKey<String>('callback-picker'),
-                        now: widget.now,
-                        onChanged: (DateTime? at) => _callbackAt = at,
-                      ),
-                    ],
-                    const SizedBox(height: CpiSpacing.sm),
-                    TextField(
-                      controller: _comment,
-                      maxLines: 3,
-                      maxLength: kCallAttemptCommentMaxLength,
-                      textCapitalization: TextCapitalization.sentences,
-                      onChanged: (String _) {
-                        if (_error != null) setState(() => _error = null);
-                      },
-                      decoration: InputDecoration(
-                        labelText: _needsComment
-                            ? 'Commentaire (obligatoire)'
-                            : 'Commentaire (facultatif)',
-                        hintText: 'En une phrase',
-                        alignLabelWithHint: true,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                CpiSpacing.md,
-                CpiSpacing.xs,
-                CpiSpacing.md,
-                CpiSpacing.md,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  if (_error != null) ...<Widget>[
-                    Semantics(
-                      liveRegion: true,
-                      child: Row(
-                        children: <Widget>[
-                          Icon(
-                            PhosphorIconsRegular.warningCircle,
-                            size: CpiIconSize.sm,
-                            color: cpi.syncFailed,
-                          ),
-                          const SizedBox(width: CpiSpacing.xs),
-                          Expanded(
-                            child: Text(
-                              _error!,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: cpi.syncFailed,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: CpiSpacing.xs),
-                  ],
-                  SizedBox(
-                    height: 52,
-                    child: FilledButton.icon(
-                      onPressed: _submit,
-                      icon: const Icon(
-                        PhosphorIconsRegular.floppyDisk,
-                        size: CpiIconSize.md,
-                      ),
-                      label: const Text('Enregistrer'),
-                    ),
-                  ),
-                  const SizedBox(height: CpiSpacing.xs),
-                  SizedBox(
-                    height: 48,
-                    child: TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Annuler'),
-                    ),
-                  ),
-                ],
-              ),
+          ),
+          for (final ({String header, List<CallReason> items}) group
+              in _groups()) ...<Widget>[
+            const SizedBox(height: CpiSpacing.md),
+            _GroupeDIssues(
+              header: group.header,
+              items: group.items,
+              selected: _reason,
+              onChanged: _choisir,
             ),
           ],
-        ),
-      ),
-    );
-  }
+          if (_reason?.effect == CallEffects.scheduleCallback) ...<Widget>[
+            const SizedBox(height: CpiSpacing.md),
+            CallbackPicker(
+              key: const ValueKey<String>('callback-picker'),
+              now: widget.now,
+              onChanged: (DateTime? at) => _callbackAt = at,
+            ),
+          ],
+          const SizedBox(height: CpiSpacing.md),
+          CpiField(
+            label: _needsComment
+                ? 'Commentaire (obligatoire)'
+                : 'Commentaire (facultatif)',
+            controller: _comment,
+            hint: 'En une phrase',
+            maxLines: 3,
+            maxLength: kCallAttemptCommentMaxLength,
+            textCapitalization: TextCapitalization.sentences,
+            onChanged: (String _) {
+              if (_error != null) setState(() => _error = null);
+            },
+          ),
+          if (_error != null) ...<Widget>[
+            const SizedBox(height: CpiSpacing.sm),
+            _Notice(
+              icon: PhosphorIconsRegular.warningCircle,
+              message: _error!,
+              live: true,
+            ),
+          ],
+          const SizedBox(height: CpiSpacing.md),
+          CpiButton(
+            'Enregistrer',
+            icon: PhosphorIconsRegular.floppyDisk,
+            onPressed: _submit,
+          ),
+          const SizedBox(height: CpiSpacing.xs),
+          CpiButton(
+            'Annuler',
+            variant: CpiButtonVariant.ghost,
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
+      );
+    },
+  );
 }
 
-class _OutcomeTile extends StatelessWidget {
-  const _OutcomeTile({
-    required this.reason,
+/// Les motifs d'un même effet, sous l'intitulé qui dit ce qu'ils font au
+/// dossier.
+///
+/// Chaque groupe porte sa propre sélection remontée à l'écran : choisir dans un
+/// groupe éteint donc les autres, sans qu'aucun ait à se connaître.
+class _GroupeDIssues extends StatelessWidget {
+  const _GroupeDIssues({
+    required this.header,
+    required this.items,
     required this.selected,
-    required this.onTap,
+    required this.onChanged,
   });
 
-  final CallReason reason;
-  final bool selected;
-  final VoidCallback onTap;
+  final String header;
+  final List<CallReason> items;
+  final CallReason? selected;
+  final ValueChanged<CallReason> onChanged;
 
   static IconData _icon(String effect) => switch (effect) {
     CallEffects.scheduleCallback => PhosphorIconsRegular.clockCountdown,
@@ -1292,114 +1977,55 @@ class _OutcomeTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    final CpiColors cpi = context.cpi;
-    final String hint = reason.requiresComment ? 'Commentaire obligatoire' : '';
-    return Semantics(
-      button: true,
-      selected: selected,
-      onTap: onTap,
-      label: '${reason.label}. $hint',
-      child: ExcludeSemantics(
-        child: Material(
-          color: selected
-              ? theme.colorScheme.secondary
-              : theme.colorScheme.surfaceContainerLowest,
-          borderRadius: CpiRadius.brMd,
-          child: InkWell(
-            borderRadius: CpiRadius.brMd,
-            onTap: onTap,
-            child: Container(
-              constraints: const BoxConstraints(minHeight: 56),
-              padding: const EdgeInsets.symmetric(
-                horizontal: CpiSpacing.sm,
-                vertical: CpiSpacing.xs,
-              ),
-              decoration: BoxDecoration(
-                borderRadius: CpiRadius.brMd,
-                border: Border.all(
-                  color: selected
-                      ? theme.colorScheme.primary
-                      : cpi.borderSubtle,
-                  width: selected ? 2 : 1,
-                ),
-              ),
-              child: Row(
-                children: <Widget>[
-                  Icon(
-                    _icon(reason.effect),
-                    size: CpiIconSize.md,
-                    color: selected
-                        ? theme.colorScheme.primary
-                        : (_tint(reason.color) ??
-                              theme.colorScheme.onSurfaceVariant),
-                  ),
-                  const SizedBox(width: CpiSpacing.sm),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        Text(reason.label, style: theme.textTheme.titleSmall),
-                        if (hint.isNotEmpty)
-                          Text(
-                            hint,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  if (selected)
-                    Icon(
-                      PhosphorIconsFill.checkCircle,
-                      size: CpiIconSize.md,
-                      color: theme.colorScheme.primary,
-                    ),
-                ],
-              ),
+    return CpiChoiceGroup<CallReason>(
+      label: header,
+      value: selected,
+      options: <CpiChoice<CallReason>>[
+        for (final CallReason reason in items)
+          CpiChoice<CallReason>(
+            value: reason,
+            label: reason.label,
+            subtitle: reason.requiresComment ? 'Commentaire obligatoire' : null,
+            details: Icon(
+              _icon(reason.effect),
+              size: CpiIconSize.md,
+              color: _tint(reason.color) ?? theme.colorScheme.onSurfaceVariant,
             ),
           ),
-        ),
-      ),
+      ],
+      onChanged: (CallReason reason) {
+        if (reason != selected) onChanged(reason);
+      },
     );
   }
 }
 
+/// Encart d'alerte : rouge pour ce qui bloque, neutre pour ce qui informe.
 class _Notice extends StatelessWidget {
   const _Notice({
     required this.icon,
-    required this.color,
-    required this.surface,
     required this.message,
+    this.danger = true,
+    this.live = false,
   });
 
   final IconData icon;
-  final Color color;
-  final Color surface;
   final String message;
+  final bool danger;
+
+  /// Passer à true pour un message qui apparaît sur un geste : le lecteur
+  /// d'écran doit le relire sans que le doigt reparte le chercher.
+  final bool live;
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(CpiSpacing.sm),
-      decoration: BoxDecoration(color: surface, borderRadius: CpiRadius.brMd),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Icon(icon, size: CpiIconSize.sm, color: color),
-          const SizedBox(width: CpiSpacing.xs),
-          Expanded(
-            child: Text(
-              message,
-              style: theme.textTheme.bodySmall?.copyWith(color: color),
-            ),
-          ),
-        ],
-      ),
+    final Widget alert = FAlert(
+      variant: danger ? FAlertVariant.destructive : FAlertVariant.primary,
+      icon: Icon(icon),
+      title: Text(message),
     );
+    if (!live) return alert;
+    return Semantics(liveRegion: true, child: alert);
   }
 }
 
