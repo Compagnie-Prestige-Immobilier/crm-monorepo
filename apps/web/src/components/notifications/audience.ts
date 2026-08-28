@@ -98,7 +98,7 @@ export function routeProblem(route: string): string | null {
 export const KNOWN_ROUTES: readonly { path: string; label: string }[] = [
   { path: '/', label: 'Accueil' },
   { path: '/historique', label: 'Historique' },
-  { path: '/phase2', label: 'Phase 2 : saisie des méthodes' },
+  { path: '/phase2', label: 'Phase 3 · Conversion' },
   { path: '/a-corriger', label: 'File de synchronisation' },
   { path: '/admin/notifications', label: 'Centre de notifications' },
   { path: '/reglages', label: 'Réglages' },

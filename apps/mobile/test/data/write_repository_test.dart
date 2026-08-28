@@ -706,6 +706,170 @@ void main() {
 
   group('payload', () {
     test(
+      'qualifier un représentant met à jour la fiche et ferme sa tâche',
+      () async {
+        await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+        await db
+            .into(db.repCallCampaigns)
+            .insert(
+              RepCallCampaignsCompanion.insert(
+                id: 'camp-1',
+                name: 'Relance CHUES',
+                updatedAt: t0,
+              ),
+            );
+        await db
+            .into(db.repCallTasks)
+            .insert(
+              RepCallTasksCompanion.insert(
+                id: 'task-1',
+                campaignId: 'camp-1',
+                representantId: 'repA',
+                position: 1,
+                updatedAt: t0,
+              ),
+            );
+
+        await repo.recordRepCallAttempt(
+          representantId: 'repA',
+          outcome: 'REACHED',
+          relationStatus: 'AMBASSADEUR',
+          whatsappStatus: 'MEME_NUMERO',
+          comment: 'Disponible.',
+        );
+
+        final Representant rep = await (db.select(
+          db.representants,
+        )..where((Representants row) => row.id.equals('repA'))).getSingle();
+        expect(rep.relationStatus, 'AMBASSADEUR');
+        expect(rep.whatsappStatus, 'MEME_NUMERO');
+        expect((await db.select(db.repCallTasks).getSingle()).status, 'DONE');
+        final OutboxData op = (await allOutbox(db)).single;
+        expect(op.entityType, repCallAttemptEntity);
+        expect(jsonDecode(op.payload), containsPair('comment', 'Disponible.'));
+      },
+    );
+
+    test(
+      'un rappel pose un rappel local et le porte dans le payload',
+      () async {
+        await insertRepresentant(
+          db,
+          id: 'repA',
+          phone: '+221770000001',
+          fullName: 'Awa Sy',
+        );
+        final DateTime rappelAt = t0.add(const Duration(hours: 2));
+
+        final String attemptId = await repo.recordRepCallAttempt(
+          representantId: 'repA',
+          outcome: 'CALLBACK',
+          callbackAt: rappelAt,
+        );
+
+        final RepCallbackReminder reminder =
+            await (db.select(db.repCallbackReminders)..where(
+                  (RepCallbackReminders row) => row.id.equals(attemptId),
+                ))
+                .getSingle();
+        expect(reminder.representantId, 'repA');
+        expect(reminder.fullName, 'Awa Sy');
+        expect(reminder.scheduledAt, rappelAt);
+        expect(reminder.notifiedAt, isNull);
+
+        final OutboxData op = (await allOutbox(db)).single;
+        expect(
+          jsonDecode(op.payload),
+          containsPair('callbackAt', rappelAt.toUtc().toIso8601String()),
+        );
+      },
+    );
+
+    // Rappeler quelqu'un, c'est saisir un appel de plus sur sa fiche : la
+    // promesse est alors tenue. Sans cet effacement, le rappel restait dans la
+    // liste et son alarme sonnait APRÈS l'appel qu'elle réclamait.
+    test('un appel de plus honore le rappel promis', () async {
+      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+      final String promis = await repo.recordRepCallAttempt(
+        representantId: 'repA',
+        outcome: 'CALLBACK',
+        callbackAt: t0.add(const Duration(hours: 2)),
+      );
+
+      final String tenu = await repo.recordRepCallAttempt(
+        representantId: 'repA',
+        outcome: 'REACHED',
+        relationStatus: 'AMBASSADEUR',
+        whatsappStatus: 'MEME_NUMERO',
+      );
+      final List<String> honores = await repo.honourRepCallbacks(
+        representantId: 'repA',
+        except: tenu,
+      );
+
+      expect(honores, <String>[promis]);
+      expect(await db.select(db.repCallbackReminders).get(), isEmpty);
+    });
+
+    // Le rappel que l'appel vient lui-même de prendre n'est pas une promesse
+    // tenue : l'effacer serait le perdre dans le geste qui le pose.
+    test('le rappel que l\'appel vient de promettre survit', () async {
+      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+      final String promis = await repo.recordRepCallAttempt(
+        representantId: 'repA',
+        outcome: 'CALLBACK',
+        callbackAt: t0.add(const Duration(hours: 2)),
+      );
+
+      expect(
+        await repo.honourRepCallbacks(representantId: 'repA', except: promis),
+        isEmpty,
+      );
+      expect((await db.select(db.repCallbackReminders).getSingle()).id, promis);
+    });
+
+    // Un « non » n'est pas une impasse : la personne appelée propose souvent
+    // quelqu'un d'autre, et c'est le seul moment où on l'a au téléphone.
+    test('la personne proposée part avec le compte rendu', () async {
+      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+
+      await repo.recordRepCallAttempt(
+        representantId: 'repA',
+        outcome: 'REFUSED',
+        relationStatus: 'REFUS',
+        suggestedPhone: '+221771234567',
+        suggestedName: '  Fatou Sarr  ',
+        suggestedNote: 'Déléguée du personnel.',
+      );
+
+      final Object? payload = jsonDecode((await allOutbox(db)).single.payload);
+      expect(payload, containsPair('suggestedPhone', '+221771234567'));
+      expect(payload, containsPair('suggestedName', 'Fatou Sarr'));
+      expect(payload, containsPair('suggestedNote', 'Déléguée du personnel.'));
+    });
+
+    // Le serveur ignore le nom et la note sans numéro : les envoyer quand même
+    // ferait partir des restes que personne ne pourrait rappeler.
+    test('sans numéro, le nom et la note ne partent pas', () async {
+      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+
+      await repo.recordRepCallAttempt(
+        representantId: 'repA',
+        outcome: 'REFUSED',
+        suggestedPhone: '   ',
+        suggestedName: 'Fatou Sarr',
+        suggestedNote: 'Déléguée du personnel.',
+      );
+
+      final Map<String, Object?> payload =
+          jsonDecode((await allOutbox(db)).single.payload)
+              as Map<String, Object?>;
+      expect(payload.containsKey('suggestedPhone'), isFalse);
+      expect(payload.containsKey('suggestedName'), isFalse);
+      expect(payload.containsKey('suggestedNote'), isFalse);
+    });
+
+    test(
       'le payload est du JSON brut, relisible après mise à jour de l\'app',
       () async {
         await repo.createRepresentant(
@@ -782,6 +946,166 @@ void main() {
               as Map<String, Object?>;
       expect(payload.containsKey('callbackAt'), isFalse);
     });
+
+    // ═══ LES RENSEIGNEMENTS DE LA CONVERSION ═══
+    //
+    // Le serveur refuse l'opération par des codes dédiés. Les mêmes règles sont
+    // rejouées ici pour que le refus tombe À LA SAISIE, sur le terrain, et non
+    // trois semaines plus tard quand plus personne ne peut corriger.
+
+    test('un rendez-vous sans date est refusé à la saisie', () async {
+      expect(
+        () => repo.recordCallAttempt(
+          prospectId: 'pros-1',
+          outcome: CallOutcomes.methodObtained,
+          method: EnrollmentMethods.appointment,
+          createdById: 'me',
+        ),
+        throwsA(
+          isA<CallAttemptInvalid>().having(
+            (CallAttemptInvalid e) => e.problem,
+            'problem',
+            CallAttemptProblem.rendezVousRequired,
+          ),
+        ),
+      );
+    });
+
+    test('une date sur une autre méthode est refusée', () async {
+      expect(
+        () => repo.recordCallAttempt(
+          prospectId: 'pros-1',
+          outcome: CallOutcomes.methodObtained,
+          method: EnrollmentMethods.platform,
+          createdById: 'me',
+          rendezVousAt: DateTime.utc(2026, 8, 13, 9),
+        ),
+        throwsA(
+          isA<CallAttemptInvalid>().having(
+            (CallAttemptInvalid e) => e.problem,
+            'problem',
+            CallAttemptProblem.rendezVousNotAllowed,
+          ),
+        ),
+      );
+    });
+
+    test('un rendez-vous déjà passé est refusé', () async {
+      expect(
+        () => repo.recordCallAttempt(
+          prospectId: 'pros-1',
+          outcome: CallOutcomes.methodObtained,
+          method: EnrollmentMethods.appointment,
+          createdById: 'me',
+          rendezVousAt: t0.subtract(const Duration(hours: 1)),
+        ),
+        throwsA(
+          isA<CallAttemptInvalid>().having(
+            (CallAttemptInvalid e) => e.problem,
+            'problem',
+            CallAttemptProblem.rendezVousPast,
+          ),
+        ),
+      );
+    });
+
+    // La tolérance existe parce qu'un téléphone de terrain dérive : sans elle,
+    // un rendez-vous « tout de suite » serait refusé pour deux minutes.
+    test('un rendez-vous dans la tolérance d\'horloge passe', () async {
+      await repo.recordCallAttempt(
+        prospectId: 'pros-1',
+        outcome: CallOutcomes.methodObtained,
+        method: EnrollmentMethods.appointment,
+        createdById: 'me',
+        rendezVousAt: t0.subtract(const Duration(minutes: 2)),
+      );
+
+      final CallAttempt attempt =
+          (await db.select(db.callAttempts).get()).single;
+      expect(attempt.rendezVousAt, t0.subtract(const Duration(minutes: 2)));
+    });
+
+    test('un e-mail mal formé est refusé à la saisie', () async {
+      expect(
+        () => repo.recordCallAttempt(
+          prospectId: 'pros-1',
+          outcome: CallOutcomes.methodObtained,
+          method: EnrollmentMethods.platform,
+          createdById: 'me',
+          email: 'awa.sow',
+        ),
+        throwsA(
+          isA<CallAttemptInvalid>().having(
+            (CallAttemptInvalid e) => e.problem,
+            'problem',
+            CallAttemptProblem.emailInvalid,
+          ),
+        ),
+      );
+    });
+
+    test('une durée hors bornes est refusée à la saisie', () async {
+      expect(
+        () => repo.recordCallAttempt(
+          prospectId: 'pros-1',
+          outcome: CallOutcomes.methodObtained,
+          method: EnrollmentMethods.platform,
+          createdById: 'me',
+          dureeEtablissementMois: 900,
+        ),
+        throwsA(
+          isA<CallAttemptInvalid>().having(
+            (CallAttemptInvalid e) => e.problem,
+            'problem',
+            CallAttemptProblem.dureeEtablissementInvalid,
+          ),
+        ),
+      );
+    });
+
+    // Le prospect n'est PAS réécrit en local : c'est le serveur qui pose nom,
+    // prénom et référentiels sur la fiche liée, et une copie locale divergerait
+    // jusqu'au pull suivant.
+    test(
+      'l\'identité recueillie part dans l\'opération, pas dans la base',
+      () async {
+        await repo.recordCallAttempt(
+          prospectId: 'pros-1',
+          outcome: CallOutcomes.methodObtained,
+          method: EnrollmentMethods.platform,
+          createdById: 'me',
+          nom: 'Sow',
+          prenom: 'Awa',
+          profession: 'Institutrice',
+          banqueId: 'bq-1',
+          syndicatId: 'sy-1',
+          email: 'awa.sow@exemple.sn',
+          fonctionnaire: false,
+          engagementEnCours: true,
+          dureeEtablissementMois: 0,
+        );
+
+        final Map<String, Object?> payload =
+            jsonDecode((await allOutbox(db)).single.payload)
+                as Map<String, Object?>;
+        expect(payload['nom'], 'Sow');
+        expect(payload['prenom'], 'Awa');
+        expect(payload['profession'], 'Institutrice');
+        expect(payload['banqueId'], 'bq-1');
+        expect(payload['syndicatId'], 'sy-1');
+        // `false` et `0` sont des réponses : les omettre les lirait comme
+        // « question non posée ».
+        expect(payload['fonctionnaire'], isFalse);
+        expect(payload['engagementEnCours'], isTrue);
+        expect(payload['dureeEtablissementMois'], 0);
+
+        final CallAttempt attempt =
+            (await db.select(db.callAttempts).get()).single;
+        expect(attempt.email, 'awa.sow@exemple.sn');
+        expect(attempt.fonctionnaire, isFalse);
+        expect(attempt.dureeEtablissementMois, 0);
+      },
+    );
 
     test('une note vide n\'est pas envoyée', () async {
       await repo.createRepresentant(
@@ -902,6 +1226,119 @@ void main() {
       );
       expect(await db.select(db.representantComments).get(), isEmpty);
     });
+  });
+
+  group('correction d\'une visite', () {
+    Future<String> inscrire() => repo.inscrireVisite(
+      visitorName: 'Awa Ndiaye',
+      date: '2026-08-12',
+      time: '09:12',
+      entrepriseId: 'e1',
+      entrepriseLabel: 'CPI',
+      objetId: 'o1',
+      objetLabel: 'ACHAT TERRAIN',
+      createdById: 'me',
+      comment: 'Venu de : BICIS',
+    );
+
+    test('pas encore partie : l\'opération est retirée et la visite '
+        'réinscrite', () async {
+      final String premier = await inscrire();
+
+      final String second = await repo.corrigerVisiteEnFile(
+        visiteId: premier,
+        visitorName: 'Awa Ndiaye',
+        date: '2026-08-12',
+        time: '09:12',
+        entrepriseId: 'e1',
+        entrepriseLabel: 'CPI',
+        objetId: 'o2',
+        objetLabel: 'SUIVI DE DOSSIER',
+        createdById: 'me',
+        comment: 'Venu de : BICIS · rappelé',
+      );
+
+      expect(second, isNot(premier));
+      final Visite ligne = (await db.select(db.visites).get()).single;
+      expect(ligne.id, second, reason: 'l\'ancienne ligne a disparu');
+      expect(ligne.objetId, 'o2');
+      expect(ligne.comment, 'Venu de : BICIS · rappelé');
+
+      // Une seule opération part : le serveur ne verra jamais la fautive.
+      final OutboxData op = (await allOutbox(db)).single;
+      expect(op.entityId, second);
+      expect(op.op, 'create');
+      expect((jsonDecode(op.payload) as Map<String, Object?>)['objetId'], 'o2');
+    });
+
+    test('une opération déjà réservée n\'est pas corrigeable', () async {
+      final String id = await inscrire();
+      await (db.update(
+        db.outbox,
+      )..where((Outbox o) => o.entityId.equals(id))).write(
+        const OutboxCompanion(
+          status: Value<String>(OutboxStatus.syncing),
+          claimToken: Value<String?>('bail'),
+        ),
+      );
+
+      await expectLater(
+        repo.corrigerVisiteEnFile(
+          visiteId: id,
+          visitorName: 'Awa Ndiaye',
+          date: '2026-08-12',
+          entrepriseId: 'e1',
+          entrepriseLabel: 'CPI',
+          objetId: 'o2',
+          objetLabel: 'SUIVI DE DOSSIER',
+          createdById: 'me',
+        ),
+        throwsA(isA<CorrectionVisiteImpossible>()),
+      );
+      expect((await db.select(db.visites).get()).single.id, id);
+      expect(await allOutbox(db), hasLength(1));
+    });
+
+    test(
+      'déjà partie : la correction se recopie en local, sans file',
+      () async {
+        await insertVisite(
+          db,
+          id: 'v-partie',
+          date: '2026-08-12',
+          time: '09:12',
+          reference: 'V-2026-000412',
+          destinataireId: 't1',
+          destinataireLabel: 'MME. NDOYE',
+        );
+        clock.advance(const Duration(minutes: 3));
+
+        await repo.appliquerCorrectionVisite(
+          visiteId: 'v-partie',
+          visitorName: 'Awa Ndiaye Sarr',
+          entrepriseId: 'e1',
+          entrepriseLabel: 'CPI',
+          objetId: 'o2',
+          objetLabel: 'SUIVI DE DOSSIER',
+          destinataireId: null,
+          destinataireLabel: null,
+        );
+
+        final Visite ligne = (await db.select(db.visites).get()).single;
+        expect(ligne.visitorName, 'Awa Ndiaye Sarr');
+        expect(ligne.objetId, 'o2');
+        expect(
+          ligne.destinataireId,
+          isNull,
+          reason: 'une personne demandée par erreur doit pouvoir se retirer',
+        );
+        expect(ligne.reference, 'V-2026-000412');
+        expect(ligne.date, '2026-08-12');
+        expect(ligne.time, '09:12');
+        expect(ligne.updatedAt, t0.add(const Duration(minutes: 3)));
+        expect(await allOutbox(db), isEmpty);
+      },
+    );
   });
 }
 

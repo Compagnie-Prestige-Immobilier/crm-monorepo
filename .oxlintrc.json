@@ -1,0 +1,33 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "error",
+    "suspicious": "off"
+  },
+  "plugins": ["typescript", "import", "react", "jsx-a11y", "nextjs", "vitest", "unicorn", "oxc"],
+  "jsPlugins": ["eslint-plugin-sonarjs"],
+  "env": {
+    "browser": true,
+    "node": true
+  },
+  "ignorePatterns": [
+    "**/dist/**",
+    "**/.next/**",
+    "**/node_modules/**",
+    "**/coverage/**",
+    "**/src/generated/**"
+  ],
+  "options": {
+    "typeAware": true,
+    "maxWarnings": 0
+  },
+  "rules": {
+    "complexity": ["error", { "max": 20, "variant": "classic" }],
+    "max-depth": ["error", 3],
+    "no-nested-ternary": "error",
+    "sonarjs/cognitive-complexity": ["error", 15],
+    "typescript/no-explicit-any": "error",
+    "typescript/consistent-type-imports": ["error", { "prefer": "type-imports" }],
+    "import/no-cycle": "error"
+  }
+}

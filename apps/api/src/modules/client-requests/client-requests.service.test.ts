@@ -1,11 +1,5 @@
 import { ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
-import {
-  ClientRequestStatus,
-  EnrollmentMethod,
-  NotificationAudience,
-  Phase2Status,
-  Role,
-} from '@crm/database';
+import { ClientRequestStatus, NotificationAudience, Role } from '@crm/database';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
@@ -238,7 +232,6 @@ describe('approbation', () => {
   const body = {
     representantId: 'rep-1',
     syndicatId: 'syn-1',
-    enrollmentMethod: EnrollmentMethod.PLATFORM,
   };
 
   beforeEach(() => {
@@ -247,7 +240,7 @@ describe('approbation', () => {
     db.syndicat.findUnique.mockResolvedValue({ id: 'syn-1' });
   });
 
-  it('crée le prospect en METHOD_OBTAINED avec sa provenance', async () => {
+  it('crée le prospect avec sa provenance, puis laisse la qualification CHUES continuer', async () => {
     await service.approve(ADMIN, 'req-1', body);
 
     const args = (db.prospect.create.mock.calls[0] as [{ data: Record<string, unknown> }])[0];
@@ -257,10 +250,10 @@ describe('approbation', () => {
       phoneE164: '+221771234567',
       origin: 'BANQUE',
       originLabel: 'CBAO',
-      phase2Status: Phase2Status.METHOD_OBTAINED,
-      enrollmentMethod: EnrollmentMethod.PLATFORM,
-      enrollmentCapturedById: ADMIN.id,
     });
+    expect(args.data).not.toHaveProperty('phase2Status');
+    expect(args.data).not.toHaveProperty('enrollmentMethod');
+    expect(args.data).not.toHaveProperty('enrollmentCapturedById');
   });
 
   it('écrit le prospect ET la demande dans la MÊME transaction', async () => {

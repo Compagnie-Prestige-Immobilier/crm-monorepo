@@ -35,6 +35,16 @@ class CampaignAttemptDto {
 
     required this.comment,
 
+    required this.email,
+
+    required this.fonctionnaire,
+
+    required this.engagementEnCours,
+
+    required this.dureeEtablissementMois,
+
+    required this.rendezVousAt,
+
     required this.performedById,
 
     required this.performedByName,
@@ -77,6 +87,22 @@ class CampaignAttemptDto {
   @JsonKey(name: r'comment', required: true, includeIfNull: true)
   final String? comment;
 
+  @JsonKey(name: r'email', required: true, includeIfNull: true)
+  final String? email;
+
+  @JsonKey(name: r'fonctionnaire', required: true, includeIfNull: true)
+  final bool? fonctionnaire;
+
+  @JsonKey(name: r'engagementEnCours', required: true, includeIfNull: true)
+  final bool? engagementEnCours;
+
+  @JsonKey(name: r'dureeEtablissementMois', required: true, includeIfNull: true)
+  final num? dureeEtablissementMois;
+
+  /// Non nulle si et seulement si method vaut APPOINTMENT.
+  @JsonKey(name: r'rendezVousAt', required: true, includeIfNull: true)
+  final DateTime? rendezVousAt;
+
   /// Commercial qui a RÉELLEMENT passé l’appel.
   @JsonKey(name: r'performedById', required: true, includeIfNull: false)
   final String performedById;
@@ -104,6 +130,11 @@ class CampaignAttemptDto {
                 outcome,
                 method,
                 comment,
+                email,
+                fonctionnaire,
+                engagementEnCours,
+                dureeEtablissementMois,
+                rendezVousAt,
                 performedById,
                 performedByName,
                 assignedToId,
@@ -117,6 +148,11 @@ class CampaignAttemptDto {
                 other.outcome,
                 other.method,
                 other.comment,
+                other.email,
+                other.fonctionnaire,
+                other.engagementEnCours,
+                other.dureeEtablissementMois,
+                other.rendezVousAt,
                 other.performedById,
                 other.performedByName,
                 other.assignedToId,
@@ -136,6 +172,11 @@ class CampaignAttemptDto {
         outcome,
         method,
         comment,
+        email,
+        fonctionnaire,
+        engagementEnCours,
+        dureeEtablissementMois,
+        rendezVousAt,
         performedById,
         performedByName,
         assignedToId,

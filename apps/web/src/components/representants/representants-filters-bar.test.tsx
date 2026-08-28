@@ -118,7 +118,8 @@ describe('RepresentantsFiltersBar, état de la relation', () => {
     setUrl('/representants');
     renderWithQuery(<RepresentantsFiltersBar />);
 
-    await choose('Relation', 'Ambassadeur');
+    // L'intitulé lu à l'écran change, la valeur envoyée à l'API ne bouge pas.
+    await choose('Relation', 'A accepté');
 
     expect(routerMock.push).toHaveBeenCalledWith('/representants?relationStatus=AMBASSADEUR', {
       scroll: false,

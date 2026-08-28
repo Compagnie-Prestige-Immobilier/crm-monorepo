@@ -116,18 +116,18 @@ void main() {
     await unmount(tester);
   });
 
-  testWidgets('l\'accueil NOMME ce que fait son bouton, et garde la création', (
+  testWidgets('l\'accueil n\'a qu\'un bouton de pied', (
     WidgetTester tester,
   ) async {
-    // « Saisir des prospects » ouvrait « Choisir un représentant » : la
-    // promesse et l'écran d'arrivée ne se ressemblaient pas, et l'utilisateur
-    // croyait s'être trompé de bouton. La création, elle, ne doit pas se
-    // retrouver à deux écrans de l'accueil : c'est le geste de la fiche qui
-    // naît en tournée.
+    // Le pied empilait deux boutons pleine largeur, dont un « primaire » qui
+    // n'ouvrait pas ce qu'il promettait. Il n'en reste qu'un, et il ouvre les
+    // deux gestes de départ ; créer un représentant n'en fait pas partie, la
+    // base des représentants venant du web.
     await paint(tester, await host(const HomeScreen()));
 
-    expect(find.text('Choisir un représentant'), findsOneWidget);
-    expect(find.text('Nouveau représentant'), findsOneWidget);
+    expect(find.text('Commencer'), findsOneWidget);
+    expect(find.text('Nouvelle fiche'), findsNothing);
+    expect(find.text('Un représentant'), findsNothing);
     expect(find.text('Saisir des prospects'), findsNothing);
 
     await unmount(tester);

@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import type { Hash } from 'node:crypto';
 import { createWriteStream } from 'node:fs';
 import { mkdir, readdir, rename, rm, stat } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
@@ -19,6 +20,22 @@ import { AppUpdateUploadDto } from './dto.js';
 const SETTING_KEY = 'mobile.android.release';
 
 const APK_CONTENT_TYPE = 'application/vnd.android.package-archive';
+
+async function saveApk(part: MultipartFile, path: string, hash: Hash): Promise<number> {
+  let size = 0;
+  part.file.on('data', (chunk: Buffer) => {
+    size += chunk.length;
+    hash.update(chunk);
+  });
+  await pipeline(part.file, createWriteStream(path, { flags: 'wx' }));
+  return size;
+}
+
+function assertApk(part: MultipartFile): void {
+  if (!part.filename.toLowerCase().endsWith('.apk')) {
+    throw new BadRequestException('Un fichier APK est requis.');
+  }
+}
 
 type ReleaseRecord = {
   versionName: string;
@@ -71,19 +88,13 @@ export class AppUpdatesService {
     let input: AppUpdateUploadDto;
     try {
       for await (const part of request.parts()) {
-        if (part.type !== 'file') {
-          if (typeof part.value === 'string') fields[part.fieldname] = part.value;
+        if (part.type === 'file') {
+          assertApk(part);
+          file = part;
+          fileSize = await saveApk(part, temporaryPath, hash);
           continue;
         }
-        if (!part.filename.toLowerCase().endsWith('.apk')) {
-          throw new BadRequestException('Un fichier APK est requis.');
-        }
-        file = part;
-        part.file.on('data', (chunk: Buffer) => {
-          fileSize += chunk.length;
-          hash.update(chunk);
-        });
-        await pipeline(part.file, createWriteStream(temporaryPath, { flags: 'wx' }));
+        if (typeof part.value === 'string') fields[part.fieldname] = part.value;
       }
 
       if (file === null) throw new BadRequestException('Un fichier APK est requis.');

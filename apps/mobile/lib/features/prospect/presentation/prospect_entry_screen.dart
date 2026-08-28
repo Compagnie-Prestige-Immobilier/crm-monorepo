@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:forui/forui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/drafts/draft_form_mixin.dart';
 import '../../../core/providers/app_providers.dart';
+import '../../../core/providers/connectivity.dart';
 import '../../../core/providers/sync_coordinator.dart';
 import '../../../core/router/back_navigation.dart';
 import '../../../core/router/route_paths.dart';
@@ -18,9 +20,11 @@ import '../../../core/utils/phone.dart';
 import '../../../data/local/database.dart';
 import '../../../data/repositories/draft_repository.dart';
 import '../../../data/repositories/write_repository.dart';
+import '../../../ui/widgets/cpi_choice_group.dart';
+import '../../../ui/widgets/cpi_kit.dart';
+import '../../../ui/widgets/cpi_steps.dart';
 import '../../../ui/widgets/local_typeahead.dart';
 import '../../../ui/widgets/cpi_resume_banner.dart';
-import '../../../ui/widgets/offline_indicator.dart';
 import '../../../ui/widgets/phone_field.dart';
 import '../../../ui/widgets/referentials_banner.dart';
 
@@ -71,10 +75,23 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
   Representant? _representant;
 
   bool _saving = false;
+
+  /// Le représentant s'inscrit lui-même : sa fiche pré-remplit le formulaire,
+  /// et l'enregistrement reste celui de n'importe quel prospect chez lui.
+  bool _luiMeme = false;
+
   String? _error;
   String? _duplicateName;
   Timer? _lookupDebounce;
   DraftSnapshot? _pendingRestore;
+
+  /// L'étape en cours, à partir de 1. Deux pour le CHUES — qui est-ce, puis sa
+  /// banque et son syndicat —, trois pour le Grand Public, qui intercale son
+  /// travail.
+  int _step = 1;
+
+  /// Ce que « Réessayer » relance après un échec d'enregistrement.
+  bool _lastAndNext = true;
 
   @override
   String get draftId => _draftId;
@@ -266,6 +283,27 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
     });
   }
 
+  /// Pré-remplissage seulement : le représentant devient un prospect comme un
+  /// autre, avec la même validation et le même enregistrement.
+  void _basculerLuiMeme(bool actif) {
+    final Representant? rep = _representant;
+    if (rep == null) return;
+    final List<String> mots = rep.fullName.trim().split(RegExp(r'\s+'));
+    setState(() {
+      _luiMeme = actif;
+      _prenom.text = actif && mots.length > 1 ? mots.first : '';
+      _nom.text = actif
+          ? (mots.length > 1 ? mots.skip(1).join(' ') : rep.fullName.trim())
+          : '';
+      _phone.text = actif
+          ? Phone.groupNational(Phone.digitsOf(rep.phoneE164))
+          : '';
+      _duplicateName = null;
+    });
+    markDraftDirty();
+    _scheduleLookup();
+  }
+
   /// Le nom, le numéro, et pour le Grand Public le secteur : rien d'autre. Un
   /// champ de plus rendu obligatoire et la saisie est abandonnée sur le terrain.
   bool get _canSave =>
@@ -274,10 +312,51 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
       (widget.projet != 'GRAND_PUBLIC' || _type != null) &&
       !_saving;
 
+  bool get _grandPublic => widget.projet == 'GRAND_PUBLIC';
+
+  int get _lastStep => _grandPublic ? 3 : 2;
+
+  /// La question de l'étape, celle qui tient lieu de titre.
+  String get _question => switch (_step) {
+    1 => 'Qui est-ce ?',
+    2 when _grandPublic => 'Que fait-il ?',
+    _ => 'Sa banque, son syndicat',
+  };
+
+  /// Ce qui retient l'étape, nommé sous « Continuer ». Tout ce qui est
+  /// obligatoire se demande à la première étape ; les suivantes sont libres.
+  String? get _manque {
+    if (_step > 1) return null;
+    if (_nom.text.trim().isEmpty) return 'Écrivez le nom';
+    if (Phone.toE164(_phone.text) == null) return 'Écrivez le numéro complet';
+    if (_grandPublic && _type == null) return 'Choisissez le secteur';
+    return null;
+  }
+
+  void _precedent() {
+    FocusScope.of(context).unfocus();
+    setState(() => _step -= 1);
+  }
+
+  void _suivant() {
+    FocusScope.of(context).unfocus();
+    setState(() => _step += 1);
+    unawaited(flushDraft());
+  }
+
+  List<CpiRecapLine> get _recap => <CpiRecapLine>[
+    CpiRecapLine('Nom complet', '${_prenom.text} ${_nom.text}'.trim()),
+    CpiRecapLine('Téléphone', _phone.text),
+    if (_grandPublic) CpiRecapLine('Secteur', _ChampSecteur.libelle(_type)),
+    CpiRecapLine('Banque', _banque.text),
+    CpiRecapLine('Syndicat', _syndicat.text),
+  ];
+
   Future<void> _save({required bool andNext}) async {
     if (!_canSave) return;
     setState(() {
       _saving = true;
+      _lastAndNext = andNext;
       _error = null;
     });
     // Capturés avant les `await` : la fiche peut être enregistrée juste après un
@@ -329,10 +408,15 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
           // suivante sous celui de la précédente sans que personne le relise.
           _type = null;
           _duplicateName = null;
+          _luiMeme = false;
           _saving = false;
+          _step = 1;
         });
         _nomFocus.requestFocus();
       } else {
+        // Éteint AVANT de quitter : au retour arrière l'écran retrouvé gardait
+        // sa roue de progression et ses deux boutons éteints.
+        setState(() => _saving = false);
         popOrHome(
           context,
           fallback: widget.projet == 'GRAND_PUBLIC'
@@ -360,6 +444,8 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
     return 'Enregistrement impossible. $raw';
   }
 
+  /// Le message est déjà posé sous les boutons, dans une région vive : seule
+  /// l'annonce assertive manque au lecteur d'écran qui a le doigt ailleurs.
   void _announceFailure(String message) {
     unawaited(
       SemanticsService.sendAnnouncement(
@@ -369,395 +455,476 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
         assertiveness: Assertiveness.assertive,
       ),
     );
-    final ScaffoldMessengerState? messenger = ScaffoldMessenger.maybeOf(
-      context,
-    );
-    messenger
-      ?..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Theme.of(context).colorScheme.error,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 6),
-        ),
-      );
   }
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final CpiColors cpi = context.cpi;
-    final List<Banque> banques =
-        ref.watch(banquesProvider).value ?? const <Banque>[];
-    final List<Syndicat> syndicats =
-        ref.watch(syndicatsProvider).value ?? const <Syndicat>[];
+    final AsyncValue<List<Banque>> banquesLues = ref.watch(banquesProvider);
+    final AsyncValue<List<Syndicat>> syndicatsLus = ref.watch(
+      syndicatsProvider,
+    );
+    final List<Banque> banques = banquesLues.value ?? const <Banque>[];
+    final List<Syndicat> syndicats = syndicatsLus.value ?? const <Syndicat>[];
+    // Tant que la base n'a pas répondu, les listes sont vides sans être
+    // absentes : accuser le téléchargement fait clignoter l'avertissement.
+    final bool referentielsManquants =
+        banquesLues.hasValue &&
+        syndicatsLus.hasValue &&
+        (banques.isEmpty || syndicats.isEmpty);
     final List<CanauxProvenanceData> canaux =
         ref.watch(canauxProvenanceProvider).value ??
         const <CanauxProvenanceData>[];
     final int count = _representantId == null
         ? 0
         : (ref.watch(prospectCountForProvider(_representantId!)).value ?? 0);
-    final bool grandPublic = widget.projet == 'GRAND_PUBLIC';
+    final bool grandPublic = _grandPublic;
     final String fallback = grandPublic
         ? Routes.grandPublic
         : Routes.historique;
 
-    return CpiPopScope(
-      fallback: fallback,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(grandPublic ? 'Nouveau prospect' : 'Saisie de prospects'),
-          leading: CpiBackButton(fallback: fallback),
-          actions: const <Widget>[
-            OfflineIndicator(),
-            SizedBox(width: CpiSpacing.xs),
-          ],
-          bottom: _contextStrip(
-            context,
-            text: _representant == null
-                ? grandPublic
-                      ? 'Projet Grand Public'
-                      : 'Sans représentant'
-                : '${_representant!.fullName} · '
-                      '$count prospect${count > 1 ? 's' : ''} ajouté'
-                      '${count > 1 ? 's' : ''}',
-            style: theme.textTheme.bodySmall?.copyWith(color: cpi.accentOnDark),
-          ),
-        ),
-        body: SafeArea(
-          child: Column(
-            children: <Widget>[
-              Expanded(
-                child: CustomScrollView(
-                  slivers: <Widget>[
-                    if (!grandPublic)
-                      SliverToBoxAdapter(
-                        child: ReferentialsBanner(
-                          missing: banques.isEmpty || syndicats.isEmpty,
-                        ),
-                      ),
-                    if (_pendingRestore != null)
-                      SliverToBoxAdapter(
-                        child: CpiResumeBanner(
-                          onResume: () => _apply(_pendingRestore!),
-                          onDiscard: () async {
-                            await ref
-                                .read(draftRepositoryProvider)
-                                .delete(_pendingRestore!.draftId);
-                            if (mounted) setState(() => _pendingRestore = null);
-                          },
-                        ),
-                      ),
-                    SliverPadding(
-                      padding: const EdgeInsets.all(CpiSpacing.md),
-                      sliver: SliverList.list(
-                        children: <Widget>[
-                          Row(
-                            children: <Widget>[
-                              Expanded(
-                                child: TextField(
-                                  controller: _prenom,
-                                  focusNode: _prenomFocus,
-                                  textCapitalization: TextCapitalization.words,
-                                  textInputAction: TextInputAction.next,
-                                  onChanged: (String _) {
-                                    markDraftDirty();
-                                    setState(() {});
-                                  },
-                                  decoration: const InputDecoration(
-                                    labelText: 'Prénom',
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: CpiSpacing.sm),
-                              Expanded(
-                                child: TextField(
-                                  controller: _nom,
-                                  focusNode: _nomFocus,
-                                  autofocus: true,
-                                  textCapitalization: TextCapitalization.words,
-                                  textInputAction: TextInputAction.next,
-                                  onChanged: (String _) {
-                                    markDraftDirty();
-                                    setState(() {});
-                                  },
-                                  decoration: const InputDecoration(
-                                    labelText: 'Nom',
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: CpiSpacing.md),
-                          PhoneField(
-                            controller: _phone,
-                            focusNode: _phoneFocus,
-                            onChanged: (String _) {
-                              markDraftDirty();
-                              _scheduleLookup();
-                              setState(() {});
-                            },
-                          ),
-                          if (_duplicateName != null) ...<Widget>[
-                            const SizedBox(height: CpiSpacing.xs),
-                            Row(
-                              children: <Widget>[
-                                Icon(
-                                  PhosphorIconsRegular.warningCircle,
-                                  size: CpiIconSize.xs,
-                                  color: cpi.accentText,
-                                ),
-                                const SizedBox(width: CpiSpacing.xxs),
-                                Expanded(
-                                  child: Text(
-                                    'Déjà saisi : $_duplicateName',
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: cpi.accentText,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                          if (grandPublic) ...<Widget>[
-                            const SizedBox(height: CpiSpacing.md),
-                            _ChampSecteur(
-                              valeur: _type,
-                              onChanged: (String? valeur) {
-                                setState(() => _type = valeur);
-                                markDraftDirty();
-                                unawaited(flushDraft());
-                              },
-                            ),
-                            const SizedBox(height: CpiSpacing.md),
-                            TextField(
-                              controller: _profession,
-                              focusNode: _professionFocus,
-                              textCapitalization: TextCapitalization.sentences,
-                              textInputAction: TextInputAction.next,
-                              onChanged: (String _) => markDraftDirty(),
-                              decoration: const InputDecoration(
-                                labelText: 'Profession',
-                              ),
-                            ),
-                          ],
-                          ...<Widget>[
-                            const SizedBox(height: CpiSpacing.md),
-                            LocalTypeahead(
-                              controller: _banque,
-                              focusNode: _banqueFocus,
-                              label: grandPublic
-                                  ? 'Banque de domiciliation'
-                                  : 'Banque',
-                              selectedId: _banqueId,
-                              emptyHint: banques.isEmpty
-                                  ? 'Aucune banque. Synchronisez.'
-                                  : 'Aucun résultat',
-                              options: banques
-                                  .map(
-                                    (Banque b) => TypeaheadOption(
-                                      id: b.id,
-                                      label: b.name,
-                                      secondary: b.shortName,
-                                      keywords: <String>[b.shortName],
-                                    ),
-                                  )
-                                  .toList(growable: false),
-                              onChanged: (String _) {
-                                if (_banqueId != null) {
-                                  setState(() => _banqueId = null);
-                                }
-                                markDraftDirty();
-                              },
-                              onSelected: (TypeaheadOption o) {
-                                setState(() => _banqueId = o.id);
-                                markDraftDirty();
-                                unawaited(flushDraft());
-                              },
-                            ),
-                            const SizedBox(height: CpiSpacing.md),
-                            LocalTypeahead(
-                              controller: _syndicat,
-                              focusNode: _syndicatFocus,
-                              label: 'Syndicat',
-                              selectedId: _syndicatId,
-                              textInputAction: TextInputAction.done,
-                              emptyHint: syndicats.isEmpty
-                                  ? 'Aucun syndicat. Synchronisez.'
-                                  : 'Aucun résultat',
-                              options: syndicats
-                                  .map(
-                                    (Syndicat s) => TypeaheadOption(
-                                      id: s.id,
-                                      label: s.name,
-                                      secondary: s.sigle,
-                                      keywords: <String>[
-                                        s.sigle,
-                                        if (s.secteur != null) s.secteur!,
-                                      ],
-                                    ),
-                                  )
-                                  .toList(growable: false),
-                              onChanged: (String _) {
-                                if (_syndicatId != null) {
-                                  setState(() => _syndicatId = null);
-                                }
-                                markDraftDirty();
-                              },
-                              onSelected: (TypeaheadOption o) {
-                                setState(() => _syndicatId = o.id);
-                                markDraftDirty();
-                                unawaited(flushDraft());
-                              },
-                            ),
-                          ],
-                          if (grandPublic) ...<Widget>[
-                            const SizedBox(height: CpiSpacing.md),
-                            TextField(
-                              controller: _duree,
-                              focusNode: _dureeFocus,
-                              keyboardType: TextInputType.number,
-                              textInputAction: TextInputAction.next,
-                              onChanged: (String _) => markDraftDirty(),
-                              decoration: const InputDecoration(
-                                labelText: 'Durée du système',
-                                suffixText: 'mois',
-                              ),
-                            ),
-                            const SizedBox(height: CpiSpacing.md),
-                            LocalTypeahead(
-                              controller: _canal,
-                              focusNode: _canalFocus,
-                              label: 'Canal de provenance',
-                              selectedId: _canalId,
-                              textInputAction: TextInputAction.done,
-                              emptyHint: canaux.isEmpty
-                                  ? 'Aucun canal. Synchronisez.'
-                                  : 'Aucun résultat',
-                              options: canaux
-                                  .map(
-                                    (CanauxProvenanceData c) => TypeaheadOption(
-                                      id: c.id,
-                                      label: c.label,
-                                      keywords: <String>[c.code],
-                                    ),
-                                  )
-                                  .toList(growable: false),
-                              onChanged: (String _) {
-                                if (_canalId != null) {
-                                  setState(() => _canalId = null);
-                                }
-                                markDraftDirty();
-                              },
-                              onSelected: (TypeaheadOption o) {
-                                setState(() => _canalId = o.id);
-                                markDraftDirty();
-                                unawaited(flushDraft());
-                              },
-                            ),
-                          ],
-                        ],
+    final String contexte = _representant == null
+        ? grandPublic
+              ? 'Grand public'
+              : 'Sans représentant'
+        : '${_representant!.fullName} · '
+              '$count prospect${count > 1 ? 's' : ''} ajouté'
+              '${count > 1 ? 's' : ''}';
+    final bool premiere = _step == 1;
+    final bool derniere = _step == _lastStep;
+
+    final Widget screen = CpiScaffold(
+      title: _question,
+      showTitle: false,
+      leading: premiere
+          ? CpiBackButton(fallback: fallback)
+          : CpiHeaderAction(
+              icon: PhosphorIconsRegular.arrowLeft,
+              label: 'Étape précédente',
+              onPressed: _saving ? null : _precedent,
+            ),
+      banner: _band(),
+      footer: _Footer(
+        canSave: _canSave,
+        saving: _saving,
+        continuer: !derniere,
+        manque: _manque,
+        onContinue: _suivant,
+        onNext: () => _save(andNext: true),
+        onDone: () => _save(andNext: false),
+      ),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          // Hors du défilement : la question de l'étape et son rang restent
+          // lisibles pendant qu'on remplit les champs.
+          CpiStepHeader(step: _step, total: _lastStep, question: _question),
+          Expanded(
+            child: CustomScrollView(
+              slivers: <Widget>[
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      CpiSpacing.md,
+                      0,
+                      CpiSpacing.md,
+                      CpiSpacing.sm,
+                    ),
+                    child: Text(
+                      contexte,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(
-                  CpiSpacing.md,
-                  CpiSpacing.sm,
-                  CpiSpacing.md,
-                  CpiSpacing.md,
-                ),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surface,
-                  border: Border(top: BorderSide(color: cpi.borderSubtle)),
-                ),
-                child: Column(
-                  children: <Widget>[
-                    if (_error != null) ...<Widget>[
-                      Semantics(
-                        liveRegion: true,
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            Icon(
-                              PhosphorIconsRegular.warningCircle,
-                              size: CpiIconSize.sm,
-                              color: theme.colorScheme.error,
-                            ),
-                            const SizedBox(width: CpiSpacing.xs),
-                            Expanded(
-                              child: Text(
-                                _error!,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.error,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                // Le bandeau des listes manquantes accompagne l'étape où l'on
+                // choisit dans ces listes, pas l'écran d'ouverture.
+                if (!grandPublic && derniere)
+                  SliverToBoxAdapter(
+                    child: ReferentialsBanner(missing: referentielsManquants),
+                  ),
+                if (!grandPublic && premiere && _representant != null)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        CpiSpacing.md,
+                        0,
+                        CpiSpacing.md,
+                        CpiSpacing.sm,
                       ),
-                      const SizedBox(height: CpiSpacing.xs),
+                      child: CpiCard.rows(<CpiRow>[
+                        CpiRow(
+                          title: 'Le représentant lui-même est intéressé',
+                          subtitle: 'Son nom et son numéro sont déjà remplis.',
+                          trailing: FSwitch(
+                            value: _luiMeme,
+                            onChange: _saving ? null : _basculerLuiMeme,
+                          ),
+                          onTap: _saving
+                              ? null
+                              : () => _basculerLuiMeme(!_luiMeme),
+                        ),
+                      ]),
+                    ),
+                  ),
+                if (_pendingRestore != null)
+                  SliverToBoxAdapter(
+                    child: CpiResumeBanner(
+                      onResume: () => _apply(_pendingRestore!),
+                      onDiscard: () async {
+                        await ref
+                            .read(draftRepositoryProvider)
+                            .delete(_pendingRestore!.draftId);
+                        if (mounted) setState(() => _pendingRestore = null);
+                      },
+                    ),
+                  ),
+                SliverPadding(
+                  padding: const EdgeInsets.all(CpiSpacing.md),
+                  sliver: SliverList.list(
+                    children: <Widget>[
+                      ..._champsDeLEtape(
+                        theme,
+                        cpi,
+                        banques,
+                        syndicats,
+                        canaux,
+                      ),
+                      if (derniere) ...<Widget>[
+                        const SizedBox(height: CpiSpacing.md),
+                        CpiRecap(lines: _recap),
+                      ],
                     ],
-                    FilledButton.icon(
-                      onPressed: _canSave ? () => _save(andNext: true) : null,
-                      icon: const Icon(
-                        PhosphorIconsRegular.arrowRight,
-                        size: CpiIconSize.md,
-                      ),
-                      label: const Text('Enregistrer et suivant'),
-                    ),
-                    const SizedBox(height: CpiSpacing.xs),
-                    OutlinedButton(
-                      onPressed: _canSave ? () => _save(andNext: false) : null,
-                      child: const Text('Enregistrer et terminer'),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
+
+    return CpiStepScope(
+      first: premiere,
+      fallback: fallback,
+      // Rien pendant l'enregistrement : reculer changerait la fiche que
+      // l'écriture est en train de poser.
+      onBack: _saving ? null : _precedent,
+      child: screen,
+    );
   }
+
+  List<Widget> _champsDeLEtape(
+    ThemeData theme,
+    CpiColors cpi,
+    List<Banque> banques,
+    List<Syndicat> syndicats,
+    List<CanauxProvenanceData> canaux,
+  ) => switch (_step) {
+    1 => _champsQui(theme, cpi),
+    2 when _grandPublic => _champsTravail(),
+    _ => _champsBanque(banques, syndicats, canaux),
+  };
+
+  /// Une seule bande d'état, sous le titre : l'échec d'abord, le réseau sinon.
+  Widget? _band() {
+    final String? error = _error;
+    if (error != null) {
+      return CpiStatusBand(
+        text: error,
+        tone: CpiTone.danger,
+        actionLabel: 'Réessayer',
+        onAction: () => _save(andNext: _lastAndNext),
+      );
+    }
+    if (ref.watch(connectivityProvider) == CpiConnectivity.online) return null;
+    return const CpiStatusBand(
+      text: 'Hors ligne. La fiche est gardée.',
+      tone: CpiTone.warning,
+    );
+  }
+
+  List<Widget> _champsQui(ThemeData theme, CpiColors cpi) {
+    return <Widget>[
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Expanded(
+            child: CpiField(
+              label: 'Prénom',
+              controller: _prenom,
+              focusNode: _prenomFocus,
+              hint: 'Ex. Fatou',
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+              onChanged: (String _) {
+                markDraftDirty();
+                setState(() {});
+              },
+            ),
+          ),
+          const SizedBox(width: CpiSpacing.sm),
+          Expanded(
+            child: CpiField(
+              label: 'Nom',
+              controller: _nom,
+              focusNode: _nomFocus,
+              hint: 'Ex. Sarr',
+              autofocus: true,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+              onChanged: (String _) {
+                markDraftDirty();
+                setState(() {});
+              },
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: CpiSpacing.md),
+      PhoneField(
+        controller: _phone,
+        focusNode: _phoneFocus,
+        // Le numéro du représentant vient de sa fiche : le retoucher ici
+        // créerait un prospect que rien ne relie plus à personne.
+        enabled: !_luiMeme,
+        onChanged: (String _) {
+          markDraftDirty();
+          _scheduleLookup();
+          setState(() {});
+        },
+      ),
+      if (_duplicateName != null) ...<Widget>[
+        const SizedBox(height: CpiSpacing.xs),
+        Row(
+          children: <Widget>[
+            Icon(
+              PhosphorIconsRegular.warningCircle,
+              size: CpiIconSize.xs,
+              color: cpi.accentText,
+            ),
+            const SizedBox(width: CpiSpacing.xxs),
+            Expanded(
+              child: Text(
+                'Déjà saisi : $_duplicateName',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: cpi.accentText,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+      if (_grandPublic) ...<Widget>[
+        const SizedBox(height: CpiSpacing.md),
+        _ChampSecteur(
+          valeur: _type,
+          onChanged: (String valeur) {
+            setState(() => _type = valeur);
+            markDraftDirty();
+            unawaited(flushDraft());
+          },
+        ),
+      ],
+    ];
+  }
+
+  /// Grand Public : ce qu'il fait, entre son identité et sa banque.
+  List<Widget> _champsTravail() => <Widget>[
+    CpiField(
+      label: 'Profession',
+      controller: _profession,
+      focusNode: _professionFocus,
+      hint: 'Ex. Instituteur',
+      textCapitalization: TextCapitalization.sentences,
+      textInputAction: TextInputAction.next,
+      onChanged: (String _) => markDraftDirty(),
+    ),
+    const SizedBox(height: CpiSpacing.md),
+    CpiField(
+      label: 'Ancienneté',
+      controller: _duree,
+      focusNode: _dureeFocus,
+      hint: 'Ex. 24',
+      keyboardType: TextInputType.number,
+      textInputAction: TextInputAction.next,
+      suffix: const Text('mois'),
+      description: 'En mois',
+      onChanged: (String _) => markDraftDirty(),
+    ),
+  ];
+
+  List<Widget> _champsBanque(
+    List<Banque> banques,
+    List<Syndicat> syndicats,
+    List<CanauxProvenanceData> canaux,
+  ) => <Widget>[
+    _champBanque(banques),
+    const SizedBox(height: CpiSpacing.md),
+    _champSyndicat(syndicats),
+    if (_grandPublic) ...<Widget>[
+      const SizedBox(height: CpiSpacing.md),
+      LocalTypeahead(
+        controller: _canal,
+        focusNode: _canalFocus,
+        label: 'Provenance',
+        hint: 'Ex. Parrainage',
+        description: 'Comment il nous a connus',
+        selectedId: _canalId,
+        textInputAction: TextInputAction.done,
+        emptyHint: canaux.isEmpty
+            ? 'La liste n\'est pas encore arrivée.'
+            : 'Aucun résultat',
+        options: canaux
+            .map(
+              (CanauxProvenanceData c) => TypeaheadOption(
+                id: c.id,
+                label: c.label,
+                keywords: <String>[c.code],
+              ),
+            )
+            .toList(growable: false),
+        onChanged: (String _) {
+          if (_canalId != null) setState(() => _canalId = null);
+          markDraftDirty();
+        },
+        onSelected: (TypeaheadOption o) {
+          setState(() => _canalId = o.id);
+          markDraftDirty();
+          unawaited(flushDraft());
+        },
+      ),
+    ],
+  ];
+
+  Widget _champBanque(List<Banque> banques) => LocalTypeahead(
+    controller: _banque,
+    focusNode: _banqueFocus,
+    label: _grandPublic ? 'Banque de domiciliation' : 'Banque',
+    hint: 'Ex. BICIS',
+    selectedId: _banqueId,
+    emptyHint: banques.isEmpty
+        ? 'La liste n\'est pas encore arrivée.'
+        : 'Aucun résultat',
+    options: banques
+        .map(
+          (Banque b) => TypeaheadOption(
+            id: b.id,
+            label: b.name,
+            secondary: b.shortName,
+            keywords: <String>[b.shortName],
+          ),
+        )
+        .toList(growable: false),
+    onChanged: (String _) {
+      if (_banqueId != null) setState(() => _banqueId = null);
+      markDraftDirty();
+    },
+    onSelected: (TypeaheadOption o) {
+      setState(() => _banqueId = o.id);
+      markDraftDirty();
+      unawaited(flushDraft());
+    },
+  );
+
+  Widget _champSyndicat(List<Syndicat> syndicats) => LocalTypeahead(
+    controller: _syndicat,
+    focusNode: _syndicatFocus,
+    label: 'Syndicat',
+    hint: 'Ex. SAEMSS',
+    selectedId: _syndicatId,
+    textInputAction: TextInputAction.done,
+    emptyHint: syndicats.isEmpty
+        ? 'La liste n\'est pas encore arrivée.'
+        : 'Aucun résultat',
+    options: syndicats
+        .map(
+          (Syndicat s) => TypeaheadOption(
+            id: s.id,
+            label: s.name,
+            secondary: s.sigle,
+            keywords: <String>[s.sigle, if (s.secteur != null) s.secteur!],
+          ),
+        )
+        .toList(growable: false),
+    onChanged: (String _) {
+      if (_syndicatId != null) setState(() => _syndicatId = null);
+      markDraftDirty();
+    },
+    onSelected: (TypeaheadOption o) {
+      setState(() => _syndicatId = o.id);
+      markDraftDirty();
+      unawaited(flushDraft());
+    },
+  );
 }
 
-PreferredSizeWidget _contextStrip(
-  BuildContext context, {
-  required String text,
-  required TextStyle? style,
-}) {
-  const int maxLines = 2;
-  final double available = MediaQuery.sizeOf(context).width - CpiSpacing.md * 2;
-  final TextPainter painter = TextPainter(
-    text: TextSpan(text: text, style: style),
-    textDirection: Directionality.of(context),
-    textScaler: MediaQuery.textScalerOf(context),
-    maxLines: maxLines,
-  )..layout(maxWidth: available < 0 ? 0 : available);
-  final double measured = painter.height;
-  painter.dispose();
+/// Barre d'action épinglée : continuer, ou les deux issues d'enregistrement.
+class _Footer extends StatelessWidget {
+  const _Footer({
+    required this.canSave,
+    required this.saving,
+    required this.continuer,
+    required this.manque,
+    required this.onContinue,
+    required this.onNext,
+    required this.onDone,
+  });
 
-  return PreferredSize(
-    preferredSize: Size.fromHeight(measured + CpiSpacing.xs),
+  final bool canSave;
+  final bool saving;
+
+  /// Avant la dernière étape : un seul bouton, qui n'enregistre rien.
+  final bool continuer;
+
+  /// Ce qui retient l'étape, nommé sous le libellé du bouton éteint.
+  final String? manque;
+
+  final VoidCallback onContinue;
+  final VoidCallback onNext;
+  final VoidCallback onDone;
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
+    top: false,
     child: Padding(
-      padding: const EdgeInsets.only(
-        left: CpiSpacing.md,
-        right: CpiSpacing.md,
-        bottom: CpiSpacing.xs,
+      padding: const EdgeInsets.fromLTRB(
+        CpiSpacing.md,
+        CpiSpacing.sm,
+        CpiSpacing.md,
+        CpiSpacing.sm,
       ),
-      child: Align(
-        alignment: AlignmentDirectional.centerStart,
-        child: Text(
-          text,
-          style: style,
-          maxLines: maxLines,
-          overflow: TextOverflow.ellipsis,
-        ),
+      child: Column(
+        // Le pied de `FScaffold` se mesure sous une contrainte lâche : une
+        // colonne « max » y prendrait tout l'écran et laisserait zéro au corps.
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: continuer
+            ? <Widget>[
+                CpiButton(
+                  'Continuer',
+                  icon: PhosphorIconsRegular.arrowRight,
+                  subtitle: manque,
+                  onPressed: manque == null ? onContinue : null,
+                ),
+              ]
+            : <Widget>[
+                CpiButton(
+                  'Enregistrer et suivant',
+                  icon: PhosphorIconsRegular.arrowRight,
+                  loading: saving,
+                  subtitle: 'Nom et téléphone d\'abord',
+                  onPressed: canSave ? onNext : null,
+                ),
+                const SizedBox(height: CpiSpacing.xs),
+                CpiButton(
+                  'Enregistrer et terminer',
+                  variant: CpiButtonVariant.secondary,
+                  onPressed: canSave ? onDone : null,
+                ),
+              ],
       ),
     ),
   );
@@ -769,7 +936,7 @@ class _ChampSecteur extends StatelessWidget {
   const _ChampSecteur({required this.valeur, required this.onChanged});
 
   final String? valeur;
-  final ValueChanged<String?> onChanged;
+  final ValueChanged<String> onChanged;
 
   static const Map<String, String> _libelles = <String, String>{
     'FONCTIONNAIRE': 'Fonctionnaire',
@@ -778,36 +945,20 @@ class _ChampSecteur extends StatelessWidget {
     'DIASPORA': 'Diaspora',
   };
 
+  static String? libelle(String? code) => code == null ? null : _libelles[code];
+
   @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text('Secteur', style: theme.textTheme.labelLarge),
-        const SizedBox(height: CpiSpacing.xs),
-        Wrap(
-          spacing: CpiSpacing.xs,
-          runSpacing: CpiSpacing.xs,
-          children: _libelles.entries
-              .map(
-                (MapEntry<String, String> e) => ChoiceChip(
-                  label: Text(e.value),
-                  selected: valeur == e.key,
-                  // Un secteur se corrige en touchant un autre choix, pas en
-                  // le retouchant : le vider laisserait une fiche invalide.
-                  onSelected: (bool choisi) {
-                    if (choisi) onChanged(e.key);
-                  },
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: CpiSpacing.sm,
-                    vertical: CpiSpacing.xs,
-                  ),
-                ),
-              )
-              .toList(growable: false),
-        ),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => CpiChoiceGroup<String>(
+    label: 'Secteur',
+    value: valeur,
+    options: <CpiChoice<String>>[
+      for (final MapEntry<String, String> e in _libelles.entries)
+        CpiChoice<String>(value: e.key, label: e.value),
+    ],
+    // Un secteur se corrige en touchant un autre choix, pas en le
+    // retouchant : le vider laisserait une fiche invalide.
+    onChanged: (String choisi) {
+      if (choisi != valeur) onChanged(choisi);
+    },
+  );
 }

@@ -51,6 +51,7 @@ export default async function ProspectsPage({
       <ProspectsView
         canAdminister={session?.role === 'ADMIN'}
         readOnly={readsOnly(session?.role)}
+        simplified={session?.role === 'COMMERCIAL' || session?.role === 'SUPERVISEUR'}
       />
     </HydrationBoundary>
   );

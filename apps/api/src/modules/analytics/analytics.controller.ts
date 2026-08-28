@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Role } from '@crm/database';
 import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
@@ -19,10 +19,13 @@ import {
   NamedCountListDto,
   Phase2StatusListDto,
   SegmentListDto,
+  StatsLayoutDto,
+  StatsLayoutQueryDto,
   TimeSeriesQueryDto,
   TopCommercialListDto,
   TopQueryDto,
   TopRepresentantListDto,
+  UpdateStatsLayoutDto,
 } from './dto.js';
 import { PilotageService } from './pilotage.service.js';
 import { PortfolioService } from './portfolio.service.js';
@@ -38,6 +41,7 @@ import {
 } from './quality.dto.js';
 import { SegmentConversionsService } from './segment-conversions.service.js';
 import { SegmentConversionListDto, SegmentConversionsQueryDto } from './segment-conversions.dto.js';
+import { StatsLayoutService } from './stats-layout.service.js';
 
 @ApiTags('analytics')
 @ApiBearerAuth()
@@ -52,7 +56,50 @@ export class AnalyticsController {
     private readonly portfolio: PortfolioService,
     private readonly quality: QualityService,
     private readonly segments: SegmentConversionsService,
+    private readonly layouts: StatsLayoutService,
   ) {}
+
+  @Get('layout')
+  @ApiOperation({
+    operationId: 'getStatsLayout',
+    summary: 'Organisation des graphiques de statistiques pour l’utilisateur courant.',
+  })
+  @ApiResponse({ status: 200, type: StatsLayoutDto })
+  layout(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: StatsLayoutQueryDto,
+  ): Promise<StatsLayoutDto> {
+    return this.layouts.get(user.id, query.screen);
+  }
+
+  @Put('layout')
+  @ApiOperation({
+    operationId: 'putStatsLayout',
+    summary: 'Enregistre l’organisation des graphiques de statistiques.',
+  })
+  @ApiResponse({ status: 200, type: StatsLayoutDto })
+  putLayout(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: StatsLayoutQueryDto,
+    @Body() body: UpdateStatsLayoutDto,
+  ): Promise<StatsLayoutDto> {
+    return this.layouts.put(user.id, query.screen, body);
+  }
+
+  @Delete('layout')
+  @ApiOperation({
+    operationId: 'deleteStatsLayout',
+    summary:
+      'Efface l’organisation personnelle des statistiques pour revenir à l’ordre par défaut.',
+  })
+  @ApiResponse({ status: 200, type: StatsLayoutDto })
+  async deleteLayout(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: StatsLayoutQueryDto,
+  ): Promise<StatsLayoutDto> {
+    await this.layouts.remove(user.id, query.screen);
+    return this.layouts.get(user.id, query.screen);
+  }
 
   @Get('funnel')
   @ApiOperation({

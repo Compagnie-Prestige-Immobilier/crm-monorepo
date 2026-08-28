@@ -31,7 +31,7 @@ import {
   CurrentUser,
   type AuthenticatedUser,
 } from '../../common/decorators/current-user.decorator.js';
-import { Roles } from '../../common/decorators/roles.decorator.js';
+import { PARCOURS_ROLES, Roles } from '../../common/decorators/roles.decorator.js';
 import { Phase2CampaignsService } from './campaigns.service.js';
 import { Phase2DirectoryService } from './directory.service.js';
 import { CallOutcomeReasonsService } from '../referentiels/call-outcome-reasons.service.js';
@@ -64,7 +64,7 @@ export class Phase2Controller {
   ) {}
 
   @Post('call-attempts/:id/recording')
-  @Roles(Role.COMMERCIAL)
+  @Roles(...PARCOURS_ROLES)
   @HttpCode(HttpStatus.OK)
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -118,7 +118,7 @@ export class Phase2Controller {
   }
 
   @Get('directory')
-  @Roles(Role.COMMERCIAL, Role.ADMIN)
+  @Roles(...PARCOURS_ROLES)
   @ApiOperation({
     operationId: 'pullPhase2Directory',
     summary: 'Annuaire hors ligne : téléphone et état de phase 2, rien d’autre.',

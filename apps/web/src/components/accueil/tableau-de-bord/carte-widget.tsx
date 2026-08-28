@@ -24,6 +24,7 @@ import {
   type DonneesSource,
 } from '@/components/accueil/tableau-de-bord/sources';
 import { ChartCard } from '@/components/dashboard/chart-card';
+import { ChoixGraphique, marqueTexte } from '@/components/dashboard/chart-visual';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -143,29 +144,23 @@ export function CarteWidget({
                   >
                     <PaletteIcon aria-hidden="true" />
                   </PopoverTrigger>
-                  <PopoverContent className="flex w-72 flex-col gap-1 p-2" align="end">
+                  <PopoverContent
+                    className="flex max-h-[70vh] w-80 flex-col gap-1 overflow-y-auto p-2"
+                    align="end"
+                  >
                     {evaluees.map((evaluee) => (
-                      <button
+                      <ChoixGraphique
                         key={evaluee.marque}
-                        type="button"
-                        onClick={() => {
+                        marque={evaluee.marque}
+                        titre={marqueTexte(evaluee.marque).nom}
+                        phrase={marqueTexte(evaluee.marque).usage}
+                        conseille={evaluee.recommandee}
+                        raison={evaluee.raison}
+                        selectionne={evaluee.marque === widget.marque}
+                        onSelect={() => {
                           onChangeMarque(evaluee.marque);
                         }}
-                        className={cn(
-                          'flex flex-col gap-0.5 rounded-md p-2 text-left hover:bg-secondary',
-                          evaluee.marque === widget.marque && 'bg-secondary',
-                          evaluee.recommandee && 'ring-1 ring-inset ring-accent-border',
-                        )}
-                      >
-                        <span className="text-[0.875rem] font-[600]">
-                          {marqueLabel(evaluee.marque)}
-                        </span>
-                        {evaluee.raison === null ? null : (
-                          <span className="text-[0.75rem] text-muted-foreground">
-                            {evaluee.raison}
-                          </span>
-                        )}
-                      </button>
+                      />
                     ))}
                   </PopoverContent>
                 </Popover>
@@ -325,31 +320,4 @@ export function CarteWidget({
       </ChartCard>
     </div>
   );
-}
-
-const MARQUE_LABELS: Record<DashboardMarque, string> = {
-  'barres-verticales': 'Barres verticales',
-  'barres-horizontales': 'Barres horizontales',
-  'barres-empilees': 'Barres empilées',
-  'barres-100': 'Barres à 100 %',
-  'barres-groupees': 'Barres groupées',
-  courbe: 'Courbe',
-  aire: 'Aire',
-  escalier: 'Escalier',
-  anneau: 'Anneau',
-  camembert: 'Camembert',
-  'aire-polaire': 'Aire polaire',
-  radar: 'Radar',
-  nuage: 'Nuage de points',
-  bulles: 'Bulles',
-  mixte: 'Mixte',
-  jauge: 'Jauge',
-  'carte-de-chaleur': 'Carte de chaleur',
-  tableau: 'Tableau',
-  tuile: 'Tuile',
-  'tuile-courbe': 'Tuile avec courbe',
-};
-
-function marqueLabel(marque: DashboardMarque): string {
-  return MARQUE_LABELS[marque];
 }

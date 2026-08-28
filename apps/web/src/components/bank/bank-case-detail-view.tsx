@@ -476,16 +476,19 @@ function AdvanceDialog({
               advance.mutate();
             }}
           >
-            {advance.isPending ? (
-              <>
-                <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-                Enregistrement…
-              </>
-            ) : isCashing ? (
-              'Confirmer l’encaissement'
-            ) : (
-              'Confirmer'
-            )}
+            {(() => {
+              if (advance.isPending)
+                return (
+                  <>
+                    <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+                    Enregistrement…
+                  </>
+                );
+              return (() => {
+                if (isCashing) return 'Confirmer l’encaissement';
+                return 'Confirmer';
+              })();
+            })()}
           </Button>
         </DialogFooter>
       </DialogContent>

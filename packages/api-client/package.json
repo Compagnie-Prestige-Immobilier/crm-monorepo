@@ -21,7 +21,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint src",
+    "lint": "oxlint --config ../../.oxlintrc.json --report-unused-disable-directives src",
     "test": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage --passWithNoTests",
     "generate": "node scripts/generate.mjs",
@@ -39,12 +39,10 @@
     }
   },
   "devDependencies": {
-    "@crm/eslint-config": "workspace:*",
     "@crm/typescript-config": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
-    "eslint": "catalog:",
     "openapi-typescript": "catalog:",
     "prettier": "catalog:",
     "typescript": "catalog:",

@@ -132,5 +132,6 @@ const _$EnrollmentMethodEnumMap = {
   EnrollmentMethod.PHYSICAL: 'PHYSICAL',
   EnrollmentMethod.VOICE_OR_ELECTRONIC_MESSAGING:
       'VOICE_OR_ELECTRONIC_MESSAGING',
+  EnrollmentMethod.APPOINTMENT: 'APPOINTMENT',
   EnrollmentMethod.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

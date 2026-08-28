@@ -170,19 +170,22 @@ export function RepresentantDetailView({
           <CardTitle>Histoire de la relation</CardTitle>
         </CardHeader>
         <CardContent>
-          {history.isPending ? (
-            <Skeleton className="h-24 w-full" />
-          ) : history.isError ? (
-            <QueryErrorState
-              error={history.error}
-              onRetry={() => {
-                void history.refetch();
-              }}
-              fallback="L’histoire de la relation n’a pas pu être chargée."
-            />
-          ) : (
-            <Timeline changes={history.data} />
-          )}
+          {(() => {
+            if (history.isPending) return <Skeleton className="h-24 w-full" />;
+            return (() => {
+              if (history.isError)
+                return (
+                  <QueryErrorState
+                    error={history.error}
+                    onRetry={() => {
+                      void history.refetch();
+                    }}
+                    fallback="L’histoire de la relation n’a pas pu être chargée."
+                  />
+                );
+              return <Timeline changes={history.data} />;
+            })();
+          })()}
         </CardContent>
       </Card>
 
@@ -191,41 +194,50 @@ export function RepresentantDetailView({
           <CardTitle>Prospects apportés</CardTitle>
         </CardHeader>
         <CardContent>
-          {prospects.isPending ? (
-            <Skeleton className="h-24 w-full" />
-          ) : prospects.isError ? (
-            <QueryErrorState
-              error={prospects.error}
-              onRetry={() => {
-                void prospects.refetch();
-              }}
-              fallback="Les prospects de ce représentant n’ont pas pu être chargés."
-            />
-          ) : prospects.data.items.length === 0 ? (
-            <p className="text-[0.875rem] text-muted-foreground">
-              Aucune fiche remise pour l’instant. C’est la dizaine de prospects attendue de chaque
-              représentant qui reste à recueillir.
-            </p>
-          ) : (
-            <ul className="flex flex-col divide-y divide-border">
-              {prospects.data.items.map((prospect) => (
-                <li
-                  key={prospect.id}
-                  className="flex flex-wrap items-center justify-between gap-2 py-2.5 first:pt-0 last:pb-0"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate font-[600]">
-                      {prospect.prenom} {prospect.nom}
+          {(() => {
+            if (prospects.isPending) return <Skeleton className="h-24 w-full" />;
+            return (() => {
+              if (prospects.isError)
+                return (
+                  <QueryErrorState
+                    error={prospects.error}
+                    onRetry={() => {
+                      void prospects.refetch();
+                    }}
+                    fallback="Les prospects de ce représentant n’ont pas pu être chargés."
+                  />
+                );
+              return (() => {
+                if (prospects.data.items.length === 0)
+                  return (
+                    <p className="text-[0.875rem] text-muted-foreground">
+                      Aucune fiche remise pour l’instant. C’est la dizaine de prospects attendue de
+                      chaque représentant qui reste à recueillir.
                     </p>
-                    <p className="truncate text-[0.75rem] text-muted-foreground tabular-nums">
-                      {formatPhone(prospect.phoneE164)}
-                    </p>
-                  </div>
-                  <Badge variant="outline">{PROSPECT_STATUT_LABELS[prospect.statut]}</Badge>
-                </li>
-              ))}
-            </ul>
-          )}
+                  );
+                return (
+                  <ul className="flex flex-col divide-y divide-border">
+                    {prospects.data.items.map((prospect) => (
+                      <li
+                        key={prospect.id}
+                        className="flex flex-wrap items-center justify-between gap-2 py-2.5 first:pt-0 last:pb-0"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate font-[600]">
+                            {prospect.prenom} {prospect.nom}
+                          </p>
+                          <p className="truncate text-[0.75rem] text-muted-foreground tabular-nums">
+                            {formatPhone(prospect.phoneE164)}
+                          </p>
+                        </div>
+                        <Badge variant="outline">{PROSPECT_STATUT_LABELS[prospect.statut]}</Badge>
+                      </li>
+                    ))}
+                  </ul>
+                );
+              })();
+            })();
+          })()}
         </CardContent>
       </Card>
     </div>

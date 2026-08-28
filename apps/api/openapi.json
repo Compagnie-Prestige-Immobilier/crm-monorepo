@@ -3075,7 +3075,7 @@
             "bearer": []
           }
         ],
-        "summary": "Liste paginée. Un COMMERCIAL ne voit que ses propres représentants.",
+        "summary": "Liste paginée de l’annuaire, commun à tous les téléconseillers.",
         "tags": ["representants"]
       },
       "post": {
@@ -3359,7 +3359,17 @@
             }
           },
           "403": {
-            "description": "La fiche appartient à un autre commercial.",
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "REPRESENTANT_NOT_FOUND.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5014,7 +5024,7 @@
     },
     "/api/v1/sync/pull": {
       "get": {
-        "description": "Pagination keyset sur (updatedAt, id) et retard de sécurité de 2 secondes. Un COMMERCIAL ne reçoit que ses propres lignes ; les référentiels sont communs.",
+        "description": "Pagination keyset sur (updatedAt, id) et retard de sécurité de 2 secondes. Un COMMERCIAL ne reçoit que ses propres prospects ; l’annuaire des représentants et les référentiels sont communs.",
         "operationId": "pullSyncChanges",
         "parameters": [
           {
@@ -8432,6 +8442,18 @@
             }
           },
           {
+            "name": "relationStatuses",
+            "required": false,
+            "in": "query",
+            "description": "Mêmes états de relation que `createRepCampaign`, pour compter avant de créer.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/RepresentantRelation"
+              }
+            }
+          },
+          {
             "name": "commercialCount",
             "required": false,
             "in": "query",
@@ -8532,7 +8554,7 @@
             }
           },
           "400": {
-            "description": "REP_CAMPAIGN_COMMENT_REQUIRED · REP_CAMPAIGN_PROMISED_NOT_ALLOWED · PHONE_INVALID.",
+            "description": "REP_CAMPAIGN_COMMENT_REQUIRED · REP_CAMPAIGN_PROMISED_NOT_ALLOWED · REP_CAMPAIGN_CALLBACK_AT_REQUIRED · REP_CAMPAIGN_CALLBACK_AT_NOT_ALLOWED · PHONE_INVALID.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8940,7 +8962,7 @@
     },
     "/api/v1/rep-campaigns/{id}/commerciaux/{userId}/programme.pdf": {
       "get": {
-        "description": "Même maquette que le programme de prospection, seules changent les cases à cocher : le même commercial reçoit les deux liasses le même matin. AUCUN nom n’y figure, chaque ligne se rapproche de sa fiche par son code court.",
+        "description": "A4 portrait, 25 représentants par page. Chaque ligne ne contient que le nom complet et le téléphone.",
         "operationId": "downloadRepProgrammePdf",
         "parameters": [
           {
@@ -9032,6 +9054,82 @@
           }
         ],
         "summary": "Programme d’appels représentants, imprimable.",
+        "tags": ["rep-campaigns"]
+      }
+    },
+    "/api/v1/rep-campaigns/{id}/programmes.zip": {
+      "get": {
+        "operationId": "downloadRepProgrammesZip",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Un PDF non vide par téléconseiller et par journée.",
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "REP_CAMPAIGN_NOT_FOUND.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Télécharge tous les programmes représentants dans une archive ZIP.",
         "tags": ["rep-campaigns"]
       }
     },
@@ -10927,7 +11025,7 @@
     },
     "/api/v1/client-requests/{id}/approve": {
       "post": {
-        "description": "Le prospect naît en METHOD_OBTAINED avec sa provenance (origin=BANQUE, libellé = nom de la banque demandeuse) : c’est la condition exacte du filtre de recherche bancaire, donc le dossier peut lui être rattaché immédiatement.",
+        "description": "Le prospect naît avec sa provenance (origin=BANQUE, libellé = nom de la banque demandeuse), puis sa qualification CHUES continue côté panel.",
         "operationId": "approveClientRequest",
         "parameters": [
           {
@@ -12050,6 +12148,204 @@
         ],
         "summary": "Substitue les variables, pour l’aperçu du compositeur.",
         "tags": ["notification-templates"]
+      }
+    },
+    "/api/v1/analytics/layout": {
+      "get": {
+        "operationId": "getStatsLayout",
+        "parameters": [
+          {
+            "name": "screen",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/StatsLayoutScreen"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsLayoutDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Organisation des graphiques de statistiques pour l’utilisateur courant.",
+        "tags": ["analytics"]
+      },
+      "put": {
+        "operationId": "putStatsLayout",
+        "parameters": [
+          {
+            "name": "screen",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/StatsLayoutScreen"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStatsLayoutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsLayoutDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Enregistre l’organisation des graphiques de statistiques.",
+        "tags": ["analytics"]
+      },
+      "delete": {
+        "operationId": "deleteStatsLayout",
+        "parameters": [
+          {
+            "name": "screen",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/StatsLayoutScreen"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsLayoutDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Efface l’organisation personnelle des statistiques pour revenir à l’ordre par défaut.",
+        "tags": ["analytics"]
       }
     },
     "/api/v1/analytics/funnel": {
@@ -20301,7 +20597,7 @@
       },
       "EnrollmentMethod": {
         "type": "string",
-        "enum": ["PLATFORM", "PHYSICAL", "VOICE_OR_ELECTRONIC_MESSAGING"]
+        "enum": ["PLATFORM", "PHYSICAL", "VOICE_OR_ELECTRONIC_MESSAGING", "APPOINTMENT"]
       },
       "ProspectSortField": {
         "type": "string",
@@ -21323,6 +21619,30 @@
             "format": "date-time",
             "description": "Tentative d’appel : date du rappel promis. Obligatoire si et seulement si outcome vaut CALLBACK. Une version ancienne de l’application ne l’envoie pas."
           },
+          "email": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Tentative d’appel : adresse électronique recueillie pendant l’appel."
+          },
+          "fonctionnaire": {
+            "type": "boolean",
+            "description": "Tentative d’appel : le prospect est-il fonctionnaire."
+          },
+          "engagementEnCours": {
+            "type": "boolean",
+            "description": "Tentative d’appel : un engagement bancaire est-il en cours."
+          },
+          "dureeEtablissementMois": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 600,
+            "description": "Tentative d’appel : ancienneté dans l’établissement, en MOIS. Distincte de `dureeSystemeMois`, qui est la durée du système de paiement du prospect."
+          },
+          "rendezVousAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Tentative d’appel : date du rendez-vous pris. Obligatoire si et seulement si method vaut APPOINTMENT."
+          },
           "visitorName": {
             "type": "string",
             "maxLength": 160,
@@ -21623,6 +21943,10 @@
               }
             ]
           },
+          "isActive": {
+            "type": "boolean",
+            "description": "Faux quand la file a été retirée au commercial. La ligne descend alors une dernière fois pour que le téléphone la retire de son programme : sans elle, il continuerait d’appeler des fiches qui ne lui sont plus confiées."
+          },
           "updatedAt": {
             "type": "string",
             "format": "date-time"
@@ -21635,6 +21959,90 @@
           "position",
           "dayIndex",
           "status",
+          "isActive",
+          "updatedAt"
+        ]
+      },
+      "SyncRepCallCampaignDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CampaignStatus"
+              }
+            ]
+          },
+          "spreadDays": {
+            "type": "number",
+            "description": "Journees d’etalement de la file."
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "closedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": ["id", "name", "status", "spreadDays", "updatedAt"]
+      },
+      "SyncRepCallTaskDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "campaignId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "representantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "position": {
+            "type": "number",
+            "description": "Rang dans le programme, à partir de 1."
+          },
+          "dayIndex": {
+            "type": "number",
+            "description": "Journée d’étalement, à partir de 0."
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CallTaskStatus"
+              }
+            ]
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Voir `SyncCallTaskDto.isActive`."
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "campaignId",
+          "representantId",
+          "position",
+          "dayIndex",
+          "status",
+          "isActive",
           "updatedAt"
         ]
       },
@@ -21808,6 +22216,18 @@
               "$ref": "#/components/schemas/SyncCallTaskDto"
             }
           },
+          "repCallCampaigns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncRepCallCampaignDto"
+            }
+          },
+          "repCallTasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncRepCallTaskDto"
+            }
+          },
           "visites": {
             "type": "array",
             "items": {
@@ -21826,6 +22246,8 @@
           "prospects",
           "callCampaigns",
           "callTasks",
+          "repCallCampaigns",
+          "repCallTasks",
           "visites"
         ]
       },
@@ -22217,6 +22639,28 @@
             "type": "string",
             "nullable": true
           },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "fonctionnaire": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "engagementEnCours": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "dureeEtablissementMois": {
+            "type": "number",
+            "nullable": true
+          },
+          "rendezVousAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Non nulle si et seulement si method vaut APPOINTMENT."
+          },
           "performedById": {
             "type": "string",
             "format": "uuid",
@@ -22244,6 +22688,11 @@
           "outcome",
           "method",
           "comment",
+          "email",
+          "fonctionnaire",
+          "engagementEnCours",
+          "dureeEtablissementMois",
+          "rendezVousAt",
           "performedById",
           "performedByName",
           "assignedToId",
@@ -23775,6 +24224,11 @@
             "type": "string",
             "format": "date-time",
             "description": "Horodatage de l’appel sur le terrain, distinct de son arrivée en base."
+          },
+          "callbackAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date du rappel promis. Obligatoire si et seulement si l’issue vaut CALLBACK : c’est elle qui arme la notification côté mobile."
           }
         },
         "required": ["id", "representantId", "outcome", "clientCreatedAt"]
@@ -23880,6 +24334,13 @@
           "onlyWithoutProspects": {
             "type": "boolean"
           },
+          "relationStatuses": {
+            "type": "array",
+            "description": "États de relation retenus par le tirage. Vide : aucun filtre.",
+            "items": {
+              "$ref": "#/components/schemas/RepresentantRelation"
+            }
+          },
           "createdById": {
             "type": "string",
             "format": "uuid"
@@ -23916,6 +24377,7 @@
           "departementId",
           "iefId",
           "onlyWithoutProspects",
+          "relationStatuses",
           "createdById",
           "createdByName",
           "commercialCount",
@@ -23972,6 +24434,14 @@
             "type": "boolean",
             "default": false,
             "description": "Ne retenir que les représentants n’ayant apporté aucun prospect vivant. C’est la campagne de relance des dormants."
+          },
+          "relationStatuses": {
+            "type": "array",
+            "maxItems": 4,
+            "description": "Ne retenir que les représentants dans ces états de relation. Absente ou vide : aucun filtre. `AMBASSADEUR` seul donne les qualifiés ; une liste qui l’exclut donne les non qualifiés.",
+            "items": {
+              "$ref": "#/components/schemas/RepresentantRelation"
+            }
           },
           "spreadDays": {
             "type": "number",
@@ -24118,6 +24588,13 @@
           "onlyWithoutProspects": {
             "type": "boolean"
           },
+          "relationStatuses": {
+            "type": "array",
+            "description": "États de relation retenus par le tirage. Vide : aucun filtre.",
+            "items": {
+              "$ref": "#/components/schemas/RepresentantRelation"
+            }
+          },
           "createdById": {
             "type": "string",
             "format": "uuid"
@@ -24175,6 +24652,7 @@
           "departementId",
           "iefId",
           "onlyWithoutProspects",
+          "relationStatuses",
           "createdById",
           "createdByName",
           "commercialCount",
@@ -25242,14 +25720,6 @@
             "type": "string",
             "format": "uuid"
           },
-          "enrollmentMethod": {
-            "description": "Méthode d’enrôlement du prospect créé. Obligatoire : le prospect naît en METHOD_OBTAINED, et une contrainte CHECK lie les deux colonnes.",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/EnrollmentMethod"
-              }
-            ]
-          },
           "banqueId": {
             "type": "string",
             "format": "uuid",
@@ -25261,7 +25731,7 @@
             "description": "Date de saisie à retenir. Par défaut celle de la demande."
           }
         },
-        "required": ["representantId", "syndicatId", "enrollmentMethod"]
+        "required": ["representantId", "syndicatId"]
       },
       "RejectClientRequestDto": {
         "type": "object",
@@ -25810,6 +26280,58 @@
         },
         "required": ["title", "body", "missing"]
       },
+      "StatsLayoutScreen": {
+        "type": "string",
+        "enum": ["dashboard", "teleconseil"]
+      },
+      "StatsLayoutWidgetDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "visible": {
+            "type": "boolean"
+          }
+        },
+        "required": ["id", "visible"]
+      },
+      "StatsLayoutDto": {
+        "type": "object",
+        "properties": {
+          "screen": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StatsLayoutScreen"
+              }
+            ]
+          },
+          "widgets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsLayoutWidgetDto"
+            }
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": ["screen", "widgets", "updatedAt"]
+      },
+      "UpdateStatsLayoutDto": {
+        "type": "object",
+        "properties": {
+          "widgets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatsLayoutWidgetDto"
+            }
+          }
+        },
+        "required": ["widgets"]
+      },
       "FunnelStageDto": {
         "type": "object",
         "properties": {
@@ -26002,6 +26524,13 @@
           "representants": {
             "type": "number"
           },
+          "methodObtained": {
+            "type": "number"
+          },
+          "conversionRate": {
+            "type": "number",
+            "nullable": true
+          },
           "share": {
             "type": "number"
           },
@@ -26011,7 +26540,16 @@
             "nullable": true
           }
         },
-        "required": ["id", "label", "prospects", "representants", "share", "derniereSaisie"]
+        "required": [
+          "id",
+          "label",
+          "prospects",
+          "representants",
+          "methodObtained",
+          "conversionRate",
+          "share",
+          "derniereSaisie"
+        ]
       },
       "TopCommercialListDto": {
         "type": "object",
@@ -27038,6 +27576,23 @@
         },
         "required": ["id", "fullName", "isActive", "openTasks"]
       },
+      "SupervisionHistogramBarDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "label": {
+            "type": "string"
+          },
+          "prospects": {
+            "type": "number"
+          }
+        },
+        "required": ["id", "label", "prospects"]
+      },
       "SupervisionActivityDto": {
         "type": "object",
         "properties": {
@@ -27071,9 +27626,31 @@
             "items": {
               "$ref": "#/components/schemas/SupervisionTeleconseillerDto"
             }
+          },
+          "prospectsByTeleconseiller": {
+            "description": "Stock courant de prospects rattachés à chaque téléconseiller.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupervisionHistogramBarDto"
+            }
+          },
+          "prospectsByRepresentant": {
+            "description": "Stock courant de prospects rattachés à chaque représentant.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupervisionHistogramBarDto"
+            }
           }
         },
-        "required": ["from", "to", "granularity", "items", "teleconseillers"]
+        "required": [
+          "from",
+          "to",
+          "granularity",
+          "items",
+          "teleconseillers",
+          "prospectsByTeleconseiller",
+          "prospectsByRepresentant"
+        ]
       },
       "PurgeDomainKey": {
         "type": "string",

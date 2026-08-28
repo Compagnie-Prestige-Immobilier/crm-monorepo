@@ -271,19 +271,19 @@ export class FakePrisma {
 
   private matchesCase(row: FakeCase, where: Where): boolean {
     for (const [key, expected] of Object.entries(where)) {
-      if (expected === undefined) continue;
-      const actual = (row as unknown as Record<string, unknown>)[key];
-      if (key === 'deletedAt') {
-        if ((actual ?? null) !== expected) return false;
-        continue;
-      }
-      if (typeof expected === 'object' && expected !== null && 'in' in expected) {
-        if (!(expected.in as unknown[]).includes(actual)) return false;
-        continue;
-      }
-      if (actual !== expected) return false;
+      if (!this.matchesCaseField(row, key, expected)) return false;
     }
     return true;
+  }
+
+  private matchesCaseField(row: FakeCase, key: string, expected: unknown): boolean {
+    if (expected === undefined) return true;
+    const actual = (row as unknown as Record<string, unknown>)[key];
+    if (key === 'deletedAt') return (actual ?? null) === expected;
+    if (typeof expected === 'object' && expected !== null && 'in' in expected) {
+      return (expected.in as unknown[]).includes(actual);
+    }
+    return actual === expected;
   }
 
   readonly bankCase = {

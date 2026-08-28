@@ -18,6 +18,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -355,6 +356,108 @@ void main() {
     });
   });
 
+  /// La suppression a quitté le balayage de l'historique : un geste destructeur
+  /// ne doit pas se déclencher sans être nommé.
+  group('autres actions', () {
+    Future<void> mountFiche(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1200, 3000);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final ProviderContainer container = await makeContainer(tester);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp.router(
+            theme: AppTheme.light,
+            locale: const Locale('fr'),
+            localizationsDelegates: GlobalMaterialLocalizations.delegates,
+            supportedLocales: const <Locale>[Locale('fr')],
+            routerConfig: GoRouter(
+              initialLocation: Routes.representantDetailFor('rep-1'),
+              routes: <RouteBase>[
+                GoRoute(
+                  path: Routes.representantDetail,
+                  builder: (BuildContext context, GoRouterState state) =>
+                      RepresentantDetailScreen(
+                        representantId: state.pathParameters['id'] ?? '',
+                      ),
+                ),
+                GoRoute(
+                  path: Routes.historique,
+                  builder: (BuildContext context, GoRouterState state) =>
+                      const Scaffold(body: Text('MES FICHES')),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+
+    testWidgets('supprimer nomme la personne avant d\'effacer', (
+      WidgetTester tester,
+    ) async {
+      await insertRepresentant(
+        db,
+        id: 'rep-1',
+        phone: '+221770000001',
+        fullName: 'Mamadou Diallo',
+      );
+      await mountFiche(tester);
+
+      await tester.tap(find.text('Autres actions'));
+      await tester.pumpAndSettle();
+      expect(find.text('Modifier'), findsOneWidget);
+      expect(find.text('Résultat de l\'appel'), findsOneWidget);
+
+      await tester.tap(find.text('Supprimer cette fiche'));
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('Mamadou Diallo et tous ses prospects'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Supprimer'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      final Representant row = await db.select(db.representants).getSingle();
+      expect(row.deletedAt, isNotNull);
+      expect(find.text('MES FICHES'), findsOneWidget);
+
+      await teardownTree(tester);
+    });
+
+    testWidgets('renoncer à la confirmation ne supprime rien', (
+      WidgetTester tester,
+    ) async {
+      await insertRepresentant(
+        db,
+        id: 'rep-1',
+        phone: '+221770000001',
+        fullName: 'Mamadou Diallo',
+      );
+      await mountFiche(tester);
+
+      await tester.tap(find.text('Autres actions'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Supprimer cette fiche'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Annuler'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      final Representant row = await db.select(db.representants).getSingle();
+      expect(row.deletedAt, isNull);
+
+      await teardownTree(tester);
+    });
+  });
+
   group('fil de commentaires', () {
     /// Surface haute : le fil est en bas d'un `ListView`, et un `ListView` ne
     /// construit pas ce qui est hors du viewport. Sur les 600 dp par défaut,
@@ -389,6 +492,16 @@ void main() {
     }
 
     setUp(() => insertRepresentant(db, id: 'rep-1', phone: '+221770000001'));
+
+    /// Le champ est replié : lire le fil est le geste courant, écrire est
+    /// l'exception.
+    Future<void> ouvrirLeChamp(WidgetTester tester) async {
+      await tester.ensureVisible(find.text('Ajouter un commentaire'));
+      await tester.pump();
+      await tester.tap(find.text('Ajouter un commentaire'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+    }
 
     testWidgets('chaque entrée porte son auteur', (WidgetTester tester) async {
       await insertComment(
@@ -436,6 +549,7 @@ void main() {
       WidgetTester tester,
     ) async {
       await mountFiche(tester);
+      await ouvrirLeChamp(tester);
 
       await tester.enterText(
         find.byType(TextField),
@@ -470,6 +584,7 @@ void main() {
       WidgetTester tester,
     ) async {
       await mountFiche(tester, writes: _BrokenWrites(db));
+      await ouvrirLeChamp(tester);
 
       await tester.enterText(
         find.byType(TextField),
@@ -495,47 +610,57 @@ void main() {
       WidgetTester tester,
     ) async {
       await mountFiche(tester);
+      await ouvrirLeChamp(tester);
 
-      expect(
-        tester
-            .widget<FilledButton>(find.widgetWithText(FilledButton, 'Publier'))
-            .enabled,
-        isFalse,
-      );
+      VoidCallback? publier() => tester
+          .widget<FButton>(find.widgetWithText(FButton, 'Publier'))
+          .onPress;
+
+      expect(publier(), isNull);
 
       await tester.enterText(find.byType(TextField), '   ');
       await tester.pump();
       expect(
-        tester
-            .widget<FilledButton>(find.widgetWithText(FilledButton, 'Publier'))
-            .enabled,
-        isFalse,
+        publier(),
+        isNull,
         reason: 'des espaces ne sont pas un commentaire',
       );
 
       await tester.enterText(find.byType(TextField), 'Un mot.');
       await tester.pump();
-      expect(
-        tester
-            .widget<FilledButton>(find.widgetWithText(FilledButton, 'Publier'))
-            .enabled,
-        isTrue,
-      );
+      expect(publier(), isNotNull);
 
       await teardownTree(tester);
     });
   });
 
   group('sélecteur', () {
-    Future<void> mountPicker(WidgetTester tester) async {
+    Future<void> mountPicker(
+      WidgetTester tester, {
+      bool pourQualifier = false,
+    }) async {
       final ProviderContainer container = await makeContainer(tester);
       final GoRouter router = GoRouter(
-        initialLocation: Routes.representants,
+        initialLocation: pourQualifier
+            ? Routes.representantsPourQualifier()
+            : Routes.representants,
         routes: <RouteBase>[
           GoRoute(
             path: Routes.representants,
             builder: (BuildContext context, GoRouterState state) =>
-                const RepresentantPickerScreen(),
+                RepresentantPickerScreen(
+                  pourQualifier:
+                      state.uri.queryParameters[Routes.butParam] ==
+                      Routes.butQualifier,
+                ),
+          ),
+          GoRoute(
+            path: Routes.representantQualification,
+            builder: (BuildContext context, GoRouterState state) => Scaffold(
+              body: Center(
+                child: Text('QUALIFIER ${state.pathParameters['id']}'),
+              ),
+            ),
           ),
           GoRoute(
             path: Routes.newProspect,
@@ -580,12 +705,11 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
     }
 
-    testWidgets('le tap sur la ligne ouvre le formulaire de ce représentant', (
+    testWidgets('le tap emmène saisir un prospect, sans feuille de choix', (
       WidgetTester tester,
     ) async {
-      // Les fiches sont importées : le geste courant est de CHOISIR puis de
-      // compléter. Sauter le formulaire pour tomber sur les prospects retirait
-      // le seul endroit où corriger un numéro ou poser une profession.
+      // Une ligne = un tap = la chose. La feuille « Que voulez-vous faire ? »
+      // demandait un second geste pour le seul parcours qui compte ici.
       await insertRepresentant(
         db,
         id: 'rep-1',
@@ -598,13 +722,13 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 
-      expect(find.text('FORMULAIRE rep-1'), findsOneWidget);
-      expect(find.text('SAISIE PROSPECT rep-1'), findsNothing);
+      expect(find.text('SAISIE PROSPECT rep-1'), findsOneWidget);
+      expect(find.text('Saisir un prospect'), findsNothing);
 
       await teardownTree(tester);
     });
 
-    testWidgets('un bouton distinct ouvre la fiche', (
+    testWidgets('la ligne ne porte plus de second bouton', (
       WidgetTester tester,
     ) async {
       await insertRepresentant(
@@ -615,18 +739,16 @@ void main() {
       );
       await mountPicker(tester);
 
-      await tester.tap(find.byTooltip('Ouvrir la fiche'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-
-      expect(find.text('FICHE rep-1'), findsOneWidget);
+      expect(find.byKey(const Key('ouvrir-la-fiche')), findsNothing);
 
       await teardownTree(tester);
     });
 
-    testWidgets('un appui long ouvre la fiche aussi', (
+    testWidgets('un appui long ne déclenche plus rien', (
       WidgetTester tester,
     ) async {
+      // Un geste qui n'est écrit nulle part n'est découvert par personne, et
+      // surprend celui qui le déclenche sans le vouloir.
       await insertRepresentant(
         db,
         id: 'rep-1',
@@ -639,7 +761,59 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 
-      expect(find.text('FICHE rep-1'), findsOneWidget);
+      expect(find.text('FICHE rep-1'), findsNothing);
+      expect(find.text('Ousmane Fall'), findsOneWidget);
+
+      await teardownTree(tester);
+    });
+
+    // Sans liste d'appel confiée, l'annuaire est le seul chemin vers la
+    // qualification : le téléconseiller a souvent le fichier de son côté.
+    testWidgets('en mode qualification, le tap ouvre la consigne d\'appel', (
+      WidgetTester tester,
+    ) async {
+      await insertRepresentant(
+        db,
+        id: 'rep-1',
+        phone: '+221770000001',
+        fullName: 'Ousmane Fall',
+      );
+      await mountPicker(tester, pourQualifier: true);
+
+      expect(find.text('Qui avez-vous appelé ?'), findsOneWidget);
+
+      await tester.tap(find.text('Ousmane Fall'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(find.text('QUALIFIER rep-1'), findsOneWidget);
+
+      await teardownTree(tester);
+    });
+
+    testWidgets('un numéro tapé avec des espaces trouve la personne', (
+      WidgetTester tester,
+    ) async {
+      await insertRepresentant(
+        db,
+        id: 'rep-1',
+        phone: '+221771521162',
+        fullName: 'Ousmane Fall',
+      );
+      await insertRepresentant(
+        db,
+        id: 'rep-2',
+        phone: '+221770000002',
+        fullName: 'Awa Diop',
+      );
+      await mountPicker(tester);
+
+      await tester.enterText(find.byType(TextField).first, '77 152 11 62');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(find.text('Ousmane Fall'), findsOneWidget);
+      expect(find.text('Awa Diop'), findsNothing);
 
       await teardownTree(tester);
     });

@@ -124,13 +124,15 @@ describe('activité des téléconseillers', () => {
     expect(result.items[0]?.reachRate).toBeNull();
   });
 
-  it('base vide : charge utile complète, deux requêtes', async () => {
+  it('base vide : charge utile complète, histogrammes compris', async () => {
     const { service, calls } = makeAnalyticsPrisma();
     const result = await new SupervisionActivityService(service).activite({});
 
-    expect(calls()).toBe(2);
+    expect(calls()).toBe(4);
     expect(result.items).toEqual([]);
     expect(result.teleconseillers).toEqual([]);
+    expect(result.prospectsByTeleconseiller).toEqual([]);
+    expect(result.prospectsByRepresentant).toEqual([]);
     expect(result.granularity).toBe(SupervisionGranularity.DAY);
   });
 });

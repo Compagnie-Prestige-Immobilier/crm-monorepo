@@ -49,6 +49,7 @@ import {
   campaignScopeLabel,
   type BadgeVariant,
   type CallOutcome,
+  type CampaignAttempt,
   type CampaignCommercial,
 } from '@/lib/types';
 
@@ -271,6 +272,7 @@ export function CampaignDetailView({
                           {attempt.comment}
                         </p>
                       ) : null}
+                      <AttemptRenseignements attempt={attempt} />
                     </div>
                     <div className="text-right text-[0.75rem] text-muted-foreground">
                       <p className="font-[600] text-foreground">{attempt.performedByName}</p>
@@ -345,6 +347,45 @@ export function CampaignDetailView({
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+/**
+ * Les renseignements de conversion, et rien d'autre. Une tentative qui n'en
+ * porte aucun n'affiche pas de ligne vide : le contrat les rend nullables, et
+ * une question non posée n'est pas un « non ».
+ */
+function AttemptRenseignements({ attempt }: { attempt: CampaignAttempt }) {
+  const entries: readonly (readonly [string, string])[] = [
+    attempt.rendezVousAt === null
+      ? null
+      : (['Rendez-vous', formatDateTime(attempt.rendezVousAt)] as const),
+    attempt.email === null ? null : (['E-mail', attempt.email] as const),
+    attempt.fonctionnaire === null
+      ? null
+      : (['Fonctionnaire', attempt.fonctionnaire ? 'Oui' : 'Non'] as const),
+    attempt.engagementEnCours === null
+      ? null
+      : (['Engagement en cours', attempt.engagementEnCours ? 'Oui' : 'Non'] as const),
+    attempt.dureeEtablissementMois === null
+      ? null
+      : ([
+          'Durée dans l’établissement',
+          `${formatNumber(attempt.dureeEtablissementMois)} mois`,
+        ] as const),
+  ].filter((entry) => entry !== null);
+
+  if (entries.length === 0) return null;
+
+  return (
+    <dl className="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-[0.75rem]">
+      {entries.map(([label, value]) => (
+        <div key={label} className="flex items-baseline gap-1.5">
+          <dt className="text-muted-foreground">{label}</dt>
+          <dd className="font-[600]">{value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 

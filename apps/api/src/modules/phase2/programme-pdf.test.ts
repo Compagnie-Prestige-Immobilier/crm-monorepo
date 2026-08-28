@@ -17,9 +17,11 @@ import {
   formatDakar,
   programmeFilename,
   prospectCheckboxGroups,
+  writeRepProgrammePdf,
   writeProgrammePdf,
   type ProgrammeData,
   type ProgrammeRow,
+  type RepProgrammeData,
 } from './programme-pdf.js';
 
 async function render(data: ProgrammeData): Promise<Buffer> {
@@ -27,6 +29,14 @@ async function render(data: ProgrammeData): Promise<Buffer> {
   const chunks: Buffer[] = [];
   sink.on('data', (chunk: Buffer) => chunks.push(chunk));
   await writeProgrammePdf(sink, data);
+  return Buffer.concat(chunks);
+}
+
+async function renderRepresentants(data: RepProgrammeData): Promise<Buffer> {
+  const sink = new PassThrough();
+  const chunks: Buffer[] = [];
+  sink.on('data', (chunk: Buffer) => chunks.push(chunk));
+  await writeRepProgrammePdf(sink, data);
   return Buffer.concat(chunks);
 }
 
@@ -170,6 +180,44 @@ describe('writeProgrammePdf', () => {
   it('rend un programme vide sans planter', async () => {
     const text = extractPdfText(await render({ ...DATA, rows: [] }));
     expect(text).toContain('Aucune ligne affectée');
+  });
+});
+
+describe('writeRepProgrammePdf', () => {
+  const representants: RepProgrammeData = {
+    campaignName: 'Qualification CHUES',
+    commercialName: 'Awa Sy',
+    segmentLabel: 'Tous les représentants',
+    generatedAt: new Date('2026-04-08T14:30:00.000Z'),
+    rows: Array.from({ length: 50 }, (_, index) => ({
+      position: index + 1,
+      fullName: `Prénom Nom ${String(index + 1)}`,
+      phoneE164: `+2217710${String(index).padStart(5, '0')}`,
+    })),
+  };
+
+  it('met exactement 25 représentants par page portrait', async () => {
+    const text = extractPdfText(await renderRepresentants(representants));
+
+    expect(text).toContain('Page 1 / 2');
+    expect(text).toContain('Page 2 / 2');
+    expect(text).not.toContain('Page 3 / 3');
+    for (const row of representants.rows) {
+      expect(text).toContain(row.fullName);
+      expect(text).toContain(
+        row.phoneE164.replace(/^(\+221)(\d{2})(\d{3})(\d{2})(\d{2})$/, '$1 $2 $3 $4 $5'),
+      );
+    }
+  });
+
+  it('ne contient que le nom et le téléphone dans les lignes', async () => {
+    const text = extractPdfText(await renderRepresentants(representants));
+
+    expect(text).toContain('Nom et prénom');
+    expect(text).toContain('Téléphone');
+    expect(text).not.toContain('Code');
+    expect(text).not.toContain('Résultat de l’appel');
+    expect(text).not.toContain('Commentaire');
   });
 });
 

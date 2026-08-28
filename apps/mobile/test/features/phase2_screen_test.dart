@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:cpi_go/core/providers/app_providers.dart';
@@ -10,13 +11,17 @@ import 'package:cpi_go/data/local/database.dart';
 import 'package:cpi_go/features/auth/auth_controller.dart';
 import 'package:cpi_go/features/auth/auth_state.dart';
 import 'package:cpi_go/features/phase2/presentation/call_audio_recorder.dart';
+import 'package:cpi_go/features/phase2/presentation/callback_picker.dart';
 import 'package:cpi_go/features/phase2/presentation/phase2_screen.dart';
+import 'package:cpi_go/ui/widgets/cpi_choice_group.dart';
+import 'package:cpi_go/ui/widgets/cpi_kit.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:forui/forui.dart';
 
 import '../support/db_fixture.dart';
 import '../support/fake_api.dart';
@@ -94,6 +99,7 @@ void main() {
   Widget host({
     bool disableAnimations = false,
     Phase2DirectorySync? directory,
+    String? prefillPhone,
   }) {
     return ProviderScope(
       overrides: [
@@ -114,7 +120,7 @@ void main() {
         supportedLocales: const <Locale>[Locale('fr')],
         home: MediaQuery(
           data: MediaQueryData(disableAnimations: disableAnimations),
-          child: const Phase2Screen(),
+          child: Phase2Screen(prefillPhone: prefillPhone),
         ),
       ),
     );
@@ -124,6 +130,108 @@ void main() {
   Future<void> type(WidgetTester tester, String digits) async {
     await tester.enterText(find.byType(TextField).first, digits);
     await tester.pumpAndSettle();
+  }
+
+  /// Passe l'étape courante. Le bouton porte le même libellé aux étapes 1 et 2.
+  Future<void> continuer(WidgetTester tester) async {
+    await tester.ensureVisible(find.text('Continuer'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continuer'));
+    await tester.pumpAndSettle();
+  }
+
+  /// L'écran est en CINQ étapes : le numéro, puis les renseignements en trois
+  /// blocs — qui est-ce, son travail, sa banque —, puis la méthode. Elle ne
+  /// s'ouvre qu'une fois le numéro trouvé et les quatre « Continuer » touchés.
+  Future<void> resultat(WidgetTester tester, String digits) async {
+    await type(tester, digits);
+    for (int i = 0; i < 4; i++) {
+      await continuer(tester);
+    }
+  }
+
+  /// S'arrête à l'étape 2, la première des renseignements.
+  Future<void> renseignements(WidgetTester tester, String digits) async {
+    await type(tester, digits);
+    await continuer(tester);
+  }
+
+  /// Répond à une question à trois réponses de l'étape 2. Le libellé « Oui » se
+  /// répète d'une question à l'autre : la recherche part donc du groupe.
+  Future<void> repondre(WidgetTester tester, String question, Tri choix) async {
+    final Finder groupe = find.byWidgetPredicate(
+      (Widget w) => w is CpiChoiceGroup<Tri> && w.label == question,
+    );
+    final Finder option = find.descendant(
+      of: groupe,
+      matching: find.text(choix.label),
+    );
+    await tester.ensureVisible(option);
+    await tester.pumpAndSettle();
+    await tester.tap(option);
+    await tester.pumpAndSettle();
+  }
+
+  /// Ouvre une liste assistée et y choisit une valeur du référentiel.
+  Future<void> choisirDansListe(
+    WidgetTester tester,
+    String label,
+    String valeur,
+  ) async {
+    final Finder field = find.descendant(
+      of: find.ancestor(
+        of: find.text(label),
+        matching: find.byType(FTextField),
+      ),
+      matching: find.byType(TextField),
+    );
+    await tester.ensureVisible(field);
+    await tester.pumpAndSettle();
+    await tester.tap(field);
+    await tester.pumpAndSettle();
+    // La frappe et non le seul appui : c'est le changement de texte qui
+    // recalcule les options de `RawAutocomplete` et ouvre la liste.
+    await tester.enterText(field, valeur.split(' ').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(valeur).last);
+    await tester.pumpAndSettle();
+  }
+
+  /// Écrit dans un champ nommé.
+  Future<void> remplir(WidgetTester tester, String label, String value) async {
+    final Finder field = find.descendant(
+      of: find.ancestor(
+        of: find.text(label),
+        matching: find.byType(FTextField),
+      ),
+      matching: find.byType(TextField),
+    );
+    await tester.ensureVisible(field);
+    await tester.pumpAndSettle();
+    await tester.enterText(field, value);
+    await tester.pumpAndSettle();
+  }
+
+  /// La note vocale est repliée derrière son bouton : elle n'existe dans l'arbre
+  /// qu'une fois dépliée.
+  Future<void> ouvrirNote(WidgetTester tester) async {
+    await tester.ensureVisible(find.text('Ajouter une note vocale'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ajouter une note vocale'));
+    await tester.pumpAndSettle();
+  }
+
+  /// Recule d'une étape par la flèche du bandeau.
+  Future<void> reculer(WidgetTester tester) async {
+    await tester.tap(find.byType(CpiHeaderAction));
+    await tester.pumpAndSettle();
+  }
+
+  /// Revient de la méthode jusqu'au numéro : une flèche par étape franchie.
+  Future<void> revenirAuNumero(WidgetTester tester) async {
+    for (int i = 0; i < 4; i++) {
+      await reculer(tester);
+    }
   }
 
   phase2TestWidgets(
@@ -143,17 +251,294 @@ void main() {
   );
 
   phase2TestWidgets(
-    'un numéro connu et ouvert ouvre les trois cartes de méthode',
+    'un numéro connu et ouvert ouvre les quatre cartes de méthode',
     (WidgetTester tester) async {
       await tester.pumpWidget(host());
-      await type(tester, '771234567');
+      await resultat(tester, '771234567');
 
+      expect(find.text('Prise de rendez-vous'), findsOneWidget);
       expect(find.text('Plateforme'), findsOneWidget);
       expect(find.text('Physique'), findsOneWidget);
-      expect(find.text('Voix / messagerie électronique'), findsOneWidget);
-      expect(find.text('Méthode non obtenue'), findsOneWidget);
+      expect(find.text('Par appel ou message'), findsOneWidget);
+      expect(find.text('L\'appel n\'a pas abouti'), findsOneWidget);
     },
   );
+
+  // La console ouverte depuis une fiche Grand Public. L'annuaire de la phase 3
+  // descend par pages, dans l'ordre des `updated_at` croissants : une base
+  // fraîchement importée arrive en dernier, et la fiche qu'on vient d'ouvrir
+  // n'y est donc pas encore. « Consigner l'appel » répondait « Ce numéro n'est
+  // pas dans la liste » sur une fiche affichée deux gestes plus tôt.
+  phase2TestWidgets(
+    'une fiche Grand Public absente de l\'annuaire se consigne quand même',
+    (WidgetTester tester) async {
+      await db
+          .into(db.prospects)
+          .insert(
+            ProspectsCompanion.insert(
+              id: 'gp-1',
+              nom: 'Ndiaye',
+              prenom: 'Awa',
+              phoneE164: '+221780000001',
+              projet: const Value<String>('GRAND_PUBLIC'),
+              createdById: 'me',
+              clientCreatedAt: t0,
+              localUpdatedAt: t0,
+            ),
+          );
+
+      await tester.pumpWidget(host(prefillPhone: '+221780000001'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ce numéro n\'est pas dans la liste.'), findsNothing);
+
+      // Autant d'étapes qu'il en reste : le nombre de blocs de renseignements
+      // se rediscute, la propriété testée ici non.
+      while (find.text('Continuer').evaluate().isNotEmpty) {
+        await continuer(tester);
+      }
+      await tester.ensureVisible(find.text('Plateforme'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Plateforme'));
+      await tester.pumpAndSettle();
+
+      final CallAttempt attempt =
+          (await db.select(db.callAttempts).get()).single;
+      expect(attempt.prospectId, 'gp-1');
+      expect(attempt.method, EnrollmentMethods.platform);
+    },
+  );
+
+  // ═══ L'ÉTAPE 2 : LES RENSEIGNEMENTS ═══
+  //
+  // Tout y est facultatif, tout part avec l'appel, et rien ne s'y écrit dans le
+  // prospect en local : c'est le serveur qui pose nom, prénom et référentiels
+  // sur la fiche liée.
+
+  /// Le seul `call_attempt` en file, décodé.
+  Future<Map<String, Object?>> payload(AppDatabase db) async {
+    final List<OutboxData> rows = await allOutbox(db);
+    final OutboxData op = rows.singleWhere(
+      (OutboxData r) => r.entityType == callAttemptEntity,
+    );
+    return jsonDecode(op.payload) as Map<String, Object?>;
+  }
+
+  phase2TestWidgets('les renseignements partent avec l\'appel', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(host());
+    await renseignements(tester, '771234567');
+
+    expect(find.text('Qui est-ce ?'), findsOneWidget);
+    // Le numéro se relit, il ne se corrige pas : le serveur refuse de l'écrire
+    // depuis un appel.
+    expect(
+      tester
+          .widget<CpiField>(find.widgetWithText(CpiField, 'Téléphone'))
+          .readOnly,
+      isTrue,
+    );
+
+    await remplir(tester, 'Nom', 'Sow');
+    await remplir(tester, 'Prénom', 'Awa');
+    await remplir(tester, 'E-mail', 'awa.sow@exemple.sn');
+    await continuer(tester);
+
+    // Étape 3 : son travail.
+    await remplir(tester, 'Ancienneté', '36');
+    await repondre(tester, 'Fonctionnaire', Tri.oui);
+    await continuer(tester);
+
+    // Étape 4 : sa banque, son syndicat.
+    await choisirDansListe(tester, 'Syndicat', 'Syndicat Test');
+    await choisirDansListe(tester, 'Banque', 'Banque Test');
+    await repondre(tester, 'Engagement en cours à la banque', Tri.non);
+
+    await continuer(tester);
+    await remplir(tester, 'Commentaire', 'Rappeler après la rentrée.');
+    await tester.ensureVisible(find.text('Plateforme'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Plateforme'));
+    await tester.pumpAndSettle();
+
+    final CallAttempt attempt = (await db.select(db.callAttempts).get()).single;
+    expect(attempt.email, 'awa.sow@exemple.sn');
+    expect(attempt.fonctionnaire, isTrue);
+    expect(attempt.engagementEnCours, isFalse);
+    expect(attempt.dureeEtablissementMois, 36);
+    expect(attempt.comment, 'Rappeler après la rentrée.');
+    expect(attempt.rendezVousAt, isNull);
+
+    // Le nom, le prénom et les référentiels ne sont PAS écrits en local : ils
+    // vivent sur le prospect, que seul le serveur met à jour.
+    final Map<String, Object?> op = await payload(db);
+    expect(op['nom'], 'Sow');
+    expect(op['prenom'], 'Awa');
+    expect(op['email'], 'awa.sow@exemple.sn');
+    expect(op['fonctionnaire'], isTrue);
+    expect(op['engagementEnCours'], isFalse);
+    expect(op['dureeEtablissementMois'], 36);
+    expect(op['banqueId'], 'bq-1');
+    expect(op['syndicatId'], 'sy-1');
+    expect(op['comment'], 'Rappeler après la rentrée.');
+    expect(op.containsKey('rendezVousAt'), isFalse);
+  });
+
+  // « Non demandé » est l'état de départ, et il ne se confond pas avec « Non » :
+  // le serveur distingue les deux, et une question non posée ne doit pas partir
+  // en refus.
+  phase2TestWidgets('une question non posée ne part pas en « non »', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(host());
+    await resultat(tester, '771234567');
+    await tester.ensureVisible(find.text('Plateforme'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Plateforme'));
+    await tester.pumpAndSettle();
+
+    final CallAttempt attempt = (await db.select(db.callAttempts).get()).single;
+    expect(attempt.fonctionnaire, isNull);
+    expect(attempt.engagementEnCours, isNull);
+
+    final Map<String, Object?> op = await payload(db);
+    expect(op.containsKey('fonctionnaire'), isFalse);
+    expect(op.containsKey('engagementEnCours'), isFalse);
+  });
+
+  phase2TestWidgets('un e-mail mal formé retient l\'étape et le dit', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(host());
+    await renseignements(tester, '771234567');
+    await remplir(tester, 'E-mail', 'awa.sow');
+
+    // `skipOffstage: false` : ForUI rend le reproche du champ hors scène tant
+    // qu'il n'a pas été atteint par le défilement.
+    expect(
+      find.textContaining('Adresse invalide', skipOffstage: false),
+      findsOneWidget,
+    );
+    final CpiButton bouton = tester.widget<CpiButton>(
+      find.widgetWithText(CpiButton, 'Continuer'),
+    );
+    expect(bouton.onPressed, isNull);
+    expect(bouton.subtitle, 'Vérifiez l\'e-mail');
+
+    await remplir(tester, 'E-mail', 'awa.sow@exemple.sn');
+    expect(
+      tester
+          .widget<CpiButton>(find.widgetWithText(CpiButton, 'Continuer'))
+          .onPressed,
+      isNotNull,
+    );
+  });
+
+  phase2TestWidgets('une durée hors bornes retient l\'étape', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(host());
+    await renseignements(tester, '771234567');
+    // La durée est à l'étape du travail, celle qui suit l'identité.
+    await continuer(tester);
+    await remplir(tester, 'Ancienneté', '900');
+
+    expect(
+      find.textContaining('De 0 à 600 mois', skipOffstage: false),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<CpiButton>(find.widgetWithText(CpiButton, 'Continuer'))
+          .subtitle,
+      'Vérifiez la durée en mois',
+    );
+  });
+
+  // ═══ LA PRISE DE RENDEZ-VOUS ═══
+  //
+  // Le serveur EXIGE la date sur cette méthode et la refuse sur les autres :
+  // l'écran ne peut donc pas enregistrer un rendez-vous sans passer par la
+  // feuille, ni laisser une date sur une autre carte.
+
+  phase2TestWidgets('la prise de rendez-vous annulée n\'enregistre rien', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(host());
+    await resultat(tester, '771234567');
+
+    await tester.ensureVisible(find.text('Prise de rendez-vous'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Prise de rendez-vous'));
+    await tester.pumpAndSettle();
+    expect(find.text('Enregistrer le rendez-vous'), findsOneWidget);
+
+    await tester.tap(find.text('Annuler'));
+    await tester.pumpAndSettle();
+
+    expect(await db.countMyAttempts().getSingle(), 0);
+    // La carte est toujours là : l'appel n'est pas consigné et le
+    // téléconseiller peut choisir une autre issue.
+    expect(find.text('Plateforme'), findsOneWidget);
+  });
+
+  phase2TestWidgets('un rendez-vous confirmé part avec sa date', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(host());
+    await resultat(tester, '771234567');
+
+    await tester.ensureVisible(find.text('Prise de rendez-vous'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Prise de rendez-vous'));
+    await tester.pumpAndSettle();
+
+    // La feuille s'ouvre sur aujourd'hui à 9 h ; « Demain » est la deuxième
+    // puce, et `t0` vaut le 12 août 2026 à 9 h.
+    await tester.ensureVisible(find.text('Demain'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Demain'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Enregistrer le rendez-vous'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Enregistrer le rendez-vous'));
+    await tester.pumpAndSettle();
+
+    final CallAttempt attempt = (await db.select(db.callAttempts).get()).single;
+    expect(attempt.method, EnrollmentMethods.appointment);
+    expect(attempt.rendezVousAt, DateTime.utc(2026, 8, 13, 9));
+
+    final Map<String, Object?> op = await payload(db);
+    expect(op['method'], EnrollmentMethods.appointment);
+    expect(op['rendezVousAt'], '2026-08-13T09:00:00.000Z');
+  });
+
+  // La suite ne s'ouvre pas toute seule : le numéro se confirme d'abord.
+  phase2TestWidgets('« Continuer » attend un numéro trouvé', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(host());
+    await tester.pump();
+
+    expect(
+      tester
+          .widget<CpiButton>(find.widgetWithText(CpiButton, 'Continuer'))
+          .onPressed,
+      isNull,
+    );
+    expect(find.text('Plateforme'), findsNothing);
+
+    await type(tester, '771234567');
+
+    expect(
+      tester
+          .widget<CpiButton>(find.widgetWithText(CpiButton, 'Continuer'))
+          .onPressed,
+      isNotNull,
+    );
+    expect(find.text('Plateforme'), findsNothing);
+  });
 
   phase2TestWidgets('changer de numéro efface la note vocale non enregistrée', (
     WidgetTester tester,
@@ -167,11 +552,13 @@ void main() {
     final File recording = File('${temp.path}/attempt.m4a');
     recording.writeAsBytesSync(<int>[1, 2, 3]);
     await tester.pumpWidget(host());
-    await type(tester, '771234567');
+    await resultat(tester, '771234567');
+    await ouvrirNote(tester);
     tester
         .widget<CallAudioRecorder>(find.byType(CallAudioRecorder))
         .onChanged(recording.path);
 
+    await revenirAuNumero(tester);
     await tester.enterText(find.byType(TextField).first, '781234567');
 
     expect(recording.existsSync(), isFalse);
@@ -189,7 +576,8 @@ void main() {
       final File recording = File('${temp.path}/attempt.m4a');
       recording.writeAsBytesSync(<int>[1, 2, 3]);
       await tester.pumpWidget(host());
-      await type(tester, '771234567');
+      await resultat(tester, '771234567');
+      await ouvrirNote(tester);
       tester
           .widget<CallAudioRecorder>(find.byType(CallAudioRecorder))
           .onChanged(recording.path);
@@ -210,22 +598,30 @@ void main() {
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(host());
-    await type(tester, '771234567');
+    await resultat(tester, '771234567');
+    await ouvrirNote(tester);
     tester
         .widget<CallAudioRecorder>(find.byType(CallAudioRecorder))
         .onRecordingStateChanged('/tmp/active-recording.m4a');
     await tester.pump();
 
-    final InkWell action = tester.widget<InkWell>(
+    // La carte est là, mais plus rien ne l'entoure qui prenne une touche : une
+    // carte muette vaut mieux qu'un `onPress` nul qu'on oublierait de vérifier.
+    expect(find.text('Plateforme'), findsOneWidget);
+    expect(
       find.ancestor(
         of: find.text('Plateforme'),
-        matching: find.byType(InkWell),
+        // `FTappable` est une fabrique : son type d'exécution n'est pas
+        // `FTappable`, et `find.byType` compare les types à l'identique.
+        matching: find.byWidgetPredicate((Widget w) => w is FTappable),
       ),
+      findsNothing,
     );
-    expect(action.onTap, isNull);
+    // Le retour à l'étape du numéro est fermé lui aussi : changer de numéro
+    // pendant l'enregistrement effacerait le fichier en cours d'écriture.
     expect(
-      tester.widget<TextField>(find.byType(TextField).first).enabled,
-      isFalse,
+      tester.widget<CpiHeaderAction>(find.byType(CpiHeaderAction)).onPressed,
+      isNull,
     );
   });
 
@@ -241,7 +637,8 @@ void main() {
     final File recording = File('${temp.path}/active.m4a');
     recording.writeAsBytesSync(<int>[1, 2, 3]);
     await tester.pumpWidget(host());
-    await type(tester, '771234567');
+    await resultat(tester, '771234567');
+    await ouvrirNote(tester);
     tester
         .widget<CallAudioRecorder>(find.byType(CallAudioRecorder))
         .onRecordingStateChanged(recording.path);
@@ -256,7 +653,7 @@ void main() {
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(host());
-    await type(tester, '771234567');
+    await resultat(tester, '771234567');
 
     // 48 dp est le plancher, pas la cible : l'app se tient debout, au soleil,
     // souvent à une main. Une carte qui porte la décision de tout l'écran est
@@ -264,13 +661,13 @@ void main() {
     for (final String label in const <String>[
       'Plateforme',
       'Physique',
-      'Voix / messagerie électronique',
-      'Méthode non obtenue',
+      'Par appel ou message',
+      'L\'appel n\'a pas abouti',
     ]) {
       final Finder tappable = find.ancestor(
         of: find.text(label),
         matching: find.byWidgetPredicate(
-          (Widget w) => w is InkWell || w is OutlinedButton,
+          (Widget w) => w is FTappable || w is FButton || w is OutlinedButton,
         ),
       );
       final Size size = tester.getSize(tappable.first);
@@ -288,42 +685,46 @@ void main() {
       await tester.pumpWidget(host());
       await type(tester, '781234567');
 
-      expect(find.text('Dossier déjà traité'), findsOneWidget);
+      expect(find.text('Déjà traité'), findsOneWidget);
       expect(find.text('Méthode obtenue'), findsOneWidget);
       expect(
-        find.textContaining('Modifiable par un administrateur'),
+        find.textContaining('Seul un responsable peut le rouvrir'),
         findsOneWidget,
       );
       // Aucune carte de saisie : le serveur refuserait l'écriture, et proposer un
       // formulaire qui ne peut pas aboutir ferait perdre du temps au commercial.
       expect(find.text('Plateforme'), findsNothing);
-      expect(find.text('Méthode non obtenue'), findsNothing);
+      expect(find.text('L\'appel n\'a pas abouti'), findsNothing);
+      // Ni « Continuer » : l'étape du résultat n'a rien à consigner ici.
+      expect(find.text('Continuer'), findsNothing);
     },
   );
 
-  phase2TestWidgets(
-    'un numéro inconnu de l\'annuaire est signalé sans blocage',
-    (WidgetTester tester) async {
-      await tester.pumpWidget(host());
-      await type(tester, '765555555');
+  phase2TestWidgets('un numéro inconnu de la liste est signalé sans blocage', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(host());
+    await type(tester, '765555555');
 
-      expect(
-        find.textContaining('Numéro absent de l\'annuaire'),
-        findsOneWidget,
-      );
-      expect(find.text('Effacer et recommencer'), findsOneWidget);
-    },
-  );
+    expect(
+      find.textContaining('Ce numéro n\'est pas dans la liste'),
+      findsOneWidget,
+    );
+    // Les deux issues sont dans le bloc : recommencer, ou mettre la liste à
+    // jour parce que le numéro vient d'être ajouté côté serveur.
+    expect(find.text('Effacer et recommencer'), findsOneWidget);
+    expect(find.text('Mettre la liste à jour'), findsOneWidget);
+  });
 
   phase2TestWidgets(
     'OTHER sans commentaire est refusé DANS la feuille, avant écriture',
     (WidgetTester tester) async {
       await tester.pumpWidget(host());
-      await type(tester, '771234567');
+      await resultat(tester, '771234567');
 
-      await tester.ensureVisible(find.text('Méthode non obtenue'));
+      await tester.ensureVisible(find.text('L\'appel n\'a pas abouti'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Méthode non obtenue'));
+      await tester.tap(find.text('L\'appel n\'a pas abouti'));
       await tester.pumpAndSettle();
 
       await tester.ensureVisible(find.text('Autre'));
@@ -353,22 +754,22 @@ void main() {
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(host());
-    await type(tester, '771234567');
+    await resultat(tester, '771234567');
 
-    await tester.ensureVisible(find.text('Méthode non obtenue'));
+    await tester.ensureVisible(find.text('L\'appel n\'a pas abouti'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Méthode non obtenue'));
+    await tester.tap(find.text('L\'appel n\'a pas abouti'));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Autre'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Autre'));
     await tester.pumpAndSettle();
     await tester.ensureVisible(
-      find.widgetWithText(TextField, 'Commentaire (obligatoire)'),
+      find.widgetWithText(CpiField, 'Commentaire (obligatoire)'),
     );
     await tester.pumpAndSettle();
     await tester.enterText(
-      find.widgetWithText(TextField, 'Commentaire (obligatoire)'),
+      find.widgetWithText(CpiField, 'Commentaire (obligatoire)'),
       'Le numéro est celui d\'une boutique.',
     );
     await tester.pumpAndSettle();
@@ -388,9 +789,9 @@ void main() {
 
   /// Ouvre la feuille des issues négatives et choisit une issue.
   Future<void> chooseOutcome(WidgetTester tester, String label) async {
-    await tester.ensureVisible(find.text('Méthode non obtenue'));
+    await tester.ensureVisible(find.text('L\'appel n\'a pas abouti'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Méthode non obtenue'));
+    await tester.tap(find.text('L\'appel n\'a pas abouti'));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text(label));
     await tester.pumpAndSettle();
@@ -407,19 +808,19 @@ void main() {
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(host());
-    await type(tester, '771234567');
+    await resultat(tester, '771234567');
     await chooseOutcome(tester, 'À rappeler');
 
     expect(find.text('Dans 1 h'), findsOneWidget);
     expect(find.text('Demain 9 h'), findsOneWidget);
-    expect(find.text('Autre heure'), findsOneWidget);
+    expect(find.text('Choisir une date'), findsOneWidget);
   });
 
   phase2TestWidgets('une autre issue n\'offre pas d\'heure de rappel', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(host());
-    await type(tester, '771234567');
+    await resultat(tester, '771234567');
     await chooseOutcome(tester, 'Refus');
 
     expect(find.text('Demain 9 h'), findsNothing);
@@ -429,7 +830,7 @@ void main() {
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(host());
-    await type(tester, '771234567');
+    await resultat(tester, '771234567');
     await chooseOutcome(tester, 'À rappeler');
 
     await tester.ensureVisible(find.text('Demain 9 h'));
@@ -455,7 +856,7 @@ void main() {
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(host());
-    await type(tester, '771234567');
+    await resultat(tester, '771234567');
     await chooseOutcome(tester, 'À rappeler');
 
     await tester.ensureVisible(find.text('Enregistrer'));
@@ -487,7 +888,7 @@ void main() {
     );
     expect(field.controller.text, isEmpty);
     expect(field.focusNode.hasFocus, isTrue);
-    expect(find.text('Dossier déjà traité'), findsNothing);
+    expect(find.text('Déjà traité'), findsNothing);
   });
 
   phase2TestWidgets(
@@ -499,13 +900,18 @@ void main() {
       final BuildContext context = tester.element(find.byType(Phase2Screen));
       expect(CpiMotion.of(context).component, Duration.zero);
 
-      final AnimatedSwitcher switcher = tester.widget<AnimatedSwitcher>(
-        find.byType(AnimatedSwitcher),
-      );
-      expect(switcher.duration, Duration.zero);
+      // Toutes : l'écran en porte une par étape, et la coque en pose sur son
+      // bandeau et sur l'en-tête d'étape. Une seule laissée à sa durée suffit à
+      // rendre le mouvement que l'utilisateur a désactivé.
+      final Iterable<AnimatedSwitcher> switchers = tester
+          .widgetList<AnimatedSwitcher>(find.byType(AnimatedSwitcher));
+      expect(switchers, isNotEmpty);
+      for (final AnimatedSwitcher switcher in switchers) {
+        expect(switcher.duration, Duration.zero);
+      }
 
       // La logique, elle, est identique : le même numéro donne le même écran.
-      await type(tester, '771234567');
+      await resultat(tester, '771234567');
       expect(find.text('Plateforme'), findsOneWidget);
     },
   );
@@ -536,11 +942,23 @@ void main() {
     await tester.pumpAndSettle();
     expect(haptics, isEmpty);
 
-    // Numéro complet et connu : toujours rien, la recherche a abouti.
+    // Numéro complet et connu : la recherche aboutit sans rien faire vibrer.
     await type(tester, '771234567');
     expect(haptics, isEmpty);
 
+    // Les quatre « Continuer » du parcours : un retour LÉGER par appui, celui
+    // que `CpiButton` donne à toute action primaire, et rien de plus.
+    for (int i = 0; i < 4; i++) {
+      await continuer(tester);
+    }
+    expect(
+      haptics,
+      everyElement('HapticFeedbackType.lightImpact'),
+      reason: 'un appui rend un retour léger ; la frappe, aucun',
+    );
+
     // Choix d'une carte : retour de SÉLECTION, exact au moment où il est émis.
+    haptics.clear();
     await tester.ensureVisible(find.text('Plateforme'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Plateforme'));
@@ -556,31 +974,57 @@ void main() {
     await tester.pumpWidget(host());
     await type(tester, '771234567');
 
+    // Étape 1 : le champ se nomme, et le rang de l'étape s'annonce. Le nœud
+    // remonte aussi sur la ligne de liste qui le porte, d'où `findsWidgets`.
+    expect(
+      find.bySemanticsLabel(RegExp('Numéro appelé, neuf chiffres')),
+      findsWidgets,
+    );
+    expect(find.bySemanticsLabel(RegExp('Étape 1 sur 5')), findsOneWidget);
+
+    await continuer(tester);
+    expect(find.bySemanticsLabel(RegExp('Étape 2 sur 5')), findsOneWidget);
+
+    await continuer(tester);
+
+    // Étape 3 : les questions à trois réponses portent la question dans le nom
+    // de chaque option, sans quoi « Oui » ne se rattache à rien.
+    expect(find.bySemanticsLabel(RegExp('Étape 3 sur 5')), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(RegExp('Fonctionnaire : Non demandé')),
+      findsOneWidget,
+    );
+
+    await continuer(tester);
+    await continuer(tester);
+
     expect(
       find.bySemanticsLabel(RegExp('Méthode obtenue : Plateforme')),
       findsOneWidget,
     );
     expect(
-      find.bySemanticsLabel(RegExp('Numéro appelé, neuf chiffres')),
+      find.bySemanticsLabel(RegExp('Méthode obtenue : Prise de rendez-vous')),
       findsOneWidget,
     );
-    expect(find.bySemanticsLabel(RegExp('appels consignés')), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('Étape 5 sur 5')), findsOneWidget);
     handle.dispose();
   });
 
-  phase2TestWidgets(
-    'l\'annuaire vide invite à le télécharger avant de commencer',
-    (WidgetTester tester) async {
-      await db.delete(db.phase2Directory).go();
-      await tester.pumpWidget(host());
-      await tester.pumpAndSettle();
+  phase2TestWidgets('la liste vide invite à la recevoir avant de commencer', (
+    WidgetTester tester,
+  ) async {
+    await db.delete(db.phase2Directory).go();
+    await tester.pumpWidget(host());
+    await tester.pumpAndSettle();
 
-      expect(find.textContaining('Annuaire non téléchargé'), findsOneWidget);
-      // L'action de premier téléchargement est ancrée en bas d'écran, en zone de
-      // pouce, et non plus en tête de bandeau.
-      expect(find.text('Télécharger l\'annuaire'), findsOneWidget);
-    },
-  );
+    expect(
+      find.textContaining('n\'est pas encore sur ce téléphone'),
+      findsOneWidget,
+    );
+    // L'action de premier téléchargement est ancrée en bas d'écran, en zone de
+    // pouce, et non plus en tête de bandeau.
+    expect(find.text('Recevoir la liste des numéros'), findsOneWidget);
+  });
 
   phase2TestWidgets('le téléchargement rend une progression, page par page', (
     WidgetTester tester,
@@ -605,7 +1049,7 @@ void main() {
 
     await tester.pumpWidget(host());
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Télécharger l\'annuaire'));
+    await tester.tap(find.text('Recevoir la liste des numéros'));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('3 numéros'), findsOneWidget);
@@ -643,20 +1087,20 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Télécharger l\'annuaire'));
+    await tester.tap(find.text('Recevoir la liste des numéros'));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('Téléchargement interrompu'), findsOneWidget);
     // Le compte-rendu compte moins que ceci : sans remise à zéro de l'état, le
-    // bouton reste désactivé et l'annuaire ne peut plus jamais être téléchargé
-    // sans redémarrer l'application.
+    // bouton reste désactivé et la liste ne peut plus jamais être reçue sans
+    // redémarrer l'application.
     expect(
       tester
-          .widget<FilledButton>(
-            find.widgetWithText(FilledButton, 'Télécharger l\'annuaire'),
+          .widget<FButton>(
+            find.widgetWithText(FButton, 'Recevoir la liste des numéros'),
           )
-          .enabled,
-      isTrue,
+          .onPress,
+      isNotNull,
     );
   });
 
@@ -708,7 +1152,7 @@ void main() {
 
     await tester.pumpWidget(host());
     await tester.pumpAndSettle();
-    await type(tester, '771234567');
+    await resultat(tester, '771234567');
     await chooseOutcome(tester, 'Ne répond pas');
 
     await tester.ensureVisible(find.text('Demain 9 h'));
@@ -723,7 +1167,7 @@ void main() {
 
     expect(
       tester
-          .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Demain 9 h'))
+          .widget<CallbackPill>(find.widgetWithText(CallbackPill, 'Demain 9 h'))
           .selected,
       isTrue,
     );
@@ -756,11 +1200,11 @@ void main() {
 
     await tester.pumpWidget(host());
     await tester.pumpAndSettle();
-    await type(tester, '771234567');
+    await resultat(tester, '771234567');
 
-    await tester.ensureVisible(find.text('Méthode non obtenue'));
+    await tester.ensureVisible(find.text('L\'appel n\'a pas abouti'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Méthode non obtenue'));
+    await tester.tap(find.text('L\'appel n\'a pas abouti'));
     await tester.pumpAndSettle();
 
     expect(find.text('Ne répond pas'), findsOneWidget);
@@ -781,7 +1225,7 @@ void main() {
 
     await tester.pumpWidget(host());
     await tester.pumpAndSettle();
-    await type(tester, '771234567');
+    await resultat(tester, '771234567');
     await chooseOutcome(tester, 'Ne répond pas');
 
     await tester.ensureVisible(find.text('Enregistrer'));
@@ -810,7 +1254,7 @@ void main() {
 
     await tester.pumpWidget(host());
     await tester.pumpAndSettle();
-    await type(tester, '771234567');
+    await resultat(tester, '771234567');
     await chooseOutcome(tester, 'Litige en cours');
 
     await tester.ensureVisible(find.text('Enregistrer'));

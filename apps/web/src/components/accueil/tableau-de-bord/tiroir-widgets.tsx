@@ -2,10 +2,8 @@
 
 import { PlusIcon } from 'lucide-react';
 
-import {
-  evaluerMarques,
-  marqueRecommandee,
-} from '@/components/accueil/tableau-de-bord/recommandation';
+import { ChoixGraphique, marquePhrase } from '@/components/dashboard/chart-visual';
+import { evaluerMarques } from '@/components/accueil/tableau-de-bord/recommandation';
 import {
   SOURCES,
   mesurerDonnees,
@@ -49,7 +47,7 @@ export function TiroirWidgets({
         <SheetHeader>
           <SheetTitle>Ajouter un graphique</SheetTitle>
           <SheetDescription>
-            Chaque source propose la marque la mieux adaptée aux données actuelles.
+            Choisissez ce que vous voulez suivre. L’image montre la forme conseillée.
           </SheetDescription>
         </SheetHeader>
         <div className="flex flex-col gap-1 overflow-y-auto px-4 pb-4">
@@ -60,31 +58,23 @@ export function TiroirWidgets({
           ) : (
             disponibles.map((source) => {
               const donneesSource = donnees.get(source);
-              const mesure = donneesSource === undefined ? null : mesurerDonnees(donneesSource);
-              const recommandee =
-                mesure === null ? null : marqueRecommandee(SOURCES[source].forme, mesure);
-              const raison =
-                mesure === null
-                  ? null
-                  : evaluerMarques(SOURCES[source].forme, mesure).find((e) => e.recommandee)
-                      ?.raison;
+              const tete =
+                donneesSource === undefined
+                  ? undefined
+                  : evaluerMarques(SOURCES[source].forme, mesurerDonnees(donneesSource))[0];
+              const marque = tete?.marque ?? 'tableau';
               return (
-                <button
+                <ChoixGraphique
                   key={source}
-                  type="button"
-                  className="flex flex-col gap-0.5 rounded-md p-3 text-left hover:bg-secondary"
-                  onClick={() => {
+                  marque={marque}
+                  titre={SOURCES[source].label}
+                  phrase={marquePhrase(marque)}
+                  conseille={tete?.recommandee === true}
+                  raison={tete?.recommandee === true ? tete.raison : null}
+                  onSelect={() => {
                     onAdd(source);
                   }}
-                >
-                  <span className="text-[0.9375rem] font-[600]">{SOURCES[source].label}</span>
-                  {recommandee === null ? null : (
-                    <span className="text-[0.8125rem] text-muted-foreground">
-                      Recommandé : {recommandee}
-                      {raison === null || raison === undefined ? '' : ` — ${raison}`}
-                    </span>
-                  )}
-                </button>
+                />
               );
             })
           )}

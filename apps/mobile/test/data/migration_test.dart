@@ -19,6 +19,8 @@ import 'generated_migrations/schema_v11.dart' as v11;
 import 'generated_migrations/schema_v13.dart' as v13;
 import 'generated_migrations/schema_v14.dart' as v14;
 import 'generated_migrations/schema_v15.dart' as v15;
+import 'generated_migrations/schema_v16.dart' as v16;
+import 'generated_migrations/schema_v18.dart' as v18;
 
 /// Test doré de migration.
 ///
@@ -873,6 +875,11 @@ void main() {
   // issues littérales. C'est donc le palier le plus exposé du fichier après le
   // v6 : la table porte le journal des appels de la journée, et deux colonnes
   // NOT NULL y apparaissent, qu'il faut DÉDUIRE et non poser à leur défaut.
+  //
+  // Ces trois-là valident à la version COURANTE, pour la raison déjà donnée au
+  // v1 → v2 : la recopie engendre la forme courante de la table, et depuis que
+  // la v19 y ajoute les renseignements de conversion, elle ne correspond plus
+  // au doré de la v10. Ce qui porte le risque : les données ont-elles traversé.
 
   test('v9 -> v10 déduit l\'effet des tentatives déjà saisies', () async {
     final schema = await verifier.schemaAt(9);
@@ -908,7 +915,7 @@ void main() {
     await old.close();
 
     final AppDatabase db = AppDatabase(schema.newConnection());
-    await verifier.migrateAndValidate(db, 10);
+    await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
 
     final List<QueryRow> attempts = await db
         .customSelect(
@@ -963,7 +970,7 @@ void main() {
   test('v9 -> v10 accepte un motif que ce client ne connaît pas', () async {
     final schema = await verifier.schemaAt(9);
     final AppDatabase db = AppDatabase(schema.newConnection());
-    await verifier.migrateAndValidate(db, 10);
+    await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
 
     // C'est TOUT l'objet du palier : l'équipe du client ajoute « NRP » depuis le
     // web, et la saisie hors ligne doit l'écrire sans qu'aucun CHECK ne cite son
@@ -1000,7 +1007,7 @@ void main() {
   test('v9 -> v10 crée l\'index du référentiel des motifs', () async {
     final schema = await verifier.schemaAt(9);
     final AppDatabase db = AppDatabase(schema.newConnection());
-    await verifier.migrateAndValidate(db, 10);
+    await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
 
     final List<QueryRow> indexes = await db
         .customSelect(
@@ -1765,6 +1772,145 @@ void main() {
       await db.close();
     },
   );
+
+  test(
+    'v16 -> v17 ajoute les campagnes représentants sans toucher à la file',
+    () async {
+      final schema = await verifier.schemaAt(16);
+      final v16.DatabaseAtV16 old = v16.DatabaseAtV16(schema.newConnection());
+      await old.customStatement(
+        'INSERT INTO outbox '
+        '(id, entity_type, entity_id, op, payload, next_attempt_at, created_at) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?)',
+        <Object?>['op-17', 'representant', 'rep-1', 'update', '{}', _iso, _iso],
+      );
+      await old.close();
+
+      final AppDatabase db = AppDatabase(schema.newConnection());
+      await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
+
+      expect(
+        await db
+            .customSelect('SELECT id FROM outbox')
+            .getSingle()
+            .then((QueryRow row) => row.read<String>('id')),
+        'op-17',
+      );
+      final List<String> indexes = await db
+          .customSelect(
+            'SELECT name FROM sqlite_master '
+            'WHERE type = \'index\' AND tbl_name = \'rep_call_tasks\'',
+          )
+          .map((QueryRow row) => row.read<String>('name'))
+          .get();
+      expect(
+        indexes,
+        containsAll(<String>[
+          'rep_call_tasks_campaign_idx',
+          'rep_call_tasks_representant_idx',
+        ]),
+      );
+      await db.close();
+    },
+  );
+
+  // ── v18 → v19 : les renseignements de la conversion ───────────────────────
+  //
+  // Le palier RECOPIE `call_attempts` : il ajoute cinq colonnes ET trois CHECK,
+  // que `ALTER TABLE ADD COLUMN` ne sait pas poser. C'est donc le journal des
+  // appels de la journée qui traverse une recréation de table.
+
+  test('v18 -> v19 garde les appels déjà saisis et leur ajoute les '
+      'renseignements', () async {
+    final schema = await verifier.schemaAt(18);
+    final v18.DatabaseAtV18 old = v18.DatabaseAtV18(schema.newConnection());
+    await old.customStatement(
+      'INSERT INTO call_attempts '
+      '(id, prospect_id, outcome, reason_code, effect, method, comment, '
+      ' callback_at, client_created_at, created_by_id) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      <Object?>[
+        'a-18',
+        'p-1',
+        'METHOD_OBTAINED',
+        'METHOD_OBTAINED',
+        'CLOSE_METHOD',
+        'PLATFORM',
+        'Rappelé à midi.',
+        null,
+        _iso,
+        'me',
+      ],
+    );
+    await old.customStatement(
+      'INSERT INTO outbox '
+      '(id, entity_type, entity_id, op, payload, next_attempt_at, created_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?)',
+      <Object?>['op-19', 'call_attempt', 'a-18', 'create', '{}', _iso, _iso],
+    );
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
+
+    final QueryRow attempt = await db
+        .customSelect(
+          'SELECT method, comment, email, fonctionnaire, '
+          '       duree_etablissement_mois, rendez_vous_at '
+          'FROM call_attempts',
+        )
+        .getSingle();
+    expect(attempt.read<String>('method'), 'PLATFORM');
+    expect(attempt.read<String>('comment'), 'Rappelé à midi.');
+    // « Non demandé » et non « non » : la question n'a pas été posée à cet
+    // appel-là, et un booléen non nul l'aurait fait passer pour un refus.
+    expect(attempt.read<bool?>('fonctionnaire'), isNull);
+    expect(attempt.read<String?>('email'), isNull);
+    expect(attempt.read<int?>('duree_etablissement_mois'), isNull);
+    expect(attempt.read<String?>('rendez_vous_at'), isNull);
+
+    expect(
+      await db
+          .customSelect('SELECT id FROM outbox')
+          .getSingle()
+          .then((QueryRow row) => row.read<String>('id')),
+      'op-19',
+      reason: 'la recopie ne vide pas la file',
+    );
+
+    await db.close();
+  });
+
+  test('v18 -> v19 refuse un rendez-vous sans prise de rendez-vous', () async {
+    final schema = await verifier.schemaAt(18);
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
+
+    Future<void> insert(String? method, String? rendezVous) =>
+        db.customStatement(
+          'INSERT INTO call_attempts '
+          '(id, prospect_id, outcome, effect, method, rendez_vous_at, '
+          ' client_created_at, created_by_id) '
+          'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          <Object?>[
+            'a-${method ?? 'nul'}-${rendezVous ?? 'nul'}',
+            'p-1',
+            'METHOD_OBTAINED',
+            method == null ? 'KEEP_OPEN' : 'CLOSE_METHOD',
+            method,
+            rendezVous,
+            _iso,
+            'me',
+          ],
+        );
+
+    await expectLater(insert('PLATFORM', _iso), throwsA(anything));
+    await expectLater(insert('APPOINTMENT', null), throwsA(anything));
+    await insert('APPOINTMENT', _iso);
+
+    expect(await db.countMyAttempts().getSingle(), 1);
+    await db.close();
+  });
 }
 
 /// Instant fixe, en texte ISO-8601 : c'est ainsi que drift stocke les DATETIME

@@ -1,28 +1,29 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:forui/forui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/providers/app_providers.dart';
 import '../../../core/router/back_navigation.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/router/single_push.dart';
-import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/phone.dart';
 import '../../../data/local/database.dart';
-import '../../../ui/widgets/cpi_action_bar.dart';
+import '../../../ui/widgets/cpi_kit.dart';
 import '../../../ui/widgets/empty_state.dart';
+import '../../../ui/widgets/error_state.dart';
 import '../../../ui/widgets/cpi_pressable.dart';
-import '../../../ui/widgets/offline_indicator.dart';
 import '../../../ui/widgets/search_field.dart';
 import '../../../ui/widgets/sync_status_icon.dart';
 import '../../../ui/async_value_x.dart';
 
 class RepresentantPickerScreen extends ConsumerStatefulWidget {
-  const RepresentantPickerScreen({super.key});
+  const RepresentantPickerScreen({super.key, this.pourQualifier = false});
+
+  /// Consigner l'appel d'un représentant plutôt que saisir un prospect : c'est
+  /// le chemin quand aucune liste d'appel n'a été confiée.
+  final bool pourQualifier;
 
   @override
   ConsumerState<RepresentantPickerScreen> createState() =>
@@ -48,199 +49,168 @@ class _RepresentantPickerScreenState
     };
 
     return CpiPopScope(
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Choisir un représentant'),
-          leading: const CpiBackButton(),
-          actions: const <Widget>[
-            OfflineIndicator(),
-            SizedBox(width: CpiSpacing.xs),
+      child: CpiScaffold(
+        title: widget.pourQualifier
+            ? 'Qui avez-vous appelé ?'
+            : 'Quel représentant ?',
+        subtitle: widget.pourQualifier
+            ? 'Cherchez son nom ou son numéro.'
+            : 'Celui qui vous a donné ce contact.',
+        leading: const CpiBackButton(),
+        body: Column(
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                CpiSpacing.md,
+                0,
+                CpiSpacing.md,
+                CpiSpacing.sm,
+              ),
+              child: CpiSearchField(
+                initial: ref.read(representantPickerSearchProvider),
+                onChanged: _setSearch,
+              ),
+            ),
+            Expanded(
+              child: rows.whenEchecDAbord(
+                loading: () => const Center(child: FCircularProgress()),
+                error: (Object e, StackTrace _) => CpiErrorState(
+                  message:
+                      'La liste des représentants n\'a pas pu être lue. '
+                      '${messageErreur(e)}',
+                  onRetry: () => ref.invalidate(representantPickerListProvider),
+                ),
+                data: (List<RepresentantSyncViewData> list) {
+                  if (list.isEmpty) {
+                    return _Empty(query: search.trim());
+                  }
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      _Compteur(nombre: list.length),
+                      Expanded(
+                        child: ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(
+                            CpiSpacing.md,
+                            0,
+                            CpiSpacing.md,
+                            CpiSpacing.xs,
+                          ),
+                          itemCount: list.length,
+                          itemBuilder: (BuildContext context, int index) =>
+                              CpiListEntrance(
+                                index: index,
+                                child: Padding(
+                                  padding: const EdgeInsets.only(
+                                    bottom: CpiSpacing.sm,
+                                  ),
+                                  child: _RepresentantRow(
+                                    data: list[index],
+                                    departement:
+                                        departements[list[index].departementId],
+                                    pourQualifier: widget.pourQualifier,
+                                  ),
+                                ),
+                              ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
           ],
-        ),
-        body: SafeArea(
-          child: Column(
-            children: <Widget>[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  CpiSpacing.md,
-                  CpiSpacing.sm,
-                  CpiSpacing.md,
-                  CpiSpacing.sm,
-                ),
-                child: CpiSearchField(
-                  initial: ref.read(representantPickerSearchProvider),
-                  onChanged: _setSearch,
-                ),
-              ),
-              Expanded(
-                child: rows.whenEchecDAbord(
-                  loading: () =>
-                      const Center(child: CircularProgressIndicator()),
-                  error: (Object e, StackTrace _) =>
-                      Center(child: Text('Lecture impossible : $e')),
-                  data: (List<RepresentantSyncViewData> list) {
-                    if (list.isEmpty) {
-                      return _Empty(searching: search.trim().isNotEmpty);
-                    }
-                    return ListView.separated(
-                      padding: const EdgeInsets.only(bottom: CpiSpacing.xs),
-                      itemCount: list.length,
-                      separatorBuilder: (BuildContext context, int index) =>
-                          const Divider(
-                            height: 1,
-                            indent: CpiSpacing.md,
-                            endIndent: CpiSpacing.md,
-                          ),
-                      itemBuilder: (BuildContext context, int index) =>
-                          CpiListEntrance(
-                            index: index,
-                            child: _RepresentantRow(
-                              data: list[index],
-                              departement:
-                                  departements[list[index].departementId],
-                            ),
-                          ),
-                    );
-                  },
-                ),
-              ),
-              _CreateBar(query: search),
-            ],
-          ),
         ),
       ),
     );
   }
 }
 
+class _Compteur extends StatelessWidget {
+  const _Compteur({required this.nombre});
+
+  final int nombre;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(
+      CpiSpacing.md,
+      0,
+      CpiSpacing.md,
+      CpiSpacing.xs,
+    ),
+    child: Text(
+      nombre == 1 ? '1 représentant' : '$nombre représentants',
+      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+    ),
+  );
+}
+
+/// Un tap, une chose : la ligne emmène saisir le prospect que ce représentant
+/// a donné, ou consigner l'appel qu'on vient de lui passer. La fiche complète
+/// s'ouvre depuis « Mes fiches ».
 class _RepresentantRow extends StatelessWidget {
-  const _RepresentantRow({required this.data, this.departement});
+  const _RepresentantRow({
+    required this.data,
+    this.departement,
+    this.pourQualifier = false,
+  });
 
   final RepresentantSyncViewData data;
   final String? departement;
+  final bool pourQualifier;
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
     final SyncStatus status = SyncStatus.parse(data.syncStatus ?? 'draft');
     final String subtitle = departement == null
         ? Phone.format(data.phoneE164)
         : '${Phone.format(data.phoneE164)} · $departement';
 
-    void openDetail() {
-      unawaited(HapticFeedback.selectionClick());
-      context.pushOnce(Routes.representantDetailFor(data.id));
-    }
-
-    return Row(
-      children: <Widget>[
-        Expanded(
-          child: Semantics(
-            button: true,
-            label: '${data.fullName}, $subtitle. Compléter la fiche.',
-            child: ExcludeSemantics(
-              child: InkWell(
-                // Les fiches sont importées : choisir mène au formulaire
-                // prérempli, jamais directement aux prospects.
-                onTap: () {
-                  unawaited(HapticFeedback.selectionClick());
-                  context.pushOnce(Routes.representantFormFor(data.id));
-                },
-                onLongPress: openDetail,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    minHeight: kCpiMinTouchTarget + 12,
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      CpiSpacing.md,
-                      CpiSpacing.sm,
-                      CpiSpacing.xs,
-                      CpiSpacing.sm,
-                    ),
-                    child: Row(
-                      children: <Widget>[
-                        SyncStatusIcon(status: status, size: CpiIconSize.md),
-                        const SizedBox(width: CpiSpacing.sm),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: <Widget>[
-                              Text(
-                                data.fullName,
-                                style: theme.textTheme.titleSmall,
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                subtitle,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Icon(
-                          PhosphorIconsRegular.pencilSimple,
-                          size: CpiIconSize.md,
-                          color: context.cpi.accentText,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+    final String? signal = status.aSignaler;
+    return CpiCard.rows(<CpiRow>[
+      CpiRow(
+        leading: signal == null
+            ? null
+            : SyncStatusIcon(
+                status: status,
+                size: CpiIconSize.md,
+                labelled: false,
               ),
-            ),
-          ),
+        title: data.fullName,
+        subtitle: subtitle,
+        trailing: signal == null ? null : CpiTag(signal, tone: status.tone),
+        onTap: () => context.pushOnce(
+          pourQualifier
+              ? Routes.representantQualificationFor(data.id)
+              : Routes.newProspectFor(data.id),
         ),
-        IconButton(
-          tooltip: 'Ouvrir la fiche',
-          onPressed: openDetail,
-          icon: const Icon(
-            PhosphorIconsRegular.caretRight,
-            size: CpiIconSize.md,
-          ),
-        ),
-        const SizedBox(width: CpiSpacing.xxs),
-      ],
-    );
+      ),
+    ]);
   }
 }
 
-class _CreateBar extends StatelessWidget {
-  const _CreateBar({required this.query});
+/// Aucune création ici : la base des représentants est importée depuis le web.
+class _Empty extends StatelessWidget {
+  const _Empty({required this.query});
 
   final String query;
 
   @override
   Widget build(BuildContext context) {
-    return CpiActionBar(
-      child: OutlinedButton.icon(
-        onPressed: () {
-          unawaited(HapticFeedback.selectionClick());
-          context.pushOnce(Routes.newRepresentantPrefilled(query));
-        },
-        icon: const Icon(PhosphorIconsRegular.plus, size: CpiIconSize.md),
-        label: const Text('Nouveau représentant'),
-      ),
+    if (query.isEmpty) {
+      return const CpiEmptyState(
+        icon: PhosphorIconsDuotone.usersThree,
+        title: 'Aucun représentant',
+        message: 'Ils sont importés depuis le web.',
+      );
+    }
+    return const CpiEmptyState(
+      icon: PhosphorIconsDuotone.magnifyingGlass,
+      title: 'Aucun résultat',
+      message: 'Vérifiez le nom ou le numéro.',
     );
   }
-}
-
-class _Empty extends StatelessWidget {
-  const _Empty({required this.searching});
-
-  final bool searching;
-
-  @override
-  Widget build(BuildContext context) => CpiEmptyState(
-    icon: searching
-        ? PhosphorIconsDuotone.magnifyingGlass
-        : PhosphorIconsDuotone.usersThree,
-    title: searching ? 'Aucun résultat' : 'Aucun représentant',
-    message: searching
-        ? 'Vérifiez le nom ou le numéro, ou créez la fiche.'
-        : 'Créez une première fiche pour commencer à saisir des prospects.',
-  );
 }

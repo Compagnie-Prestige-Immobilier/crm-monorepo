@@ -20,17 +20,23 @@ import '../../features/campagnes/campagnes.dart';
 import '../../features/campagnes/presentation/campagne_file_screen.dart';
 import '../../features/campagnes/presentation/campagnes_screen.dart';
 import '../../features/phase2/presentation/phase2_screen.dart';
+import '../../features/prospect/presentation/prospect_detail_screen.dart';
 import '../../features/prospect/presentation/prospect_entry_screen.dart';
+import '../../features/rappels/presentation/rappels_screen.dart';
 import '../../features/reglages/presentation/reglages_screen.dart';
 import '../../features/representant/presentation/representant_detail_screen.dart';
 import '../../features/representant/presentation/representant_form_screen.dart';
 import '../../features/representant/presentation/representant_picker_screen.dart';
+import '../../features/representant/presentation/representant_qualification_screen.dart';
 import '../../features/shell/app_shell.dart';
+import '../../features/shell/grand_public_fiches_screen.dart';
 import '../../features/shell/grand_public_screen.dart';
 import '../../features/shell/hub_screen.dart';
 import '../../features/shell/projects.dart';
+import '../../ui/widgets/cpi_kit.dart';
 import '../providers/app_providers.dart';
 import '../theme/cpi_tokens.dart';
+import 'route_guard.dart';
 import 'route_memory.dart';
 import 'route_paths.dart';
 
@@ -59,9 +65,27 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
   final _AuthRefreshNotifier refresh = _AuthRefreshNotifier(ref);
   ref.onDispose(refresh.dispose);
 
-  final bool authenticated = ref.read(authControllerProvider).isAuthenticated;
+  final AuthState depart = ref.read(authControllerProvider);
   final String initial =
-      memory.read(authenticated: authenticated) ?? Routes.home;
+      memory.read(authenticated: depart.isAuthenticated, role: depart.role) ??
+      Routes.home;
+
+  bool vivant = true;
+  ref.onDispose(() => vivant = false);
+
+  // Le refus se pose APRÈS la trame : `redirect` tourne pendant la
+  // construction du routeur, et écrire un état Riverpod là relance la trame en
+  // cours.
+  void annoncerLeRefus() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (vivant) ref.read(accesRefuseProvider.notifier).poser();
+    });
+  }
+
+  final RouteGuard guard = RouteGuard(
+    role: () => ref.read(authControllerProvider).role,
+    onRefus: annoncerLeRefus,
+  );
 
   final GoRouter router = GoRouter(
     navigatorKey: _rootNavigatorKey,
@@ -88,6 +112,24 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         return next;
       }
 
+      // Un rôle qui n'ouvre qu'un projet n'a rien à choisir : le hub lui
+      // demandait un geste de plus pour une seule porte. Le compte d'accueil
+      // arrive donc sur son registre. Une route mémorisée, elle, n'est pas
+      // « / » : elle passe avant et n'est pas détournée.
+      if (state.uri.path == Routes.home) {
+        final String porte = RouteGuard.atterrissage(auth.role);
+        return porte == Routes.home ? null : porte;
+      }
+
+      // Le projet fermé au rôle ne s'ouvre par aucun chemin : ni une route
+      // mémorisée d'une session précédente, ni le lien d'une notification.
+      // Sans ce garde-fou, un compte d'accueil se retrouvait dans les onglets
+      // du CHUES sur un simple `router.go`.
+      if (!RouteGuard.autorise(state.uri.path, auth.role)) {
+        annoncerLeRefus();
+        return guard.repli(auth.role);
+      }
+
       return null;
     },
     routes: <RouteBase>[
@@ -105,25 +147,58 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         builder: (BuildContext context, GoRouterState state) =>
             const HubScreen(),
       ),
-      GoRoute(
-        path: Routes.accueil,
-        name: 'accueil',
-        parentNavigatorKey: _rootNavigatorKey,
-        builder: (BuildContext context, GoRouterState state) =>
-            const ProjectScope(
-              project: CpiProject.accueil,
-              child: RegistreScreen(),
-            ),
-      ),
-      GoRoute(
-        path: Routes.accueilChiffres,
-        name: 'accueilChiffres',
-        parentNavigatorKey: _rootNavigatorKey,
-        builder: (BuildContext context, GoRouterState state) =>
-            const ProjectScope(
-              project: CpiProject.accueil,
-              child: ChiffresScreen(),
-            ),
+      // La coque de l'accueil. « À corriger » et « Réglages » y sont aussi :
+      // c'est dans Réglages que vit la déconnexion, et un compte d'accueil
+      // n'ouvre aucun autre projet où aller la chercher.
+      StatefulShellRoute.indexedStack(
+        builder:
+            (
+              BuildContext context,
+              GoRouterState state,
+              StatefulNavigationShell shell,
+            ) => AppShell(shell: shell, project: CpiProject.accueil),
+        branches: <StatefulShellBranch>[
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: Routes.accueil,
+                name: 'accueil',
+                builder: (BuildContext context, GoRouterState state) =>
+                    const RegistreScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: Routes.accueilChiffres,
+                name: 'accueilChiffres',
+                builder: (BuildContext context, GoRouterState state) =>
+                    const ChiffresScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: Routes.accueilCorrections,
+                name: 'accueilCorrections',
+                builder: (BuildContext context, GoRouterState state) =>
+                    const CorrectionsScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: Routes.accueilReglages,
+                name: 'accueilReglages',
+                builder: (BuildContext context, GoRouterState state) =>
+                    const ReglagesScreen(),
+              ),
+            ],
+          ),
+        ],
       ),
       GoRoute(
         path: Routes.accueilVisiteNew,
@@ -171,6 +246,22 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         ),
       ),
       GoRoute(
+        path: Routes.grandPublicRappels,
+        name: 'grandPublicRappels',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) =>
+            const ProjectScope(
+              project: CpiProject.grandPublic,
+              child: RappelsScreen(grandPublic: true),
+            ),
+      ),
+      GoRoute(
+        path: Routes.rappels,
+        name: 'rappels',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: _chues((GoRouterState state) => const RappelsScreen()),
+      ),
+      GoRoute(
         path: CampagnesRoutes.grandPublicConsole,
         name: 'grandPublicConsole',
         parentNavigatorKey: _rootNavigatorKey,
@@ -181,15 +272,58 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
           ),
         ),
       ),
-      GoRoute(
-        path: Routes.grandPublic,
-        name: 'grandPublic',
-        parentNavigatorKey: _rootNavigatorKey,
-        builder: (BuildContext context, GoRouterState state) =>
-            const ProjectScope(
-              project: CpiProject.grandPublic,
-              child: GrandPublicScreen(),
-            ),
+      // Le Grand Public a sa propre coque à onglets : « À corriger » et
+      // « Réglages » sont globaux, mais un onglet qui sauterait dans la coque
+      // CHUES ferait changer de projet sans le dire.
+      StatefulShellRoute.indexedStack(
+        builder:
+            (
+              BuildContext context,
+              GoRouterState state,
+              StatefulNavigationShell shell,
+            ) => AppShell(shell: shell, project: CpiProject.grandPublic),
+        branches: <StatefulShellBranch>[
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: Routes.grandPublic,
+                name: 'grandPublic',
+                builder: (BuildContext context, GoRouterState state) =>
+                    const GrandPublicScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: Routes.grandPublicFiches,
+                name: 'grandPublicFiches',
+                builder: (BuildContext context, GoRouterState state) =>
+                    const GrandPublicFichesScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: Routes.grandPublicCorrections,
+                name: 'grandPublicCorrections',
+                builder: (BuildContext context, GoRouterState state) =>
+                    const CorrectionsScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: <RouteBase>[
+              GoRoute(
+                path: Routes.grandPublicReglages,
+                name: 'grandPublicReglages',
+                builder: (BuildContext context, GoRouterState state) =>
+                    const ReglagesScreen(),
+              ),
+            ],
+          ),
+        ],
       ),
 
       GoRoute(
@@ -197,7 +331,11 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         name: 'representants',
         parentNavigatorKey: _rootNavigatorKey,
         builder: _chues(
-          (GoRouterState state) => const RepresentantPickerScreen(),
+          (GoRouterState state) => RepresentantPickerScreen(
+            pourQualifier:
+                state.uri.queryParameters[Routes.butParam] ==
+                Routes.butQualifier,
+          ),
         ),
       ),
       GoRoute(
@@ -215,6 +353,16 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       ),
       // Après `newRepresentant` : go_router essaie les routes dans l'ordre, et
       // `:id` avalerait `/representants/nouveau`.
+      GoRoute(
+        path: Routes.representantQualification,
+        name: 'representantQualification',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: _chues(
+          (GoRouterState state) => RepresentantQualificationScreen(
+            representantId: state.pathParameters['id'] ?? '',
+          ),
+        ),
+      ),
       GoRoute(
         path: Routes.representantDetail,
         name: 'representantDetail',
@@ -236,6 +384,15 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
           ),
         ),
       ),
+      // Après `newProspect` : `:id` avalerait `/prospects/nouveau`. Hors
+      // `ProjectScope` : la fiche choisit sa palette sur le projet du prospect.
+      GoRoute(
+        path: Routes.prospectDetail,
+        name: 'prospectDetail',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) =>
+            ProspectDetailScreen(prospectId: state.pathParameters['id'] ?? ''),
+      ),
       GoRoute(
         path: Routes.phase2,
         name: 'phase2',
@@ -250,7 +407,24 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         path: CampagnesRoutes.liste,
         name: 'campagnes',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: _chues((GoRouterState state) => const CampagnesScreen()),
+        builder: _chues(
+          (GoRouterState state) => CampagnesScreen(
+            representantsDabord:
+                state.uri.queryParameters[CampagnesRoutes.ongletParam] ==
+                CampagnesRoutes.ongletRepresentants,
+          ),
+        ),
+      ),
+      GoRoute(
+        path: CampagnesRoutes.repFile,
+        name: 'repCampagneFile',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: _chues(
+          (GoRouterState state) => CampagneFileScreen(
+            campaignId: state.pathParameters[CampagnesRoutes.idParam] ?? '',
+            representants: true,
+          ),
+        ),
       ),
       GoRoute(
         path: CampagnesRoutes.file,
@@ -287,10 +461,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
               BuildContext context,
               GoRouterState state,
               StatefulNavigationShell shell,
-            ) => ProjectScope(
-              project: CpiProject.chues,
-              child: AppShell(shell: shell),
-            ),
+            ) => AppShell(shell: shell, project: CpiProject.chues),
         branches: <StatefulShellBranch>[
           StatefulShellBranch(
             routes: <RouteBase>[
@@ -344,11 +515,34 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
     if (config.isEmpty) return;
     final String location = config.uri.toString();
     if (location.isEmpty) return;
+    // Une adresse que le rôle n'a pas le droit d'ouvrir ne se mémorise pas :
+    // elle reviendrait au lancement suivant, et la fuite se rejouerait seule.
+    final String? role = ref.read(authControllerProvider).role;
+    if (!RouteGuard.autorise(config.uri.path, role)) return;
     unawaited(memory.write(location));
   }
 
   router.routerDelegate.addListener(remember);
   ref.onDispose(() => router.routerDelegate.removeListener(remember));
+
+  guard.attacher(router);
+  router.routerDelegate.addListener(guard.verifier);
+  ref.onDispose(() => router.routerDelegate.removeListener(guard.verifier));
+
+  // La toute première adresse n'émet aucun changement : sans ce contrôle-ci,
+  // une adresse restaurée ne passerait que par `redirect`.
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (vivant) guard.verifier();
+  });
+
+  // Le rôle peut changer sous les pieds : jeton rafraîchi, rétrogradation
+  // décidée côté serveur. `redirect` ne rejoue pas tout seul pour ça.
+  ref.listen<AuthState>(authControllerProvider, (
+    AuthState? previous,
+    AuthState next,
+  ) {
+    if (previous?.role != next.role) guard.verifier();
+  });
 
   return router;
 });
@@ -361,24 +555,28 @@ class _RouteNotFound extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Page introuvable')),
+    return CpiScaffold(
+      title: 'Page introuvable',
       body: Padding(
         padding: const EdgeInsets.all(CpiSpacing.xl),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            Text(
-              'Cette adresse n\'existe pas.',
-              style: theme.textTheme.titleMedium,
+            // L'adresse ne dit rien à qui lit l'écran ; elle reste pour le
+            // support, qui la lira au lecteur d'écran ou au rapport de bogue.
+            Semantics(
+              label: 'Cette page n\'existe plus. Adresse demandée : $location',
+              excludeSemantics: true,
+              child: Text(
+                'Cette page n\'existe plus.',
+                style: theme.textTheme.titleMedium,
+              ),
             ),
-            const SizedBox(height: CpiSpacing.xs),
-            Text(location, style: theme.textTheme.bodySmall),
             const SizedBox(height: CpiSpacing.xl),
-            FilledButton(
+            CpiButton(
+              'Revenir à l\'accueil',
               onPressed: () => context.go(Routes.home),
-              child: const Text('Revenir à l\'accueil'),
             ),
           ],
         ),

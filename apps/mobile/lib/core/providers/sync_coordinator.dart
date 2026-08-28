@@ -104,6 +104,23 @@ class SyncCoordinator extends Notifier<SyncUiState> {
   @override
   SyncUiState build() {
     ref.onDispose(_teardown);
+    // Un auditeur permanent sur le verdict réseau. Sans lui il n'est écouté que
+    // par les écrans : il se périme dès qu'aucun ne l'affiche, puis se recalcule
+    // en cascade pendant le `build` du suivant — que Riverpod 3.3 sanctionne
+    // d'un `markNeedsBuild` en pleine phase de construction.
+    ref.listen<CpiConnectivity>(
+      connectivityProvider,
+      (CpiConnectivity? _, CpiConnectivity _) {},
+    );
+    // Android soupçonne le lien mort : la seule façon d'en avoir le cœur net est
+    // d'essayer. Le verdict lui-même n'allume aucune bande, c'est l'issue de ce
+    // cycle qui tranche.
+    ref.listen<AsyncValue<bool?>>(networkValidatedProvider, (
+      AsyncValue<bool?>? _,
+      AsyncValue<bool?> next,
+    ) {
+      if (next.value == false) unawaited(run(pull: false));
+    });
     ref.listen<AsyncValue<List<ConnectivityResult>>>(
       connectivityTriggerProvider,
       (
@@ -161,6 +178,12 @@ class SyncCoordinator extends Notifier<SyncUiState> {
     state = state.copyWith(running: true, clearError: true);
     try {
       final SyncOutcome outcome = await engine.runOnce(pull: pull);
+      // Une déconnexion, ou la fin d'un écran, peut jeter le fournisseur
+      // pendant que le cycle attend le réseau. Écrire son état après coup lève,
+      // et l'erreur ressort d'un `unawaited` que personne n'attrape : c'est
+      // toute l'application qui tombe pour un cycle qui n'intéresse plus
+      // personne.
+      if (!ref.mounted) return outcome;
       state = state.copyWith(
         running: false,
         lastRunAt: DateTime.now(),
@@ -180,12 +203,14 @@ class SyncCoordinator extends Notifier<SyncUiState> {
       if (pull && outcome.isOk) await _pullDirectory();
       return outcome;
     } on Object catch (e) {
-      state = state.copyWith(
-        running: false,
-        lastRunAt: DateTime.now(),
-        lastError: e.toString(),
-        lastErrorKind: FailureKind.retryable,
-      );
+      if (ref.mounted) {
+        state = state.copyWith(
+          running: false,
+          lastRunAt: DateTime.now(),
+          lastError: e.toString(),
+          lastErrorKind: FailureKind.retryable,
+        );
+      }
       return const SyncOutcome.failed(
         'unexpected',
         kind: FailureKind.retryable,

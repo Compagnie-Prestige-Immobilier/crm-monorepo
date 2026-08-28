@@ -8,13 +8,24 @@ import '../../data/local/database.dart';
 abstract final class CampagnesRoutes {
   static const String liste = '/campagnes';
   static const String file = '/campagnes/:id';
+  static const String repFile = '/campagnes/representants/:id';
   static const String grandPublicListe = '/grand-public/campagnes';
   static const String grandPublicFile = '/grand-public/campagnes/:id';
   static const String grandPublicConsole = '/grand-public/console';
   static const String idParam = 'id';
 
+  /// Ouvre `/campagnes` directement sur l'onglet Représentants : c'est la
+  /// phase 1, et elle ne doit pas demander un tap de plus pour s'afficher.
+  static const String ongletParam = 'onglet';
+  static const String ongletRepresentants = 'representants';
+  static const String listeRepresentants =
+      '$liste?$ongletParam=$ongletRepresentants';
+
   static String fileFor(String campaignId) =>
       '$liste/${Uri.encodeComponent(campaignId)}';
+
+  static String repFileFor(String campaignId) =>
+      '$liste/representants/${Uri.encodeComponent(campaignId)}';
 
   static String grandPublicFileFor(String campaignId) =>
       '$grandPublicListe/${Uri.encodeComponent(campaignId)}';
@@ -31,42 +42,56 @@ abstract final class CampagnesRoutes {
   ).toString();
 }
 
-final StreamProvider<List<CampaignsWithOpenWorkResult>> campagnesProvider =
-    StreamProvider<List<CampaignsWithOpenWorkResult>>((Ref ref) {
-      return ref.watch(appDatabaseProvider).campaignsWithOpenWork().watch();
-    });
+final StreamProvider<List<RepCampaignsWithOpenWorkResult>>
+repCampagnesProvider = StreamProvider<List<RepCampaignsWithOpenWorkResult>>((
+  Ref ref,
+) {
+  return ref.watch(appDatabaseProvider).repCampaignsWithOpenWork().watch();
+});
 
 final StreamProvider<List<CampaignsWithOpenWorkResult>>
-grandPublicCampagnesProvider =
-    StreamProvider<List<CampaignsWithOpenWorkResult>>((Ref ref) {
-      final AppDatabase db = ref.watch(appDatabaseProvider);
-      return db
-          .customSelect(
-            'SELECT c.*, COUNT(t.id) AS ouvertes '
-            'FROM call_campaigns c '
-            'JOIN call_tasks t ON t.campaign_id = c.id AND t.status = \'OPEN\' '
-            'JOIN prospects p ON p.id = t.prospect_id '
-            '  AND p.deleted_at IS NULL AND p.projet = \'GRAND_PUBLIC\' '
-            'GROUP BY c.id ORDER BY c.updated_at DESC',
-            readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
-              db.callCampaigns,
-              db.callTasks,
-              db.prospects,
-            },
-          )
-          .map(
-            (QueryRow row) => CampaignsWithOpenWorkResult(
-              id: row.read<String>('id'),
-              name: row.read<String>('name'),
-              status: row.read<String>('status'),
-              spreadDays: row.read<int>('spread_days'),
-              closedAt: row.read<DateTime?>('closed_at'),
-              updatedAt: row.read<DateTime>('updated_at'),
-              ouvertes: row.read<int>('ouvertes'),
-            ),
-          )
-          .watch();
-    });
+grandPublicCampagnesProvider = _campagnesDuProjet('GRAND_PUBLIC');
+
+/// Les files de prospects du seul projet CHUES : le Grand Public a sa propre
+/// coque et son propre travail du jour.
+final StreamProvider<List<CampaignsWithOpenWorkResult>> chuesCampagnesProvider =
+    _campagnesDuProjet('CHUES');
+
+/// `campaignsWithOpenWork` ne connaît pas le projet : une même campagne peut
+/// porter des fiches des deux, et le compte d'un projet ne doit pas gonfler de
+/// l'autre.
+StreamProvider<List<CampaignsWithOpenWorkResult>> _campagnesDuProjet(
+  String projet,
+) => StreamProvider<List<CampaignsWithOpenWorkResult>>((Ref ref) {
+  final AppDatabase db = ref.watch(appDatabaseProvider);
+  return db
+      .customSelect(
+        'SELECT c.*, COUNT(t.id) AS ouvertes '
+        'FROM call_campaigns c '
+        'JOIN call_tasks t ON t.campaign_id = c.id AND t.status = \'OPEN\' '
+        'JOIN prospects p ON p.id = t.prospect_id '
+        '  AND p.deleted_at IS NULL AND p.projet = ?1 '
+        'GROUP BY c.id ORDER BY c.updated_at DESC',
+        variables: <Variable<Object>>[Variable<String>(projet)],
+        readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+          db.callCampaigns,
+          db.callTasks,
+          db.prospects,
+        },
+      )
+      .map(
+        (QueryRow row) => CampaignsWithOpenWorkResult(
+          id: row.read<String>('id'),
+          name: row.read<String>('name'),
+          status: row.read<String>('status'),
+          spreadDays: row.read<int>('spread_days'),
+          closedAt: row.read<DateTime?>('closed_at'),
+          updatedAt: row.read<DateTime>('updated_at'),
+          ouvertes: row.read<int>('ouvertes'),
+        ),
+      )
+      .watch();
+});
 
 /// L'en-tête d'une campagne, absent tant que sa page de pull n'est pas
 /// descendue : la file, elle, s'affiche quand même.
@@ -80,6 +105,16 @@ final campagneProvider = StreamProvider.family<CallCampaign?, String>((
   )..where((CallCampaigns t) => t.id.equals(campaignId))).watchSingleOrNull();
 });
 
+final repCampagneProvider = StreamProvider.family<RepCallCampaign?, String>((
+  Ref ref,
+  String campaignId,
+) {
+  final AppDatabase db = ref.watch(appDatabaseProvider);
+  return (db.select(db.repCallCampaigns)
+        ..where((RepCallCampaigns row) => row.id.equals(campaignId)))
+      .watchSingleOrNull();
+});
+
 final fileDeCampagneProvider =
     StreamProvider.family<List<CampaignQueueResult>, String>((
       Ref ref,
@@ -88,6 +123,17 @@ final fileDeCampagneProvider =
       return ref
           .watch(appDatabaseProvider)
           .campaignQueue(campaignId: campaignId)
+          .watch();
+    });
+
+final repFileDeCampagneProvider =
+    StreamProvider.family<List<RepCampaignQueueResult>, String>((
+      Ref ref,
+      String campaignId,
+    ) {
+      return ref
+          .watch(appDatabaseProvider)
+          .repCampaignQueue(campaignId: campaignId)
           .watch();
     });
 

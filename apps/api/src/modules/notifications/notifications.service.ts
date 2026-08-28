@@ -17,6 +17,7 @@ import {
   BREVO_TRANSPORT,
   chunkRecipients,
   type BrevoRecipient,
+  type BrevoDispatchResult,
   type BrevoTransport,
   type BrevoTransportStatus,
 } from './brevo.transport.js';
@@ -172,6 +173,66 @@ interface EmailJob {
   readonly html: string;
   readonly text: string;
   readonly rows: readonly EmailRecipient[];
+}
+
+interface DeliveryCounters {
+  sent: number;
+  failed: number;
+  pending: number;
+}
+
+function verdictFor(
+  outcome: BrevoDispatchResult['outcomes'][number] | undefined,
+  refusedWave: boolean,
+): DeliveryVerdict {
+  if (outcome === undefined) {
+    return refusedWave ? { kind: 'retry', error: DELIVERY_RETRY_ERROR } : { kind: 'sent' };
+  }
+  if (outcome.ok) return { kind: 'sent' };
+  const error = outcome.errorCode ?? 'UNKNOWN';
+  return outcome.kind === 'permanent'
+    ? { kind: 'failed', error }
+    : { kind: 'retry', error: DELIVERY_RETRY_ERROR };
+}
+
+function waveVerdicts(
+  result: BrevoDispatchResult,
+  wave: readonly EmailJob[],
+  accepted: Set<string>,
+): Map<string, DeliveryVerdict> {
+  const byEmail = new Map(result.outcomes.map((outcome) => [outcome.email, outcome]));
+  const verdicts = new Map<string, DeliveryVerdict>();
+  const refused = result.status === 'TRANSPORT_ERROR';
+  for (const job of wave) {
+    for (const row of job.rows) {
+      const outcome = byEmail.get(row.email);
+      if (outcome?.ok) accepted.add(row.id);
+      verdicts.set(row.id, verdictFor(outcome, refused));
+    }
+  }
+  return verdicts;
+}
+
+function countDelivery(
+  delivery: PendingDelivery,
+  email: EmailLegResult,
+  counters: Map<string, DeliveryCounters>,
+  emailed: Map<string, number>,
+): boolean {
+  const bucket = counters.get(delivery.notificationId);
+  if (bucket === undefined) return false;
+  if (email.accepted.has(delivery.id)) {
+    emailed.set(delivery.notificationId, (emailed.get(delivery.notificationId) ?? 0) + 1);
+  }
+  const verdict = email.verdicts.get(delivery.id);
+  if (verdict === undefined) {
+    bucket.pending += 1;
+    return email.emailable !== null && !email.emailable.has(delivery.userId);
+  }
+  if (verdict.kind === 'sent') bucket.sent += 1;
+  else if (verdict.kind === 'retry') bucket.pending += 1;
+  else bucket.failed += 1;
+  return false;
 }
 
 /**
@@ -455,40 +516,14 @@ export class NotificationsService {
 
     const email = await this.sendByEmail(claim, byId, served);
 
-    const counters = new Map(live.map((row) => [row.id, { sent: 0, failed: 0, pending: 0 }]));
+    const counters = new Map<string, DeliveryCounters>(
+      live.map((row) => [row.id, { sent: 0, failed: 0, pending: 0 }]),
+    );
     const emailed = new Map(live.map((row) => [row.id, 0]));
     const inboxOnly: string[] = [];
 
     for (const delivery of served) {
-      const bucket = counters.get(delivery.notificationId);
-      if (!bucket) continue;
-      if (email.accepted.has(delivery.id)) {
-        emailed.set(delivery.notificationId, (emailed.get(delivery.notificationId) ?? 0) + 1);
-      }
-
-      const verdict = email.verdicts.get(delivery.id);
-      if (verdict === undefined) {
-        // Aucun verdict. `PENDING` et non `FAILED` : rien n'a échoué. Reste à
-        // dire POURQUOI, et c'est `emailable` qui tranche, pas le transport.
-        bucket.pending += 1;
-        if (email.emailable !== null && !email.emailable.has(delivery.userId)) {
-          inboxOnly.push(delivery.id);
-        }
-        continue;
-      }
-
-      // Le sort des livraisons SERVIES est déjà écrit : `sendByEmail` l'a posé
-      // vague par vague, au fur et à mesure des acceptations. Il ne reste ici
-      // qu'à compter.
-      if (verdict.kind === 'sent') {
-        bucket.sent += 1;
-        continue;
-      }
-      if (verdict.kind === 'retry') {
-        bucket.pending += 1;
-        continue;
-      }
-      bucket.failed += 1;
+      if (countDelivery(delivery, email, counters, emailed)) inboxOnly.push(delivery.id);
     }
 
     // LE MARQUEUR DÉCRIT LE DESTINATAIRE, il ne dépend donc plus de l'état du
@@ -666,11 +701,10 @@ export class NotificationsService {
       );
       emailable = new Set(addressed.keys());
 
-      const targeted: EmailRecipient[] = [];
-      for (const delivery of deliveries) {
+      const targeted = deliveries.flatMap((delivery): EmailRecipient[] => {
         const account = addressed.get(delivery.userId);
-        if (account) targeted.push({ ...delivery, ...account });
-      }
+        return account === undefined ? [] : [{ ...delivery, ...account }];
+      });
       // Les comptes sont connus : le rattrapage se resserre sur eux, et la
       // nature de chaque destinataire est désormais établie.
       candidates = targeted;
@@ -688,100 +722,7 @@ export class NotificationsService {
       // `EMAIL_PERSIST_GROUP_SIZE` : ce qui a été accepté par Brevo est acquis
       // en base avant qu'on n'expose la suite, faute de quoi une reprise
       // renverrait le message à des gens qui l'ont déjà reçu.
-      for (const wave of emailWaves(targeted, notifications)) {
-        const result = await this.email.send(
-          wave.map((job) => ({
-            recipients: job.rows.map((row): BrevoRecipient => ({
-              email: row.email,
-              name: row.fullName,
-            })),
-            subject: job.subject,
-            htmlContent: job.html,
-            textContent: job.text,
-          })),
-        );
-
-        const waveVerdicts = new Map<string, DeliveryVerdict>();
-
-        // ═══ `TRANSPORT_ERROR` NE DIT PAS « PASSAGER » ═══
-        //
-        // Le transport l'annonce dès qu'aucun lot n'est passé, QUELLE QUE SOIT
-        // la nature des refus. Or un public de moins de cent adresses tient
-        // dans un seul lot : une clé invalide (401), un expéditeur non vérifié
-        // (403) ou un corps refusé (400) y produisent donc toujours
-        // `TRANSPORT_ERROR`, alors que ce sont des refus DÉFINITIFS. Le
-        // traduire en bloc par « tout le monde réessaie » épinglait la
-        // notification en SENDING et la faisait repartir tous les quarts
-        // d'heure, indéfiniment, pour un état que l'attente ne change pas.
-        //
-        // La nature de l'échec se lit donc sur l'ISSUE, ici comme sur le
-        // chemin nominal. L'état global ne décide plus que du sort des
-        // adresses dont le transport n'a rien dit.
-        const refusedWave = result.status === 'TRANSPORT_ERROR';
-        if (refusedWave) {
-          refused = true;
-          this.logger.warn(
-            `Expédition : e-mail non parti (${result.detail ?? 'sans détail'}). Sort décidé par issue.`,
-          );
-        }
-
-        const byEmail = new Map(result.outcomes.map((outcome) => [outcome.email, outcome]));
-        for (const job of wave) {
-          for (const row of job.rows) {
-            const outcome = byEmail.get(row.email);
-            if (outcome === undefined) {
-              // ISSUE MUETTE. Sur un envoi qui a abouti, un transport qui ne dit
-              // rien d'une adresse qu'il a reçue l'a prise en charge, et le
-              // doute ne justifie ni un échec ni un réessai. Sur un envoi que le
-              // transport déclare non parti, le même silence dit l'inverse : la
-              // ligne reste en file.
-              waveVerdicts.set(
-                row.id,
-                refusedWave ? { kind: 'retry', error: DELIVERY_RETRY_ERROR } : { kind: 'sent' },
-              );
-              continue;
-            }
-            if (outcome.ok) {
-              accepted.add(row.id);
-              waveVerdicts.set(row.id, { kind: 'sent' });
-              continue;
-            }
-            const error = outcome.errorCode ?? 'UNKNOWN';
-            // `permanent` et non `!== 'transient'` : une issue en échec sans
-            // nature annoncée doit repartir en file. Classer un passager en
-            // définitif est la faute coûteuse, elle enterre un envoi que la
-            // seule attente aurait fait passer.
-            waveVerdicts.set(
-              row.id,
-              outcome.kind === 'permanent'
-                ? { kind: 'failed', error }
-                : { kind: 'retry', error: DELIVERY_RETRY_ERROR },
-            );
-          }
-        }
-
-        await this.persistVerdicts(claim, waveVerdicts);
-        for (const [deliveryId, verdict] of waveVerdicts) verdicts.set(deliveryId, verdict);
-
-        // ═══ LE BAIL EST RENOUVELÉ ENTRE DEUX VAGUES, ET SA RÉPONSE EST LUE ═══
-        //
-        // Sans renouvellement, une expédition plus longue que le bail était
-        // reprise par un second passage pendant que le premier envoyait encore.
-        //
-        // Et sans LIRE la réponse, le renouvellement lui-même devenait l'arme
-        // du crime : un expéditeur figé au-delà du bail, repris entre-temps,
-        // renouvelait le bail DU REPRENEUR et poursuivait ses vagues. On
-        // s'arrête donc ici, tout de suite, avant d'exposer la vague suivante.
-        // Les livraisons déjà servies sont écrites, les autres restent en file
-        // et appartiennent désormais au nouveau détenteur.
-        if (!(await claim.renew())) {
-          this.logger.warn(
-            `Bail perdu en cours d'expédition, les vagues restantes sont ` +
-              `abandonnées au détenteur suivant.`,
-          );
-          break;
-        }
-      }
+      refused = await this.sendEmailWaves(claim, targeted, notifications, accepted, verdicts);
 
       if (accepted.size) {
         this.logger.log(`${String(accepted.size)} e-mail(s) remis à Brevo.`);
@@ -828,6 +769,45 @@ export class NotificationsService {
         emailable,
       };
     }
+  }
+
+  private async sendEmailWaves(
+    claim: DispatchClaim,
+    targeted: readonly EmailRecipient[],
+    notifications: ReadonlyMap<string, NotificationRow>,
+    accepted: Set<string>,
+    verdicts: Map<string, DeliveryVerdict>,
+  ): Promise<boolean> {
+    let refused = false;
+    for (const wave of emailWaves(targeted, notifications)) {
+      const result = await this.email.send(
+        wave.map((job) => ({
+          recipients: job.rows.map((row): BrevoRecipient => ({
+            email: row.email,
+            name: row.fullName,
+          })),
+          subject: job.subject,
+          htmlContent: job.html,
+          textContent: job.text,
+        })),
+      );
+      const current = waveVerdicts(result, wave, accepted);
+      if (result.status === 'TRANSPORT_ERROR') {
+        refused = true;
+        this.logger.warn(
+          `Expédition : e-mail non parti (${result.detail ?? 'sans détail'}). Sort décidé par issue.`,
+        );
+      }
+      await this.persistVerdicts(claim, current);
+      for (const [deliveryId, verdict] of current) verdicts.set(deliveryId, verdict);
+      if (await claim.renew()) continue;
+      this.logger.warn(
+        `Bail perdu en cours d'expédition, les vagues restantes sont ` +
+          `abandonnées au détenteur suivant.`,
+      );
+      break;
+    }
+    return refused;
   }
 
   /**

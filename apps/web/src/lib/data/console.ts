@@ -2,6 +2,7 @@ import type { ApiClient, components } from '@crm/api-client';
 import { unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
+import { dakarLocalToIso } from '@/lib/format';
 import {
   fetchRepresentants,
   type RepresentantScriptPatch,
@@ -206,6 +207,28 @@ export function callbackSlots(now: number): CallbackSlot[] {
   return slots;
 }
 
+/**
+ * Les demi-heures ouvrées d'un jour, de 08 h 00 à 19 h 00, celles déjà passées
+ * retirées. Même règle et mêmes libellés que `callbackHalfHours` du mobile : un
+ * rappel se prend à la demi-heure, jamais à la minute.
+ */
+export function callbackHalfHours(now: number, day: string): CallbackSlot[] {
+  const slots: CallbackSlot[] = [];
+  for (let half = 16; half <= 38; half++) {
+    const at = Date.parse(
+      `${day}T${pad(Math.floor(half / 2))}:${half % 2 === 0 ? '00' : '30'}:00Z`,
+    );
+    if (Number.isNaN(at) || at <= now) continue;
+    const stamp = new Date(at);
+    slots.push({
+      key: String(slots.length + 1),
+      label: `${pad(stamp.getUTCHours())} h ${pad(stamp.getUTCMinutes())}`,
+      at: stamp.toISOString(),
+    });
+  }
+  return slots;
+}
+
 export type QueueBucket = 'due' | 'never' | 'callback' | 'unreachable' | 'other' | 'closed';
 
 export const QUEUE_BUCKET_LABELS: Record<QueueBucket, string> = {
@@ -359,12 +382,145 @@ export function queueLabel(
 }
 
 export const COMMENT_MAX_LENGTH = 2_000;
+export const EMAIL_MAX_LENGTH = 160;
+export const NAME_MAX_LENGTH = 120;
+export const DUREE_ETABLISSEMENT_MAX_MOIS = 600;
+
+/** Même tolérance que le serveur : le rendez-vous se juge sur l'horodatage terrain. */
+const RENDEZ_VOUS_SKEW_MS = 5 * 60_000;
+
+/** Aussi grossier que `EMAIL_PATTERN` côté serveur : refuser ce qui n'est pas une adresse. */
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/u;
+
+/**
+ * Les renseignements recueillis pendant l'appel de conversion (phase 3). Tout
+ * est saisi en texte : la durée et le rendez-vous ne prennent leur type qu'au
+ * moment de l'envoi, sinon un champ vidé n'aurait plus de représentation.
+ */
+export interface ConversionDraft {
+  readonly nom: string;
+  readonly prenom: string;
+  readonly email: string;
+  readonly profession: string;
+  readonly dureeEtablissementMois: string;
+  readonly fonctionnaire: boolean | null;
+  readonly syndicatId: string;
+  readonly banqueId: string;
+  readonly engagementEnCours: boolean | null;
+  readonly method: EnrollmentMethod;
+  readonly rendezVousAt: string;
+}
+
+export type ConversionField = keyof ConversionDraft;
+export type ConversionErrors = Partial<Record<ConversionField, string>>;
+
+/** Le formulaire s'ouvre déjà rempli de ce que la fiche sait : on ne redemande rien. */
+export function conversionFrom(prospect: ProspectRow, method: EnrollmentMethod): ConversionDraft {
+  return {
+    nom: prospect.nom,
+    prenom: prospect.prenom,
+    email: '',
+    profession: prospect.profession ?? '',
+    dureeEtablissementMois: '',
+    fonctionnaire: null,
+    syndicatId: prospect.syndicatId ?? '',
+    banqueId: prospect.banqueId ?? '',
+    engagementEnCours: null,
+    method,
+    rendezVousAt: '',
+  };
+}
+
+/** Miroir de `normalizeAttempt` pour les renseignements de conversion. */
+export function validateConversion(
+  draft: ConversionDraft,
+  now: number = Date.now(),
+): ConversionErrors {
+  const errors: ConversionErrors = {};
+
+  const nom = draft.nom.trim();
+  if (nom === '') errors.nom = 'Le nom est obligatoire.';
+  else if (nom.length > NAME_MAX_LENGTH) errors.nom = 'Nom trop long (120 caractères maximum).';
+
+  if (draft.prenom.trim().length > NAME_MAX_LENGTH) {
+    errors.prenom = 'Prénom trop long (120 caractères maximum).';
+  }
+  if (draft.profession.trim().length > NAME_MAX_LENGTH) {
+    errors.profession = 'Profession trop longue (120 caractères maximum).';
+  }
+
+  const email = draft.email.trim();
+  if (email !== '' && (email.length > EMAIL_MAX_LENGTH || !EMAIL_PATTERN.test(email))) {
+    errors.email = 'Cette adresse électronique n’en est pas une.';
+  }
+
+  const mois = draft.dureeEtablissementMois.trim();
+  if (mois !== '' && (!/^\d+$/u.test(mois) || Number(mois) > DUREE_ETABLISSEMENT_MAX_MOIS)) {
+    errors.dureeEtablissementMois = `La durée s’exprime en mois entiers, de 0 à ${String(DUREE_ETABLISSEMENT_MAX_MOIS)}.`;
+  }
+
+  const rendezVous = draft.rendezVousAt.trim();
+  if (draft.method === 'APPOINTMENT') {
+    const iso = dakarLocalToIso(rendezVous);
+    if (rendezVous === '') {
+      errors.rendezVousAt = 'La prise de rendez-vous exige la date du rendez-vous.';
+    } else if (iso === null) {
+      errors.rendezVousAt = 'La date du rendez-vous est illisible.';
+    } else if (Date.parse(iso) < now - RENDEZ_VOUS_SKEW_MS) {
+      errors.rendezVousAt = 'Le rendez-vous ne peut pas précéder l’appel.';
+    }
+  } else if (rendezVous !== '') {
+    errors.rendezVousAt = 'Une date de rendez-vous n’est admise que sur « Prise de rendez-vous ».';
+  }
+
+  return errors;
+}
+
+/**
+ * Le serveur répond en 200 avec un code par opération : le refus doit revenir
+ * SOUS le champ fautif, sinon la téléconseillère relit tout le formulaire.
+ */
+export const CONVERSION_ERRORS: Readonly<
+  Record<string, { readonly field: ConversionField; readonly message: string }>
+> = {
+  PHASE2_RENDEZ_VOUS_REQUIRED: {
+    field: 'rendezVousAt',
+    message: 'La prise de rendez-vous exige la date du rendez-vous.',
+  },
+  PHASE2_RENDEZ_VOUS_NOT_ALLOWED: {
+    field: 'rendezVousAt',
+    message: 'Une date de rendez-vous n’est admise que sur « Prise de rendez-vous ».',
+  },
+  PHASE2_RENDEZ_VOUS_INVALID: {
+    field: 'rendezVousAt',
+    message: 'La date du rendez-vous est illisible.',
+  },
+  PHASE2_RENDEZ_VOUS_PAST: {
+    field: 'rendezVousAt',
+    message: 'Le rendez-vous ne peut pas précéder l’appel.',
+  },
+  PHASE2_EMAIL_INVALID: {
+    field: 'email',
+    message: 'Cette adresse électronique n’en est pas une.',
+  },
+  PHASE2_DUREE_ETABLISSEMENT_INVALID: {
+    field: 'dureeEtablissementMois',
+    message: `La durée s’exprime en mois entiers, de 0 à ${String(DUREE_ETABLISSEMENT_MAX_MOIS)}.`,
+  },
+};
+
+export function conversionErrorFor(
+  code: string,
+): { readonly field: ConversionField; readonly message: string } | null {
+  return CONVERSION_ERRORS[code] ?? null;
+}
 
 export interface AttemptDraft {
   readonly outcome: CallOutcome;
   readonly method: EnrollmentMethod | null;
   readonly comment: string;
   readonly callbackAt?: string | null;
+  readonly conversion?: ConversionDraft;
 }
 
 /** Miroir de `apps/api/src/modules/phase2/attempt-rules.ts` : un écart sort en 400 sec. */
@@ -390,6 +546,9 @@ export function validateAttempt(draft: AttemptDraft, now: number = Date.now()): 
   if (comment.length > COMMENT_MAX_LENGTH) {
     return `Le commentaire dépasse ${String(COMMENT_MAX_LENGTH)} caractères.`;
   }
+  if (draft.conversion !== undefined) {
+    return Object.values(validateConversion(draft.conversion, now))[0] ?? null;
+  }
   return null;
 }
 
@@ -409,6 +568,35 @@ export function uuidV7(now: number = Date.now(), random: () => number = Math.ran
 }
 
 type SyncPushBody = components['schemas']['SyncPushDto'];
+type SyncEntityData = components['schemas']['SyncEntityDataDto'];
+
+/**
+ * Un champ laissé vide n'est PAS envoyé : le serveur écrirait la chaîne vide
+ * sur le prospect, et un formulaire dont la profession n'a pas été demandée
+ * effacerait celle que le représentant avait relevée.
+ */
+function conversionData(draft: ConversionDraft): SyncEntityData {
+  const nom = draft.nom.trim();
+  const prenom = draft.prenom.trim();
+  const email = draft.email.trim();
+  const profession = draft.profession.trim();
+  const mois = draft.dureeEtablissementMois.trim();
+  const rendezVousAt =
+    draft.method === 'APPOINTMENT' ? dakarLocalToIso(draft.rendezVousAt.trim()) : null;
+
+  return {
+    ...(nom === '' ? {} : { nom }),
+    ...(prenom === '' ? {} : { prenom }),
+    ...(email === '' ? {} : { email }),
+    ...(profession === '' ? {} : { profession }),
+    ...(draft.syndicatId === '' ? {} : { syndicatId: draft.syndicatId }),
+    ...(draft.banqueId === '' ? {} : { banqueId: draft.banqueId }),
+    ...(mois === '' ? {} : { dureeEtablissementMois: Number(mois) }),
+    ...(draft.fonctionnaire === null ? {} : { fonctionnaire: draft.fonctionnaire }),
+    ...(draft.engagementEnCours === null ? {} : { engagementEnCours: draft.engagementEnCours }),
+    ...(rendezVousAt === null ? {} : { rendezVousAt }),
+  };
+}
 
 export interface AttemptInput {
   readonly prospectId: string;
@@ -439,6 +627,7 @@ export function buildAttemptBatch(input: AttemptInput): SyncPushBody {
           ...(input.draft.method === null ? {} : { method: input.draft.method }),
           ...(comment === '' ? {} : { comment }),
           ...(callbackAt === null ? {} : { callbackAt }),
+          ...(input.draft.conversion === undefined ? {} : conversionData(input.draft.conversion)),
           clientCreatedAt: input.at,
         },
       },
@@ -565,6 +754,8 @@ export interface RepAnswer {
   readonly suggestedPhone?: string;
   readonly suggestedNote?: string;
   readonly comment?: string;
+  /** Exigée par le serveur pour l'issue CALLBACK, et par elle seule. */
+  readonly callbackAt?: string;
 }
 
 export function buildRepAttempt(

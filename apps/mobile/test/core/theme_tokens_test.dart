@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:math' as math;
 
 import 'package:cpi_go/core/theme/app_theme.dart';
 import 'package:cpi_go/core/theme/cpi_colors.dart';
@@ -7,17 +6,7 @@ import 'package:cpi_go/core/theme/cpi_tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-double _luminance(Color c) {
-  double channel(double v) =>
-      v <= 0.03928 ? v / 12.92 : math.pow((v + 0.055) / 1.055, 2.4).toDouble();
-  return 0.2126 * channel(c.r) + 0.7152 * channel(c.g) + 0.0722 * channel(c.b);
-}
-
-double contrast(Color a, Color b) {
-  final double la = _luminance(a);
-  final double lb = _luminance(b);
-  return (math.max(la, lb) + 0.05) / (math.min(la, lb) + 0.05);
-}
+import '../support/contrast_helpers.dart';
 
 void main() {
   group('Contour des champs (WCAG 1.4.11)', () {
@@ -35,11 +24,11 @@ void main() {
           ('le remplissage du champ', cpi.inputBackground),
         ]) {
           expect(
-            contrast(cpi.inputBorder, fond),
+            contrastRatio(cpi.inputBorder, fond),
             greaterThanOrEqualTo(3.0),
             reason:
                 '$coque : le contour de champ disparaît sur $voisin '
-                '(${contrast(cpi.inputBorder, fond).toStringAsFixed(2)}:1)',
+                '(${contrastRatio(cpi.inputBorder, fond).toStringAsFixed(2)}:1)',
           );
         }
       });
@@ -53,51 +42,44 @@ void main() {
             cpi.borderSubtle,
             cpi.inputBackground,
           );
-          expect(contrast(aplati, cpi.inputBackground), lessThan(3.0));
+          expect(contrastRatio(aplati, cpi.inputBackground), lessThan(3.0));
           expect(cpi.inputBorder, isNot(cpi.borderSubtle));
         },
       );
 
       test('$coque : la piste de progression du démarrage tient 3:1', () {
-        final Color piste = cpiTrackOn(scheme.primary);
-        expect(contrast(piste, scheme.primary), greaterThanOrEqualTo(3.0));
-        expect(contrast(piste, scheme.onPrimary), greaterThanOrEqualTo(3.0));
+        // Le démarrage ne peint plus l'aplat de marque : le fil se lit
+        // maintenant sur la piste neutre de la surface (WCAG 1.4.11).
+        expect(
+          contrastRatio(scheme.primary, scheme.surfaceContainerHigh),
+          greaterThanOrEqualTo(3.0),
+        );
       });
 
-      test(
-        '$coque : le dégradé de connexion reste lisible sur ses trois arrêts',
-        () {
-          final List<Color> stops = cpiBrandGradient(scheme.primary);
-          expect(stops, hasLength(3));
-          expect(stops[1], scheme.primary);
-          for (final Color stop in stops) {
-            expect(
-              contrast(scheme.onPrimary, stop),
-              greaterThanOrEqualTo(4.5),
-              reason: '$coque : le texte de connexion passe sous AA',
-            );
-            expect(
-              contrast(cpi.navForeground, stop),
-              greaterThanOrEqualTo(4.5),
-            );
-          }
-        },
-      );
+      // Le dégradé de connexion a été supprimé (`cpiBrandGradient`, zéro
+      // appelant) : l'aplat de marque reste, et c'est LUI qui doit porter ses
+      // deux encres.
+      test('$coque : l\'aplat de marque porte ses encres', () {
+        expect(
+          contrastRatio(scheme.onPrimary, scheme.primary),
+          greaterThanOrEqualTo(4.5),
+          reason: '$coque : le texte de connexion passe sous AA',
+        );
+        expect(
+          contrastRatio(cpi.navForeground, scheme.primary),
+          greaterThanOrEqualTo(4.5),
+        );
+      });
     }
 
-    test(
-      'la connexion ne peut plus rendre du bordeaux sous la coque CHUES',
-      () {
-        // Le dégradé était écrit en dur : #7B0A1B -> #630210 -> #48000A.
-        final List<Color> cpi = cpiBrandGradient(AppTheme.colorScheme.primary);
-        final List<Color> chues = cpiBrandGradient(
-          AppTheme.chuesColorScheme.primary,
-        );
-        expect(cpi.toSet().intersection(chues.toSet()), isEmpty);
-        expect(cpi, contains(const Color(0xFF630210)));
-        expect(chues, isNot(contains(const Color(0xFF630210))));
-      },
-    );
+    test('la coque CHUES ne rend pas de bordeaux', () {
+      expect(
+        AppTheme.chuesColorScheme.primary,
+        isNot(AppTheme.colorScheme.primary),
+      );
+      expect(AppTheme.colorScheme.primary, const Color(0xFF630210));
+      expect(AppTheme.chuesColorScheme.primary, isNot(const Color(0xFF630210)));
+    });
 
     test('les deux coques ont bien DEUX contours différents', () {
       expect(CpiColors.light.inputBorder, isNot(CpiColors.chues.inputBorder));
@@ -119,6 +101,100 @@ void main() {
       expect(
         theme.outlinedButtonTheme.style?.side?.resolve(<WidgetState>{})?.color,
         cpi.inputBorder,
+      );
+    });
+  });
+
+  group('Contour des champs en sombre (WCAG 1.4.11)', () {
+    for (final (String coque, ColorScheme scheme, CpiColors cpi)
+        in <(String, ColorScheme, CpiColors)>[
+          ('CPI', AppTheme.darkColorScheme, CpiColors.dark),
+          ('CHUES', AppTheme.chuesDarkColorScheme, CpiColors.chuesDark),
+        ]) {
+      test('$coque sombre : le contour atteint 3:1 sur ses trois voisins', () {
+        for (final (String voisin, Color fond) in <(String, Color)>[
+          ('le fond de page', scheme.surface),
+          ('la carte', scheme.surfaceContainerLowest),
+          ('le remplissage du champ', cpi.inputBackground),
+        ]) {
+          expect(
+            contrastRatio(cpi.inputBorder, fond),
+            greaterThanOrEqualTo(3.0),
+            reason:
+                '$coque sombre : le contour de champ disparaît sur $voisin '
+                '(${contrastRatio(cpi.inputBorder, fond).toStringAsFixed(2)}:1)',
+          );
+        }
+      });
+
+      test('$coque sombre : la bordure décorative NE PASSE PAS', () {
+        final Color aplati = Color.alphaBlend(
+          cpi.borderSubtle,
+          cpi.inputBackground,
+        );
+        expect(contrastRatio(aplati, cpi.inputBackground), lessThan(3.0));
+        expect(cpi.inputBorder, isNot(cpi.borderSubtle));
+      });
+
+      test('$coque sombre : l\'aplat de marque reste lisible', () {
+        // En sombre l'aplat de marque est CLAIR : c'est `onPrimary`, teinte
+        // profonde, qui s'y écrit — pas `navForeground`, réservé au fond noir.
+        expect(
+          contrastRatio(scheme.onPrimary, scheme.primary),
+          greaterThanOrEqualTo(4.5),
+          reason: '$coque sombre : le texte sur l\'aplat passe sous AA',
+        );
+      });
+
+      // En sombre l'ombre ne se voit pas : le filet EST la limite de la carte.
+      test('$coque sombre : le filet de carte se voit sur la carte', () {
+        expect(
+          contrastRatio(cpi.cardBorder, scheme.surfaceContainerLowest),
+          greaterThanOrEqualTo(1.5),
+          reason:
+              '$coque sombre : filet à '
+              '${contrastRatio(cpi.cardBorder, scheme.surfaceContainerLowest).toStringAsFixed(2)}:1',
+        );
+        expect(
+          contrastRatio(cpi.cardBorder, scheme.surfaceContainerLowest),
+          greaterThan(
+            contrastRatio(scheme.outlineVariant, scheme.surfaceContainerLowest),
+          ),
+        );
+      });
+
+      test('$coque sombre : le fil du démarrage tient 3:1 sur sa piste', () {
+        // Le démarrage montre la même surface neutre en clair et en sombre :
+        // c'est contre elle, et non contre un aplat de marque, que le fil de
+        // progression doit se lire.
+        expect(
+          contrastRatio(scheme.primary, scheme.surfaceContainerHigh),
+          greaterThanOrEqualTo(3.0),
+        );
+      });
+    }
+
+    test('en sombre non plus, CHUES ne rend pas de bordeaux', () {
+      expect(
+        AppTheme.chuesDarkColorScheme.primary,
+        isNot(AppTheme.darkColorScheme.primary),
+      );
+      expect(
+        AppTheme.darkColorScheme.primary,
+        isNot(AppTheme.colorScheme.primary),
+      );
+      expect(CpiColors.dark.cardBorder, isNot(CpiColors.chuesDark.cardBorder));
+    });
+
+    test('les deux coques sombres ont bien DEUX contours différents', () {
+      expect(
+        CpiColors.dark.inputBorder,
+        isNot(CpiColors.chuesDark.inputBorder),
+      );
+      expect(CpiColors.dark.inputBorder, isNot(CpiColors.light.inputBorder));
+      expect(
+        CpiColors.chuesDark.inputBorder,
+        isNot(CpiColors.chues.inputBorder),
       );
     });
   });

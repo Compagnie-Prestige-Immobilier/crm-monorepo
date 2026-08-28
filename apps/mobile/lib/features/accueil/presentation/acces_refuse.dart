@@ -3,7 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/router/route_paths.dart';
-import '../../../core/theme/cpi_tokens.dart';
+import '../../../ui/widgets/cpi_kit.dart';
+import '../../../ui/widgets/empty_state.dart';
 
 /// Le refus d'accès du registre, partagé par `/accueil` et `/accueil/chiffres`.
 ///
@@ -17,25 +18,26 @@ class AccesRefuse extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(PhosphorIconsRegular.squaresFour),
-          tooltip: 'Projets',
-          onPressed: () => context.go(Routes.home),
-        ),
-        title: Text(title),
+    void versLesProjets() => context.go(Routes.home);
+
+    return CpiScaffold(
+      title: title,
+      leading: CpiHeaderAction(
+        icon: PhosphorIconsRegular.squaresFour,
+        label: 'Projets',
+        onPressed: versLesProjets,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(CpiSpacing.xl),
-        child: Center(
-          child: Text(
+      body: CpiEmptyState(
+        icon: PhosphorIconsDuotone.lockSimple,
+        title: 'Registre réservé',
+        message:
             'Ce compte ne tient pas le registre des visites. '
             'Demandez l\'accès à la direction.',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyLarge,
-          ),
+        action: CpiButton(
+          'Revenir aux projets',
+          variant: CpiButtonVariant.secondary,
+          expand: false,
+          onPressed: versLesProjets,
         ),
       ),
     );

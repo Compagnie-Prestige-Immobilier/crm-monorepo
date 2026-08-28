@@ -47,6 +47,11 @@ export interface CallAttemptRow {
   reasonId: string | null;
   method: string | null;
   comment: string | null;
+  email: string | null;
+  fonctionnaire: boolean | null;
+  engagementEnCours: boolean | null;
+  dureeEtablissementMois: number | null;
+  rendezVousAt: Date | null;
   clientCreatedAt: Date;
 }
 
@@ -130,33 +135,29 @@ function matches(
 ): boolean {
   if (!where) return true;
   for (const [key, expected] of Object.entries(where)) {
-    if (key === 'AND') {
-      if (!(expected as Row[]).every((clause) => matches(row, clause, relations))) return false;
-      continue;
-    }
-    if (key === 'OR') {
-      if (!(expected as Row[]).some((clause) => matches(row, clause, relations))) return false;
-      continue;
-    }
-    const relation = relations[key];
-    if (relation) {
-      if (!relation(expected as Row)) return false;
-      continue;
-    }
-    const actual = row[key];
-    if (expected === null) {
-      if (actual !== null && actual !== undefined) return false;
-      continue;
-    }
-    if (typeof expected === 'object') {
-      const filter = expected as { not?: unknown; in?: unknown[] };
-      if ('not' in filter && actual === filter.not) return false;
-      if (filter.in && !filter.in.includes(actual)) return false;
-      continue;
-    }
-    if (actual !== expected) return false;
+    if (!matchesFilter(row, key, expected, relations)) return false;
   }
   return true;
+}
+
+function matchesFilter(
+  row: Row,
+  key: string,
+  expected: unknown,
+  relations: Record<string, (clause: Row) => boolean>,
+): boolean {
+  if (key === 'AND') return (expected as Row[]).every((clause) => matches(row, clause, relations));
+  if (key === 'OR') return (expected as Row[]).some((clause) => matches(row, clause, relations));
+  const relation = relations[key];
+  if (relation !== undefined) return relation(expected as Row);
+
+  const actual = row[key];
+  if (expected === null) return actual === null || actual === undefined;
+  if (typeof expected !== 'object') return actual === expected;
+
+  const filter = expected as { not?: unknown; in?: unknown[] };
+  if ('not' in filter && actual === filter.not) return false;
+  return filter.in === undefined || filter.in.includes(actual);
 }
 
 const clone = <T>(value: T): T => structuredClone(value);

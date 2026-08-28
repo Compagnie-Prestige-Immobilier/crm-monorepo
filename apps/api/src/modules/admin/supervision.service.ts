@@ -55,6 +55,9 @@ function latest(a: Date | undefined, b: Date | undefined): Date | null {
   return a > b ? a : b;
 }
 
+const optionalDate = (value: Date | null | undefined): Date | undefined => value ?? undefined;
+const isoOrNull = (value: Date | null | undefined): string | null => value?.toISOString() ?? null;
+
 @Injectable()
 export class SupervisionService {
   constructor(private readonly prisma: PrismaService) {}
@@ -134,8 +137,14 @@ export class SupervisionService {
     const beatOf = new Map(heartbeats.map((row) => [row.userId, row]));
 
     const rows = users.map((user): SupervisedUserDto => {
-      const beat = beatOf.get(user.id);
-      const pushedAt = latest(syncAt.get(user.id), beat?.lastPushAt ?? undefined);
+      const beat = beatOf.get(user.id) ?? {
+        lastPushAt: null,
+        lastPullAt: null,
+        pendingOps: null,
+        appVersion: null,
+      };
+      const departement = user.departement ?? { name: null };
+      const pushedAt = latest(syncAt.get(user.id), optionalDate(beat.lastPushAt));
 
       const signals: ActivitySignals = {
         isActive: user.isActive,
@@ -144,7 +153,7 @@ export class SupervisionService {
         lastTokenAt: tokenAt.get(user.id) ?? null,
         // Un pull ne laisse aucune autre trace : sans lui, un appareil ouvert
         // qui n'a rien à remonter passe pour absent pendant des heures.
-        lastSyncAt: latest(pushedAt ?? undefined, beat?.lastPullAt ?? undefined),
+        lastSyncAt: latest(optionalDate(pushedAt), optionalDate(beat.lastPullAt)),
         // Un téléconseiller écrit des tentatives d'appel, un agent des
         // transitions de dossier. On prend la plus récente des deux plutôt que
         // de brancher sur le rôle : un compte peut changer de rôle, son
@@ -159,17 +168,17 @@ export class SupervisionService {
         email: user.email,
         role: user.role,
         isActive: user.isActive,
-        departementName: user.departement?.name ?? null,
+        departementName: departement.name,
         presence: presenceOf(signals, now),
         hasLiveSession: signals.hasLiveSession,
         sessionCount: sessionCounts.get(user.id) ?? 0,
-        lastSeenAt: lastSeenAt(signals)?.toISOString() ?? null,
-        lastLoginAt: signals.lastLoginAt?.toISOString() ?? null,
-        lastSyncAt: pushedAt?.toISOString() ?? null,
-        lastPullAt: beat?.lastPullAt?.toISOString() ?? null,
-        pendingOps: beat?.pendingOps ?? null,
-        appVersion: beat?.appVersion ?? null,
-        lastWriteAt: signals.lastWriteAt?.toISOString() ?? null,
+        lastSeenAt: isoOrNull(lastSeenAt(signals)),
+        lastLoginAt: isoOrNull(signals.lastLoginAt),
+        lastSyncAt: isoOrNull(pushedAt),
+        lastPullAt: isoOrNull(beat.lastPullAt),
+        pendingOps: beat.pendingOps,
+        appVersion: beat.appVersion,
+        lastWriteAt: isoOrNull(signals.lastWriteAt),
       };
     });
 

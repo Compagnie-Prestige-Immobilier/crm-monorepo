@@ -193,68 +193,80 @@ export function PortfolioBlocks() {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          {cohortsFailed ? (
-            <div className="px-5 pb-5">
-              <QueryErrorInline
-                error={cohorts.error}
-                onRetry={() => {
-                  void cohorts.refetch();
-                }}
-                fallback="Les cohortes n’ont pas pu être calculées."
-              />
-            </div>
-          ) : cohorts.data === undefined ? (
-            <div className="px-5 pb-5" aria-hidden="true">
-              <Skeleton className="h-40 w-full" />
-            </div>
-          ) : cohorts.data.items.length === 0 ? (
-            <p className="px-5 pb-5 text-[0.875rem] text-muted-foreground">
-              Aucun prospect sur la sélection.
-            </p>
-          ) : (
-            <div className="max-h-72 overflow-auto scrollbar-thin">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead>Semaine</TableHead>
-                    <TableHead className="text-right">Prospects</TableHead>
-                    <TableHead className="text-right">Méthode</TableHead>
-                    <TableHead className="text-right">Dossiers</TableHead>
-                    <TableHead className="text-right">Encaissés</TableHead>
-                    <TableHead className="text-right">Montant</TableHead>
-                    <TableHead className="text-right">Conversion</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {cohorts.data.items.map((week) => (
-                    <TableRow key={week.week}>
-                      <TableCell className="font-[600] tabular-nums">
-                        <time dateTime={week.week}>{formatShortDate(week.week)}</time>
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatNumber(week.prospects)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatNumber(week.methodObtained)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatNumber(week.cases)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatNumber(week.cashed)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatXof(week.cashedAmountXof)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatRateOrNone(week.conversionRate)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+          {(() => {
+            if (cohortsFailed)
+              return (
+                <div className="px-5 pb-5">
+                  <QueryErrorInline
+                    error={cohorts.error}
+                    onRetry={() => {
+                      void cohorts.refetch();
+                    }}
+                    fallback="Les cohortes n’ont pas pu être calculées."
+                  />
+                </div>
+              );
+            return (() => {
+              if (cohorts.data === undefined)
+                return (
+                  <div className="px-5 pb-5" aria-hidden="true">
+                    <Skeleton className="h-40 w-full" />
+                  </div>
+                );
+              return (() => {
+                if (cohorts.data.items.length === 0)
+                  return (
+                    <p className="px-5 pb-5 text-[0.875rem] text-muted-foreground">
+                      Aucun prospect sur la sélection.
+                    </p>
+                  );
+                return (
+                  <div className="max-h-72 overflow-auto scrollbar-thin">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead>Semaine</TableHead>
+                          <TableHead className="text-right">Prospects</TableHead>
+                          <TableHead className="text-right">Méthode</TableHead>
+                          <TableHead className="text-right">Dossiers</TableHead>
+                          <TableHead className="text-right">Encaissés</TableHead>
+                          <TableHead className="text-right">Montant</TableHead>
+                          <TableHead className="text-right">Conversion</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {cohorts.data.items.map((week) => (
+                          <TableRow key={week.week}>
+                            <TableCell className="font-[600] tabular-nums">
+                              <time dateTime={week.week}>{formatShortDate(week.week)}</time>
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {formatNumber(week.prospects)}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {formatNumber(week.methodObtained)}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {formatNumber(week.cases)}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {formatNumber(week.cashed)}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {formatXof(week.cashedAmountXof)}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {formatRateOrNone(week.conversionRate)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                );
+              })();
+            })();
+          })()}
         </CardContent>
       </Card>
 
@@ -262,75 +274,93 @@ export function PortfolioBlocks() {
         <CardHeader>
           <CardTitle className="text-[1.0625rem]">Productivité des représentants</CardTitle>
           <CardDescription>
-            {productivityFailed
-              ? 'Productivité indisponible.'
-              : productivity.data === undefined
-                ? 'Calcul en cours…'
-                : `${formatNumber(dormant.length)} représentant${dormant.length > 1 ? 's' : ''} sans aucun apport depuis ${formatNumber(productivity.data.dormantDays)} jours.`}
+            {(() => {
+              if (productivityFailed) return 'Productivité indisponible.';
+              return (() => {
+                if (productivity.data === undefined) return 'Calcul en cours…';
+                return `${formatNumber(dormant.length)} représentant${dormant.length > 1 ? 's' : ''} sans aucun apport depuis ${formatNumber(productivity.data.dormantDays)} jours.`;
+              })();
+            })()}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          {productivityFailed ? (
-            <div className="px-5 pb-5">
-              <QueryErrorInline
-                error={productivity.error}
-                onRetry={() => {
-                  void productivity.refetch();
-                }}
-                fallback="La productivité des représentants n’a pas pu être calculée."
-              />
-            </div>
-          ) : productivity.data === undefined ? (
-            <div className="px-5 pb-5" aria-hidden="true">
-              <Skeleton className="h-40 w-full" />
-            </div>
-          ) : productivity.data.items.length === 0 ? (
-            <p className="px-5 pb-5 text-[0.875rem] text-muted-foreground">
-              Aucun représentant sur la sélection.
-            </p>
-          ) : (
-            <div className="max-h-72 overflow-auto scrollbar-thin">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead>Représentant</TableHead>
-                    <TableHead>Département</TableHead>
-                    <TableHead className="text-right">Prospects</TableHead>
-                    <TableHead className="text-right">Méthode</TableHead>
-                    <TableHead className="text-right">Conversion</TableHead>
-                    <TableHead>Dernier apport</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {productivity.data.items.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell className="font-[600]">{row.label}</TableCell>
-                      <TableCell className="text-muted-foreground">{row.departementName}</TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatNumber(row.prospects)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatNumber(row.methodObtained)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatRateOrNone(row.conversionRate)}
-                      </TableCell>
-                      <TableCell className={row.dormant ? 'text-warning' : 'text-muted-foreground'}>
-                        {row.lastProspectAt === null ? (
-                          'Jamais'
-                        ) : (
-                          <time dateTime={row.lastProspectAt}>
-                            {formatShortDate(row.lastProspectAt)}
-                          </time>
-                        )}
-                        {row.dormant ? ' · dormant' : ''}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+          {(() => {
+            if (productivityFailed)
+              return (
+                <div className="px-5 pb-5">
+                  <QueryErrorInline
+                    error={productivity.error}
+                    onRetry={() => {
+                      void productivity.refetch();
+                    }}
+                    fallback="La productivité des représentants n’a pas pu être calculée."
+                  />
+                </div>
+              );
+            return (() => {
+              if (productivity.data === undefined)
+                return (
+                  <div className="px-5 pb-5" aria-hidden="true">
+                    <Skeleton className="h-40 w-full" />
+                  </div>
+                );
+              return (() => {
+                if (productivity.data.items.length === 0)
+                  return (
+                    <p className="px-5 pb-5 text-[0.875rem] text-muted-foreground">
+                      Aucun représentant sur la sélection.
+                    </p>
+                  );
+                return (
+                  <div className="max-h-72 overflow-auto scrollbar-thin">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead>Représentant</TableHead>
+                          <TableHead>Département</TableHead>
+                          <TableHead className="text-right">Prospects</TableHead>
+                          <TableHead className="text-right">Méthode</TableHead>
+                          <TableHead className="text-right">Conversion</TableHead>
+                          <TableHead>Dernier apport</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {productivity.data.items.map((row) => (
+                          <TableRow key={row.id}>
+                            <TableCell className="font-[600]">{row.label}</TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {row.departementName}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {formatNumber(row.prospects)}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {formatNumber(row.methodObtained)}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {formatRateOrNone(row.conversionRate)}
+                            </TableCell>
+                            <TableCell
+                              className={row.dormant ? 'text-warning' : 'text-muted-foreground'}
+                            >
+                              {row.lastProspectAt === null ? (
+                                'Jamais'
+                              ) : (
+                                <time dateTime={row.lastProspectAt}>
+                                  {formatShortDate(row.lastProspectAt)}
+                                </time>
+                              )}
+                              {row.dormant ? ' · dormant' : ''}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                );
+              })();
+            })();
+          })()}
         </CardContent>
       </Card>
     </div>
