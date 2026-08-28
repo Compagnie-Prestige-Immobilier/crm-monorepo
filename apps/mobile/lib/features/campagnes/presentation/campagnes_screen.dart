@@ -83,15 +83,6 @@ class _CampagnesScreenState extends ConsumerState<CampagnesScreen> {
       child: CpiScaffold(
         title: 'Appels',
         leading: const CpiBackButton(),
-        actions: <Widget>[
-          if (representants)
-            CpiHeaderAction(
-              icon: PhosphorIconsRegular.magnifyingGlass,
-              label: 'Chercher un représentant',
-              onPressed: () =>
-                  context.pushOnce(Routes.representantsPourQualifier()),
-            ),
-        ],
         banner: horsLigne
             ? const CpiStatusBand(
                 text: 'Hors ligne. Liste du dernier téléchargement.',
@@ -128,6 +119,24 @@ class _CampagnesScreenState extends ConsumerState<CampagnesScreen> {
                       ),
                     ),
                   ],
+                ),
+              ),
+            // La sortie vers l'annuaire est écrite, pas cachée sous une loupe :
+            // un représentant appelé hors liste se consigne quand même.
+            if (representants)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  CpiSpacing.md,
+                  0,
+                  CpiSpacing.md,
+                  CpiSpacing.md,
+                ),
+                child: CpiButton(
+                  'Chercher un autre représentant',
+                  variant: CpiButtonVariant.secondary,
+                  icon: PhosphorIconsRegular.magnifyingGlass,
+                  onPressed: () =>
+                      context.pushOnce(Routes.representantsPourQualifier()),
                 ),
               ),
             Expanded(

@@ -216,11 +216,13 @@ class _Fiche extends ConsumerWidget {
         CpiSpacing.xxl,
       ),
       children: <Widget>[
-        Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: SyncStatusChip(status: status),
-        ),
-        const SizedBox(height: CpiSpacing.md),
+        if (status.aSignaler != null) ...<Widget>[
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: SyncStatusChip(status: status),
+          ),
+          const SizedBox(height: CpiSpacing.md),
+        ],
         _Numero(phoneE164: data.phoneE164),
         if (faits.isNotEmpty) ...<Widget>[
           const SizedBox(height: CpiSpacing.md),

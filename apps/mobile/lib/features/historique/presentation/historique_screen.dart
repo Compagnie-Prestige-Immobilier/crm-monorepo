@@ -23,15 +23,6 @@ import '../../../ui/widgets/search_field.dart';
 import '../../../ui/widgets/sync_status_icon.dart';
 import '../../../ui/async_value_x.dart';
 
-CpiTone _toneFor(SyncStatus status) => switch (status) {
-  SyncStatus.synced => CpiTone.success,
-  SyncStatus.draft ||
-  SyncStatus.pending ||
-  SyncStatus.syncing => CpiTone.neutral,
-  SyncStatus.conflict || SyncStatus.blocked => CpiTone.warning,
-  SyncStatus.failed => CpiTone.danger,
-};
-
 /// La base des représentants vient du web : ici on ne crée que des prospects,
 /// et toujours en choisissant d'abord chez qui.
 void ouvrirAjoutDeProspect(BuildContext context) {
@@ -210,16 +201,19 @@ class _RepresentantTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final SyncStatus status = SyncStatus.parse(data.syncStatus ?? 'draft');
+    final String? signal = status.aSignaler;
     return CpiCard.rows(<CpiRow>[
       CpiRow(
         title: data.fullName,
         subtitle: Phone.format(data.phoneE164),
-        leading: SyncStatusIcon(
-          status: status,
-          size: CpiIconSize.xl,
-          labelled: false,
-        ),
-        trailing: CpiTag(status.label, tone: _toneFor(status)),
+        leading: signal == null
+            ? null
+            : SyncStatusIcon(
+                status: status,
+                size: CpiIconSize.xl,
+                labelled: false,
+              ),
+        trailing: signal == null ? null : CpiTag(signal, tone: status.tone),
         onTap: () => context.pushOnce(Routes.representantDetailFor(data.id)),
       ),
     ]);

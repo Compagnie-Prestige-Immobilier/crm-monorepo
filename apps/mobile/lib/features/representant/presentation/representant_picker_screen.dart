@@ -169,16 +169,19 @@ class _RepresentantRow extends StatelessWidget {
         ? Phone.format(data.phoneE164)
         : '${Phone.format(data.phoneE164)} · $departement';
 
+    final String? signal = status.aSignaler;
     return CpiCard.rows(<CpiRow>[
       CpiRow(
-        leading: SyncStatusIcon(
-          status: status,
-          size: CpiIconSize.md,
-          labelled: false,
-        ),
+        leading: signal == null
+            ? null
+            : SyncStatusIcon(
+                status: status,
+                size: CpiIconSize.md,
+                labelled: false,
+              ),
         title: data.fullName,
         subtitle: subtitle,
-        trailing: CpiTag(status.label, tone: status.tone),
+        trailing: signal == null ? null : CpiTag(signal, tone: status.tone),
         onTap: () => context.pushOnce(
           pourQualifier
               ? Routes.representantQualificationFor(data.id)

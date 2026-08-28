@@ -91,18 +91,6 @@ class CampagneFileScreen extends ConsumerWidget {
               ? CampagnesRoutes.grandPublicListe
               : CampagnesRoutes.liste,
         ),
-        // La file donne l'ordre du jour ; l'annuaire donne tous les autres. Un
-        // représentant appelé hors liste doit pouvoir être consigné sans
-        // attendre qu'une campagne le contienne.
-        actions: <Widget>[
-          if (representants)
-            CpiHeaderAction(
-              icon: PhosphorIconsRegular.magnifyingGlass,
-              label: 'Chercher un représentant',
-              onPressed: () =>
-                  context.pushOnce(Routes.representantsPourQualifier()),
-            ),
-        ],
         banner: horsLigne
             ? const CpiStatusBand(
                 text: 'Hors ligne. Liste du dernier téléchargement.',
@@ -129,6 +117,7 @@ class CampagneFileScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             _NomDeLaFile(nom),
+            if (representants) const _ChercherAilleurs(),
             Expanded(
               child: _corps(
                 file,
@@ -197,6 +186,28 @@ class CampagneFileScreen extends ConsumerWidget {
       rows.map(convert).toList(growable: false),
     );
   }
+}
+
+/// La sortie vers l'annuaire, écrite en toutes lettres. Une loupe seule en
+/// tête d'écran ne se lit pas : personne ne devine qu'elle sort de la liste.
+class _ChercherAilleurs extends StatelessWidget {
+  const _ChercherAilleurs();
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(
+      CpiSpacing.md,
+      0,
+      CpiSpacing.md,
+      CpiSpacing.md,
+    ),
+    child: CpiButton(
+      'Chercher un autre représentant',
+      variant: CpiButtonVariant.secondary,
+      icon: PhosphorIconsRegular.magnifyingGlass,
+      onPressed: () => context.pushOnce(Routes.representantsPourQualifier()),
+    ),
+  );
 }
 
 /// Le nom de la liste, en tête du corps et plafonné à deux lignes.

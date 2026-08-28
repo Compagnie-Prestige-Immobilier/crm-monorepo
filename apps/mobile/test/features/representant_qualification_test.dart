@@ -158,26 +158,31 @@ void main() {
       findsNothing,
     );
 
+    // Le « non » ouvre les champs sur place : la personne proposée se note
+    // pendant l'appel, pas une étape plus loin.
     await taper(tester, find.text('Non'));
-    // La personne proposée est à l'étape des détails, derrière « Continuer ».
-    await versLesDetails(tester);
     expect(
       find.text('Il propose quelqu\'un d\'autre ? (facultatif)'),
       findsOneWidget,
     );
-    // Sans numéro, le serveur jette le nom : les champs restent éteints.
+    // Les trois champs sont actifs d'emblée : ce qui est tapé ne se perd pas
+    // faute de numéro, c'est l'enregistrement qui le réclame.
     expect(
-      tester.widget<TextField>(champ('Son nom (facultatif)')).enabled,
-      isFalse,
+      tester.widget<TextField>(champ('Son nom et prénom (facultatif)')).enabled,
+      isTrue,
+    );
+
+    await tester.enterText(
+      champ('Son nom et prénom (facultatif)'),
+      'Fatou Sarr',
+    );
+    await tester.pump();
+    expect(
+      continuer(tester).subtitle,
+      'Écrivez le numéro de la personne proposée',
     );
 
     await tester.enterText(champ('Son numéro'), '77 123 45 67');
-    await tester.pump();
-    expect(
-      tester.widget<TextField>(champ('Son nom (facultatif)')).enabled,
-      isTrue,
-    );
-    await tester.enterText(champ('Son nom (facultatif)'), 'Fatou Sarr');
     await tester.pump();
     await tester.enterText(
       champ('Sa remarque (facultatif)'),
@@ -185,6 +190,7 @@ void main() {
     );
     await tester.pump();
 
+    await versLesDetails(tester);
     await tester.tap(find.text('Enregistrer'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
@@ -205,15 +211,14 @@ void main() {
 
     await taper(tester, find.text('Joignable'));
     await taper(tester, find.text('Non'));
-    await versLesDetails(tester);
-    expect(enregistrer(tester).onPressed, isNotNull);
+    expect(continuer(tester).onPressed, isNotNull);
 
     await tester.enterText(champ('Son numéro'), '77 12');
     await tester.pump();
 
-    expect(enregistrer(tester).onPressed, isNull);
+    expect(continuer(tester).onPressed, isNull);
     expect(
-      enregistrer(tester).subtitle,
+      continuer(tester).subtitle,
       'Numéro de la personne proposée incomplet',
     );
 

@@ -338,20 +338,28 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Autre heure'));
+      await tester.tap(find.text('Choisir une date'));
+      await tester.pumpAndSettle();
+
+      // La feuille s'ouvre sur le calendrier : l'heure ne vient qu'après le
+      // jour.
+      await tester.tap(find.text('12').first);
       await tester.pumpAndSettle();
 
       expect(
         tester.getSemantics(find.byType(FPicker)),
         isSemantics(
           label: 'Heure du rappel',
-          value: 'Aujourd\'hui 09 h 30',
-          increasedValue: 'Aujourd\'hui 10 h 00',
+          value: '09 h 30',
+          increasedValue: '10 h 00',
           hasIncreaseAction: true,
         ),
       );
 
       tester.semantics.increase(find.semantics.byLabel('Heure du rappel'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Valider'));
       await tester.pumpAndSettle();
 
       expect(choix.last, DateTime.utc(2026, 8, 12, 10));

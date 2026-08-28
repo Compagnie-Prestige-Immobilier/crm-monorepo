@@ -100,6 +100,32 @@ class _EntranceState extends State<_Entrance>
   );
 }
 
+/// Ouverture d'un bloc que la réponse précédente vient de rendre utile : la
+/// hauteur s'ouvre au lieu de sauter. Sans animation demandée, il paraît d'un
+/// coup.
+class CpiReveal extends StatelessWidget {
+  const CpiReveal({super.key, required this.visible, required this.child});
+
+  final bool visible;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final CpiMotion motion = CpiMotion.of(context);
+    if (motion.component == Duration.zero) {
+      return visible ? child : const SizedBox.shrink();
+    }
+    return AnimatedSize(
+      duration: motion.component,
+      curve: motion.easeOut,
+      alignment: Alignment.topCenter,
+      child: visible
+          ? child
+          : const SizedBox(width: double.infinity, height: 0),
+    );
+  }
+}
+
 /// Arrivée d'un bloc qui vient de se poser : il grandit jusqu'à sa taille avec
 /// un léger dépassement. Pour un résultat, une confirmation, une carte qui
 /// apparaît — pas pour une liste.
