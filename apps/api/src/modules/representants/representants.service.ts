@@ -9,13 +9,7 @@ import { v7 as uuidv7 } from 'uuid';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { normalizePhone } from '../../common/phone.js';
-import {
-  assertOwnership,
-  assertReadable,
-  isAdmin,
-  readableOwnerId,
-  readScope,
-} from '../../common/scope.js';
+import { assertOwnership, isAdmin } from '../../common/scope.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { OkDto } from '../../common/dto/ok.dto.js';
 import { RepresentantSortField } from './dto.js';
@@ -141,18 +135,15 @@ export function toRepresentantCommentDto(row: CommentRow): RepresentantCommentDt
 export class RepresentantsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(user: AuthenticatedUser, query: RepresentantQueryDto): Promise<RepresentantListDto> {
+  async list(query: RepresentantQueryDto): Promise<RepresentantListDto> {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 25;
 
-    // Le cloisonnement est composé ICI, dans le service : posé dans le
-    // contrôleur, il dépendrait de la discipline de chaque route.
-    const where: Prisma.RepresentantWhereInput = {
-      deletedAt: null,
-      ...readScope(user),
-    };
+    // L'ANNUAIRE est commun : la liste n'est bornée par aucun créateur, comme le
+    // flux de synchronisation. Le cloisonnement demeure sur les PROSPECTS.
+    const where: Prisma.RepresentantWhereInput = { deletedAt: null };
     if (query.commercialId) {
-      where.createdById = readableOwnerId(user, query.commercialId);
+      where.createdById = query.commercialId;
     }
     if (query.departementId) where.departementId = query.departementId;
     if (query.iefId) where.iefId = query.iefId;
@@ -199,7 +190,7 @@ export class RepresentantsService {
     };
   }
 
-  async get(user: AuthenticatedUser, id: string): Promise<RepresentantDto> {
+  async get(id: string): Promise<RepresentantDto> {
     const row = await this.prisma.representant.findFirst({
       where: { id, deletedAt: null },
       include: INCLUDE,
@@ -210,31 +201,18 @@ export class RepresentantsService {
         message: 'Représentant introuvable.',
       });
     }
-    assertReadable(user, row);
     return toRepresentantDto(row);
   }
 
   /**
    * Recherche par téléphone, avant saisie.
    *
-   * Répond même quand la fiche appartient à un AUTRE commercial : c'est tout
-   * l'objet de l'endpoint. Le commercial doit apprendre que ce représentant est
-   * déjà connu et par qui, sinon il ressaisit une fiche que la contrainte
-   * d'unicité rejettera sans lui dire pourquoi.
-   *
-   * MAIS SEUL LE NOM DU PROPRIÉTAIRE EST DIVULGUÉ, et c'est ce que la réponse
-   * doit refléter. La version précédente rendait le DTO COMPLET de la fiche
-   * d'autrui : nom du représentant, téléphone E.164, notes de terrain,
-   * département, nombre de prospects portés, identifiant du propriétaire. Un
-   * annuaire nominatif entier, énumérable numéro par numéro par n'importe quel
-   * compte. Ici, une fiche qui n'appartient pas à l'appelant ne rend que « ce
-   * numéro est pris, par untel » : exactement ce qui évite la double saisie,
-   * rien de plus.
-   *
-   * L'ADMIN garde la vue complète : c'est lui qui arbitre les doublons, et lui
-   * masquer la fiche rendrait l'arbitrage impossible.
+   * Rend la fiche entière quel qu'en soit le créateur : l'annuaire est commun,
+   * il descend déjà sur tous les téléphones, et c'est ainsi qu'on qualifie un
+   * représentant trouvé au numéro sans le ressaisir en double. Le propriétaire
+   * reste nommé, pour savoir vers qui se tourner.
    */
-  async lookup(user: AuthenticatedUser, phone: string): Promise<RepresentantLookupDto> {
+  async lookup(phone: string): Promise<RepresentantLookupDto> {
     const phoneE164 = normalizePhone(phone);
     const row = await this.prisma.representant.findFirst({
       where: { phoneE164, deletedAt: null },
@@ -248,19 +226,6 @@ export class RepresentantsService {
         representant: null,
         ownedByCommercialId: null,
         ownedByCommercialName: null,
-      };
-    }
-
-    if (!isAdmin(user) && row.createdById !== user.id) {
-      return {
-        found: true,
-        phoneE164,
-        representant: null,
-        // L'identifiant du propriétaire est tu lui aussi : il ne sert qu'à
-        // reconnaître SA PROPRE fiche, ce que l'appelant sait déjà quand elle
-        // lui appartient. Le nom suffit à savoir vers qui se tourner.
-        ownedByCommercialId: null,
-        ownedByCommercialName: row.createdBy.fullName,
       };
     }
 
@@ -359,13 +324,10 @@ export class RepresentantsService {
    * Sert l'index `(representantId, changedAt)`. Le cloisonnement s'est joué sur
    * la fiche, résolue par sa clé primaire juste au-dessus.
    */
-  async relationHistory(
-    user: AuthenticatedUser,
-    id: string,
-  ): Promise<RepresentantRelationChangeListDto> {
+  async relationHistory(id: string): Promise<RepresentantRelationChangeListDto> {
     const representant = await this.prisma.representant.findFirst({
       where: { id, deletedAt: null },
-      select: { id: true, createdById: true },
+      select: { id: true },
     });
     if (!representant) {
       throw new NotFoundException({
@@ -373,7 +335,6 @@ export class RepresentantsService {
         message: 'Représentant introuvable.',
       });
     }
-    assertReadable(user, representant);
 
     // LECTURE GLOBALE délibérée : une trace suit toujours la nature de son
     // représentant, déjà résolu ci-dessus. Rejouer le filtre ici rendrait soit
@@ -391,7 +352,6 @@ export class RepresentantsService {
   }
 
   async listComments(
-    user: AuthenticatedUser,
     id: string,
     query: RepresentantCommentQueryDto,
   ): Promise<RepresentantCommentListDto> {
@@ -399,7 +359,7 @@ export class RepresentantsService {
     const pageSize = query.pageSize ?? 50;
     const representant = await this.prisma.representant.findFirst({
       where: { id, deletedAt: null },
-      select: { id: true, createdById: true },
+      select: { id: true },
     });
     if (!representant) {
       throw new NotFoundException({
@@ -407,7 +367,6 @@ export class RepresentantsService {
         message: 'Représentant introuvable.',
       });
     }
-    assertReadable(user, representant);
 
     const where: Prisma.RepresentantCommentWhereInput = {
       representantId: id,
@@ -439,6 +398,9 @@ export class RepresentantsService {
    *
    * L'auteur vient de la session, jamais du corps de requête, et aucune route
    * ne réécrit une ligne posée.
+   *
+   * Le fil suit l'ANNUAIRE : commenter n'importe quelle fiche vivante est permis,
+   * modifier la fiche elle-même ne l'est pas.
    */
   async addComment(
     user: AuthenticatedUser,
@@ -447,7 +409,7 @@ export class RepresentantsService {
   ): Promise<RepresentantCommentDto> {
     const representant = await this.prisma.representant.findFirst({
       where: { id, deletedAt: null },
-      select: { id: true, createdById: true },
+      select: { id: true },
     });
     if (!representant) {
       throw new NotFoundException({
@@ -455,7 +417,6 @@ export class RepresentantsService {
         message: 'Représentant introuvable.',
       });
     }
-    assertOwnership(user, representant);
 
     // `skipDuplicates` plutôt qu'une lecture préalable : le rejeu et la course
     // se traitent du même geste, c'est PostgreSQL qui arbitre la clé primaire.

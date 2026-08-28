@@ -1,5 +1,6 @@
 import { ForbiddenException } from '@nestjs/common';
 import { Role } from '@crm/database';
+import type { Prisma } from '@crm/database';
 
 import type { AuthenticatedUser } from './decorators/current-user.decorator.js';
 
@@ -25,6 +26,36 @@ export const readScope = (
   user: Pick<AuthenticatedUser, 'id' | 'role'>,
 ): { createdById?: string } => (readsEveryone(user) ? {} : { createdById: user.id });
 
+/**
+ * CE QU'UN TÉLÉCONSEILLER A EN MAIN : ses propres fiches, ou celles qu'une
+ * campagne lui a confiées.
+ *
+ * Écrite ici une seule fois, et servie au panneau comme au téléphone. Quand la
+ * règle existait en deux exemplaires, le web bornait sur `createdById` seul et
+ * affichait « aucun prospect à appeler » à la personne dont le mobile comptait
+ * six fiches à appeler.
+ */
+const mineOrAssignedProspect = (userId: string): Prisma.ProspectWhereInput => ({
+  OR: [
+    { createdById: userId },
+    { callTasks: { some: { assignedToId: userId, isActive: true } } },
+  ],
+});
+
+/** Portée de lecture des PROSPECTS à l'écran. Supervision et direction lisent tout. */
+export const prospectReadScope = (
+  user: Pick<AuthenticatedUser, 'id' | 'role'>,
+): Prisma.ProspectWhereInput => (readsEveryone(user) ? {} : mineOrAssignedProspect(user.id));
+
+/**
+ * Portée des prospects sur le TÉLÉPHONE. Volontairement plus étroite que
+ * `prospectReadScope` : lire le travail de tous à l'écran est une chose, en
+ * tirer le portefeuille national sur un appareil en est une autre.
+ */
+export const prospectSyncScope = (
+  user: Pick<AuthenticatedUser, 'id' | 'role'>,
+): Prisma.ProspectWhereInput => (isAdmin(user) ? {} : mineOrAssignedProspect(user.id));
+
 export function readableOwnerId(
   user: Pick<AuthenticatedUser, 'id' | 'role'>,
   requestedId: string,
@@ -39,7 +70,8 @@ export function readableOwnerId(
  * Distinct d'`ownerScope`, qui reste la portée du téléphone. Le superviseur
  * corrige, réattribue et débloque ce que ses commerciaux ont saisi ; il ne
  * synchronise pas, donc il ne tire aucun portefeuille sur un appareil.
- * La DIRECTION lit tout mais n'écrit rien : elle n'est pas ici.
+ * La DIRECTION mène les trois étapes sur SES propres fiches, sans corriger
+ * celles des autres : elle n'est pas ici.
  */
 export const manages = (user: Pick<AuthenticatedUser, 'role'>): boolean =>
   isAdmin(user) || user.role === Role.SUPERVISEUR;

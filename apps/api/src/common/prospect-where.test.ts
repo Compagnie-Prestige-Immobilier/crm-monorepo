@@ -13,6 +13,11 @@ const alice: AuthenticatedUser = {
 };
 const admin: AuthenticatedUser = { ...alice, id: 'admin-1', username: 'admin', role: Role.ADMIN };
 
+/** Ce qu'un téléconseiller a en main : ses fiches, ou celles qu'on lui a confiées. */
+const portee = (userId: string): Record<string, unknown> => ({
+  OR: [{ createdById: userId }, { callTasks: { some: { assignedToId: userId, isActive: true } } }],
+});
+
 describe('filtre par segment', () => {
   it('délègue à segmentWhere plutôt que de réécrire le croisement', () => {
     for (const segment of ['BDD1', 'BDD2', 'BDD3', 'BDD4'] as const) {
@@ -38,7 +43,7 @@ describe('filtre par segment', () => {
 
   it('reste soumis au cloisonnement : un segment ne l’élargit pas', () => {
     const where = buildProspectWhere(alice, { segment: 'BDD1' });
-    expect(where.createdById).toBe('com-alice');
+    expect(where.AND).toEqual([portee(alice.id), segmentWhere('BDD1')]);
   });
 });
 
@@ -152,8 +157,12 @@ describe('portée du SUPERVISEUR', () => {
     expect(where.createdById).toBe('com-alice');
   });
 
-  it('un téléconseiller reste enfermé sur lui-même quoi qu’il demande', () => {
+  it('un téléconseiller qui filtre sur un collègue ne reçoit QUE ce qu’il a déjà en main', () => {
     const where = buildProspectWhere(alice, { commercialId: 'com-bob' });
-    expect(where.createdById).toBe('__aucun__');
+
+    // Le filtre passe tel quel, mais la portée reste en AND : ne remontent que
+    // les fiches saisies par le collègue et confiées à Alice par une campagne.
+    expect(where.createdById).toBe('com-bob');
+    expect(where.AND).toEqual([portee(alice.id)]);
   });
 });

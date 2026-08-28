@@ -21,7 +21,7 @@ import { lastAttemptsByProspect, type LastAttempt } from './last-attempt.js';
 import { normalizePhone } from '../../common/phone.js';
 import { AuditAction, audit } from '../../common/audit.js';
 import { PROSPECT_STATUT_TRANSITIONS, assertTransition } from '../../common/transitions.js';
-import { assertOwnership, assertReadable, isAdmin, ownerScope } from '../../common/scope.js';
+import { assertOwnership, isAdmin, ownerScope, prospectReadScope } from '../../common/scope.js';
 import { buildProspectWhere } from '../../common/prospect-where.js';
 import { ProspectSortField, SortOrder } from '../../common/dto/prospect-filter.dto.js';
 import type { ProspectQueryDto } from '../../common/dto/prospect-filter.dto.js';
@@ -305,13 +305,25 @@ export class ProspectsService {
 
   async get(user: AuthenticatedUser, id: string): Promise<ProspectDto> {
     const row = await this.prisma.prospect.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, deletedAt: null, ...prospectReadScope(user) },
       include: PROSPECT_INCLUDE,
     });
+    // Deux requêtes seulement quand la lecture échoue : la règle de portée reste
+    // écrite à un seul endroit, et « pas à vous » ne se confond pas avec
+    // « n'existe pas ».
     if (!row) {
+      const ailleurs = await this.prisma.prospect.findFirst({
+        where: { id, deletedAt: null },
+        select: { id: true },
+      });
+      if (ailleurs) {
+        throw new ForbiddenException({
+          code: 'NOT_OWNER',
+          message: 'Cette fiche appartient à un autre téléconseiller.',
+        });
+      }
       throw new NotFoundException({ code: 'PROSPECT_NOT_FOUND', message: 'Prospect introuvable.' });
     }
-    assertReadable(user, row);
     const attempts = await lastAttemptsByProspect(this.prisma, [row.id]);
     return toProspectDto(row, attempts.get(row.id));
   }
@@ -322,7 +334,7 @@ export class ProspectsService {
 
     await this.assertIdAvailable(user, id);
     // Le rattachement est facultatif : une fiche Grand Public n'en a aucun.
-    if (input.representantId) await this.assertRepresentantUsable(user, input.representantId);
+    if (input.representantId) await this.assertRepresentantUsable(input.representantId);
     const projet = input.projet ?? Projet.CHUES;
     const attached = await this.attachProjectByPhone(user, phoneE164, projet, input);
     if (attached) return attached;
@@ -383,7 +395,7 @@ export class ProspectsService {
     if (phoneE164 && phoneE164 !== existing.phoneE164)
       await this.assertPhoneFree(user, phoneE164, id);
     if (input.representantId && input.representantId !== existing.representantId) {
-      await this.assertRepresentantUsable(user, input.representantId);
+      await this.assertRepresentantUsable(input.representantId);
     }
     this.assertPayment(
       input.paymentMode ?? existing.paymentMode,
@@ -721,7 +733,7 @@ export class ProspectsService {
     });
     if (!rows.length) return { updated: 0, prospectIds: [] };
 
-    if (input.representantId) await this.assertRepresentantUsable(user, input.representantId);
+    if (input.representantId) await this.assertRepresentantUsable(input.representantId);
     if (input.commercialId) {
       const owner = await this.prisma.user.findFirst({
         where: { id: input.commercialId, deletedAt: null },
@@ -748,13 +760,11 @@ export class ProspectsService {
   }
 
   /**
-   * Le représentant de rattachement doit exister et être visible par
-   * l'appelant. Sans ce contrôle, un COMMERCIAL pourrait accrocher ses
-   * prospects sous le représentant d'un collègue et les faire apparaître dans
-   * la synchro de ce dernier.
+   * L'ANNUAIRE est commun : tout représentant vivant sert de rattachement, quel
+   * que soit son créateur. Le cloisonnement se joue sur le PROSPECT créé, qui
+   * reste celui de son auteur.
    */
   private async assertRepresentantUsable(
-    user: AuthenticatedUser,
     representantId: string,
   ): Promise<{ id: string; createdById: string }> {
     const representant = await this.prisma.representant.findFirst({
@@ -767,7 +777,6 @@ export class ProspectsService {
         message: 'Représentant introuvable.',
       });
     }
-    assertOwnership(user, representant, 'Ce représentant appartient à un autre commercial.');
     return representant;
   }
 

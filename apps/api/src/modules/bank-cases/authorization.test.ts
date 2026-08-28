@@ -196,7 +196,7 @@ const MATRICE_NOUVEAUX: {
   {
     controller: RepCampaignsController,
     method: 'recordAttempt',
-    roles: [Role.ADMIN, Role.COMMERCIAL],
+    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION],
   },
 
   {
@@ -207,16 +207,28 @@ const MATRICE_NOUVEAUX: {
   {
     controller: RepresentantsController,
     method: 'lookup',
-    roles: [Role.ADMIN, Role.COMMERCIAL],
+    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION],
   },
   {
     controller: RepresentantsController,
     method: 'get',
     roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION],
   },
-  { controller: RepresentantsController, method: 'create', roles: [Role.ADMIN, Role.COMMERCIAL] },
-  { controller: RepresentantsController, method: 'update', roles: [Role.ADMIN, Role.COMMERCIAL] },
-  { controller: RepresentantsController, method: 'remove', roles: [Role.ADMIN, Role.COMMERCIAL] },
+  {
+    controller: RepresentantsController,
+    method: 'create',
+    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION],
+  },
+  {
+    controller: RepresentantsController,
+    method: 'update',
+    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION],
+  },
+  {
+    controller: RepresentantsController,
+    method: 'remove',
+    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION],
+  },
   { controller: RepresentantsController, method: 'import', roles: [Role.ADMIN] },
   {
     controller: RepresentantsController,
@@ -231,7 +243,7 @@ const MATRICE_NOUVEAUX: {
   {
     controller: RepresentantsController,
     method: 'addComment',
-    roles: [Role.ADMIN, Role.COMMERCIAL],
+    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION],
   },
   { controller: RepresentantsController, method: 'removeComment', roles: [Role.ADMIN] },
 ];
@@ -281,10 +293,18 @@ describe('matrice d’autorisation des modules récents', () => {
     expect(allows(RepresentantsController, 'import', Role.ADMIN)).toBe(true);
   });
 
-  it('l’annuaire des représentants n’est ouvert qu’en lecture aux rôles de pilotage', () => {
-    for (const method of ['create', 'update', 'remove', 'import', 'addComment', 'removeComment']) {
-      for (const role of [Role.SUPERVISEUR, Role.DIRECTION]) {
+  it('la supervision et la direction qualifient un représentant, sans toucher à l’administration', () => {
+    for (const role of [Role.SUPERVISEUR, Role.DIRECTION]) {
+      for (const method of ['create', 'update', 'remove', 'addComment']) {
+        expect(allows(RepresentantsController, method, role), `${role}.${method}`).toBe(true);
+      }
+      for (const method of ['import', 'removeComment']) {
         expect(allows(RepresentantsController, method, role), `${role}.${method}`).toBe(false);
+      }
+      for (const method of ['preview', 'create', 'close']) {
+        expect(allows(RepCampaignsController, method, role), `${role}.campagnes.${method}`).toBe(
+          false,
+        );
       }
     }
   });

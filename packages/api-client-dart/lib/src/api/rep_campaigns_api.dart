@@ -18,6 +18,7 @@ import 'package:crm_api_client/src/model/rep_call_attempt_result_dto.dart';
 import 'package:crm_api_client/src/model/rep_campaign_detail_dto.dart';
 import 'package:crm_api_client/src/model/rep_campaign_list_dto.dart';
 import 'package:crm_api_client/src/model/rep_campaign_preview_dto.dart';
+import 'package:crm_api_client/src/model/representant_relation.dart';
 
 class RepCampaignsApi {
   final Dio _dio;
@@ -556,6 +557,7 @@ class RepCampaignsApi {
   /// * [departementId]
   /// * [iefId]
   /// * [onlyWithoutProspects]
+  /// * [relationStatuses] - Mêmes états de relation que `createRepCampaign`, pour compter avant de créer.
   /// * [commercialCount]
   /// * [spreadDays]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
@@ -571,6 +573,7 @@ class RepCampaignsApi {
     String? departementId,
     String? iefId,
     bool? onlyWithoutProspects = false,
+    List<RepresentantRelation>? relationStatuses,
     num? commercialCount = 1,
     num? spreadDays = 1,
     CancelToken? cancelToken,
@@ -598,6 +601,7 @@ class RepCampaignsApi {
       if (iefId != null) r'iefId': iefId,
       if (onlyWithoutProspects != null)
         r'onlyWithoutProspects': onlyWithoutProspects,
+      if (relationStatuses != null) r'relationStatuses': relationStatuses,
       if (commercialCount != null) r'commercialCount': commercialCount,
       if (spreadDays != null) r'spreadDays': spreadDays,
     };

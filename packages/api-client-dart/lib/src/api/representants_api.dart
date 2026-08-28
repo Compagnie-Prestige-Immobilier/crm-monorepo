@@ -753,7 +753,7 @@ class RepresentantsApi {
     );
   }
 
-  /// Liste paginée. Un COMMERCIAL ne voit que ses propres représentants.
+  /// Liste paginée de l’annuaire, commun à tous les téléconseillers.
   ///
   ///
   /// Parameters:

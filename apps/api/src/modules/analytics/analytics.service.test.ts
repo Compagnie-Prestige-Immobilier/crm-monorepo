@@ -93,10 +93,14 @@ describe('conditions communes', () => {
     expect(rendered(prospectConditions(alice, {}))).toContain('p."createdById" = "com-alice"');
   });
 
-  it('un COMMERCIAL qui vise un collègue obtient l’ensemble vide', () => {
+  it('un COMMERCIAL qui vise un collègue ne compte QUE ce qu’il a déjà en main', () => {
     const sql = rendered(prospectConditions(alice, { commercialId: 'com-bob' }));
-    expect(sql).not.toContain('"com-bob"');
-    expect(sql).toContain('"__aucun__"');
+
+    expect(sql).toContain('p."createdById" = "com-bob"');
+    // Sa propre portée reste en AND : les fiches du collègue qu’aucune campagne
+    // ne lui a confiées restent hors du compte.
+    expect(sql).toContain('p."createdById" = "com-alice"');
+    expect(sql).toContain('ct."assignedToId" = "com-alice"');
   });
 
   it('traduit les filtres de phase 2 sur les bonnes colonnes', () => {

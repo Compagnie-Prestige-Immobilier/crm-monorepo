@@ -93,14 +93,25 @@ describe('un filtre, la même population sur les trois surfaces', () => {
   it('le cloisonnement s’applique aux trois surfaces, et n’est jamais surchargeable', () => {
     const filtre: ProspectFilterDto = { commercialId: 'com-bob', includeDeleted: true };
 
+    // Filtrer sur un collègue n’ouvre rien : la portée reste en AND, et ne
+    // laisse que les fiches du collègue déjà confiées à Alice.
     expect(buildProspectWhere(alice, filtre)).toMatchObject({
-      createdById: '__aucun__',
+      createdById: 'com-bob',
       deletedAt: null,
+      AND: [
+        {
+          OR: [
+            { createdById: 'com-alice' },
+            { callTasks: { some: { assignedToId: 'com-alice', isActive: true } } },
+          ],
+        },
+      ],
     });
 
     const sql = rendered(prospectConditions(alice, filtre));
     expect(sql).toContain('p."createdById" = "com-alice"');
-    expect(sql).toContain('"__aucun__"');
+    expect(sql).toContain('ct."assignedToId" = "com-alice"');
+    expect(sql).toContain('p."createdById" = "com-bob"');
     expect(sql).toContain('p."deletedAt" IS NULL');
   });
 

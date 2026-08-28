@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform, Type } from 'class-transformer';
+import { Transform, Type, type TransformFnParams } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -28,6 +28,10 @@ import { MAX_SPREAD_DAYS, MIN_SPREAD_DAYS } from '../phase2/distribution.js';
 import { PageMetaDto } from '../../common/dto/prospect-filter.dto.js';
 import { PROFESSION_MAX_LENGTH, RepresentantLookupDto } from '../representants/dto.js';
 import { queryBoolean } from '../../common/dto/query-boolean.js';
+
+/** Une requête ne rend un tableau que si le paramètre apparaît plusieurs fois. */
+const queryList = ({ value }: TransformFnParams): unknown =>
+  value === undefined || Array.isArray(value) ? value : [value];
 
 export class CreateRepCampaignDto {
   @ApiProperty({ maxLength: 120, example: 'Relance représentants dormants' })
@@ -73,6 +77,20 @@ export class CreateRepCampaignDto {
   @Transform(queryBoolean)
   @IsBoolean()
   onlyWithoutProspects?: boolean;
+
+  @ApiPropertyOptional({
+    enum: RepresentantRelation,
+    enumName: 'RepresentantRelation',
+    isArray: true,
+    maxItems: 4,
+    description:
+      'Ne retenir que les représentants dans ces états de relation. Absente ou vide : aucun filtre. `AMBASSADEUR` seul donne les qualifiés ; une liste qui l’exclut donne les non qualifiés.',
+  })
+  @IsOptional()
+  @IsEnum(RepresentantRelation, { each: true })
+  @ArrayUnique()
+  @ArrayMaxSize(4)
+  relationStatuses?: RepresentantRelation[];
 
   @ApiPropertyOptional({
     type: Number,
@@ -168,6 +186,14 @@ export class RepCampaignSummaryDto {
   @ApiProperty({ type: String, format: 'uuid', nullable: true }) departementId!: string | null;
   @ApiProperty({ type: String, format: 'uuid', nullable: true }) iefId!: string | null;
   @ApiProperty({ type: Boolean }) onlyWithoutProspects!: boolean;
+
+  @ApiProperty({
+    enum: RepresentantRelation,
+    enumName: 'RepresentantRelation',
+    isArray: true,
+    description: 'États de relation retenus par le tirage. Vide : aucun filtre.',
+  })
+  relationStatuses!: RepresentantRelation[];
 
   @ApiProperty({ format: 'uuid' }) createdById!: string;
   @ApiProperty() createdByName!: string;
@@ -265,6 +291,20 @@ export class RepCampaignPreviewQueryDto {
   @Transform(queryBoolean)
   @IsBoolean()
   onlyWithoutProspects?: boolean;
+
+  @ApiPropertyOptional({
+    enum: RepresentantRelation,
+    enumName: 'RepresentantRelation',
+    isArray: true,
+    maxItems: 4,
+    description: 'Mêmes états de relation que `createRepCampaign`, pour compter avant de créer.',
+  })
+  @IsOptional()
+  @Transform(queryList)
+  @IsEnum(RepresentantRelation, { each: true })
+  @ArrayUnique()
+  @ArrayMaxSize(4)
+  relationStatuses?: RepresentantRelation[];
 
   @ApiPropertyOptional({ type: Number, minimum: 1, maximum: 200, default: 1 })
   @IsOptional()

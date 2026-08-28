@@ -601,7 +601,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Liste paginée. Un COMMERCIAL ne voit que ses propres représentants. */
+    /** Liste paginée de l’annuaire, commun à tous les téléconseillers. */
     get: operations['listRepresentants'];
     put?: never;
     /** Crée un représentant. L’identifiant peut être fourni par le client. */
@@ -897,7 +897,7 @@ export interface paths {
     };
     /**
      * Récupère les changements depuis un curseur opaque.
-     * @description Pagination keyset sur (updatedAt, id) et retard de sécurité de 2 secondes. Un COMMERCIAL ne reçoit que ses propres lignes ; les référentiels sont communs.
+     * @description Pagination keyset sur (updatedAt, id) et retard de sécurité de 2 secondes. Un COMMERCIAL ne reçoit que ses propres prospects ; l’annuaire des représentants et les référentiels sont communs.
      */
     get: operations['pullSyncChanges'];
     put?: never;
@@ -4964,6 +4964,8 @@ export interface components {
       /** Format: uuid */
       iefId: string | null;
       onlyWithoutProspects: boolean;
+      /** @description États de relation retenus par le tirage. Vide : aucun filtre. */
+      relationStatuses: components['schemas']['RepresentantRelation'][];
       /** Format: uuid */
       createdById: string;
       createdByName: string;
@@ -5000,6 +5002,8 @@ export interface components {
        * @default false
        */
       onlyWithoutProspects: boolean;
+      /** @description Ne retenir que les représentants dans ces états de relation. Absente ou vide : aucun filtre. `AMBASSADEUR` seul donne les qualifiés ; une liste qui l’exclut donne les non qualifiés. */
+      relationStatuses?: components['schemas']['RepresentantRelation'][];
       /**
        * @description Étale la file de chaque commercial sur N journées. À 1 (défaut), un seul programme par commercial.
        * @default 1
@@ -5057,6 +5061,8 @@ export interface components {
       /** Format: uuid */
       iefId: string | null;
       onlyWithoutProspects: boolean;
+      /** @description États de relation retenus par le tirage. Vide : aucun filtre. */
+      relationStatuses: components['schemas']['RepresentantRelation'][];
       /** Format: uuid */
       createdById: string;
       createdByName: string;
@@ -8640,8 +8646,17 @@ export interface operations {
           'application/json': components['schemas']['ApiErrorDto'];
         };
       };
-      /** @description La fiche appartient à un autre commercial. */
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
       403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description REPRESENTANT_NOT_FOUND. */
+      404: {
         headers: {
           [name: string]: unknown;
         };
@@ -12064,6 +12079,8 @@ export interface operations {
         departementId?: string;
         iefId?: string;
         onlyWithoutProspects?: boolean;
+        /** @description Mêmes états de relation que `createRepCampaign`, pour compter avant de créer. */
+        relationStatuses?: components['schemas']['RepresentantRelation'][];
         commercialCount?: number;
         spreadDays?: number;
       };

@@ -68,13 +68,44 @@ const CONTROLLERS: readonly Controller[] = [
 ];
 
 /**
+ * LES TROIS ÉTAPES : qualifier un représentant, ajouter un prospect, le
+ * convertir. La supervision et la direction les mènent elles-mêmes ; ce que
+ * chacune écrit reste borné à ses propres fiches par `assertOwnership`, et son
+ * tirage à ses propres prospects par `mineOrAssignedProspect`.
+ */
+const TROIS_ETAPES: readonly string[] = [
+  'Phase2Controller.pullDirectory',
+  'Phase2Controller.uploadRecording',
+
+  // La console d'appel POSTE la tentative sur `/sync/push` : sans ces deux
+  // routes, l'écran de l'étape 3 n'enregistre rien.
+  'SyncController.pull',
+  'SyncController.push',
+
+  'ProspectsController.create',
+  'ProspectsController.remove',
+  'ProspectsController.update',
+
+  'RepCampaignsController.recordAttempt',
+
+  'RepresentantsController.addComment',
+  'RepresentantsController.create',
+  'RepresentantsController.lookup',
+  'RepresentantsController.remove',
+  'RepresentantsController.update',
+];
+
+/**
  * TOUT ce qu'un SUPERVISEUR atteint, nommément.
  *
- * Le rôle est un rôle de LECTURE : la liste est donc aussi la preuve de ce
- * qu'il n'atteint pas. Une route ouverte sans figurer ici fait rougir le
- * balayage, y compris une route ajoutée demain sous un `@Roles` de classe.
+ * Hors des trois étapes, le rôle reste un rôle de LECTURE : la liste est donc
+ * aussi la preuve de ce qu'il n'atteint pas. Une route ouverte sans figurer ici
+ * fait rougir le balayage, y compris une route ajoutée demain sous un `@Roles`
+ * de classe.
  */
 const ADMISES: readonly string[] = [
+  ...TROIS_ETAPES,
+
   'AdminController.supervisionOverview',
 
   'AnalyticsController.ambassadorConversion',
@@ -217,9 +248,10 @@ const ADMISES_ACCUEIL: readonly string[] = [
 ];
 
 /**
- * La DIRECTION lit ce que lit la supervision, tient le registre avec l'accueil,
- * administre les quatre listes qui l'alimentent et exporte ce qu'elle lit. Elle
- * n'ouvre aucun compte et ne purge rien.
+ * La DIRECTION lit ce que lit la supervision, mène les trois étapes comme elle,
+ * tient le registre avec l'accueil, administre les quatre listes qui
+ * l'alimentent et exporte ce qu'elle lit. Elle n'ouvre aucun compte et ne purge
+ * rien.
  */
 const ADMISES_DIRECTION: readonly string[] = [
   ...ADMISES.filter((route) => route !== 'AnalyticsController.bankAging'),
@@ -295,17 +327,23 @@ describe('ce qu’un SUPERVISEUR atteint, route par route', () => {
     expect(ADMISES.filter((route) => !connues.has(route))).toEqual([]);
   });
 
-  it('LA SYNCHRONISATION MOBILE LUI EST FERMÉE, poussée comme tirage', () => {
+  it('SYNCHRONISE SON PROPRE TRAVAIL, poussée comme tirage', () => {
     for (const method of routesOf(SyncController)) {
-      expect(allows(SyncController, method), `sync.${method}`).toBe(false);
+      expect(allows(SyncController, method), `sync.${method}`).toBe(true);
     }
   });
 
-  it('n’écrit aucune fiche, n’émet aucune notification, ne purge rien', () => {
-    for (const method of ['create', 'update', 'remove', 'merge', 'reassign', 'changeSegment']) {
+  it('mène les trois étapes, sans fusionner, réattribuer ni importer', () => {
+    for (const method of ['create', 'update', 'remove']) {
+      expect(allows(ProspectsController, method), `prospects.${method}`).toBe(true);
+    }
+    for (const method of ['merge', 'reassign', 'changeSegment']) {
       expect(allows(ProspectsController, method), `prospects.${method}`).toBe(false);
     }
-    for (const method of ['create', 'update', 'remove', 'import', 'addComment', 'removeComment']) {
+    for (const method of ['create', 'update', 'remove', 'addComment']) {
+      expect(allows(RepresentantsController, method), `representants.${method}`).toBe(true);
+    }
+    for (const method of ['import', 'removeComment']) {
       expect(allows(RepresentantsController, method), `representants.${method}`).toBe(false);
     }
     expect(allows(SuggestionsController, 'setStatus')).toBe(false);
@@ -411,9 +449,9 @@ describe('ce qu’une DIRECTION atteint, route par route', () => {
     expect(allowsAs(Role.DIRECTION, AnalyticsController, 'bankAging')).toBe(false);
   });
 
-  it('LA SYNCHRONISATION MOBILE LUI EST FERMÉE, poussée comme tirage', () => {
+  it('SYNCHRONISE SON PROPRE TRAVAIL, poussée comme tirage', () => {
     for (const method of routesOf(SyncController)) {
-      expect(allowsAs(Role.DIRECTION, SyncController, method), `sync.${method}`).toBe(false);
+      expect(allowsAs(Role.DIRECTION, SyncController, method), `sync.${method}`).toBe(true);
     }
   });
 
@@ -426,7 +464,7 @@ describe('ce qu’une DIRECTION atteint, route par route', () => {
     for (const method of routesOf(NotificationTemplatesController)) {
       expect(allowsAs(Role.DIRECTION, NotificationTemplatesController, method)).toBe(false);
     }
-    for (const method of ['create', 'update', 'remove', 'merge', 'reassign', 'changeSegment']) {
+    for (const method of ['merge', 'reassign', 'changeSegment']) {
       expect(allowsAs(Role.DIRECTION, ProspectsController, method), `prospects.${method}`).toBe(
         false,
       );
