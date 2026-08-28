@@ -146,7 +146,7 @@ describe('RepScript : rien n’est choisi d’office', () => {
   it('montre la liste confiée d’abord, l’annuaire dès qu’on cherche', async () => {
     await renderListe();
 
-    expect(screen.getByText(/Votre liste d’appel/u)).toBeTruthy();
+    expect(screen.getByText('Choisissez qui vous venez d’appeler.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Bineta Diop/u })).toBeNull();
 
     await userEvent.type(screen.getByLabelText('Qui avez-vous appelé ?'), 'Bineta');

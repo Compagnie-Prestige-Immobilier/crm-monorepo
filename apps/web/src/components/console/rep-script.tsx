@@ -164,11 +164,7 @@ export function RepScript() {
 
       <ChampAnnuaire value={search} onChange={setSearch} />
 
-      <p className="text-[0.8125rem] text-muted-foreground">
-        {listeEstFile
-          ? 'Votre liste d’appel. Choisissez qui vous venez d’appeler.'
-          : 'Choisissez qui vous venez d’appeler.'}
-      </p>
+      <p className="text-[0.8125rem] text-muted-foreground">Choisissez qui vous venez d’appeler.</p>
 
       {annuaire.isError && !listeEstFile ? (
         <QueryErrorState
