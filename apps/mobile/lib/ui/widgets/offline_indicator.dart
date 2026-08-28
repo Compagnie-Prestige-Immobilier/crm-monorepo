@@ -24,7 +24,7 @@ class OfflineIndicator extends ConsumerWidget {
         CpiConnectivity.offline => const _OfflinePulse(
           key: ValueKey<String>('offline'),
           icon: PhosphorIconsRegular.wifiSlash,
-          label: 'Hors ligne. Les saisies partiront au retour du réseau.',
+          label: 'Hors ligne. Vos fiches sont gardées.',
         ),
         CpiConnectivity.unreachable => const _OfflinePulse(
           key: ValueKey<String>('unreachable'),
@@ -91,7 +91,15 @@ class _OfflinePulseState extends State<_OfflinePulse>
 
   @override
   Widget build(BuildContext context) {
-    final Color color = context.cpi.accentOnDark;
+    // Sur un aplat de marque (AppBar) l'or clair porte ; sur une surface neutre
+    // (en-tête ForUI) il disparaît. La couleur d'icône ambiante dit lequel.
+    final Color base =
+        IconTheme.of(context).color ?? Theme.of(context).colorScheme.onSurface;
+    final CpiColors cpi = context.cpi;
+    final Color color =
+        ThemeData.estimateBrightnessForColor(base) == Brightness.light
+        ? cpi.accentOnDark
+        : cpi.accentText;
     final Widget icon = Icon(widget.icon, size: CpiIconSize.md, color: color);
 
     return Semantics(

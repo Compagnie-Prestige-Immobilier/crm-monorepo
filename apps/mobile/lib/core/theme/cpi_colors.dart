@@ -29,6 +29,7 @@ class CpiColors extends ThemeExtension<CpiColors> {
     required this.inputBorder,
     required this.switchTrack,
     required this.borderSubtle,
+    required this.cardBorder,
     required this.chart1,
     required this.chart2,
     required this.chart3,
@@ -66,10 +67,13 @@ class CpiColors extends ThemeExtension<CpiColors> {
     navActiveForeground: Color(0xFFFFFFFF),
     navBorder: Color(0x14FFFFFF),
     navRing: Color(0xFFB05070),
-    inputBackground: Color(0xFFF5ECEE),
-    inputBorder: Color(0xFFAB757C),
+    inputBackground: Color(0xFFF3F1F2),
+    // Neutre chaud, pas une teinte de marque : un contour de champ rose lisait
+    // comme une erreur. Tient 3:1 sur le fond, la carte et le remplissage.
+    inputBorder: Color(0xFF7E7679),
     switchTrack: Color(0xFFC4A0AA),
     borderSubtle: Color(0x1F630210),
+    cardBorder: Color(0xFFECE1E2),
     chart1: Color(0xFF630210),
     chart2: Color(0xFFC8921A),
     chart3: Color(0xFF1A6B44),
@@ -84,7 +88,59 @@ class CpiColors extends ThemeExtension<CpiColors> {
     syncBlocked: Color(0xFF6B4A52),
   );
 
+  /// CPI en mode sombre. Les neutres suivent le registre sobre de la migration
+  /// (fond #141013, carte #211D20, filet #2E292C) ; seule la teinte bordeaux
+  /// éclaircie porte l'identité, sinon les deux coques deviendraient le même
+  /// gris sur noir.
+  static const CpiColors dark = CpiColors(
+    success: Color(0xFF5FBF8F),
+    onSuccess: Color(0xFF0E2117),
+    successSurface: Color(0xFF132A20),
+    warning: Color(0xFFE8C069),
+    onWarning: Color(0xFF231A05),
+    warningSurface: Color(0xFF2E2512),
+    info: Color(0xFFE39BB4),
+    onInfo: Color(0xFF2A0F18),
+    infoSurface: Color(0xFF2E1A21),
+    accent: Color(0xFFC8921A),
+    accentForeground: Color(0xFF1A1206),
+    accentText: Color(0xFFE8C069),
+    accentBorder: Color(0xFFD9A93E),
+    accentOnDark: Color(0xFFF0CC7E),
+    accentSurface: Color(0xFF332913),
+    destructiveOnDark: Color(0xFFFFB3A8),
+    navSurface: Color(0xFF1B171A),
+    navForeground: Color(0xFFB0A6A9),
+    navActive: Color(0xFF38262B),
+    navActiveForeground: Color(0xFFF7D3D8),
+    navBorder: Color(0x14FFFFFF),
+    navRing: Color(0xFFE3919A),
+    inputBackground: Color(0xFF1E1A1D),
+    inputBorder: Color(0xFF7C7074),
+    switchTrack: Color(0xFF7A6B70),
+    borderSubtle: Color(0x1FF2C4CB),
+    cardBorder: Color(0xFF423C40),
+    chart1: Color(0xFFE3919A),
+    chart2: Color(0xFFE8C069),
+    chart3: Color(0xFF5FBF8F),
+    chart4: Color(0xFFC97BA0),
+    chart5: Color(0xFFA78BFA),
+    syncDraft: Color(0xFFB0A6A9),
+    syncPending: Color(0xFFB0A6A9),
+    syncSyncing: Color(0xFFE39BB4),
+    syncSynced: Color(0xFF5FBF8F),
+    syncConflict: Color(0xFFE8C069),
+    syncFailed: Color(0xFFFF8D7E),
+    syncBlocked: Color(0xFFB0A6A9),
+  );
+
   /// Identité de l'Union des Enseignants du Sénégal : noir massif, filet bleu.
+  /// Le bleu est celui du logo (#0201E9, teinte dominante mesurée) ; les
+  /// surfaces restent le gris froid neutre, elles ne prennent pas la teinte.
+  ///
+  /// La série 1 porte la marque ; les séries 2 à 5 sont le jeu catégoriel
+  /// commun aux deux coques. Les décliner en bleus (l'ancien #1D4ED8 à 18° et
+  /// 1,4:1 du bleu du logo) rendait deux courbes indiscernables.
   static const CpiColors chues = CpiColors(
     success: Color(0xFF1A6B44),
     onSuccess: Color(0xFFFFFFFF),
@@ -92,38 +148,83 @@ class CpiColors extends ThemeExtension<CpiColors> {
     warning: Color(0xFF856011),
     onWarning: Color(0xFFFFFFFF),
     warningSurface: Color(0xFFFAF4E8),
-    info: Color(0xFF1D4ED8),
+    info: Color(0xFF0201E9),
     onInfo: Color(0xFFFFFFFF),
-    infoSurface: Color(0xFFE8EEFB),
-    accent: Color(0xFF1D4ED8),
+    infoSurface: Color(0xFFE6E6FF),
+    accent: Color(0xFF0201CB),
     accentForeground: Color(0xFFFFFFFF),
-    accentText: Color(0xFF1D4ED8),
-    accentBorder: Color(0xFF1D4ED8),
-    accentOnDark: Color(0xFF8FB8FF),
-    accentSurface: Color(0xFFE8EEFB),
+    accentText: Color(0xFF0201CB),
+    accentBorder: Color(0xFF0201E9),
+    accentOnDark: Color(0xFFB3B3FF),
+    accentSurface: Color(0xFFE6E6FF),
     destructiveOnDark: Color(0xFFFCA5A5),
     navSurface: Color(0xFF0B0D12),
-    navForeground: Color(0xFFC3CFE6),
-    navActive: Color(0xFF16233D),
+    navForeground: Color(0xFFCDCDE4),
+    navActive: Color(0xFF08087D),
     navActiveForeground: Color(0xFFFFFFFF),
     navBorder: Color(0x14FFFFFF),
-    navRing: Color(0xFF5B9BFF),
-    inputBackground: Color(0xFFEEF1F7),
-    inputBorder: Color(0xFF77869F),
-    switchTrack: Color(0xFF9AA6BF),
-    borderSubtle: Color(0x1F0B2E6F),
-    chart1: Color(0xFF0B2E6F),
-    chart2: Color(0xFF1D4ED8),
+    navRing: Color(0xFF6C6BFF),
+    inputBackground: Color(0xFFF1F2F5),
+    inputBorder: Color(0xFF78789B),
+    switchTrack: Color(0xFF9F9FBC),
+    borderSubtle: Color(0x1F0201E9),
+    cardBorder: Color(0xFFDDE2EC),
+    chart1: Color(0xFF0201E9),
+    chart2: Color(0xFFC8921A),
     chart3: Color(0xFF1A6B44),
-    chart4: Color(0xFF5B9BFF),
+    chart4: Color(0xFFB05070),
     chart5: Color(0xFF8B5CF6),
     syncDraft: Color(0xFF44506A),
     syncPending: Color(0xFF44506A),
-    syncSyncing: Color(0xFF1D4ED8),
+    syncSyncing: Color(0xFF0201E9),
     syncSynced: Color(0xFF1A6B44),
     syncConflict: Color(0xFF856011),
     syncFailed: Color(0xFFB91C1C),
     syncBlocked: Color(0xFF44506A),
+  );
+
+  /// CHUES en mode sombre : mêmes neutres sobres que [dark], à un cran froid,
+  /// et le bleu du logo éclairci en accent.
+  static const CpiColors chuesDark = CpiColors(
+    success: Color(0xFF5FBF8F),
+    onSuccess: Color(0xFF0E2117),
+    successSurface: Color(0xFF132A20),
+    warning: Color(0xFFE8C069),
+    onWarning: Color(0xFF231A05),
+    warningSurface: Color(0xFF2E2512),
+    info: Color(0xFFA5A4FF),
+    onInfo: Color(0xFF0A0940),
+    infoSurface: Color(0xFF1E1E4A),
+    accent: Color(0xFF3231E0),
+    accentForeground: Color(0xFFFFFFFF),
+    accentText: Color(0xFFA5A4FF),
+    accentBorder: Color(0xFF6C6BFF),
+    accentOnDark: Color(0xFFC4C4FF),
+    accentSurface: Color(0xFF1E1E4A),
+    destructiveOnDark: Color(0xFFFFC0B6),
+    navSurface: Color(0xFF171A21),
+    navForeground: Color(0xFFA6ACBA),
+    navActive: Color(0xFF262560),
+    navActiveForeground: Color(0xFFCFCEFF),
+    navBorder: Color(0x14FFFFFF),
+    navRing: Color(0xFF8B8AFF),
+    inputBackground: Color(0xFF1A1D24),
+    inputBorder: Color(0xFF7A7A93),
+    switchTrack: Color(0xFF6E6E88),
+    borderSubtle: Color(0x1F9A99FF),
+    cardBorder: Color(0xFF3E4351),
+    chart1: Color(0xFF9A99FF),
+    chart2: Color(0xFFE8C069),
+    chart3: Color(0xFF5FBF8F),
+    chart4: Color(0xFFC97BA0),
+    chart5: Color(0xFFA78BFA),
+    syncDraft: Color(0xFFA6ACBA),
+    syncPending: Color(0xFFA6ACBA),
+    syncSyncing: Color(0xFFA5A4FF),
+    syncSynced: Color(0xFF5FBF8F),
+    syncConflict: Color(0xFFE8C069),
+    syncFailed: Color(0xFFFF8D7E),
+    syncBlocked: Color(0xFFA6ACBA),
   );
 
   final Color success;
@@ -164,6 +265,11 @@ class CpiColors extends ThemeExtension<CpiColors> {
   final Color inputBorder;
   final Color switchTrack;
   final Color borderSubtle;
+
+  /// Filet d'une carte, d'une pastille de nav ou d'un calque flottant. En
+  /// sombre l'ombre ne se voit pas : ce filet EST la limite de la surface, et
+  /// `outlineVariant` la laissait à 1,2:1 de la carte.
+  final Color cardBorder;
 
   final Color chart1;
   final Color chart2;
@@ -215,6 +321,7 @@ class CpiColors extends ThemeExtension<CpiColors> {
     Color? inputBorder,
     Color? switchTrack,
     Color? borderSubtle,
+    Color? cardBorder,
     Color? chart1,
     Color? chart2,
     Color? chart3,
@@ -255,6 +362,7 @@ class CpiColors extends ThemeExtension<CpiColors> {
       inputBorder: inputBorder ?? this.inputBorder,
       switchTrack: switchTrack ?? this.switchTrack,
       borderSubtle: borderSubtle ?? this.borderSubtle,
+      cardBorder: cardBorder ?? this.cardBorder,
       chart1: chart1 ?? this.chart1,
       chart2: chart2 ?? this.chart2,
       chart3: chart3 ?? this.chart3,
@@ -301,6 +409,7 @@ class CpiColors extends ThemeExtension<CpiColors> {
       inputBorder: l(inputBorder, other.inputBorder),
       switchTrack: l(switchTrack, other.switchTrack),
       borderSubtle: l(borderSubtle, other.borderSubtle),
+      cardBorder: l(cardBorder, other.cardBorder),
       chart1: l(chart1, other.chart1),
       chart2: l(chart2, other.chart2),
       chart3: l(chart3, other.chart3),

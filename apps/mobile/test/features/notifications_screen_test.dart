@@ -16,6 +16,7 @@ import 'package:cpi_go/features/notifications/notifications_controller.dart';
 import 'package:cpi_go/features/notifications/presentation/notification_bell.dart';
 import 'package:cpi_go/features/notifications/presentation/notifications_screen.dart';
 import 'package:cpi_go/features/notifications/push_deep_link_listener.dart';
+import 'package:cpi_go/ui/widgets/cpi_kit.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -238,7 +239,7 @@ void main() {
       expect(inbox.reads, contains('ntf-1'));
     });
 
-    notificationTestWidgets('un échec de rapatriement le DIT, avec sa date', (
+    notificationTestWidgets('un échec de rapatriement le DIT, en une phrase', (
       WidgetTester tester,
     ) async {
       // « Aucune annonce » recouvrait trois situations : boîte vraiment vide,
@@ -249,7 +250,7 @@ void main() {
       await tester.pumpWidget(host());
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Liste non actualisée'), findsOneWidget);
+      expect(find.textContaining('Hors ligne'), findsOneWidget);
     });
 
     notificationTestWidgets('un rapatriement réussi ne dit rien', (
@@ -258,7 +259,50 @@ void main() {
       await tester.pumpWidget(host());
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Liste non actualisée'), findsNothing);
+      expect(find.textContaining('Hors ligne'), findsNothing);
+    });
+
+    notificationTestWidgets(
+      '« Tout marquer comme lu » est un bouton nommé, qui confirme',
+      (WidgetTester tester) async {
+        // C'était une icône de bandeau : deux traits sans nom, qui marquaient
+        // tout lu sans rien demander.
+        await PushInboxHelper(db).seed(message('ntf-1'));
+        await PushInboxHelper(db).seed(message('ntf-2'));
+
+        await tester.pumpWidget(host());
+        await tester.pumpAndSettle();
+
+        expect(find.text('2 non lues'), findsOneWidget);
+
+        await tester.tap(find.text('Tout marquer comme lu'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('2 annonces seront marquées lues.'), findsOneWidget);
+
+        await tester.tap(find.text('Marquer'));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byType(CpiTag),
+          findsNothing,
+          reason: 'plus de « Non lue »',
+        );
+        expect(find.text('2 annonces marquées lues.'), findsOneWidget);
+      },
+    );
+
+    notificationTestWidgets('l\'état vide offre un bouton pour actualiser', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(host());
+      await tester.pumpAndSettle();
+
+      final int avant = inbox.refreshes;
+      await tester.tap(find.text('Actualiser'));
+      await tester.pumpAndSettle();
+
+      expect(inbox.refreshes, greaterThan(avant));
     });
 
     notificationTestWidgets(

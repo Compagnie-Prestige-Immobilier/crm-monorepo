@@ -29,7 +29,6 @@ abstract final class CpiIconSize {
   static const double xxl = 28;
   static const double xxxl = 36;
   static const double display = 56;
-  static const double hero = 88;
 }
 
 abstract final class CpiRadius {
@@ -78,12 +77,28 @@ abstract final class CpiElevation {
   ];
 
   static Color get shadowTint => _tint;
+
+  /// La même ombre repeinte à l'encre de la coque. `scheme.shadow` porte le
+  /// bordeaux chez CPI et le bleu-noir chez CHUES : garder le tint CPI sous la
+  /// coque CHUES posait une ombre chaude sur un gris froid.
+  static List<BoxShadow> tinted(List<BoxShadow> base, Color tint) =>
+      <BoxShadow>[
+        for (final BoxShadow shadow in base)
+          BoxShadow(
+            color: tint.withValues(alpha: shadow.color.a),
+            offset: shadow.offset,
+            blurRadius: shadow.blurRadius,
+          ),
+      ];
 }
 
 abstract final class CpiStateOpacity {
   static const double hover = 0.08;
   static const double focus = 0.10;
-  static const double pressed = 0.12;
+
+  /// Un appui doit se VOIR au soleil, à bout de bras : 0,12 rendait 1,2:1 avec
+  /// le repos sur une carte blanche, sous le seuil du perceptible.
+  static const double pressed = 0.16;
   static const double selected = 0.12;
   static const double dragged = 0.16;
   static const double disabledContent = 0.38;
@@ -94,28 +109,14 @@ abstract final class CpiStateOpacity {
 /// 2.5.8 AAA) ; 44 laissait `SyncBadge` et `NotificationBell` coder 48 à côté.
 const double kCpiMinTouchTarget = 48;
 
-/// Piste de progression posée sur un aplat de marque : le blanc translucide
-/// doit rester à 3:1 du fond ET de l'indicateur blanc (WCAG 1.4.11).
-Color cpiTrackOn(Color brand) =>
-    Color.alphaBlend(const Color(0x73FFFFFF), brand);
-
-/// Dégradé plein écran d'un aplat de marque : la même teinte éclaircie puis
-/// assombrie, pour qu'une autre coque n'hérite pas du bordeaux CPI.
-List<Color> cpiBrandGradient(Color brand) {
-  final HSLColor base = HSLColor.fromColor(brand);
-  return <Color>[
-    base.withLightness((base.lightness + 0.06).clamp(0.0, 1.0)).toColor(),
-    brand,
-    base.withLightness((base.lightness - 0.05).clamp(0.0, 1.0)).toColor(),
-  ];
-}
-
 @immutable
 class CpiMotion extends ThemeExtension<CpiMotion> {
   const CpiMotion({
     required this.micro,
     required this.component,
     required this.screen,
+    required this.stagger,
+    required this.figure,
     required this.easeOut,
     required this.easeSpring,
   });
@@ -124,6 +125,8 @@ class CpiMotion extends ThemeExtension<CpiMotion> {
     micro: Duration(milliseconds: 150),
     component: Duration(milliseconds: 220),
     screen: Duration(milliseconds: 300),
+    stagger: Duration(milliseconds: 40),
+    figure: Duration(milliseconds: 600),
     easeOut: Cubic(0.22, 1, 0.36, 1),
     easeSpring: Cubic(0.34, 1.56, 0.64, 1),
   );
@@ -132,6 +135,8 @@ class CpiMotion extends ThemeExtension<CpiMotion> {
     micro: Duration.zero,
     component: Duration.zero,
     screen: Duration.zero,
+    stagger: Duration.zero,
+    figure: Duration.zero,
     easeOut: Cubic(0.22, 1, 0.36, 1),
     easeSpring: Cubic(0.34, 1.56, 0.64, 1),
   );
@@ -141,6 +146,13 @@ class CpiMotion extends ThemeExtension<CpiMotion> {
   final Duration component;
 
   final Duration screen;
+
+  /// Écart entre deux entrées d'une même liste.
+  final Duration stagger;
+
+  /// Défilement d'un compteur. Plus long qu'un mouvement : c'est le chiffre
+  /// qu'on lit, pas le mouvement qu'on regarde.
+  final Duration figure;
 
   final Curve easeOut;
 
@@ -156,6 +168,8 @@ class CpiMotion extends ThemeExtension<CpiMotion> {
     Duration? micro,
     Duration? component,
     Duration? screen,
+    Duration? stagger,
+    Duration? figure,
     Curve? easeOut,
     Curve? easeSpring,
   }) {
@@ -163,6 +177,8 @@ class CpiMotion extends ThemeExtension<CpiMotion> {
       micro: micro ?? this.micro,
       component: component ?? this.component,
       screen: screen ?? this.screen,
+      stagger: stagger ?? this.stagger,
+      figure: figure ?? this.figure,
       easeOut: easeOut ?? this.easeOut,
       easeSpring: easeSpring ?? this.easeSpring,
     );

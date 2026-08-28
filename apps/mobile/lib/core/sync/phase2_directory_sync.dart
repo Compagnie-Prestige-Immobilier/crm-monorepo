@@ -58,6 +58,7 @@ class Phase2DirectorySync {
 
   Future<int> _applyPage(List<Phase2DirectoryEntry> entries) async {
     if (entries.isEmpty) return 0;
+    await _retireShadowed(entries);
     await _db.batch((Batch batch) {
       for (final Phase2DirectoryEntry e in entries) {
         batch.insert(
@@ -94,6 +95,31 @@ class Phase2DirectorySync {
     return entries.length;
   }
 
+  /// `phase2_directory_phone_unique` n'admet qu'une ligne par numéro. Une base
+  /// serveur remontée redescend le même numéro sous un prospect NEUF : sans
+  /// cette purge, l'insertion viole l'index, la page entière est perdue et
+  /// l'annuaire ne se complète plus jamais. La ligne périmée s'efface : elle ne
+  /// porte rien qui ait été saisi ici, seulement l'état que le serveur en avait.
+  Future<void> _retireShadowed(List<Phase2DirectoryEntry> entries) async {
+    final Map<String, String> byPhone = <String, String>{
+      for (final Phase2DirectoryEntry e in entries) e.phoneE164: e.prospectId,
+    };
+    final List<Phase2DirectoryData> locals =
+        await (_db.select(_db.phase2Directory)..where(
+              (Phase2Directory t) =>
+                  t.phoneE164.isIn(byPhone.keys.toList(growable: false)),
+            ))
+            .get();
+    final List<String> stale = <String>[
+      for (final Phase2DirectoryData row in locals)
+        if (byPhone[row.phoneE164] != row.prospectId) row.prospectId,
+    ];
+    if (stale.isEmpty) return;
+    await (_db.delete(
+      _db.phase2Directory,
+    )..where((Phase2Directory t) => t.prospectId.isIn(stale))).go();
+  }
+
   Future<void> markLocallyClosed({
     required String prospectId,
     required String outcome,
@@ -114,8 +140,50 @@ class Phase2DirectorySync {
     );
   }
 
-  Future<Phase2DirectoryData?> lookupByPhone(String phoneE164) =>
-      _db.phase2ByPhone(phone: phoneE164).getSingleOrNull();
+  /// L'annuaire d'abord, la fiche locale ensuite.
+  ///
+  /// Le repli n'est pas un confort : l'annuaire descend PAR PAGES, dans l'ordre
+  /// des `updated_at` croissants, et une base fraîchement importée : le Grand
+  /// Public en entier : arrive donc en DERNIER. La fiche, elle, est déjà là,
+  /// puisque c'est depuis sa liste qu'on vient. Sans ce repli, « Consigner
+  /// l'appel » rendait « Ce numéro n'est pas dans la liste » sur une fiche
+  /// ouverte deux gestes plus tôt, et rien de ce que le téléconseiller pouvait
+  /// faire n'y changeait quoi que ce soit.
+  Future<Phase2DirectoryData?> lookupByPhone(String phoneE164) async =>
+      await _db.phase2ByPhone(phone: phoneE164).getSingleOrNull() ??
+      await _localEntry(phoneE164);
+
+  Future<Phase2DirectoryData?> _localEntry(String phoneE164) async {
+    final Prospect? fiche =
+        await (_db.select(_db.prospects)
+              ..where(
+                (Prospects t) =>
+                    t.phoneE164.equals(phoneE164) & t.deletedAt.isNull(),
+              )
+              ..limit(1))
+            .getSingleOrNull();
+    if (fiche == null) return null;
+    // Ce que CE téléphone sait du dossier : une issue terminale déjà saisie ici
+    // doit fermer la fiche, sinon la console la rouvrirait à chaque recherche.
+    final CallAttempt? dernier =
+        await (_db.select(_db.callAttempts)
+              ..where((CallAttempts t) => t.prospectId.equals(fiche.id))
+              ..orderBy(<OrderClauseGenerator<CallAttempts>>[
+                (CallAttempts t) => OrderingTerm.desc(t.clientCreatedAt),
+              ])
+              ..limit(1))
+            .getSingleOrNull();
+    return Phase2DirectoryData(
+      prospectId: fiche.id,
+      phoneE164: fiche.phoneE164,
+      phase2Status:
+          (dernier == null ? null : CallEffects.phase2Status(dernier.effect)) ??
+          Phase2Statuses.pending,
+      enrollmentMethod: dernier?.method,
+      rev: 0,
+      updatedAt: fiche.localUpdatedAt,
+    );
+  }
 
   Future<int> count() => _db.countPhase2Directory().getSingle();
 
@@ -365,6 +433,10 @@ abstract final class EnrollmentMethods {
   static const String physical = 'PHYSICAL';
   static const String voiceOrElectronicMessaging =
       'VOICE_OR_ELECTRONIC_MESSAGING';
+
+  /// La seule méthode qui exige une date : le serveur refuse l'opération sans
+  /// `rendezVousAt`, et la refuse sur toutes les autres.
+  static const String appointment = 'APPOINTMENT';
 
   static final List<String> all = EnrollmentMethod.values
       .where(

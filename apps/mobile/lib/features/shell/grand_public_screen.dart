@@ -5,35 +5,34 @@ import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/providers/app_providers.dart';
-import '../../core/providers/sync_coordinator.dart';
 import '../../core/router/route_paths.dart';
-import '../../core/theme/cpi_colors.dart';
 import '../../core/theme/cpi_tokens.dart';
-import '../../core/utils/phone.dart';
 import '../../data/local/database.dart';
-import '../../data/repositories/write_repository.dart';
-import '../../ui/async_value_x.dart';
-import '../../ui/widgets/empty_state.dart';
-import '../../ui/widgets/error_state.dart';
-import '../../ui/widgets/offline_indicator.dart';
-import '../../ui/widgets/search_field.dart';
-import '../../ui/widgets/sync_badge.dart';
-import '../../ui/widgets/sync_status_icon.dart';
+import '../../ui/widgets/cpi_kit.dart';
 import '../campagnes/campagnes.dart';
+import 'app_shell.dart';
+import 'projects.dart';
+import 'workspace_switch.dart';
 
+/// L'écran de travail du Grand Public.
+///
+/// Rien ne s'y saisit : la base des prospects vient du bureau. Le travail du
+/// téléconseiller, c'est la CONVERSION : appeler la file du jour, tenir les
+/// rappels promis, et retrouver une fiche au besoin.
 class GrandPublicScreen extends ConsumerWidget {
   const GrandPublicScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final AsyncValue<List<ProspectSyncViewData>> prospects = ref.watch(
-      grandPublicProspectListProvider,
-    );
-    final AsyncValue<int> count = ref.watch(grandPublicProspectCountProvider);
     final AsyncValue<List<CampaignsWithOpenWorkResult>> campaigns = ref.watch(
       grandPublicCampagnesProvider,
     );
-    final String search = ref.watch(historiqueSearchProvider);
+    final AsyncValue<int> prospects = ref.watch(
+      grandPublicProspectCountProvider,
+    );
+    final AsyncValue<List<Rappel>> rappels = ref.watch(
+      grandPublicRappelsProvider,
+    );
     final List<CampaignsWithOpenWorkResult> campaignRows =
         campaigns.value ?? const <CampaignsWithOpenWorkResult>[];
     final int openCalls = campaignRows.fold<int>(
@@ -42,254 +41,234 @@ class GrandPublicScreen extends ConsumerWidget {
           total + campaign.ouvertes,
     );
 
-    void openCallsQueue() {
+    void appeler() {
+      HapticFeedback.selectionClick().ignore();
+      // Une seule file : on y va droit. Aucune : la console reste la porte
+      // d'entrée pour consigner un appel entrant.
       if (campaignRows.length == 1) {
         context
             .push(CampagnesRoutes.grandPublicFileFor(campaignRows.single.id))
             .ignore();
         return;
       }
+      if (campaignRows.isEmpty) {
+        context.push(CampagnesRoutes.grandPublicConsole).ignore();
+        return;
+      }
       context.push(CampagnesRoutes.grandPublicListe).ignore();
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(PhosphorIconsRegular.squaresFour),
-          tooltip: 'Projets',
-          onPressed: () => context.go(Routes.home),
-        ),
-        title: const Text('Projet Grand Public'),
-        actions: <Widget>[
-          IconButton(
-            icon: const Icon(PhosphorIconsRegular.userPlus),
-            tooltip: 'Nouveau prospect',
-            onPressed: () => context.push(Routes.grandPublicNew),
-          ),
-          const OfflineIndicator(),
-          const SyncBadge(),
-          const SizedBox(width: CpiSpacing.xs),
-        ],
+    final List<Rappel>? prochains = rappels.value;
+    final Rappel? prochain = prochains == null || prochains.isEmpty
+        ? null
+        : prochains.first;
+
+    return CpiScaffold(
+      title: 'Aujourd\'hui',
+      subtitle: 'Prospects hors CHUES',
+      leading: const CpiWorkspaceSwitch(
+        key: Key('Projets'),
+        current: CpiProject.grandPublic,
       ),
-      body: SafeArea(
-        child: Column(
+      banner: const PendingBanner(),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await HapticFeedback.selectionClick();
+          await ref.read(syncCoordinatorProvider.notifier).run();
+        },
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(
+            CpiSpacing.md,
+            0,
+            CpiSpacing.md,
+            CpiSpacing.xl,
+          ),
           children: <Widget>[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                CpiSpacing.md,
-                CpiSpacing.md,
-                CpiSpacing.md,
-                0,
-              ),
-              child: _CallConsoleCard(
-                openCalls: openCalls,
-                loading: campaigns.isLoading,
-                onTap: openCallsQueue,
-              ),
+            _GrandeCarte(
+              nombre: openCalls,
+              loading: campaigns.isLoading,
+              titre: 'Appels du jour',
+              icon: PhosphorIconsRegular.phoneCall,
+              vide: 'Rien à appeler aujourd\'hui.',
+              onTap: appeler,
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                CpiSpacing.md,
-                CpiSpacing.md,
-                CpiSpacing.md,
-                CpiSpacing.sm,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  Text(
-                    count.when(
-                      data: (int value) =>
-                          '$value prospect${value > 1 ? 's' : ''}',
-                      loading: () => 'Prospects',
-                      error: (Object error, StackTrace stackTrace) =>
-                          'Prospects',
-                    ),
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  const SizedBox(height: CpiSpacing.sm),
-                  CpiSearchField(
-                    initial: ref.read(historiqueSearchProvider),
-                    onChanged: ref.read(historiqueSearchProvider.notifier).set,
-                  ),
-                ],
-              ),
+            const SizedBox(height: CpiSpacing.sm),
+            _Carte(
+              nombre: prospects.value,
+              titre: 'Prospects',
+              detail: 'Retrouver une fiche',
+              icon: PhosphorIconsRegular.usersThree,
+              onTap: () => context.go(Routes.grandPublicFiches),
             ),
-            Expanded(
-              child: prospects.whenEchecDAbord(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (Object error, StackTrace _) => CpiErrorState(
-                  message:
-                      'La liste des prospects n\'a pas pu être lue. '
-                      '${messageErreur(error)}',
-                  onRetry: () =>
-                      ref.invalidate(grandPublicProspectListProvider),
-                ),
-                data: (List<ProspectSyncViewData> rows) {
-                  if (rows.isEmpty) {
-                    return _Empty(searching: search.trim().isNotEmpty);
-                  }
-                  return RefreshIndicator(
-                    onRefresh: () async {
-                      await HapticFeedback.selectionClick();
-                      await ref.read(syncCoordinatorProvider.notifier).run();
-                    },
-                    child: ListView.builder(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.only(bottom: CpiSpacing.xxl),
-                      itemCount: rows.length,
-                      itemBuilder: (BuildContext context, int index) =>
-                          _ProspectTile(
-                            key: ValueKey<String>(rows[index].id),
-                            prospect: rows[index],
-                          ),
-                    ),
-                  );
-                },
-              ),
+            const SizedBox(height: CpiSpacing.sm),
+            _Carte(
+              nombre: prochains?.length,
+              titre: 'Rappels',
+              detail: prochain == null
+                  ? 'Aucun rappel prévu'
+                  : 'Prochain ${_quand(context, prochain.at)}',
+              icon: PhosphorIconsRegular.bellRinging,
+              // Toujours ouvrable, même à zéro : c'est la liste qui dit qu'il
+              // n'y a rien, pas une carte qui refuse le geste.
+              onTap: () => context.push(Routes.grandPublicRappels).ignore(),
             ),
           ],
         ),
       ),
     );
   }
+
+  /// Dakar est à UTC toute l'année : l'heure du serveur et celle du téléphone
+  /// se lisent pareil.
+  static String _quand(BuildContext context, DateTime at) {
+    final MaterialLocalizations l = MaterialLocalizations.of(context);
+    final DateTime local = at.toUtc();
+    return '${l.formatMediumDate(local)} à '
+        '${l.formatTimeOfDay(TimeOfDay.fromDateTime(local))}';
+  }
 }
 
-class _CallConsoleCard extends StatelessWidget {
-  const _CallConsoleCard({
-    required this.openCalls,
+/// La carte du travail du jour : le nombre en très gros, une seule destination.
+class _GrandeCarte extends StatelessWidget {
+  const _GrandeCarte({
+    required this.nombre,
     required this.loading,
+    required this.titre,
+    required this.icon,
+    required this.vide,
     required this.onTap,
   });
 
-  final int openCalls;
+  final int nombre;
   final bool loading;
+  final String titre;
+  final IconData icon;
+  final String vide;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(CpiSpacing.md),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer,
-        borderRadius: CpiRadius.brLg,
-      ),
-      child: Row(
-        children: <Widget>[
-          Icon(
-            PhosphorIconsDuotone.headset,
-            size: CpiIconSize.xxxl,
-            color: theme.colorScheme.onPrimaryContainer,
-          ),
-          const SizedBox(width: CpiSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text('Console d’appel', style: theme.textTheme.titleMedium),
-                const SizedBox(height: CpiSpacing.xxs),
-                Text(
-                  loading
-                      ? 'Chargement de la file…'
-                      : openCalls == 0
-                      ? 'Aucune fiche en attente'
-                      : '$openCalls fiche${openCalls > 1 ? 's' : ''} à traiter',
-                  style: theme.textTheme.bodySmall,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: CpiSpacing.sm),
-          IconButton.filled(
-            onPressed: onTap,
-            tooltip: openCalls == 0 ? 'Voir les campagnes' : 'Ouvrir la file',
-            icon: const Icon(PhosphorIconsRegular.arrowRight),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ProspectTile extends ConsumerWidget {
-  const _ProspectTile({super.key, required this.prospect});
-
-  final ProspectSyncViewData prospect;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final String name = '${prospect.prenom} ${prospect.nom}'.trim();
-    return Dismissible(
-      key: ValueKey<String>('gp-${prospect.id}'),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        color: context.cpi.syncFailed,
-        padding: const EdgeInsets.only(right: CpiSpacing.lg),
-        child: const Icon(PhosphorIconsRegular.trash, color: Colors.white),
-      ),
-      confirmDismiss: (DismissDirection _) async {
-        // Même piège qu'à l'Historique : la ligne se démonte avec la
-        // confirmation, et `ref` lu après l'`await` n'envoie plus rien.
-        final SyncCoordinator sync = ref.read(syncCoordinatorProvider.notifier);
-        final WriteRepository writes = ref.read(writeRepositoryProvider);
-        final bool? confirmed = await showDialog<bool>(
-          context: context,
-          builder: (BuildContext context) => AlertDialog(
-            title: const Text('Supprimer ce prospect ?'),
-            content: Text('$name sera supprimé.'),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Annuler'),
+    final ColorScheme scheme = theme.colorScheme;
+    return Semantics(
+      button: true,
+      label: loading
+          ? 'Chargement des appels du jour.'
+          : nombre == 0
+          ? '$vide Ouvrir la liste.'
+          : '$nombre $titre. Ouvrir la liste.',
+      child: ExcludeSemantics(
+        child: CpiCard(
+          onTap: onTap,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  Icon(icon, size: CpiIconSize.xxl, color: scheme.primary),
+                  const SizedBox(width: CpiSpacing.xs),
+                  Expanded(
+                    child: Text(titre, style: theme.textTheme.titleMedium),
+                  ),
+                  Icon(
+                    PhosphorIconsRegular.caretRight,
+                    size: CpiIconSize.xl,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ],
               ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Supprimer'),
+              const SizedBox(height: CpiSpacing.xs),
+              if (loading)
+                Text('…', style: theme.textTheme.headlineSmall)
+              else
+                Text(
+                  '$nombre',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    color: scheme.primary,
+                  ),
+                ),
+              Text(
+                nombre == 0 && !loading ? vide : 'À appeler',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),
-        );
-        if (confirmed != true) return false;
-        try {
-          await writes.deleteProspect(prospect.id);
-          sync.nudge();
-          return true;
-        } on Object catch (error) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Suppression impossible. $error')),
-            );
-          }
-          return false;
-        }
-      },
-      child: ListTile(
-        leading: SyncStatusIcon(
-          status: SyncStatus.parse(prospect.syncStatus ?? 'draft'),
-          size: CpiIconSize.lg,
         ),
-        title: Text(name),
-        subtitle: Text(Phone.format(prospect.phoneE164)),
       ),
     );
   }
 }
 
-class _Empty extends StatelessWidget {
-  const _Empty({required this.searching});
+/// Une carte de repère : un nombre, un mot, une destination.
+class _Carte extends StatelessWidget {
+  const _Carte({
+    required this.nombre,
+    required this.titre,
+    required this.detail,
+    required this.icon,
+    required this.onTap,
+  });
 
-  final bool searching;
+  final int? nombre;
+  final String titre;
+  final String detail;
+  final IconData icon;
+  final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) => CpiEmptyState(
-    icon: searching
-        ? PhosphorIconsDuotone.magnifyingGlass
-        : PhosphorIconsDuotone.usersThree,
-    title: searching ? 'Aucun résultat' : 'Aucun prospect à traiter',
-    message: searching
-        ? 'Vérifiez le nom ou le numéro, ou effacez la recherche.'
-        : 'Synchronisez pour recevoir les prospects à traiter.',
-  );
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final ColorScheme scheme = theme.colorScheme;
+    final String compte = nombre == null ? '' : '$nombre ';
+    return Semantics(
+      button: onTap != null,
+      enabled: onTap != null,
+      onTap: onTap,
+      label: '$compte$titre. $detail.',
+      child: ExcludeSemantics(
+        child: CpiCard(
+          onTap: onTap,
+          child: Row(
+            children: <Widget>[
+              Icon(icon, size: CpiIconSize.xxl, color: scheme.onSurfaceVariant),
+              const SizedBox(width: CpiSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text(
+                      nombre == null ? titre : '$nombre $titre',
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: CpiSpacing.xxs),
+                    Text(
+                      detail,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (onTap != null) ...<Widget>[
+                const SizedBox(width: CpiSpacing.xs),
+                Icon(
+                  PhosphorIconsRegular.caretRight,
+                  size: CpiIconSize.xl,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

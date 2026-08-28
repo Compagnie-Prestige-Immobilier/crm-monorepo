@@ -3,10 +3,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/providers/app_providers.dart';
+import '../../../core/providers/sync_coordinator.dart';
 import '../../../core/router/back_navigation.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/router/single_push.dart';
@@ -15,7 +17,12 @@ import '../../../core/utils/phone.dart';
 import '../../../core/utils/relative_time.dart';
 import '../../../core/utils/whatsapp.dart';
 import '../../../data/local/database.dart';
-import '../../../ui/widgets/offline_indicator.dart';
+import '../../../data/repositories/write_repository.dart';
+import '../../../ui/widgets/cpi_action_bar.dart';
+import '../../../ui/widgets/cpi_forui.dart';
+import '../../../ui/widgets/cpi_kit.dart';
+import '../../../ui/widgets/empty_state.dart';
+import '../../../ui/widgets/error_state.dart';
 import '../../../ui/widgets/sync_status_icon.dart';
 import '../../auth/auth_state.dart';
 import '../../../ui/async_value_x.dart';
@@ -30,27 +37,24 @@ class RepresentantDetailScreen extends ConsumerWidget {
     final AsyncValue<RepresentantSyncViewData?> fiche = ref.watch(
       representantDetailProvider(representantId),
     );
+    final RepresentantSyncViewData? data = fiche.value;
 
     return CpiPopScope(
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Représentant'),
-          leading: const CpiBackButton(fallback: Routes.historique),
-          actions: const <Widget>[
-            OfflineIndicator(),
-            SizedBox(width: CpiSpacing.xs),
-          ],
-        ),
-        body: SafeArea(
-          child: fiche.whenEchecDAbord(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (Object e, StackTrace _) =>
-                Center(child: Text('Lecture impossible : $e')),
-            data: (RepresentantSyncViewData? data) {
-              if (data == null) return const _Missing();
-              return _Fiche(data: data);
-            },
+      child: CpiScaffold(
+        title: data?.fullName ?? 'Fiche',
+        leading: const CpiBackButton(fallback: Routes.historique),
+        footer: data == null ? null : _PiedDeFiche(data: data),
+        body: fiche.whenEchecDAbord(
+          loading: () => const Center(child: FCircularProgress()),
+          error: (Object e, StackTrace _) => CpiErrorState(
+            message: 'Cette fiche n\'a pas pu être lue. ${messageErreur(e)}',
+            onRetry: () =>
+                ref.invalidate(representantDetailProvider(representantId)),
           ),
+          data: (RepresentantSyncViewData? data) {
+            if (data == null) return const _Missing();
+            return _Fiche(data: data);
+          },
         ),
       ),
     );
@@ -67,6 +71,111 @@ String relationLabel(String status) => switch (status) {
   'REFUS' => 'Refus',
   _ => status,
 };
+
+class _PiedDeFiche extends ConsumerWidget {
+  const _PiedDeFiche({required this.data});
+
+  final RepresentantSyncViewData data;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => CpiActionBar(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        CpiButton(
+          'Ajouter des prospects',
+          icon: PhosphorIconsRegular.userPlus,
+          onPressed: () => context.pushOnce(Routes.newProspectFor(data.id)),
+        ),
+        const SizedBox(height: CpiSpacing.xs),
+        Builder(
+          builder: (BuildContext context) => CpiButton(
+            'Autres actions',
+            variant: CpiButtonVariant.secondary,
+            icon: PhosphorIconsRegular.dotsThree,
+            onPressed: () => unawaited(_autresActions(context, ref, data)),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Les gestes rares de la fiche, nommés : rien ne se déclenche plus par un
+/// balayage ni par un appui long.
+Future<void> _autresActions(
+  BuildContext context,
+  WidgetRef ref,
+  RepresentantSyncViewData data,
+) async {
+  final String? choix = await showCpiSheet<String>(
+    context,
+    title: 'Autres actions',
+    builder: (BuildContext sheet) => CpiCard.rows(<CpiRow>[
+      CpiRow(
+        leading: const Icon(
+          PhosphorIconsRegular.pencilSimple,
+          size: CpiIconSize.md,
+        ),
+        title: 'Modifier',
+        onTap: () => Navigator.of(sheet).pop('modifier'),
+      ),
+      CpiRow(
+        leading: const Icon(
+          PhosphorIconsRegular.phoneCall,
+          size: CpiIconSize.md,
+        ),
+        title: 'Résultat de l\'appel',
+        onTap: () => Navigator.of(sheet).pop('qualifier'),
+      ),
+      CpiRow(
+        leading: const Icon(PhosphorIconsRegular.trash, size: CpiIconSize.md),
+        title: 'Supprimer cette fiche',
+        danger: true,
+        onTap: () => Navigator.of(sheet).pop('supprimer'),
+      ),
+    ]),
+  );
+  if (choix == null || !context.mounted) return;
+  switch (choix) {
+    case 'modifier':
+      context.pushOnce(Routes.representantFormFor(data.id));
+    case 'qualifier':
+      context.pushOnce(Routes.representantQualificationFor(data.id));
+    case 'supprimer':
+      await _supprimer(context, ref, data);
+  }
+}
+
+Future<void> _supprimer(
+  BuildContext context,
+  WidgetRef ref,
+  RepresentantSyncViewData data,
+) async {
+  // `ref` se lit AVANT la confirmation : la fiche se démonte avec la
+  // suppression, et un `ref` lu après appartiendrait à un widget mort.
+  final SyncCoordinator sync = ref.read(syncCoordinatorProvider.notifier);
+  final WriteRepository writes = ref.read(writeRepositoryProvider);
+  final bool? ok = await cpiConfirm(
+    context,
+    title: 'Supprimer ce représentant ?',
+    message: '${data.fullName} et tous ses prospects seront supprimés.',
+    confirmLabel: 'Supprimer',
+    danger: true,
+  );
+  if (ok != true) return;
+  try {
+    await writes.deleteRepresentant(data.id);
+  } on Object catch (e) {
+    if (context.mounted) {
+      cpiToast(context, 'Suppression impossible. $e', persistent: true);
+    }
+    return;
+  }
+  sync.nudge();
+  if (context.mounted) context.go(Routes.historique);
+}
 
 class _Fiche extends ConsumerWidget {
   const _Fiche({required this.data});
@@ -92,98 +201,145 @@ class _Fiche extends ConsumerWidget {
 
     final String notes = (data.notes ?? '').trim();
     final String profession = (data.profession ?? '').trim();
+    final WhatsappStatus? whatsapp = WhatsappStatus.parse(data.whatsappStatus);
+    final String? whatsappAutre = whatsapp == WhatsappStatus.autreNumero
+        ? data.whatsappE164
+        : null;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(
         CpiSpacing.md,
-        CpiSpacing.md,
+        0,
         CpiSpacing.md,
         CpiSpacing.xxl,
       ),
       children: <Widget>[
-        Text(data.fullName, style: theme.textTheme.titleLarge),
-        const SizedBox(height: CpiSpacing.xs),
         Wrap(
           spacing: CpiSpacing.sm,
           runSpacing: CpiSpacing.xxs,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: <Widget>[
             SyncStatusChip(status: status),
-            _RelationChip(status: data.relationStatus),
+            Semantics(
+              label: 'Relation : ${relationLabel(data.relationStatus)}',
+              child: ExcludeSemantics(
+                child: CpiTag(relationLabel(data.relationStatus)),
+              ),
+            ),
           ],
         ),
         const SizedBox(height: CpiSpacing.md),
-        _CopyableRow(
-          icon: PhosphorIconsRegular.phone,
-          label: 'Téléphone',
-          value: Phone.format(data.phoneE164),
-          copied: data.phoneE164,
-        ),
-        if (departement != null)
-          _InfoRow(
-            icon: PhosphorIconsRegular.mapPin,
-            label: 'Département',
-            value: departement,
+        CpiCard.rows(<CpiRow>[
+          _copiable(
+            context,
+            icon: PhosphorIconsRegular.phone,
+            label: 'Téléphone',
+            value: Phone.format(data.phoneE164),
+            copied: data.phoneE164,
           ),
-        _WhatsappRow(
-          status: data.whatsappStatus,
-          whatsappE164: data.whatsappE164,
-        ),
-        if (profession.isNotEmpty)
-          _InfoRow(
-            icon: PhosphorIconsRegular.briefcase,
-            label: 'Profession',
-            value: profession,
-          ),
-        if (ief != null)
-          _InfoRow(
-            icon: PhosphorIconsRegular.buildings,
-            label: 'IEF',
-            value: ief,
-          ),
-        const SizedBox(height: CpiSpacing.lg),
-        Text('Notes', style: theme.textTheme.titleSmall),
-        const SizedBox(height: CpiSpacing.xxs),
-        Text(
-          notes.isEmpty
-              ? 'Aucune note. Ajoutez-en une depuis « Modifier ».'
-              : notes,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: notes.isEmpty ? theme.colorScheme.onSurfaceVariant : null,
-          ),
-        ),
-        const SizedBox(height: CpiSpacing.lg),
-        FilledButton.icon(
-          onPressed: () {
-            unawaited(HapticFeedback.selectionClick());
-            context.pushOnce(Routes.newProspectFor(data.id));
-          },
-          icon: const Icon(PhosphorIconsRegular.userPlus, size: CpiIconSize.md),
-          label: const Text('Nouveau prospect'),
-        ),
-        const SizedBox(height: CpiSpacing.xs),
-        OutlinedButton.icon(
-          onPressed: () {
-            unawaited(HapticFeedback.selectionClick());
-            context.pushOnce(Routes.representantFormFor(data.id));
-          },
-          icon: const Icon(
-            PhosphorIconsRegular.pencilSimple,
-            size: CpiIconSize.md,
-          ),
-          label: const Text('Modifier'),
-        ),
-        const SizedBox(height: CpiSpacing.lg),
-        Text('Prospects', style: theme.textTheme.titleSmall),
-        const SizedBox(height: CpiSpacing.xxs),
+          if (departement != null)
+            _info(
+              icon: PhosphorIconsRegular.mapPin,
+              label: 'Département',
+              value: departement,
+            ),
+          // `NON_DEMANDE` n'est PAS `AUCUN` : la fiche dit « non demandé » tant
+          // que la question ne lui a pas été posée, et ne prétend jamais à une
+          // absence constatée. Sur `MEME_NUMERO` la ligne dit le lien, pas le
+          // numéro : il n'est stocké qu'une fois, une ligne plus haut.
+          if (whatsappAutre != null)
+            _copiable(
+              context,
+              icon: PhosphorIconsRegular.whatsappLogo,
+              label: 'WhatsApp',
+              value: Phone.format(whatsappAutre),
+              copied: whatsappAutre,
+            )
+          else
+            _info(
+              icon: PhosphorIconsRegular.whatsappLogo,
+              label: 'WhatsApp',
+              // Une valeur ajoutée côté serveur s'affiche telle quelle plutôt
+              // que de disparaître.
+              value: whatsapp?.label ?? data.whatsappStatus,
+            ),
+          if (profession.isNotEmpty)
+            _info(
+              icon: PhosphorIconsRegular.briefcase,
+              label: 'Profession',
+              value: profession,
+            ),
+          if (ief != null)
+            _info(
+              icon: PhosphorIconsRegular.buildings,
+              label: 'Inspection',
+              value: ief,
+            ),
+        ]),
         _ProspectList(representantId: data.id),
-        const SizedBox(height: CpiSpacing.lg),
-        Text('Commentaires', style: theme.textTheme.titleSmall),
-        const SizedBox(height: CpiSpacing.xxs),
+        const _Section('Notes'),
+        CpiCard(
+          child: Text(
+            notes.isEmpty ? 'Aucune note.' : notes,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: notes.isEmpty ? theme.colorScheme.onSurfaceVariant : null,
+            ),
+          ),
+        ),
+        const _Section('Commentaires'),
         RepresentantCommentThread(representantId: data.id),
       ],
     );
   }
+
+  static CpiRow _info({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) => CpiRow(
+    leading: Icon(icon, size: CpiIconSize.md),
+    title: label,
+    subtitle: value,
+  );
+
+  static CpiRow _copiable(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required String value,
+    required String copied,
+  }) => CpiRow(
+    leading: Icon(icon, size: CpiIconSize.md),
+    title: label,
+    subtitle: value,
+    trailing: const Icon(
+      PhosphorIconsRegular.copy,
+      size: CpiIconSize.md,
+      semanticLabel: 'Copier',
+    ),
+    onTap: () async {
+      await Clipboard.setData(ClipboardData(text: copied));
+      await HapticFeedback.selectionClick();
+      if (!context.mounted) return;
+      cpiToast(context, 'Numéro copié');
+    },
+  );
+}
+
+/// Intertitre de la fiche : le même écart au-dessus, la même graisse.
+class _Section extends StatelessWidget {
+  const _Section(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(0, CpiSpacing.lg, 0, CpiSpacing.xs),
+    child: Semantics(
+      header: true,
+      child: Text(text, style: Theme.of(context).textTheme.titleSmall),
+    ),
+  );
 }
 
 /// Fil en AJOUT SEUL : rien ne se modifie, rien ne s'efface, donc rien à
@@ -205,6 +361,10 @@ class _RepresentantCommentThreadState
     extends ConsumerState<RepresentantCommentThread> {
   final TextEditingController _controller = TextEditingController();
   bool _sending = false;
+
+  /// Le champ ne s'ouvre qu'à la demande : lire le fil est le geste courant,
+  /// écrire est l'exception.
+  bool _composing = false;
   String? _error;
 
   @override
@@ -234,6 +394,7 @@ class _RepresentantCommentThreadState
           );
       _controller.clear();
       await HapticFeedback.selectionClick();
+      if (mounted) setState(() => _composing = false);
     } on Object catch (e) {
       if (mounted) setState(() => _error = 'Commentaire non enregistré. $e');
     } finally {
@@ -242,186 +403,107 @@ class _RepresentantCommentThreadState
   }
 
   @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final AsyncValue<List<RepresentantComment>> rows = ref.watch(
-      representantCommentsProvider(widget.representantId),
-    );
-    final bool canPublish = !_sending && _controller.text.trim().isNotEmpty;
+  Widget build(BuildContext context) => CpiForui(
+    builder: (BuildContext context) {
+      final ThemeData theme = Theme.of(context);
+      final AsyncValue<List<RepresentantComment>> rows = ref.watch(
+        representantCommentsProvider(widget.representantId),
+      );
+      final bool canPublish = !_sending && _controller.text.trim().isNotEmpty;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        TextField(
-          controller: _controller,
-          minLines: 2,
-          maxLines: 5,
-          textCapitalization: TextCapitalization.sentences,
-          onChanged: (String _) => setState(() {}),
-          decoration: const InputDecoration(
-            hintText: 'Ce qu\'il faut retenir de cette fiche',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        if (_error != null) ...<Widget>[
-          const SizedBox(height: CpiSpacing.xs),
-          Semantics(
-            liveRegion: true,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Icon(
-                  PhosphorIconsRegular.warningCircle,
-                  size: CpiIconSize.sm,
-                  color: theme.colorScheme.error,
-                ),
-                const SizedBox(width: CpiSpacing.xs),
-                Expanded(
-                  child: Text(
-                    _error!,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.error,
-                    ),
-                  ),
-                ),
-              ],
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          if (!_composing)
+            CpiButton(
+              'Ajouter un commentaire',
+              variant: CpiButtonVariant.secondary,
+              icon: PhosphorIconsRegular.chatCircleText,
+              onPressed: () => setState(() => _composing = true),
+            )
+          else ...<Widget>[
+            CpiField(
+              label: 'Nouveau commentaire',
+              controller: _controller,
+              hint: 'Ce qu\'il faut retenir de cette fiche',
+              maxLines: 5,
+              autofocus: true,
+              textCapitalization: TextCapitalization.sentences,
+              onChanged: (String _) => setState(() {}),
             ),
-          ),
-        ],
-        const SizedBox(height: CpiSpacing.xs),
-        Align(
-          alignment: Alignment.centerRight,
-          child: FilledButton.icon(
-            onPressed: canPublish ? _publish : null,
-            icon: const Icon(
-              PhosphorIconsRegular.paperPlaneTilt,
-              size: CpiIconSize.md,
-            ),
-            label: const Text('Publier'),
-          ),
-        ),
-        const SizedBox(height: CpiSpacing.sm),
-        rows.whenEchecDAbord(
-          loading: () => const LinearProgressIndicator(),
-          error: (Object e, StackTrace _) => Text('Lecture impossible : $e'),
-          data: (List<RepresentantComment> list) {
-            if (list.isEmpty) {
-              return Text(
-                'Aucun commentaire. Notez ici ce que le prochain téléconseiller '
-                'doit savoir avant d\'appeler.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+            if (_error != null) ...<Widget>[
+              const SizedBox(height: CpiSpacing.xs),
+              Semantics(
+                liveRegion: true,
+                child: FAlert(
+                  variant: FAlertVariant.destructive,
+                  icon: const Icon(PhosphorIconsRegular.warningCircle),
+                  title: Text(_error!),
                 ),
-              );
-            }
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: list
-                  .map(
-                    (RepresentantComment c) => Padding(
-                      padding: const EdgeInsets.only(bottom: CpiSpacing.sm),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
-                          Text(c.body, style: theme.textTheme.bodyMedium),
-                          Text(
-                            '${c.authorName} · ${relativeTime(c.clientCreatedAt)}',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                  .toList(growable: false),
-            );
-          },
-        ),
-      ],
-    );
-  }
-}
-
-/// Affiché en pastille et non en ligne d'information : la relation qualifie la
-/// fiche, elle ne la décrit pas, et l'écran est déjà long.
-class _RelationChip extends StatelessWidget {
-  const _RelationChip({required this.status});
-
-  final String status;
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return Semantics(
-      label: 'Relation : ${relationLabel(status)}',
-      child: ExcludeSemantics(
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Icon(
-              PhosphorIconsRegular.handshake,
-              size: CpiIconSize.xs,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: CpiSpacing.xxsPlus),
-            Flexible(
-              child: Text(
-                relationLabel(status),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+              ),
+            ],
+            const SizedBox(height: CpiSpacing.xs),
+            Align(
+              alignment: Alignment.centerRight,
+              child: CpiButton(
+                'Publier',
+                icon: PhosphorIconsRegular.paperPlaneTilt,
+                expand: false,
+                onPressed: canPublish ? _publish : null,
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-/// `NON_DEMANDE` n'est PAS `AUCUN` : la fiche dit « non demandé » tant que la
-/// question ne lui a pas été posée, et ne prétend jamais à une absence
-/// constatée. Sur `MEME_NUMERO` la ligne dit le lien, pas le numéro : il n'est
-/// stocké qu'une fois, une ligne plus haut.
-class _WhatsappRow extends StatelessWidget {
-  const _WhatsappRow({required this.status, this.whatsappE164});
-
-  final String status;
-  final String? whatsappE164;
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final WhatsappStatus? known = WhatsappStatus.parse(status);
-    final String? autre = known == WhatsappStatus.autreNumero
-        ? whatsappE164
-        : null;
-
-    if (autre != null) {
-      return _CopyableRow(
-        icon: PhosphorIconsRegular.whatsappLogo,
-        label: 'WhatsApp',
-        value: Phone.format(autre),
-        copied: autre,
+          const SizedBox(height: CpiSpacing.sm),
+          rows.whenEchecDAbord(
+            loading: () => const FProgress(),
+            error: (Object e, StackTrace _) => CpiErrorState(
+              message:
+                  'Les commentaires n\'ont pas pu être lus. '
+                  '${messageErreur(e)}',
+              onRetry: () => ref.invalidate(
+                representantCommentsProvider(widget.representantId),
+              ),
+            ),
+            data: (List<RepresentantComment> list) {
+              if (list.isEmpty) {
+                return Text(
+                  'Aucun commentaire pour l\'instant.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                );
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  for (final RepresentantComment c in list)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: CpiSpacing.xs),
+                      child: CpiCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            Text(c.body, style: theme.textTheme.bodyMedium),
+                            const SizedBox(height: CpiSpacing.xxs),
+                            Text(
+                              '${c.authorName} · ${relativeTime(c.clientCreatedAt)}',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ],
       );
-    }
-    return _InfoRow(
-      icon: PhosphorIconsRegular.whatsappLogo,
-      label: 'WhatsApp',
-      // Une valeur ajoutée côté serveur s'affiche telle quelle plutôt que de
-      // disparaître.
-      value: known?.label ?? status,
-      valueStyle: known == WhatsappStatus.nonDemande
-          ? theme.textTheme.bodyLarge?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            )
-          : null,
-    );
-  }
+    },
+  );
 }
 
 class _ProspectList extends ConsumerWidget {
@@ -435,153 +517,51 @@ class _ProspectList extends ConsumerWidget {
     final AsyncValue<List<ProspectSyncViewData>> rows = ref.watch(
       prospectsForRepresentantProvider(representantId),
     );
+    final List<ProspectSyncViewData>? list = rows.value;
 
-    return rows.whenEchecDAbord(
-      loading: () => const Padding(
-        padding: EdgeInsets.symmetric(vertical: CpiSpacing.sm),
-        child: LinearProgressIndicator(),
-      ),
-      error: (Object e, StackTrace _) => Text('Lecture impossible : $e'),
-      data: (List<ProspectSyncViewData> list) {
-        if (list.isEmpty) {
-          return Text(
-            'Aucun prospect. Utilisez « Nouveau prospect » pour en saisir un.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          );
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: list
-              .map((ProspectSyncViewData p) {
-                final SyncStatus status = SyncStatus.parse(
-                  p.syncStatus ?? 'draft',
-                );
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: CpiSpacing.xs),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: SyncStatusIcon(
-                          status: status,
-                          size: CpiIconSize.md,
-                        ),
-                      ),
-                      const SizedBox(width: CpiSpacing.sm),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: <Widget>[
-                            Text(
-                              '${p.prenom} ${p.nom}',
-                              style: theme.textTheme.titleSmall,
-                            ),
-                            Text(
-                              '${Phone.format(p.phoneE164)} · ${status.label}',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              })
-              .toList(growable: false),
-        );
-      },
-    );
-  }
-}
-
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-    this.valueStyle,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-  final TextStyle? valueStyle;
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: CpiSpacing.xs),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Icon(
-              icon,
-              size: CpiIconSize.md,
-              color: theme.colorScheme.onSurfaceVariant,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        _Section(list == null ? 'Prospects' : 'Prospects (${list.length})'),
+        rows.whenEchecDAbord(
+          loading: () => const Padding(
+            padding: EdgeInsets.symmetric(vertical: CpiSpacing.sm),
+            child: FProgress(),
+          ),
+          error: (Object e, StackTrace _) => CpiErrorState(
+            message:
+                'Les prospects n\'ont pas pu être lus. ${messageErreur(e)}',
+            onRetry: () => ref.invalidate(
+              prospectsForRepresentantProvider(representantId),
             ),
           ),
-          const SizedBox(width: CpiSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Text(
-                  label,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+          data: (List<ProspectSyncViewData> list) {
+            if (list.isEmpty) {
+              return Text(
+                'Aucun prospect pour l\'instant.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
-                Text(value, style: valueStyle ?? theme.textTheme.bodyLarge),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CopyableRow extends StatelessWidget {
-  const _CopyableRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.copied,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-  final String copied;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: '$label : $value. Copier.',
-      child: ExcludeSemantics(
-        child: InkWell(
-          onTap: () async {
-            await Clipboard.setData(ClipboardData(text: copied));
-            await HapticFeedback.selectionClick();
-            if (!context.mounted) return;
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(const SnackBar(content: Text('Numéro copié')));
+              );
+            }
+            return CpiCard.rows(<CpiRow>[
+              for (final ProspectSyncViewData p in list)
+                CpiRow(
+                  leading: SyncStatusIcon(
+                    status: SyncStatus.parse(p.syncStatus ?? 'draft'),
+                    size: CpiIconSize.md,
+                    labelled: false,
+                  ),
+                  title: '${p.prenom} ${p.nom}',
+                  subtitle:
+                      '${Phone.format(p.phoneE164)} · '
+                      '${SyncStatus.parse(p.syncStatus ?? 'draft').label}',
+                  onTap: () => context.pushOnce(Routes.prospectDetailFor(p.id)),
+                ),
+            ]);
           },
-          child: _InfoRow(icon: icon, label: label, value: value),
         ),
-      ),
+      ],
     );
   }
 }
@@ -590,41 +570,14 @@ class _Missing extends StatelessWidget {
   const _Missing();
 
   @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(CpiSpacing.xl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Icon(
-              PhosphorIconsDuotone.userMinus,
-              size: CpiIconSize.display,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(height: CpiSpacing.md),
-            Text(
-              'Fiche introuvable',
-              style: theme.textTheme.titleSmall,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: CpiSpacing.xs),
-            Text(
-              'Elle a été supprimée sur cet appareil.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: CpiSpacing.lg),
-            FilledButton(
-              onPressed: () => context.go(Routes.historique),
-              child: const Text('Voir l\'historique'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => CpiEmptyState(
+    icon: PhosphorIconsDuotone.userMinus,
+    title: 'Cette fiche n\'est plus ici',
+    message: 'Elle a été supprimée sur cet appareil.',
+    action: CpiButton(
+      'Voir mes fiches',
+      expand: false,
+      onPressed: () => context.go(Routes.historique),
+    ),
+  );
 }

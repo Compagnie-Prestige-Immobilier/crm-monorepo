@@ -60,6 +60,34 @@ void main() {
               page('Saisie de prospects', fallback: Routes.historique),
         ),
         GoRoute(
+          path: Routes.prospectDetail,
+          builder: (_, _) =>
+              page('Fiche prospect', fallback: Routes.grandPublic),
+        ),
+        GoRoute(
+          path: Routes.grandPublicRappels,
+          builder: (_, _) =>
+              page('Rappels du Grand Public', fallback: Routes.grandPublic),
+        ),
+        GoRoute(
+          path: Routes.rappels,
+          builder: (_, _) => page('Rappels', fallback: Routes.chues),
+        ),
+        GoRoute(
+          path: Routes.chues,
+          builder: (_, _) => Scaffold(
+            appBar: AppBar(title: const Text('CHUES')),
+            body: const Center(child: Text('corps CHUES')),
+          ),
+        ),
+        GoRoute(
+          path: Routes.grandPublic,
+          builder: (_, _) => Scaffold(
+            appBar: AppBar(title: const Text('Grand Public')),
+            body: const Center(child: Text('corps Grand Public')),
+          ),
+        ),
+        GoRoute(
           path: Routes.historique,
           builder: (_, _) => Scaffold(
             appBar: AppBar(title: const Text('Historique')),
@@ -97,10 +125,13 @@ void main() {
   }
 
   /// Chaque route pleine page de l'app, avec son titre d'AppBar.
-  const Map<String, String> fullScreenRoutes = <String, String>{
+  final Map<String, String> fullScreenRoutes = <String, String>{
     Routes.phase2: 'Phase 2',
     Routes.newRepresentant: 'Nouveau représentant',
     Routes.newProspect: 'Saisie de prospects',
+    Routes.prospectDetailFor('p-1'): 'Fiche prospect',
+    Routes.grandPublicRappels: 'Rappels du Grand Public',
+    Routes.rappels: 'Rappels',
     Routes.batteryHelp: 'Autorisations et batterie',
     Routes.about: 'À propos',
   };
@@ -121,7 +152,7 @@ void main() {
             reason: 'push doit empiler, pas remplacer',
           );
 
-          await tester.tap(find.byTooltip('Retour'));
+          await tester.tap(find.byType(CpiBackButton));
           await tester.pumpAndSettle();
 
           expect(find.text('corps Accueil'), findsOneWidget);
@@ -158,7 +189,7 @@ void main() {
         final GoRouter router = await pumpApp(tester, at: Routes.phase2);
         expect(router.canPop(), isFalse);
 
-        await tester.tap(find.byTooltip('Retour'));
+        await tester.tap(find.byType(CpiBackButton));
         await tester.pumpAndSettle();
 
         expect(find.text('corps Accueil'), findsOneWidget);
@@ -171,7 +202,7 @@ void main() {
       // « À propos » ouvert directement doit revenir aux Réglages, pas à
       // l'accueil : c'est de là qu'il vient dans le parcours réel.
       await pumpApp(tester, at: Routes.about);
-      await tester.tap(find.byTooltip('Retour'));
+      await tester.tap(find.byType(CpiBackButton));
       await tester.pumpAndSettle();
       expect(find.text('corps Réglages'), findsOneWidget);
     });

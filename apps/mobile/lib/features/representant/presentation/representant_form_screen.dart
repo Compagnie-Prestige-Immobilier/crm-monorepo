@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -12,7 +13,6 @@ import '../../../core/providers/app_providers.dart';
 import '../../../core/router/back_navigation.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/sync/api_port.dart';
-import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/ids.dart';
 import '../../../core/utils/phone.dart';
@@ -20,9 +20,12 @@ import '../../../core/utils/whatsapp.dart';
 import '../../../data/local/database.dart';
 import '../../../data/repositories/draft_repository.dart';
 import '../../../data/repositories/reference_repository.dart';
+import '../../../ui/widgets/cpi_action_bar.dart';
+import '../../../ui/widgets/cpi_choice_group.dart';
+import '../../../ui/widgets/cpi_kit.dart';
+import '../../../ui/widgets/cpi_steps.dart';
 import '../../../ui/widgets/local_typeahead.dart';
 import '../../../ui/widgets/cpi_resume_banner.dart';
-import '../../../ui/widgets/offline_indicator.dart';
 import '../../../ui/widgets/phone_field.dart';
 import '../../../ui/widgets/referentials_banner.dart';
 import 'representant_detail_screen.dart' show relationLabel;
@@ -350,6 +353,62 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
     }
   }
 
+  bool get _creation => widget.representantId == null;
+
+  /// Trois étapes, en création comme en correction : un écran qui empile onze
+  /// champs se relit mal, et la correction se fait sur le terrain, debout.
+  static const int _etapes = 3;
+  int _etape = 0;
+
+  static const List<String> _questions = <String>[
+    'Qui est-ce ?',
+    'Où travaille-t-il ?',
+    'Pour l\'appeler',
+  ];
+
+  void _suivant() {
+    FocusScope.of(context).unfocus();
+    setState(() => _etape += 1);
+    unawaited(flushDraft());
+  }
+
+  void _precedent() {
+    FocusScope.of(context).unfocus();
+    setState(() => _etape -= 1);
+  }
+
+  /// Ce qui manque pour passer à la suite, dit en une phrase. Null quand
+  /// l'étape est complète : le bouton s'allume alors.
+  String? get _manque {
+    if (_etape == 0) {
+      final bool nom = _nom.text.trim().length >= 2;
+      final bool tel = Phone.toE164(_phone.text) != null;
+      if (!nom && !tel) return 'Écrivez le nom et le numéro';
+      if (!nom) return 'Écrivez le nom complet';
+      if (!tel) return 'Écrivez le numéro de téléphone';
+      return null;
+    }
+    if (_etape == 1) {
+      return _departementId == null ? 'Choisissez le département' : null;
+    }
+    if (!_whatsappComplete) return 'Écrivez le numéro WhatsApp';
+    if (_departementId == null) return 'Choisissez le département';
+    if (_nom.text.trim().length < 2 || Phone.toE164(_phone.text) == null) {
+      return 'Écrivez le nom et le numéro';
+    }
+    return null;
+  }
+
+  List<CpiRecapLine> get _recap => <CpiRecapLine>[
+    CpiRecapLine('Nom complet', _nom.text),
+    CpiRecapLine('Téléphone', _phone.text),
+    CpiRecapLine('Département', _departement.text),
+    CpiRecapLine(
+      'WhatsApp',
+      WhatsappStatus.parse(_whatsappStatus)?.label ?? _whatsappStatus,
+    ),
+  ];
+
   /// Un « autre numéro » sans numéro serait un état qui ment : la fiche dirait
   /// qu'il a WhatsApp ailleurs sans dire où.
   bool get _whatsappComplete =>
@@ -363,7 +422,8 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
       _whatsappComplete &&
       !_saving;
 
-  Future<void> _save() async {
+  /// [context] est pris SOUS la coque : le message passe par son `FToaster`.
+  Future<void> _save(BuildContext context) async {
     if (!_canSave) return;
     setState(() {
       _saving = true;
@@ -427,20 +487,20 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
       await HapticFeedback.mediumImpact();
       ref.read(syncCoordinatorProvider.notifier).nudge();
 
-      if (!mounted) return;
+      if (!context.mounted) return;
       context.pushReplacement(Routes.newProspectFor(_entityId));
     } on Object catch (e) {
-      if (!mounted) return;
+      if (!context.mounted) return;
       final String message = _humanize(e);
       setState(() {
         _saving = false;
         _error = message;
       });
-      _announceFailure(message);
+      _announceFailure(context, message);
     }
   }
 
-  void _announceFailure(String message) {
+  void _announceFailure(BuildContext context, String message) {
     unawaited(
       SemanticsService.sendAnnouncement(
         View.of(context),
@@ -449,19 +509,7 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
         assertiveness: Assertiveness.assertive,
       ),
     );
-    final ScaffoldMessengerState? messenger = ScaffoldMessenger.maybeOf(
-      context,
-    );
-    messenger
-      ?..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Theme.of(context).colorScheme.error,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 6),
-        ),
-      );
+    cpiToast(context, message);
   }
 
   static String _humanize(Object error) {
@@ -483,263 +531,308 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
     final List<Ief> iefs =
         ref.watch(iefsProvider(_departementId)).value ?? const <Ief>[];
 
-    return CpiPopScope(
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(
-            widget.representantId == null
-                ? 'Nouveau représentant'
-                : 'Modifier le représentant',
-          ),
-          leading: const CpiBackButton(),
-          actions: const <Widget>[
-            OfflineIndicator(),
-            SizedBox(width: CpiSpacing.xs),
-          ],
-        ),
-        body: SafeArea(
-          child: Column(
-            children: <Widget>[
-              ReferentialsBanner(missing: departements.isEmpty),
-              if (_pendingRestore != null)
-                CpiResumeBanner(
-                  label: (_pendingRestore!.values['fullName'] as String?)
-                      ?.trim(),
-                  onResume: () => _apply(_pendingRestore!),
-                  onDiscard: () async {
-                    await ref
-                        .read(draftRepositoryProvider)
-                        .delete(_pendingRestore!.draftId);
-                    if (mounted) setState(() => _pendingRestore = null);
-                  },
-                ),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.all(CpiSpacing.md),
-                  children: <Widget>[
-                    if (_relationStatus != null) ...<Widget>[
-                      _ChampRelation(
-                        status: _relationStatus!,
-                        onChanged: (String choix) {
-                          setState(() => _relationStatus = choix);
-                          markDraftDirty();
-                        },
-                      ),
-                      const SizedBox(height: CpiSpacing.md),
-                    ],
-                    TextField(
-                      controller: _nom,
-                      focusNode: _nomFocus,
-                      autofocus: widget.representantId == null,
-                      textCapitalization: TextCapitalization.words,
-                      textInputAction: TextInputAction.next,
-                      onChanged: (String _) {
-                        markDraftDirty();
-                        setState(() {});
-                      },
-                      decoration: const InputDecoration(
-                        labelText: 'Nom complet',
-                        hintText: 'Mamadou Diallo',
-                      ),
-                    ),
-                    const SizedBox(height: CpiSpacing.md),
-                    PhoneField(
-                      controller: _phone,
-                      focusNode: _phoneFocus,
-                      onChanged: (String _) {
-                        markDraftDirty();
-                        _scheduleLookup();
-                        setState(() {});
-                      },
-                    ),
-                    if (_duplicate != null) ...<Widget>[
-                      const SizedBox(height: CpiSpacing.sm),
-                      _DuplicateBanner(
-                        name: _duplicate!.name,
-                        owner: _duplicate!.owner,
-                        onAddProspects: _duplicate!.representantId == null
-                            ? null
-                            : () => context.pushReplacement(
-                                Routes.newProspectFor(
-                                  _duplicate!.representantId!,
-                                ),
-                              ),
-                      ),
-                    ],
-                    const SizedBox(height: CpiSpacing.md),
-                    // Masquée tant qu'aucun département ne porte de libellé de
-                    // région : sur un appareil qui n'a pas encore rejoué le pull
-                    // complet du palier v8, l'étape n'aurait rien à proposer.
-                    if (regions.isNotEmpty) ...<Widget>[
-                      LocalTypeahead(
-                        controller: _region,
-                        focusNode: _regionFocus,
-                        label: 'Région',
-                        hint: 'Dakar, Thiès, Tambacounda…',
-                        selectedId: _regionId,
-                        emptyHint: 'Aucun résultat',
-                        options: regions
-                            .map(
-                              (Region r) =>
-                                  TypeaheadOption(id: r.id, label: r.name),
-                            )
-                            .toList(growable: false),
-                        onChanged: (String _) {
-                          if (_regionId != null) {
-                            setState(() => _regionId = null);
-                          }
-                          markDraftDirty();
-                        },
-                        onSelected: (TypeaheadOption option) {
-                          setState(() {
-                            _regionId = option.id;
-                            _departementId = null;
-                            _departement.text = '';
-                            _iefId = null;
-                            _ief.text = '';
-                          });
-                          markDraftDirty();
-                          unawaited(flushDraft());
-                        },
-                      ),
-                      const SizedBox(height: CpiSpacing.md),
-                    ],
-                    LocalTypeahead(
-                      controller: _departement,
-                      focusNode: _departementFocus,
-                      label: 'Département',
-                      // La region ne fait que RETRECIR la liste: les 46 departements
-                      // restent choisissables sans elle.
-                      hint: 'Dakar, Thiès, Mbour…',
-                      selectedId: _departementId,
-                      textInputAction: TextInputAction.done,
-                      emptyHint: departements.isEmpty
-                          ? 'Aucun département. Synchronisez.'
-                          : 'Aucun résultat',
-                      options: departements
-                          .map(
-                            (Departement d) => TypeaheadOption(
-                              id: d.id,
-                              label: d.name,
-                              secondary: d.code,
-                              keywords: <String>[d.code],
-                            ),
-                          )
-                          .toList(growable: false),
-                      onChanged: (String _) {
-                        if (_departementId != null) {
-                          setState(() => _departementId = null);
-                        }
-                        markDraftDirty();
-                      },
-                      onSelected: (TypeaheadOption option) {
-                        setState(() {
-                          _departementId = option.id;
-                          _iefId = null;
-                          _ief.text = '';
-                        });
-                        markDraftDirty();
-                        unawaited(flushDraft());
-                      },
-                    ),
-                    const SizedBox(height: CpiSpacing.md),
-                    LocalTypeahead(
-                      controller: _ief,
-                      focusNode: _iefFocus,
-                      label: 'IEF (facultatif)',
-                      hint: 'Almadies, Grand Dakar, Thiaroye…',
-                      selectedId: _iefId,
-                      textInputAction: TextInputAction.done,
-                      emptyHint: iefs.isEmpty
-                          ? 'Aucune IEF pour ce département.'
-                          : 'Aucun résultat',
-                      options: iefs
-                          .map(
-                            (Ief i) => TypeaheadOption(
-                              id: i.id,
-                              label: i.name,
-                              secondary: i.departementName,
-                              keywords: <String>[i.code, i.departementName],
-                            ),
-                          )
-                          .toList(growable: false),
-                      onChanged: (String _) {
-                        if (_iefId != null) setState(() => _iefId = null);
-                        markDraftDirty();
-                      },
-                      onSelected: (TypeaheadOption option) {
-                        setState(() => _iefId = option.id);
-                        markDraftDirty();
-                        unawaited(flushDraft());
-                      },
-                    ),
-                    const SizedBox(height: CpiSpacing.md),
-                    _WhatsappPicker(
-                      status: _whatsappStatus,
-                      controller: _whatsapp,
-                      focusNode: _whatsappFocus,
-                      onPick: _pickWhatsapp,
-                      onNumberChanged: (String _) {
-                        markDraftDirty();
-                        setState(() {});
-                      },
-                    ),
-                    const SizedBox(height: CpiSpacing.md),
-                    LocalTypeahead(
-                      controller: _profession,
-                      focusNode: _professionFocus,
-                      label: 'Profession (facultatif)',
-                      hint: 'Instituteur, Proviseur, Inspecteur…',
-                      selectedId: _professionId,
-                      freeText: true,
-                      maxLength: kProfessionMaxLength,
-                      textInputAction: TextInputAction.done,
-                      options: kProfessionsFrequentes
-                          .map((String m) => TypeaheadOption(id: m, label: m))
-                          .toList(growable: false),
-                      onChanged: (String _) {
-                        if (_professionId != null) {
-                          setState(() => _professionId = null);
-                        }
-                        markDraftDirty();
-                      },
-                      onSelected: (TypeaheadOption option) {
-                        setState(() => _professionId = option.id);
-                        markDraftDirty();
-                        unawaited(flushDraft());
-                      },
-                    ),
-                    const SizedBox(height: CpiSpacing.md),
-                    TextField(
-                      controller: _notes,
-                      focusNode: _notesFocus,
-                      minLines: 2,
-                      maxLines: 5,
-                      maxLength: 2000,
-                      textCapitalization: TextCapitalization.sentences,
-                      onChanged: (String _) => markDraftDirty(),
-                      decoration: const InputDecoration(
-                        labelText: 'Notes (facultatif)',
-                      ),
-                    ),
-                  ],
-                ),
+    final bool derniereEtape = _etape == _etapes - 1;
+    final Widget ecran = CpiScaffold(
+      title: _questions[_etape],
+      showTitle: false,
+      leading: _etape > 0
+          ? CpiHeaderAction(
+              icon: PhosphorIconsRegular.arrowLeft,
+              label: 'Étape précédente',
+              onPressed: _saving ? null : _precedent,
+            )
+          : const CpiBackButton(),
+      footer: derniereEtape
+          ? _SaveBar(
+              // Les deux chemins enchaînent sur la saisie de prospects : le
+              // libellé le dit, au lieu de laisser l'écran suivant surprendre.
+              label: 'Enregistrer et saisir des prospects',
+              enabled: _canSave,
+              busy: _saving,
+              onPressed: _save,
+              error: _error,
+              subtitle: _manque,
+            )
+          : CpiActionBar(
+              child: CpiButton(
+                'Continuer',
+                icon: PhosphorIconsRegular.arrowRight,
+                subtitle: _manque,
+                onPressed: _manque == null ? _suivant : null,
               ),
-              _SaveBar(
-                // Les deux chemins enchaînent sur la saisie de prospects : le
-                // libellé le dit, au lieu de laisser l'écran suivant surprendre.
-                label: 'Enregistrer et saisir des prospects',
-                enabled: _canSave,
-                busy: _saving,
-                onPressed: _save,
-                error: _error,
-              ),
-            ],
+            ),
+      body: Column(
+        children: <Widget>[
+          CpiStepHeader(
+            step: _etape + 1,
+            total: _etapes,
+            question: _questions[_etape],
           ),
-        ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(
+                CpiSpacing.md,
+                0,
+                CpiSpacing.md,
+                CpiSpacing.md,
+              ),
+              children: <Widget>[
+                // Les deux bandeaux défilent AVEC le formulaire : posés
+                // au-dessus d'un `Expanded`, ils prenaient sa place et la
+                // colonne débordait de l'écran à 1,76×.
+                ReferentialsBanner(missing: departements.isEmpty),
+                if (_pendingRestore != null)
+                  CpiResumeBanner(
+                    label: (_pendingRestore!.values['fullName'] as String?)
+                        ?.trim(),
+                    onResume: () => _apply(_pendingRestore!),
+                    onDiscard: () async {
+                      await ref
+                          .read(draftRepositoryProvider)
+                          .delete(_pendingRestore!.draftId);
+                      if (mounted) setState(() => _pendingRestore = null);
+                    },
+                  ),
+                ..._champs(regions, departements, iefs),
+                if (derniereEtape) ...<Widget>[
+                  const SizedBox(height: CpiSpacing.md),
+                  CpiRecap(lines: _recap),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
+
+    // Le retour système remonte d'UNE étape : quitter l'écran depuis la
+    // troisième perdrait les deux premières.
+    return CpiStepScope(
+      first: _etape == 0,
+      onBack: _saving ? null : _precedent,
+      child: ecran,
+    );
   }
+
+  List<Widget> _champs(
+    List<Region> regions,
+    List<Departement> departements,
+    List<Ief> iefs,
+  ) => switch (_etape) {
+    0 => <Widget>[
+      // La relation ne se règle que sur une fiche qui existe, et elle a sa
+      // place auprès de la personne, pas de son lieu de travail.
+      if (!_creation && _relationStatus != null) ...<Widget>[
+        _ChampRelation(
+          status: _relationStatus!,
+          onChanged: (String choix) {
+            setState(() => _relationStatus = choix);
+            markDraftDirty();
+          },
+        ),
+        const SizedBox(height: CpiSpacing.md),
+      ],
+      ..._identite(),
+    ],
+    1 => _lieu(regions, departements, iefs),
+    _ => _contact(),
+  };
+
+  List<Widget> _identite() => <Widget>[
+    CpiField(
+      label: 'Nom complet',
+      controller: _nom,
+      focusNode: _nomFocus,
+      hint: 'Ex. Mamadou Diallo',
+      autofocus: _creation,
+      textCapitalization: TextCapitalization.words,
+      textInputAction: TextInputAction.next,
+      onChanged: (String _) {
+        markDraftDirty();
+        setState(() {});
+      },
+    ),
+    const SizedBox(height: CpiSpacing.md),
+    PhoneField(
+      controller: _phone,
+      focusNode: _phoneFocus,
+      onChanged: (String _) {
+        markDraftDirty();
+        _scheduleLookup();
+        setState(() {});
+      },
+    ),
+    if (_duplicate != null) ...<Widget>[
+      const SizedBox(height: CpiSpacing.sm),
+      _DuplicateBanner(
+        name: _duplicate!.name,
+        owner: _duplicate!.owner,
+        onAddProspects: _duplicate!.representantId == null
+            ? null
+            : () => context.pushReplacement(
+                Routes.newProspectFor(_duplicate!.representantId!),
+              ),
+      ),
+    ],
+  ];
+
+  List<Widget> _lieu(
+    List<Region> regions,
+    List<Departement> departements,
+    List<Ief> iefs,
+  ) => <Widget>[
+    // Masquée tant qu'aucun département ne porte de libellé de région : sur un
+    // appareil qui n'a pas encore rejoué le pull complet du palier v8, l'étape
+    // n'aurait rien à proposer.
+    if (regions.isNotEmpty) ...<Widget>[
+      LocalTypeahead(
+        controller: _region,
+        focusNode: _regionFocus,
+        label: 'Région',
+        hint: 'Dakar, Thiès, Tambacounda…',
+        selectedId: _regionId,
+        emptyHint: 'Aucun résultat',
+        options: regions
+            .map((Region r) => TypeaheadOption(id: r.id, label: r.name))
+            .toList(growable: false),
+        onChanged: (String _) {
+          if (_regionId != null) {
+            setState(() => _regionId = null);
+          }
+          markDraftDirty();
+        },
+        onSelected: (TypeaheadOption option) {
+          setState(() {
+            _regionId = option.id;
+            _departementId = null;
+            _departement.text = '';
+            _iefId = null;
+            _ief.text = '';
+          });
+          markDraftDirty();
+          unawaited(flushDraft());
+        },
+      ),
+      const SizedBox(height: CpiSpacing.md),
+    ],
+    LocalTypeahead(
+      controller: _departement,
+      focusNode: _departementFocus,
+      label: 'Département',
+      // La region ne fait que RETRECIR la liste: les 46 departements restent
+      // choisissables sans elle.
+      hint: 'Dakar, Thiès, Mbour…',
+      selectedId: _departementId,
+      textInputAction: TextInputAction.done,
+      emptyHint: departements.isEmpty
+          ? 'La liste n\'est pas encore arrivée. Touchez « Recevoir les listes ».'
+          : 'Aucun résultat',
+      options: departements
+          .map(
+            (Departement d) => TypeaheadOption(
+              id: d.id,
+              label: d.name,
+              secondary: d.code,
+              keywords: <String>[d.code],
+            ),
+          )
+          .toList(growable: false),
+      onChanged: (String _) {
+        if (_departementId != null) {
+          setState(() => _departementId = null);
+        }
+        markDraftDirty();
+      },
+      onSelected: (TypeaheadOption option) {
+        setState(() {
+          _departementId = option.id;
+          _iefId = null;
+          _ief.text = '';
+        });
+        markDraftDirty();
+        unawaited(flushDraft());
+      },
+    ),
+    const SizedBox(height: CpiSpacing.md),
+    LocalTypeahead(
+      controller: _ief,
+      focusNode: _iefFocus,
+      label: 'Inspection (facultatif)',
+      hint: 'Almadies, Grand Dakar, Thiaroye…',
+      selectedId: _iefId,
+      textInputAction: TextInputAction.done,
+      emptyHint: iefs.isEmpty
+          ? 'Aucune inspection pour ce département.'
+          : 'Aucun résultat',
+      options: iefs
+          .map(
+            (Ief i) => TypeaheadOption(
+              id: i.id,
+              label: i.name,
+              secondary: i.departementName,
+              keywords: <String>[i.code, i.departementName],
+            ),
+          )
+          .toList(growable: false),
+      onChanged: (String _) {
+        if (_iefId != null) setState(() => _iefId = null);
+        markDraftDirty();
+      },
+      onSelected: (TypeaheadOption option) {
+        setState(() => _iefId = option.id);
+        markDraftDirty();
+        unawaited(flushDraft());
+      },
+    ),
+  ];
+
+  List<Widget> _contact() => <Widget>[
+    _WhatsappPicker(
+      status: _whatsappStatus,
+      controller: _whatsapp,
+      focusNode: _whatsappFocus,
+      onPick: _pickWhatsapp,
+      onNumberChanged: (String _) {
+        markDraftDirty();
+        setState(() {});
+      },
+    ),
+    const SizedBox(height: CpiSpacing.md),
+    LocalTypeahead(
+      controller: _profession,
+      focusNode: _professionFocus,
+      label: 'Profession (facultatif)',
+      hint: 'Instituteur, Proviseur, Inspecteur…',
+      selectedId: _professionId,
+      freeText: true,
+      maxLength: kProfessionMaxLength,
+      textInputAction: TextInputAction.done,
+      options: kProfessionsFrequentes
+          .map((String m) => TypeaheadOption(id: m, label: m))
+          .toList(growable: false),
+      onChanged: (String _) {
+        if (_professionId != null) {
+          setState(() => _professionId = null);
+        }
+        markDraftDirty();
+      },
+      onSelected: (TypeaheadOption option) {
+        setState(() => _professionId = option.id);
+        markDraftDirty();
+        unawaited(flushDraft());
+      },
+    ),
+    const SizedBox(height: CpiSpacing.md),
+    CpiField(
+      label: 'Notes (facultatif)',
+      controller: _notes,
+      focusNode: _notesFocus,
+      maxLines: 5,
+      maxLength: 2000,
+      textCapitalization: TextCapitalization.sentences,
+      onChanged: (String _) => markDraftDirty(),
+    ),
+  ];
 
   ({String name, String? owner, String? representantId})? get _duplicate {
     if (_localMatch != null) {
@@ -801,51 +894,38 @@ class _WhatsappPicker extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text('WhatsApp', style: theme.textTheme.titleSmall),
-        const SizedBox(height: CpiSpacing.xs),
-        Wrap(
-          spacing: CpiSpacing.xs,
-          runSpacing: CpiSpacing.xs,
-          children: <Widget>[
-            for (final String code in _codes)
-              ChoiceChip(
-                label: Text(
-                  WhatsappStatus.parse(code)?.label ?? code,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                selected: status == code,
-                onSelected: (bool on) =>
-                    onPick(on ? code : WhatsappStatus.nonDemande.code),
-              ),
-          ],
-        ),
-        if (status == WhatsappStatus.nonDemande.code) ...<Widget>[
-          const SizedBox(height: CpiSpacing.xxs),
-          Text(
-            'Question non posée.',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: <Widget>[
+      CpiChoiceGroup<String>(
+        label: 'WhatsApp',
+        description: status == WhatsappStatus.nonDemande.code
+            ? 'Question non posée.'
+            : null,
+        value: status,
+        options: <CpiChoice<String>>[
+          for (final String code in _codes)
+            CpiChoice<String>(
+              value: code,
+              label: WhatsappStatus.parse(code)?.label ?? code,
             ),
-          ),
         ],
-        if (status == WhatsappStatus.autreNumero.code) ...<Widget>[
-          const SizedBox(height: CpiSpacing.xs),
-          PhoneField(
-            controller: controller,
-            focusNode: focusNode,
-            label: 'Numéro WhatsApp',
-            onChanged: onNumberChanged,
-          ),
-        ],
+        // Retoucher la puce choisie repose la question : c'est le seul chemin
+        // vers « non demandé » une fois qu'une réponse a été prise.
+        onChanged: (String code) =>
+            onPick(code == status ? WhatsappStatus.nonDemande.code : code),
+      ),
+      if (status == WhatsappStatus.autreNumero.code) ...<Widget>[
+        const SizedBox(height: CpiSpacing.xs),
+        PhoneField(
+          controller: controller,
+          focusNode: focusNode,
+          label: 'Numéro WhatsApp',
+          onChanged: onNumberChanged,
+        ),
       ],
-    );
-  }
+    ],
+  );
 }
 
 /// Où en est la relation. Le commercial la règle depuis le terrain : c'est lui
@@ -865,47 +945,20 @@ class _ChampRelation extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Row(
-          children: <Widget>[
-            Icon(
-              PhosphorIconsRegular.handshake,
-              size: CpiIconSize.sm,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: CpiSpacing.xs),
-            Text('Relation', style: theme.textTheme.labelLarge),
-          ],
-        ),
-        const SizedBox(height: CpiSpacing.xs),
-        Wrap(
-          spacing: CpiSpacing.xs,
-          runSpacing: CpiSpacing.xs,
-          children: _choix
-              .map(
-                (String valeur) => ChoiceChip(
-                  label: Text(relationLabel(valeur)),
-                  selected: status == valeur,
-                  // Se corrige en touchant un autre choix : la relation a
-                  // toujours un état, elle ne se vide pas.
-                  onSelected: (bool choisi) {
-                    if (choisi) onChanged(valeur);
-                  },
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: CpiSpacing.sm,
-                    vertical: CpiSpacing.xs,
-                  ),
-                ),
-              )
-              .toList(growable: false),
-        ),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => CpiChoiceGroup<String>(
+    label: 'Relation',
+    icon: PhosphorIconsRegular.handshake,
+    value: status,
+    options: <CpiChoice<String>>[
+      for (final String valeur in _choix)
+        CpiChoice<String>(value: valeur, label: relationLabel(valeur)),
+    ],
+    // Se corrige en touchant un autre choix : la relation a toujours un état,
+    // elle ne se vide pas.
+    onChanged: (String valeur) {
+      if (valeur != status) onChanged(valeur);
+    },
+  );
 }
 
 class _DuplicateBanner extends StatelessWidget {
@@ -916,66 +969,29 @@ class _DuplicateBanner extends StatelessWidget {
   final VoidCallback? onAddProspects;
 
   @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final CpiColors cpi = context.cpi;
-    return Container(
-      padding: const EdgeInsets.all(CpiSpacing.sm),
-      decoration: BoxDecoration(
-        color: cpi.accentSurface,
-        borderRadius: CpiRadius.brMd,
-        border: Border.all(color: cpi.accentBorder.withValues(alpha: 0.5)),
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: <Widget>[
+      FAlert(
+        icon: const Icon(PhosphorIconsRegular.warningCircle),
+        title: const Text('Ce représentant existe déjà'),
+        subtitle: Text(owner == null ? name : '$name · enregistré par $owner'),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Icon(
-                PhosphorIconsRegular.warningCircle,
-                size: CpiIconSize.md,
-                color: cpi.accentText,
-              ),
-              const SizedBox(width: CpiSpacing.xs),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      'Ce représentant existe déjà',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        color: cpi.accentText,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      owner == null ? name : '$name · enregistré par $owner',
-                      style: theme.textTheme.bodySmall,
-                    ),
-                  ],
-                ),
-              ),
-            ],
+      if (onAddProspects != null) ...<Widget>[
+        const SizedBox(height: CpiSpacing.xs),
+        Align(
+          alignment: Alignment.centerRight,
+          child: CpiButton(
+            'Ajouter des prospects',
+            variant: CpiButtonVariant.ghost,
+            icon: PhosphorIconsRegular.userPlus,
+            expand: false,
+            onPressed: onAddProspects,
           ),
-          if (onAddProspects != null) ...<Widget>[
-            const SizedBox(height: CpiSpacing.xs),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: onAddProspects,
-                icon: const Icon(
-                  PhosphorIconsRegular.userPlus,
-                  size: CpiIconSize.sm,
-                ),
-                label: const Text('Ajouter des prospects'),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ],
+  );
 }
 
 class _SaveBar extends StatelessWidget {
@@ -985,72 +1001,46 @@ class _SaveBar extends StatelessWidget {
     required this.busy,
     required this.onPressed,
     this.error,
+    this.subtitle,
   });
 
   final String label;
   final bool enabled;
   final bool busy;
-  final VoidCallback onPressed;
+  final ValueChanged<BuildContext> onPressed;
 
   final String? error;
 
+  /// Ce qui manque, sous le libellé du bouton éteint.
+  final String? subtitle;
+
   @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(
-        CpiSpacing.md,
-        CpiSpacing.sm,
-        CpiSpacing.md,
-        CpiSpacing.md,
-      ),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        border: Border(top: BorderSide(color: context.cpi.borderSubtle)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          if (error != null) ...<Widget>[
-            Semantics(
-              liveRegion: true,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Icon(
-                    PhosphorIconsRegular.warningCircle,
-                    size: CpiIconSize.sm,
-                    color: theme.colorScheme.error,
-                  ),
-                  const SizedBox(width: CpiSpacing.xs),
-                  Expanded(
-                    child: Text(
-                      error!,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.error,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+  Widget build(BuildContext context) => CpiActionBar(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        if (error != null) ...<Widget>[
+          Semantics(
+            liveRegion: true,
+            child: FAlert(
+              variant: FAlertVariant.destructive,
+              icon: const Icon(PhosphorIconsRegular.warningCircle),
+              title: Text(error!),
             ),
-            const SizedBox(height: CpiSpacing.xs),
-          ],
-          FilledButton.icon(
-            onPressed: enabled ? onPressed : null,
-            icon: busy
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(PhosphorIconsRegular.check, size: CpiIconSize.md),
-            label: Text(label),
           ),
+          const SizedBox(height: CpiSpacing.xs),
         ],
-      ),
-    );
-  }
+        Builder(
+          builder: (BuildContext context) => CpiButton(
+            label,
+            icon: PhosphorIconsRegular.check,
+            loading: busy,
+            subtitle: subtitle,
+            onPressed: enabled ? () => onPressed(context) : null,
+          ),
+        ),
+      ],
+    ),
+  );
 }

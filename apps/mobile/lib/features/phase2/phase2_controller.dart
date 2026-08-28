@@ -10,11 +10,43 @@ import '../../data/repositories/write_repository.dart';
 
 enum Phase2Stage { search, notFound, alreadyClosed, capture, confirmed }
 
+/// Ce que l'étape « Renseignements » a recueilli. Tout y est facultatif : un
+/// téléconseiller n'obtient pas toujours une réponse, et un champ manquant ne
+/// doit jamais empêcher l'appel d'être consigné.
+@immutable
+class Phase2Renseignements {
+  const Phase2Renseignements({
+    this.nom,
+    this.prenom,
+    this.email,
+    this.profession,
+    this.dureeEtablissementMois,
+    this.fonctionnaire,
+    this.syndicatId,
+    this.banqueId,
+    this.engagementEnCours,
+  });
+
+  final String? nom;
+  final String? prenom;
+  final String? email;
+  final String? profession;
+  final int? dureeEtablissementMois;
+
+  /// Tri-état : `null` vaut « non demandé », et ce n'est pas « non ».
+  final bool? fonctionnaire;
+
+  final String? syndicatId;
+  final String? banqueId;
+  final bool? engagementEnCours;
+}
+
 @immutable
 class Phase2State {
   const Phase2State({
     this.stage = Phase2Stage.search,
     this.entry,
+    this.prospect,
     this.searchedPhone,
     this.errorMessage,
     this.confirmation,
@@ -28,6 +60,11 @@ class Phase2State {
   final Phase2Stage stage;
 
   final Phase2DirectoryData? entry;
+
+  /// La fiche locale du même prospect, quand elle est sur cet appareil.
+  /// L'annuaire ne porte qu'un numéro : nom, prénom et profession ne se
+  /// pré-remplissent que si le pull a déjà descendu la fiche elle-même.
+  final Prospect? prospect;
 
   final String? searchedPhone;
 
@@ -45,6 +82,7 @@ class Phase2State {
   Phase2State copyWith({
     Phase2Stage? stage,
     Phase2DirectoryData? entry,
+    Prospect? prospect,
     bool clearEntry = false,
     String? searchedPhone,
     String? errorMessage,
@@ -60,6 +98,7 @@ class Phase2State {
     return Phase2State(
       stage: stage ?? this.stage,
       entry: clearEntry ? null : (entry ?? this.entry),
+      prospect: clearEntry ? null : (prospect ?? this.prospect),
       searchedPhone: searchedPhone ?? this.searchedPhone,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       confirmation: confirmation ?? this.confirmation,
@@ -79,6 +118,7 @@ class Phase2State {
       other is Phase2State &&
           other.stage == stage &&
           other.entry == entry &&
+          other.prospect == prospect &&
           other.searchedPhone == searchedPhone &&
           other.errorMessage == errorMessage &&
           other.confirmation == confirmation &&
@@ -92,6 +132,7 @@ class Phase2State {
   int get hashCode => Object.hash(
     stage,
     entry,
+    prospect,
     searchedPhone,
     errorMessage,
     confirmation,
@@ -147,9 +188,25 @@ class Phase2Controller extends Notifier<Phase2State> {
           ? Phase2Stage.capture
           : Phase2Stage.alreadyClosed,
       entry: found,
+      prospect: await _localProspect(found.prospectId),
       searchedPhone: parsed.e164,
       clearError: true,
     );
+  }
+
+  /// La fiche du prospect si le pull l'a descendue sur cet appareil. Une lecture
+  /// qui casse ne fait pas échouer la recherche : elle ne prive que du
+  /// pré-remplissage.
+  Future<Prospect?> _localProspect(String prospectId) async {
+    final AppDatabase db = ref.read(appDatabaseProvider);
+    try {
+      final Prospect? row = await (db.select(
+        db.prospects,
+      )..where((Prospects t) => t.id.equals(prospectId))).getSingleOrNull();
+      return row?.deletedAt == null ? row : null;
+    } on Object {
+      return null;
+    }
   }
 
   Future<bool> record({
@@ -158,6 +215,8 @@ class Phase2Controller extends Notifier<Phase2State> {
     String? comment,
     DateTime? callbackAt,
     String? recordingPath,
+    Phase2Renseignements? renseignements,
+    DateTime? rendezVousAt,
   }) async {
     final Phase2DirectoryData? entry = state.entry;
     if (entry == null) return false;
@@ -180,6 +239,16 @@ class Phase2Controller extends Notifier<Phase2State> {
         callbackAt: callbackAt,
         recordingPath: recordingPath,
         createdById: me,
+        nom: renseignements?.nom,
+        prenom: renseignements?.prenom,
+        profession: renseignements?.profession,
+        banqueId: renseignements?.banqueId,
+        syndicatId: renseignements?.syndicatId,
+        email: renseignements?.email,
+        fonctionnaire: renseignements?.fonctionnaire,
+        engagementEnCours: renseignements?.engagementEnCours,
+        dureeEtablissementMois: renseignements?.dureeEtablissementMois,
+        rendezVousAt: rendezVousAt,
       );
     } on CallAttemptInvalid catch (e) {
       state = state.copyWith(saving: false, errorMessage: e.message);
@@ -235,7 +304,8 @@ class Phase2Controller extends Notifier<Phase2State> {
     'NETWORK' || 'TIMEOUT' =>
       'Réseau indisponible. L\'annuaire déjà téléchargé reste utilisable.',
     'SESSION_EXPIRED' || 'UNAUTHORIZED' => 'Session expirée. Reconnectez-vous.',
-    'FORBIDDEN' => 'Votre compte n\'a pas accès à l\'annuaire de phase 2.',
+    'FORBIDDEN' =>
+      'Votre compte n\'a pas accès à l\'annuaire des prospects à convertir.',
     _ => e.message ?? 'Téléchargement impossible pour le moment.',
   };
 
@@ -250,6 +320,7 @@ class Phase2Controller extends Notifier<Phase2State> {
     EnrollmentMethods.platform => 'Plateforme',
     EnrollmentMethods.physical => 'Physique',
     EnrollmentMethods.voiceOrElectronicMessaging => 'Voix / messagerie',
+    EnrollmentMethods.appointment => 'Prise de rendez-vous',
     _ => method,
   };
 
