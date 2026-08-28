@@ -83,15 +83,6 @@ export function EtapesNav({ courante }: { courante: EtapeNumero }) {
                     : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
                 )}
               >
-                <span
-                  aria-hidden="true"
-                  className={cn(
-                    'flex size-6 shrink-0 items-center justify-center rounded-full font-display text-[0.8125rem] font-[800]',
-                    active ? 'bg-accent-text text-background' : 'bg-muted text-muted-foreground',
-                  )}
-                >
-                  {etape.n}
-                </span>
                 <span className="min-w-0 truncate">{etape.titre}</span>
               </Link>
             </li>

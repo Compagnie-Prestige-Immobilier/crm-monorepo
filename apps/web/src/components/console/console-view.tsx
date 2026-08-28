@@ -574,7 +574,7 @@ export function ConsoleView() {
               <>
                 <fieldset className="flex flex-col gap-2" disabled={send.isPending}>
                   <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
-                    Il accepte — de quelle manière ?
+                    Il accepte : de quelle manière ?
                   </legend>
                   <div className="flex flex-wrap gap-2">
                     {METHOD_KEYS.map(({ key, method }) => (
@@ -894,7 +894,7 @@ function SortExplainer({
           file (« pourquoi celle-là en tête ? ») n'est pas un geste de travail,
           et « 4 règles de tri » n'était pas une réponse. */}
       <PopoverTrigger render={<Button variant="link" size="sm" />}>
-        {rawOrder ? 'Tri désactivé — pourquoi ?' : 'Pourquoi cet ordre ?'}
+        {rawOrder ? 'Tri désactivé, pourquoi ?' : 'Pourquoi cet ordre ?'}
       </PopoverTrigger>
       <PopoverContent className="w-80 text-[0.8125rem]">
         <ul className="flex flex-col gap-1">

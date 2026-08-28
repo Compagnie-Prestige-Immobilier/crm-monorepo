@@ -341,7 +341,7 @@ export function RegistreView() {
           les visites au-delà de la page en cours. */}
       {pageCount > 1 ? (
         <p className="hidden text-[0.75rem] print:block">
-          Page {page} sur {pageCount} — visites {formatNumber(premiere)} à {formatNumber(derniere)}{' '}
+          Page {page} sur {pageCount}, visites {formatNumber(premiere)} à {formatNumber(derniere)}{' '}
           sur {formatNumber(total)}. Les autres pages s’impriment séparément.
         </p>
       ) : null}
