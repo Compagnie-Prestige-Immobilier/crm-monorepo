@@ -63,7 +63,7 @@ export function RepresentantsView({
     placeholderData: (previous) => previous,
   });
 
-  // Le total des ambassadeurs porte sur la SÉLECTION entière, pas sur la page :
+  // Le total de ceux qui ont accepté porte sur la SÉLECTION entière, pas sur la page :
   // l'API ne le rend pas avec la liste, il se lit sur le `total` d'une seconde
   // requête aux mêmes critères.
   const ambassadorFilters: RepresentantFilters = {
@@ -148,131 +148,140 @@ export function RepresentantsView({
 
       <RepresentantsFiltersBar />
 
-      {isPending ? (
-        <TableSkeleton />
-      ) : isError ? (
-        <QueryErrorState
-          error={error}
-          onRetry={() => {
-            void refetch();
-          }}
-          fallback="Liste des représentants non chargée."
-        />
-      ) : data.items.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-border bg-card py-16 text-center shadow-elev-sm">
-          <UsersRoundIcon className="size-8 text-muted-foreground" aria-hidden="true" />
-          <p className="font-[600]">
-            {activeFilterCount === 0
-              ? 'Aucun représentant enregistré.'
-              : 'Aucun représentant ne correspond à ces critères.'}
-          </p>
-          <p className="max-w-md text-[0.8125rem] text-muted-foreground">
-            {activeFilterCount === 0
-              ? 'Les fiches sont saisies en tournée depuis le mobile, ou créées ici, une par une ou par import d’un classeur.'
-              : 'Élargissez la recherche ou retirez un filtre.'}
-          </p>
-        </div>
-      ) : (
-        <>
-          {/* ─── Cartes : sous 1024 px ────────────────────────────────── */}
-          <ul className={cn('flex flex-col gap-3 lg:hidden', isFetching && 'opacity-80')}>
-            {data.items.map((representant) => (
-              <li key={representant.id}>
-                <RepresentantCard
-                  representant={representant}
-                  onEdit={
-                    readOnly
-                      ? null
-                      : () => {
-                          setEditing({ representant });
+      {(() => {
+        if (isPending) return <TableSkeleton />;
+        return (() => {
+          if (isError)
+            return (
+              <QueryErrorState
+                error={error}
+                onRetry={() => {
+                  void refetch();
+                }}
+                fallback="Liste des représentants non chargée."
+              />
+            );
+          return (() => {
+            if (data.items.length === 0)
+              return (
+                <div className="flex flex-col items-center gap-2 rounded-lg border border-border bg-card py-16 text-center shadow-elev-sm">
+                  <UsersRoundIcon className="size-8 text-muted-foreground" aria-hidden="true" />
+                  <p className="font-[600]">
+                    {activeFilterCount === 0
+                      ? 'Aucun représentant enregistré.'
+                      : 'Aucun représentant ne correspond à ces critères.'}
+                  </p>
+                  <p className="max-w-md text-[0.8125rem] text-muted-foreground">
+                    {activeFilterCount === 0
+                      ? 'Les fiches sont saisies en tournée depuis le mobile, ou créées ici, une par une ou par import d’un classeur.'
+                      : 'Élargissez la recherche ou retirez un filtre.'}
+                  </p>
+                </div>
+              );
+            return (
+              <>
+                {/* ─── Cartes : sous 1024 px ────────────────────────────────── */}
+                <ul className={cn('flex flex-col gap-3 lg:hidden', isFetching && 'opacity-80')}>
+                  {data.items.map((representant) => (
+                    <li key={representant.id}>
+                      <RepresentantCard
+                        representant={representant}
+                        onEdit={
+                          readOnly
+                            ? null
+                            : () => {
+                                setEditing({ representant });
+                              }
                         }
-                  }
-                />
-              </li>
-            ))}
-          </ul>
+                      />
+                    </li>
+                  ))}
+                </ul>
 
-          {/* ─── Tableau : à partir de 1024 px ────────────────────────── */}
-          <div
-            className={cn(
-              'hidden overflow-hidden rounded-lg border border-border bg-card shadow-elev-sm transition-opacity lg:block',
-              isFetching && 'opacity-80',
-            )}
-          >
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>Représentant</TableHead>
-                  <TableHead>Relation</TableHead>
-                  <TableHead>Téléphone</TableHead>
-                  <TableHead>Département</TableHead>
-                  <TableHead>IEF</TableHead>
-                  <TableHead>Saisi par</TableHead>
-                  <TableHead className="text-right">Prospects</TableHead>
-                  <TableHead>Première saisie</TableHead>
-                  {readOnly ? null : (
-                    <TableHead className="w-24">
-                      <span className="sr-only">Actions</span>
-                    </TableHead>
+                {/* ─── Tableau : à partir de 1024 px ────────────────────────── */}
+                <div
+                  className={cn(
+                    'hidden overflow-hidden rounded-lg border border-border bg-card shadow-elev-sm transition-opacity lg:block',
+                    isFetching && 'opacity-80',
                   )}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.items.map((representant) => (
-                  <TableRow key={representant.id}>
-                    <TableCell className="font-[600]">
-                      <Link
-                        href={`/chues/representants/${representant.id}`}
-                        className="hover:underline focus-visible:underline"
-                      >
-                        {representant.fullName}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <RelationBadge status={representant.relationStatus} />
-                    </TableCell>
-                    <TableCell className="tabular-nums">
-                      {formatPhone(representant.phoneE164)}
-                    </TableCell>
-                    <TableCell>{representant.departementName}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {/* Un tiret demi-cadratin, et non « aucune » : les fiches
+                >
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead>Représentant</TableHead>
+                        <TableHead>Relation</TableHead>
+                        <TableHead>Téléphone</TableHead>
+                        <TableHead>Département</TableHead>
+                        <TableHead>IEF</TableHead>
+                        <TableHead>Saisi par</TableHead>
+                        <TableHead className="text-right">Prospects</TableHead>
+                        <TableHead>Première saisie</TableHead>
+                        {readOnly ? null : (
+                          <TableHead className="w-24">
+                            <span className="sr-only">Actions</span>
+                          </TableHead>
+                        )}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {data.items.map((representant) => (
+                        <TableRow key={representant.id}>
+                          <TableCell className="font-[600]">
+                            <Link
+                              href={`/chues/representants/${representant.id}`}
+                              className="hover:underline focus-visible:underline"
+                            >
+                              {representant.fullName}
+                            </Link>
+                          </TableCell>
+                          <TableCell>
+                            <RelationBadge status={representant.relationStatus} />
+                          </TableCell>
+                          <TableCell className="tabular-nums">
+                            {formatPhone(representant.phoneE164)}
+                          </TableCell>
+                          <TableCell>{representant.departementName}</TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {/* Un tiret demi-cadratin, et non « aucune » : les fiches
                           saisies avant l'arrivée du référentiel n'en portent
                           pas, et ce n'est pas une anomalie à commenter. */}
-                      {representant.iefName ?? NO_VALUE}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {representant.createdByName}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatNumber(representant.prospectCount)}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {formatDate(representant.clientCreatedAt)}
-                    </TableCell>
-                    {readOnly ? null : (
-                      <TableCell className="text-right">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          aria-label={`Modifier la fiche de ${representant.fullName}`}
-                          onClick={() => {
-                            setEditing({ representant });
-                          }}
-                        >
-                          <PencilIcon className="size-4" aria-hidden="true" />
-                          <span aria-hidden="true">Modifier</span>
-                        </Button>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </>
-      )}
+                            {representant.iefName ?? NO_VALUE}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {representant.createdByName}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {formatNumber(representant.prospectCount)}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {formatDate(representant.clientCreatedAt)}
+                          </TableCell>
+                          {readOnly ? null : (
+                            <TableCell className="text-right">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                aria-label={`Modifier la fiche de ${representant.fullName}`}
+                                onClick={() => {
+                                  setEditing({ representant });
+                                }}
+                              >
+                                <PencilIcon className="size-4" aria-hidden="true" />
+                                <span aria-hidden="true">Modifier</span>
+                              </Button>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
+            );
+          })();
+        })();
+      })()}
 
       {/*
         Le pied de tableau n'existe QUE sur la branche chargée.
@@ -301,7 +310,7 @@ export function RepresentantsView({
               : `${formatNumber(first)}–${formatNumber(last)} sur ${formatNumber(total)}`}
             {total === 0 || ambassadorCount === null
               ? ''
-              : `, dont ${formatNumber(ambassadorCount)} ambassadeur${ambassadorCount === 1 ? '' : 's'}`}
+              : `, dont ${formatNumber(ambassadorCount)} qui ont accepté`}
           </p>
 
           <div className="flex items-center gap-1">

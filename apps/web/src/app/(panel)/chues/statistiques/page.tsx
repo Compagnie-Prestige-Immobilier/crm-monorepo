@@ -7,7 +7,7 @@ import { StatisticsView } from '@/components/stats/statistics-view';
 import { StatChartsSkeleton, StatTilesSkeleton } from '@/components/stats/stat-tile';
 import { guardRoles } from '@/lib/session';
 
-export const metadata: Metadata = { title: 'Statistiques' };
+export const metadata: Metadata = { title: 'Chiffres' };
 
 export default async function StatistiquesPage() {
   const guard = await guardRoles(['ADMIN', 'SUPERVISEUR', 'DIRECTION']);

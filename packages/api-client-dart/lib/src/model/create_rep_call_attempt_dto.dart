@@ -47,6 +47,8 @@ class CreateRepCallAttemptDto {
     this.profession,
 
     required this.clientCreatedAt,
+
+    this.callbackAt,
   });
 
   /// UUID v7 engendré par le client. Clé d’idempotence.
@@ -116,6 +118,10 @@ class CreateRepCallAttemptDto {
   @JsonKey(name: r'clientCreatedAt', required: true, includeIfNull: false)
   final DateTime clientCreatedAt;
 
+  /// Date du rappel promis. Obligatoire si et seulement si l’issue vaut CALLBACK : c’est elle qui arme la notification côté mobile.
+  @JsonKey(name: r'callbackAt', required: false, includeIfNull: false)
+  final DateTime? callbackAt;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is CreateRepCallAttemptDto &&
@@ -135,6 +141,7 @@ class CreateRepCallAttemptDto {
                 whatsappE164,
                 profession,
                 clientCreatedAt,
+                callbackAt,
               ],
               [
                 other.id,
@@ -150,6 +157,7 @@ class CreateRepCallAttemptDto {
                 other.whatsappE164,
                 other.profession,
                 other.clientCreatedAt,
+                other.callbackAt,
               ],
             );
   }
@@ -171,6 +179,7 @@ class CreateRepCallAttemptDto {
         whatsappE164,
         profession,
         clientCreatedAt,
+        callbackAt,
       ]);
 
   factory CreateRepCallAttemptDto.fromJson(Map<String, dynamic> json) =>

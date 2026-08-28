@@ -366,12 +366,12 @@ export class BankCasesService {
     // abonné doivent répondre. Une saisie partielle retombe sur les chiffres bruts.
     const digits = term.replace(/\D/gu, '');
     const normalized = tryNormalizePhone(term);
-    const phone: Prisma.Sql =
-      normalized !== undefined
-        ? Prisma.sql`OR p."phoneE164" = ${normalized}`
-        : digits.length >= 4
-          ? Prisma.sql`OR p."phoneE164" LIKE ${`%${digits}`}`
-          : Prisma.sql``;
+    let phone = Prisma.sql``;
+    if (normalized !== undefined) {
+      phone = Prisma.sql`OR p."phoneE164" = ${normalized}`;
+    } else if (digits.length >= 4) {
+      phone = Prisma.sql`OR p."phoneE164" LIKE ${`%${digits}`}`;
+    }
 
     const where = Prisma.sql`
       p."deletedAt" IS NULL

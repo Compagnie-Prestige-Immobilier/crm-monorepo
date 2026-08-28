@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:forui/forui.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -9,6 +10,8 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:record/record.dart';
 
 import '../../../core/theme/cpi_tokens.dart';
+import '../../../ui/widgets/cpi_forui.dart';
+import '../../../ui/widgets/cpi_kit.dart';
 
 class CallAudioRecorder extends StatefulWidget {
   const CallAudioRecorder({
@@ -159,6 +162,14 @@ class _CallAudioRecorderState extends State<CallAudioRecorder> {
   }
 
   Future<void> _replace() async {
+    final bool? ok = await cpiConfirm(
+      context,
+      title: 'Effacer cette note ?',
+      message: 'L\'enregistrement actuel sera supprimé.',
+      confirmLabel: 'Effacer et recommencer',
+      danger: true,
+    );
+    if (ok != true || !mounted) return;
     await _player.stop();
     final String? previous = _path;
     if (previous != null) {
@@ -175,21 +186,48 @@ class _CallAudioRecorderState extends State<CallAudioRecorder> {
     await _start();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final bool ready = _path != null && !_recording;
-    final double progress = _duration.inMilliseconds == 0
-        ? 0
-        : (_position.inMilliseconds / _duration.inMilliseconds).clamp(0, 1);
+  /// La bande d'onde EST la molette de position : le doigt s'y pose et y
+  /// glisse. Un curseur séparé demandait une seconde cible sur un bloc déjà
+  /// serré, et il n'y avait pas la place.
+  void _seekTo(Offset local, double width) {
+    if (width <= 0) return;
+    unawaited(_player.seek(_duration * (local.dx / width).clamp(0, 1)));
+  }
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: CpiRadius.brMd,
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      child: Padding(
+  Future<void> _pickSpeed(BuildContext context) async {
+    final double? choix = await showCpiSheet<double>(
+      context,
+      title: 'Vitesse de lecture',
+      builder: (BuildContext context) => CpiCard.rows(<CpiRow>[
+        for (final double value in const <double>[1, 1.25, 1.5, 2])
+          CpiRow(
+            title: '$value×',
+            trailing: value == _speed
+                ? const Icon(
+                    PhosphorIconsFill.checkCircle,
+                    size: CpiIconSize.md,
+                  )
+                : null,
+            onTap: () => Navigator.of(context).pop(value),
+          ),
+      ]),
+    );
+    if (choix == null) return;
+    await _player.setSpeed(choix);
+    if (!mounted) return;
+    setState(() => _speed = choix);
+  }
+
+  @override
+  Widget build(BuildContext context) => CpiForui(
+    builder: (BuildContext context) {
+      final ThemeData theme = Theme.of(context);
+      final bool ready = _path != null && !_recording;
+      final double progress = _duration.inMilliseconds == 0
+          ? 0
+          : (_position.inMilliseconds / _duration.inMilliseconds).clamp(0, 1);
+
+      return CpiCard(
         padding: const EdgeInsets.all(CpiSpacing.sm),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -198,100 +236,169 @@ class _CallAudioRecorderState extends State<CallAudioRecorder> {
             const SizedBox(height: CpiSpacing.xxs),
             Text(
               'Le microphone du téléphone est enregistré. Prévenez la personne.',
-              style: theme.textTheme.bodySmall,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
             if (_recording || ready) ...<Widget>[
               const SizedBox(height: CpiSpacing.sm),
-              SizedBox(
-                height: 48,
-                child: CustomPaint(
-                  painter: _WaveformPainter(
-                    samples: List<double>.of(_samples),
-                    progress: _recording ? 1 : progress,
-                    color: theme.colorScheme.primary,
-                    background: theme.colorScheme.outlineVariant,
-                  ),
-                  child: ready
-                      ? Slider(
-                          value: progress,
-                          onChanged: (double value) =>
-                              _player.seek(_duration * value),
-                          semanticFormatterCallback: (_) => _time(_position),
-                        )
-                      : null,
-                ),
+              _Waveform(
+                samples: List<double>.of(_samples),
+                progress: _recording ? 1 : progress,
+                color: theme.colorScheme.primary,
+                background: context.theme.colors.border,
+                position: _time(_position),
+                onSeek: ready ? _seekTo : null,
               ),
             ],
             const SizedBox(height: CpiSpacing.xs),
             if (_recording)
-              FilledButton.icon(
+              CpiButton(
+                'Arrêter l’enregistrement',
+                icon: PhosphorIconsFill.stop,
                 onPressed: _stop,
-                icon: const Icon(PhosphorIconsFill.stop, size: CpiIconSize.sm),
-                label: const Text('Arrêter l’enregistrement'),
               )
             else if (!ready)
-              OutlinedButton.icon(
+              CpiButton(
+                'Enregistrer une note vocale',
+                variant: CpiButtonVariant.secondary,
+                icon: PhosphorIconsRegular.microphone,
                 onPressed: widget.enabled ? _start : null,
-                icon: const Icon(
-                  PhosphorIconsRegular.microphone,
-                  size: CpiIconSize.md,
-                ),
-                label: const Text('Enregistrer une note vocale'),
               )
             else
               Row(
+                spacing: CpiSpacing.xs,
                 children: <Widget>[
-                  IconButton.filled(
-                    onPressed: _togglePlayback,
-                    tooltip: _playing ? 'Pause' : 'Écouter',
-                    icon: Icon(
-                      _playing
-                          ? PhosphorIconsFill.pause
-                          : PhosphorIconsFill.play,
-                      size: CpiIconSize.md,
-                    ),
+                  _IconAction(
+                    label: _playing ? 'Pause' : 'Écouter',
+                    icon: _playing
+                        ? PhosphorIconsFill.pause
+                        : PhosphorIconsFill.play,
+                    variant: FButtonVariant.primary,
+                    onPress: _togglePlayback,
                   ),
-                  const SizedBox(width: CpiSpacing.xs),
                   Expanded(
                     child: Text('${_time(_position)} / ${_time(_duration)}'),
                   ),
-                  DropdownButton<double>(
-                    value: _speed,
-                    underline: const SizedBox.shrink(),
-                    items: const <double>[1, 1.25, 1.5, 2]
-                        .map(
-                          (double value) => DropdownMenuItem<double>(
-                            value: value,
-                            child: Text('$value×'),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (double? value) async {
-                      if (value == null) return;
-                      await _player.setSpeed(value);
-                      if (!mounted) return;
-                      setState(() => _speed = value);
-                    },
-                  ),
-                  IconButton(
-                    onPressed: widget.enabled ? _replace : null,
-                    tooltip: 'Recommencer',
-                    icon: const Icon(
-                      PhosphorIconsRegular.arrowCounterClockwise,
-                      size: CpiIconSize.md,
+                  Builder(
+                    builder: (BuildContext context) => CpiButton(
+                      '$_speed×',
+                      variant: CpiButtonVariant.ghost,
+                      expand: false,
+                      onPressed: () => unawaited(_pickSpeed(context)),
                     ),
+                  ),
+                  _IconAction(
+                    label: 'Recommencer',
+                    icon: PhosphorIconsRegular.arrowCounterClockwise,
+                    variant: FButtonVariant.ghost,
+                    onPress: widget.enabled ? _replace : null,
                   ),
                 ],
               ),
             if (_error != null) ...<Widget>[
               const SizedBox(height: CpiSpacing.xs),
-              Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
+              Semantics(
+                liveRegion: true,
+                child: FAlert(
+                  variant: FAlertVariant.destructive,
+                  icon: const Icon(PhosphorIconsRegular.warningCircle),
+                  title: Text(_error!),
+                ),
+              ),
             ],
           ],
         ),
+      );
+    },
+  );
+}
+
+/// Bouton d'action sans libellé visible : le lecteur d'écran en reçoit un.
+class _IconAction extends StatelessWidget {
+  const _IconAction({
+    required this.label,
+    required this.icon,
+    required this.variant,
+    required this.onPress,
+  });
+
+  final String label;
+  final IconData icon;
+  final FButtonVariant variant;
+  final VoidCallback? onPress;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    label: label,
+    child: ExcludeSemantics(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          minWidth: kCpiMinTouchTarget,
+          minHeight: kCpiMinTouchTarget,
+        ),
+        child: FButton.icon(
+          variant: variant,
+          onPress: onPress,
+          child: Icon(icon, size: CpiIconSize.md),
+        ),
       ),
-    );
-  }
+    ),
+  );
+}
+
+class _Waveform extends StatelessWidget {
+  const _Waveform({
+    required this.samples,
+    required this.progress,
+    required this.color,
+    required this.background,
+    required this.position,
+    required this.onSeek,
+  });
+
+  final List<double> samples;
+  final double progress;
+  final Color color;
+  final Color background;
+  final String position;
+  final void Function(Offset local, double width)? onSeek;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (BuildContext context, BoxConstraints box) {
+      final Widget onde = SizedBox(
+        height: kCpiMinTouchTarget,
+        child: CustomPaint(
+          size: Size(box.maxWidth, kCpiMinTouchTarget),
+          painter: _WaveformPainter(
+            samples: samples,
+            progress: progress,
+            color: color,
+            background: background,
+          ),
+        ),
+      );
+      final void Function(Offset, double)? seek = onSeek;
+      if (seek == null) return onde;
+      return Semantics(
+        slider: true,
+        label: 'Position de lecture',
+        value: position,
+        child: ExcludeSemantics(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapDown: (TapDownDetails d) =>
+                seek(d.localPosition, box.maxWidth),
+            onHorizontalDragUpdate: (DragUpdateDetails d) =>
+                seek(d.localPosition, box.maxWidth),
+            child: onde,
+          ),
+        ),
+      );
+    },
+  );
 }
 
 String _time(Duration value) {

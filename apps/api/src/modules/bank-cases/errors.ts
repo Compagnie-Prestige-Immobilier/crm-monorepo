@@ -49,7 +49,7 @@ export const prospectNotEnrolled = (
 ): UnprocessableEntityException =>
   new UnprocessableEntityException({
     code: BankCaseError.PROSPECT_NOT_ENROLLED,
-    message: `Un dossier bancaire ne peut être ouvert que sur un prospect dont la méthode d’enrôlement est obtenue. Statut phase 2 actuel : ${phase2Status}.`,
+    message: `Un dossier bancaire ne peut être ouvert que sur un prospect dont la méthode d’enrôlement est obtenue. Statut phase 3 actuel : ${phase2Status}.`,
     prospectId,
     phase2Status,
   });

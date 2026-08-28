@@ -5,6 +5,7 @@
 // ignore_for_file: unused_element
 import 'package:crm_api_client/src/model/rep_campaign_progress_dto.dart';
 import 'package:crm_api_client/src/model/campaign_status.dart';
+import 'package:crm_api_client/src/model/representant_relation.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/src/equatable_utils.dart';
@@ -36,6 +37,8 @@ class RepCampaignSummaryDto {
     required this.iefId,
 
     required this.onlyWithoutProspects,
+
+    required this.relationStatuses,
 
     required this.createdById,
 
@@ -83,6 +86,10 @@ class RepCampaignSummaryDto {
   @JsonKey(name: r'onlyWithoutProspects', required: true, includeIfNull: false)
   final bool onlyWithoutProspects;
 
+  /// États de relation retenus par le tirage. Vide : aucun filtre.
+  @JsonKey(name: r'relationStatuses', required: true, includeIfNull: false)
+  final List<RepresentantRelation> relationStatuses;
+
   @JsonKey(name: r'createdById', required: true, includeIfNull: false)
   final String createdById;
 
@@ -119,6 +126,7 @@ class RepCampaignSummaryDto {
                 departementId,
                 iefId,
                 onlyWithoutProspects,
+                relationStatuses,
                 createdById,
                 createdByName,
                 commercialCount,
@@ -136,6 +144,7 @@ class RepCampaignSummaryDto {
                 other.departementId,
                 other.iefId,
                 other.onlyWithoutProspects,
+                other.relationStatuses,
                 other.createdById,
                 other.createdByName,
                 other.commercialCount,
@@ -159,6 +168,7 @@ class RepCampaignSummaryDto {
         departementId,
         iefId,
         onlyWithoutProspects,
+        relationStatuses,
         createdById,
         createdByName,
         commercialCount,

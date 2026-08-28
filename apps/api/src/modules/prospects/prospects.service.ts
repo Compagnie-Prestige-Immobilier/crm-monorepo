@@ -21,7 +21,7 @@ import { lastAttemptsByProspect, type LastAttempt } from './last-attempt.js';
 import { normalizePhone } from '../../common/phone.js';
 import { AuditAction, audit } from '../../common/audit.js';
 import { PROSPECT_STATUT_TRANSITIONS, assertTransition } from '../../common/transitions.js';
-import { assertOwnership, assertReadable, isAdmin, ownerScope } from '../../common/scope.js';
+import { assertOwnership, isAdmin, ownerScope, prospectReadScope } from '../../common/scope.js';
 import { buildProspectWhere } from '../../common/prospect-where.js';
 import { ProspectSortField, SortOrder } from '../../common/dto/prospect-filter.dto.js';
 import type { ProspectQueryDto } from '../../common/dto/prospect-filter.dto.js';
@@ -70,6 +70,22 @@ export const PROSPECT_INCLUDE = {
 } satisfies Prisma.ProspectInclude;
 
 type ProspectRow = Prisma.ProspectGetPayload<{ include: typeof PROSPECT_INCLUDE }>;
+
+// `Partial<T>` seul ne suffit pas : sous `exactOptionalPropertyTypes`, une
+// clé `profession?: string | undefined` reste distincte de `profession?:
+// string`, alors que les deux décrivent la même absence pour Prisma. Le
+// mapped type retire `undefined` du type de chaque valeur en plus de rendre
+// la clé optionnelle.
+function defined<T extends Record<string, unknown>>(
+  values: T,
+): { [K in keyof T]?: Exclude<T[K], undefined> } {
+  return Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined)) as {
+    [K in keyof T]?: Exclude<T[K], undefined>;
+  };
+}
+
+const isoOrNull = (value: Date | null | undefined): string | null =>
+  value === null || value === undefined ? null : value.toISOString();
 
 /**
  * Ce qu'une fiche qui sort du jeu laisse derrière elle.
@@ -175,6 +191,20 @@ async function moveJourneys(
 }
 
 export function toProspectDto(row: ProspectRow, lastAttempt?: LastAttempt): ProspectDto {
+  const banque = row.banque ?? { name: null, shortName: null };
+  const syndicat = row.syndicat ?? { sigle: null };
+  const representant = row.representant ?? {
+    fullName: null,
+    phoneE164: null,
+    departementId: null,
+    departement: { name: null },
+  };
+  const profession = row.professionRef ?? { label: row.profession, isTeaching: null };
+  const incomeBand = row.incomeBand ?? { label: null };
+  const provenance = row.canalProvenance ?? { label: null };
+  const enrollmentAuthor = row.enrollmentCapturedBy ?? { fullName: null };
+  const attempt = lastAttempt ?? { outcome: null, comment: null, at: null };
+
   return {
     id: row.id,
     nom: row.nom,
@@ -184,51 +214,51 @@ export function toProspectDto(row: ProspectRow, lastAttempt?: LastAttempt): Pros
     statut: row.statut,
     projet: row.projet,
     banqueId: row.banqueId,
-    banqueName: row.banque?.name ?? null,
+    banqueName: banque.name,
     syndicatId: row.syndicatId,
-    syndicatSigle: row.syndicat?.sigle ?? null,
+    syndicatSigle: syndicat.sigle,
     representantId: row.representantId,
-    representantName: row.representant?.fullName ?? null,
-    representantPhoneE164: row.representant?.phoneE164 ?? null,
-    departementId: row.representant?.departementId ?? null,
-    departementName: row.representant?.departement.name ?? null,
+    representantName: representant.fullName,
+    representantPhoneE164: representant.phoneE164,
+    departementId: representant.departementId,
+    departementName: representant.departement.name,
     ownedByCommercialId: row.createdBy.id,
     ownedByCommercialName: row.createdBy.fullName,
     type: row.type,
-    profession: row.professionRef?.label ?? row.profession,
+    profession: profession.label,
     professionId: row.professionId ?? null,
-    professionIsTeaching: row.professionRef?.isTeaching ?? null,
+    professionIsTeaching: profession.isTeaching,
     incomeBandId: row.incomeBandId ?? null,
-    incomeBandLabel: row.incomeBand?.label ?? null,
+    incomeBandLabel: incomeBand.label,
     paymentMode: row.paymentMode ?? null,
     journeys: row.journeys.map((journey) => ({
       ...journey,
-      consentAt: journey.consentAt?.toISOString() ?? null,
-      convertedAt: journey.convertedAt?.toISOString() ?? null,
+      consentAt: isoOrNull(journey.consentAt),
+      convertedAt: isoOrNull(journey.convertedAt),
     })),
     dureeSystemeMois: row.dureeSystemeMois,
     canalProvenanceId: row.canalProvenanceId,
-    canalProvenanceLabel: row.canalProvenance?.label ?? null,
+    canalProvenanceLabel: provenance.label,
     // Définition UNIQUE du croisement : le même helper sert au filtrage, aux
     // statistiques et aux onglets du classeur. NUL dès qu'il manque un axe.
     segment: classifySegment({
-      syndicatSigle: row.syndicat?.sigle ?? null,
-      banqueShortName: row.banque?.shortName ?? null,
+      syndicatSigle: syndicat.sigle,
+      banqueShortName: banque.shortName,
     }),
     phase2Status: row.phase2Status,
     enrollmentMethod: row.enrollmentMethod,
     enrollmentCapturedById: row.enrollmentCapturedById,
-    enrollmentCapturedByName: row.enrollmentCapturedBy?.fullName ?? null,
-    enrollmentCapturedAt: row.enrollmentCapturedAt?.toISOString() ?? null,
+    enrollmentCapturedByName: enrollmentAuthor.fullName,
+    enrollmentCapturedAt: isoOrNull(row.enrollmentCapturedAt),
     origin: row.origin,
     originLabel: row.originLabel,
-    lastOutcome: lastAttempt?.outcome ?? null,
-    lastComment: lastAttempt?.comment ?? null,
-    lastAttemptAt: lastAttempt?.at.toISOString() ?? null,
+    lastOutcome: attempt.outcome,
+    lastComment: attempt.comment,
+    lastAttemptAt: isoOrNull(attempt.at),
     clientCreatedAt: row.clientCreatedAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
-    deletedAt: row.deletedAt?.toISOString() ?? null,
+    deletedAt: isoOrNull(row.deletedAt),
   };
 }
 
@@ -275,13 +305,25 @@ export class ProspectsService {
 
   async get(user: AuthenticatedUser, id: string): Promise<ProspectDto> {
     const row = await this.prisma.prospect.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, deletedAt: null, ...prospectReadScope(user) },
       include: PROSPECT_INCLUDE,
     });
+    // Deux requêtes seulement quand la lecture échoue : la règle de portée reste
+    // écrite à un seul endroit, et « pas à vous » ne se confond pas avec
+    // « n'existe pas ».
     if (!row) {
+      const ailleurs = await this.prisma.prospect.findFirst({
+        where: { id, deletedAt: null },
+        select: { id: true },
+      });
+      if (ailleurs) {
+        throw new ForbiddenException({
+          code: 'NOT_OWNER',
+          message: 'Cette fiche appartient à un autre téléconseiller.',
+        });
+      }
       throw new NotFoundException({ code: 'PROSPECT_NOT_FOUND', message: 'Prospect introuvable.' });
     }
-    assertReadable(user, row);
     const attempts = await lastAttemptsByProspect(this.prisma, [row.id]);
     return toProspectDto(row, attempts.get(row.id));
   }
@@ -292,7 +334,7 @@ export class ProspectsService {
 
     await this.assertIdAvailable(user, id);
     // Le rattachement est facultatif : une fiche Grand Public n'en a aucun.
-    if (input.representantId) await this.assertRepresentantUsable(user, input.representantId);
+    if (input.representantId) await this.assertRepresentantUsable(input.representantId);
     const projet = input.projet ?? Projet.CHUES;
     const attached = await this.attachProjectByPhone(user, phoneE164, projet, input);
     if (attached) return attached;
@@ -309,20 +351,17 @@ export class ProspectsService {
         syndicatId: input.syndicatId ?? null,
         representantId: input.representantId ?? null,
         createdById: user.id,
-        ...(input.projet ? { projet } : {}),
-        ...(input.type ? { type: input.type } : {}),
-        ...(input.profession === undefined ? {} : { profession: input.profession.trim() }),
-        ...(input.professionId === undefined ? {} : { professionId: input.professionId }),
-        ...(input.incomeBandId === undefined ? {} : { incomeBandId: input.incomeBandId }),
-        ...(input.paymentMode === undefined ? {} : { paymentMode: input.paymentMode }),
-        ...(input.dureeSystemeMois === undefined
-          ? {}
-          : { dureeSystemeMois: input.dureeSystemeMois }),
-        ...(input.canalProvenanceId === undefined
-          ? {}
-          : { canalProvenanceId: input.canalProvenanceId }),
-
-        ...(input.statut ? { statut: input.statut } : {}),
+        ...defined({
+          projet: input.projet === undefined ? undefined : projet,
+          type: input.type,
+          profession: input.profession?.trim(),
+          professionId: input.professionId,
+          incomeBandId: input.incomeBandId,
+          paymentMode: input.paymentMode,
+          dureeSystemeMois: input.dureeSystemeMois,
+          canalProvenanceId: input.canalProvenanceId,
+          statut: input.statut,
+        }),
         journeys: {
           create: {
             projet,
@@ -356,7 +395,7 @@ export class ProspectsService {
     if (phoneE164 && phoneE164 !== existing.phoneE164)
       await this.assertPhoneFree(user, phoneE164, id);
     if (input.representantId && input.representantId !== existing.representantId) {
-      await this.assertRepresentantUsable(user, input.representantId);
+      await this.assertRepresentantUsable(input.representantId);
     }
     this.assertPayment(
       input.paymentMode ?? existing.paymentMode,
@@ -368,62 +407,31 @@ export class ProspectsService {
     // écrit l'engagement. Sans cette garde, un simple PATCH y menait, sans
     // consentement, sans conversion, sans auteur — et depuis n'importe quel
     // état, `PERDU` compris.
-    if (input.statut && input.statut !== existing.statut) {
-      assertTransition(PROSPECT_STATUT_TRANSITIONS, existing.statut, input.statut, {
-        code: 'PROSPECT_STATUT_TRANSITION_REFUSED',
-        label: 'Statut du prospect',
-        ...(isAdmin(user) ? { bypass: true } : {}),
-      });
-      if (input.statut === 'CONVERTI' && !isAdmin(user)) {
-        throw new ForbiddenException({
-          code: 'PROSPECT_CONVERSION_REQUIRES_CONFIRMATION',
-          message:
-            'Une conversion s’enregistre par la confirmation dédiée, qui recueille ' +
-            'l’offre et le montant.',
-        });
-      }
-    }
-
-    if (input.projet) {
-      await this.prisma.prospectJourney.upsert({
-        where: { prospectId_projet: { prospectId: id, projet: input.projet } },
-        create: {
-          prospectId: id,
-          projet: input.projet,
-          ...(input.statut ? { statut: input.statut } : {}),
-          consent:
-            input.projet === Projet.GRAND_PUBLIC
-              ? GrandPublicConsent.INTERESSE
-              : GrandPublicConsent.NON_DEMANDE,
-          consentAt: input.projet === Projet.GRAND_PUBLIC ? new Date() : null,
-        },
-        update: input.statut === undefined ? {} : { statut: input.statut },
-      });
-    }
+    this.assertStatusUpdate(user, existing.statut, input.statut);
+    await this.upsertJourney(id, input);
 
     const updated = await this.prisma.prospect.update({
       where: { id },
       data: {
-        ...(input.nom ? { nom: input.nom.trim() } : {}),
-        ...(input.prenom ? { prenom: input.prenom.trim() } : {}),
-        ...(phoneE164 ? { phoneE164 } : {}),
-        ...(input.banqueId ? { banqueId: input.banqueId } : {}),
-        ...(input.syndicatId ? { syndicatId: input.syndicatId } : {}),
-        ...(input.representantId ? { representantId: input.representantId } : {}),
-        ...(input.projet ? { projet: input.projet } : {}),
-        ...(input.type ? { type: input.type } : {}),
-        ...(input.profession === undefined ? {} : { profession: input.profession.trim() }),
-        ...(input.professionId === undefined ? {} : { professionId: input.professionId }),
-        ...(input.incomeBandId === undefined ? {} : { incomeBandId: input.incomeBandId }),
-        ...(input.paymentMode === undefined ? {} : { paymentMode: input.paymentMode }),
-        ...(input.dureeSystemeMois === undefined
-          ? {}
-          : { dureeSystemeMois: input.dureeSystemeMois }),
-        ...(input.canalProvenanceId === undefined
-          ? {}
-          : { canalProvenanceId: input.canalProvenanceId }),
-        ...(input.statut ? { statut: input.statut } : {}),
-        ...(input.clientCreatedAt ? { clientCreatedAt: new Date(input.clientCreatedAt) } : {}),
+        ...defined({
+          nom: input.nom?.trim(),
+          prenom: input.prenom?.trim(),
+          phoneE164,
+          banqueId: input.banqueId,
+          syndicatId: input.syndicatId,
+          representantId: input.representantId,
+          projet: input.projet,
+          type: input.type,
+          profession: input.profession?.trim(),
+          professionId: input.professionId,
+          incomeBandId: input.incomeBandId,
+          paymentMode: input.paymentMode,
+          dureeSystemeMois: input.dureeSystemeMois,
+          canalProvenanceId: input.canalProvenanceId,
+          statut: input.statut,
+          clientCreatedAt:
+            input.clientCreatedAt === undefined ? undefined : new Date(input.clientCreatedAt),
+        }),
         rev: { increment: 1 },
       },
       include: PROSPECT_INCLUDE,
@@ -432,6 +440,44 @@ export class ProspectsService {
     // renverrait au client une réponse qui contredit la liste dont il vient.
     const attempts = await lastAttemptsByProspect(this.prisma, [updated.id]);
     return toProspectDto(updated, attempts.get(updated.id));
+  }
+
+  private assertStatusUpdate(
+    user: AuthenticatedUser,
+    current: ProspectStatut,
+    next: ProspectStatut | undefined,
+  ): void {
+    if (next === undefined || next === current) return;
+    assertTransition(PROSPECT_STATUT_TRANSITIONS, current, next, {
+      code: 'PROSPECT_STATUT_TRANSITION_REFUSED',
+      label: 'Statut du prospect',
+      ...(isAdmin(user) ? { bypass: true } : {}),
+    });
+    if (next !== 'CONVERTI' || isAdmin(user)) return;
+    throw new ForbiddenException({
+      code: 'PROSPECT_CONVERSION_REQUIRES_CONFIRMATION',
+      message:
+        'Une conversion s’enregistre par la confirmation dédiée, qui recueille ' +
+        'l’offre et le montant.',
+    });
+  }
+
+  private async upsertJourney(id: string, input: UpdateProspectDto): Promise<void> {
+    if (input.projet === undefined) return;
+    await this.prisma.prospectJourney.upsert({
+      where: { prospectId_projet: { prospectId: id, projet: input.projet } },
+      create: {
+        prospectId: id,
+        projet: input.projet,
+        ...(input.statut ? { statut: input.statut } : {}),
+        consent:
+          input.projet === Projet.GRAND_PUBLIC
+            ? GrandPublicConsent.INTERESSE
+            : GrandPublicConsent.NON_DEMANDE,
+        consentAt: input.projet === Projet.GRAND_PUBLIC ? new Date() : null,
+      },
+      update: input.statut === undefined ? {} : { statut: input.statut },
+    });
   }
 
   private assertPayment(
@@ -687,7 +733,7 @@ export class ProspectsService {
     });
     if (!rows.length) return { updated: 0, prospectIds: [] };
 
-    if (input.representantId) await this.assertRepresentantUsable(user, input.representantId);
+    if (input.representantId) await this.assertRepresentantUsable(input.representantId);
     if (input.commercialId) {
       const owner = await this.prisma.user.findFirst({
         where: { id: input.commercialId, deletedAt: null },
@@ -714,13 +760,11 @@ export class ProspectsService {
   }
 
   /**
-   * Le représentant de rattachement doit exister et être visible par
-   * l'appelant. Sans ce contrôle, un COMMERCIAL pourrait accrocher ses
-   * prospects sous le représentant d'un collègue et les faire apparaître dans
-   * la synchro de ce dernier.
+   * L'ANNUAIRE est commun : tout représentant vivant sert de rattachement, quel
+   * que soit son créateur. Le cloisonnement se joue sur le PROSPECT créé, qui
+   * reste celui de son auteur.
    */
   private async assertRepresentantUsable(
-    user: AuthenticatedUser,
     representantId: string,
   ): Promise<{ id: string; createdById: string }> {
     const representant = await this.prisma.representant.findFirst({
@@ -733,7 +777,6 @@ export class ProspectsService {
         message: 'Représentant introuvable.',
       });
     }
-    assertOwnership(user, representant, 'Ce représentant appartient à un autre commercial.');
     return representant;
   }
 

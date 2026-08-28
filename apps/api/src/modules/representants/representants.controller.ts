@@ -31,7 +31,7 @@ import {
   type AuthenticatedUser,
 } from '../../common/decorators/current-user.decorator.js';
 import { OkDto } from '../../common/dto/ok.dto.js';
-import { Roles } from '../../common/decorators/roles.decorator.js';
+import { PARCOURS_ROLES, Roles } from '../../common/decorators/roles.decorator.js';
 import { RepresentantsService } from './representants.service.js';
 import { RepresentantsImportService } from './representants-import.service.js';
 import {
@@ -67,17 +67,15 @@ export class RepresentantsController {
   @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiOperation({
     operationId: 'listRepresentants',
-    summary: 'Liste paginée. Un COMMERCIAL ne voit que ses propres représentants.',
+    summary: 'Liste paginée de l’annuaire, commun à tous les téléconseillers.',
   })
   @ApiResponse({ status: 200, type: RepresentantListDto })
-  list(
-    @CurrentUser() user: AuthenticatedUser,
-    @Query() query: RepresentantQueryDto,
-  ): Promise<RepresentantListDto> {
-    return this.representants.list(user, query);
+  list(@Query() query: RepresentantQueryDto): Promise<RepresentantListDto> {
+    return this.representants.list(query);
   }
 
   @Get('lookup')
+  @Roles(...PARCOURS_ROLES)
   @ApiOperation({
     operationId: 'lookupRepresentantByPhone',
     summary: 'Cherche un représentant par téléphone, avant saisie.',
@@ -85,11 +83,8 @@ export class RepresentantsController {
       'Répond même si la fiche appartient à un autre commercial, en nommant son propriétaire.',
   })
   @ApiResponse({ status: 200, type: RepresentantLookupDto })
-  lookup(
-    @CurrentUser() user: AuthenticatedUser,
-    @Query() query: RepresentantLookupQueryDto,
-  ): Promise<RepresentantLookupDto> {
-    return this.representants.lookup(user, query.phone);
+  lookup(@Query() query: RepresentantLookupQueryDto): Promise<RepresentantLookupDto> {
+    return this.representants.lookup(query.phone);
   }
 
   @Post('import')
@@ -134,19 +129,13 @@ export class RepresentantsController {
   @ApiOperation({ operationId: 'getRepresentant', summary: 'Détail d’un représentant.' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, type: RepresentantDto })
-  @ApiResponse({
-    status: 403,
-    type: ApiErrorDto,
-    description: 'La fiche appartient à un autre commercial.',
-  })
-  get(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<RepresentantDto> {
-    return this.representants.get(user, id);
+  @ApiResponse({ status: 404, type: ApiErrorDto, description: 'REPRESENTANT_NOT_FOUND.' })
+  get(@Param('id', ParseUUIDPipe) id: string): Promise<RepresentantDto> {
+    return this.representants.get(id);
   }
 
   @Post()
+  @Roles(...PARCOURS_ROLES)
   @ApiOperation({
     operationId: 'createRepresentant',
     summary: 'Crée un représentant. L’identifiant peut être fourni par le client.',
@@ -170,6 +159,7 @@ export class RepresentantsController {
   }
 
   @Patch(':id')
+  @Roles(...PARCOURS_ROLES)
   @ApiOperation({ operationId: 'updateRepresentant', summary: 'Modifie un représentant.' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, type: RepresentantDto })
@@ -196,10 +186,9 @@ export class RepresentantsController {
     description: 'REPRESENTANT_NOT_FOUND.',
   })
   relationHistory(
-    @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<RepresentantRelationChangeListDto> {
-    return this.representants.relationHistory(user, id);
+    return this.representants.relationHistory(id);
   }
 
   @Get(':id/comments')
@@ -212,14 +201,14 @@ export class RepresentantsController {
   @ApiResponse({ status: 200, type: RepresentantCommentListDto })
   @ApiResponse({ status: 404, type: ApiErrorDto, description: 'REPRESENTANT_NOT_FOUND.' })
   listComments(
-    @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
     @Query() query: RepresentantCommentQueryDto,
   ): Promise<RepresentantCommentListDto> {
-    return this.representants.listComments(user, id, query);
+    return this.representants.listComments(id, query);
   }
 
   @Post(':id/comments')
+  @Roles(...PARCOURS_ROLES)
   @ApiOperation({
     operationId: 'addRepresentantComment',
     summary: 'Ajoute un commentaire. L’identifiant fourni sert de clé d’idempotence.',
@@ -264,6 +253,7 @@ export class RepresentantsController {
   }
 
   @Delete(':id')
+  @Roles(...PARCOURS_ROLES)
   @ApiOperation({
     operationId: 'deleteRepresentant',
     summary: 'Supprime logiquement un représentant.',

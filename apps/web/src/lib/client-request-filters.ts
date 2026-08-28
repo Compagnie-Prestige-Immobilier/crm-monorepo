@@ -38,18 +38,21 @@ export type { RawSearchParams };
 
 export const ALL_STATUSES = 'tous';
 
+function parseStatus(status: string | null): ClientRequestStatus | null {
+  if (status === ALL_STATUSES) return null;
+  if (status !== null && (CLIENT_REQUEST_STATUSES as readonly string[]).includes(status)) {
+    return status as ClientRequestStatus;
+  }
+  return DEFAULT_CLIENT_REQUEST_FILTERS.status;
+}
+
 export function parseClientRequestFilters(
   params: RawSearchParams | URLSearchParams,
 ): ClientRequestFilters {
   const status = readString(params, 'statut');
 
   return {
-    status:
-      status === ALL_STATUSES
-        ? null
-        : status !== null && (CLIENT_REQUEST_STATUSES as readonly string[]).includes(status)
-          ? (status as ClientRequestStatus)
-          : DEFAULT_CLIENT_REQUEST_FILTERS.status,
+    status: parseStatus(status),
     search: readString(params, 'search') ?? '',
     banqueId: readString(params, 'banqueId'),
     page: readPositiveInt(params, 'page', 1),

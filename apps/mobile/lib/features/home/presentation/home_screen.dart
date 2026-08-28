@@ -1,7 +1,9 @@
+import 'dart:async';
+
+import 'package:drift/drift.dart' show QueryRow, ResultSetImplementation;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/providers/app_providers.dart';
@@ -10,187 +12,333 @@ import '../../../data/local/database.dart';
 import '../../campagnes/campagnes.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/router/single_push.dart';
-import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../ui/widgets/activity_chart.dart';
 import '../../../ui/widgets/cpi_action_bar.dart';
+import '../../../ui/widgets/cpi_kit.dart';
 import '../../../ui/widgets/cpi_pressable.dart';
-import '../../../ui/widgets/offline_indicator.dart';
-import '../../../ui/widgets/summary_card.dart';
-import '../../../ui/widgets/sync_badge.dart';
 import '../../auth/auth_state.dart';
-import '../../notifications/presentation/notification_bell.dart';
+import '../../notifications/notifications_controller.dart';
+import '../../shell/app_shell.dart';
+import '../../shell/projects.dart';
+import '../../shell/workspace_switch.dart';
 
+/// Les représentants qui ont dit oui et chez qui personne n'a encore été saisi :
+/// c'est exactement le travail de l'étape 2.
+final StreamProvider<int>
+representantsSansProspectProvider = StreamProvider<int>((Ref ref) {
+  final AppDatabase db = ref.watch(appDatabaseProvider);
+  return db
+      .customSelect(
+        'SELECT COUNT(*) AS c FROM representants r '
+        'WHERE r.deleted_at IS NULL AND r.relation_status = \'AMBASSADEUR\' '
+        'AND NOT EXISTS (SELECT 1 FROM prospects p '
+        '  WHERE p.representant_id = r.id AND p.deleted_at IS NULL)',
+        readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+          db.representants,
+          db.prospects,
+        },
+      )
+      .watchSingle()
+      .map((QueryRow row) => row.read<int>('c'));
+});
+
+/// Le travail du jour, dans l'ordre des trois phases CHUES. Rien d'autre en
+/// haut de l'écran : ce sont les trois seules choses à faire.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ThemeData theme = Theme.of(context);
-    final CpiColors cpi = context.cpi;
     final AuthState auth = ref.watch(authControllerProvider);
-    final AsyncValue<int> representants = ref.watch(representantCountProvider);
-    final AsyncValue<int> prospects = ref.watch(prospectCountProvider);
-    final AsyncValue<int> pending = ref.watch(pendingSyncCountProvider);
+    final AsyncValue<List<RepCampaignsWithOpenWorkResult>> filesRep = ref.watch(
+      repCampagnesProvider,
+    );
+    final AsyncValue<List<CampaignsWithOpenWorkResult>> files = ref.watch(
+      chuesCampagnesProvider,
+    );
+    final AsyncValue<int> sansProspect = ref.watch(
+      representantsSansProspectProvider,
+    );
     final List<ActivityDay> activity =
         ref.watch(activityLast7DaysProvider).value ?? const <ActivityDay>[];
+    final bool chiffresIllisibles =
+        filesRep.hasError || files.hasError || sansProspect.hasError;
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(PhosphorIconsRegular.squaresFour),
-          tooltip: 'Projets',
-          onPressed: () => context.go(Routes.home),
-        ),
-        title: const Text('Projet CHUES'),
-        actions: const <Widget>[
-          OfflineIndicator(),
-          NotificationBell(),
-          SyncBadge(),
-          SizedBox(width: CpiSpacing.xs),
-        ],
+    final List<RepCampaignsWithOpenWorkResult> campagnesRep =
+        filesRep.value ?? const <RepCampaignsWithOpenWorkResult>[];
+    final List<CampaignsWithOpenWorkResult> campagnes =
+        files.value ?? const <CampaignsWithOpenWorkResult>[];
+
+    final AsyncValue<int> aQualifier = filesRep.whenData(
+      (List<RepCampaignsWithOpenWorkResult> rows) => rows.fold<int>(
+        0,
+        (int total, RepCampaignsWithOpenWorkResult c) => total + c.ouvertes,
       ),
-      body: SafeArea(
-        child: Column(
-          children: <Widget>[
-            Expanded(
-              child: RefreshIndicator(
-                color: theme.colorScheme.primary,
-                onRefresh: () async {
-                  final SyncCoordinator sync = ref.read(
-                    syncCoordinatorProvider.notifier,
-                  );
-                  await HapticFeedback.selectionClick();
-                  await sync.run();
-                },
-                child: ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(
-                    CpiSpacing.md,
-                    CpiSpacing.sm,
-                    CpiSpacing.md,
-                    CpiSpacing.xs,
-                  ),
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  itemCount: 8,
-                  itemBuilder: (BuildContext context, int index) {
-                    final Widget child = switch (index) {
-                      0 => _Greeting(name: auth.fullName),
-                      1 => Padding(
-                        padding: const EdgeInsets.only(bottom: CpiSpacing.xs),
-                        child: SummaryCard(
-                          label: 'Représentants',
-                          value: '${representants.value ?? 0}',
-                          isLoading: representants.isLoading,
-                          icon: PhosphorIconsRegular.usersThree,
-                          accentColor: theme.colorScheme.primary,
-                          onTap: () => context.go(Routes.historique),
-                        ),
-                      ),
-                      2 => Padding(
-                        padding: const EdgeInsets.only(bottom: CpiSpacing.xs),
-                        child: SummaryCard(
-                          label: 'Prospects',
-                          value: '${prospects.value ?? 0}',
-                          isLoading: prospects.isLoading,
-                          icon: PhosphorIconsRegular.identificationCard,
-                          accentColor: cpi.info,
-                          onTap: () => context.go(Routes.historique),
-                        ),
-                      ),
-                      3 => Builder(
-                        builder: (BuildContext context) {
-                          final int count = pending.value ?? 0;
-                          return Padding(
-                            padding: const EdgeInsets.only(
-                              bottom: CpiSpacing.xs,
-                            ),
-                            child: SummaryCard(
-                              label: 'En attente d\'envoi',
-                              value: '$count',
-                              isLoading: pending.isLoading,
-                              icon: count == 0
-                                  ? PhosphorIconsRegular.checkCircle
-                                  : PhosphorIconsRegular.cloudSlash,
-                              accentColor: count == 0
-                                  ? cpi.success
-                                  : cpi.accentText,
-                              surfaceColor: count == 0
-                                  ? null
-                                  : cpi.accentSurface,
-                              onTap: () => context.go(Routes.corrections),
-                            ),
-                          );
-                        },
-                      ),
-                      4 => Padding(
-                        padding: const EdgeInsets.only(bottom: CpiSpacing.xs),
-                        child: Consumer(
-                          builder:
-                              (BuildContext context, WidgetRef ref, Widget? _) {
-                                final AsyncValue<
-                                  List<CampaignsWithOpenWorkResult>
-                                >
-                                campagnes = ref.watch(campagnesProvider);
-                                final int reste =
-                                    (campagnes.value ??
-                                            <CampaignsWithOpenWorkResult>[])
-                                        .fold<int>(
-                                          0,
-                                          (
-                                            int total,
-                                            CampaignsWithOpenWorkResult c,
-                                          ) => total + c.ouvertes,
-                                        );
-                                return SummaryCard(
-                                  label: 'À appeler',
-                                  value: '$reste',
-                                  isLoading: campagnes.isLoading,
-                                  icon: PhosphorIconsRegular.phoneCall,
-                                  accentColor: cpi.accentText,
-                                  onTap: () =>
-                                      context.go(CampagnesRoutes.liste),
-                                );
-                              },
-                        ),
-                      ),
-                      5 => Padding(
-                        padding: const EdgeInsets.only(bottom: CpiSpacing.xs),
-                        child: _ActivityCard(days: activity),
-                      ),
-                      6 => const Padding(
-                        padding: EdgeInsets.only(bottom: CpiSpacing.xs),
-                        child: _Phase2Entry(),
-                      ),
-                      _ => const SizedBox(height: CpiSpacing.xs),
-                    };
-                    return CpiListEntrance(index: index, child: child);
-                  },
-                ),
-              ),
-            ),
-            const _PrimaryAction(),
-          ],
+    );
+    final AsyncValue<int> aConvertir = files.whenData(
+      (List<CampaignsWithOpenWorkResult> rows) => rows.fold<int>(
+        0,
+        (int total, CampaignsWithOpenWorkResult c) => total + c.ouvertes,
+      ),
+    );
+
+    // Sans liste confiée, la qualification passe par l'annuaire : le
+    // téléconseiller a souvent le fichier des représentants de son côté et
+    // cherche la personne au nom ou au numéro.
+    void ouvrirQualification() => context.pushOnce(
+      filesRep.hasValue && campagnesRep.isEmpty
+          ? Routes.representantsPourQualifier()
+          : campagnesRep.length == 1
+          ? CampagnesRoutes.repFileFor(campagnesRep.single.id)
+          : CampagnesRoutes.listeRepresentants,
+    );
+
+    void ouvrirConversion() => context.pushOnce(
+      campagnes.isEmpty
+          ? Routes.phase2
+          : campagnes.length == 1
+          ? CampagnesRoutes.fileFor(campagnes.single.id)
+          : CampagnesRoutes.liste,
+    );
+
+    final List<Widget> corps = <Widget>[
+      if (chiffresIllisibles)
+        Padding(
+          padding: const EdgeInsets.only(bottom: CpiSpacing.sm),
+          child: CpiStatusBand(
+            text: 'Les chiffres n\'ont pas pu être lus.',
+            tone: CpiTone.danger,
+            actionLabel: 'Réessayer',
+            onAction: () {
+              ref.invalidate(repCampagnesProvider);
+              ref.invalidate(chuesCampagnesProvider);
+              ref.invalidate(representantsSansProspectProvider);
+            },
+          ),
+        ),
+      _EtapeCard(
+        rang: 1,
+        titre: 'Qualifier les représentants',
+        phrase: 'Appelez chaque représentant et notez sa réponse.',
+        compte: aQualifier,
+        libelle: (int n) =>
+            n == 1 ? 'représentant à appeler' : 'représentants à appeler',
+        onTap: ouvrirQualification,
+      ),
+      _EtapeCard(
+        rang: 2,
+        titre: 'Ajouter des prospects',
+        phrase: 'Notez les collègues que vos représentants vous donnent.',
+        compte: sansProspect,
+        libelle: (int n) => n == 1
+            ? 'représentant sans prospect'
+            : 'représentants sans prospect',
+        onTap: () => context.pushOnce(Routes.representants),
+      ),
+      _EtapeCard(
+        rang: 3,
+        titre: 'Convertir les prospects',
+        phrase: 'Appelez les prospects pour obtenir leur adhésion.',
+        compte: aConvertir,
+        libelle: (int n) =>
+            n == 1 ? 'prospect à appeler' : 'prospects à appeler',
+        onTap: ouvrirConversion,
+      ),
+      const Padding(
+        padding: EdgeInsets.only(bottom: CpiSpacing.sm),
+        child: _Raccourcis(),
+      ),
+      _ActivityCard(days: activity),
+      const SizedBox(height: CpiSpacing.xs),
+    ];
+
+    return CpiScaffold(
+      title: 'Aujourd\'hui',
+      // Le prénom sous le titre plutôt qu'une seconde ligne dans le corps :
+      // sur un téléphone partagé, savoir qui est connecté vaut mieux qu'un
+      // bonjour répété.
+      subtitle: _bonjour(auth.fullName),
+      leading: const CpiWorkspaceSwitch(
+        key: Key('Projets'),
+        current: CpiProject.chues,
+      ),
+      banner: const PendingBanner(),
+      footer: _PrimaryAction(onQualifier: ouvrirQualification),
+      body: RefreshIndicator(
+        color: theme.colorScheme.primary,
+        onRefresh: () async {
+          final SyncCoordinator sync = ref.read(
+            syncCoordinatorProvider.notifier,
+          );
+          await HapticFeedback.selectionClick();
+          await sync.run();
+        },
+        child: ListView.builder(
+          padding: const EdgeInsets.fromLTRB(
+            CpiSpacing.md,
+            0,
+            CpiSpacing.md,
+            CpiSpacing.xs,
+          ),
+          physics: const AlwaysScrollableScrollPhysics(),
+          itemCount: corps.length,
+          itemBuilder: (BuildContext context, int index) =>
+              CpiListEntrance(index: index, child: corps[index]),
         ),
       ),
     );
   }
 }
 
-class _Greeting extends StatelessWidget {
-  const _Greeting({this.name});
+String _bonjour(String? nom) => (nom == null || nom.trim().isEmpty)
+    ? 'Bonjour'
+    : 'Bonjour, ${nom.trim().split(' ').first}';
 
-  final String? name;
+/// Une étape du parcours : son rang, ce qu'elle demande, et ce qu'il en reste.
+/// Le chiffre ne ment jamais : « … » tant qu'il se lit, « – » s'il n'a pas pu
+/// être lu, jamais un zéro inventé.
+class _EtapeCard extends StatelessWidget {
+  const _EtapeCard({
+    required this.rang,
+    required this.titre,
+    required this.phrase,
+    required this.compte,
+    required this.libelle,
+    required this.onTap,
+  });
+
+  final int rang;
+  final String titre;
+  final String phrase;
+  final AsyncValue<int> compte;
+  final String Function(int nombre) libelle;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    final String display = (name == null || name!.trim().isEmpty)
-        ? 'Bonjour'
-        : 'Bonjour, ${name!.split(' ').first}';
-    return Padding(
-      padding: const EdgeInsets.only(bottom: CpiSpacing.sm),
-      child: Text(display, style: theme.textTheme.headlineSmall),
+    final ColorScheme scheme = theme.colorScheme;
+    final int? nombre = compte.hasError ? null : compte.value;
+    final String valeur = compte.hasError
+        ? '–'
+        : nombre == null
+        ? '…'
+        : '$nombre';
+    final String mots = nombre == null
+        ? 'en cours de lecture'
+        : libelle(nombre);
+
+    return Semantics(
+      button: true,
+      onTap: onTap,
+      label: 'Étape $rang. $titre. $valeur $mots.',
+      child: ExcludeSemantics(
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: CpiSpacing.sm),
+          child: CpiCard(
+            onTap: onTap,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                CpiTag('$rang'),
+                const SizedBox(width: CpiSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Text(titre, style: theme.textTheme.titleLarge),
+                      const SizedBox(height: CpiSpacing.xxs),
+                      Text(
+                        phrase,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: CpiSpacing.sm),
+                      Row(
+                        children: <Widget>[
+                          Text(
+                            valeur,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.headlineMedium,
+                          ),
+                          const SizedBox(width: CpiSpacing.xs),
+                          Expanded(
+                            child: Text(
+                              mots,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: CpiSpacing.xs),
+                Icon(
+                  PhosphorIconsRegular.caretRight,
+                  size: CpiIconSize.xl,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
+  }
+}
+
+/// Les deux entrées secondaires du jour, en lignes plutôt qu'en cartes : elles
+/// ne portent pas de chiffre à lire de loin.
+class _Raccourcis extends ConsumerWidget {
+  const _Raccourcis();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final int unread = ref.watch(unreadNotificationsProvider).value ?? 0;
+    final int rappels =
+        ref.watch(representantRappelsProvider).value?.length ?? 0;
+    return CpiCard.rows(<CpiRow>[
+      CpiRow(
+        title: 'Consigner un appel',
+        subtitle: 'Après l\'appel, notez ce qui a été dit.',
+        leading: const Icon(
+          PhosphorIconsRegular.phoneCall,
+          size: CpiIconSize.lg,
+        ),
+        onTap: () => context.pushOnce(Routes.phase2),
+      ),
+      CpiRow(
+        title: rappels == 0 ? 'Rappels' : 'Rappels ($rappels)',
+        subtitle: 'Ce qui a été promis au téléphone',
+        leading: Icon(
+          rappels == 0
+              ? PhosphorIconsRegular.bell
+              : PhosphorIconsRegular.bellRinging,
+          size: CpiIconSize.lg,
+        ),
+        onTap: () => context.pushOnce(Routes.rappels),
+      ),
+      CpiRow(
+        title: unread == 0
+            ? 'Annonces'
+            : 'Annonces ($unread non lue${unread > 1 ? 's' : ''})',
+        leading: Icon(
+          unread == 0 ? PhosphorIconsRegular.bell : PhosphorIconsFill.bell,
+          size: CpiIconSize.lg,
+        ),
+        onTap: () => context.pushOnce(Routes.notifications),
+      ),
+    ]);
   }
 }
 
@@ -203,136 +351,71 @@ class _ActivityCard extends StatelessWidget {
   Widget build(BuildContext context) {
     if (days.isEmpty) return const SizedBox.shrink();
     final ThemeData theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(CpiSpacing.md),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLowest,
-        borderRadius: CpiRadius.brLg,
-        border: Border.all(color: context.cpi.borderSubtle),
-      ),
-      child: ActivityChart(days: days),
-    );
-  }
-}
-
-class _Phase2Entry extends ConsumerWidget {
-  const _Phase2Entry();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final ThemeData theme = Theme.of(context);
-    final CpiColors cpi = context.cpi;
-    final int pending = ref.watch(phase2PendingCountProvider).value ?? 0;
-    final int directory = ref.watch(phase2DirectoryCountProvider).value ?? 0;
-
-    void open() => context.pushOnce(Routes.phase2);
-
-    return Semantics(
-      button: true,
-      onTap: open,
-      label:
-          'Phase 2, méthodes d\'enrôlement. '
-          '${directory == 0 ? 'Annuaire non téléchargé.' : '$directory numéros dans l\'annuaire.'}'
-          '${pending > 0 ? ' $pending en attente d\'envoi.' : ''}',
-      child: ExcludeSemantics(
-        child: CpiPressable(
-          onTap: open,
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 72),
-            padding: const EdgeInsets.all(CpiSpacing.md),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerLowest,
-              borderRadius: CpiRadius.brLg,
-              border: Border.all(
-                color: cpi.accentBorder.withValues(alpha: 0.5),
-              ),
-            ),
-            child: Row(
-              children: <Widget>[
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: cpi.accent,
-                    borderRadius: CpiRadius.brMd,
-                  ),
-                  child: Icon(
-                    PhosphorIconsRegular.phoneCall,
-                    size: CpiIconSize.lg,
-                    color: cpi.accentForeground,
-                  ),
-                ),
-                const SizedBox(width: CpiSpacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      Text(
-                        'Phase 2 · Méthodes d\'enrôlement',
-                        style: theme.textTheme.titleSmall,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        directory == 0
-                            ? 'Annuaire non téléchargé'
-                            : pending > 0
-                            ? '$pending en attente d\'envoi'
-                            : 'Consigner un appel',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: pending > 0 || directory == 0
-                              ? cpi.accentText
-                              : theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  PhosphorIconsRegular.caretRight,
-                  size: CpiIconSize.md,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ],
-            ),
-          ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Padding(
+          padding: const EdgeInsets.only(bottom: CpiSpacing.xs),
+          child: Text('Ces 7 jours', style: theme.textTheme.titleSmall),
         ),
-      ),
+        CpiCard(child: ActivityChart(days: days)),
+      ],
     );
   }
 }
 
+/// Les deux seuls gestes de départ de CHUES, derrière un bouton unique : la
+/// feuille les nomme en toutes lettres plutôt que de les cacher dans les
+/// cartes d'étapes.
 class _PrimaryAction extends StatelessWidget {
-  const _PrimaryAction();
+  const _PrimaryAction({required this.onQualifier});
+
+  final VoidCallback onQualifier;
 
   @override
-  Widget build(BuildContext context) {
-    return CpiActionBar(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          FilledButton.icon(
-            onPressed: () {
-              HapticFeedback.selectionClick().ignore();
-              context.pushOnce(Routes.representants);
-            },
-            icon: const Icon(PhosphorIconsRegular.users, size: CpiIconSize.md),
-            label: const Text('Choisir un représentant'),
-          ),
-          const SizedBox(height: CpiSpacing.xs),
-          OutlinedButton.icon(
-            onPressed: () {
-              HapticFeedback.selectionClick().ignore();
-              context.pushOnce(Routes.newRepresentant);
-            },
-            icon: const Icon(
-              PhosphorIconsRegular.userPlus,
-              size: CpiIconSize.md,
-            ),
-            label: const Text('Nouveau représentant'),
-          ),
-        ],
+  Widget build(BuildContext context) => CpiActionBar(
+    child: CpiButton(
+      'Commencer',
+      icon: PhosphorIconsRegular.plus,
+      // Le retour haptique vient de `CpiButton` : le rejouer ici vibre deux
+      // fois.
+      onPressed: () => unawaited(_choisirLeGeste(context, onQualifier)),
+    ),
+  );
+}
+
+Future<void> _choisirLeGeste(
+  BuildContext context,
+  VoidCallback onQualifier,
+) async {
+  final String? choix = await showCpiSheet<String>(
+    context,
+    title: 'Que voulez-vous faire ?',
+    builder: (BuildContext sheet) => CpiCard.rows(<CpiRow>[
+      CpiRow(
+        leading: const Icon(
+          PhosphorIconsRegular.phoneCall,
+          size: CpiIconSize.lg,
+        ),
+        title: 'Qualifier un représentant',
+        subtitle: 'Appelez-le et notez sa réponse.',
+        onTap: () => Navigator.of(sheet).pop('qualifier'),
       ),
-    );
+      CpiRow(
+        leading: const Icon(
+          PhosphorIconsRegular.userPlus,
+          size: CpiIconSize.lg,
+        ),
+        title: 'Ajouter un prospect',
+        subtitle: 'Notez un contact donné par un représentant.',
+        onTap: () => Navigator.of(sheet).pop('prospect'),
+      ),
+    ]),
+  );
+  if (choix == null || !context.mounted) return;
+  if (choix == 'qualifier') {
+    onQualifier();
+    return;
   }
+  context.pushOnce(Routes.representants);
 }

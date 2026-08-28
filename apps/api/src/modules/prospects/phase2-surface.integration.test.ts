@@ -451,9 +451,9 @@ describe('un filtre unique, des comptes identiques sur les trois surfaces', () =
     const book = await workbook({ phase2Status: 'METHOD_OBTAINED' }, ExportMode.CONSOLIDATED);
     const feuille = sheetOf(book, 'BDD1');
 
-    expect(column(feuille, 'Statut phase 2').every((value) => value === 'Méthode obtenue')).toBe(
-      true,
-    );
+    expect(
+      column(feuille, 'Statut phase 3 (conversion)').every((value) => value === 'Méthode obtenue'),
+    ).toBe(true);
     expect(column(feuille, 'Méthode d’enrôlement').every((value) => value === 'Plateforme')).toBe(
       true,
     );

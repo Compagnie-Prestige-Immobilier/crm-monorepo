@@ -12,7 +12,7 @@ import {
 import { Role } from '@crm/database';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
-import { Roles } from '../../common/decorators/roles.decorator.js';
+import { PARCOURS_ROLES, Roles } from '../../common/decorators/roles.decorator.js';
 
 import {
   CurrentUser,
@@ -76,6 +76,7 @@ export class ProspectsController {
   }
 
   @Post()
+  @Roles(...PARCOURS_ROLES)
   @ApiOperation({ operationId: 'createProspect', summary: 'Enregistre un prospect.' })
   @ApiResponse({ status: 201, type: ProspectDto })
   @ApiResponse({
@@ -92,6 +93,7 @@ export class ProspectsController {
   }
 
   @Patch(':id')
+  @Roles(...PARCOURS_ROLES)
   @ApiOperation({ operationId: 'updateProspect', summary: 'Modifie un prospect.' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, type: ProspectDto })
@@ -133,6 +135,7 @@ export class ProspectsController {
   }
 
   @Delete(':id')
+  @Roles(...PARCOURS_ROLES)
   @ApiOperation({
     operationId: 'deleteProspect',
     summary: 'Supprime logiquement un prospect ; le numéro redevient ressaisissable.',

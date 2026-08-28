@@ -5,6 +5,7 @@ import 'package:cpi_go/core/settings/display_settings.dart';
 import 'package:cpi_go/core/theme/app_theme.dart';
 import 'package:cpi_go/data/local/database.dart';
 import 'package:cpi_go/data/repositories/draft_repository.dart';
+import 'package:cpi_go/data/repositories/write_repository.dart';
 import 'package:cpi_go/core/updates/app_update_controller.dart';
 import 'package:cpi_go/data/repositories/visites_repository.dart'
     show PeriodeRegistre;
@@ -24,19 +25,25 @@ import 'package:cpi_go/features/corrections/presentation/corrections_screen.dart
 import 'package:cpi_go/features/historique/presentation/historique_screen.dart';
 import 'package:cpi_go/features/home/presentation/home_screen.dart';
 import 'package:cpi_go/features/permissions/presentation/battery_help_screen.dart';
+import 'package:cpi_go/features/shell/grand_public_fiches_screen.dart';
 import 'package:cpi_go/features/shell/grand_public_screen.dart';
 import 'package:cpi_go/features/shell/hub_screen.dart';
 import 'package:cpi_go/features/phase2/presentation/callback_picker.dart';
 import 'package:cpi_go/features/phase2/presentation/phase2_screen.dart';
+import 'package:cpi_go/features/prospect/presentation/prospect_detail_screen.dart';
 import 'package:cpi_go/features/prospect/presentation/prospect_entry_screen.dart';
+import 'package:cpi_go/features/rappels/presentation/rappels_screen.dart';
 import 'package:cpi_go/features/reglages/presentation/reglages_screen.dart';
 import 'package:cpi_go/features/representant/presentation/representant_detail_screen.dart';
 import 'package:cpi_go/features/representant/presentation/representant_form_screen.dart';
 import 'package:cpi_go/features/representant/presentation/representant_picker_screen.dart';
+import 'package:cpi_go/features/representant/presentation/representant_qualification_screen.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:forui/forui.dart' show FTile;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../support/db_fixture.dart';
@@ -97,6 +104,29 @@ void main() {
       representantId: 'repFiche',
       phone: '+221780000002',
     );
+    // La fiche de prospect dans son état le plus large : tous les faits
+    // renseignés, la profession la plus longue, et un représentant dont le nom
+    // ne tient pas sur une ligne.
+    await db
+        .into(db.prospects)
+        .insert(
+          ProspectsCompanion.insert(
+            id: 'proFicheLarge',
+            nom: 'Ndiaye Sow',
+            prenom: 'Ndeye Fatou Bineta',
+            phoneE164: '+221780009999',
+            banqueId: const Value<String?>('bq-1'),
+            syndicatId: const Value<String?>('sy-1'),
+            representantId: const Value<String?>('repFiche'),
+            type: const Value<String?>('SECTEUR_PRIVE'),
+            profession: const Value<String?>(
+              'Personnel administratif de l\'inspection',
+            ),
+            createdById: 'me',
+            clientCreatedAt: t0,
+            localUpdatedAt: t0,
+          ),
+        );
     // Le fil dans son état le plus large : une entrée dont le corps ET la ligne
     // d'auteur passent à la ligne. Un fil vide ne peint que son état vide, et
     // c'est l'entrée qui porte le risque.
@@ -109,6 +139,50 @@ void main() {
           'l\'inspection prend les messages entre midi et quatorze heures.',
       authorName: 'Ndeye Astou Mbengue Sarr',
     );
+
+    // Les rappels dans leur état le plus haut : un nom qui ne tient pas sur une
+    // ligne, un rappel d'un autre jour (date entière devant l'heure) et un
+    // rappel déjà dépassé, qui porte la pastille « En retard ».
+    await db
+        .into(db.prospects)
+        .insert(
+          ProspectsCompanion.insert(
+            id: 'proRappel',
+            nom: 'Kane Diagne',
+            prenom: 'Abdoulaye Ousseynou',
+            phoneE164: '+221780000042',
+            projet: const Value<String>('GRAND_PUBLIC'),
+            createdById: 'me',
+            clientCreatedAt: t0,
+            localUpdatedAt: t0,
+          ),
+        );
+    await db
+        .into(db.prospectJourneys)
+        .insert(
+          ProspectJourneysCompanion.insert(
+            prospectId: 'proRappel',
+            projet: 'GRAND_PUBLIC',
+          ),
+        );
+    await WriteRepository(db, clock: FakeClock(t0)).recordCallAttempt(
+      prospectId: 'proRappel',
+      outcome: CallOutcomes.callback,
+      createdById: 'me',
+      callbackAt: DateTime.utc(2026, 9, 30, 15, 30),
+    );
+    await db
+        .into(db.repCallbackReminders)
+        .insert(
+          RepCallbackRemindersCompanion.insert(
+            id: 'rapRappel',
+            representantId: 'repFiche',
+            fullName: 'Abdoulaye Ousseynou Kane Diagne',
+            phoneE164: '+221770000002',
+            scheduledAt: DateTime.utc(2026, 8, 12, 8),
+            createdAt: t0,
+          ),
+        );
 
     // Une campagne dans son état le plus large : un nom rédigé depuis le web,
     // une file étalée sur assez de jours pour que l'en-tête porte deux nombres,
@@ -346,6 +420,11 @@ void main() {
     // geometrie qui deborde en premier quand le texte grandit.
     'Projets': HubScreen.new,
     'Projet Grand Public': GrandPublicScreen.new,
+    'Fiches Grand Public': GrandPublicFichesScreen.new,
+    // Les deux listes de rappels dans leur état le plus haut : un nom qui passe
+    // à la ligne, une date entière devant l'heure, et la pastille « En retard ».
+    'Rappels du Grand Public': () => const RappelsScreen(grandPublic: true),
+    'Rappels des représentants': RappelsScreen.new,
     'Accueil': HomeScreen.new,
     'Réglages': ReglagesScreen.new,
     'Historique': HistoriqueScreen.new,
@@ -356,6 +435,8 @@ void main() {
     'Choisir un représentant': RepresentantPickerScreen.new,
     'Fiche représentant': () =>
         const RepresentantDetailScreen(representantId: 'repFiche'),
+    'Fiche prospect': () =>
+        const ProspectDetailScreen(prospectId: 'proFicheLarge'),
     // Peint à part, comme « Heure de rappel » : le fil est en bas du `ListView`
     // de la fiche, donc hors des 780 dp peints ici, donc jamais construit. Un
     // débordement y serait passé sans que rien ne le dise.
@@ -375,9 +456,17 @@ void main() {
     // plafond, et des `Row` de `TextButton` pleins qui ne savaient pas passer à
     // la ligne.
     'Nouveau représentant': RepresentantFormScreen.new,
+    // La correction d'une fiche importée : mêmes étapes que la création, plus
+    // la question de la relation en tête de la première.
+    'Modifier le représentant': () =>
+        const RepresentantFormScreen(representantId: 'repFiche'),
     'Saisie de prospects sans représentant': ProspectEntryScreen.new,
     'Saisie de prospects': () =>
         const ProspectEntryScreen(representantId: 'repA'),
+    'Saisie Grand Public': () =>
+        const ProspectEntryScreen(projet: 'GRAND_PUBLIC'),
+    'Résultat de l\'appel': () =>
+        const RepresentantQualificationScreen(representantId: 'repFiche'),
     // Les quatre que la liste oubliait en se croyant complète. Trois sont
     // atteignables sans session ou juste après, donc jamais vus par un
     // balayage qui partait de l'accueil.
@@ -428,8 +517,23 @@ void main() {
     // ce que l'équipe du client a rédigé depuis le web, sous des en-têtes
     // d'effet. Ni la longueur des libellés ni leur nombre ne sont désormais
     // connus à la compilation, et c'est exactement ce qui déborde.
+    //
+    // Le défilement vient de `showCpiSheet` en vrai : le balayage le pose donc
+    // lui-même, comme pour « Heure de rappel ».
     'Feuille des issues': () => Scaffold(
-      body: CallOutcomeSheet(now: t0, reasons: _reasons),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: CallOutcomeSheet(now: t0, reasons: _reasons),
+      ),
+    ),
+    // La prise de rendez-vous de la phase 3 : un calendrier, une roue d'heures
+    // et un récapitulatif, empilés dans une feuille. Le calendrier a une
+    // largeur de tuile fixe, c'est la forme qui déborde en premier sur 320 dp.
+    'Prise de rendez-vous': () => Scaffold(
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: RendezVousSheet(now: t0),
+      ),
     ),
     // Version longue et notes multi-lignes : c'est l'état le plus haut de
     // l'écran, et `forceUpdate` retire le bouton « Plus tard », ce qui change
@@ -495,6 +599,338 @@ void main() {
         });
       }
     }
+  }
+
+  /// Le balayage ci-dessus ne peint que l'état d'ouverture : il ne joue pas de
+  /// parcours, et les deux dernières étapes du formulaire de création ne se
+  /// construisent qu'après un « Continuer ». Ce sont pourtant elles qui portent
+  /// les listes assistées et les puces WhatsApp, c'est-à-dire les formes qui
+  /// débordent.
+  for (final double widthDp in <double>[360, 320]) {
+    testWidgets('Nouveau représentant ne déborde à aucune étape sur '
+        '${widthDp.toInt()} dp', (WidgetTester tester) async {
+      useSurface(tester, widthDp: widthDp);
+      // Sans le brouillon du `setUp` : son bandeau de reprise coiffe la
+      // première étape et cache les champs à franchir. Il est peint par le
+      // balayage ci-dessus, celui-ci porte sur les étapes.
+      await db.delete(db.formDrafts).go();
+      await tester.pumpWidget(
+        await host(
+          const RepresentantFormScreen(),
+          scale: CpiTextScale.extraLarge,
+          systemFactor: kCpiMaxSystemTextScale,
+        ),
+      );
+
+      Future<void> images() async {
+        for (int i = 0; i < 6; i++) {
+          await tester.pump(const Duration(milliseconds: 50));
+        }
+      }
+
+      await images();
+      expect(tester.takeException(), isNull, reason: 'étape 1 sur 3');
+
+      await tester.enterText(
+        find.byType(TextField).first,
+        'Abdoulaye Ousseynou Kane Diagne',
+      );
+      await images();
+      await tester.enterText(find.byType(TextField).at(1), '77 123 45 67');
+      await images();
+      await tester.tap(find.text('Continuer'));
+      await images();
+      expect(tester.takeException(), isNull, reason: 'étape 2 sur 3');
+
+      await tester.tap(find.byType(TextField).first);
+      await images();
+      await tester.tap(find.text('Dakar').last);
+      await images();
+      await tester.tap(find.text('Continuer'));
+      await images();
+      expect(tester.takeException(), isNull, reason: 'étape 3 sur 3');
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 1));
+    });
+  }
+
+  /// Six images de 50 ms : de quoi laisser lever un débordement sans attendre
+  /// la stabilisation d'un écran qui replanifie sans fin.
+  Future<void> images(WidgetTester tester) async {
+    for (int i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+  }
+
+  Future<void> continuer(WidgetTester tester) async {
+    await tester.ensureVisible(find.text('Continuer'));
+    await images(tester);
+    await tester.tap(find.text('Continuer'));
+    await images(tester);
+  }
+
+  /// Touche une tuile de choix, en la faisant venir à l'image d'abord : à
+  /// 1,76× sur 780 dp de haut, une réponse posée sous la ligne de flottaison
+  /// n'est même pas CONSTRUITE par la liste.
+  Future<void> toucher(WidgetTester tester, String label) async {
+    if (find.text(label).evaluate().isEmpty) {
+      await tester.scrollUntilVisible(
+        find.text(label),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await images(tester);
+    }
+    await tester.ensureVisible(find.text(label).first);
+    await images(tester);
+    await tester.tap(find.text(label).first);
+    await images(tester);
+  }
+
+  /// La saisie d'un prospect CHUES : qui est-ce, puis sa banque et son
+  /// syndicat. La deuxième étape porte deux listes assistées et le
+  /// récapitulatif, qu'aucun balayage d'ouverture ne peint.
+  for (final double widthDp in <double>[360, 320]) {
+    testWidgets('Saisie de prospects ne déborde à aucune étape sur '
+        '${widthDp.toInt()} dp', (WidgetTester tester) async {
+      useSurface(tester, widthDp: widthDp);
+      // Sans le brouillon du `setUp` : son bandeau de reprise coiffe la
+      // première étape. Il est peint par le balayage ci-dessus.
+      await db.delete(db.formDrafts).go();
+      await tester.pumpWidget(
+        await host(
+          const ProspectEntryScreen(representantId: 'repA'),
+          scale: CpiTextScale.extraLarge,
+          systemFactor: kCpiMaxSystemTextScale,
+        ),
+      );
+
+      await images(tester);
+      expect(tester.takeException(), isNull, reason: 'étape 1 sur 2');
+
+      await tester.enterText(
+        find.byType(TextField).first,
+        'Ndeye Fatou Bineta',
+      );
+      await images(tester);
+      await tester.enterText(find.byType(TextField).at(1), 'Ndiaye Sow Diagne');
+      await images(tester);
+      await tester.enterText(find.byType(TextField).at(2), '77 123 45 67');
+      await images(tester);
+      await continuer(tester);
+      expect(tester.takeException(), isNull, reason: 'étape 2 sur 2');
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 1));
+    });
+  }
+
+  /// Le Grand Public en trois étapes : son identité et son secteur, son
+  /// travail, puis sa banque, son syndicat et sa provenance.
+  for (final double widthDp in <double>[360, 320]) {
+    testWidgets('Saisie Grand Public ne déborde à aucune étape sur '
+        '${widthDp.toInt()} dp', (WidgetTester tester) async {
+      useSurface(tester, widthDp: widthDp);
+      await db.delete(db.formDrafts).go();
+      await tester.pumpWidget(
+        await host(
+          const ProspectEntryScreen(projet: 'GRAND_PUBLIC'),
+          scale: CpiTextScale.extraLarge,
+          systemFactor: kCpiMaxSystemTextScale,
+        ),
+      );
+
+      await images(tester);
+      expect(tester.takeException(), isNull, reason: 'étape 1 sur 3');
+
+      await tester.enterText(
+        find.byType(TextField).first,
+        'Ndeye Fatou Bineta',
+      );
+      await images(tester);
+      await tester.enterText(find.byType(TextField).at(1), 'Ndiaye Sow Diagne');
+      await images(tester);
+      await tester.enterText(find.byType(TextField).at(2), '77 123 45 67');
+      await images(tester);
+      await toucher(tester, 'Secteur privé');
+      await continuer(tester);
+      expect(tester.takeException(), isNull, reason: 'étape 2 sur 3');
+
+      await continuer(tester);
+      expect(tester.takeException(), isNull, reason: 'étape 3 sur 3');
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 1));
+    });
+  }
+
+  /// La correction d'une fiche : les mêmes trois étapes que la création, mais
+  /// remplies, donc plus hautes — et la première porte en plus la relation.
+  for (final double widthDp in <double>[360, 320]) {
+    testWidgets('Modifier le représentant ne déborde à aucune étape sur '
+        '${widthDp.toInt()} dp', (WidgetTester tester) async {
+      useSurface(tester, widthDp: widthDp);
+      await db.delete(db.formDrafts).go();
+      await tester.pumpWidget(
+        await host(
+          const RepresentantFormScreen(representantId: 'repFiche'),
+          scale: CpiTextScale.extraLarge,
+          systemFactor: kCpiMaxSystemTextScale,
+        ),
+      );
+
+      await images(tester);
+      expect(tester.takeException(), isNull, reason: 'étape 1 sur 3');
+
+      await continuer(tester);
+      expect(tester.takeException(), isNull, reason: 'étape 2 sur 3');
+
+      await continuer(tester);
+      expect(tester.takeException(), isNull, reason: 'étape 3 sur 3');
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 1));
+    });
+  }
+
+  /// Le résultat d'un appel à un représentant : le refus ouvre la personne
+  /// proposée à la place, trois champs de plus que le balayage d'ouverture ne
+  /// peint jamais.
+  for (final double widthDp in <double>[360, 320]) {
+    testWidgets('Résultat de l\'appel ne déborde à aucune étape sur '
+        '${widthDp.toInt()} dp', (WidgetTester tester) async {
+      useSurface(tester, widthDp: widthDp);
+      await tester.pumpWidget(
+        await host(
+          const RepresentantQualificationScreen(representantId: 'repFiche'),
+          scale: CpiTextScale.extraLarge,
+          systemFactor: kCpiMaxSystemTextScale,
+        ),
+      );
+
+      await images(tester);
+      expect(tester.takeException(), isNull, reason: 'étape 1 sur 2');
+
+      await toucher(tester, 'Joignable');
+      await toucher(tester, 'Non');
+      expect(tester.takeException(), isNull, reason: 'étape 1, refus');
+
+      await continuer(tester);
+      expect(tester.takeException(), isNull, reason: 'étape 2 sur 2');
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 1));
+    });
+  }
+
+  /// La phase 3 est passée à cinq étapes, et les trois blocs de renseignements
+  /// n'existent qu'après un numéro trouvé et un « Continuer » : le balayage
+  /// ci-dessus ne peint que la première. Ce sont pourtant elles qui empilent
+  /// neuf champs, deux questions à trois réponses et une barre épinglée.
+  for (final double widthDp in <double>[360, 320]) {
+    testWidgets('Phase 3 · Conversion ne déborde à aucune étape sur '
+        '${widthDp.toInt()} dp', (WidgetTester tester) async {
+      useSurface(tester, widthDp: widthDp);
+      await db
+          .into(db.phase2Directory)
+          .insert(
+            Phase2DirectoryCompanion.insert(
+              prospectId: 'proFiche',
+              phoneE164: '+221780000002',
+              updatedAt: t0,
+            ),
+          );
+      await tester.pumpWidget(
+        await host(
+          const Phase2Screen(),
+          scale: CpiTextScale.extraLarge,
+          systemFactor: kCpiMaxSystemTextScale,
+        ),
+      );
+
+      await images(tester);
+      expect(tester.takeException(), isNull, reason: 'étape 1 sur 5');
+
+      await tester.enterText(find.byType(TextField).first, '78 000 00 02');
+      await images(tester);
+      for (int etape = 2; etape <= 5; etape++) {
+        await continuer(tester);
+        expect(tester.takeException(), isNull, reason: 'étape $etape sur 5');
+      }
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 1));
+    });
+  }
+
+  /// L'inscription d'un visiteur est passée à trois étapes : le balayage
+  /// ci-dessus ne peint que la première. Les deux autres portent les quatre
+  /// listes du classeur, la ligne d'arrivée et le récapitulatif, c'est-à-dire
+  /// tout ce qui empile.
+  for (final double widthDp in <double>[360, 320]) {
+    testWidgets('Inscrire un visiteur ne déborde à aucune étape sur '
+        '${widthDp.toInt()} dp', (WidgetTester tester) async {
+      useSurface(tester, widthDp: widthDp);
+      await tester.pumpWidget(
+        await host(
+          const VisiteFormScreen(),
+          scale: CpiTextScale.extraLarge,
+          systemFactor: kCpiMaxSystemTextScale,
+        ),
+      );
+
+      Future<void> images() async {
+        for (int i = 0; i < 6; i++) {
+          await tester.pump(const Duration(milliseconds: 50));
+        }
+      }
+
+      await images();
+      expect(tester.takeException(), isNull, reason: 'étape 1 sur 3');
+
+      await tester.enterText(
+        find.byKey(const ValueKey<String>('visite-nom')),
+        'Abdoulaye Ousseynou Kane Diagne',
+      );
+      await images();
+      // Le numéro est exigé : sans lui, « Continuer » reste éteint.
+      await tester.enterText(
+        find.byKey(const ValueKey<String>('visite-telephone')),
+        '77 123 45 67',
+      );
+      await images();
+      await tester.tap(find.text('Continuer'));
+      await images();
+      expect(tester.takeException(), isNull, reason: 'étape 2 sur 3');
+
+      // Les intitulés les plus longs du classeur, choisis dans les listes.
+      for (final String champ in <String>[
+        'champ-entreprise',
+        'champ-destinataire',
+        'champ-direction',
+        'champ-objet',
+      ]) {
+        final Finder saisie = find.descendant(
+          of: find.byKey(ValueKey<String>(champ)),
+          matching: find.byType(TextField),
+        );
+        await tester.ensureVisible(saisie);
+        await images();
+        await tester.tap(saisie);
+        await images();
+        await tester.tap(find.byType(FTile).first);
+        await images();
+      }
+      expect(tester.takeException(), isNull, reason: 'étape 2 remplie');
+
+      await tester.tap(find.text('Continuer'));
+      await images();
+      expect(tester.takeException(), isNull, reason: 'étape 3 sur 3');
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 1));
+    });
   }
 
   testWidgets('le plafond effectif du texte reste atteignable et borné', (

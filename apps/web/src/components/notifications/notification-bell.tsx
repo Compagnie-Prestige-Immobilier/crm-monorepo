@@ -141,38 +141,53 @@ export function NotificationBell({ href }: { href: string }) {
             Au-delà de vingt, c'est le pied de panneau qui renvoie vers l'écran
             complet : voir `INBOX_PAGE_SIZE`. */}
         <div className="max-h-[26rem] overflow-y-auto scrollbar-thin">
-          {isPending ? (
-            <div className="flex flex-col gap-2 p-3" aria-hidden="true">
-              {[0, 1, 2].map((index) => (
-                <Skeleton key={index} className="h-14 w-full" />
-              ))}
-            </div>
-          ) : isError ? (
-            <p role="status" className="px-3 py-8 text-center text-[0.8125rem] text-destructive">
-              Les notifications n’ont pas pu être chargées.
-            </p>
-          ) : items.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 px-3 py-10 text-center">
-              <InboxIcon className="size-7 text-muted-foreground" aria-hidden="true" />
-              <p className="text-[0.875rem] font-[600]">Aucune annonce</p>
-              <p className="text-[0.75rem] text-muted-foreground">
-                Les rappels et les demandes à traiter apparaîtront ici.
-              </p>
-            </div>
-          ) : (
-            <ul className="divide-y divide-border">
-              {items.map((item) => (
-                <li key={item.id}>
-                  <InboxRow
-                    item={item}
-                    onActivate={() => {
-                      activate(item);
-                    }}
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
+          {(() => {
+            if (isPending)
+              return (
+                <div className="flex flex-col gap-2 p-3" aria-hidden="true">
+                  {[0, 1, 2].map((index) => (
+                    <Skeleton key={index} className="h-14 w-full" />
+                  ))}
+                </div>
+              );
+            return (() => {
+              if (isError)
+                return (
+                  <p
+                    role="status"
+                    className="px-3 py-8 text-center text-[0.8125rem] text-destructive"
+                  >
+                    Les notifications n’ont pas pu être chargées.
+                  </p>
+                );
+              return (() => {
+                if (items.length === 0)
+                  return (
+                    <div className="flex flex-col items-center gap-2 px-3 py-10 text-center">
+                      <InboxIcon className="size-7 text-muted-foreground" aria-hidden="true" />
+                      <p className="text-[0.875rem] font-[600]">Aucune annonce</p>
+                      <p className="text-[0.75rem] text-muted-foreground">
+                        Les rappels et les demandes à traiter apparaîtront ici.
+                      </p>
+                    </div>
+                  );
+                return (
+                  <ul className="divide-y divide-border">
+                    {items.map((item) => (
+                      <li key={item.id}>
+                        <InboxRow
+                          item={item}
+                          onActivate={() => {
+                            activate(item);
+                          }}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                );
+              })();
+            })();
+          })()}
         </div>
 
         {/*

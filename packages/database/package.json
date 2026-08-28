@@ -17,7 +17,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint src",
+    "lint": "oxlint --config ../../.oxlintrc.json --report-unused-disable-directives src",
     "test": "vitest run --passWithNoTests",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
@@ -33,15 +33,11 @@
     "@prisma/adapter-pg": "catalog:",
     "@prisma/client": "catalog:",
     "argon2": "catalog:",
-    "pg": "catalog:",
     "prisma": "catalog:"
   },
   "devDependencies": {
-    "@crm/eslint-config": "workspace:*",
     "@crm/typescript-config": "workspace:*",
     "@types/node": "catalog:",
-    "@types/pg": "catalog:",
-    "eslint": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

@@ -13,13 +13,33 @@ import '../local/database.dart';
 
 const int kCallAttemptCommentMaxLength = 2000;
 
+const int kCallAttemptEmailMaxLength = 160;
+
+/// Ancienneté dans l'établissement, en mois : cinquante ans de carrière.
+const int kDureeEtablissementMaxMois = 600;
+
+/// Tolérance d'horloge admise par le serveur entre la saisie et le rendez-vous.
+/// Un téléphone de terrain dérive : sans elle, un rendez-vous « tout de suite »
+/// serait refusé pour être né deux minutes avant son propre appel.
+const Duration kRendezVousSkew = Duration(minutes: 5);
+
+/// Le format vaut ce que vaut celui du serveur : une adresse en une arobase,
+/// sans espace, avec un point dans le domaine. Il refuse les fautes de frappe,
+/// il ne prétend pas décider si la boîte existe.
+final RegExp _emailPattern = RegExp(r'^[^@\s]+@[^@\s.]+(\.[^@\s.]+)+$');
+
 enum CallAttemptProblem {
   unknownReason,
   unknownMethod,
   methodRequired,
   methodNotAllowed,
   commentRequired,
-  commentTooLong;
+  commentTooLong,
+  emailInvalid,
+  dureeEtablissementInvalid,
+  rendezVousRequired,
+  rendezVousNotAllowed,
+  rendezVousPast;
 
   String get message => switch (this) {
     CallAttemptProblem.unknownReason =>
@@ -34,6 +54,17 @@ enum CallAttemptProblem {
           'motif.',
     CallAttemptProblem.commentTooLong =>
       'Le commentaire dépasse $kCallAttemptCommentMaxLength caractères.',
+    CallAttemptProblem.emailInvalid =>
+      'L\'adresse e-mail n\'est pas valide. Exemple : awa.sy@exemple.sn',
+    CallAttemptProblem.dureeEtablissementInvalid =>
+      'La durée dans l\'établissement va de 0 à $kDureeEtablissementMaxMois '
+          'mois.',
+    CallAttemptProblem.rendezVousRequired =>
+      'Choisissez la date et l\'heure du rendez-vous.',
+    CallAttemptProblem.rendezVousNotAllowed =>
+      'Une date de rendez-vous ne se saisit que sur une prise de rendez-vous.',
+    CallAttemptProblem.rendezVousPast =>
+      'Le rendez-vous est déjà passé. Choisissez une date à venir.',
   };
 }
 
@@ -57,6 +88,17 @@ class DiscardPreview {
 
 class _ClaimRace implements Exception {
   const _ClaimRace();
+}
+
+/// Une correction que la file ne peut plus reprendre : l'opération est déjà
+/// réservée par une poussée en cours, ou n'existe plus.
+class CorrectionVisiteImpossible implements Exception {
+  const CorrectionVisiteImpossible(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
 }
 
 class CallAttemptInvalid implements Exception {
@@ -153,6 +195,96 @@ class WriteRepository {
       );
     });
     return entityId;
+  }
+
+  /// Corrige une visite qui n'est PAS encore partie.
+  ///
+  /// La file ne sait pas modifier une création : l'opération est retirée — ce
+  /// qui efface aussi la ligne locale (`discardOperation`) — et la visite est
+  /// réinscrite sous un identifiant neuf. Le serveur ne verra qu'une visite,
+  /// la bonne, et tout ceci marche hors ligne.
+  Future<String> corrigerVisiteEnFile({
+    required String visiteId,
+    required String visitorName,
+    required String date,
+    required String entrepriseId,
+    required String entrepriseLabel,
+    required String objetId,
+    required String objetLabel,
+    required String createdById,
+    String? time,
+    String? phone,
+    String? directionId,
+    String? directionLabel,
+    String? destinataireId,
+    String? destinataireLabel,
+    String? comment,
+  }) async {
+    final OutboxData? creation = await headOperation('visite', visiteId);
+    if (creation == null || creation.op != 'create') {
+      throw const CorrectionVisiteImpossible(
+        'Cette visite est déjà partie. Rechargez le registre.',
+      );
+    }
+    final DiscardResult retrait = await discardOperation(creation.seq);
+    if (retrait.outcome != DiscardOutcome.discarded) {
+      throw const CorrectionVisiteImpossible(
+        'Cette visite est en train de partir. Réessayez dans un instant.',
+      );
+    }
+    return inscrireVisite(
+      visitorName: visitorName,
+      date: date,
+      time: time,
+      phone: phone,
+      entrepriseId: entrepriseId,
+      entrepriseLabel: entrepriseLabel,
+      objetId: objetId,
+      objetLabel: objetLabel,
+      directionId: directionId,
+      directionLabel: directionLabel,
+      destinataireId: destinataireId,
+      destinataireLabel: destinataireLabel,
+      comment: comment,
+      createdById: createdById,
+    );
+  }
+
+  /// Recopie en local la correction qu'un `PATCH /visites/:id` vient
+  /// d'accepter. Rien n'entre dans la file : la modification est déjà chez le
+  /// serveur, et le prochain pull réécrira la ligne par-dessus.
+  Future<void> appliquerCorrectionVisite({
+    required String visiteId,
+    required String visitorName,
+    required String entrepriseId,
+    required String entrepriseLabel,
+    required String objetId,
+    required String objetLabel,
+    String? phone,
+    String? directionId,
+    String? directionLabel,
+    String? destinataireId,
+    String? destinataireLabel,
+    String? comment,
+  }) async {
+    await (_db.update(
+      _db.visites,
+    )..where((Visites t) => t.id.equals(visiteId))).write(
+      VisitesCompanion(
+        visitorName: Value<String>(visitorName),
+        phone: Value<String?>(phone),
+        entrepriseId: Value<String>(entrepriseId),
+        entrepriseLabel: Value<String>(entrepriseLabel),
+        objetId: Value<String>(objetId),
+        objetLabel: Value<String>(objetLabel),
+        directionId: Value<String?>(directionId),
+        directionLabel: Value<String?>(directionLabel),
+        destinataireId: Value<String?>(destinataireId),
+        destinataireLabel: Value<String?>(destinataireLabel),
+        comment: Value<String?>(comment),
+        updatedAt: Value<DateTime>(_clock.now()),
+      ),
+    );
   }
 
   Future<String> createRepresentant({
@@ -602,6 +734,10 @@ class WriteRepository {
   /// [outcome] et [reasonCode] désignent le MÊME motif : le second l'emporte, le
   /// premier reste le point d'entrée des six codes système, dont le référentiel
   /// garantit qu'ils portent le code de leur issue.
+  ///
+  /// [nom], [prenom], [profession], [banqueId] et [syndicatId] ne sont PAS
+  /// écrits en local : c'est le serveur qui les pose sur le prospect lié, et
+  /// les recopier ici donnerait deux vérités à tenir d'accord jusqu'au pull.
   Future<String> recordCallAttempt({
     required String prospectId,
     required String outcome,
@@ -612,6 +748,16 @@ class WriteRepository {
     DateTime? callbackAt,
     String? recordingPath,
     String? id,
+    String? nom,
+    String? prenom,
+    String? profession,
+    String? banqueId,
+    String? syndicatId,
+    String? email,
+    bool? fonctionnaire,
+    bool? engagementEnCours,
+    int? dureeEtablissementMois,
+    DateTime? rendezVousAt,
   }) async {
     final CallReason? reason = await resolveCallReason(
       _db,
@@ -621,10 +767,17 @@ class WriteRepository {
       throw const CallAttemptInvalid(CallAttemptProblem.unknownReason);
     }
     final String? normalizedComment = normalizeComment(comment);
+    final String? normalizedEmail = normalizeComment(email);
+    final String entityId = id ?? Ids.newId();
+    final DateTime now = _clock.now();
     final CallAttemptProblem? problem = validateCallAttempt(
       reason: reason,
       method: method,
       comment: normalizedComment,
+      email: normalizedEmail,
+      dureeEtablissementMois: dureeEtablissementMois,
+      rendezVousAt: rendezVousAt,
+      clientCreatedAt: now,
     );
     if (problem != null) throw CallAttemptInvalid(problem);
 
@@ -632,8 +785,6 @@ class WriteRepository {
     final DateTime? callback = reason.effect == CallEffects.scheduleCallback
         ? callbackAt
         : null;
-    final String entityId = id ?? Ids.newId();
-    final DateTime now = _clock.now();
 
     await _db.transaction(() async {
       await _db
@@ -649,6 +800,11 @@ class WriteRepository {
               method: Value<String?>(method),
               comment: Value<String?>(normalizedComment),
               callbackAt: Value<DateTime?>(callback),
+              email: Value<String?>(normalizedEmail),
+              fonctionnaire: Value<bool?>(fonctionnaire),
+              engagementEnCours: Value<bool?>(engagementEnCours),
+              dureeEtablissementMois: Value<int?>(dureeEtablissementMois),
+              rendezVousAt: Value<DateTime?>(rendezVousAt),
               clientCreatedAt: now,
               createdById: createdById,
             ),
@@ -665,6 +821,18 @@ class WriteRepository {
           'method': ?method,
           'comment': ?normalizedComment,
           'callbackAt': ?callback?.toUtc().toIso8601String(),
+          'nom': ?normalizeComment(nom),
+          'prenom': ?normalizeComment(prenom),
+          'profession': ?normalizeComment(profession),
+          'banqueId': ?banqueId,
+          'syndicatId': ?syndicatId,
+          'email': ?normalizedEmail,
+          // Le `?` n'omet que le NUL : `false` est une réponse et part, là où
+          // son absence se lirait « question non posée ».
+          'fonctionnaire': ?fonctionnaire,
+          'engagementEnCours': ?engagementEnCours,
+          'dureeEtablissementMois': ?dureeEtablissementMois,
+          'rendezVousAt': ?rendezVousAt?.toUtc().toIso8601String(),
           'clientCreatedAt': now.toUtc().toIso8601String(),
           '_recordingPath': ?recordingPath,
         },
@@ -689,6 +857,144 @@ class WriteRepository {
     return entityId;
   }
 
+  Future<String> recordRepCallAttempt({
+    required String representantId,
+    required String outcome,
+    String? relationStatus,
+    String? whatsappStatus,
+    String? whatsappE164,
+    String? comment,
+    DateTime? callbackAt,
+    String? suggestedPhone,
+    String? suggestedName,
+    String? suggestedNote,
+    String? id,
+  }) async {
+    final String entityId = id ?? Ids.newId();
+    final DateTime now = _clock.now();
+    final String? normalizedComment = normalizeComment(comment);
+    // Le serveur ne retient le nom et la note qu'avec un numéro : sans lui, la
+    // suggestion ne désigne personne et l'envoi partirait avec des restes.
+    final String? suggested = normalizeComment(suggestedPhone);
+    final String? suggestedFullName = suggested == null
+        ? null
+        : normalizeComment(suggestedName);
+    final String? suggestedComment = suggested == null
+        ? null
+        : normalizeComment(suggestedNote);
+    final String? whatsapp = whatsappStatus == null
+        ? null
+        : _whatsappE164For(whatsappStatus, whatsappE164);
+    if (whatsappStatus == WhatsappStatus.autreNumero.code && whatsapp == null) {
+      throw ArgumentError.value(whatsappE164, 'whatsappE164');
+    }
+    const Set<String> terminal = <String>{
+      'REACHED',
+      'PROSPECTS_PROMISED',
+      'REFUSED',
+      'WRONG_NUMBER',
+    };
+
+    await _db.transaction(() async {
+      final Representant? representant =
+          await (_db.select(_db.representants)
+                ..where((Representants row) => row.id.equals(representantId)))
+              .getSingleOrNull();
+      await (_db.update(
+        _db.representants,
+      )..where((Representants row) => row.id.equals(representantId))).write(
+        RepresentantsCompanion(
+          relationStatus: relationStatus == null
+              ? const Value<String>.absent()
+              : Value<String>(relationStatus),
+          whatsappStatus: whatsappStatus == null
+              ? const Value<String>.absent()
+              : Value<String>(whatsappStatus),
+          whatsappE164: whatsappStatus == null
+              ? const Value<String?>.absent()
+              : Value<String?>(whatsapp),
+          localUpdatedAt: Value<DateTime>(now),
+        ),
+      );
+      if (terminal.contains(outcome)) {
+        await (_db.update(_db.repCallTasks)..where(
+              (RepCallTasks row) =>
+                  row.representantId.equals(representantId) &
+                  row.status.equals('OPEN'),
+            ))
+            .write(
+              RepCallTasksCompanion(
+                status: const Value<String>('DONE'),
+                updatedAt: Value<DateTime>(now),
+              ),
+            );
+      }
+      if (callbackAt != null) {
+        await _db
+            .into(_db.repCallbackReminders)
+            .insert(
+              RepCallbackRemindersCompanion.insert(
+                id: entityId,
+                representantId: representantId,
+                fullName: representant?.fullName ?? '',
+                phoneE164: representant?.phoneE164 ?? '',
+                scheduledAt: callbackAt,
+                createdAt: now,
+              ),
+            );
+      }
+      await _enqueue(
+        dependencyKey: representantId,
+        entityType: repCallAttemptEntity,
+        entityId: entityId,
+        op: 'create',
+        payload: <String, Object?>{
+          'id': entityId,
+          'representantId': representantId,
+          'outcome': outcome,
+          'comment': ?normalizedComment,
+          'relationStatus': ?relationStatus,
+          'whatsappStatus': ?whatsappStatus,
+          'whatsappE164': ?whatsapp,
+          'callbackAt': ?callbackAt?.toUtc().toIso8601String(),
+          'suggestedPhone': ?suggested,
+          'suggestedName': ?suggestedFullName,
+          'suggestedNote': ?suggestedComment,
+          'clientCreatedAt': now.toUtc().toIso8601String(),
+        },
+        now: now,
+      );
+    });
+    return entityId;
+  }
+
+  /// Efface les rappels promis à ce représentant : l'appel qui vient d'être
+  /// saisi les honore, quelle qu'en soit l'issue. Rend les identifiants effacés,
+  /// qui sont ceux des notifications locales à annuler.
+  ///
+  /// [except] est le rappel que l'appel vient lui-même de programmer : sans lui,
+  /// consigner « à rappeler » effacerait la promesse dans le geste qui la prend.
+  Future<List<String>> honourRepCallbacks({
+    required String representantId,
+    String? except,
+  }) async {
+    final List<RepCallbackReminder> promis =
+        await (_db.select(_db.repCallbackReminders)..where(
+              (RepCallbackReminders row) =>
+                  row.representantId.equals(representantId),
+            ))
+            .get();
+    final List<String> honores = promis
+        .map((RepCallbackReminder r) => r.id)
+        .where((String id) => id != except)
+        .toList(growable: false);
+    if (honores.isEmpty) return honores;
+    await (_db.delete(
+      _db.repCallbackReminders,
+    )..where((RepCallbackReminders row) => row.id.isIn(honores))).go();
+    return honores;
+  }
+
   static String? normalizeComment(String? raw) {
     if (raw == null) return null;
     final String trimmed = raw.trim();
@@ -699,6 +1005,10 @@ class WriteRepository {
     required CallReason reason,
     String? method,
     String? comment,
+    String? email,
+    int? dureeEtablissementMois,
+    DateTime? rendezVousAt,
+    DateTime? clientCreatedAt,
   }) {
     if (reason.effect == CallEffects.closeMethod) {
       if (method == null) return CallAttemptProblem.methodRequired;
@@ -714,7 +1024,41 @@ class WriteRepository {
     if (comment != null && comment.length > kCallAttemptCommentMaxLength) {
       return CallAttemptProblem.commentTooLong;
     }
-    return null;
+    if (email != null && validateCallAttemptEmail(email) != null) {
+      return CallAttemptProblem.emailInvalid;
+    }
+    if (dureeEtablissementMois != null &&
+        (dureeEtablissementMois < 0 ||
+            dureeEtablissementMois > kDureeEtablissementMaxMois)) {
+      return CallAttemptProblem.dureeEtablissementInvalid;
+    }
+    return _validateRendezVous(method, rendezVousAt, clientCreatedAt);
+  }
+
+  /// Publique : l'écran reproche la faute de frappe SOUS le champ, pendant la
+  /// saisie, et il doit le faire avec la règle exacte de l'enregistrement.
+  static CallAttemptProblem? validateCallAttemptEmail(String email) =>
+      email.length > kCallAttemptEmailMaxLength ||
+          !_emailPattern.hasMatch(email)
+      ? CallAttemptProblem.emailInvalid
+      : null;
+
+  static CallAttemptProblem? _validateRendezVous(
+    String? method,
+    DateTime? rendezVousAt,
+    DateTime? clientCreatedAt,
+  ) {
+    if (method == EnrollmentMethods.appointment) {
+      if (rendezVousAt == null) return CallAttemptProblem.rendezVousRequired;
+      final DateTime? floor = clientCreatedAt?.subtract(kRendezVousSkew);
+      if (floor != null && rendezVousAt.toUtc().isBefore(floor.toUtc())) {
+        return CallAttemptProblem.rendezVousPast;
+      }
+      return null;
+    }
+    return rendezVousAt == null
+        ? null
+        : CallAttemptProblem.rendezVousNotAllowed;
   }
 
   Future<OutboxData?> headOperation(String entityType, String entityId) {

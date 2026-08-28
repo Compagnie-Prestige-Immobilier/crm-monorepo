@@ -23,32 +23,34 @@ const PANEL_ROUTES: readonly (readonly [path: string, heading: string, marker: s
   // Le hub, atterrissage de tous les rôles. Son titre est celui de la PAGE et
   // non de la barre supérieure, qu'il ne porte pas : aucun repère à ajouter.
   ['/espaces', 'Choisissez un espace', null],
-  ['/tableau-de-bord', 'Tableau de bord', null],
-  ['/statistiques', 'Statistiques', null],
+  ['/chues', 'Projet CHUES', 'Trois étapes, dans l’ordre'],
+  ['/tableau-de-bord', 'Chiffres', null],
+  ['/statistiques', 'Chiffres', null],
   ['/prospects', 'Prospects', null],
-  ['/prospects/nouveau', 'Nouveau prospect', 'Enregistrer et suivant'],
+  ['/prospects/nouveau', 'Nouveau prospect', 'Enregistrer ce prospect'],
   ['/accueil/tableau-de-bord', 'Tableau de bord', 'Organiser'],
   ['/campagnes', 'Campagnes', 'Appels prospects'],
   ['/campagnes/representants', 'Campagnes', 'Appels représentants'],
-  ['/console', 'Console d’appel', 'Carte clavier'],
+  ['/console', 'Appeler les prospects', 'Carte clavier'],
+  ['/chues/appels-representants', 'Appeler les représentants', 'Carte clavier'],
   ['/rappels', 'Rappels', 'En retard'],
-  ['/suggestions', 'Numéros suggérés', 'Numéros donnés par un représentant'],
-  ['/dossiers', 'Dossiers', null],
+  ['/suggestions', 'Contacts recommandés', 'Numéros donnés par un représentant'],
+  ['/dossiers', 'Dossiers bancaires', null],
   ['/dossiers/nouveau', 'Nouveau dossier', null],
   ['/dossiers/export', 'Export', null],
-  ['/dossiers/etapes', 'Étapes bancaires', null],
-  ['/demandes-clients', 'Demandes clients', null],
+  ['/dossiers/etapes', 'Étapes des dossiers', null],
+  ['/demandes-clients', 'Créations de client à valider', null],
   ['/representants', 'Représentants', null],
   ['/representants/import', 'Représentants', 'Partir du modèle'],
   ['/commerciaux', 'Utilisateurs', null],
-  ['/supervision', 'Supervision', 'Activité'],
-  ['/referentiels', 'Référentiels', null],
-  ['/imports', 'Imports', 'Déposer un classeur'],
+  ['/supervision', 'Équipes', 'Activité'],
+  ['/referentiels', 'Listes de référence', null],
+  ['/imports', 'Importer un fichier Excel', 'Déposer un classeur'],
   ['/parametres', 'Paramètres', null],
   ['/notifications', 'Notifications', null],
-  // `/banque` n'appartient pas à la navigation d'un ADMIN : `navTitle` ne
-  // trouve donc aucune entrée et retombe sur le nom du produit.
-  ['/banque', 'CPI GO', null],
+  // `/banque` n'appartient pas à la navigation d'un ADMIN : `navTitle` remonte
+  // à l'entrée la plus proche, la racine de la coque.
+  ['/banque', 'Projet CHUES', null],
 ];
 
 async function analyze(page: Page, where: string): Promise<void> {

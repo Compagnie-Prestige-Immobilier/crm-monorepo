@@ -33,14 +33,16 @@ void main() {
     expect(page.truncated, isFalse);
   });
 
-  test('la recherche porte sur le nom, l\'entreprise, la référence et les '
-      'deux colonnes de téléphone', () async {
+  test('la recherche porte sur le nom, l\'entreprise, l\'étage, la référence '
+      'et les deux colonnes de téléphone', () async {
     await insertVisite(
       db,
       id: 'v1',
       date: '2026-08-12',
       visitorName: 'Awa Ndiaye',
       entrepriseLabel: 'CPI',
+      directionId: 'd1',
+      directionLabel: 'MARKETING',
       reference: 'V-2026-000001',
     );
     await insertVisite(
@@ -71,6 +73,7 @@ void main() {
     expect(await noms('770000002'), <String>['Moussa Fall']);
     expect(await noms('77 000 00 02'), <String>['Moussa Fall']);
     expect(await noms('awa'), <String>['Awa Ndiaye']);
+    expect(await noms('marketing'), <String>['Awa Ndiaye']);
   });
 
   test(
@@ -172,6 +175,99 @@ void main() {
 
     expect(top.entreprises, hasLength(5));
     expect(top.objets, hasLength(5));
+  });
+
+  test('les personnes demandées se comptent aussi, sur la fenêtre '
+      'demandée', () async {
+    await insertVisite(
+      db,
+      id: 'v1',
+      date: '2026-08-12',
+      destinataireId: 't1',
+      destinataireLabel: 'MME. NDOYE',
+    );
+    await insertVisite(
+      db,
+      id: 'v2',
+      date: '2026-08-12',
+      destinataireId: 't1',
+      destinataireLabel: 'MME. NDOYE',
+    );
+    await insertVisite(
+      db,
+      id: 'v3',
+      date: '2026-08-01',
+      destinataireId: 't2',
+      destinataireLabel: 'M. DIOP',
+    );
+    // Sans personne demandée : ne compte pour personne.
+    await insertVisite(db, id: 'v4', date: '2026-08-12');
+
+    final TopLabels mois = await repo.watchTopLabels(maintenant).first;
+    expect(
+      mois.destinataires.map((LabelCompte l) => (l.libelle, l.total)),
+      <(String, int)>[('MME. NDOYE', 2), ('M. DIOP', 1)],
+    );
+
+    final TopLabels jour = await repo
+        .watchTopLabels(maintenant, jours: 1)
+        .first;
+    expect(jour.destinataires.map((LabelCompte l) => l.libelle), <String>[
+      'MME. NDOYE',
+    ]);
+  });
+
+  group('rappel visiteur', () {
+    test('la dernière visite d\'un homonyme, sur 90 jours', () async {
+      await insertVisite(
+        db,
+        id: 'v-vieille',
+        date: '2026-06-01',
+        visitorName: 'Awa Ndiaye',
+        objetLabel: 'Achat terrain',
+      );
+      await insertVisite(
+        db,
+        id: 'v-recente',
+        date: '2026-08-01',
+        time: '11:00',
+        visitorName: 'Awa Ndiaye',
+        objetLabel: 'Suivi de dossier',
+        destinataireId: 't1',
+        destinataireLabel: 'MME. NDOYE',
+      );
+      await insertVisite(
+        db,
+        id: 'v-autre',
+        date: '2026-08-10',
+        visitorName: 'Moussa Fall',
+      );
+
+      // Le rapprochement se fait sur le DÉBUT du nom : trois lettres suffisent.
+      final VisiteAvecStatut? trouvee = await repo.dernierePourNom(
+        'awa',
+        maintenant: maintenant,
+      );
+      expect(trouvee?.id, 'v-recente');
+      expect(trouvee?.destinataireLabel, 'MME. NDOYE');
+      expect(trouvee?.objetLabel, 'Suivi de dossier');
+    });
+
+    test('rien au-delà de la fenêtre, rien sur un autre nom', () async {
+      await insertVisite(
+        db,
+        id: 'v-trop-vieille',
+        date: '2026-01-01',
+        visitorName: 'Awa Ndiaye',
+      );
+
+      expect(await repo.dernierePourNom('awa', maintenant: maintenant), isNull);
+      expect(
+        await repo.dernierePourNom('ndiaye', maintenant: maintenant),
+        isNull,
+      );
+      expect(await repo.dernierePourNom('  ', maintenant: maintenant), isNull);
+    });
   });
 
   test('l\'heure de pointe est celle qui a vu le plus de visiteurs', () async {

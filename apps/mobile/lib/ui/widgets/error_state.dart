@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:forui/forui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/sync/api_port.dart';
 import '../../core/theme/cpi_tokens.dart';
+import 'cpi_forui.dart';
+import 'cpi_kit.dart';
 
 String messageErreur(Object error) {
   if (error is ApiException) {
@@ -19,37 +22,13 @@ class CpiFailureBanner extends StatelessWidget {
   final String message;
 
   @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(CpiSpacing.sm),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.errorContainer,
-        borderRadius: CpiRadius.brMd,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Icon(
-            PhosphorIconsRegular.warningCircle,
-            size: CpiIconSize.md,
-            color: theme.colorScheme.onErrorContainer,
-          ),
-          const SizedBox(width: CpiSpacing.xs),
-          Expanded(
-            child: Text(
-              message,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onErrorContainer,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => CpiForui(
+    builder: (BuildContext context) => FAlert(
+      variant: FAlertVariant.destructive,
+      icon: const Icon(PhosphorIconsRegular.warningCircle),
+      title: Text(message),
+    ),
+  );
 }
 
 /// Un écran en défaut n'est jamais une impasse : il dit ce qui a échoué et
@@ -68,8 +47,8 @@ class CpiErrorState extends StatelessWidget {
   final String retryLabel;
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
+  Widget build(BuildContext context) => CpiForui(
+    builder: (BuildContext context) => Padding(
       padding: const EdgeInsets.all(CpiSpacing.md),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -77,17 +56,17 @@ class CpiErrorState extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           CpiFailureBanner(message: message),
-          const SizedBox(height: CpiSpacing.xs),
-          OutlinedButton.icon(
+          const SizedBox(height: CpiSpacing.sm),
+          // `CpiButton` et non `FButton` : le plancher de 56 dp, l'élision du
+          // libellé et la coquille sémantique sont déjà à l'intérieur.
+          CpiButton(
+            retryLabel,
+            variant: CpiButtonVariant.secondary,
+            icon: PhosphorIconsRegular.arrowClockwise,
             onPressed: onRetry,
-            icon: const Icon(
-              PhosphorIconsRegular.arrowClockwise,
-              size: CpiIconSize.md,
-            ),
-            label: Text(retryLabel),
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
 }

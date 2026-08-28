@@ -49,8 +49,8 @@ test('la connexion pose une session utilisable et mène au hub des espaces', asy
   }
 
   await tuiles.getByRole('link', { name: /^Projet CHUES/ }).click();
-  await page.waitForURL('**/chues/tableau-de-bord');
-  await expect(page).toHaveTitle(/Tableau de bord/);
+  await page.waitForURL('**/chues');
+  await expect(page).toHaveTitle(/Projet CHUES/);
 });
 
 test('la déconnexion efface la session et reverrouille le panel', async ({ page }) => {

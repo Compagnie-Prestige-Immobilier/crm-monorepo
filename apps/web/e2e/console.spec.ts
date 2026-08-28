@@ -104,7 +104,9 @@ test('la console traite un appel au clavier, et la fiche suivante s’ouvre seul
   }
 
   await page.goto(`/console?fiche=${ouverte.id}`);
-  await expect(page.getByRole('heading', { name: 'Console d’appel', level: 1 })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Appeler les prospects', level: 1 }),
+  ).toBeVisible();
   // Si la fiche visée n'était pas dans les 200 chargées, l'écran le dit ici, et
   // tout ce qui suit porterait sur une AUTRE fiche.
   await expect(page.getByText('n’est pas dans cette file')).toHaveCount(0);
@@ -160,8 +162,8 @@ test('la saisie en rafale garde la banque et le syndicat', async ({ page }) => {
   await page.goto('/prospects/nouveau');
   await expect(page.getByRole('heading', { name: 'Nouveau prospect', level: 1 })).toBeVisible();
 
-  const etat = page.getByText('La banque et le syndicat restent en place.');
-  await expect(etat).toBeVisible();
+  await expect(page.getByText('Ctrl + Entrée enregistre et enchaîne.')).toBeVisible();
+  await expect(page.getByText('Aucun prospect noté pour l’instant.')).toBeVisible();
 
   await choisir(page, /Représentant/, 'Ibrahima Fixture', /Ibrahima Fixture/);
   await choisir(page, /Banque/, 'CBAO', /^CBAO/);
@@ -171,11 +173,9 @@ test('la saisie en rafale garde la banque et le syndicat', async ({ page }) => {
   await page.getByLabel(/^Prénom/).fill(premier.prenom);
   await page.getByLabel(/^Nom/).fill(premier.nom);
   await page.getByLabel(/^Téléphone/).fill(premier.saisie);
-  await page.getByRole('button', { name: 'Enregistrer et suivant' }).click();
+  await page.getByRole('button', { name: 'Enregistrer ce prospect' }).click();
 
-  await expect(
-    page.getByText(`1 prospect enregistré. Dernier : ${premier.prenom} ${premier.nom}.`),
-  ).toBeVisible();
+  await expect(page.getByText('1 prospect noté pour Ibrahima Fixture aujourd’hui')).toBeVisible();
 
   // L'identité est vidée, le contexte NON : c'est toute la différence entre
   // enchaîner une liste et ressaisir six champs par fiche.
@@ -197,11 +197,9 @@ test('la saisie en rafale garde la banque et le syndicat', async ({ page }) => {
   await page.getByLabel(/^Prénom/).fill(second.prenom);
   await page.getByLabel(/^Nom/).fill(second.nom);
   await page.getByLabel(/^Téléphone/).fill(second.saisie);
-  await page.getByRole('button', { name: 'Enregistrer et suivant' }).click();
+  await page.getByRole('button', { name: 'Enregistrer ce prospect' }).click();
 
-  await expect(
-    page.getByText(`2 prospects enregistrés. Dernier : ${second.prenom} ${second.nom}.`),
-  ).toBeVisible();
+  await expect(page.getByText('2 prospects notés pour Ibrahima Fixture aujourd’hui')).toBeVisible();
 });
 
 test('un numéro déjà pris nomme la fiche existante', async ({ page }) => {
@@ -215,7 +213,7 @@ test('un numéro déjà pris nomme la fiche existante', async ({ page }) => {
   await page.getByLabel(/^Prénom/).fill('Doublon');
   await page.getByLabel(/^Nom/).fill('Refuse');
   await page.getByLabel(/^Téléphone/).fill(premier.saisie);
-  await page.getByRole('button', { name: 'Enregistrer et suivant' }).click();
+  await page.getByRole('button', { name: 'Enregistrer ce prospect' }).click();
 
   /**
    * Le refus NOMME la fiche existante, et c'est ce qui le rend utilisable :

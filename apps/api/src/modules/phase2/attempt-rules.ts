@@ -1,6 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import type { EnrollmentMethod } from '@crm/database';
-import { CallOutcome, Phase2Status } from '@crm/database';
+import { CallOutcome, EnrollmentMethod, Phase2Status } from '@crm/database';
 
 import { SYSTEM_OUTCOME_REASONS, outcomeEffectRule } from '../referentiels/call-outcome-rules.js';
 
@@ -26,6 +25,16 @@ export const PHASE2_STATUS_FOR_OUTCOME: Readonly<Record<TerminalOutcome, Phase2S
 
 /** Même valeur que `IMPORT_CLOCK_SKEW_TOLERANCE_MS` : une seule dérive admise dans le dépôt. */
 export const CALLBACK_CLOCK_SKEW_TOLERANCE_MS = 5 * 60_000;
+
+export const EMAIL_MAX_LENGTH = 160;
+export const DUREE_ETABLISSEMENT_MAX_MOIS = 600;
+
+/**
+ * Volontairement grossier : le serveur n'a pas à trancher la RFC 5322, il refuse
+ * ce qui n'est manifestement pas une adresse. Une saisie douteuse mais plausible
+ * vaut mieux qu'une fiche abandonnée au téléphone.
+ */
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 /**
  * Motif appliqué à une tentative. `id` est nul quand il vient de la table
@@ -70,6 +79,11 @@ export interface RawAttempt {
   readonly comment?: string | null;
   readonly callbackAt?: string | null;
   readonly clientCreatedAt?: string | null;
+  readonly email?: string | null;
+  readonly fonctionnaire?: boolean | null;
+  readonly engagementEnCours?: boolean | null;
+  readonly dureeEtablissementMois?: number | null;
+  readonly rendezVousAt?: string | null;
 }
 
 export interface NormalizedAttempt {
@@ -80,6 +94,11 @@ export interface NormalizedAttempt {
   readonly callbackAt: Date | null;
   readonly terminal: boolean;
   readonly phase2Status: Phase2Status | null;
+  readonly email: string | null;
+  readonly fonctionnaire: boolean | null;
+  readonly engagementEnCours: boolean | null;
+  readonly dureeEtablissementMois: number | null;
+  readonly rendezVousAt: Date | null;
 }
 
 const invalid = (code: string, message: string): never => {
@@ -145,7 +164,73 @@ export function normalizeAttempt(input: RawAttempt, reason?: AttemptReason): Nor
     callbackAt: callbackAt(input, applied),
     terminal: rule.closes,
     phase2Status: rule.phase2Status,
+    email: email(input),
+    fonctionnaire: input.fonctionnaire ?? null,
+    engagementEnCours: input.engagementEnCours ?? null,
+    dureeEtablissementMois: dureeEtablissementMois(input),
+    rendezVousAt: rendezVousAt(input, method),
   };
+}
+
+function email(input: RawAttempt): string | null {
+  const raw = input.email?.trim() ?? '';
+  if (raw === '') return null;
+
+  if (raw.length > EMAIL_MAX_LENGTH || !EMAIL_PATTERN.test(raw)) {
+    invalid('PHASE2_EMAIL_INVALID', 'L’adresse électronique saisie n’est pas une adresse.');
+  }
+  return raw;
+}
+
+function dureeEtablissementMois(input: RawAttempt): number | null {
+  const mois = input.dureeEtablissementMois ?? null;
+  if (mois === null) return null;
+
+  if (!Number.isInteger(mois) || mois < 0 || mois > DUREE_ETABLISSEMENT_MAX_MOIS) {
+    invalid(
+      'PHASE2_DUREE_ETABLISSEMENT_INVALID',
+      `La durée dans l’établissement s’exprime en mois entiers, de 0 à ${String(DUREE_ETABLISSEMENT_MAX_MOIS)}.`,
+    );
+  }
+  return mois;
+}
+
+/**
+ * Le rendez-vous se juge sur l'horodatage TERRAIN, comme le rappel : un lot
+ * poussé trois semaines plus tard porte une date passée pour le serveur, et la
+ * refuser condamnerait une saisie pourtant correcte au moment de l'appel.
+ */
+function rendezVousAt(input: RawAttempt, method: EnrollmentMethod | null): Date | null {
+  const raw = input.rendezVousAt ?? null;
+  const prisRendezVous = method === EnrollmentMethod.APPOINTMENT;
+
+  if (raw === null) {
+    if (prisRendezVous) {
+      invalid(
+        'PHASE2_RENDEZ_VOUS_REQUIRED',
+        'La prise de rendez-vous exige la date du rendez-vous.',
+      );
+    }
+    return null;
+  }
+
+  if (!prisRendezVous) {
+    invalid(
+      'PHASE2_RENDEZ_VOUS_NOT_ALLOWED',
+      'Une date de rendez-vous n’est admise que pour la méthode « prise de rendez-vous ».',
+    );
+  }
+
+  const fixe = new Date(raw);
+  if (Number.isNaN(fixe.getTime())) {
+    invalid('PHASE2_RENDEZ_VOUS_INVALID', 'La date du rendez-vous est illisible.');
+  }
+
+  if (fixe.getTime() < fieldTime(input.clientCreatedAt) - CALLBACK_CLOCK_SKEW_TOLERANCE_MS) {
+    invalid('PHASE2_RENDEZ_VOUS_PAST', 'La date du rendez-vous précède l’appel qui l’a fixé.');
+  }
+
+  return fixe;
 }
 
 /**

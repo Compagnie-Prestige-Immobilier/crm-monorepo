@@ -11,6 +11,7 @@ import 'package:cpi_go/data/repositories/write_repository.dart';
 import 'package:cpi_go/features/corrections/presentation/corrections_screen.dart';
 import 'package:cpi_go/features/corrections/presentation/discard_confirmation.dart';
 import 'package:cpi_go/features/corrections/presentation/ownership_sheet.dart';
+import 'package:cpi_go/ui/widgets/cpi_kit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,8 +24,9 @@ import '../support/fake_api.dart';
 
 /// ═══ CE QUE CES TESTS TIENNENT ═══
 ///
-/// Deux boutons détruisent la même chose : « Supprimer » sur la carte de
-/// « À corriger », et « Supprimer cette saisie » dans la feuille d'arbitrage.
+/// Deux boutons détruisent la même chose : « Supprimer cette saisie » dans la
+/// feuille « Autres » d'une carte de « À corriger », et le bouton du même nom
+/// dans la feuille d'arbitrage.
 /// La ligne visée est, dans les deux cas, la création d'un représentant en
 /// `conflict`, c'est-à-dire la seule ligne de la file dont l'abandon emporte
 /// une cascade : le représentant ET tous les prospects saisis sous lui.
@@ -138,6 +140,16 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1));
   }
 
+  /// La feuille « Autres » et la boîte de confirmation portent deux boutons
+  /// rouges voisins : le libellé les sépare, la variante lève le doute.
+  Finder bouton(String label, {CpiButtonVariant? variant}) =>
+      find.byWidgetPredicate(
+        (Widget w) =>
+            w is CpiButton &&
+            w.label == label &&
+            (variant == null || w.variant == variant),
+      );
+
   group('la phrase de la boîte, sans mise en scène', () {
     test('elle nomme les fiches à ressaisir, pas les opérations', () {
       expect(
@@ -159,14 +171,22 @@ void main() {
   });
 
   group('« À corriger » : la boîte annonce la cascade réelle', () {
+    /// La suppression est maintenant dans la feuille « Autres » : la carte ne
+    /// porte plus que deux boutons, et aucun ne détruit.
+    Future<void> ouvrirAutres(WidgetTester tester) async {
+      await tester.tap(bouton('Autres'));
+      await paint(tester);
+      await tester.tap(bouton('Supprimer cette saisie'));
+      await paint(tester);
+    }
+
     testWidgets('les prospects `pending` sont comptés, pas ignorés', (
       WidgetTester tester,
     ) async {
       await seedRefusedChain();
       await paint(tester, await host(const CorrectionsScreen()));
 
-      await tester.tap(find.widgetWithText(TextButton, 'Supprimer'));
-      await paint(tester);
+      await ouvrirAutres(tester);
 
       expect(
         find.textContaining('2 prospects'),
@@ -187,9 +207,8 @@ void main() {
       await seedRefusedChain();
       await paint(tester, await host(const CorrectionsScreen()));
 
-      await tester.tap(find.widgetWithText(TextButton, 'Supprimer'));
-      await paint(tester);
-      await tester.tap(find.widgetWithText(TextButton, 'Annuler'));
+      await ouvrirAutres(tester);
+      await tester.tap(bouton('Annuler'));
       await paint(tester);
 
       expect(await allOutbox(db), hasLength(3));
@@ -203,9 +222,8 @@ void main() {
       await seedRefusedChain();
       await paint(tester, await host(const CorrectionsScreen()));
 
-      await tester.tap(find.widgetWithText(TextButton, 'Supprimer'));
-      await paint(tester);
-      await tester.tap(find.widgetWithText(FilledButton, 'Supprimer'));
+      await ouvrirAutres(tester);
+      await tester.tap(bouton('Supprimer', variant: CpiButtonVariant.danger));
       await paint(tester);
 
       expect(await allOutbox(db), isEmpty);
@@ -237,9 +255,11 @@ void main() {
       );
 
       await paint(tester, await host(const CorrectionsScreen()));
+      await tester.tap(bouton('Autres'));
+      await paint(tester);
 
       expect(find.text('Modifier'), findsNothing);
-      expect(find.text('Voir dans l\'historique'), findsOneWidget);
+      expect(find.text('Voir la fiche'), findsOneWidget);
       await unmount(tester);
     });
   });
@@ -420,7 +440,7 @@ void main() {
 
       await tester.tap(find.text('Supprimer cette saisie'));
       await paint(tester);
-      await tester.tap(find.widgetWithText(TextButton, 'Annuler'));
+      await tester.tap(bouton('Annuler'));
       await paint(tester);
 
       expect(await allOutbox(db), hasLength(3));
@@ -435,7 +455,7 @@ void main() {
 
       await tester.tap(find.text('Supprimer cette saisie'));
       await paint(tester);
-      await tester.tap(find.widgetWithText(FilledButton, 'Supprimer'));
+      await tester.tap(bouton('Supprimer', variant: CpiButtonVariant.danger));
       await paint(tester);
 
       expect(await allOutbox(db), isEmpty);

@@ -1,3 +1,4 @@
+import 'package:cpi_go/core/onboarding/onboarding_controller.dart';
 import 'package:cpi_go/core/providers/app_providers.dart';
 import 'package:cpi_go/core/sync/token_store.dart';
 import 'package:cpi_go/core/theme/app_theme.dart';
@@ -7,6 +8,7 @@ import 'package:cpi_go/features/auth/presentation/login_screen.dart';
 import 'package:cpi_go/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:forui/forui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -118,11 +120,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('CPI GO'), findsOneWidget);
-    expect(find.text('Accédez à vos espaces de travail'), findsOneWidget);
+    expect(find.text('Connectez-vous pour commencer'), findsOneWidget);
+    // La case est un `FCheckbox` depuis le passage à ForUI : c'est lui, et non
+    // l'`InkWell` Material d'avant, qui porte la cible tactile.
     final Finder toggle = find
         .ancestor(
           of: find.text('Rester connecté sur cet appareil'),
-          matching: find.byType(InkWell),
+          matching: find.byType(FCheckbox),
         )
         .first;
     expect(
@@ -134,9 +138,10 @@ void main() {
   testWidgets('un premier lancement qui ne s\'enregistre pas le DIT', (
     WidgetTester tester,
   ) async {
-    // « Passer » écrivait un drapeau dans les préférences sans attendre le
+    // Le sas écrivait un drapeau dans les préférences sans attendre le
     // résultat : si l'écriture échoue, l'écran ne bouge pas et rien n'explique
-    // pourquoi. Le doigt réappuie, indéfiniment.
+    // pourquoi. Le doigt réappuie, indéfiniment. « Passer » a disparu : le sas
+    // se termine par « Commencer », au bout des deux pages.
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -153,9 +158,22 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Passer'));
+    await tester.tap(find.text('Continuer'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Commencer'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Réessayez'), findsOneWidget);
+    expect(
+      find.textContaining('n\'a pas pu garder ce réglage'),
+      findsOneWidget,
+    );
+    // Et le sas s'ouvre quand même : un stockage en panne n'enferme personne.
+    expect(
+      ProviderScope.containerOf(
+        tester.element(find.byType(OnboardingScreen)),
+        listen: false,
+      ).read(onboardingControllerProvider),
+      isTrue,
+    );
   });
 }

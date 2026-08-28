@@ -4,6 +4,13 @@ import { MOVED_ROUTES, movedTarget } from '@/app/moved-routes';
 import { COQUES, coqueOf, navItems } from '@/components/layout/nav-items';
 import { PANEL_ROLES } from '@/lib/data/auth';
 
+/**
+ * Écrans NÉS APRÈS le découpage en coques. Aucune notification, aucun signet
+ * ne porte une adresse d'avant pour eux : leur donner une redirection
+ * héritée n'aurait rien à ramener.
+ */
+const NES_APRES = new Set(['/chues', '/chues/appels-representants']);
+
 describe('anciennes adresses, d’avant le découpage en coques', () => {
   // Les notifications déjà envoyées portent l'adresse d'AVANT : aucun écran
   // déplacé ne doit avoir perdu la sienne.
@@ -11,10 +18,18 @@ describe('anciennes adresses, d’avant le découpage en coques', () => {
     for (const role of PANEL_ROLES) {
       for (const coque of ['chues', 'admin'] as const) {
         for (const { href } of navItems(role, coque)) {
+          if (NES_APRES.has(href)) continue;
           const [, , racine = '', ...reste] = href.split('/');
           expect(movedTarget(racine, reste), href).toBe(href);
         }
       }
+    }
+  });
+
+  it('ne redirige AUCUN écran né après le découpage : il n’avait pas d’adresse d’avant', () => {
+    for (const href of NES_APRES) {
+      const [, , racine = '', ...reste] = href.split('/');
+      expect(movedTarget(racine, reste), href).toBeNull();
     }
   });
 

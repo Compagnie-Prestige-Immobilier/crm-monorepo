@@ -5,7 +5,6 @@ import 'package:cpi_go/data/local/database.dart';
 import 'package:cpi_go/features/accueil/presentation/chiffres_screen.dart';
 import 'package:cpi_go/features/auth/auth_controller.dart';
 import 'package:cpi_go/features/auth/auth_state.dart';
-import 'package:cpi_go/ui/widgets/summary_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -62,14 +61,15 @@ void main() {
       await tester.pumpWidget(host('ACCUEIL'));
       await tester.pumpAndSettle();
 
-      SummaryCard carte(String label) => tester.widget<SummaryCard>(
-        find.byWidgetPredicate(
-          (Widget w) => w is SummaryCard && w.label == label,
-        ),
+      // Une carte par chiffre, repérée par sa clé : le nombre y est en très
+      // gros, le libellé au-dessus.
+      Finder chiffre(String cle, String valeur) => find.descendant(
+        of: find.byKey(ValueKey<String>(cle)),
+        matching: find.text(valeur),
       );
 
-      expect(carte('Visites aujourd\'hui').value, '2');
-      expect(carte('Visites sur 7 jours').value, '3');
+      expect(chiffre('chiffre-jour', '2'), findsOneWidget);
+      expect(chiffre('chiffre-semaine', '3'), findsOneWidget);
       // Sous le graphique, hors du premier écran peint dans ce viewport de test.
       expect(
         find.textContaining(
@@ -82,6 +82,90 @@ void main() {
       await teardownTree(tester);
     },
   );
+
+  testWidgets('« Reçus aujourd\'hui » compte par personne demandée', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(1080, 3600);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await insertVisite(
+      db,
+      id: 'v1',
+      date: '2026-08-12',
+      time: '10:05',
+      destinataireId: 't1',
+      destinataireLabel: 'MME. NDOYE',
+    );
+    await insertVisite(
+      db,
+      id: 'v2',
+      date: '2026-08-12',
+      time: '10:40',
+      destinataireId: 't1',
+      destinataireLabel: 'MME. NDOYE',
+    );
+    // Hier : ne compte pas dans la journée.
+    await insertVisite(
+      db,
+      id: 'v3',
+      date: '2026-08-11',
+      destinataireId: 't2',
+      destinataireLabel: 'M. DIOP',
+    );
+
+    await tester.pumpWidget(host('ACCUEIL'));
+    await tester.pumpAndSettle();
+
+    final Finder carte = find.byKey(const ValueKey<String>('chiffre-recus'));
+    expect(carte, findsOneWidget);
+    expect(
+      find.descendant(of: carte, matching: find.text('Par personne demandée')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: carte, matching: find.text('MME. NDOYE')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: carte, matching: find.text('2')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: carte, matching: find.text('M. DIOP')),
+      findsNothing,
+    );
+
+    // Les entreprises ne sont plus réparties : trois sociétés du groupe ne
+    // font pas une statistique.
+    expect(
+      find.text('Entreprises les plus reçues', skipOffstage: false),
+      findsNothing,
+    );
+
+    await teardownTree(tester);
+  });
+
+  testWidgets('sans personne demandée, la carte le dit', (
+    WidgetTester tester,
+  ) async {
+    await insertVisite(db, id: 'v1', date: '2026-08-12', time: '10:05');
+
+    await tester.pumpWidget(host('ACCUEIL'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Personne n\'a encore été demandé nommément aujourd\'hui.',
+        skipOffstage: false,
+      ),
+      findsOneWidget,
+    );
+
+    await teardownTree(tester);
+  });
 
   testWidgets('un compte sans le registre est renvoyé vers la direction', (
     WidgetTester tester,

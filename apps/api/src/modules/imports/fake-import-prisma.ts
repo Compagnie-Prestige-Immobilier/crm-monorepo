@@ -154,7 +154,7 @@ function compareOn(left: object, right: object, criterion: OrderBy): number {
 
   let delta = 0;
   if (a instanceof Date && b instanceof Date) delta = a.getTime() - b.getTime();
-  else if (typeof a === 'string' && typeof b === 'string') delta = a < b ? -1 : a > b ? 1 : 0;
+  else if (typeof a === 'string' && typeof b === 'string') delta = a.localeCompare(b);
   else if (typeof a === 'number' && typeof b === 'number') delta = a - b;
 
   return direction === 'desc' ? -delta : delta;

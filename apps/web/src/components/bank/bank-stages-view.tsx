@@ -181,11 +181,13 @@ export function BankStagesView() {
               const canMoveDown = index < open.length - 1 && !(initialLocked && index === 0);
 
               const locked = stage.isSystem || stage.isInitial;
-              const lockedLabel = stage.isSystem
-                ? 'Étape système : sa désactivation casserait le flux.'
-                : stage.isInitial
-                  ? 'Étape initiale : tout nouveau dossier y entre.'
-                  : null;
+              const lockedLabel = (() => {
+                if (stage.isSystem) return 'Étape système : sa désactivation casserait le flux.';
+                return (() => {
+                  if (stage.isInitial) return 'Étape initiale : tout nouveau dossier y entre.';
+                  return null;
+                })();
+              })();
               const toggleLabel = stage.isActive ? 'Désactiver' : 'Réactiver';
               const toggle = (): void => {
                 if (stage.isActive) {

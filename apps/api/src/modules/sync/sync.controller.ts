@@ -133,7 +133,7 @@ export class SyncController {
     operationId: 'pullSyncChanges',
     summary: 'Récupère les changements depuis un curseur opaque.',
     description:
-      'Pagination keyset sur (updatedAt, id) et retard de sécurité de 2 secondes. Un COMMERCIAL ne reçoit que ses propres lignes ; les référentiels sont communs.',
+      'Pagination keyset sur (updatedAt, id) et retard de sécurité de 2 secondes. Un COMMERCIAL ne reçoit que ses propres prospects ; l’annuaire des représentants et les référentiels sont communs.',
   })
   @ApiResponse({ status: 200, type: SyncPullResponseDto })
   @ApiResponse({

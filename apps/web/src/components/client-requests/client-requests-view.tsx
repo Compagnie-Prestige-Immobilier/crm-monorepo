@@ -166,83 +166,94 @@ export function ClientRequestsView({ role }: { role: Role }) {
         </div>
       </section>
 
-      {isPending ? (
-        <RequestsSkeleton />
-      ) : isError ? (
-        <QueryErrorState
-          error={error}
-          onRetry={() => {
-            void refetch();
-          }}
-          fallback="Les demandes n’ont pas pu être chargées."
-        />
-      ) : data.items.length === 0 ? (
-        <EmptyState
-          icon={InboxIcon}
-          title={
-            activeFilterCount === 0
-              ? 'Aucune demande en attente'
-              : 'Aucune demande ne correspond à ces filtres'
-          }
-          description={
-            activeFilterCount > 0
-              ? 'Changez de statut ou retirez un critère.'
-              : canReview
-                ? 'Une demande arrivée ici attend votre approbation, ou un refus dont le motif est remonté à la banque.'
-                : 'Ouvrez un dossier depuis « Nouveau dossier » : si le client est absent de la base, vous pourrez y demander sa création.'
-          }
-        />
-      ) : (
-        <>
-          <ul className={isFetching ? 'flex flex-col gap-3 opacity-80' : 'flex flex-col gap-3'}>
-            {data.items.map((request) => (
-              <li key={request.id}>
-                <RequestCard
-                  request={request}
-                  canReview={canReview}
-                  onReview={(action) => {
-                    setReviewing({ request, action });
-                  }}
+      {(() => {
+        if (isPending) return <RequestsSkeleton />;
+        return (() => {
+          if (isError)
+            return (
+              <QueryErrorState
+                error={error}
+                onRetry={() => {
+                  void refetch();
+                }}
+                fallback="Les demandes n’ont pas pu être chargées."
+              />
+            );
+          return (() => {
+            if (data.items.length === 0)
+              return (
+                <EmptyState
+                  icon={InboxIcon}
+                  title={
+                    activeFilterCount === 0
+                      ? 'Aucune demande en attente'
+                      : 'Aucune demande ne correspond à ces filtres'
+                  }
+                  description={
+                    activeFilterCount > 0
+                      ? 'Changez de statut ou retirez un critère.'
+                      : canReview
+                        ? 'Une demande arrivée ici attend votre approbation, ou un refus dont le motif est remonté à la banque.'
+                        : 'Ouvrez un dossier depuis « Nouveau dossier » : si le client est absent de la base, vous pourrez y demander sa création.'
+                  }
                 />
-              </li>
-            ))}
-          </ul>
+              );
+            return (
+              <>
+                <ul
+                  className={isFetching ? 'flex flex-col gap-3 opacity-80' : 'flex flex-col gap-3'}
+                >
+                  {data.items.map((request) => (
+                    <li key={request.id}>
+                      <RequestCard
+                        request={request}
+                        canReview={canReview}
+                        onReview={(action) => {
+                          setReviewing({ request, action });
+                        }}
+                      />
+                    </li>
+                  ))}
+                </ul>
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-[0.8125rem] text-muted-foreground" role="status">
-              <span className="sr-only">Demandes affichées&nbsp;: </span>
-              {formatNumber(data.meta.total)} demande{data.meta.total > 1 ? 's' : ''}
-            </p>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="icon"
-                aria-label="Page précédente"
-                disabled={data.meta.page <= 1}
-                onClick={() => {
-                  setFilters({ page: data.meta.page - 1 });
-                }}
-              >
-                <ChevronLeftIcon className="size-4" aria-hidden="true" />
-              </Button>
-              <span className="min-w-20 text-center text-[0.8125rem] tabular-nums">
-                {data.meta.page} / {Math.max(1, data.meta.pageCount)}
-              </span>
-              <Button
-                variant="outline"
-                size="icon"
-                aria-label="Page suivante"
-                disabled={data.meta.page >= data.meta.pageCount}
-                onClick={() => {
-                  setFilters({ page: data.meta.page + 1 });
-                }}
-              >
-                <ChevronRightIcon className="size-4" aria-hidden="true" />
-              </Button>
-            </div>
-          </div>
-        </>
-      )}
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-[0.8125rem] text-muted-foreground" role="status">
+                    <span className="sr-only">Demandes affichées&nbsp;: </span>
+                    {formatNumber(data.meta.total)} demande{data.meta.total > 1 ? 's' : ''}
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      aria-label="Page précédente"
+                      disabled={data.meta.page <= 1}
+                      onClick={() => {
+                        setFilters({ page: data.meta.page - 1 });
+                      }}
+                    >
+                      <ChevronLeftIcon className="size-4" aria-hidden="true" />
+                    </Button>
+                    <span className="min-w-20 text-center text-[0.8125rem] tabular-nums">
+                      {data.meta.page} / {Math.max(1, data.meta.pageCount)}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      aria-label="Page suivante"
+                      disabled={data.meta.page >= data.meta.pageCount}
+                      onClick={() => {
+                        setFilters({ page: data.meta.page + 1 });
+                      }}
+                    >
+                      <ChevronRightIcon className="size-4" aria-hidden="true" />
+                    </Button>
+                  </div>
+                </div>
+              </>
+            );
+          })();
+        })();
+      })()}
 
       <ClientRequestReviewDialogs
         pending={reviewing}

@@ -223,8 +223,10 @@ function activity(overrides: Partial<SupervisionActivity> = {}): SupervisionActi
       { id: ALICE, fullName: 'Alice Diop', isActive: true, openTasks: 1 },
       { id: BINETA, fullName: 'Bineta Fall', isActive: true, openTasks: 4 },
     ],
+    prospectsByTeleconseiller: [],
+    prospectsByRepresentant: [],
     ...overrides,
-  };
+  } as unknown as SupervisionActivity;
 }
 
 function row(overrides: Partial<ActivityRow> = {}): ActivityRow {

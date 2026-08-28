@@ -345,68 +345,77 @@ function KindPanel({
         />
       </div>
 
-      {isPending ? (
-        <ListSkeleton />
-      ) : isError ? (
-        <QueryErrorState
-          error={error}
-          onRetry={() => {
-            void refetch();
-          }}
-          fallback="Liste non chargée."
-        />
-      ) : rows.length === 0 ? (
-        <EmptyState searchActive={search.trim() !== ''} emptyLabel={config.emptyLabel} />
-      ) : (
-        <div className="overflow-hidden rounded-lg border border-border bg-card shadow-elev-sm">
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            accessibility={{ announcements, screenReaderInstructions }}
-            onDragEnd={onDragEnd}
-          >
-            <SortableContext
-              items={rows.map((entry) => entry.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              <ol className="divide-y divide-border">
-                {rows.map((entry) => {
-                  const index = allRows.findIndex((row) => row.id === entry.id);
-                  return (
-                    <SortableRow
-                      key={entry.id}
-                      entry={entry}
-                      disabled={search.trim() !== ''}
-                      canMoveUp={index > 0}
-                      canMoveDown={index < allRows.length - 1}
-                      reordering={reorder.isPending}
-                      usageCount={usageOf(usage, kind, entry.id)}
-                      onMoveUp={() => {
-                        move(entry.id, -1);
-                      }}
-                      onMoveDown={() => {
-                        move(entry.id, 1);
-                      }}
-                      onEdit={() => {
-                        setEditing(entry);
-                        setFormOpen(true);
-                      }}
-                      onToggleActive={() => {
-                        if (entry.isActive) {
-                          setDeactivating(entry);
-                        } else {
-                          setActive.mutate({ entry, isActive: true });
-                        }
-                      }}
-                      togglePending={setActive.isPending}
-                    />
-                  );
-                })}
-              </ol>
-            </SortableContext>
-          </DndContext>
-        </div>
-      )}
+      {(() => {
+        if (isPending) return <ListSkeleton />;
+        return (() => {
+          if (isError)
+            return (
+              <QueryErrorState
+                error={error}
+                onRetry={() => {
+                  void refetch();
+                }}
+                fallback="Liste non chargée."
+              />
+            );
+          return (() => {
+            if (rows.length === 0)
+              return (
+                <EmptyState searchActive={search.trim() !== ''} emptyLabel={config.emptyLabel} />
+              );
+            return (
+              <div className="overflow-hidden rounded-lg border border-border bg-card shadow-elev-sm">
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  accessibility={{ announcements, screenReaderInstructions }}
+                  onDragEnd={onDragEnd}
+                >
+                  <SortableContext
+                    items={rows.map((entry) => entry.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <ol className="divide-y divide-border">
+                      {rows.map((entry) => {
+                        const index = allRows.findIndex((row) => row.id === entry.id);
+                        return (
+                          <SortableRow
+                            key={entry.id}
+                            entry={entry}
+                            disabled={search.trim() !== ''}
+                            canMoveUp={index > 0}
+                            canMoveDown={index < allRows.length - 1}
+                            reordering={reorder.isPending}
+                            usageCount={usageOf(usage, kind, entry.id)}
+                            onMoveUp={() => {
+                              move(entry.id, -1);
+                            }}
+                            onMoveDown={() => {
+                              move(entry.id, 1);
+                            }}
+                            onEdit={() => {
+                              setEditing(entry);
+                              setFormOpen(true);
+                            }}
+                            onToggleActive={() => {
+                              if (entry.isActive) {
+                                setDeactivating(entry);
+                              } else {
+                                setActive.mutate({ entry, isActive: true });
+                              }
+                            }}
+                            togglePending={setActive.isPending}
+                          />
+                        );
+                      })}
+                    </ol>
+                  </SortableContext>
+                </DndContext>
+              </div>
+            );
+          })();
+        })();
+      })()}
 
       <ListeFormDialog
         kind={kind}

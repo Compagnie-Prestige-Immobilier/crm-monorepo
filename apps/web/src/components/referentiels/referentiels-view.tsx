@@ -349,126 +349,139 @@ function BanquesTab({ search, onSearch }: { search: string; onSearch: (value: st
         setFormOpen(true);
       }}
     >
-      {isPending ? (
-        <TableSkeleton />
-      ) : isError ? (
-        <QueryErrorState
-          error={error}
-          onRetry={() => {
-            void refetch();
-          }}
-          fallback="Référentiel non chargé."
-        />
-      ) : (
-        <div className="overflow-hidden rounded-lg border border-border bg-card shadow-elev-sm">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Abréviation</TableHead>
-                <TableHead>Nom complet</TableHead>
-                <TableHead className="text-right">Prospects</TableHead>
-                <TableHead className="text-right">Ordre</TableHead>
-                <TableHead>
-                  <span className="sr-only">Actions</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.length === 0 ? (
-                <EmptyRow colSpan={6}>
-                  {search.trim() === ''
-                    ? 'Aucune banque enregistrée.'
-                    : 'Aucune banque ne correspond à cette recherche.'}
-                </EmptyRow>
-              ) : null}
-              {rows.map((banque) => {
-                const index = allRows.indexOf(banque);
-                return (
-                  <TableRow key={banque.id} className={cn(!banque.isActive && inactiveRowClass)}>
-                    <TableCell>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span
-                          className={cn('font-[600]', !banque.isActive && 'text-muted-foreground')}
-                        >
-                          {banque.shortName}
-                        </span>
-                        {banque.isActive ? null : <Badge variant="outline">Retirée</Badge>}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{banque.name}</TableCell>
-                    <TableCell className="text-right">
-                      <UsageCell count={usageOf(usage, 'banques', banque.id)} />
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">{banque.sortOrder}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label={`Monter ${banque.shortName}`}
-                          disabled={index === 0 || swap.isPending}
-                          onClick={() => {
-                            const previous = allRows[index - 1];
-                            if (previous !== undefined) swap.mutate({ a: banque, b: previous });
-                          }}
-                        >
-                          <ChevronUpIcon className="size-4" aria-hidden="true" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label={`Descendre ${banque.shortName}`}
-                          disabled={index === allRows.length - 1 || swap.isPending}
-                          onClick={() => {
-                            const next = allRows[index + 1];
-                            if (next !== undefined) swap.mutate({ a: banque, b: next });
-                          }}
-                        >
-                          <ChevronDownIcon className="size-4" aria-hidden="true" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label={`Modifier ${banque.shortName}`}
-                          onClick={() => {
-                            setEditing(banque);
-                            setFormOpen(true);
-                          }}
-                        >
-                          <PencilIcon className="size-4" aria-hidden="true" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label={
-                            banque.isActive
-                              ? `Désactiver ${banque.shortName}`
-                              : `Réactiver ${banque.shortName}`
-                          }
-                          disabled={setActive.isPending}
-                          onClick={() => {
-                            if (banque.isActive) {
-                              setDeactivating(banque);
-                            } else {
-                              setActive.mutate({ banque, isActive: true });
-                            }
-                          }}
-                        >
-                          {banque.isActive ? (
-                            <PowerOffIcon className="size-4" aria-hidden="true" />
-                          ) : (
-                            <PowerIcon className="size-4" aria-hidden="true" />
-                          )}
-                        </Button>
-                      </div>
-                    </TableCell>
+      {(() => {
+        if (isPending) return <TableSkeleton />;
+        return (() => {
+          if (isError)
+            return (
+              <QueryErrorState
+                error={error}
+                onRetry={() => {
+                  void refetch();
+                }}
+                fallback="Référentiel non chargé."
+              />
+            );
+          return (
+            <div className="overflow-hidden rounded-lg border border-border bg-card shadow-elev-sm">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead>Abréviation</TableHead>
+                    <TableHead>Nom complet</TableHead>
+                    <TableHead className="text-right">Prospects</TableHead>
+                    <TableHead className="text-right">Ordre</TableHead>
+                    <TableHead>
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+                </TableHeader>
+                <TableBody>
+                  {rows.length === 0 ? (
+                    <EmptyRow colSpan={6}>
+                      {search.trim() === ''
+                        ? 'Aucune banque enregistrée.'
+                        : 'Aucune banque ne correspond à cette recherche.'}
+                    </EmptyRow>
+                  ) : null}
+                  {rows.map((banque) => {
+                    const index = allRows.indexOf(banque);
+                    return (
+                      <TableRow
+                        key={banque.id}
+                        className={cn(!banque.isActive && inactiveRowClass)}
+                      >
+                        <TableCell>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className={cn(
+                                'font-[600]',
+                                !banque.isActive && 'text-muted-foreground',
+                              )}
+                            >
+                              {banque.shortName}
+                            </span>
+                            {banque.isActive ? null : <Badge variant="outline">Retirée</Badge>}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{banque.name}</TableCell>
+                        <TableCell className="text-right">
+                          <UsageCell count={usageOf(usage, 'banques', banque.id)} />
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {banque.sortOrder}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={`Monter ${banque.shortName}`}
+                              disabled={index === 0 || swap.isPending}
+                              onClick={() => {
+                                const previous = allRows[index - 1];
+                                if (previous !== undefined) swap.mutate({ a: banque, b: previous });
+                              }}
+                            >
+                              <ChevronUpIcon className="size-4" aria-hidden="true" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={`Descendre ${banque.shortName}`}
+                              disabled={index === allRows.length - 1 || swap.isPending}
+                              onClick={() => {
+                                const next = allRows[index + 1];
+                                if (next !== undefined) swap.mutate({ a: banque, b: next });
+                              }}
+                            >
+                              <ChevronDownIcon className="size-4" aria-hidden="true" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={`Modifier ${banque.shortName}`}
+                              onClick={() => {
+                                setEditing(banque);
+                                setFormOpen(true);
+                              }}
+                            >
+                              <PencilIcon className="size-4" aria-hidden="true" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={
+                                banque.isActive
+                                  ? `Désactiver ${banque.shortName}`
+                                  : `Réactiver ${banque.shortName}`
+                              }
+                              disabled={setActive.isPending}
+                              onClick={() => {
+                                if (banque.isActive) {
+                                  setDeactivating(banque);
+                                } else {
+                                  setActive.mutate({ banque, isActive: true });
+                                }
+                              }}
+                            >
+                              {banque.isActive ? (
+                                <PowerOffIcon className="size-4" aria-hidden="true" />
+                              ) : (
+                                <PowerIcon className="size-4" aria-hidden="true" />
+                              )}
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          );
+        })();
+      })()}
 
       <BanqueFormDialog open={formOpen} onOpenChange={setFormOpen} banque={editing} />
       <DeactivateReferentielDialog
@@ -559,136 +572,144 @@ function SyndicatsTab({ search, onSearch }: { search: string; onSearch: (value: 
         setFormOpen(true);
       }}
     >
-      {isPending ? (
-        <TableSkeleton />
-      ) : isError ? (
-        <QueryErrorState
-          error={error}
-          onRetry={() => {
-            void refetch();
-          }}
-          fallback="Référentiel non chargé."
-        />
-      ) : (
-        <div className="overflow-hidden rounded-lg border border-border bg-card shadow-elev-sm">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Sigle</TableHead>
-                <TableHead>Nom complet</TableHead>
-                <TableHead>Secteur</TableHead>
-                <TableHead className="text-right">Prospects</TableHead>
-                <TableHead className="text-right">Ordre</TableHead>
-                <TableHead>
-                  <span className="sr-only">Actions</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.length === 0 ? (
-                <EmptyRow colSpan={7}>
-                  {search.trim() === ''
-                    ? 'Aucun syndicat enregistré.'
-                    : 'Aucun syndicat ne correspond à cette recherche.'}
-                </EmptyRow>
-              ) : null}
-              {rows.map((syndicat) => {
-                const index = allRows.indexOf(syndicat);
-                return (
-                  <TableRow
-                    key={syndicat.id}
-                    className={cn(!syndicat.isActive && inactiveRowClass)}
-                  >
-                    <TableCell>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span
-                          className={cn(
-                            'font-[600]',
-                            !syndicat.isActive && 'text-muted-foreground',
-                          )}
-                        >
-                          {syndicat.sigle}
-                        </span>
-                        {syndicat.isActive ? null : <Badge variant="outline">Retiré</Badge>}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{syndicat.name}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {syndicat.secteur ?? '–'}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <UsageCell count={usageOf(usage, 'syndicats', syndicat.id)} />
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">{syndicat.sortOrder}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label={`Monter ${syndicat.sigle}`}
-                          disabled={index === 0 || swap.isPending}
-                          onClick={() => {
-                            const previous = allRows[index - 1];
-                            if (previous !== undefined) swap.mutate({ a: syndicat, b: previous });
-                          }}
-                        >
-                          <ChevronUpIcon className="size-4" aria-hidden="true" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label={`Descendre ${syndicat.sigle}`}
-                          disabled={index === allRows.length - 1 || swap.isPending}
-                          onClick={() => {
-                            const next = allRows[index + 1];
-                            if (next !== undefined) swap.mutate({ a: syndicat, b: next });
-                          }}
-                        >
-                          <ChevronDownIcon className="size-4" aria-hidden="true" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label={`Modifier ${syndicat.sigle}`}
-                          onClick={() => {
-                            setEditing(syndicat);
-                            setFormOpen(true);
-                          }}
-                        >
-                          <PencilIcon className="size-4" aria-hidden="true" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label={
-                            syndicat.isActive
-                              ? `Désactiver ${syndicat.sigle}`
-                              : `Réactiver ${syndicat.sigle}`
-                          }
-                          disabled={setActive.isPending}
-                          onClick={() => {
-                            if (syndicat.isActive) {
-                              setDeactivating(syndicat);
-                            } else {
-                              setActive.mutate({ syndicat, isActive: true });
-                            }
-                          }}
-                        >
-                          {syndicat.isActive ? (
-                            <PowerOffIcon className="size-4" aria-hidden="true" />
-                          ) : (
-                            <PowerIcon className="size-4" aria-hidden="true" />
-                          )}
-                        </Button>
-                      </div>
-                    </TableCell>
+      {(() => {
+        if (isPending) return <TableSkeleton />;
+        return (() => {
+          if (isError)
+            return (
+              <QueryErrorState
+                error={error}
+                onRetry={() => {
+                  void refetch();
+                }}
+                fallback="Référentiel non chargé."
+              />
+            );
+          return (
+            <div className="overflow-hidden rounded-lg border border-border bg-card shadow-elev-sm">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead>Sigle</TableHead>
+                    <TableHead>Nom complet</TableHead>
+                    <TableHead>Secteur</TableHead>
+                    <TableHead className="text-right">Prospects</TableHead>
+                    <TableHead className="text-right">Ordre</TableHead>
+                    <TableHead>
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+                </TableHeader>
+                <TableBody>
+                  {rows.length === 0 ? (
+                    <EmptyRow colSpan={7}>
+                      {search.trim() === ''
+                        ? 'Aucun syndicat enregistré.'
+                        : 'Aucun syndicat ne correspond à cette recherche.'}
+                    </EmptyRow>
+                  ) : null}
+                  {rows.map((syndicat) => {
+                    const index = allRows.indexOf(syndicat);
+                    return (
+                      <TableRow
+                        key={syndicat.id}
+                        className={cn(!syndicat.isActive && inactiveRowClass)}
+                      >
+                        <TableCell>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className={cn(
+                                'font-[600]',
+                                !syndicat.isActive && 'text-muted-foreground',
+                              )}
+                            >
+                              {syndicat.sigle}
+                            </span>
+                            {syndicat.isActive ? null : <Badge variant="outline">Retiré</Badge>}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{syndicat.name}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {syndicat.secteur ?? '–'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <UsageCell count={usageOf(usage, 'syndicats', syndicat.id)} />
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {syndicat.sortOrder}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={`Monter ${syndicat.sigle}`}
+                              disabled={index === 0 || swap.isPending}
+                              onClick={() => {
+                                const previous = allRows[index - 1];
+                                if (previous !== undefined)
+                                  swap.mutate({ a: syndicat, b: previous });
+                              }}
+                            >
+                              <ChevronUpIcon className="size-4" aria-hidden="true" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={`Descendre ${syndicat.sigle}`}
+                              disabled={index === allRows.length - 1 || swap.isPending}
+                              onClick={() => {
+                                const next = allRows[index + 1];
+                                if (next !== undefined) swap.mutate({ a: syndicat, b: next });
+                              }}
+                            >
+                              <ChevronDownIcon className="size-4" aria-hidden="true" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={`Modifier ${syndicat.sigle}`}
+                              onClick={() => {
+                                setEditing(syndicat);
+                                setFormOpen(true);
+                              }}
+                            >
+                              <PencilIcon className="size-4" aria-hidden="true" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={
+                                syndicat.isActive
+                                  ? `Désactiver ${syndicat.sigle}`
+                                  : `Réactiver ${syndicat.sigle}`
+                              }
+                              disabled={setActive.isPending}
+                              onClick={() => {
+                                if (syndicat.isActive) {
+                                  setDeactivating(syndicat);
+                                } else {
+                                  setActive.mutate({ syndicat, isActive: true });
+                                }
+                              }}
+                            >
+                              {syndicat.isActive ? (
+                                <PowerOffIcon className="size-4" aria-hidden="true" />
+                              ) : (
+                                <PowerIcon className="size-4" aria-hidden="true" />
+                              )}
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          );
+        })();
+      })()}
 
       <SyndicatFormDialog open={formOpen} onOpenChange={setFormOpen} syndicat={editing} />
       <DeactivateReferentielDialog
@@ -769,107 +790,114 @@ function DepartementsTab({
         setFormOpen(true);
       }}
     >
-      {isPending ? (
-        <TableSkeleton />
-      ) : isError ? (
-        <QueryErrorState
-          error={error}
-          onRetry={() => {
-            void refetch();
-          }}
-          fallback="Référentiel non chargé."
-        />
-      ) : (
-        <div className="overflow-hidden rounded-lg border border-border bg-card shadow-elev-sm">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Département</TableHead>
-                <TableHead>Code</TableHead>
-                <TableHead>Région</TableHead>
-                <TableHead className="text-right">Prospects</TableHead>
-                <TableHead>
-                  <span className="sr-only">Actions</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.length === 0 ? (
-                <EmptyRow colSpan={6}>
-                  {search.trim() === ''
-                    ? 'Aucun département enregistré.'
-                    : 'Aucun département ne correspond à cette recherche.'}
-                </EmptyRow>
-              ) : null}
-              {rows.map((departement) => (
-                <TableRow
-                  key={departement.id}
-                  className={cn(!departement.isActive && inactiveRowClass)}
-                >
-                  <TableCell>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={cn(
-                          'font-[600]',
-                          !departement.isActive && 'text-muted-foreground',
-                        )}
-                      >
-                        {departement.name}
-                      </span>
-                      {departement.isActive ? null : <Badge variant="outline">Retiré</Badge>}
-                    </div>
-                  </TableCell>
-                  <TableCell className="tabular-nums text-muted-foreground">
-                    {departement.code}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{departement.regionName}</TableCell>
-                  <TableCell className="text-right">
-                    <UsageCell count={usageOf(usage, 'departements', departement.id)} />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`Modifier ${departement.name}`}
-                        onClick={() => {
-                          setEditing(departement);
-                          setFormOpen(true);
-                        }}
-                      >
-                        <PencilIcon className="size-4" aria-hidden="true" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={
-                          departement.isActive
-                            ? `Désactiver ${departement.name}`
-                            : `Réactiver ${departement.name}`
-                        }
-                        disabled={setActive.isPending}
-                        onClick={() => {
-                          if (departement.isActive) {
-                            setDeactivating(departement);
-                          } else {
-                            setActive.mutate({ departement, isActive: true });
-                          }
-                        }}
-                      >
-                        {departement.isActive ? (
-                          <PowerOffIcon className="size-4" aria-hidden="true" />
-                        ) : (
-                          <PowerIcon className="size-4" aria-hidden="true" />
-                        )}
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+      {(() => {
+        if (isPending) return <TableSkeleton />;
+        return (() => {
+          if (isError)
+            return (
+              <QueryErrorState
+                error={error}
+                onRetry={() => {
+                  void refetch();
+                }}
+                fallback="Référentiel non chargé."
+              />
+            );
+          return (
+            <div className="overflow-hidden rounded-lg border border-border bg-card shadow-elev-sm">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead>Département</TableHead>
+                    <TableHead>Code</TableHead>
+                    <TableHead>Région</TableHead>
+                    <TableHead className="text-right">Prospects</TableHead>
+                    <TableHead>
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.length === 0 ? (
+                    <EmptyRow colSpan={6}>
+                      {search.trim() === ''
+                        ? 'Aucun département enregistré.'
+                        : 'Aucun département ne correspond à cette recherche.'}
+                    </EmptyRow>
+                  ) : null}
+                  {rows.map((departement) => (
+                    <TableRow
+                      key={departement.id}
+                      className={cn(!departement.isActive && inactiveRowClass)}
+                    >
+                      <TableCell>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            className={cn(
+                              'font-[600]',
+                              !departement.isActive && 'text-muted-foreground',
+                            )}
+                          >
+                            {departement.name}
+                          </span>
+                          {departement.isActive ? null : <Badge variant="outline">Retiré</Badge>}
+                        </div>
+                      </TableCell>
+                      <TableCell className="tabular-nums text-muted-foreground">
+                        {departement.code}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {departement.regionName}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <UsageCell count={usageOf(usage, 'departements', departement.id)} />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={`Modifier ${departement.name}`}
+                            onClick={() => {
+                              setEditing(departement);
+                              setFormOpen(true);
+                            }}
+                          >
+                            <PencilIcon className="size-4" aria-hidden="true" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={
+                              departement.isActive
+                                ? `Désactiver ${departement.name}`
+                                : `Réactiver ${departement.name}`
+                            }
+                            disabled={setActive.isPending}
+                            onClick={() => {
+                              if (departement.isActive) {
+                                setDeactivating(departement);
+                              } else {
+                                setActive.mutate({ departement, isActive: true });
+                              }
+                            }}
+                          >
+                            {departement.isActive ? (
+                              <PowerOffIcon className="size-4" aria-hidden="true" />
+                            ) : (
+                              <PowerIcon className="size-4" aria-hidden="true" />
+                            )}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          );
+        })();
+      })()}
 
       <DepartementFormDialog open={formOpen} onOpenChange={setFormOpen} departement={editing} />
       <DeactivateReferentielDialog

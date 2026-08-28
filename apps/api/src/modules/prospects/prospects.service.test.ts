@@ -75,6 +75,11 @@ function firstArg(fn: ReturnType<typeof vi.fn>): PrismaCallArgs {
 const service = (prisma: PrismaMock): ProspectsService =>
   new ProspectsService(prisma as unknown as PrismaService);
 
+/** Ce qu'un téléconseiller a en main : ses fiches, ou celles qu'on lui a confiées. */
+const portee = (userId: string): Record<string, unknown> => ({
+  OR: [{ createdById: userId }, { callTasks: { some: { assignedToId: userId, isActive: true } } }],
+});
+
 describe('cloisonnement par commercial', () => {
   let prisma: PrismaMock;
 
@@ -82,20 +87,21 @@ describe('cloisonnement par commercial', () => {
     prisma = makePrisma();
   });
 
-  it('la liste d’un COMMERCIAL est bornée à ses propres lignes, dans le WHERE', async () => {
+  it('la liste d’un COMMERCIAL porte SES fiches ET celles qu’on lui a confiées', async () => {
     await service(prisma).list(alice, {});
 
     const where = firstArg(prisma.prospect.findMany).where ?? {};
-    expect(where.createdById).toBe('com-alice');
+    expect(where.AND).toEqual([portee('com-alice')]);
+    expect(where.createdById).toBeUndefined();
     expect(firstArg(prisma.prospect.count).where).toEqual(where);
   });
 
-  it('un COMMERCIAL qui filtre sur un collègue obtient l’ensemble vide, pas ses lignes', async () => {
+  it('un COMMERCIAL qui filtre sur un collègue reste borné à ce qu’il a en main', async () => {
     await service(prisma).list(alice, { commercialId: 'com-bob' });
 
     const where = firstArg(prisma.prospect.findMany).where ?? {};
-    expect(where.createdById).not.toBe('com-bob');
-    expect(where.createdById).toBe('__aucun__');
+    expect(where.createdById).toBe('com-bob');
+    expect(where.AND).toEqual([portee('com-alice')]);
   });
 
   it('un ADMIN n’est pas borné', async () => {
@@ -123,9 +129,20 @@ describe('cloisonnement par commercial', () => {
   });
 
   it('un COMMERCIAL ne peut pas lire le prospect d’un autre commercial', async () => {
-    prisma.prospect.findFirst.mockResolvedValue({ id: 'p-1', createdById: bob.id });
+    // Hors de sa portée à la première lecture, présent à la seconde : c'est ce
+    // qui distingue « pas à vous » de « n'existe pas ».
+    prisma.prospect.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'p-1', createdById: bob.id });
 
     await expect(service(prisma).get(alice, 'p-1')).rejects.toThrow(ForbiddenException);
+    expect(firstArg(prisma.prospect.findFirst).where).toMatchObject(portee('com-alice'));
+  });
+
+  it('ouvre la fiche qu’une campagne lui a confiée, comme sur son téléphone', async () => {
+    prisma.prospect.findFirst.mockResolvedValue(prospectRow({ createdById: admin.id }));
+
+    await expect(service(prisma).get(alice, 'p-1')).resolves.toMatchObject({ id: 'p-1' });
   });
 
   it('un COMMERCIAL ne peut pas modifier le prospect d’un autre commercial', async () => {
@@ -175,21 +192,24 @@ describe('cloisonnement par commercial', () => {
     ).rejects.toThrow(ForbiddenException);
   });
 
-  it('un COMMERCIAL ne peut pas rattacher un prospect au représentant d’un collègue', async () => {
+  it('un COMMERCIAL rattache son prospect au représentant d’un collègue, l’annuaire étant commun', async () => {
     prisma.prospect.findUnique.mockResolvedValue(null);
     prisma.representant.findFirst.mockResolvedValue({ id: 'r-bob', createdById: bob.id });
+    prisma.prospect.create.mockResolvedValue(prospectRow({}));
 
-    await expect(
-      service(prisma).create(alice, {
-        nom: 'Ndiaye',
-        prenom: 'Awa',
-        phone: '77 123 45 67',
-        banqueId: 'b-1',
-        syndicatId: 's-1',
-        representantId: 'r-bob',
-      }),
-    ).rejects.toThrow(ForbiddenException);
-    expect(prisma.prospect.create).not.toHaveBeenCalled();
+    await service(prisma).create(alice, {
+      nom: 'Ndiaye',
+      prenom: 'Awa',
+      phone: '77 123 45 67',
+      banqueId: 'b-1',
+      syndicatId: 's-1',
+      representantId: 'r-bob',
+    });
+
+    const data = firstArg(prisma.prospect.create).data ?? {};
+    expect(data.representantId).toBe('r-bob');
+    // La fiche créée reste celle de son auteur : c'est là qu'est le cloisonnement.
+    expect(data.createdById).toBe(alice.id);
   });
 });
 
@@ -487,12 +507,12 @@ describe('surface de phase 2 dans la liste', () => {
 
     const where = firstArg(prisma.prospect.findMany).where ?? {};
     expect(where).toMatchObject({
-      createdById: 'com-alice',
       phase2Status: 'METHOD_OBTAINED',
       enrollmentMethod: 'PLATFORM',
       enrollmentCapturedById: 'com-bob',
     });
     expect(where.AND).toEqual([
+      portee('com-alice'),
       { syndicat: { sigle: 'CHUES' }, banque: { shortName: 'CBAO' } },
       { callTasks: { some: { campaignId: 'camp-1' } } },
     ]);
@@ -593,11 +613,11 @@ describe('lecture du SUPERVISEUR', () => {
     expect(firstArg(prisma.prospect.findMany).where?.createdById).toBe('com-bob');
   });
 
-  it('ouvre la fiche d’un téléconseiller', async () => {
+  it('ouvre la fiche d’un téléconseiller, sans borner la lecture sur lui-même', async () => {
     prisma.prospect.findFirst.mockResolvedValue(prospectRow({ createdById: bob.id }));
 
     await expect(service(prisma).get(superviseur, 'p-1')).resolves.toMatchObject({ id: 'p-1' });
-    await expect(service(prisma).get(alice, 'p-1')).rejects.toThrow(ForbiddenException);
+    expect(firstArg(prisma.prospect.findFirst).where).not.toHaveProperty('OR');
   });
 
   it('n’écrit rien : modification, suppression et réaffectation lui sont refusées', async () => {

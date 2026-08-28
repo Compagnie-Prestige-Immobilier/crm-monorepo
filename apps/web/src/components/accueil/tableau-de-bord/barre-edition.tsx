@@ -11,6 +11,8 @@ export function BarreEdition({
   dirty,
   pending,
   isAdmin,
+  entryLabel = 'Organiser les graphiques',
+  entryVariant = 'outline',
   onEnter,
   onSave,
   onCancel,
@@ -20,6 +22,9 @@ export function BarreEdition({
   dirty: boolean;
   pending: boolean;
   isAdmin: boolean;
+  /** Ce que dit la porte d'entrée du mode organisation, et son poids visuel. */
+  entryLabel?: string;
+  entryVariant?: 'outline' | 'ghost';
   onEnter: () => void;
   onSave: () => void;
   onCancel: () => void;
@@ -30,15 +35,18 @@ export function BarreEdition({
 
   if (!editing) {
     return (
-      <Button type="button" variant="outline" onClick={onEnter}>
+      <Button type="button" variant={entryVariant} onClick={onEnter}>
         <LayoutGridIcon aria-hidden="true" />
-        Organiser
+        {entryLabel}
       </Button>
     );
   }
 
   return (
     <div className="flex flex-wrap items-center gap-2">
+      <span className="rounded-md bg-secondary px-3 py-2 text-[0.8125rem] font-[600] text-foreground">
+        Mode organisation
+      </span>
       {isAdmin ? (
         <>
           <Button
@@ -49,14 +57,14 @@ export function BarreEdition({
             }}
           >
             <ShieldCheckIcon aria-hidden="true" />
-            Faire de cette disposition la disposition par défaut
+            Proposer par défaut
           </Button>
           <ConfirmDialog
             open={confirmDefaut}
             onOpenChange={setConfirmDefaut}
             title="Fixer la disposition par défaut"
-            description="Les comptes qui n’ont pas composé la leur verront celle-ci."
-            confirmLabel="Fixer par défaut"
+            description="Les comptes qui n’ont rien enregistré verront cette organisation."
+            confirmLabel="Proposer par défaut"
             onConfirm={() => {
               onSetDefault();
               setConfirmDefaut(false);
@@ -77,14 +85,14 @@ export function BarreEdition({
         }}
       >
         <XIcon aria-hidden="true" />
-        Annuler
+        Quitter
       </Button>
       <ConfirmDialog
         open={confirmAnnuler}
         onOpenChange={setConfirmAnnuler}
-        title="Annuler les changements"
-        description="Les modifications faites depuis l’ouverture du mode Organiser seront perdues."
-        confirmLabel="Annuler les changements"
+        title="Quitter sans enregistrer"
+        description="Les changements faits dans ce mode seront perdus."
+        confirmLabel="Quitter sans enregistrer"
         onConfirm={() => {
           setConfirmAnnuler(false);
           onCancel();

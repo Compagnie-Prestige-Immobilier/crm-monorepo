@@ -81,7 +81,7 @@ const KIND_OPTIONS = [
 
 const IMPORT_HINTS: Readonly<Record<ImportKind, string>> = {
   PROSPECTS:
-    'Banque et Syndicat se choisissent dans les listes déroulantes du modèle : leur croisement détermine le segment BDD. Ce fichier ne crée aucun représentant, importez-les d’abord.',
+    'Banque et Syndicat se choisissent dans les listes déroulantes du modèle : leur croisement détermine le groupe (BDD1 à BDD4). Ce fichier ne crée aucun représentant, importez-les d’abord.',
   PROSPECTS_GRAND_PUBLIC:
     'Seuls le nom et le téléphone sont exigés : profession, syndicat, banque, durée du système et canal de provenance peuvent rester vides. Les colonnes sont retrouvées par le texte de leur en-tête, pas par leur rang.',
   REPRESENTANTS:
@@ -407,13 +407,23 @@ export function ImportsView() {
         />
       )}
 
-      <History
-        selectedId={jobId}
-        onOpen={(opened) => {
-          queryClient.setQueryData(queryKeys.importJob(opened.id), opened);
-          setJobId(opened.id);
-        }}
-      />
+      {/* L'historique se consulte APRÈS coup, et rarement : replié, il laisse
+          l'écran à son seul geste, déposer un classeur. */}
+      <details>
+        <summary className="flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-md text-[0.9375rem] font-[600] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+          <HistoryIcon className="size-4 shrink-0" aria-hidden="true" />
+          Imports précédents
+        </summary>
+        <div className="pt-3">
+          <History
+            selectedId={jobId}
+            onOpen={(opened) => {
+              queryClient.setQueryData(queryKeys.importJob(opened.id), opened);
+              setJobId(opened.id);
+            }}
+          />
+        </div>
+      </details>
 
       <ApplyDialog
         job={confirming && job !== undefined ? job : null}
@@ -694,135 +704,147 @@ function History({
 
   return (
     <Card>
+      {/* Pas de titre ici : le repli « Imports précédents » qui ouvre cette
+          carte en tient lieu. */}
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-[1.0625rem]">
-          <HistoryIcon className="size-4" aria-hidden="true" />
-          Historique
-        </CardTitle>
         <CardDescription>
           Un travail « échu » n’a pas échoué : son classeur et son rapport ont passé leur échéance.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4 p-0">
-        {shouldShowError({ isError: history.isError, hasData: data !== undefined }) ? (
-          <div className="px-5">
-            <QueryErrorInline
-              error={history.error}
-              onRetry={() => {
-                void history.refetch();
-              }}
-              fallback="L’historique des imports n’a pas pu être chargé."
-            />
-          </div>
-        ) : shouldShowSkeleton({ isPending: history.isPending, hasData: data !== undefined }) ? (
-          <div className="flex flex-col gap-2 px-5">
-            {[0, 1, 2].map((row) => (
-              <Skeleton key={row} className="h-11 w-full" />
-            ))}
-          </div>
-        ) : data === undefined || data.items.length === 0 ? (
-          <div className="px-5">
-            <EmptyState
-              icon={HistoryIcon}
-              title="Aucun import"
-              description="Déposez un classeur ci-dessus : les travaux apparaîtront ici avec leur rapport."
-            />
-          </div>
-        ) : (
-          <>
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>Fichier</TableHead>
-                  <TableHead>Entité</TableHead>
-                  <TableHead>État</TableHead>
-                  <TableHead className="text-right">Créées</TableHead>
-                  <TableHead className="text-right">Ignorées</TableHead>
-                  <TableHead className="text-right">Erreurs</TableHead>
-                  <TableHead>Déposé le</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.items.map((row) => (
-                  <TableRow
-                    key={row.id}
-                    data-state={row.id === selectedId ? 'selected' : undefined}
-                  >
-                    <TableCell className="max-w-56 truncate font-[600]">{row.fileName}</TableCell>
-                    <TableCell>{IMPORT_KIND_LABELS[row.kind]}</TableCell>
-                    <TableCell>
-                      <Badge variant={statusTone(row)}>{statusLabel(row)}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-success">
-                      {formatNumber(row.createdRows)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
-                      {formatNumber(row.skippedRows)}
-                    </TableCell>
-                    <TableCell
-                      className={cn(
-                        'text-right tabular-nums',
-                        row.errorRows > 0 ? 'text-destructive' : 'text-muted-foreground',
-                      )}
-                    >
-                      {formatNumber(row.errorRows)}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {formatDateTime(row.createdAt)}
-                    </TableCell>
-                    <TableCell className="text-right">
+        {(() => {
+          if (shouldShowError({ isError: history.isError, hasData: data !== undefined }))
+            return (
+              <div className="px-5">
+                <QueryErrorInline
+                  error={history.error}
+                  onRetry={() => {
+                    void history.refetch();
+                  }}
+                  fallback="L’historique des imports n’a pas pu être chargé."
+                />
+              </div>
+            );
+          return (() => {
+            if (shouldShowSkeleton({ isPending: history.isPending, hasData: data !== undefined }))
+              return (
+                <div className="flex flex-col gap-2 px-5">
+                  {[0, 1, 2].map((row) => (
+                    <Skeleton key={row} className="h-11 w-full" />
+                  ))}
+                </div>
+              );
+            return (() => {
+              if (data === undefined || data.items.length === 0)
+                return (
+                  <div className="px-5">
+                    <EmptyState
+                      icon={HistoryIcon}
+                      title="Aucun import"
+                      description="Déposez un classeur ci-dessus : les travaux apparaîtront ici avec leur rapport."
+                    />
+                  </div>
+                );
+              return (
+                <>
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead>Fichier</TableHead>
+                        <TableHead>Entité</TableHead>
+                        <TableHead>État</TableHead>
+                        <TableHead className="text-right">Créées</TableHead>
+                        <TableHead className="text-right">Ignorées</TableHead>
+                        <TableHead className="text-right">Erreurs</TableHead>
+                        <TableHead>Déposé le</TableHead>
+                        <TableHead />
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {data.items.map((row) => (
+                        <TableRow
+                          key={row.id}
+                          data-state={row.id === selectedId ? 'selected' : undefined}
+                        >
+                          <TableCell className="max-w-56 truncate font-[600]">
+                            {row.fileName}
+                          </TableCell>
+                          <TableCell>{IMPORT_KIND_LABELS[row.kind]}</TableCell>
+                          <TableCell>
+                            <Badge variant={statusTone(row)}>{statusLabel(row)}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums text-success">
+                            {formatNumber(row.createdRows)}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums text-muted-foreground">
+                            {formatNumber(row.skippedRows)}
+                          </TableCell>
+                          <TableCell
+                            className={cn(
+                              'text-right tabular-nums',
+                              row.errorRows > 0 ? 'text-destructive' : 'text-muted-foreground',
+                            )}
+                          >
+                            {formatNumber(row.errorRows)}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-muted-foreground">
+                            {formatDateTime(row.createdAt)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                onOpen(row);
+                              }}
+                            >
+                              Ouvrir
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+
+                  <div className="flex flex-wrap items-center justify-between gap-3 px-5 pb-1">
+                    <p className="text-[0.8125rem] text-muted-foreground" role="status">
+                      <span className="sr-only">Travaux d’import&nbsp;: </span>
+                      {formatNumber(data.total)} travail{data.total > 1 ? 'x' : ''}
+                    </p>
+                    <div className="flex items-center gap-1">
                       <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
+                        variant="outline"
+                        size="icon"
+                        aria-label="Page précédente"
+                        disabled={data.page <= 1}
                         onClick={() => {
-                          onOpen(row);
+                          setPage(data.page - 1);
                         }}
                       >
-                        Ouvrir
+                        <ChevronLeftIcon className="size-4" aria-hidden="true" />
                       </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-
-            <div className="flex flex-wrap items-center justify-between gap-3 px-5 pb-1">
-              <p className="text-[0.8125rem] text-muted-foreground" role="status">
-                <span className="sr-only">Travaux d’import&nbsp;: </span>
-                {formatNumber(data.total)} travail{data.total > 1 ? 'x' : ''}
-              </p>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  aria-label="Page précédente"
-                  disabled={data.page <= 1}
-                  onClick={() => {
-                    setPage(data.page - 1);
-                  }}
-                >
-                  <ChevronLeftIcon className="size-4" aria-hidden="true" />
-                </Button>
-                <span className="min-w-20 text-center text-[0.8125rem] tabular-nums">
-                  {data.page} / {Math.max(1, data.pageCount)}
-                </span>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  aria-label="Page suivante"
-                  disabled={data.page >= data.pageCount}
-                  onClick={() => {
-                    setPage(data.page + 1);
-                  }}
-                >
-                  <ChevronRightIcon className="size-4" aria-hidden="true" />
-                </Button>
-              </div>
-            </div>
-          </>
-        )}
+                      <span className="min-w-20 text-center text-[0.8125rem] tabular-nums">
+                        {data.page} / {Math.max(1, data.pageCount)}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        aria-label="Page suivante"
+                        disabled={data.page >= data.pageCount}
+                        onClick={() => {
+                          setPage(data.page + 1);
+                        }}
+                      >
+                        <ChevronRightIcon className="size-4" aria-hidden="true" />
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              );
+            })();
+          })();
+        })()}
       </CardContent>
     </Card>
   );

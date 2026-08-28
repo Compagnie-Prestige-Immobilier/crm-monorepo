@@ -45,10 +45,11 @@ describe('frontières de route', () => {
   });
 
   /**
-   * Les seules pages du panel sans titre : les racines de coque, qui ne
-   * rendent rien et redirigent vers le premier écran du rôle.
+   * La seule page du panel sans titre : la racine de la coque Admin, qui ne
+   * rend rien et redirige vers le premier écran du rôle. Celle de CHUES porte
+   * désormais l'écran des trois étapes, donc son propre titre.
    */
-  const SANS_TITRE = new Set(['(panel)/chues/page.tsx', '(panel)/admin/page.tsx']);
+  const SANS_TITRE = new Set(['(panel)/admin/page.tsx']);
 
   /** Déclaré sur place, ou repris d'un écran réexporté. */
   const PORTE_UN_TITRE =

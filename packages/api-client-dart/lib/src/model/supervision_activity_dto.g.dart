@@ -19,6 +19,14 @@ abstract class _$SupervisionActivityDtoCWProxy {
     List<SupervisionTeleconseillerDto> teleconseillers,
   );
 
+  SupervisionActivityDto prospectsByTeleconseiller(
+    List<SupervisionHistogramBarDto> prospectsByTeleconseiller,
+  );
+
+  SupervisionActivityDto prospectsByRepresentant(
+    List<SupervisionHistogramBarDto> prospectsByRepresentant,
+  );
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SupervisionActivityDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -31,6 +39,8 @@ abstract class _$SupervisionActivityDtoCWProxy {
     SupervisionGranularity granularity,
     List<SupervisionActivityRowDto> items,
     List<SupervisionTeleconseillerDto> teleconseillers,
+    List<SupervisionHistogramBarDto> prospectsByTeleconseiller,
+    List<SupervisionHistogramBarDto> prospectsByRepresentant,
   });
 }
 
@@ -61,6 +71,16 @@ class _$SupervisionActivityDtoCWProxyImpl
   ) => this(teleconseillers: teleconseillers);
 
   @override
+  SupervisionActivityDto prospectsByTeleconseiller(
+    List<SupervisionHistogramBarDto> prospectsByTeleconseiller,
+  ) => this(prospectsByTeleconseiller: prospectsByTeleconseiller);
+
+  @override
+  SupervisionActivityDto prospectsByRepresentant(
+    List<SupervisionHistogramBarDto> prospectsByRepresentant,
+  ) => this(prospectsByRepresentant: prospectsByRepresentant);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SupervisionActivityDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -73,6 +93,8 @@ class _$SupervisionActivityDtoCWProxyImpl
     Object? granularity = const $CopyWithPlaceholder(),
     Object? items = const $CopyWithPlaceholder(),
     Object? teleconseillers = const $CopyWithPlaceholder(),
+    Object? prospectsByTeleconseiller = const $CopyWithPlaceholder(),
+    Object? prospectsByRepresentant = const $CopyWithPlaceholder(),
   }) {
     return SupervisionActivityDto(
       from: from == const $CopyWithPlaceholder()
@@ -95,6 +117,16 @@ class _$SupervisionActivityDtoCWProxyImpl
           ? _value.teleconseillers
           // ignore: cast_nullable_to_non_nullable
           : teleconseillers as List<SupervisionTeleconseillerDto>,
+      prospectsByTeleconseiller:
+          prospectsByTeleconseiller == const $CopyWithPlaceholder()
+          ? _value.prospectsByTeleconseiller
+          // ignore: cast_nullable_to_non_nullable
+          : prospectsByTeleconseiller as List<SupervisionHistogramBarDto>,
+      prospectsByRepresentant:
+          prospectsByRepresentant == const $CopyWithPlaceholder()
+          ? _value.prospectsByRepresentant
+          // ignore: cast_nullable_to_non_nullable
+          : prospectsByRepresentant as List<SupervisionHistogramBarDto>,
     );
   }
 }
@@ -121,6 +153,8 @@ SupervisionActivityDto _$SupervisionActivityDtoFromJson(
       'granularity',
       'items',
       'teleconseillers',
+      'prospectsByTeleconseiller',
+      'prospectsByRepresentant',
     ],
   );
   final val = SupervisionActivityDto(
@@ -159,6 +193,24 @@ SupervisionActivityDto _$SupervisionActivityDtoFromJson(
           )
           .toList(),
     ),
+    prospectsByTeleconseiller: $checkedConvert(
+      'prospectsByTeleconseiller',
+      (v) => (v as List<dynamic>)
+          .map(
+            (e) =>
+                SupervisionHistogramBarDto.fromJson(e as Map<String, dynamic>),
+          )
+          .toList(),
+    ),
+    prospectsByRepresentant: $checkedConvert(
+      'prospectsByRepresentant',
+      (v) => (v as List<dynamic>)
+          .map(
+            (e) =>
+                SupervisionHistogramBarDto.fromJson(e as Map<String, dynamic>),
+          )
+          .toList(),
+    ),
   );
   return val;
 });
@@ -171,6 +223,12 @@ Map<String, dynamic> _$SupervisionActivityDtoToJson(
   'granularity': _$SupervisionGranularityEnumMap[instance.granularity]!,
   'items': instance.items.map((e) => e.toJson()).toList(),
   'teleconseillers': instance.teleconseillers.map((e) => e.toJson()).toList(),
+  'prospectsByTeleconseiller': instance.prospectsByTeleconseiller
+      .map((e) => e.toJson())
+      .toList(),
+  'prospectsByRepresentant': instance.prospectsByRepresentant
+      .map((e) => e.toJson())
+      .toList(),
 };
 
 const _$SupervisionGranularityEnumMap = {

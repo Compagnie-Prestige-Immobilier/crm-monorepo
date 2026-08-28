@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:forui/forui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
-import '../../core/theme/cpi_colors.dart';
 import '../../core/theme/cpi_tokens.dart';
+import 'cpi_forui.dart';
+import 'cpi_kit.dart';
 
 /// Le bandeau de reprise d'un brouillon, deux copies quasi identiques avant
 /// cette extraction.
@@ -20,45 +22,43 @@ class CpiResumeBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final CpiColors cpi = context.cpi;
     final String who = (label == null || label!.isEmpty) ? 'la saisie' : label!;
-    return Container(
-      width: double.infinity,
-      color: cpi.infoSurface,
-      padding: const EdgeInsets.symmetric(
-        horizontal: CpiSpacing.md,
-        vertical: CpiSpacing.xs,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return CpiForui(
+      builder: (BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: CpiSpacing.md,
+          vertical: CpiSpacing.xs,
+        ),
+        child: FAlert(
+          style: const FAlertStyleDelta.delta(
+            padding: EdgeInsetsGeometryDelta.value(
+              EdgeInsets.all(CpiSpacing.sm),
+            ),
+          ),
+          icon: const Icon(PhosphorIconsRegular.arrowCounterClockwise),
+          // Corps de texte et non titre : le bandeau coiffe un formulaire, il
+          // ne doit pas lui prendre sa place à 1,76x.
+          title: Text(
+            'Saisie non terminée : $who',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          // Les deux issues vivent dans le bandeau : reprendre est le geste
+          // attendu, supprimer reste offert mais en retrait. Le `Wrap` les
+          // empile plutôt que de rogner un libellé à 1,76x.
+          subtitle: Wrap(
+            spacing: CpiSpacing.xs,
+            runSpacing: CpiSpacing.xxs,
             children: <Widget>[
-              Icon(
-                PhosphorIconsRegular.arrowCounterClockwise,
-                size: CpiIconSize.sm,
-                color: cpi.info,
-              ),
-              const SizedBox(width: CpiSpacing.xs),
-              Expanded(
-                child: Text(
-                  'Saisie non terminée : $who',
-                  style: theme.textTheme.bodySmall?.copyWith(color: cpi.info),
-                ),
+              CpiButton('Reprendre', onPressed: onResume, expand: false),
+              CpiButton(
+                'Supprimer',
+                variant: CpiButtonVariant.ghost,
+                onPressed: onDiscard,
+                expand: false,
               ),
             ],
           ),
-          Wrap(
-            alignment: WrapAlignment.end,
-            children: <Widget>[
-              TextButton(onPressed: onResume, child: const Text('Reprendre')),
-              TextButton(onPressed: onDiscard, child: const Text('Supprimer')),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }

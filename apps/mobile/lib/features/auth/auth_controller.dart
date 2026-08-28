@@ -142,7 +142,17 @@ class AuthController extends Notifier<AuthState> {
     state = const AuthState.signedOut();
   }
 
-  static String _messageFor(ApiException e) => switch (e.code) {
+  static String _messageFor(ApiException e) {
+    // Le serveur renvoie le nom de sa classe d'exception (« ThrottlerException:
+    // Too Many Requests ») : personne ne doit lire ça sur un écran de connexion.
+    if (e.kind == FailureKind.throttled || e.statusCode == 429) {
+      return 'Trop d\'essais de connexion. Attendez une minute, puis '
+          'réessayez.';
+    }
+    return _messageParCode(e);
+  }
+
+  static String _messageParCode(ApiException e) => switch (e.code) {
     'invalid_credentials' => 'Identifiant ou mot de passe incorrect.',
     'account_disabled' =>
       'Ce compte est désactivé. Contactez votre responsable.',

@@ -12,6 +12,11 @@ import { AA_LARGE, AA_TEXT, ratio, relativeLuminance, parseHex } from '@/lib/con
  */
 const CSS = readFileSync(fileURLToPath(new URL('../../app/globals.css', import.meta.url)), 'utf8');
 
+const SIDEBAR_NAV = readFileSync(
+  fileURLToPath(new URL('./sidebar-nav.tsx', import.meta.url)),
+  'utf8',
+);
+
 function block(selector: string): Record<string, string> {
   const start = CSS.indexOf(selector);
   expect(start, `sélecteur absent de globals.css : ${selector}`).toBeGreaterThan(-1);
@@ -105,6 +110,36 @@ describe.each([
   it('n’emprunte pas l’or de CPI', () => {
     for (const role of ['accent', 'accent-text', 'accent-border', 'accent-on-dark']) {
       expect(String(tokens[role]).toLowerCase(), role).not.toBe('#c8921a');
+    }
+  });
+});
+
+/**
+ * Le repère de l'entrée courante, LU DANS LE COMPOSANT.
+ *
+ * L'entrée active ne peut pas se signaler par la seule couleur du texte : elle
+ * porte un filet vertical, qui doit lui-même se voir. Le token est extrait de
+ * la classe plutôt que recopié, sinon le test survivrait au retour d'un bleu
+ * illisible sur le noir de la coque.
+ */
+describe('filet de l’entrée courante', () => {
+  const token = /before:bg-([\w-]+)/u.exec(SIDEBAR_NAV)?.[1];
+
+  it('existe, et ne repose pas sur la couleur du texte seule', () => {
+    expect(token).toBeDefined();
+    expect(SIDEBAR_NAV).toContain("aria-current={isActive ? 'page' : undefined}");
+  });
+
+  it.each([
+    ['clair', CLAIR],
+    ['sombre', SOMBRE],
+  ])('se détache du fond de la barre en mode %s', (mode, tokens) => {
+    for (const fond of ['sidebar', 'sidebar-accent']) {
+      const mesure = ratio(String(tokens[String(token)]), String(tokens[fond]));
+      expect(
+        mesure,
+        `${mode} · --${String(token)} sur --${fond} : ${String(mesure)}:1`,
+      ).toBeGreaterThanOrEqual(AA_LARGE);
     }
   });
 });

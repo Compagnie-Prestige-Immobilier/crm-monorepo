@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
+import '../theme/forui_theme.dart';
 import 'route_paths.dart';
 
 void popOrHome(BuildContext context, {String fallback = Routes.home}) {
@@ -38,10 +40,28 @@ class CpiBackButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return IconButton(
-      icon: const Icon(PhosphorIconsRegular.arrowLeft),
-      tooltip: tooltip,
-      onPressed: () => popOrHome(context, fallback: fallback),
+    // Sans `container`, la coquille fusionne dans le nœud du `FHeader` : le
+    // bandeau entier se faisait appeler « Retour » et le vrai bouton n'exposait
+    // plus que `focus` (WCAG 4.1.2, 2.4.4).
+    return MergeSemantics(
+      child: Semantics(
+        container: true,
+        button: true,
+        label: tooltip,
+        tooltip: tooltip,
+        onTap: () => popOrHome(context, fallback: fallback),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            minWidth: kCpiHeaderActionSize,
+            minHeight: kCpiHeaderActionSize,
+          ),
+          child: FButton.icon(
+            variant: FButtonVariant.ghost,
+            onPress: () => popOrHome(context, fallback: fallback),
+            child: const Icon(PhosphorIconsRegular.arrowLeft),
+          ),
+        ),
+      ),
     );
   }
 }

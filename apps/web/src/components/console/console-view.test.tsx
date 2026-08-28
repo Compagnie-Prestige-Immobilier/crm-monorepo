@@ -3,8 +3,14 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ConsoleView } from '@/components/console/console-view';
-import { AttemptRefused, type AttemptInput, type Callback } from '@/lib/data/console';
+import {
+  AttemptRefused,
+  type AttemptInput,
+  type Callback,
+  type ConversionDraft,
+} from '@/lib/data/console';
 import type * as ConsoleData from '@/lib/data/console';
+import type * as ReferenceData from '@/lib/data/reference';
 import type { CallOutcome, ProspectRow } from '@/lib/types';
 import { renderWithQuery } from '@/test/render-query';
 import { routerMock, setUrl } from '@/test/router-mock';
@@ -14,7 +20,27 @@ const fetchConsoleCampaigns = vi.fn();
 const fetchCallbacks = vi.fn();
 const pushCallAttempt = vi.fn();
 const fetchRepScriptQueue = vi.fn();
+const fetchBanques = vi.fn();
+const fetchSyndicats = vi.fn();
 const toastError = vi.fn();
+
+const BANQUES = [
+  { id: 'b-1', name: 'CBAO Sénégal', shortName: 'CBAO', isActive: true, sortOrder: 1 },
+  { id: 'b-2', name: 'Banque de l’Habitat', shortName: 'BHS', isActive: true, sortOrder: 2 },
+];
+const SYNDICATS = [
+  { id: 's-1', name: 'SUDES', sigle: 'SUDES', isActive: true, sortOrder: 1 },
+  { id: 's-2', name: 'SAES', sigle: 'SAES', isActive: true, sortOrder: 2 },
+];
+
+vi.mock('@/lib/data/reference', async (importOriginal) => {
+  const actual = await importOriginal<typeof ReferenceData>();
+  return {
+    ...actual,
+    fetchBanques: () => fetchBanques() as unknown,
+    fetchSyndicats: () => fetchSyndicats() as unknown,
+  };
+});
 
 vi.mock('@/lib/data/console', async (importOriginal) => {
   const actual = await importOriginal<typeof ConsoleData>();
@@ -119,6 +145,7 @@ const lastDraft = (): {
   method: string | null;
   comment: string;
   callbackAt?: string | null;
+  conversion?: ConversionDraft;
 } => (pushCallAttempt.mock.calls.at(-1)?.[0] as AttemptInput).draft;
 
 function scheduled(prospectId: string, scheduledAt: string, overdue: boolean): Callback {
@@ -154,6 +181,10 @@ beforeEach(() => {
   pushCallAttempt.mockResolvedValue(undefined);
   fetchRepScriptQueue.mockReset();
   fetchRepScriptQueue.mockResolvedValue({ items: [], total: 0 });
+  fetchBanques.mockReset();
+  fetchBanques.mockResolvedValue(BANQUES);
+  fetchSyndicats.mockReset();
+  fetchSyndicats.mockResolvedValue(SYNDICATS);
   toastError.mockClear();
 });
 
@@ -177,13 +208,15 @@ describe('ConsoleView : file', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Rappel Fiche');
     });
-    expect(screen.getByText('rappel en retard de 2 h')).toBeTruthy();
+    // La fiche jamais appelée passe derrière : elle attend dans le repli.
+    await userEvent.click(screen.getByText(/Suivants à appeler/u));
+    expect(screen.getByRole('button', { name: /Neuve Fiche/u })).toBeTruthy();
   });
 
   it('ne promet une heure que pour les fiches qui en portent une', async () => {
     await renderConsole();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Pourquoi cet ordre' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Pourquoi cet ordre ?' }));
 
     expect(await screen.findByText(/pas une date promise/)).toBeTruthy();
     expect(screen.queryByText(/Aucune échéance de rappel n’existe en base/)).toBeNull();
@@ -213,10 +246,9 @@ describe('ConsoleView : file', () => {
 });
 
 describe('ConsoleView : une touche, une issue', () => {
+  // Les méthodes n'y figurent plus : depuis la phase 3, elles ouvrent les
+  // renseignements de conversion au lieu de partir seules.
   const immediate: readonly [string, CallOutcome, string | null][] = [
-    ['1', 'METHOD_OBTAINED', 'PLATFORM'],
-    ['2', 'METHOD_OBTAINED', 'PHYSICAL'],
-    ['3', 'METHOD_OBTAINED', 'VOICE_OR_ELECTRONIC_MESSAGING'],
     ['4', 'UNREACHABLE', null],
     ['6', 'REFUSED', null],
     ['7', 'WRONG_NUMBER', null],
@@ -246,20 +278,24 @@ describe('ConsoleView : une touche, une issue', () => {
     expect(screen.queryByRole('button', { name: /suivant/i })).toBeNull();
   });
 
-  it('compte la session au fil des envois', async () => {
+  it('enchaîne sur la fiche suivante et le dit, une fois l’appel consigné', async () => {
     await renderConsole();
 
     await userEvent.keyboard('1');
+    await userEvent.click(await screen.findByRole('button', { name: /Enregistrer l’adhésion/ }));
+
     await waitFor(() => {
-      expect(screen.getByText(/1 appel consigné · 1 méthode/)).toBeTruthy();
+      expect(screen.getByRole('status').textContent).toBe('Enregistré. Personne suivante.');
     });
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Rappel Fiche');
   });
 
   it('chaque touche est doublée d’un bouton qui porte son chiffre', async () => {
     await renderConsole();
 
-    for (const key of ['1', '2', '3', '4', '5', '6', '7', '8']) {
-      expect(screen.getByText(key, { selector: 'kbd' })).toBeTruthy();
+    const fiche = within(screen.getByRole('region', { name: 'Fiche courante' }));
+    for (const key of ['1', '2', '3', '4', '5', '6', '7', '8', '9']) {
+      expect(fiche.getByText(key, { selector: 'kbd' })).toBeTruthy();
     }
   });
 
@@ -355,6 +391,221 @@ describe('ConsoleView : échéance du rappel', () => {
       expect(pushCallAttempt).toHaveBeenCalledTimes(1);
     });
     expect(lastDraft().callbackAt).toBeNull();
+  });
+});
+
+describe('ConsoleView : phase 3 · Conversion', () => {
+  const lastConversion = (): ConversionDraft | undefined => lastDraft().conversion;
+
+  const submit = async (): Promise<void> => {
+    await userEvent.click(screen.getByRole('button', { name: /Enregistrer l’adhésion/ }));
+  };
+
+  const RENSEIGNE = prospect({
+    id: 'p-1',
+    nom: 'Neuve',
+    prenom: 'Fiche',
+    profession: 'Instituteur',
+    banqueId: 'b-1',
+    syndicatId: 's-1',
+  });
+
+  it('la méthode ouvre les renseignements au lieu d’envoyer l’appel', async () => {
+    await renderConsole();
+
+    await userEvent.keyboard('1');
+
+    expect(await screen.findByText('Phase 3 · Conversion')).toBeTruthy();
+    expect(pushCallAttempt).not.toHaveBeenCalled();
+  });
+
+  it('demande les onze renseignements, dans l’ordre du script', async () => {
+    await renderConsole();
+
+    await userEvent.keyboard('1');
+    await screen.findByText('Phase 3 · Conversion');
+
+    for (const label of [
+      /^Nom/,
+      /^Prénom/,
+      /^Téléphone/,
+      /^E-mail/,
+      /^Profession/,
+      /Durée dans l’établissement/,
+    ]) {
+      expect(screen.getByLabelText(label)).toBeTruthy();
+    }
+    for (const groupe of ['Fonctionnaire', 'Engagement en cours à la banque']) {
+      expect(screen.getByRole('group', { name: groupe })).toBeTruthy();
+    }
+    for (const liste of [/Syndicat/, /Banque/]) {
+      expect(screen.getByRole('combobox', { name: liste })).toBeTruthy();
+    }
+    expect(screen.getByRole('radio', { name: 'Prise de rendez-vous' })).toBeTruthy();
+    expect(screen.getByLabelText(/Commentaire/)).toBeTruthy();
+  });
+
+  it('le téléphone se lit, il ne se corrige pas depuis un appel', async () => {
+    await renderConsole();
+
+    await userEvent.keyboard('1');
+
+    expect(await screen.findByLabelText(/^Téléphone/)).toHaveProperty('readOnly', true);
+  });
+
+  it('s’ouvre rempli de ce que la fiche sait déjà', async () => {
+    await renderConsole([RENSEIGNE]);
+
+    await userEvent.keyboard('1');
+
+    expect(await screen.findByLabelText(/^Nom/)).toHaveProperty('value', 'Neuve');
+    expect(screen.getByLabelText(/^Prénom/)).toHaveProperty('value', 'Fiche');
+    expect(screen.getByLabelText(/^Profession/)).toHaveProperty('value', 'Instituteur');
+    expect(screen.getByRole('combobox', { name: /Banque/ }).textContent).toContain('CBAO');
+    expect(screen.getByRole('combobox', { name: /Syndicat/ }).textContent).toContain('SUDES');
+  });
+
+  it('envoie tous les renseignements avec l’appel', async () => {
+    await renderConsole([RENSEIGNE]);
+
+    await userEvent.keyboard('1');
+    await userEvent.type(await screen.findByLabelText(/^E-mail/), 'neuve@example.sn');
+    await userEvent.type(screen.getByLabelText(/Durée dans l’établissement/), '36');
+    await userEvent.click(
+      within(screen.getByRole('group', { name: 'Fonctionnaire' })).getByRole('radio', {
+        name: 'Oui',
+      }),
+    );
+    await userEvent.click(
+      within(screen.getByRole('group', { name: /Engagement en cours/ })).getByRole('radio', {
+        name: 'Non',
+      }),
+    );
+    await userEvent.type(screen.getByLabelText(/Commentaire/), 'adhésion confirmée');
+    await submit();
+
+    await waitFor(() => {
+      expect(pushCallAttempt).toHaveBeenCalledTimes(1);
+    });
+    expect(lastDraft()).toMatchObject({
+      outcome: 'METHOD_OBTAINED',
+      method: 'PLATFORM',
+      comment: 'adhésion confirmée',
+    });
+    expect(lastConversion()).toMatchObject({
+      nom: 'Neuve',
+      prenom: 'Fiche',
+      email: 'neuve@example.sn',
+      profession: 'Instituteur',
+      dureeEtablissementMois: '36',
+      fonctionnaire: true,
+      engagementEnCours: false,
+      banqueId: 'b-1',
+      syndicatId: 's-1',
+      method: 'PLATFORM',
+    });
+  });
+
+  it('laisse « non demandé » quand la question n’a pas été posée', async () => {
+    await renderConsole([RENSEIGNE]);
+
+    await userEvent.keyboard('1');
+    await screen.findByText('Phase 3 · Conversion');
+    await submit();
+
+    await waitFor(() => {
+      expect(pushCallAttempt).toHaveBeenCalledTimes(1);
+    });
+    expect(lastConversion()?.fonctionnaire).toBeNull();
+    expect(lastConversion()?.engagementEnCours).toBeNull();
+  });
+
+  it('la prise de rendez-vous réclame sa date, et ne part pas sans elle', async () => {
+    await renderConsole([RENSEIGNE]);
+
+    await userEvent.keyboard('9');
+    await submit();
+
+    expect(await screen.findByText(/exige la date du rendez-vous/)).toBeTruthy();
+    expect(pushCallAttempt).not.toHaveBeenCalled();
+  });
+
+  it('consigne la date du rendez-vous à l’heure de Dakar', async () => {
+    await renderConsole([RENSEIGNE]);
+
+    await userEvent.keyboard('9');
+    await userEvent.type(await screen.findByLabelText(/Date du rendez-vous/), '2027-03-04T11:30');
+    await submit();
+
+    await waitFor(() => {
+      expect(pushCallAttempt).toHaveBeenCalledTimes(1);
+    });
+    expect(lastDraft().method).toBe('APPOINTMENT');
+    expect(lastConversion()?.rendezVousAt).toBe('2027-03-04T11:30');
+  });
+
+  it('change de méthode sans laisser traîner la date du rendez-vous', async () => {
+    await renderConsole([RENSEIGNE]);
+
+    await userEvent.keyboard('9');
+    await userEvent.type(await screen.findByLabelText(/Date du rendez-vous/), '2027-03-04T11:30');
+    await userEvent.click(screen.getByRole('radio', { name: 'Plateforme' }));
+    await submit();
+
+    await waitFor(() => {
+      expect(pushCallAttempt).toHaveBeenCalledTimes(1);
+    });
+    expect(lastConversion()?.rendezVousAt).toBe('');
+  });
+
+  it('refuse une adresse qui n’en est pas une, avant d’appeler le serveur', async () => {
+    await renderConsole([RENSEIGNE]);
+
+    await userEvent.keyboard('1');
+    await userEvent.type(await screen.findByLabelText(/^E-mail/), 'neuve');
+    await submit();
+
+    expect(await screen.findByText(/adresse électronique n’en est pas une/)).toBeTruthy();
+    expect(pushCallAttempt).not.toHaveBeenCalled();
+  });
+
+  it('pose le refus du serveur sous le champ qu’il vise', async () => {
+    pushCallAttempt.mockRejectedValue(
+      new AttemptRefused('PHASE2_DUREE_ETABLISSEMENT_INVALID', 'Durée refusée.'),
+    );
+    await renderConsole([RENSEIGNE]);
+
+    await userEvent.keyboard('1');
+    await screen.findByText('Phase 3 · Conversion');
+    await submit();
+
+    const message = await screen.findByText(/mois entiers, de 0 à 600/);
+    expect(
+      screen.getByLabelText(/Durée dans l’établissement/).getAttribute('aria-describedby'),
+    ).toContain(message.id);
+  });
+
+  it('Échap referme les renseignements sans rien consigner', async () => {
+    await renderConsole([RENSEIGNE]);
+
+    await userEvent.keyboard('1');
+    await screen.findByText('Phase 3 · Conversion');
+    await userEvent.keyboard('{Escape}');
+
+    expect(screen.queryByText('Phase 3 · Conversion')).toBeNull();
+    expect(screen.getByRole('button', { name: /Injoignable/ })).toBeTruthy();
+    expect(pushCallAttempt).not.toHaveBeenCalled();
+  });
+
+  it('rend les chiffres inertes tant que les renseignements sont ouverts', async () => {
+    await renderConsole([RENSEIGNE]);
+
+    await userEvent.keyboard('1');
+    await screen.findByText('Phase 3 · Conversion');
+    await userEvent.keyboard('4');
+
+    expect(pushCallAttempt).not.toHaveBeenCalled();
+    expect(screen.getByText('Phase 3 · Conversion')).toBeTruthy();
   });
 });
 
@@ -497,31 +748,102 @@ describe('ConsoleView : navigation et raccourcis annexes', () => {
     expect(routerMock.push).toHaveBeenCalledWith('/chues/representants/r-9');
   });
 
-  it('affiche la carte clavier sur ?', async () => {
+  it('garde la carte clavier repliée en pied d’écran, dépliable sur ?', async () => {
     await renderConsole();
 
-    expect(screen.queryByText('Copier le numéro')).toBeNull();
+    const carte = (): HTMLDetailsElement | null =>
+      screen.getByText(/Carte clavier/u).closest('details');
+    expect(carte()?.open).toBe(false);
 
     await userEvent.keyboard('?');
 
+    expect(carte()?.open).toBe(true);
     expect(screen.getByText('Copier le numéro')).toBeTruthy();
   });
 });
 
-describe('ConsoleView : les deux volets', () => {
-  it('ouvre sur les prospects, sans appeler la file des représentants', async () => {
+describe('ConsoleView : une seule file', () => {
+  it('appelle les prospects, sans jamais toucher à la file des représentants', async () => {
     await renderConsole();
 
     expect(screen.getByRole('button', { name: /Injoignable/ })).toBeTruthy();
     expect(fetchRepScriptQueue).not.toHaveBeenCalled();
   });
 
-  it('bascule vers le script représentant sur M', async () => {
+  it('n’a plus de volet caché derrière M : l’écran ne change pas de nature', async () => {
     await renderConsole();
 
     await userEvent.keyboard('m');
 
-    expect(await screen.findByRole('region', { name: 'File des représentants' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /Injoignable/ })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'File des représentants' })).toBeNull();
+    expect(screen.getByRole('button', { name: /Injoignable/ })).toBeTruthy();
+    expect(fetchRepScriptQueue).not.toHaveBeenCalled();
+  });
+});
+
+/** Rien à appeler : l'écran ne garde que ce qui décrit quelque chose de réel. */
+describe('ConsoleView : file vide', () => {
+  async function renderVide(): Promise<void> {
+    serve([]);
+    renderWithQuery(<ConsoleView />);
+    await screen.findByText('Aucun prospect à appeler pour l’instant.');
+  }
+
+  it('ne propose que les deux gestes qui refont une file', async () => {
+    await renderVide();
+
+    expect(screen.getByRole('link', { name: 'Ajouter un prospect' }).getAttribute('href')).toBe(
+      '/chues/prospects/nouveau',
+    );
+    expect(
+      screen.getByRole('link', { name: 'Qualifier un représentant' }).getAttribute('href'),
+    ).toBe('/chues/appels-representants');
+  });
+
+  it('ne décrit ni fiche ni file, puisqu’il n’y en a pas', async () => {
+    await renderVide();
+
+    expect(screen.queryByText(/à traiter/u)).toBeNull();
+    expect(screen.queryByText('Pourquoi cet ordre ?')).toBeNull();
+    expect(screen.queryByText('Dernier appel')).toBeNull();
+    expect(screen.queryByText('Session')).toBeNull();
+    expect(screen.queryByText('Carte clavier')).toBeNull();
+    expect(screen.queryByRole('region', { name: 'File d’appel' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Contexte' })).toBeNull();
+  });
+
+  it('rend la fiche, sans rail ni compteur, dès qu’une personne attend', async () => {
+    await renderConsole([NEUVE]);
+
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Neuve Fiche');
+    expect(screen.queryByRole('region', { name: 'File d’appel' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Contexte' })).toBeNull();
+    expect(screen.queryByText(/à traiter/u)).toBeNull();
+    // Seule fiche en file : rien à replier derrière « Suivants à appeler ».
+    expect(screen.queryByText(/Suivants à appeler/u)).toBeNull();
+  });
+});
+
+/** Une fiche à la fois : la file et l'ordre se déroulent à la demande. */
+describe('ConsoleView : une seule colonne', () => {
+  it('replie les suivants derrière une ligne, avec l’ordre et la campagne', async () => {
+    await renderConsole();
+
+    const repli = screen.getByText(/Suivants à appeler/u);
+    expect(repli.textContent).toBe('Suivants à appeler · 1');
+    expect(repli.closest('details')?.open).toBe(false);
+
+    await userEvent.click(repli);
+
+    expect(repli.closest('details')?.open).toBe(true);
+    expect(screen.getByRole('button', { name: 'Pourquoi cet ordre ?' })).toBeTruthy();
+  });
+
+  it('pose le contexte de l’appel sous le numéro, en lignes grises', async () => {
+    await renderConsole([NEUVE]);
+
+    const fiche = within(screen.getByRole('region', { name: 'Fiche courante' }));
+    expect(fiche.getByText(/Représentant Aminata Ndiaye/u)).toBeTruthy();
+    expect(fiche.getByText('Jamais appelée.')).toBeTruthy();
   });
 });

@@ -67,6 +67,36 @@ void main() {
         );
   }
 
+  /// Une fiche Grand Public : aucun représentant, aucune banque, aucun
+  /// syndicat. C'est ce qui la distingue d'une fiche CHUES.
+  Future<void> seedFicheGrandPublic({
+    String id = 'gp-1',
+    String phone = '+221780000001',
+  }) async {
+    await db
+        .into(db.prospects)
+        .insert(
+          ProspectsCompanion.insert(
+            id: id,
+            nom: 'Ndiaye',
+            prenom: 'Awa',
+            phoneE164: phone,
+            projet: const Value<String>('GRAND_PUBLIC'),
+            createdById: 'me',
+            clientCreatedAt: t0,
+            localUpdatedAt: t0,
+          ),
+        );
+    await db
+        .into(db.prospectJourneys)
+        .insert(
+          ProspectJourneysCompanion.insert(
+            prospectId: id,
+            projet: 'GRAND_PUBLIC',
+          ),
+        );
+  }
+
   // ───────────────────────────────────────────────────────────────────────────
   // Confidentialité
   // ───────────────────────────────────────────────────────────────────────────
@@ -260,10 +290,46 @@ void main() {
       },
     );
 
-    test('un numéro absent de l\'annuaire ne rend rien', () async {
+    test('un numéro inconnu de l\'appareil ne rend rien', () async {
       await seedDirectory(phone: '+221771234567');
       expect(await directory.lookupByPhone('+221780000000'), isNull);
     });
+
+    // L'annuaire descend PAR PAGES, dans l'ordre des `updated_at` croissants :
+    // une base fraîchement importée : le Grand Public en entier : arrive donc
+    // en DERNIER. La fiche, elle, est déjà sur l'appareil, puisque c'est depuis
+    // sa liste qu'on ouvre « Consigner l'appel ». Sans ce repli, le parcours de
+    // conversion du Grand Public s'arrêtait là, sur « Ce numéro n'est pas dans
+    // la liste », et rien de ce que le téléconseiller pouvait faire n'y
+    // changeait quoi que ce soit.
+    test('une fiche Grand Public que l\'annuaire n\'a pas encore descendue '
+        'se résout quand même', () async {
+      await seedFicheGrandPublic();
+
+      final Phase2DirectoryData? found = await directory.lookupByPhone(
+        '+221780000001',
+      );
+
+      expect(found?.prospectId, 'gp-1');
+      expect(found?.phase2Status, Phase2Statuses.pending);
+    });
+
+    test(
+      'le repli porte l\'issue terminale déjà saisie sur cet appareil',
+      () async {
+        await seedFicheGrandPublic();
+        await writes.recordCallAttempt(
+          prospectId: 'gp-1',
+          outcome: CallOutcomes.refused,
+          createdById: 'me',
+        );
+
+        expect(
+          (await directory.lookupByPhone('+221780000001'))?.phase2Status,
+          Phase2Statuses.refused,
+        );
+      },
+    );
 
     test('la recherche ne touche jamais le réseau', () async {
       await seedDirectory();
@@ -1131,6 +1197,56 @@ void main() {
         data.clientCreatedAt!.toUtc(),
       );
 
+      expect(await db.countPhase2Pending().getSingle(), 0);
+    });
+
+    // Les renseignements de la conversion voyagent par le MÊME `data` typé. Un
+    // champ que le modèle généré laisserait tomber ne se verrait qu'ici : côté
+    // serveur il arriverait simplement absent, et le prospect ne serait jamais
+    // complété.
+    test('les renseignements de la conversion arrivent sur le fil', () async {
+      await seedDirectory(prospectId: 'a', phone: '+221770000001');
+      await writes.recordCallAttempt(
+        prospectId: 'a',
+        outcome: CallOutcomes.methodObtained,
+        method: EnrollmentMethods.appointment,
+        createdById: 'me',
+        nom: 'Sow',
+        prenom: 'Awa',
+        profession: 'Institutrice',
+        banqueId: 'bq-1',
+        syndicatId: 'sy-1',
+        email: 'awa.sow@exemple.sn',
+        fonctionnaire: true,
+        engagementEnCours: false,
+        dureeEtablissementMois: 36,
+        rendezVousAt: DateTime.utc(2026, 8, 13, 15),
+        comment: 'Rendez-vous à l\'inspection.',
+      );
+
+      await engine.drain();
+
+      final SyncOperationDto sent = api.calls.single.operations.single;
+      final SyncEntityDataDto data = sent.data!;
+      expect(data.method, EnrollmentMethod.APPOINTMENT);
+      expect(data.rendezVousAt, DateTime.utc(2026, 8, 13, 15));
+      expect(data.email, 'awa.sow@exemple.sn');
+      expect(data.fonctionnaire, isTrue);
+      expect(data.engagementEnCours, isFalse);
+      expect(data.dureeEtablissementMois, 36);
+      expect(data.nom, 'Sow');
+      expect(data.prenom, 'Awa');
+      expect(data.profession, 'Institutrice');
+      expect(data.banqueId, 'bq-1');
+      expect(data.syndicatId, 'sy-1');
+      expect(data.comment, 'Rendez-vous à l\'inspection.');
+
+      // Le JSON réellement émis : un enum rendu `unknown_default_open_api`
+      // passerait toutes les assertions ci-dessus sur les objets.
+      final Map<String, dynamic> wireData =
+          sent.toJson()['data'] as Map<String, dynamic>;
+      expect(wireData['method'], EnrollmentMethods.appointment);
+      expect(wireData['rendezVousAt'], endsWith('Z'));
       expect(await db.countPhase2Pending().getSingle(), 0);
     });
 

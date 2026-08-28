@@ -6,6 +6,7 @@ import 'package:crm_api_client/crm_api_client.dart';
 import 'package:drift/drift.dart';
 
 import '../../data/local/database.dart';
+import '../../data/repositories/visites_repository.dart';
 import '../utils/ids.dart';
 import 'api_port.dart';
 import 'backoff.dart';
@@ -19,6 +20,8 @@ import 'phase2_directory_sync.dart'
         callAttemptEntity,
         loadCallReasons;
 import 'token_store.dart';
+
+const String repCallAttemptEntity = 'rep_call_attempt';
 
 class SyncEngine {
   SyncEngine({
@@ -143,6 +146,13 @@ class SyncEngine {
         await reclaimExpiredLeases();
         final List<OutboxData> batch = await claimBatch();
         if (batch.isEmpty) break;
+
+        if (batch.first.entityType == repCallAttemptEntity) {
+          final _SendReport report = await _sendRepCallAttempts(batch);
+          acknowledged += report.acknowledged;
+          if (!report.keepGoing) break;
+          continue;
+        }
 
         final _PreparedBatch prepared = await _prepare(batch);
         if (prepared.isEmpty) {
@@ -308,6 +318,11 @@ class SyncEngine {
       for (final OutboxData row in chain) {
         if (row.status != OutboxStatus.pending) break;
         if (row.nextAttemptAt.isAfter(at)) break;
+        if (batch.isNotEmpty &&
+            (row.entityType == repCallAttemptEntity) !=
+                (batch.first.entityType == repCallAttemptEntity)) {
+          return batch;
+        }
 
         final String entity = '${row.entityType}:${row.entityId}';
         if (entitiesInBatch.contains(entity)) break;
@@ -593,6 +608,50 @@ class SyncEngine {
     return _SendReport(acknowledged: acknowledged, keepGoing: true);
   }
 
+  Future<_SendReport> _sendRepCallAttempts(List<OutboxData> rows) async {
+    int acknowledged = 0;
+    for (int index = 0; index < rows.length; index++) {
+      final OutboxData row = rows[index];
+      try {
+        final Object? decoded = jsonDecode(row.payload);
+        if (decoded is! Map<String, dynamic>) {
+          throw const FormatException('payload non objet');
+        }
+        final RepCallAttemptResultDto result = await _api.recordRepCallAttempt(
+          CreateRepCallAttemptDto.fromJson(decoded),
+        );
+        if (result.status == RepCallAttemptApplyStatus.unknownDefaultOpenApi) {
+          throw const FormatException('statut serveur inconnu');
+        }
+        await _markDone(
+          row,
+          SyncOperationResultDto(
+            opId: row.id,
+            status: result.status == RepCallAttemptApplyStatus.applied
+                ? SyncOpStatus.applied
+                : SyncOpStatus.duplicate,
+            entityId: null,
+            rev: null,
+            serverUpdatedAt: null,
+            errorCode: null,
+            error: null,
+          ),
+        );
+        acknowledged++;
+      } on FormatException catch (error) {
+        await _markFailed(
+          row,
+          ClientErrorCodes.payloadSchemaMismatch,
+          error.message,
+        );
+      } on ApiException catch (error) {
+        await _handleBatchFailure(rows.sublist(index), error);
+        return _SendReport(acknowledged: acknowledged, keepGoing: false);
+      }
+    }
+    return _SendReport(acknowledged: acknowledged, keepGoing: true);
+  }
+
   static const Set<String> _conflictCodes = <String>{
     ServerErrorCodes.revConflict,
     ServerErrorCodes.representantPhoneConflict,
@@ -765,7 +824,9 @@ class SyncEngine {
     required int? rev,
   }) async {
     if (rev == null) return;
-    if (entityType == callAttemptEntity) return;
+    if (entityType == callAttemptEntity || entityType == repCallAttemptEntity) {
+      return;
+    }
     await (_db.update(_db.outbox)..where(
           (Outbox o) =>
               o.entityType.equals(entityType) &
@@ -786,7 +847,9 @@ class SyncEngine {
   }) async {
     final bool clearDeletion = op != 'delete';
     if (rev == null && serverUpdatedAt == null && !clearDeletion) return;
-    if (entityType == callAttemptEntity) return;
+    if (entityType == callAttemptEntity || entityType == repCallAttemptEntity) {
+      return;
+    }
     if (entityType == 'representant') {
       await (_db.update(
         _db.representants,
@@ -1132,6 +1195,12 @@ class SyncEngine {
     String? code,
     String? message,
   }) async {
+    // Un groupe annulé sans autre explication : une fiche a pu citer une banque
+    // ou une IEF que le serveur ne connaît plus. Le miroir tranche, et il ne
+    // coûte que trois lectures.
+    if (code == ServerErrorCodes.groupTransactionFailed) {
+      await requestReferentielsMirror();
+    }
     final int blocked = row.blockedAttempts + 1;
     if (blocked >= maxBlockedAttempts) {
       await _markFailed(
@@ -1186,6 +1255,12 @@ class SyncEngine {
         lastErrorMsg: Value<String?>(message),
       ),
     );
+    // Le serveur vient de dire qu'une entrée de liste n'existe plus : les
+    // listes du téléphone sont périmées, et le prochain passage les relit en
+    // entier plutôt que d'attendre qu'elles bougent.
+    if (code == ServerErrorCodes.visiteReferentielUnavailable) {
+      await VisitesRepository(_db).demanderMiroirReferentiels();
+    }
   }
 
   static const String cursorKey = 'all';
@@ -1199,6 +1274,8 @@ class SyncEngine {
       await pullCallOutcomeReasons();
       int applied = 0;
       String? cursor = await readCursor();
+      bool listesBougees = false;
+      bool referentielsBouges = false;
 
       for (int page = 0; page < maxPages; page++) {
         final PullPage result = await _api.pull(
@@ -1207,6 +1284,9 @@ class SyncEngine {
           payloadVersion: payloadVersion,
         );
         applied += await _applyPage(result);
+        listesBougees =
+            listesBougees || result.changes.visiteReferentiels.isNotEmpty;
+        referentielsBouges = referentielsBouges || _referentielsIn(result);
         final bool advanced = await advanceCursor(
           from: cursor,
           to: result.nextCursor,
@@ -1214,10 +1294,37 @@ class SyncEngine {
         cursor = result.nextCursor;
         if (!advanced || !result.hasMore) break;
       }
+      await mirrorVisiteReferentiels(force: listesBougees);
+      await mirrorReferentiels(force: referentielsBouges);
       return applied;
     } finally {
       _pulling = false;
     }
+  }
+
+  /// Les quatre listes de l'accueil redescendent ENTIÈRES, et ce qui n'y est
+  /// plus quitte le téléphone.
+  ///
+  /// Le flux keyset ne dit que ce qui a changé : une base serveur remontée
+  /// réattribue des identifiants neufs aux mêmes intitulés, et l'ancienne
+  /// génération restait pour toujours. Le comptoir voyait chaque société deux
+  /// fois et la visite partait avec un identifiant mort
+  /// (`VISITE_REFERENTIEL_UNAVAILABLE`).
+  ///
+  /// Relu quand le serveur a bougé une entrée, et une fois sur les téléphones
+  /// qui n'ont jamais été mis au miroir — c'est ce qui les soigne sans
+  /// migration. Un échec ne casse pas le pull : les listes restent celles
+  /// d'hier, ce qui vaut mieux que pas de listes.
+  Future<int> mirrorVisiteReferentiels({bool force = false}) async {
+    final VisitesRepository listes = VisitesRepository(_db);
+    if (!force && !await listes.referentielsJamaisMiroites()) return 0;
+    final VisiteReferentielsBundleDto bundle;
+    try {
+      bundle = await _api.pullVisiteReferentiels();
+    } on ApiException {
+      return 0;
+    }
+    return listes.remplacerReferentiels(bundle, maintenant: _clock.now());
   }
 
   /// Le référentiel des motifs ne voyage PAS par le curseur keyset : il a son
@@ -1304,6 +1411,360 @@ class SyncEngine {
     return open.map((OutboxData o) => o.entityId).toSet();
   }
 
+  /// Le miroir des cinq référentiels de saisie.
+  ///
+  /// Le curseur ne descend que les CHANGEMENTS : une ligne effacée du serveur
+  /// n'y apparaît jamais, et le téléphone la proposerait pour toujours à côté
+  /// de celle qui l'a remplacée. Une base remontée renumérote tout : les deux
+  /// générations cohabitent alors dans le sélecteur, et le serveur refuse la
+  /// saisie qui cite l'ancienne. La liste ENTIÈRE est le seul moyen de savoir
+  /// ce qui existe encore.
+  ///
+  /// Relu quand le serveur a bougé une entrée, et une fois sur les téléphones
+  /// qui n'ont jamais été mis au miroir — c'est ce qui les soigne sans
+  /// migration. Un échec n'interrompt pas le pull : le miroir se refait à la
+  /// synchronisation suivante, alors qu'une page de saisies perdue, elle, ne
+  /// se rattrape pas.
+  Future<int> mirrorReferentiels({bool force = false}) async {
+    if (!force && !await _referentielsJamaisMiroites()) return 0;
+    final ReferentielsSnapshot snapshot;
+    try {
+      snapshot = await _api.pullReferentiels();
+    } on ApiException {
+      return 0;
+    }
+    return _db.transaction(() async {
+      int retired = 0;
+      retired += await _mirrorKind<DepartementDto>(
+        _db.departements,
+        snapshot.departements,
+        (DepartementDto d) => d.id,
+        _upsertDepartement,
+      );
+      retired += await _mirrorKind<IefDto>(
+        _db.iefs,
+        snapshot.iefs,
+        (IefDto i) => i.id,
+        _upsertIef,
+      );
+      retired += await _mirrorKind<BanqueDto>(
+        _db.banques,
+        snapshot.banques,
+        (BanqueDto b) => b.id,
+        _upsertBanque,
+      );
+      retired += await _mirrorKind<SyndicatDto>(
+        _db.syndicats,
+        snapshot.syndicats,
+        (SyndicatDto s) => s.id,
+        _upsertSyndicat,
+      );
+      retired += await _mirrorKind<CanalProvenanceDto>(
+        _db.canauxProvenance,
+        snapshot.canauxProvenance,
+        (CanalProvenanceDto c) => c.id,
+        _upsertCanalProvenance,
+      );
+      // Le marqueur est posé DANS la transaction : une écriture interrompue ne
+      // doit pas laisser croire que le miroir est fait.
+      await _db
+          .into(_db.syncState)
+          .insertOnConflictUpdate(
+            SyncStateCompanion.insert(
+              collection: referentielsMirrorKey,
+              lastPulledAt: Value<DateTime?>(_clock.now()),
+            ),
+          );
+      return retired;
+    });
+  }
+
+  /// Une base remontée réattribue TOUS les identifiants : la page qui la porte
+  /// bouge donc au moins un référentiel, et c'est ce qui déclenche le miroir.
+  static bool _referentielsIn(PullPage page) =>
+      page.changes.departements.isNotEmpty ||
+      page.changes.iefs.isNotEmpty ||
+      page.changes.banques.isNotEmpty ||
+      page.changes.syndicats.isNotEmpty ||
+      page.changes.canauxProvenance.isNotEmpty;
+
+  static const String referentielsMirrorKey = 'referentiels_mirror';
+
+  Future<bool> _referentielsJamaisMiroites() async {
+    final SyncStateData? row =
+        await (_db.select(_db.syncState)..where(
+              (SyncState t) => t.collection.equals(referentielsMirrorKey),
+            ))
+            .getSingleOrNull();
+    return row?.lastPulledAt == null;
+  }
+
+  /// Redemande un miroir au prochain passage : un refus du serveur sur un
+  /// groupe entier dit, entre autres, qu'une fiche a cité un référentiel que le
+  /// serveur ne connaît plus. Le miroir est le seul moyen de le savoir.
+  Future<void> requestReferentielsMirror() async {
+    await (_db.delete(
+      _db.syncState,
+    )..where((SyncState t) => t.collection.equals(referentielsMirrorKey))).go();
+  }
+
+  /// Une liste VIDE ne retire rien : aucun de ces référentiels n'est vide côté
+  /// serveur, et une réponse vide est une anomalie de transport, pas une
+  /// suppression de masse.
+  Future<int> _mirrorKind<D>(
+    TableInfo<Table, Object?> table,
+    List<D> rows,
+    String Function(D) idOf,
+    Future<void> Function(D) upsert,
+  ) async {
+    if (rows.isEmpty) return 0;
+    for (final D row in rows) {
+      await upsert(row);
+    }
+    final List<String> ids = <String>[for (final D row in rows) idOf(row)];
+    final String holes = _holes(ids.length);
+    final List<Variable<Object>> keys = _keys(ids);
+    final int retired = await _db.customUpdate(
+      'UPDATE ${table.actualTableName} SET deleted_at = ? '
+      'WHERE deleted_at IS NULL AND id NOT IN ($holes)',
+      variables: <Variable<Object>>[Variable<DateTime>(_clock.now()), ...keys],
+      updates: <TableInfo<Table, Object?>>{table},
+    );
+    // Une restauration qui rend leurs identifiants aux lignes les ramène : le
+    // miroir doit savoir les rouvrir, sinon elles resteraient invisibles.
+    await _db.customUpdate(
+      'UPDATE ${table.actualTableName} SET deleted_at = NULL '
+      'WHERE deleted_at IS NOT NULL AND id IN ($holes)',
+      variables: keys,
+      updates: <TableInfo<Table, Object?>>{table},
+    );
+    return retired;
+  }
+
+  /// Le numéro identifie la PERSONNE, l'identifiant identifie la LIGNE.
+  ///
+  /// Une base serveur remontée redescend la même personne sous un identifiant
+  /// neuf : l'index unique partiel local refuse alors l'insertion, et c'est la
+  /// transaction de la page entière — donc toute la synchronisation, pour
+  /// toujours — qui s'arrête. La ligne locale que le serveur ne connaît plus
+  /// lui cède donc la place.
+  ///
+  /// Sauf si elle porte des saisies non parties : celles-là ne s'effacent
+  /// jamais. C'est alors la ligne SERVEUR qu'on écarte, et l'envoi rendra son
+  /// propre conflit de téléphone, qui est ce que « À corriger » sait déjà
+  /// montrer et résoudre.
+  ///
+  /// Rend les identifiants ENTRANTS à ne pas appliquer.
+  Future<Set<String>> _retireShadowed(
+    TableInfo<Table, Object?> table,
+    Map<String, String> incoming, {
+    required Set<String> guarded,
+  }) async {
+    if (incoming.isEmpty) return const <String>{};
+    final List<String> phones = incoming.values.toSet().toList(growable: false);
+    final String holes = _holes(phones.length);
+    final List<QueryRow> locals = await _db
+        .customSelect(
+          'SELECT id, phone_e164 FROM ${table.actualTableName} '
+          'WHERE deleted_at IS NULL AND phone_e164 IN ($holes)',
+          variables: _keys(phones),
+          readsFrom: <ResultSetImplementation<dynamic, dynamic>>{table},
+        )
+        .get();
+
+    final Set<String> blocked = <String>{};
+    final List<String> retirable = <String>[];
+    for (final QueryRow row in locals) {
+      final String id = row.read<String>('id');
+      if (incoming.containsKey(id)) continue;
+      if (guarded.contains(id)) {
+        final String phone = row.read<String>('phone_e164');
+        blocked.addAll(incoming.keys.where((String k) => incoming[k] == phone));
+        continue;
+      }
+      retirable.add(id);
+    }
+    if (retirable.isNotEmpty) {
+      await _db.customUpdate(
+        'UPDATE ${table.actualTableName} SET deleted_at = ? '
+        'WHERE id IN (${_holes(retirable.length)})',
+        variables: <Variable<Object>>[
+          Variable<DateTime>(_clock.now()),
+          ..._keys(retirable),
+        ],
+        updates: <TableInfo<Table, Object?>>{table},
+      );
+    }
+    return blocked;
+  }
+
+  static String _holes(int count) => List<String>.filled(count, '?').join(', ');
+
+  static List<Variable<Object>> _keys(List<String> values) =>
+      <Variable<Object>>[for (final String v in values) Variable<String>(v)];
+
+  Future<void> _upsertDepartement(DepartementDto d) async {
+    await _db
+        .into(_db.departements)
+        .insert(
+          DepartementsCompanion.insert(
+            id: d.id,
+            code: d.code,
+            name: d.name,
+            regionId: d.regionId,
+            regionName: Value<String>(d.regionName),
+            isActive: Value<bool>(d.isActive),
+            localUpdatedAt: _clock.now(),
+            serverUpdatedAt: Value<DateTime?>(d.updatedAt),
+          ),
+          onConflict: DoUpdate<Departements, Departement>(
+            (Departements old) => DepartementsCompanion.custom(
+              code: const CustomExpression<String>('excluded.code'),
+              name: const CustomExpression<String>('excluded.name'),
+              regionId: const CustomExpression<String>('excluded.region_id'),
+              regionName: const CustomExpression<String>(
+                'excluded.region_name',
+              ),
+              isActive: const CustomExpression<bool>('excluded.is_active'),
+              serverUpdatedAt: const CustomExpression<DateTime>(
+                'excluded.server_updated_at',
+              ),
+              localUpdatedAt: const CustomExpression<DateTime>(
+                'excluded.local_updated_at',
+              ),
+            ),
+          ),
+        );
+  }
+
+  Future<void> _upsertIef(IefDto i) async {
+    await _db
+        .into(_db.iefs)
+        .insert(
+          IefsCompanion.insert(
+            id: i.id,
+            code: i.code,
+            name: i.name,
+            departementId: i.departementId,
+            departementName: i.departementName,
+            isActive: Value<bool>(i.isActive),
+            localUpdatedAt: _clock.now(),
+            serverUpdatedAt: Value<DateTime?>(i.updatedAt),
+          ),
+          onConflict: DoUpdate<Iefs, Ief>(
+            (Iefs old) => IefsCompanion.custom(
+              code: const CustomExpression<String>('excluded.code'),
+              name: const CustomExpression<String>('excluded.name'),
+              departementId: const CustomExpression<String>(
+                'excluded.departement_id',
+              ),
+              departementName: const CustomExpression<String>(
+                'excluded.departement_name',
+              ),
+              isActive: const CustomExpression<bool>('excluded.is_active'),
+              serverUpdatedAt: const CustomExpression<DateTime>(
+                'excluded.server_updated_at',
+              ),
+              localUpdatedAt: const CustomExpression<DateTime>(
+                'excluded.local_updated_at',
+              ),
+            ),
+          ),
+        );
+  }
+
+  Future<void> _upsertBanque(BanqueDto b) async {
+    await _db
+        .into(_db.banques)
+        .insert(
+          BanquesCompanion.insert(
+            id: b.id,
+            name: b.name,
+            shortName: b.shortName,
+            isActive: Value<bool>(b.isActive),
+            sortOrder: Value<int>(b.sortOrder.toInt()),
+            localUpdatedAt: _clock.now(),
+            serverUpdatedAt: Value<DateTime?>(b.updatedAt),
+          ),
+          onConflict: DoUpdate<Banques, Banque>(
+            (Banques old) => BanquesCompanion.custom(
+              name: const CustomExpression<String>('excluded.name'),
+              shortName: const CustomExpression<String>('excluded.short_name'),
+              isActive: const CustomExpression<bool>('excluded.is_active'),
+              sortOrder: const CustomExpression<int>('excluded.sort_order'),
+              serverUpdatedAt: const CustomExpression<DateTime>(
+                'excluded.server_updated_at',
+              ),
+              localUpdatedAt: const CustomExpression<DateTime>(
+                'excluded.local_updated_at',
+              ),
+            ),
+          ),
+        );
+  }
+
+  Future<void> _upsertSyndicat(SyndicatDto s) async {
+    await _db
+        .into(_db.syndicats)
+        .insert(
+          SyndicatsCompanion.insert(
+            id: s.id,
+            name: s.name,
+            sigle: s.sigle,
+            secteur: Value<String?>(s.secteur),
+            isActive: Value<bool>(s.isActive),
+            sortOrder: Value<int>(s.sortOrder.toInt()),
+            localUpdatedAt: _clock.now(),
+            serverUpdatedAt: Value<DateTime?>(s.updatedAt),
+          ),
+          onConflict: DoUpdate<Syndicats, Syndicat>(
+            (Syndicats old) => SyndicatsCompanion.custom(
+              name: const CustomExpression<String>('excluded.name'),
+              sigle: const CustomExpression<String>('excluded.sigle'),
+              secteur: const CustomExpression<String>('excluded.secteur'),
+              isActive: const CustomExpression<bool>('excluded.is_active'),
+              sortOrder: const CustomExpression<int>('excluded.sort_order'),
+              serverUpdatedAt: const CustomExpression<DateTime>(
+                'excluded.server_updated_at',
+              ),
+              localUpdatedAt: const CustomExpression<DateTime>(
+                'excluded.local_updated_at',
+              ),
+            ),
+          ),
+        );
+  }
+
+  Future<void> _upsertCanalProvenance(CanalProvenanceDto c) async {
+    await _db
+        .into(_db.canauxProvenance)
+        .insert(
+          CanauxProvenanceCompanion.insert(
+            id: c.id,
+            code: c.code,
+            label: c.label,
+            isActive: Value<bool>(c.isActive),
+            sortOrder: Value<int>(c.position.toInt()),
+            localUpdatedAt: _clock.now(),
+            serverUpdatedAt: Value<DateTime?>(c.updatedAt),
+          ),
+          onConflict: DoUpdate<CanauxProvenance, CanauxProvenanceData>(
+            (CanauxProvenance old) => CanauxProvenanceCompanion.custom(
+              code: const CustomExpression<String>('excluded.code'),
+              label: const CustomExpression<String>('excluded.label'),
+              isActive: const CustomExpression<bool>('excluded.is_active'),
+              sortOrder: const CustomExpression<int>('excluded.sort_order'),
+              serverUpdatedAt: const CustomExpression<DateTime>(
+                'excluded.server_updated_at',
+              ),
+              localUpdatedAt: const CustomExpression<DateTime>(
+                'excluded.local_updated_at',
+              ),
+            ),
+          ),
+        );
+  }
+
   Future<int> _applyPage(PullPage page) async {
     int count = 0;
     await _db.transaction(() async {
@@ -1314,137 +1775,23 @@ class SyncEngine {
         'prospect',
       );
       for (final DepartementDto d in page.changes.departements) {
-        await _db
-            .into(_db.departements)
-            .insert(
-              DepartementsCompanion.insert(
-                id: d.id,
-                code: d.code,
-                name: d.name,
-                regionId: d.regionId,
-                regionName: Value<String>(d.regionName),
-                isActive: Value<bool>(d.isActive),
-                localUpdatedAt: _clock.now(),
-                serverUpdatedAt: Value<DateTime?>(d.updatedAt),
-              ),
-              onConflict: DoUpdate<Departements, Departement>(
-                (Departements old) => DepartementsCompanion.custom(
-                  code: const CustomExpression<String>('excluded.code'),
-                  name: const CustomExpression<String>('excluded.name'),
-                  regionId: const CustomExpression<String>(
-                    'excluded.region_id',
-                  ),
-                  regionName: const CustomExpression<String>(
-                    'excluded.region_name',
-                  ),
-                  isActive: const CustomExpression<bool>('excluded.is_active'),
-                  serverUpdatedAt: const CustomExpression<DateTime>(
-                    'excluded.server_updated_at',
-                  ),
-                  localUpdatedAt: const CustomExpression<DateTime>(
-                    'excluded.local_updated_at',
-                  ),
-                ),
-              ),
-            );
+        await _upsertDepartement(d);
         count++;
       }
       for (final IefDto i in page.changes.iefs) {
-        await _db
-            .into(_db.iefs)
-            .insert(
-              IefsCompanion.insert(
-                id: i.id,
-                code: i.code,
-                name: i.name,
-                departementId: i.departementId,
-                departementName: i.departementName,
-                isActive: Value<bool>(i.isActive),
-                localUpdatedAt: _clock.now(),
-                serverUpdatedAt: Value<DateTime?>(i.updatedAt),
-              ),
-              onConflict: DoUpdate<Iefs, Ief>(
-                (Iefs old) => IefsCompanion.custom(
-                  code: const CustomExpression<String>('excluded.code'),
-                  name: const CustomExpression<String>('excluded.name'),
-                  departementId: const CustomExpression<String>(
-                    'excluded.departement_id',
-                  ),
-                  departementName: const CustomExpression<String>(
-                    'excluded.departement_name',
-                  ),
-                  isActive: const CustomExpression<bool>('excluded.is_active'),
-                  serverUpdatedAt: const CustomExpression<DateTime>(
-                    'excluded.server_updated_at',
-                  ),
-                  localUpdatedAt: const CustomExpression<DateTime>(
-                    'excluded.local_updated_at',
-                  ),
-                ),
-              ),
-            );
+        await _upsertIef(i);
         count++;
       }
       for (final BanqueDto b in page.changes.banques) {
-        await _db
-            .into(_db.banques)
-            .insert(
-              BanquesCompanion.insert(
-                id: b.id,
-                name: b.name,
-                shortName: b.shortName,
-                isActive: Value<bool>(b.isActive),
-                sortOrder: Value<int>(b.sortOrder.toInt()),
-                localUpdatedAt: _clock.now(),
-                serverUpdatedAt: Value<DateTime?>(b.updatedAt),
-              ),
-              onConflict: DoUpdate<Banques, Banque>(
-                (Banques old) => BanquesCompanion.custom(
-                  name: const CustomExpression<String>('excluded.name'),
-                  shortName: const CustomExpression<String>(
-                    'excluded.short_name',
-                  ),
-                  isActive: const CustomExpression<bool>('excluded.is_active'),
-                  sortOrder: const CustomExpression<int>('excluded.sort_order'),
-                  serverUpdatedAt: const CustomExpression<DateTime>(
-                    'excluded.server_updated_at',
-                  ),
-                  localUpdatedAt: const CustomExpression<DateTime>(
-                    'excluded.local_updated_at',
-                  ),
-                ),
-              ),
-            );
+        await _upsertBanque(b);
         count++;
       }
       for (final CanalProvenanceDto c in page.changes.canauxProvenance) {
-        await _db
-            .into(_db.canauxProvenance)
-            .insert(
-              CanauxProvenanceCompanion.insert(
-                id: c.id,
-                code: c.code,
-                label: c.label,
-                isActive: Value<bool>(c.isActive),
-                sortOrder: Value<int>(c.position.toInt()),
-                localUpdatedAt: _clock.now(),
-                serverUpdatedAt: Value<DateTime?>(c.updatedAt),
-              ),
-              onConflict: DoUpdate<CanauxProvenance, CanauxProvenanceData>(
-                (CanauxProvenance old) => CanauxProvenanceCompanion.custom(
-                  code: const CustomExpression<String>('excluded.code'),
-                  label: const CustomExpression<String>('excluded.label'),
-                  isActive: const CustomExpression<bool>('excluded.is_active'),
-                  sortOrder: const CustomExpression<int>('excluded.sort_order'),
-                  serverUpdatedAt: const CustomExpression<DateTime>(
-                    'excluded.server_updated_at',
-                  ),
-                  localUpdatedAt: const CustomExpression<DateTime>(
-                    'excluded.local_updated_at',
-                  ),
-                ),
-              ),
-            );
+        await _upsertCanalProvenance(c);
+        count++;
+      }
+      for (final SyndicatDto s in page.changes.syndicats) {
+        await _upsertSyndicat(s);
         count++;
       }
       for (final SyncVisiteReferentielDto r
@@ -1465,38 +1812,17 @@ class SyncEngine {
             );
         count++;
       }
-      for (final SyndicatDto s in page.changes.syndicats) {
-        await _db
-            .into(_db.syndicats)
-            .insert(
-              SyndicatsCompanion.insert(
-                id: s.id,
-                name: s.name,
-                sigle: s.sigle,
-                secteur: Value<String?>(s.secteur),
-                isActive: Value<bool>(s.isActive),
-                sortOrder: Value<int>(s.sortOrder.toInt()),
-                localUpdatedAt: _clock.now(),
-                serverUpdatedAt: Value<DateTime?>(s.updatedAt),
-              ),
-              onConflict: DoUpdate<Syndicats, Syndicat>(
-                (Syndicats old) => SyndicatsCompanion.custom(
-                  name: const CustomExpression<String>('excluded.name'),
-                  sigle: const CustomExpression<String>('excluded.sigle'),
-                  secteur: const CustomExpression<String>('excluded.secteur'),
-                  isActive: const CustomExpression<bool>('excluded.is_active'),
-                  sortOrder: const CustomExpression<int>('excluded.sort_order'),
-                  serverUpdatedAt: const CustomExpression<DateTime>(
-                    'excluded.server_updated_at',
-                  ),
-                  localUpdatedAt: const CustomExpression<DateTime>(
-                    'excluded.local_updated_at',
-                  ),
-                ),
-              ),
-            );
-        count++;
-      }
+      guardedRepresentants.addAll(
+        await _retireShadowed(_db.representants, <String, String>{
+          for (final RepresentantDto r in page.changes.representants)
+            r.id: r.phoneE164,
+        }, guarded: guardedRepresentants),
+      );
+      guardedProspects.addAll(
+        await _retireShadowed(_db.prospects, <String, String>{
+          for (final ProspectDto p in page.changes.prospects) p.id: p.phoneE164,
+        }, guarded: guardedProspects),
+      );
       for (final RepresentantDto r in page.changes.representants) {
         if (guardedRepresentants.contains(r.id)) continue;
         await _db
@@ -1664,7 +1990,18 @@ class SyncEngine {
             );
         count++;
       }
+      // Une file retirée au commercial descend une DERNIÈRE fois, avec
+      // `isActive` à faux : c'est le seul moment où le téléphone apprend qu'il
+      // doit cesser d'appeler ces fiches. Sans cette suppression, elle restait
+      // au programme pour toujours.
       for (final SyncCallTaskDto t in page.changes.callTasks) {
+        if (!t.isActive) {
+          await (_db.delete(
+            _db.callTasks,
+          )..where((CallTasks c) => c.id.equals(t.id))).go();
+          count++;
+          continue;
+        }
         await _db
             .into(_db.callTasks)
             .insertOnConflictUpdate(
@@ -1672,6 +2009,44 @@ class SyncEngine {
                 id: t.id,
                 campaignId: t.campaignId,
                 prospectId: t.prospectId,
+                position: t.position.toInt(),
+                dayIndex: Value<int>(t.dayIndex.toInt()),
+                status: Value<String>(t.status.value),
+                updatedAt: t.updatedAt,
+              ),
+            );
+        count++;
+      }
+      for (final SyncRepCallCampaignDto c in page.changes.repCallCampaigns) {
+        await _db
+            .into(_db.repCallCampaigns)
+            .insertOnConflictUpdate(
+              RepCallCampaignsCompanion.insert(
+                id: c.id,
+                name: c.name,
+                status: Value<String>(c.status.value),
+                spreadDays: Value<int>(c.spreadDays.toInt()),
+                closedAt: Value<DateTime?>(c.closedAt),
+                updatedAt: c.updatedAt,
+              ),
+            );
+        count++;
+      }
+      for (final SyncRepCallTaskDto t in page.changes.repCallTasks) {
+        if (!t.isActive) {
+          await (_db.delete(
+            _db.repCallTasks,
+          )..where((RepCallTasks c) => c.id.equals(t.id))).go();
+          count++;
+          continue;
+        }
+        await _db
+            .into(_db.repCallTasks)
+            .insertOnConflictUpdate(
+              RepCallTasksCompanion.insert(
+                id: t.id,
+                campaignId: t.campaignId,
+                representantId: t.representantId,
                 position: t.position.toInt(),
                 dayIndex: Value<int>(t.dayIndex.toInt()),
                 status: Value<String>(t.status.value),

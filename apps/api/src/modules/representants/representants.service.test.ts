@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  NotFoundException,
   RequestMethod,
 } from '@nestjs/common';
 import { ChangeSource, RepresentantRelation, Role, WhatsappStatus } from '@crm/database';
@@ -96,43 +97,26 @@ beforeEach(() => {
 });
 
 describe('lookup par téléphone', () => {
-  it('ne divulgue QUE le nom du propriétaire sur la fiche d’un autre commercial', async () => {
+  it('rend la fiche d’un autre commercial en entier, en nommant son propriétaire', async () => {
     db.representant.findFirst.mockResolvedValue(foreignRow());
 
-    const result = await service.lookup(COMMERCIAL, '77 123 45 67');
+    const result = await service.lookup('77 123 45 67');
 
     expect(result.found).toBe(true);
     expect(result.phoneE164).toBe('+221771234567');
     expect(result.ownedByCommercialName).toBe('Moussa Sarr');
-
-    expect(result.representant).toBeNull();
-    expect(result.ownedByCommercialId).toBeNull();
+    expect(result.ownedByCommercialId).toBe('com-2');
+    expect(result.representant?.fullName).toBe('Fatou Ndiaye');
   });
 
-  it('n’expose RIEN d’autre que found, phoneE164 et le nom du propriétaire', async () => {
+  it('rend exactement les cinq champs du contrat, sans en inventer un', async () => {
     db.representant.findFirst.mockResolvedValue(foreignRow());
 
-    const result = await service.lookup(COMMERCIAL, '77 123 45 67');
+    const result = await service.lookup('77 123 45 67');
 
     expect(Object.keys(result).sort()).toEqual(
       ['found', 'phoneE164', 'representant', 'ownedByCommercialId', 'ownedByCommercialName'].sort(),
     );
-
-    const charge = JSON.stringify(result);
-    for (const secret of [
-      'Fatou Ndiaye',
-      'Almadies',
-      'Rappeler après 16 h',
-      'rep-9',
-      'com-2',
-      'dep-1',
-      'Dakar',
-      '42',
-    ]) {
-      expect(charge, `« ${secret} » a fui hors du lookup`).not.toContain(secret);
-    }
-
-    expect(charge).toContain('Moussa Sarr');
   });
 
   it('rend la fiche complète quand elle appartient à l’appelant', async () => {
@@ -142,31 +126,22 @@ describe('lookup par téléphone', () => {
       createdBy: { id: COMMERCIAL.id, fullName: COMMERCIAL.fullName },
     });
 
-    const result = await service.lookup(COMMERCIAL, '77 123 45 67');
+    const result = await service.lookup('77 123 45 67');
 
     expect(result.representant?.fullName).toBe('Fatou Ndiaye');
     expect(result.ownedByCommercialId).toBe(COMMERCIAL.id);
   });
 
-  it('rend la fiche complète à un ADMIN : c’est lui qui arbitre les doublons', async () => {
-    db.representant.findFirst.mockResolvedValue(foreignRow());
-
-    const result = await service.lookup(ADMIN, '77 123 45 67');
-
-    expect(result.representant?.fullName).toBe('Fatou Ndiaye');
-    expect(result.ownedByCommercialId).toBe('com-2');
-  });
-
   it('répond « libre » sans erreur quand le numéro n’est pas pris', async () => {
-    const result = await service.lookup(COMMERCIAL, '77 123 45 67');
+    const result = await service.lookup('77 123 45 67');
 
     expect(result.found).toBe(false);
     expect(result.representant).toBeNull();
     expect(result.ownedByCommercialName).toBeNull();
   });
 
-  it('applique la visibilité de démonstration', async () => {
-    await service.lookup(COMMERCIAL, '77 123 45 67');
+  it('cherche sur tout l’annuaire, sans borner sur un créateur', async () => {
+    await service.lookup('77 123 45 67');
 
     const where = (
       db.representant.findFirst.mock.calls[0] as [{ where: Record<string, unknown> }]
@@ -237,13 +212,13 @@ describe('filtre par état de relation', () => {
     (db.representant.findMany.mock.calls[0]?.[0] as { where: Record<string, unknown> }).where;
 
   it('ne retient que les fiches dans l’état demandé', async () => {
-    await service.list(ADMIN, { relationStatus: RepresentantRelation.AMBASSADEUR });
+    await service.list({ relationStatus: RepresentantRelation.AMBASSADEUR });
 
     expect(whereOf().relationStatus).toBe(RepresentantRelation.AMBASSADEUR);
   });
 
   it('ne filtre sur rien quand l’état n’est pas demandé', async () => {
-    await service.list(ADMIN, {});
+    await service.list({});
 
     expect(whereOf()).not.toHaveProperty('relationStatus');
   });
@@ -254,18 +229,16 @@ describe('filtre par état de relation', () => {
       relationStatus: RepresentantRelation.AMBASSADEUR,
     });
 
-    await expect(service.get(ADMIN, 'rep-9')).resolves.toMatchObject({
+    await expect(service.get('rep-9')).resolves.toMatchObject({
       relationStatus: RepresentantRelation.AMBASSADEUR,
     });
   });
 
-  it('laisse le cloisonnement du téléconseiller par-dessus le filtre', async () => {
-    await service.list(COMMERCIAL, { relationStatus: RepresentantRelation.AMBASSADEUR });
+  it('le filtre ne rajoute AUCUN cloisonnement : l’annuaire est commun', async () => {
+    await service.list({ relationStatus: RepresentantRelation.AMBASSADEUR });
 
-    expect(whereOf()).toMatchObject({
-      relationStatus: RepresentantRelation.AMBASSADEUR,
-      createdById: COMMERCIAL.id,
-    });
+    expect(whereOf()).toMatchObject({ relationStatus: RepresentantRelation.AMBASSADEUR });
+    expect(whereOf()).not.toHaveProperty('createdById');
   });
 });
 
@@ -381,12 +354,16 @@ describe('bascule de relation par le panel', () => {
 });
 
 describe('historique de relation', () => {
-  it('refuse la fiche d’un autre téléconseiller', async () => {
+  it('ouvre l’histoire d’une fiche d’un autre téléconseiller : l’annuaire est commun', async () => {
     db.representant.findFirst.mockResolvedValue({ id: 'rep-9', createdById: 'com-2' });
 
-    await expect(service.relationHistory(COMMERCIAL, 'rep-9')).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
+    await expect(service.relationHistory('rep-9')).resolves.toEqual({ items: [] });
+  });
+
+  it('rend 404 sur une fiche absente ou supprimée', async () => {
+    db.representant.findFirst.mockResolvedValue(null);
+
+    await expect(service.relationHistory('rep-9')).rejects.toBeInstanceOf(NotFoundException);
     expect(db.representantRelationChange.findMany).not.toHaveBeenCalled();
   });
 
@@ -406,7 +383,7 @@ describe('historique de relation', () => {
       },
     ]);
 
-    const result = await service.relationHistory(COMMERCIAL, 'rep-9');
+    const result = await service.relationHistory('rep-9');
 
     expect(result.items).toEqual([
       {
@@ -431,7 +408,7 @@ describe('historique de relation', () => {
   it('rend une liste vide sans erreur quand la relation n’a jamais bougé', async () => {
     db.representant.findFirst.mockResolvedValue({ id: 'rep-9', createdById: COMMERCIAL.id });
 
-    await expect(service.relationHistory(ADMIN, 'rep-9')).resolves.toEqual({ items: [] });
+    await expect(service.relationHistory('rep-9')).resolves.toEqual({ items: [] });
   });
 });
 
@@ -530,13 +507,14 @@ describe('fil de commentaires', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('refuse d’écrire sur la fiche d’un autre téléconseiller', async () => {
+  it('commente la fiche d’un autre téléconseiller : l’annuaire est commun', async () => {
     db.representant.findFirst.mockResolvedValue(foreignRow());
+    db.representantComment.findUniqueOrThrow.mockResolvedValue(comment());
 
     await expect(
       service.addComment(COMMERCIAL, 'rep-9', { id: 'cmt-1', body: 'Vu sur place' }),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(db.representantComment.createMany).not.toHaveBeenCalled();
+    ).resolves.toMatchObject({ id: 'cmt-1' });
+    expect(postedData(0).authorId).toBe(COMMERCIAL.id);
   });
 
   it('le commentaire suit la nature de la FICHE, pas le mode en vigueur', async () => {
@@ -554,7 +532,7 @@ describe('fil de commentaires', () => {
     db.representantComment.count.mockResolvedValue(1);
     db.representantComment.findMany.mockResolvedValue([comment()]);
 
-    const result = await service.listComments(COMMERCIAL, 'rep-9', {});
+    const result = await service.listComments('rep-9', {});
 
     expect(result.items).toEqual([
       {
@@ -572,12 +550,16 @@ describe('fil de commentaires', () => {
     expect(args.orderBy).toEqual([{ clientCreatedAt: 'desc' }, { id: 'desc' }]);
   });
 
-  it('refuse le fil de la fiche d’un autre téléconseiller', async () => {
+  it('ouvre le fil de la fiche d’un autre téléconseiller : l’annuaire est commun', async () => {
     db.representant.findFirst.mockResolvedValue({ id: 'rep-9', createdById: 'com-2' });
 
-    await expect(service.listComments(COMMERCIAL, 'rep-9', {})).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
+    await expect(service.listComments('rep-9', {})).resolves.toMatchObject({ items: [] });
+  });
+
+  it('rend 404 sur le fil d’une fiche absente ou supprimée', async () => {
+    db.representant.findFirst.mockResolvedValue(null);
+
+    await expect(service.listComments('rep-9', {})).rejects.toBeInstanceOf(NotFoundException);
     expect(db.representantComment.findMany).not.toHaveBeenCalled();
   });
 
@@ -622,13 +604,13 @@ describe('lecture du SUPERVISEUR', () => {
     (db.representant.findMany.mock.calls[0]?.[0] as { where: Record<string, unknown> }).where;
 
   it('liste l’annuaire national', async () => {
-    await service.list(SUPERVISEUR, {});
+    await service.list({});
 
     expect(whereOf().createdById).toBeUndefined();
   });
 
   it('son filtre par téléconseiller RÉPOND, au lieu de rendre zéro ligne', async () => {
-    await service.list(SUPERVISEUR, { commercialId: 'com-2' });
+    await service.list({ commercialId: 'com-2' });
 
     expect(whereOf().createdById).toBe('com-2');
   });
@@ -636,10 +618,8 @@ describe('lecture du SUPERVISEUR', () => {
   it('ouvre la fiche d’autrui, et son historique de relation', async () => {
     db.representant.findFirst.mockResolvedValue(foreignRow());
 
-    await expect(service.get(SUPERVISEUR, 'rep-9')).resolves.toMatchObject({ id: 'rep-9' });
-    await expect(service.relationHistory(SUPERVISEUR, 'rep-9')).resolves.toMatchObject({
-      items: [],
-    });
+    await expect(service.get('rep-9')).resolves.toMatchObject({ id: 'rep-9' });
+    await expect(service.relationHistory('rep-9')).resolves.toMatchObject({ items: [] });
   });
 
   it('n’écrit rien : la modification lui est refusée comme à un tiers', async () => {
@@ -653,16 +633,22 @@ describe('lecture du SUPERVISEUR', () => {
     );
   });
 
-  it('lit le fil de commentaires, et n’en dépose aucun', async () => {
+  it('lit le fil de commentaires, et en dépose comme un téléconseiller', async () => {
     db.representant.findFirst.mockResolvedValue(foreignRow());
-
-    await expect(service.listComments(SUPERVISEUR, 'rep-9', {})).resolves.toMatchObject({
-      items: [],
+    db.representantComment.findUniqueOrThrow.mockResolvedValue({
+      id: 'cmt-1',
+      representantId: 'rep-9',
+      authorId: SUPERVISEUR.id,
+      author: { fullName: SUPERVISEUR.fullName },
+      body: 'vu',
+      clientCreatedAt: date,
+      createdAt: date,
     });
+
+    await expect(service.listComments('rep-9', {})).resolves.toMatchObject({ items: [] });
     await expect(
       service.addComment(SUPERVISEUR, 'rep-9', { id: 'cmt-1', body: 'vu' }),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(db.representantComment.createMany).not.toHaveBeenCalled();
+    ).resolves.toMatchObject({ id: 'cmt-1' });
   });
 });
 
@@ -684,7 +670,7 @@ describe('WhatsApp et profession sur la fiche', () => {
     db.representant.findFirst.mockResolvedValue(
       own({ whatsappStatus: WhatsappStatus.MEME_NUMERO }),
     );
-    await expect(service.get(COMMERCIAL, 'rep-9')).resolves.toMatchObject({
+    await expect(service.get('rep-9')).resolves.toMatchObject({
       whatsappNumber: '+221771234567',
       whatsappE164: null,
     });
@@ -692,12 +678,12 @@ describe('WhatsApp et profession sur la fiche', () => {
     db.representant.findFirst.mockResolvedValue(
       own({ whatsappStatus: WhatsappStatus.AUTRE_NUMERO, whatsappE164: '+221780000001' }),
     );
-    await expect(service.get(COMMERCIAL, 'rep-9')).resolves.toMatchObject({
+    await expect(service.get('rep-9')).resolves.toMatchObject({
       whatsappNumber: '+221780000001',
     });
 
     db.representant.findFirst.mockResolvedValue(own({ whatsappStatus: WhatsappStatus.AUCUN }));
-    await expect(service.get(COMMERCIAL, 'rep-9')).resolves.toMatchObject({
+    await expect(service.get('rep-9')).resolves.toMatchObject({
       whatsappNumber: null,
       whatsappStatus: WhatsappStatus.AUCUN,
     });
@@ -753,32 +739,32 @@ describe('WhatsApp et profession sur la fiche', () => {
   });
 
   it('filtre sur un état WhatsApp précis', async () => {
-    await service.list(ADMIN, { whatsappStatus: WhatsappStatus.NON_DEMANDE });
+    await service.list({ whatsappStatus: WhatsappStatus.NON_DEMANDE });
 
     expect(whereOf().whatsappStatus).toEqual({ in: [WhatsappStatus.NON_DEMANDE] });
   });
 
   it('hasWhatsapp sépare les joignables de tous les autres, question non posée comprise', async () => {
-    await service.list(ADMIN, { hasWhatsapp: true });
+    await service.list({ hasWhatsapp: true });
     expect(whereOf().whatsappStatus).toEqual({
       in: [WhatsappStatus.MEME_NUMERO, WhatsappStatus.AUTRE_NUMERO],
     });
 
     db.representant.findMany.mockClear();
-    await service.list(ADMIN, { hasWhatsapp: false });
+    await service.list({ hasWhatsapp: false });
     expect(whereOf().whatsappStatus).toEqual({
       in: [WhatsappStatus.NON_DEMANDE, WhatsappStatus.AUCUN],
     });
   });
 
   it('les deux filtres se composent par intersection, aucun n’en écrase un autre', async () => {
-    await service.list(ADMIN, { hasWhatsapp: false, whatsappStatus: WhatsappStatus.AUCUN });
+    await service.list({ hasWhatsapp: false, whatsappStatus: WhatsappStatus.AUCUN });
 
     expect(whereOf().whatsappStatus).toEqual({ in: [WhatsappStatus.AUCUN] });
   });
 
   it('ne filtre sur rien quand aucun des deux n’est demandé', async () => {
-    await service.list(ADMIN, {});
+    await service.list({});
 
     expect(whereOf()).not.toHaveProperty('whatsappStatus');
   });

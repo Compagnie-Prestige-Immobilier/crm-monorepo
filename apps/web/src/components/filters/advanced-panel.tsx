@@ -39,6 +39,7 @@ export function AdvancedPanel<K extends string>({
   onRemove,
   onClearAll,
   actions,
+  startCollapsed = false,
   children,
 }: {
   module: string;
@@ -46,19 +47,27 @@ export function AdvancedPanel<K extends string>({
   onRemove: (key: K) => void;
   onClearAll: () => void;
   actions?: ReactNode | undefined;
+  /**
+   * Replié même quand un critère est actif. Réservé aux écrans où le filtre
+   * vient d'un LIEN et non d'une intention : ouvrir douze listes déroulantes
+   * devant quelqu'un qui a simplement cliqué « voir les prospects en attente »
+   * lui montre l'outillage au lieu du résultat. Les critères actifs restent
+   * lisibles : le rappel en pastilles ci-dessous ne s'affiche QUE fermé.
+   */
+  startCollapsed?: boolean;
   children: ReactNode;
 }) {
   const panelId = useId();
   const count = chips.length;
 
-  const [open, setOpen] = useState(() => count > 0);
+  const [open, setOpen] = useState(() => !startCollapsed && count > 0);
   const preferenceApplied = useRef(false);
 
   useEffect(() => {
     if (preferenceApplied.current) return;
     preferenceApplied.current = true;
-    setOpen(advancedOpenFrom(count > 0, readStoredOpen(module)));
-  }, [count, module]);
+    setOpen(advancedOpenFrom(!startCollapsed && count > 0, readStoredOpen(module)));
+  }, [count, module, startCollapsed]);
 
   const toggle = useCallback(() => {
     setOpen((current) => {

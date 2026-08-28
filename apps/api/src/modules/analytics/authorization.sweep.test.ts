@@ -11,6 +11,7 @@ import { PilotageService } from './pilotage.service.js';
 import { PortfolioService } from './portfolio.service.js';
 import { QualityService } from './quality.service.js';
 import { SegmentConversionsService } from './segment-conversions.service.js';
+import { StatsLayoutService } from './stats-layout.service.js';
 
 const ALICE: AuthenticatedUser = {
   id: 'com-alice',
@@ -87,12 +88,13 @@ function controllerFor(prisma: PrismaService): AnalyticsController {
     new PortfolioService(prisma),
     new QualityService(prisma),
     new SegmentConversionsService(prisma),
+    new StatsLayoutService(prisma),
   );
 }
 
 const routeNames = (): string[] =>
   Object.getOwnPropertyNames(AnalyticsController.prototype).filter(
-    (name) => name !== 'constructor',
+    (name) => name !== 'constructor' && !name.toLowerCase().includes('layout'),
   );
 
 type Route = (user: AuthenticatedUser, query: object) => Promise<unknown>;

@@ -1,0 +1,11 @@
+{
+  "plugins": [],
+  "jsPlugins": ["eslint-plugin-sonarjs"],
+  "ignorePatterns": ["**/src/generated/**"],
+  "rules": {
+    "complexity": ["error", { "max": 20, "variant": "classic" }],
+    "max-depth": ["error", 3],
+    "no-nested-ternary": "error",
+    "sonarjs/cognitive-complexity": ["error", 15]
+  }
+}

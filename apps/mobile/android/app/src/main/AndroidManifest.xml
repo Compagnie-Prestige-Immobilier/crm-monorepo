@@ -5,13 +5,16 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
 
     <!--
-      POST_NOTIFICATIONS a été RETIRÉE avec Firebase. Plus rien dans
-      l'application n'affiche de notification système : les annonces arrivent
-      par l'inbox applicative, tirée depuis /notifications/mine et lue dans
-      l'écran « Annonces ». Une permission déclarée mais jamais utilisée
-      apparaît quand même sur la fiche Play Store et dans les réglages, et fait
-      promettre à l'application ce qu'elle ne fait pas.
+      POST_NOTIFICATIONS avait été retirée avec Firebase (les annonces
+      restent servies par l'inbox applicative, voir
+      `features/notifications/notification_inbox.dart`), mais revient ici
+      pour UN SEUL usage : l'alarme locale d'un rappel promis à un
+      représentant (issue CALLBACK). Toujours sans Firebase : c'est
+      `flutter_local_notifications`, planifié sur l'appareil, sans serveur
+      push.
     -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
     <!--
       CONFIDENTIALITÉ AU REPOS : voir android:allowBackup ci-dessous.
 

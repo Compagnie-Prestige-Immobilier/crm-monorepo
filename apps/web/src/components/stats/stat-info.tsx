@@ -32,13 +32,11 @@ export function StatInfo({ stat, label }: { stat: StatKey; label: string }) {
         <InfoIcon className="size-4" aria-hidden="true" />
       </PopoverTrigger>
 
-      <PopoverContent
-        align="start"
-        sideOffset={6}
-        className="w-72 p-3 text-[0.8125rem] leading-[1.55]"
-        initialFocus={pinned}
-      >
-        {explain(stat)}
+      <PopoverContent align="start" sideOffset={6} className="w-80 p-3" initialFocus={pinned}>
+        <div className="flex flex-col gap-1">
+          <p className="text-[0.8125rem] font-[700] text-foreground">{label}</p>
+          <p className="text-[0.8125rem] leading-[1.55] text-muted-foreground">{explain(stat)}</p>
+        </div>
       </PopoverContent>
     </Popover>
   );
