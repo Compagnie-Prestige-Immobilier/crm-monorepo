@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:forui/forui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/cpi_colors.dart';
 import '../../core/theme/cpi_tokens.dart';
+import 'cpi_forui.dart';
+import 'cpi_kit.dart';
 
 class ReferentialsBanner extends ConsumerStatefulWidget {
   const ReferentialsBanner({super.key, required this.missing});
@@ -30,56 +33,49 @@ class _ReferentialsBannerState extends ConsumerState<ReferentialsBanner> {
   @override
   Widget build(BuildContext context) {
     if (!widget.missing) return const SizedBox.shrink();
-    final ThemeData theme = Theme.of(context);
-    final CpiColors cpi = context.cpi;
 
     return Semantics(
       liveRegion: true,
-      child: Container(
-        width: double.infinity,
-        color: cpi.accentSurface,
-        padding: const EdgeInsets.symmetric(
-          horizontal: CpiSpacing.md,
-          vertical: CpiSpacing.xs,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Icon(
-                  PhosphorIconsRegular.cloudArrowDown,
-                  size: CpiIconSize.sm,
-                  color: cpi.accentText,
+      child: CpiForui(
+        builder: (BuildContext context) => Padding(
+          padding: const EdgeInsets.fromLTRB(
+            CpiSpacing.md,
+            CpiSpacing.xs,
+            CpiSpacing.md,
+            0,
+          ),
+          child: FAlert(
+            // L'ambre porte l'avertissement sans virer au rouge : rien n'est
+            // cassé, il manque un téléchargement. Le rembourrage est resserré :
+            // le bandeau coiffe un formulaire, il ne doit pas lui prendre sa
+            // place à 1,76x.
+            style: FAlertStyleDelta.delta(
+              iconStyle: IconThemeDataDelta.delta(
+                color: context.cpi.accentText,
+              ),
+              padding: const EdgeInsetsGeometryDelta.value(
+                EdgeInsets.symmetric(
+                  horizontal: CpiSpacing.sm,
+                  vertical: CpiSpacing.xs,
                 ),
-                const SizedBox(width: CpiSpacing.xs),
-                Expanded(
-                  child: Text(
-                    'Référentiels non téléchargés : synchronisez pour pouvoir '
-                    'enregistrer.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: cpi.accentText,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            Align(
-              alignment: AlignmentDirectional.centerEnd,
-              child: TextButton(
-                onPressed: _running ? null : _sync,
-                child: _running
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Synchroniser'),
               ),
             ),
-          ],
+            icon: const Icon(PhosphorIconsRegular.cloudArrowDown),
+            // Le corps de texte du bandeau reste celui d'une annotation : à
+            // 1,76x, la taille de titre de ForUI lui ferait manger le
+            // formulaire qu'il coiffe.
+            title: Text(
+              'Les listes ne sont pas encore sur ce téléphone.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            subtitle: CpiButton(
+              'Recevoir les listes',
+              variant: CpiButtonVariant.secondary,
+              onPressed: _sync,
+              loading: _running,
+              expand: false,
+            ),
+          ),
         ),
       ),
     );

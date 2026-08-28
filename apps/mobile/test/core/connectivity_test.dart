@@ -202,27 +202,54 @@ void main() {
       return container;
     }
 
-    test(
-      'un portail captif est annoncé AVANT le premier échec de cycle',
-      () async {
-        // Android a déjà sondé : `NET_CAPABILITY_VALIDATED` est absente. Sans ce
-        // canal, il fallait attendre qu'un cycle de synchronisation échoue pour
-        // que l'écran ose dire quoi que ce soit : l'utilisateur entrait dans la
-        // salle de formation et voyait une application qui se croyait en ligne.
-        final ProviderContainer container = withValidation(false);
-        container.listen(
-          connectivityInterfaceProvider,
-          (Object? _, Object? _) {},
-        );
-        container.listen(networkValidatedProvider, (Object? _, Object? _) {});
-        await pumpEventQueue();
+    /// Mesuré sur emulator-5554 : le Wi-Fi devient le réseau par défaut à t+8 s
+    /// et n'est validé qu'à t+12 s (t+15,8 s au démarrage) ; le lien data, lui,
+    /// route vers l'API sans jamais recevoir `NET_CAPABILITY_VALIDATED`. Un
+    /// « non » du système est donc soit un « pas encore », soit une erreur : il
+    /// ne coupe pas la connexion à quelqu'un qui pouvait travailler.
+    test('un verdict « non » n\'allume aucune bande à lui seul', () async {
+      final ProviderContainer container = withValidation(false);
+      container.listen(
+        connectivityInterfaceProvider,
+        (Object? _, Object? _) {},
+      );
+      container.listen(networkValidatedProvider, (Object? _, Object? _) {});
+      await pumpEventQueue();
 
-        expect(
-          container.read(connectivityProvider),
-          CpiConnectivity.unreachable,
+      expect(container.read(connectivityProvider), CpiConnectivity.online);
+    });
+
+    /// Démarrage à froid sur l'écran de connexion : lui seul écoute le verdict,
+    /// et il refuse le bouton tant qu'il n'est pas « en ligne ».
+    test('démarrage à froid : aucune bande sur l\'écran de connexion', () {
+      fakeAsync((FakeAsync async) {
+        final ProviderContainer container = ProviderContainer(
+          overrides: [
+            connectivitySourceProvider.overrideWithValue(
+              _FakeSource(
+                initial: <ConnectivityResult>[ConnectivityResult.wifi],
+                changes: const Stream<List<ConnectivityResult>>.empty(),
+              ),
+            ),
+            networkValidationProvider.overrideWithValue(
+              const _FakeValidation(false),
+            ),
+          ],
         );
-      },
-    );
+        final List<CpiConnectivity> seen = <CpiConnectivity>[];
+        container.listen<CpiConnectivity>(
+          connectivityProvider,
+          (CpiConnectivity? _, CpiConnectivity next) => seen.add(next),
+          fireImmediately: true,
+        );
+        async.elapse(kConnectivityDebounce * 2);
+
+        expect(seen, everyElement(CpiConnectivity.online));
+        expect(container.read(connectivityProvider), CpiConnectivity.online);
+
+        container.dispose();
+      });
+    });
 
     test('un verdict positif laisse l\'application tranquille', () async {
       final ProviderContainer container = withValidation(true);
@@ -271,6 +298,41 @@ void main() {
       await pumpEventQueue();
 
       expect(container.read(connectivityProvider), CpiConnectivity.offline);
+    });
+
+    /// Le terrain, reproduit deux fois sur emulator-5554 : la Wi-Fi revient,
+    /// Android ne l'a pas encore validée à l'instant de l'événement, et plus
+    /// aucun événement ne suivra. La bande « Hors ligne » ne repartait plus de
+    /// la session.
+    test('le réseau revient avant qu\'Android ne l\'ait validé', () {
+      fakeAsync((FakeAsync async) {
+        final StreamController<List<ConnectivityResult>> events =
+            StreamController<List<ConnectivityResult>>.broadcast();
+        final ProviderContainer container = ProviderContainer(
+          overrides: [
+            connectivitySourceProvider.overrideWithValue(
+              _FakeSource(
+                initial: <ConnectivityResult>[ConnectivityResult.none],
+                changes: events.stream,
+              ),
+            ),
+            networkValidationProvider.overrideWithValue(
+              const _FakeValidation(false),
+            ),
+          ],
+        );
+        container.listen(connectivityProvider, (Object? _, Object? _) {});
+        async.elapse(const Duration(milliseconds: 100));
+        expect(container.read(connectivityProvider), CpiConnectivity.offline);
+
+        events.add(<ConnectivityResult>[ConnectivityResult.wifi]);
+        async.elapse(kConnectivityDebounce * 2);
+
+        expect(container.read(connectivityProvider), CpiConnectivity.online);
+
+        container.dispose();
+        unawaited(events.close());
+      });
     });
 
     test(
@@ -357,6 +419,32 @@ void main() {
       });
     });
 
+    /// L'échec prouvait l'ancien lien, pas le nouveau. Sur l'écran de connexion
+    /// aucun cycle ne tourne pour l'effacer : la bande y survivait au retour du
+    /// réseau.
+    test('le retour d\'une interface efface la preuve', () async {
+      final StreamController<List<ConnectivityResult>> events =
+          StreamController<List<ConnectivityResult>>.broadcast();
+      addTearDown(events.close);
+      final ProviderContainer container = containerWith(
+        _FakeSource(
+          initial: <ConnectivityResult>[ConnectivityResult.none],
+          changes: events.stream,
+        ),
+      );
+      container.listen(connectivityProvider, (Object? _, Object? _) {});
+      await pumpEventQueue();
+
+      container
+          .read(unreachableEvidenceProvider.notifier)
+          .record(DateTime.now());
+      events.add(<ConnectivityResult>[ConnectivityResult.wifi]);
+      await pumpEventQueue();
+
+      expect(container.read(unreachableEvidenceProvider), isNull);
+      expect(container.read(connectivityProvider), CpiConnectivity.online);
+    });
+
     test('un succès efface la preuve immédiatement', () async {
       final ProviderContainer container = online();
       container.listen(
@@ -370,6 +458,114 @@ void main() {
       );
       evidence.record(DateTime.now());
       evidence.clear();
+      expect(container.read(connectivityProvider), CpiConnectivity.online);
+    });
+
+    /// Le terrain : la bande reste « Hors ligne » alors que la Wi-Fi est
+    /// revenue. Le verdict doit redescendre à « en ligne » sur le seul
+    /// événement d'interface, sans attendre un cycle de synchronisation.
+    test('le réseau revient : le verdict repasse en ligne', () async {
+      final StreamController<List<ConnectivityResult>> events =
+          StreamController<List<ConnectivityResult>>.broadcast();
+      addTearDown(events.close);
+      final ProviderContainer container = ProviderContainer(
+        overrides: [
+          connectivitySourceProvider.overrideWithValue(
+            _FakeSource(
+              initial: <ConnectivityResult>[ConnectivityResult.none],
+              changes: events.stream,
+            ),
+          ),
+          networkValidationProvider.overrideWithValue(
+            const _FakeValidation(true),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      container.listen(connectivityProvider, (Object? _, Object? _) {});
+      await pumpEventQueue();
+      expect(container.read(connectivityProvider), CpiConnectivity.offline);
+
+      events.add(<ConnectivityResult>[ConnectivityResult.wifi]);
+      await pumpEventQueue();
+
+      expect(container.read(connectivityProvider), CpiConnectivity.online);
+    });
+
+    /// Le même retour de réseau, mais pendant que plus aucun écran n'affiche le
+    /// verdict : c'est le cas réel, la bande ne vit que sur l'accueil.
+    test('le réseau revient pendant qu\'aucun écran n\'écoute', () async {
+      final StreamController<List<ConnectivityResult>> events =
+          StreamController<List<ConnectivityResult>>.broadcast();
+      addTearDown(events.close);
+      final ProviderContainer container = ProviderContainer(
+        overrides: [
+          connectivitySourceProvider.overrideWithValue(
+            _FakeSource(
+              initial: <ConnectivityResult>[ConnectivityResult.none],
+              changes: events.stream,
+            ),
+          ),
+          networkValidationProvider.overrideWithValue(
+            const _FakeValidation(true),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      // La source reste active pour toute l'application, comme le tient
+      // `SyncCoordinator` ; seul l'écran s'en va.
+      container.listen(connectivityResultsProvider, (Object? _, Object? _) {});
+      final ProviderSubscription<CpiConnectivity> ecran = container.listen(
+        connectivityProvider,
+        (Object? _, Object? _) {},
+      );
+      await pumpEventQueue();
+      expect(container.read(connectivityProvider), CpiConnectivity.offline);
+
+      ecran.close();
+      events.add(<ConnectivityResult>[ConnectivityResult.wifi]);
+      await pumpEventQueue();
+
+      expect(container.read(connectivityProvider), CpiConnectivity.online);
+    });
+
+    /// L'onglet quitté n'est pas démonté : Flutter coupe son `TickerMode`, ce
+    /// que Riverpod traduit par une mise en pause des abonnements.
+    test('le réseau revient pendant que l\'écran est en pause', () async {
+      final StreamController<List<ConnectivityResult>> events =
+          StreamController<List<ConnectivityResult>>.broadcast();
+      addTearDown(events.close);
+      final ProviderContainer container = ProviderContainer(
+        overrides: [
+          connectivitySourceProvider.overrideWithValue(
+            _FakeSource(
+              initial: <ConnectivityResult>[ConnectivityResult.none],
+              changes: events.stream,
+            ),
+          ),
+          networkValidationProvider.overrideWithValue(
+            const _FakeValidation(true),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      container.listen(connectivityResultsProvider, (Object? _, Object? _) {});
+      final ProviderSubscription<CpiConnectivity> ecran = container.listen(
+        connectivityProvider,
+        (Object? _, Object? _) {},
+      );
+      await pumpEventQueue();
+      expect(container.read(connectivityProvider), CpiConnectivity.offline);
+
+      ecran.pause();
+      events.add(<ConnectivityResult>[ConnectivityResult.wifi]);
+      await pumpEventQueue();
+      ecran.resume();
+      await pumpEventQueue();
+
       expect(container.read(connectivityProvider), CpiConnectivity.online);
     });
 

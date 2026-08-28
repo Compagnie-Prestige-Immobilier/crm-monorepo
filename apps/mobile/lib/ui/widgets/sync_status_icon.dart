@@ -1,10 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:forui/forui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/cpi_colors.dart';
 import '../../core/theme/cpi_tokens.dart';
+import 'cpi_forui.dart';
+import 'cpi_kit.dart';
 
 enum SyncStatus {
   draft,
@@ -25,14 +28,30 @@ enum SyncStatus {
     _ => SyncStatus.draft,
   };
 
+  /// Une seule grammaire d'état, en mots simples, partout dans l'app.
   String get label => switch (this) {
-    SyncStatus.draft => 'Brouillon',
-    SyncStatus.pending => 'En attente',
-    SyncStatus.syncing => 'Envoi en cours',
-    SyncStatus.synced => 'Synchronisé',
-    SyncStatus.conflict => 'Conflit à résoudre',
-    SyncStatus.failed => 'Échec d\'envoi',
-    SyncStatus.blocked => 'Bloqué par le représentant',
+    SyncStatus.draft || SyncStatus.pending => 'Pas encore envoyé',
+    SyncStatus.syncing => 'Envoi…',
+    SyncStatus.synced => 'Envoyé ✓',
+    SyncStatus.conflict ||
+    SyncStatus.failed ||
+    SyncStatus.blocked => 'À corriger',
+  };
+
+  bool get needsAttention => switch (this) {
+    SyncStatus.conflict || SyncStatus.failed || SyncStatus.blocked => true,
+    _ => false,
+  };
+
+  /// Le ton du kit qui va avec l'état. Source unique : quatre écrans le
+  /// retraduisaient à la main, et « À corriger » sortait tantôt en rouge,
+  /// tantôt en neutre.
+  CpiTone get tone => switch (this) {
+    SyncStatus.draft || SyncStatus.pending => CpiTone.neutral,
+    SyncStatus.syncing => CpiTone.neutral,
+    SyncStatus.synced => CpiTone.success,
+    SyncStatus.conflict => CpiTone.warning,
+    SyncStatus.failed || SyncStatus.blocked => CpiTone.danger,
   };
 
   IconData get icon => switch (this) {
@@ -140,25 +159,40 @@ class SyncStatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
     final Color color = context.cpi.colorForSyncStatus(status.name);
     return Semantics(
       label: 'État de synchronisation : ${status.label}',
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          SyncStatusIcon(status: status, size: CpiIconSize.xs, labelled: false),
-          const SizedBox(width: CpiSpacing.xxsPlus),
-          // « Bloqué par le représentant » débordait : le Row en `min` ne
-          // contraint pas son texte, il faut le rendre compressible.
-          Flexible(
-            child: Text(
-              status.label,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelMedium?.copyWith(color: color),
+      child: CpiForui(
+        // Contour plutôt qu'aplat teinté : la couleur d'état porte le texte,
+        // et la poser aussi en fond la ferait passer sous 4,5:1.
+        builder: (BuildContext context) => FBadge.raw(
+          variant: FBadgeVariant.outline,
+          builder: (BuildContext context, FBadgeStyle style) => Padding(
+            padding: style.contentStyle.padding,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                SyncStatusIcon(
+                  status: status,
+                  size: CpiIconSize.xs,
+                  labelled: false,
+                ),
+                const SizedBox(width: CpiSpacing.xxsPlus),
+                // « Bloqué par le représentant » débordait : le Row en `min` ne
+                // contraint pas son texte, il faut le rendre compressible.
+                Flexible(
+                  child: Text(
+                    status.label,
+                    overflow: TextOverflow.ellipsis,
+                    style: style.contentStyle.labelTextStyle.copyWith(
+                      color: color,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }

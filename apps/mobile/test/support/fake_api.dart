@@ -25,7 +25,10 @@ class FakeApi implements ApiPort {
   /// Chaque appel à [push], dans l'ordre de réception.
   final List<PushCall> calls = <PushCall>[];
   final List<String> uploadedRecordings = <String>[];
+  final List<CreateRepCallAttemptDto> repCallAttempts =
+      <CreateRepCallAttemptDto>[];
   ApiException? failNextRecordingUpload;
+  ApiException? failNextRepCallAttempt;
 
   /// Les entités effectivement créées côté serveur, par identifiant.
   final Map<String, SyncOperationDto> rows = <String, SyncOperationDto>{};
@@ -106,6 +109,86 @@ class FakeApi implements ApiPort {
       return RepresentantLookup(found: false, phoneE164: phone);
     }
     return handler(phone);
+  }
+
+  /// Les quatre listes de l'accueil que le serveur sert en entier. `null` ⇒
+  /// personne n'a demandé de miroir dans ce test : la lecture échoue comme
+  /// hors ligne, et les listes locales restent telles quelles.
+  VisiteReferentielsBundleDto? visiteReferentiels;
+
+  /// Chaque lecture complète des listes de l'accueil.
+  int visiteReferentielsPulls = 0;
+
+  @override
+  Future<VisiteReferentielsBundleDto> pullVisiteReferentiels() async {
+    visiteReferentielsPulls++;
+    final VisiteReferentielsBundleDto? bundle = visiteReferentiels;
+    if (bundle == null) {
+      throw const ApiException(
+        'NETWORK',
+        message: 'Aucune liste servie par ce faux serveur.',
+        kind: FailureKind.unreachable,
+      );
+    }
+    return bundle;
+  }
+
+  /// Les cinq référentiels de saisie que le serveur sert en entier. `null` ⇒
+  /// personne n'a demandé de miroir dans ce test : la lecture échoue comme hors
+  /// ligne, et le miroir local reste tel quel.
+  ReferentielsSnapshot? referentiels;
+
+  /// Chaque lecture complète des référentiels de saisie.
+  int referentielsPulls = 0;
+
+  @override
+  Future<ReferentielsSnapshot> pullReferentiels() async {
+    referentielsPulls++;
+    final ReferentielsSnapshot? snapshot = referentiels;
+    if (snapshot == null) {
+      throw const ApiException(
+        'NETWORK',
+        message: 'Aucun référentiel servi par ce faux serveur.',
+        kind: FailureKind.unreachable,
+      );
+    }
+    return snapshot;
+  }
+
+  /// Chaque correction de visite reçue, dans l'ordre.
+  final List<VisiteCorrigee> visitesCorrigees = <VisiteCorrigee>[];
+
+  /// Erreur à lever à la prochaine correction de visite.
+  ApiException? failNextUpdateVisite;
+
+  @override
+  Future<void> updateVisite({
+    required String id,
+    required String visitorName,
+    required String entrepriseId,
+    required String objetId,
+    String? phone,
+    String? directionId,
+    String? destinataireId,
+    String? comment,
+  }) async {
+    final ApiException? boom = failNextUpdateVisite;
+    if (boom != null) {
+      failNextUpdateVisite = null;
+      throw boom;
+    }
+    visitesCorrigees.add(
+      VisiteCorrigee(
+        id: id,
+        visitorName: visitorName,
+        entrepriseId: entrepriseId,
+        objetId: objetId,
+        phone: phone,
+        directionId: directionId,
+        destinataireId: destinataireId,
+        comment: comment,
+      ),
+    );
   }
 
   /// Pages d'annuaire de phase 2 à servir, dans l'ordre.
@@ -198,6 +281,23 @@ class FakeApi implements ApiPort {
       batchId: batchId,
       results: results,
       serverTime: serverTime,
+    );
+  }
+
+  @override
+  Future<RepCallAttemptResultDto> recordRepCallAttempt(
+    CreateRepCallAttemptDto attempt,
+  ) async {
+    final ApiException? failure = failNextRepCallAttempt;
+    failNextRepCallAttempt = null;
+    if (failure != null) throw failure;
+    repCallAttempts.add(attempt);
+    return RepCallAttemptResultDto(
+      status: RepCallAttemptApplyStatus.applied,
+      attemptId: attempt.id,
+      taskId: null,
+      taskClosed: false,
+      suggestion: null,
     );
   }
 
@@ -385,6 +485,8 @@ PullPage emptyPullPage({String? cursor}) => PullPage(
     prospects: const <ProspectDto>[],
     callCampaigns: const <SyncCallCampaignDto>[],
     callTasks: const <SyncCallTaskDto>[],
+    repCallCampaigns: const <SyncRepCallCampaignDto>[],
+    repCallTasks: const <SyncRepCallTaskDto>[],
     visites: const <SyncVisiteDto>[],
   ),
   deletions: const <SyncDeletionDto>[],
@@ -422,6 +524,29 @@ SyncOperationResultDto invalidOn(
   errorCode: errorCode,
   error: message,
 );
+
+/// Une correction de visite reçue par le faux serveur.
+class VisiteCorrigee {
+  const VisiteCorrigee({
+    required this.id,
+    required this.visitorName,
+    required this.entrepriseId,
+    required this.objetId,
+    required this.phone,
+    required this.directionId,
+    required this.destinataireId,
+    required this.comment,
+  });
+
+  final String id;
+  final String visitorName;
+  final String entrepriseId;
+  final String objetId;
+  final String? phone;
+  final String? directionId;
+  final String? destinataireId;
+  final String? comment;
+}
 
 /// Fiche serveur minimale, pour les réponses de lookup.
 RepresentantDto representantDto({
@@ -500,6 +625,11 @@ class ExplodingApi implements ApiPort {
   }) => _boom();
 
   @override
+  Future<RepCallAttemptResultDto> recordRepCallAttempt(
+    CreateRepCallAttemptDto attempt,
+  ) => _boom();
+
+  @override
   Future<Phase2DirectoryPage> pullPhase2Directory({
     String? cursor,
     int limit = 2000,
@@ -512,6 +642,24 @@ class ExplodingApi implements ApiPort {
 
   @override
   Future<RepresentantLookup> lookupRepresentantByPhone(String phone) => _boom();
+
+  @override
+  Future<void> updateVisite({
+    required String id,
+    required String visitorName,
+    required String entrepriseId,
+    required String objetId,
+    String? phone,
+    String? directionId,
+    String? destinataireId,
+    String? comment,
+  }) => _boom();
+
+  @override
+  Future<VisiteReferentielsBundleDto> pullVisiteReferentiels() => _boom();
+
+  @override
+  Future<ReferentielsSnapshot> pullReferentiels() => _boom();
 
   @override
   Future<void> uploadCallRecording({

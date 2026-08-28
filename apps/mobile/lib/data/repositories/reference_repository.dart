@@ -149,17 +149,24 @@ class ReferenceRepository {
     String? search,
     int limit = 500,
   }) {
-    final String pattern = '%${(search ?? '').trim().toLowerCase()}%';
+    final String terme = (search ?? '').trim();
+    final String pattern = '%${terme.toLowerCase()}%';
+    // Un numéro se tape avec des espaces (« 77 152 11 62 ») et se range en
+    // E.164 : sans cette seconde forme, aucune recherche par téléphone ne sort.
+    final String chiffres = terme.replaceAll(RegExp(r'[^0-9]'), '');
+    final String parNumero = chiffres.isEmpty ? '' : '%$chiffres%';
     return _db
         .customSelect(
           'SELECT * FROM representant_sync_view '
           'WHERE deleted_at IS NULL '
-          '  AND (?1 = \'%%\' OR lower(full_name) LIKE ?1 OR phone_e164 LIKE ?1) '
+          '  AND (?1 = \'%%\' OR lower(full_name) LIKE ?1 OR phone_e164 LIKE ?1 '
+          '       OR (?3 <> \'\' AND phone_e164 LIKE ?3)) '
           'ORDER BY client_created_at DESC '
           'LIMIT ?2',
           variables: <Variable<Object>>[
             Variable<String>(pattern),
             Variable<int>(limit),
+            Variable<String>(parNumero),
           ],
           readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
             _db.representants,
@@ -181,6 +188,20 @@ class ReferenceRepository {
           },
         )
         .map((QueryRow row) => _db.representantSyncView.map(row.data))
+        .watchSingleOrNull();
+  }
+
+  Stream<ProspectSyncViewData?> watchProspect(String id) {
+    return _db
+        .customSelect(
+          'SELECT * FROM prospect_sync_view WHERE id = ?1 AND deleted_at IS NULL',
+          variables: <Variable<Object>>[Variable<String>(id)],
+          readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+            _db.prospects,
+            _db.outbox,
+          },
+        )
+        .map((QueryRow row) => _db.prospectSyncView.map(row.data))
         .watchSingleOrNull();
   }
 

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers/app_providers.dart';
 import '../../data/local/database.dart';
+import '../../data/repositories/visites_repository.dart';
 
 export '../../core/utils/dakar_time.dart';
 
@@ -60,3 +61,33 @@ final Set<String> _rolesDuRegistre = <String>{
 
 bool peutTenirLeRegistre(String? role) =>
     role != null && _rolesDuRegistre.contains(role.toUpperCase());
+
+/// Les personnes le plus demandées AUJOURD'HUI : la même requête que l'ordre
+/// des listes, sur une fenêtre d'un jour.
+final StreamProvider<List<LabelCompte>> destinatairesDuJourProvider =
+    StreamProvider<List<LabelCompte>>((Ref ref) {
+      return ref
+          .watch(visitesRepositoryProvider)
+          .watchTopLabels(ref.watch(clockProvider).now(), jours: 1)
+          .map((TopLabels top) => top.destinataires);
+    });
+
+/// Le champ de recherche du registre garde son texte tant que son élément vit :
+/// vider le fournisseur ne suffit pas, il faut remonter le champ. Ce compteur
+/// est sa clé.
+final NotifierProvider<RegistreSearchReset, int> registreSearchResetProvider =
+    NotifierProvider<RegistreSearchReset, int>(RegistreSearchReset.new);
+
+class RegistreSearchReset extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void bump() => state = state + 1;
+}
+
+/// Vide la recherche du registre ET le champ qui la porte.
+void viderRechercheRegistre(WidgetRef ref) {
+  if (ref.read(registreSearchProvider).isEmpty) return;
+  ref.read(registreSearchProvider.notifier).set('');
+  ref.read(registreSearchResetProvider.notifier).bump();
+}

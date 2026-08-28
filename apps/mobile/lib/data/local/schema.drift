@@ -513,13 +513,32 @@ CREATE TABLE call_attempts (
     -- sans date, et un `CHECK ((outcome = 'CALLBACK') = (callback_at IS NOT NULL))`
     -- ferait échouer leur INSERT LOCAL, hors ligne, sur le terrain.
     callback_at DATETIME NULL,
+    -- Renseignements recueillis PENDANT l'appel de conversion. Nuls sur toute
+    -- tentative saisie avant la v19, et nuls sur une tentative où la question
+    -- n'a pas été posée : c'est la même chose du point de vue du dossier.
+    email TEXT NULL,
+    -- Tri-état : 1 oui, 0 non, NULL question non posée. Un booléen NON NUL
+    -- aurait fait passer 12 929 fiches pour « non fonctionnaire ».
+    fonctionnaire BOOLEAN NULL,
+    engagement_en_cours BOOLEAN NULL,
+    -- Ancienneté DANS L'ÉTABLISSEMENT, en mois. Distincte de
+    -- `prospects.duree_systeme_mois`, qui est la durée du système de paiement.
+    duree_etablissement_mois INTEGER NULL,
+    rendez_vous_at DATETIME NULL,
     client_created_at DATETIME NOT NULL,
     created_by_id TEXT NOT NULL,
     -- Méthode si et seulement si le motif ferme sur une méthode obtenue.
     CHECK ((effect = 'CLOSE_METHOD') = (method IS NOT NULL)),
     -- Un motif qui exige un commentaire l'obtient, non vide.
     CHECK (requires_comment = 0 OR (comment IS NOT NULL AND length(trim(comment)) > 0)),
-    CHECK (comment IS NULL OR length(comment) <= 2000)
+    CHECK (comment IS NULL OR length(comment) <= 2000),
+    CHECK (email IS NULL OR length(email) <= 160),
+    CHECK (duree_etablissement_mois IS NULL
+        OR (duree_etablissement_mois BETWEEN 0 AND 600)),
+    -- Date de rendez-vous si et seulement si la méthode est la prise de
+    -- rendez-vous, comme côté serveur. `COALESCE` et non `method =` : sur une
+    -- méthode nulle la comparaison rend NULL, et un CHECK NULL laisse passer.
+    CHECK ((COALESCE(method, '') = 'APPOINTMENT') = (rendez_vous_at IS NOT NULL))
 );
 
 CREATE INDEX call_attempts_prospect_idx
@@ -839,6 +858,68 @@ campaignsWithOpenWork:
     JOIN prospects p ON p.id = t.prospect_id AND p.deleted_at IS NULL
     GROUP BY c.id
     ORDER BY c.updated_at DESC;
+
+CREATE TABLE rep_call_campaigns (
+    id TEXT NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'ACTIVE',
+    spread_days INTEGER NOT NULL DEFAULT 1,
+    closed_at DATETIME,
+    updated_at DATETIME NOT NULL
+);
+
+CREATE TABLE rep_call_tasks (
+    id TEXT NOT NULL PRIMARY KEY,
+    campaign_id TEXT NOT NULL,
+    representant_id TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    day_index INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'OPEN',
+    updated_at DATETIME NOT NULL
+);
+
+CREATE INDEX rep_call_tasks_campaign_idx ON rep_call_tasks (campaign_id, day_index, position);
+CREATE INDEX rep_call_tasks_representant_idx ON rep_call_tasks (representant_id);
+
+repCampaignQueue:
+    SELECT t.*, r.full_name AS full_name, r.phone_e164 AS phone_e164
+    FROM rep_call_tasks t
+    JOIN representants r ON r.id = t.representant_id
+    WHERE t.campaign_id = :campaignId
+      AND t.status = 'OPEN'
+      AND r.deleted_at IS NULL
+    ORDER BY t.day_index ASC, t.position ASC;
+
+repCampaignsWithOpenWork:
+    SELECT c.*, COUNT(t.id) AS ouvertes
+    FROM rep_call_campaigns c
+    JOIN rep_call_tasks t ON t.campaign_id = c.id AND t.status = 'OPEN'
+    JOIN representants r ON r.id = t.representant_id AND r.deleted_at IS NULL
+    GROUP BY c.id
+    ORDER BY c.updated_at DESC;
+
+-- Rappels promis pendant un appel représentant (issue CALLBACK), pour armer la
+-- notification locale et le popup in-app. `full_name`/`phone_e164` sont
+-- DUPLIQUÉS depuis `representants` : la fiche peut être modifiée ou purgée
+-- entre-temps, et le rappel doit rester lisible hors-ligne même alors.
+CREATE TABLE rep_callback_reminders (
+    id TEXT NOT NULL PRIMARY KEY,
+    representant_id TEXT NOT NULL,
+    full_name TEXT NOT NULL,
+    phone_e164 TEXT NOT NULL,
+    scheduled_at DATETIME NOT NULL,
+    -- NULL tant que le popup in-app ne l'a pas montré. Voir `notifications.read_at`
+    -- pour le même patron.
+    notified_at DATETIME NULL,
+    created_at DATETIME NOT NULL
+);
+
+CREATE INDEX rep_callback_reminders_pending_idx ON rep_callback_reminders (notified_at, scheduled_at);
+
+pendingRepCallbackReminders:
+    SELECT * FROM rep_callback_reminders
+    WHERE notified_at IS NULL
+    ORDER BY scheduled_at ASC;
 
 -- ── Registre des visites ─────────────────────────────────────────────────────
 --

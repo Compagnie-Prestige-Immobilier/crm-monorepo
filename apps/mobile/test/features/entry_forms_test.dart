@@ -14,6 +14,7 @@ import 'package:cpi_go/features/auth/auth_controller.dart';
 import 'package:cpi_go/features/auth/auth_state.dart';
 import 'package:cpi_go/features/prospect/presentation/prospect_entry_screen.dart';
 import 'package:cpi_go/features/representant/presentation/representant_form_screen.dart';
+import 'package:cpi_go/ui/widgets/cpi_kit.dart';
 // `Column` est masqué : celui de drift décrit une colonne SQL, et les finders
 // de ce fichier visent celui de Flutter.
 import 'package:drift/drift.dart' hide Column, isNotNull, isNull;
@@ -23,6 +24,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 
 import '../support/db_fixture.dart';
@@ -38,6 +40,77 @@ import '../support/fake_api.dart';
 /// relisait sous cet identifiant, qui n'avait par construction jamais rien
 /// porté. La saisie était bien en base ; plus personne ne savait sous quel nom
 /// la chercher.
+/// La saisie d'un champ ForUI : le libellé est posé À CÔTÉ de la zone de
+/// texte au lieu d'être logé dedans, hors de portée de `find.widgetWithText`.
+/// `FTextField` couvre aussi bien `CpiField` que les champs téléphone et les
+/// listes assistées, qui l'emploient directement.
+Finder champ(String label) => find.descendant(
+  of: find.ancestor(of: find.text(label), matching: find.byType(FTextField)),
+  matching: find.byType(TextField),
+);
+
+Finder bouton(String label) =>
+    find.byWidgetPredicate((Widget w) => w is CpiButton && w.label == label);
+
+/// La création d'un représentant se fait en TROIS étapes : qui est-ce, où
+/// travaille-t-il, de quoi l'appeler. Un test qui vise un champ des deux
+/// dernières doit franchir les précédentes, comme le commercial.
+Future<void> etapeIdentite(
+  WidgetTester tester, {
+  String nom = 'Ousmane Fall',
+  String telephone = '77 123 45 67',
+}) async {
+  await tester.enterText(champ('Nom complet'), nom);
+  await tester.pumpAndSettle();
+  await tester.enterText(champ('Téléphone'), telephone);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Continuer'));
+  await tester.pumpAndSettle();
+}
+
+Future<void> etapeLieu(
+  WidgetTester tester, {
+  String nom = 'Ousmane Fall',
+  String telephone = '77 123 45 67',
+  String departement = 'Dakar',
+}) async {
+  await etapeIdentite(tester, nom: nom, telephone: telephone);
+  await tester.tap(champ('Département'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(departement).last);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Continuer'));
+  await tester.pumpAndSettle();
+}
+
+/// La MODIFICATION suit les mêmes trois étapes que la création : la fiche est
+/// déjà remplie, il n'y a donc rien à saisir pour les franchir.
+Future<void> jusquAuContact(WidgetTester tester) async {
+  await tester.tap(find.text('Continuer'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Continuer'));
+  await tester.pumpAndSettle();
+}
+
+/// La saisie d'un prospect CHUES se fait en DEUX étapes : qui est-ce, puis sa
+/// banque et son syndicat. Un test qui vise la banque doit franchir la
+/// première, comme le téléconseiller.
+Future<void> etapeProspectQui(
+  WidgetTester tester, {
+  String prenom = 'Awa',
+  String nom = 'Sow',
+  String telephone = '77 123 45 67',
+}) async {
+  await tester.enterText(champ('Prénom'), prenom);
+  await tester.pumpAndSettle();
+  await tester.enterText(champ('Nom'), nom);
+  await tester.pumpAndSettle();
+  await tester.enterText(champ('Téléphone'), telephone);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Continuer'));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   late AppDatabase db;
   late FakeApi api;
@@ -257,6 +330,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Ousmane Fall'), findsOneWidget);
+      // Le département est à l'étape suivante : la reprise le rapporte aussi.
+      await tester.tap(find.text('Continuer'));
+      await tester.pumpAndSettle();
       expect(find.text('Dakar'), findsOneWidget);
 
       // Une seule ligne, et c'est l'ancienne : dupliquer laisserait la première
@@ -405,13 +481,14 @@ void main() {
 
       await tester.pumpWidget(host(const RepresentantFormScreen()));
       await tester.pumpAndSettle();
+      await etapeIdentite(tester);
 
-      await tester.tap(find.widgetWithText(TextField, 'Région'));
+      await tester.tap(champ('Région'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Tambacounda').last);
       await tester.pumpAndSettle();
 
-      await tester.tap(find.widgetWithText(TextField, 'Département'));
+      await tester.tap(champ('Département'));
       await tester.pumpAndSettle();
 
       expect(find.text('Bakel'), findsOneWidget);
@@ -429,19 +506,20 @@ void main() {
 
       await tester.pumpWidget(host(const RepresentantFormScreen()));
       await tester.pumpAndSettle();
+      await etapeIdentite(tester);
 
-      await tester.tap(find.widgetWithText(TextField, 'Département'));
+      await tester.tap(champ('Département'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Dakar').last);
       await tester.pumpAndSettle();
 
-      await tester.tap(find.widgetWithText(TextField, 'Région'));
+      await tester.tap(champ('Région'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Tambacounda').last);
       await tester.pumpAndSettle();
 
       final TextField departement = tester.widget<TextField>(
-        find.widgetWithText(TextField, 'Département'),
+        champ('Département'),
       );
       expect(departement.controller?.text, isEmpty);
     });
@@ -454,8 +532,9 @@ void main() {
         // jetait exactement ce qu'on cherche à protéger.
         await tester.pumpWidget(host(const RepresentantFormScreen()));
         await tester.pumpAndSettle();
+        await etapeIdentite(tester);
 
-        await tester.tap(find.widgetWithText(TextField, 'Département'));
+        await tester.tap(champ('Département'));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Dakar').last);
         await tester.pumpAndSettle();
@@ -463,42 +542,47 @@ void main() {
         await tester.pump(const Duration(seconds: 1));
         await tester.pumpAndSettle();
 
-        expect(await drafts(), hasLength(1));
+        final List<FormDraft> rows = await drafts();
+        expect(rows, hasLength(1));
+        expect(
+          jsonDecode(rows.single.payload) as Map<String, Object?>,
+          containsPair('departementId', 'dep-1'),
+        );
       },
     );
   });
 
   // ───────────────────────────────────────────────────────────────────────────
   group('reprise d\'une saisie de prospect', () {
-    formTestWidgets(
-      'banque et syndicat seuls suffisent à écrire un brouillon',
-      (WidgetTester tester) async {
-        await insertRepresentant(db, id: 'rep-1', phone: '+221770000001');
+    formTestWidgets('banque et syndicat choisies partent dans le brouillon', (
+      WidgetTester tester,
+    ) async {
+      await insertRepresentant(db, id: 'rep-1', phone: '+221770000001');
 
-        await tester.pumpWidget(
-          host(const ProspectEntryScreen(representantId: 'rep-1')),
-        );
-        await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        host(const ProspectEntryScreen(representantId: 'rep-1')),
+      );
+      await tester.pumpAndSettle();
+      await etapeProspectQui(tester);
 
-        await tester.tap(find.widgetWithText(TextField, 'Banque'));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Banque Test').last);
-        await tester.pumpAndSettle();
-        await tester.tap(find.widgetWithText(TextField, 'Syndicat'));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Syndicat Test').last);
-        await tester.pumpAndSettle();
-        await tester.pump(const Duration(seconds: 1));
-        await tester.pumpAndSettle();
+      await tester.tap(champ('Banque'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Banque Test').last);
+      await tester.pumpAndSettle();
+      await tester.tap(champ('Syndicat'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Syndicat Test').last);
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
 
-        final List<FormDraft> rows = await drafts();
-        expect(rows, hasLength(1));
-        final Map<String, Object?> values =
-            jsonDecode(rows.single.payload) as Map<String, Object?>;
-        expect(values['banqueId'], 'bq-1');
-        expect(values['syndicatId'], 'sy-1');
-      },
-    );
+      final List<FormDraft> rows = await drafts();
+      expect(rows, hasLength(1));
+      final Map<String, Object?> values =
+          jsonDecode(rows.single.payload) as Map<String, Object?>;
+      expect(values['banqueId'], 'bq-1');
+      expect(values['syndicatId'], 'sy-1');
+    });
 
     // Le Grand Public n'exige que le nom, le numéro et le secteur. Rendre un
     // champ de plus obligatoire, c'est une fiche abandonnée sur le terrain.
@@ -510,23 +594,34 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.enterText(find.widgetWithText(TextField, 'Nom'), 'Ndiaye');
-      await tester.enterText(
-        find.widgetWithText(TextField, 'Téléphone'),
-        '77 000 00 42',
-      );
+      await tester.enterText(champ('Nom'), 'Ndiaye');
+      await tester.enterText(champ('Téléphone'), '77 000 00 42');
       await tester.pumpAndSettle();
 
-      final Finder enregistrer = find.widgetWithText(
-        FilledButton,
-        'Enregistrer et suivant',
+      // Étape 1 sur 3 : « Continuer » reste éteint tant que le secteur manque,
+      // et il DIT lequel.
+      final Finder continuer = bouton('Continuer');
+      expect(tester.widget<CpiButton>(continuer).onPressed, isNull);
+      expect(
+        tester.widget<CpiButton>(continuer).subtitle,
+        'Choisissez le secteur',
       );
-      expect(tester.widget<FilledButton>(enregistrer).onPressed, isNull);
 
       await tester.tap(find.text('Informel'));
       await tester.pumpAndSettle();
 
-      expect(tester.widget<FilledButton>(enregistrer).onPressed, isNotNull);
+      expect(tester.widget<CpiButton>(continuer).onPressed, isNotNull);
+
+      // Les deux étapes suivantes sont facultatives : rien n'y retient.
+      await tester.tap(continuer);
+      await tester.pumpAndSettle();
+      await tester.tap(bouton('Continuer'));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget<CpiButton>(bouton('Enregistrer et suivant')).onPressed,
+        isNotNull,
+      );
     });
 
     formTestWidgets('la fiche Grand Public emporte ses champs propres', (
@@ -537,30 +632,39 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.enterText(find.widgetWithText(TextField, 'Nom'), 'Ndiaye');
-      await tester.enterText(
-        find.widgetWithText(TextField, 'Téléphone'),
-        '77 000 00 42',
-      );
+      await tester.enterText(champ('Nom'), 'Ndiaye');
+      await tester.enterText(champ('Téléphone'), '77 000 00 42');
       await tester.tap(find.text('Fonctionnaire'));
       await tester.pumpAndSettle();
-      await tester.enterText(
-        find.widgetWithText(TextField, 'Profession'),
-        'Instituteur',
+      // Le travail est à l'étape 2, la banque et la provenance à l'étape 3.
+      await tester.tap(bouton('Continuer'));
+      await tester.pumpAndSettle();
+      await tester.enterText(champ('Profession'), 'Instituteur');
+      await tester.enterText(champ('Ancienneté'), '24');
+      await tester.pumpAndSettle();
+      await tester.tap(bouton('Continuer'));
+      await tester.pumpAndSettle();
+      // Le libellé ForUI est posé AU-DESSUS du champ et les cibles tactiles
+      // font 48 dp au plancher : le formulaire est plus haut qu'avec les
+      // étiquettes flottantes de Material, et la `ListView` ne construit même
+      // plus le dernier champ tant qu'on ne l'a pas amené à l'image.
+      await tester.scrollUntilVisible(
+        find.text('Provenance'),
+        160,
+        scrollable: find.byType(Scrollable).first,
       );
-      await tester.enterText(
-        find.widgetWithText(TextField, 'Durée du système'),
-        '24',
-      );
-      await tester.tap(find.widgetWithText(TextField, 'Canal de provenance'));
+      await tester.pumpAndSettle();
+      await tester.tap(champ('Provenance'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Parrainage').last);
       await tester.pumpAndSettle();
 
-      await tester.tap(
-        find.widgetWithText(FilledButton, 'Enregistrer et suivant'),
-      );
-      await tester.pumpAndSettle();
+      await tester.tap(bouton('Enregistrer et suivant'));
+      // Des images comptées plutôt que `pumpAndSettle` : l'appui allume
+      // l'indicateur de progression du bouton, dont l'animation replanifie une
+      // image sans fin.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       final Prospect fiche = (await db.select(db.prospects).get()).single;
       expect(fiche.projet, 'GRAND_PUBLIC');
@@ -649,6 +753,10 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Supprimer'));
       await tester.pumpAndSettle();
+      // L'appui de ForUI arme un minuteur de 150 ms qui ne programme aucune
+      // image : `pumpAndSettle` s'arrête avant lui, et le démontage échoue
+      // alors sur « A Timer is still pending ».
+      await tester.pump(const Duration(milliseconds: 200));
 
       expect(find.textContaining('Saisie non terminée'), findsNothing);
       expect(await drafts(), isEmpty);
@@ -672,28 +780,26 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.widgetWithText(TextField, 'Prénom'), 'Awa');
-    await tester.enterText(find.widgetWithText(TextField, 'Nom'), 'Sow');
-    await tester.enterText(
-      find.widgetWithText(TextField, 'Téléphone'),
-      '771234567',
-    );
-    await tester.tap(find.widgetWithText(TextField, 'Banque'));
+    await etapeProspectQui(tester, telephone: '771234567');
+    await tester.tap(champ('Banque'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Banque Test').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(TextField, 'Syndicat'));
+    await tester.tap(champ('Syndicat'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Syndicat Test').last);
     await tester.pumpAndSettle();
 
     // Une frappe juste avant l'appui : le minuteur du brouillon est armé et n'a
     // pas encore tiré.
-    await tester.enterText(find.widgetWithText(TextField, 'Nom'), 'Sowe');
+    await tester.enterText(champ('Syndicat'), 'Syndicat Tes');
     await tester.pump();
     await tester.tap(find.text('Enregistrer et terminer'));
+    // Des images comptées : « et terminer » quitte l'écran, et sans navigateur
+    // pour l'emmener l'indicateur du bouton tourne indéfiniment. `pumpAndSettle`
+    // attendrait alors ses dix minutes de garde pour rien.
     await tester.pump(const Duration(milliseconds: 500));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 500));
 
     expect(await db.select(db.prospects).get(), hasLength(1));
     expect(await drafts(), isEmpty);
@@ -722,11 +828,11 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.textContaining('Référentiels non téléchargés'),
+        find.textContaining('Les listes ne sont pas encore'),
         findsOneWidget,
       );
       expect(
-        find.widgetWithText(TextButton, 'Synchroniser'),
+        find.widgetWithText(FButton, 'Recevoir les listes'),
         findsOneWidget,
         reason: 'un diagnostic sans action laisse l\'utilisateur au même point',
       );
@@ -738,7 +844,10 @@ void main() {
       await tester.pumpWidget(host(const RepresentantFormScreen()));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Référentiels non téléchargés'), findsNothing);
+      expect(
+        find.textContaining('Les listes ne sont pas encore'),
+        findsNothing,
+      );
     });
   });
 
@@ -759,12 +868,10 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await etapeIdentite(tester);
 
       expect(
-        find.descendant(
-          of: find.widgetWithText(TextField, 'Département'),
-          matching: find.text('Dakar'),
-        ),
+        find.descendant(of: champ('Département'), matching: find.text('Dakar')),
         findsOneWidget,
       );
     });
@@ -776,25 +883,9 @@ void main() {
       // l'affichait, et aucun écran mobile ne pouvait l'écrire.
       await tester.pumpWidget(hostRouted(const RepresentantFormScreen()));
       await tester.pumpAndSettle();
+      await etapeLieu(tester);
 
-      await tester.enterText(
-        find.widgetWithText(TextField, 'Nom complet'),
-        'Ousmane Fall',
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(TextField, 'Département'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Dakar').last);
-      await tester.pumpAndSettle();
-      await tester.enterText(
-        find.widgetWithText(TextField, 'Téléphone'),
-        '77 123 45 67',
-      );
-      await tester.pumpAndSettle();
-      await tester.enterText(
-        find.widgetWithText(TextField, 'Notes (facultatif)'),
-        'Absent le vendredi',
-      );
+      await tester.enterText(champ('Notes (facultatif)'), 'Absent le vendredi');
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Enregistrer et saisir des prospects'));
@@ -817,33 +908,17 @@ void main() {
     ) async {
       await tester.pumpWidget(hostRouted(const RepresentantFormScreen()));
       await tester.pumpAndSettle();
+      await etapeLieu(tester);
 
-      await tester.enterText(
-        find.widgetWithText(TextField, 'Nom complet'),
-        'Ousmane Fall',
-      );
+      await tester.tap(find.text('Même numéro'));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(TextField, 'Département'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Dakar').last);
-      await tester.pumpAndSettle();
-      await tester.enterText(
-        find.widgetWithText(TextField, 'Téléphone'),
-        '77 123 45 67',
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.widgetWithText(ChoiceChip, 'Même numéro'));
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.widgetWithText(TextField, 'Profession (facultatif)'),
-      );
+      await tester.tap(champ('Profession (facultatif)'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Instituteur').last);
       await tester.pumpAndSettle();
 
       // Aucun second champ de numéro n'apparaît : il n'y a rien à taper.
-      expect(find.widgetWithText(TextField, 'Numéro WhatsApp'), findsNothing);
+      expect(champ('Numéro WhatsApp'), findsNothing);
 
       await tester.tap(find.text('Enregistrer et saisir des prospects'));
       await tester.pump();
@@ -874,16 +949,15 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await tester.enterText(champ('Nom complet'), 'Ousmane Fall');
+      await tester.pumpAndSettle();
+      await jusquAuContact(tester);
+
       expect(
-        find.widgetWithText(ChoiceChip, 'NUMERO_PROFESSIONNEL'),
+        find.widgetWithText(FTile, 'NUMERO_PROFESSIONNEL'),
         findsOneWidget,
       );
 
-      await tester.enterText(
-        find.widgetWithText(TextField, 'Nom complet'),
-        'Ousmane Fall',
-      );
-      await tester.pumpAndSettle();
       await tester.tap(find.text('Enregistrer et saisir des prospects'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
@@ -907,22 +981,9 @@ void main() {
     const String expected = 'Ce numéro est déjà enregistré sur cet appareil.';
 
     Future<void> fillAndSave(WidgetTester tester) async {
-      await tester.enterText(
-        find.widgetWithText(TextField, 'Nom complet'),
-        'Ousmane Fall',
-      );
-      await tester.pumpAndSettle();
-      // Le département AVANT le téléphone : saisir le numéro fait apparaître le
-      // bandeau de doublon, qui décale la liste déroulante en cours d'ouverture.
-      await tester.tap(find.widgetWithText(TextField, 'Département'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Dakar').last);
-      await tester.pumpAndSettle();
-      await tester.enterText(
-        find.widgetWithText(TextField, 'Téléphone'),
-        typedPhone,
-      );
-      await tester.pumpAndSettle();
+      // Le doublon se signale dès l'étape de l'identité ; le département vient
+      // à l'étape suivante, où plus aucun bandeau ne décale la liste.
+      await etapeLieu(tester, telephone: typedPhone);
 
       await tester.tap(find.text('Enregistrer et saisir des prospects'));
       // Des images comptées plutôt que `pumpAndSettle` : l'appui allume
@@ -949,7 +1010,7 @@ void main() {
       final Finder saveBarColumn = find
           .ancestor(
             of: find.widgetWithText(
-              FilledButton,
+              FButton,
               'Enregistrer et saisir des prospects',
             ),
             matching: find.byType(Column),
@@ -982,7 +1043,7 @@ void main() {
       );
       expect(
         banner.bottom,
-        lessThanOrEqualTo(tester.getRect(find.byType(Scaffold)).bottom),
+        lessThanOrEqualTo(tester.getRect(find.byType(CpiScaffold)).bottom),
         reason:
             'sous le bas de l\'écran, il n\'est pas plus lisible que dans la liste',
       );
@@ -1023,7 +1084,7 @@ void main() {
         of: find
             .ancestor(
               of: find.widgetWithText(
-                FilledButton,
+                FButton,
                 'Enregistrer et saisir des prospects',
               ),
               matching: find.byType(Column),
@@ -1055,7 +1116,9 @@ void main() {
       );
 
       // Le second canal : l'infobulle, qui passe par-dessus le clavier ouvert.
-      expect(find.widgetWithText(SnackBar, expected), findsOneWidget);
+      // Elle porte le même texte que la barre épinglée, d'où les deux
+      // exemplaires.
+      expect(find.text(expected), findsNWidgets(2));
 
       // Le contrôle de fin de test exige que la poignée soit rendue AVANT les
       // `tearDown` ; `addTearDown` arriverait trop tard et ferait échouer un
@@ -1081,13 +1144,18 @@ void main() {
 
   // ───────────────────────────────────────────────────────────────────────────
   group('bandeau de contexte de la saisie de prospects', () {
-    /// La hauteur du bandeau est MESURÉE, et cette mesure doit tenir à 1,8.
+    /// Le bandeau a longtemps vécu sous une hauteur MESURÉE, puis figée à 28 px
+    /// — une ligne de `bodySmall` à l'échelle 1,0. À « Très grand », la même
+    /// ligne en réclame près de 40 et le texte sortait du bas de la barre. Le
+    /// balayage de débordement ne voit pas ce défaut : un texte coupé par une
+    /// hauteur trop courte ne lève aucun `RenderFlex`.
     ///
-    /// Elle était figée à 28 px : une ligne de `bodySmall` à l'échelle 1,0. À
-    /// « Très grand », la même ligne en réclame près de 40 et le texte sortait
-    /// du bas de la barre. Le balayage de débordement ne voit pas ce défaut :
-    /// un texte coupé par une hauteur trop courte ne lève aucun `RenderFlex`.
-    testWidgets('le texte reste entièrement dans la barre à 1,8', (
+    /// Le bandeau défile désormais avec le formulaire, sans hauteur imposée :
+    /// ce qui reste à tenir est qu'il coiffe le corps et qu'il prenne toute la
+    /// hauteur qu'il demande. La comparaison avec le premier champ n'est plus
+    /// possible : à 320 dp et 1,8, le bandeau à lui seul dépasse la hauteur du
+    /// corps, et la bascule « le représentant lui-même » s'intercale ensuite.
+    testWidgets('le texte prend toute sa hauteur, en tête du corps, à 1,8', (
       WidgetTester tester,
     ) async {
       tester.view.physicalSize = const Size(320 * 3, 780 * 3);
@@ -1130,16 +1198,165 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      // Le champ « Nom » s'autofocalise et fait défiler la liste jusqu'à lui :
+      // à 320 dp et 1,8, la bascule « le représentant lui-même » suffit à
+      // pousser le bandeau hors du viewport. Ce qui se vérifie ici est sa mise
+      // en page, pas sa position après un défilement : on revient en haut.
+      tester
+          .state<ScrollableState>(
+            find
+                .descendant(
+                  of: find.byType(CustomScrollView),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          )
+          .position
+          .jumpTo(0);
+      await tester.pumpAndSettle();
+
       final Finder strip = find.textContaining('Mamadou Diallo Ndiaye');
       expect(strip, findsOneWidget);
+      expect(tester.takeException(), isNull);
       expect(
-        tester.getRect(strip).bottom,
-        lessThanOrEqualTo(tester.getRect(find.byType(AppBar)).bottom),
-        reason: 'une hauteur figée coupe la dernière ligne sans rien signaler',
+        tester.getRect(strip).top,
+        tester.getRect(find.byType(CustomScrollView)).top,
+        reason: 'le bandeau coiffe le formulaire, il ne se glisse pas dedans',
+      );
+      expect(
+        tester.getSize(strip).height,
+        greaterThan(28),
+        reason:
+            'la hauteur figée à 28 px coupait la dernière ligne sans rien '
+            'signaler : le bandeau prend désormais la place qu\'il demande',
       );
 
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump(const Duration(milliseconds: 1));
+    });
+  });
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Le représentant qui vend le produit finit souvent par y souscrire : il
+  // devient alors un prospect chez lui-même. Sans cette bascule, le
+  // téléconseiller retapait un nom et un numéro qu'il avait sous les yeux.
+  group('le représentant lui-même', () {
+    formTestWidgets('la bascule remplit le nom et verrouille le numéro', (
+      WidgetTester tester,
+    ) async {
+      await insertRepresentant(
+        db,
+        id: 'rep-1',
+        phone: '+221770000001',
+        fullName: 'Ousmane Fall',
+      );
+
+      await tester.pumpWidget(
+        host(const ProspectEntryScreen(representantId: 'rep-1')),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Le représentant lui-même est intéressé'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ousmane'), findsOneWidget);
+      expect(find.text('Fall'), findsOneWidget);
+      expect(find.text('77 000 00 01'), findsOneWidget);
+      expect(
+        tester.widget<TextField>(champ('Téléphone')).enabled,
+        isFalse,
+        reason: 'le numéro vient de la fiche : le retoucher casserait le lien',
+      );
+      // La première étape est complète du seul fait de la bascule : rien à
+      // taper avant de passer à la banque.
+      expect(
+        tester.widget<CpiButton>(bouton('Continuer')).onPressed,
+        isNotNull,
+      );
+
+      await tester.tap(bouton('Continuer'));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.widget<CpiButton>(bouton('Enregistrer et suivant')).onPressed,
+        isNotNull,
+      );
+    });
+
+    formTestWidgets('elle enregistre un prospect ordinaire chez lui', (
+      WidgetTester tester,
+    ) async {
+      await insertRepresentant(
+        db,
+        id: 'rep-1',
+        phone: '+221770000001',
+        fullName: 'Ousmane Fall',
+      );
+
+      await tester.pumpWidget(
+        host(const ProspectEntryScreen(representantId: 'rep-1')),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Le représentant lui-même est intéressé'));
+      await tester.pumpAndSettle();
+      await tester.tap(bouton('Continuer'));
+      await tester.pumpAndSettle();
+      await tester.tap(bouton('Enregistrer et suivant'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final List<Prospect> saisis = await db.select(db.prospects).get();
+      expect(saisis, hasLength(1));
+      expect(saisis.single.nom, 'Fall');
+      expect(saisis.single.prenom, 'Ousmane');
+      expect(saisis.single.phoneE164, '+221770000001');
+      expect(saisis.single.representantId, 'rep-1');
+      expect(saisis.single.projet, 'CHUES');
+    });
+
+    // Le représentant a déjà été saisi comme prospect : le même bandeau que
+    // pour n'importe quel doublon, et rien de plus.
+    formTestWidgets('un numéro déjà saisi porte le bandeau « Déjà saisi »', (
+      WidgetTester tester,
+    ) async {
+      await insertRepresentant(
+        db,
+        id: 'rep-1',
+        phone: '+221770000001',
+        fullName: 'Ousmane Fall',
+      );
+      await insertProspect(
+        db,
+        id: 'pro-1',
+        representantId: 'rep-1',
+        phone: '+221770000001',
+        nom: 'Fall',
+        prenom: 'Ousmane',
+      );
+
+      await tester.pumpWidget(
+        host(const ProspectEntryScreen(representantId: 'rep-1')),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Le représentant lui-même est intéressé'));
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Déjà saisi : Ousmane Fall'), findsOneWidget);
+    });
+
+    // Rien de tout cela dans le Grand Public : il n'y a pas de représentant.
+    formTestWidgets('le Grand Public n\'a pas de bascule', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        host(const ProspectEntryScreen(projet: 'GRAND_PUBLIC')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Le représentant lui-même est intéressé'), findsNothing);
     });
   });
 
@@ -1179,18 +1396,38 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.widgetWithText(TextField, 'Ousmane'),
+        champ('Ousmane'),
         findsOneWidget,
         reason: 'le champ doit refléter le filtre réellement appliqué',
       );
     });
 
-    formTestWidgets('créer après une recherche vaine EMPORTE la recherche', (
+    // La base des représentants est importée depuis le web : le mobile ne la
+    // crée plus. Ni bouton de pied, ni « Créer « <recherche> » » sous un
+    // résultat vide.
+    formTestWidgets('aucune création de représentant depuis l\'annuaire', (
       WidgetTester tester,
     ) async {
-      // Chercher « Ousmane », ne pas le trouver, puis retaper « Ousmane » dans
-      // l'écran suivant : un geste de plus juste après en avoir fait un pour
-      // rien.
+      await tester.pumpWidget(hostPicker());
+      await tester.pumpAndSettle();
+
+      expect(find.text('Aucun représentant'), findsOneWidget);
+      expect(find.text('Ils sont importés depuis le web.'), findsOneWidget);
+      expect(bouton('Créer un représentant'), findsNothing);
+
+      await tester.enterText(find.byType(EditableText).first, 'Ousmane');
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Aucun résultat'), findsOneWidget);
+      expect(bouton('Créer « Ousmane »'), findsNothing);
+    });
+
+    // Le formulaire de création reste routable pour la MODIFICATION d'une fiche
+    // importée (`?id=`) ; plus aucun bouton n'y mène en création.
+    formTestWidgets('un pré-remplissage arrive intact dans le formulaire', (
+      WidgetTester tester,
+    ) async {
       expect(
         Routes.newRepresentantPrefilled('Ousmane Fall'),
         contains('nom=Ousmane'),
@@ -1213,13 +1450,12 @@ void main() {
       expect(find.text('77 123 45 67'), findsOneWidget);
     });
 
-    /// Les fiches sont IMPORTÉES : on ne les crée quasiment jamais, on les
-    /// choisit. Choisir sautait par-dessus la fiche et tombait directement sur
-    /// la saisie de prospects : plus rien ne permettait de corriger un numéro
-    /// ou de compléter une profession recueillie au téléphone.
-    formTestWidgets('choisir un représentant ouvre SA fiche, préremplie', (
+    formTestWidgets('choisir un représentant ouvre la saisie sans détour', (
       WidgetTester tester,
     ) async {
+      // La feuille « Que voulez-vous faire ? » posait une question dont la
+      // réponse était toujours la même. Le résultat de l'appel se consigne
+      // depuis la fiche, où il a sa place.
       await insertRepresentant(
         db,
         id: 'rep-1',
@@ -1235,34 +1471,7 @@ void main() {
       await tester.tap(find.text('Ousmane Fall'));
       await tester.pumpAndSettle();
 
-      expect(
-        find.text('prospects'),
-        findsNothing,
-        reason: 'le formulaire ne se saute pas',
-      );
-      expect(
-        find.descendant(
-          of: find.widgetWithText(TextField, 'Nom complet'),
-          matching: find.text('Ousmane Fall'),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(
-          of: find.widgetWithText(TextField, 'Téléphone'),
-          matching: find.text('77 000 00 01'),
-        ),
-        findsOneWidget,
-      );
-      expect(find.text('Instituteur'), findsWidgets);
-      // Où en est la relation, sans quitter la fiche, et réglable sur place.
-      expect(find.text('Relation'), findsOneWidget);
-      expect(
-        tester
-            .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Ambassadeur'))
-            .selected,
-        isTrue,
-      );
+      expect(find.text('prospects'), findsOneWidget);
     });
 
     // Le commercial est celui qui sait qu'un représentant vient d'accepter :
@@ -1282,8 +1491,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.widgetWithText(ChoiceChip, 'Ambassadeur'));
+      await tester.tap(find.text('Ambassadeur'));
       await tester.pumpAndSettle();
+      await jusquAuContact(tester);
       await tester.tap(find.text('Enregistrer et saisir des prospects'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
@@ -1311,6 +1521,7 @@ void main() {
         hostRouted(const RepresentantFormScreen(representantId: 'rep-1')),
       );
       await tester.pumpAndSettle();
+      await jusquAuContact(tester);
       await tester.tap(find.text('Enregistrer et saisir des prospects'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
@@ -1329,25 +1540,9 @@ void main() {
     ) async {
       await tester.pumpWidget(hostRouted(const RepresentantFormScreen()));
       await tester.pumpAndSettle();
+      await etapeLieu(tester);
 
-      await tester.enterText(
-        find.widgetWithText(TextField, 'Nom complet'),
-        'Ousmane Fall',
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(TextField, 'Département'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Dakar').last);
-      await tester.pumpAndSettle();
-      await tester.enterText(
-        find.widgetWithText(TextField, 'Téléphone'),
-        '77 123 45 67',
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(
-        find.widgetWithText(TextField, 'Profession (facultatif)'),
-      );
+      await tester.tap(champ('Profession (facultatif)'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Instituteur').last);
       await tester.pumpAndSettle();
@@ -1368,24 +1563,10 @@ void main() {
     ) async {
       await tester.pumpWidget(hostRouted(const RepresentantFormScreen()));
       await tester.pumpAndSettle();
+      await etapeLieu(tester);
 
       await tester.enterText(
-        find.widgetWithText(TextField, 'Nom complet'),
-        'Ousmane Fall',
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(TextField, 'Département'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Dakar').last);
-      await tester.pumpAndSettle();
-      await tester.enterText(
-        find.widgetWithText(TextField, 'Téléphone'),
-        '77 123 45 67',
-      );
-      await tester.pumpAndSettle();
-
-      await tester.enterText(
-        find.widgetWithText(TextField, 'Profession (facultatif)'),
+        champ('Profession (facultatif)'),
         'Surveillant général',
       );
       await tester.pumpAndSettle();
@@ -1406,18 +1587,14 @@ void main() {
     ) async {
       await tester.pumpWidget(host(const RepresentantFormScreen()));
       await tester.pumpAndSettle();
+      await etapeLieu(tester);
 
-      await tester.enterText(
-        find.widgetWithText(TextField, 'Profession (facultatif)'),
-        'a' * 400,
-      );
+      await tester.enterText(champ('Profession (facultatif)'), 'a' * 400);
       await tester.pumpAndSettle();
 
       expect(
         tester
-            .widget<TextField>(
-              find.widgetWithText(TextField, 'Profession (facultatif)'),
-            )
+            .widget<TextField>(champ('Profession (facultatif)'))
             .controller!
             .text
             .length,

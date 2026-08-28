@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:forui/forui.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
@@ -17,7 +18,10 @@ import '../../../data/local/database.dart';
 import '../notification_inbox.dart';
 import '../notifications_controller.dart';
 import '../../../ui/async_value_x.dart';
+import '../../../ui/widgets/cpi_action_bar.dart';
+import '../../../ui/widgets/cpi_kit.dart';
 import '../../../ui/widgets/empty_state.dart';
+import '../../../ui/widgets/error_state.dart';
 
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
@@ -50,60 +54,106 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     ref.read(notificationInboxProvider).refresh(force: true).ignore();
   }
 
-  Future<void> _markAllRead() async {
+  Future<void> _markAllRead(BuildContext context, int unread) async {
+    // Lu AVANT la feuille : la confirmation démonte le contexte, et un `ref`
+    // relu ensuite porterait sur un widget mort.
+    final PushInboxStore store = ref.read(pushInboxStoreProvider);
+    final bool? ok = await cpiConfirm(
+      context,
+      title: 'Tout marquer comme lu ?',
+      message: unread == 1
+          ? 'Cette annonce sera marquée lue.'
+          : '$unread annonces seront marquées lues.',
+      confirmLabel: 'Marquer',
+    );
+    if (ok != true) return;
     try {
-      await ref.read(pushInboxStoreProvider).markAllRead();
+      await store.markAllRead();
     } on Object {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Marquage impossible. Réessayez.')),
-      );
+      if (!mounted || !context.mounted) return;
+      cpiToast(context, 'Marquage impossible. Réessayez.', persistent: true);
+      return;
     }
+    if (!mounted || !context.mounted) return;
+    cpiToast(
+      context,
+      unread == 1 ? 'Annonce marquée lue.' : '$unread annonces marquées lues.',
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    final CpiColors cpi = context.cpi;
     final AsyncValue<List<StoredNotification>> notifications = ref.watch(
       notificationsProvider,
     );
+    final int unread = ref.watch(unreadNotificationsProvider).value ?? 0;
 
     return CpiPopScope(
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Annonces'),
-          leading: const CpiBackButton(),
-          actions: <Widget>[
-            IconButton(
-              tooltip: 'Tout marquer comme lu',
-              icon: const Icon(PhosphorIconsRegular.checks),
-              onPressed: _markAllRead,
-            ),
-            const SizedBox(width: CpiSpacing.xxs),
-          ],
+      child: CpiScaffold(
+        title: 'Annonces',
+        leading: const CpiBackButton(),
+        banner: ValueListenableBuilder<InboxStatus>(
+          valueListenable: ref.watch(notificationInboxProvider).status,
+          builder: (BuildContext context, InboxStatus status, Widget? _) =>
+              status.state != InboxSync.offline
+              ? const SizedBox.shrink()
+              : const Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    CpiSpacing.md,
+                    0,
+                    CpiSpacing.md,
+                    CpiSpacing.xs,
+                  ),
+                  child: CpiStatusBand(
+                    text: 'Hors ligne. Voici les annonces déjà reçues.',
+                    tone: CpiTone.warning,
+                  ),
+                ),
         ),
+        footer: unread == 0
+            ? null
+            // `Builder` : la confirmation et le message bref ont besoin d'un
+            // contexte SOUS le `FToaster` que pose `CpiScaffold`.
+            : Builder(
+                builder: (BuildContext context) => CpiActionBar(
+                  child: MergeSemantics(
+                    child: Semantics(
+                      container: true,
+                      button: true,
+                      onTap: () => unawaited(_markAllRead(context, unread)),
+                      child: CpiButton(
+                        'Tout marquer comme lu',
+                        icon: PhosphorIconsRegular.checks,
+                        onPressed: () =>
+                            unawaited(_markAllRead(context, unread)),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
         body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            ValueListenableBuilder<InboxStatus>(
-              valueListenable: ref.watch(notificationInboxProvider).status,
-              builder: (BuildContext context, InboxStatus status, Widget? _) {
-                if (status.state != InboxSync.offline) {
-                  return const SizedBox.shrink();
-                }
-                return _StaleStrip(lastSuccessAt: status.lastSuccessAt);
-              },
-            ),
+            if (unread > 0)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  CpiSpacing.md,
+                  0,
+                  CpiSpacing.md,
+                  CpiSpacing.xs,
+                ),
+                child: Text(
+                  '$unread non lue${unread > 1 ? 's' : ''}',
+                  style: theme.textTheme.titleSmall,
+                ),
+              ),
             Expanded(
               child: notifications.whenEchecDAbord(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (Object error, StackTrace stack) => CpiEmptyState(
-                  icon: PhosphorIconsDuotone.warningCircle,
-                  title: 'Liste indisponible',
-                  message:
-                      'Les annonces enregistrées sur cet appareil n’ont pas pu '
-                      'être lues.',
-                  iconColor: cpi.syncFailed,
+                loading: () => const Center(child: FCircularProgress()),
+                error: (Object _, StackTrace _) => CpiErrorState(
+                  message: 'Les annonces n\'ont pas pu être lues.',
+                  onRetry: () => ref.invalidate(notificationsProvider),
                 ),
                 data: (List<StoredNotification> rows) => RefreshIndicator(
                   color: theme.colorScheme.primary,
@@ -123,78 +173,40 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                                 constraints: BoxConstraints(
                                   minHeight: box.maxHeight,
                                 ),
-                                child: const CpiEmptyState(
+                                child: CpiEmptyState(
                                   icon: PhosphorIconsDuotone.megaphone,
                                   title: 'Aucune annonce',
-                                  message:
-                                      'Les annonces et les rappels envoyés par le '
-                                      'siège apparaîtront ici, même sans réseau.\n'
-                                      'Tirez vers le bas pour actualiser.',
+                                  message: 'Rien pour l\'instant.',
+                                  action: CpiButton(
+                                    'Actualiser',
+                                    icon: PhosphorIconsRegular.arrowClockwise,
+                                    expand: false,
+                                    onPressed: _refresh,
+                                  ),
                                 ),
                               ),
                             );
                           },
                         )
-                      : ListView.separated(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: CpiSpacing.xs,
+                      : Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            CpiSpacing.md,
+                            0,
+                            CpiSpacing.md,
+                            CpiSpacing.md,
                           ),
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          itemCount: rows.length,
-                          separatorBuilder: (BuildContext context, int index) =>
-                              const Divider(
-                                height: 1,
-                                indent: CpiSpacing.md,
-                                endIndent: CpiSpacing.md,
-                              ),
-                          itemBuilder: (BuildContext context, int index) =>
-                              _NotificationTile(data: rows[index]),
+                          child: FTileGroup.builder(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            count: rows.length,
+                            tileBuilder: (BuildContext context, int index) =>
+                                _NotificationTile(data: rows[index]),
+                          ),
                         ),
                 ),
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _StaleStrip extends StatelessWidget {
-  const _StaleStrip({this.lastSuccessAt});
-
-  final DateTime? lastSuccessAt;
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final CpiColors cpi = context.cpi;
-    return Container(
-      width: double.infinity,
-      color: cpi.accentSurface,
-      padding: const EdgeInsets.symmetric(
-        horizontal: CpiSpacing.md,
-        vertical: CpiSpacing.xs,
-      ),
-      child: Row(
-        children: <Widget>[
-          Icon(
-            PhosphorIconsRegular.cloudSlash,
-            size: CpiIconSize.xs,
-            color: cpi.accentText,
-          ),
-          const SizedBox(width: CpiSpacing.xs),
-          Expanded(
-            child: Text(
-              lastSuccessAt == null
-                  ? 'Liste non actualisée, hors ligne. '
-                        'Seules les annonces déjà reçues sont affichées.'
-                  : 'Liste non actualisée, hors ligne. '
-                        'Dernière mise à jour : ${_formatDate(lastSuccessAt!)}.',
-              style: theme.textTheme.bodySmall?.copyWith(color: cpi.accentText),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -227,9 +239,7 @@ class _NotificationTileState extends ConsumerState<_NotificationTile> {
     } on Object {
       _opening = false;
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Marquage impossible. Réessayez.')),
-      );
+      cpiToast(context, 'Marquage impossible. Réessayez.', persistent: true);
       return;
     }
     if (!mounted) {
@@ -249,80 +259,50 @@ class _NotificationTileState extends ConsumerState<_NotificationTile> {
     final bool isUnread = data.readAt == null;
     final bool hasRoute = PushMessage.isSafeRoute(data.route);
 
-    return InkWell(
-      onTap: () => unawaited(_open()),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 48),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: CpiSpacing.md,
-            vertical: CpiSpacing.sm,
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return FTile(
+      title: Text(data.title),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(data.body),
+          const SizedBox(height: CpiSpacing.xxs),
+          // `Wrap` et non `Row` : au plus grand texte, date et affordance
+          // « Ouvrir » ne tiennent plus côte à côte dans la largeur restante.
+          Wrap(
+            spacing: CpiSpacing.xs,
+            runSpacing: CpiSpacing.xxs,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: <Widget>[
-              Semantics(
-                label: isUnread ? 'Non lue' : 'Lue',
-                child: Container(
-                  margin: const EdgeInsets.only(top: 6),
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isUnread
-                        ? theme.colorScheme.primary
-                        : Colors.transparent,
-                  ),
+              Text(
+                _formatDate(data.createdAt),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(width: CpiSpacing.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              if (hasRoute)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    Text(
-                      data.title,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: isUnread
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                      ),
+                    Icon(
+                      PhosphorIconsRegular.arrowRight,
+                      size: CpiIconSize.xxs,
+                      color: cpi.accentText,
                     ),
-                    const SizedBox(height: 2),
-                    Text(data.body, style: theme.textTheme.bodyMedium),
-                    const SizedBox(height: CpiSpacing.xxs),
-                    Row(
-                      children: <Widget>[
-                        Text(
-                          _formatDate(data.createdAt),
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                        if (hasRoute) ...<Widget>[
-                          const SizedBox(width: CpiSpacing.xs),
-                          Icon(
-                            PhosphorIconsRegular.arrowRight,
-                            size: CpiIconSize.xxs,
-                            color: cpi.accentText,
-                          ),
-                          const SizedBox(width: 2),
-                          Text(
-                            'Ouvrir',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: cpi.accentText,
-                            ),
-                          ),
-                        ],
-                      ],
+                    const SizedBox(width: CpiSpacing.xxs),
+                    Text(
+                      'Ouvrir',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: cpi.accentText,
+                      ),
                     ),
                   ],
                 ),
-              ),
             ],
           ),
-        ),
+        ],
       ),
+      details: isUnread ? const CpiTag('Non lue', tone: CpiTone.warning) : null,
+      onPress: () => unawaited(_open()),
     );
   }
 }

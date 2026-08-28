@@ -482,6 +482,28 @@ void main() {
       expect((await outboxById(db, 'V1')).status, OutboxStatus.done);
     });
 
+    test('une qualification représentant en file est envoyée', () async {
+      await queueOp(
+        db,
+        id: 'RA1',
+        entityType: 'rep_call_attempt',
+        entityId: 'repA',
+        payload: <String, Object?>{
+          'id': '01931f3c-1a2b-7c4d-8e5f-000000000001',
+          'representantId': 'repA',
+          'outcome': 'REACHED',
+          'relationStatus': 'AMBASSADEUR',
+          'whatsappStatus': 'MEME_NUMERO',
+          'clientCreatedAt': t0.toIso8601String(),
+        },
+      );
+
+      await engine.drain();
+
+      expect((await outboxById(db, 'RA1')).status, OutboxStatus.done);
+      expect(api.repCallAttempts.single.representantId, 'repA');
+    });
+
     test('un verdict `duplicate` est un succès, pas un échec', () async {
       await insertRepresentant(db, id: 'repA', phone: '+221770000001');
       await queueOp(db, id: 'A1', entityType: 'representant', entityId: 'repA');
@@ -1759,6 +1781,8 @@ void main() {
             prospects: const <ProspectDto>[],
             callCampaigns: const <SyncCallCampaignDto>[],
             callTasks: const <SyncCallTaskDto>[],
+            repCallCampaigns: const <SyncRepCallCampaignDto>[],
+            repCallTasks: const <SyncRepCallTaskDto>[],
             visites: const <SyncVisiteDto>[],
           ),
           deletions: const <SyncDeletionDto>[],
@@ -1800,6 +1824,8 @@ void main() {
             ],
             callCampaigns: const <SyncCallCampaignDto>[],
             callTasks: const <SyncCallTaskDto>[],
+            repCallCampaigns: const <SyncRepCallCampaignDto>[],
+            repCallTasks: const <SyncRepCallTaskDto>[],
             visites: const <SyncVisiteDto>[],
           ),
           deletions: const <SyncDeletionDto>[],
@@ -1855,6 +1881,8 @@ void main() {
             prospects: const <ProspectDto>[],
             callCampaigns: const <SyncCallCampaignDto>[],
             callTasks: const <SyncCallTaskDto>[],
+            repCallCampaigns: const <SyncRepCallCampaignDto>[],
+            repCallTasks: const <SyncRepCallTaskDto>[],
             visites: const <SyncVisiteDto>[],
           ),
           deletions: const <SyncDeletionDto>[],
@@ -1895,6 +1923,8 @@ void main() {
             prospects: const <ProspectDto>[],
             callCampaigns: const <SyncCallCampaignDto>[],
             callTasks: const <SyncCallTaskDto>[],
+            repCallCampaigns: const <SyncRepCallCampaignDto>[],
+            repCallTasks: const <SyncRepCallTaskDto>[],
             visites: const <SyncVisiteDto>[],
           ),
           deletions: <SyncDeletionDto>[
@@ -1930,6 +1960,8 @@ void main() {
             prospects: const <ProspectDto>[],
             callCampaigns: const <SyncCallCampaignDto>[],
             callTasks: const <SyncCallTaskDto>[],
+            repCallCampaigns: const <SyncRepCallCampaignDto>[],
+            repCallTasks: const <SyncRepCallTaskDto>[],
             visites: const <SyncVisiteDto>[],
           ),
           deletions: const <SyncDeletionDto>[],
@@ -1974,9 +2006,12 @@ void main() {
                   position: 1,
                   dayIndex: 0,
                   status: CallTaskStatus.OPEN,
+                  isActive: true,
                   updatedAt: t0,
                 ),
               ],
+              repCallCampaigns: const <SyncRepCallCampaignDto>[],
+              repCallTasks: const <SyncRepCallTaskDto>[],
               visites: const <SyncVisiteDto>[],
             ),
             deletions: const <SyncDeletionDto>[],
@@ -2034,6 +2069,8 @@ void main() {
               prospects: const <ProspectDto>[],
               callCampaigns: const <SyncCallCampaignDto>[],
               callTasks: const <SyncCallTaskDto>[],
+              repCallCampaigns: const <SyncRepCallCampaignDto>[],
+              repCallTasks: const <SyncRepCallTaskDto>[],
               visites: <SyncVisiteDto>[
                 SyncVisiteDto(
                   id: 'visite-1',

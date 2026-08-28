@@ -74,15 +74,33 @@ dependencies:
   path: ^1.9.0
   path_provider: ^2.1.5
   shared_preferences: ^2.5.0
-  collection: ^1.19.0
   record: '>=6.1.2 <7.0.0'
   just_audio: ^0.10.6
+  # Tirée par just_audio, mais importée directement par core/feedback : le mode
+  # sonnerie et les attributs audio des sons d'interface s'y lisent. Jamais
+  # `AudioSession.configure()` : la note vocale partage la session du processus.
+  audio_session: ^0.2.4
   # Ni `firebase_core` ni `firebase_messaging` : le projet Firebase exige un
   # compte Google que CPI n'a pas et ne veut pas ouvrir. Le canal d'annonces est
   # donc l'inbox applicative, tirée depuis `/notifications/mine` (voir
   # `features/notifications/notification_inbox.dart`). Elle marche hors ligne,
   # ne demande aucune autorisation système, et ne dépend d'aucun tiers.
   crypto: ^3.0.3
+  # Alarme des rappels représentants promis pendant un appel (issue CALLBACK).
+  # Locale, pas Firebase : même raison que ci-dessus, et c'est justement ce
+  # qu'il faut pour survivre à une app fermée sans dépendre d'un serveur push.
+  flutter_local_notifications: ^19.4.2
+  # Tirée par flutter_local_notifications (zonedSchedule exige un TZDateTime),
+  # mais importée directement pour construire ces dates : voir le commentaire
+  # sur `_businessTime` dans callback_picker.dart, Dakar est fixe en UTC toute
+  # l'année, `tz.UTC` suffit — aucune base IANA n'est chargée.
+  timezone: ^0.10.1
+
+  # ── Système visuel ──────────────────────────────────────────────────────────
+  # Migration progressive vers le langage visuel de references/gnawalma. Les
+  # écrans encore Material cohabitent avec ForUI le temps de la migration
+  # (voir core/theme/forui_theme.dart, lib/ui/widgets/cpi_kit.dart).
+  forui: ^0.21.3
 
 dev_dependencies:
   flutter_test:
@@ -107,24 +125,11 @@ flutter:
 
   assets:
     - assets/brand/
+    - assets/sounds/
 
   # Polices EMPAQUETÉES dans l'APK. Pas de `google_fonts` : un premier lancement
   # sur réseau faible afficherait une police de repli pendant dix secondes.
   fonts:
-    - family: Bricolage Grotesque
-      fonts:
-        - asset: assets/fonts/BricolageGrotesque-Light.ttf
-          weight: 300
-        - asset: assets/fonts/BricolageGrotesque-Regular.ttf
-          weight: 400
-        - asset: assets/fonts/BricolageGrotesque-Medium.ttf
-          weight: 500
-        - asset: assets/fonts/BricolageGrotesque-SemiBold.ttf
-          weight: 600
-        - asset: assets/fonts/BricolageGrotesque-Bold.ttf
-          weight: 700
-        - asset: assets/fonts/BricolageGrotesque-ExtraBold.ttf
-          weight: 800
     - family: Plus Jakarta Sans
       fonts:
         - asset: assets/fonts/PlusJakartaSans-Light.ttf
@@ -149,13 +154,21 @@ flutter_launcher_icons:
   adaptive_icon_foreground_inset: 22
 
 # ── Écran de démarrage ────────────────────────────────────────────────────────
+# La surface neutre de l'application, pas l'aplat de marque : le démarrage
+# natif et `_BrandSplash` doivent être le même écran. Le logo couleur est sur
+# fond blanc opaque, d'où le fichier détouré blanc en sombre.
 flutter_native_splash:
-  color: "#630210"
-  image: assets/brand/cpi-header.png
+  color: "#FAF7F7"
+  image: assets/brand/cpi-logo.png
+  color_dark: "#141013"
+  image_dark: assets/brand/cpi-header.png
   android_12:
-    color: "#630210"
-    image: assets/brand/icon-512.png
-    icon_background_color: "#630210"
+    color: "#FAF7F7"
+    image: assets/brand/cpi-logo.png
+    icon_background_color: "#FAF7F7"
+    color_dark: "#141013"
+    image_dark: assets/brand/cpi-header.png
+    icon_background_color_dark: "#141013"
   android: true
   ios: false
   web: false
