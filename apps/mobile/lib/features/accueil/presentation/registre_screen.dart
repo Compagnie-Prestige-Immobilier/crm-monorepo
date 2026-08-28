@@ -21,7 +21,6 @@ import '../../../ui/widgets/cpi_kit.dart';
 import '../../../ui/widgets/empty_state.dart';
 import '../../../ui/widgets/error_state.dart';
 import '../../../ui/widgets/search_field.dart';
-import '../../../ui/widgets/sync_status_icon.dart';
 import '../../auth/auth_state.dart';
 import '../visites_repository.dart';
 import 'acces_refuse.dart';
@@ -380,11 +379,6 @@ class _RegistreTronque extends ConsumerWidget {
   }
 }
 
-CpiTone _tonEnvoi(SyncStatus statut) {
-  if (statut == SyncStatus.synced) return CpiTone.success;
-  return statut.needsAttention ? CpiTone.danger : CpiTone.neutral;
-}
-
 /// Une visite, empilée : à la taille de texte maximale, une rangée
 /// heure + nom + état ne tient sur aucun téléphone de 320 dp.
 ///
@@ -446,8 +440,15 @@ class _LigneVisite extends ConsumerWidget {
               reference,
               style: theme.textTheme.bodyMedium?.copyWith(color: discret),
             ),
-          const SizedBox(height: CpiSpacing.sm),
-          CpiTag(visite.syncStatus.label, tone: _tonEnvoi(visite.syncStatus)),
+          if (visite.syncStatus.aSignaler case final String signal) ...<Widget>[
+            const SizedBox(height: CpiSpacing.sm),
+            CpiTag(
+              signal,
+              tone: visite.syncStatus.needsAttention
+                  ? CpiTone.danger
+                  : CpiTone.neutral,
+            ),
+          ],
         ],
       ),
     );

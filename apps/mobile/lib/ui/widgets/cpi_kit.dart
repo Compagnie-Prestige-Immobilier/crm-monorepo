@@ -799,15 +799,20 @@ class CpiPersonRow extends StatelessWidget {
   final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) => CpiRow(
-    title: name,
-    subtitle: phone,
-    // L'icône n'est pas étiquetée : la pastille dit déjà l'état, et deux
-    // annonces pour un seul signal font une ligne bavarde.
-    leading: SyncStatusIcon(status: status, labelled: false),
-    trailing: CpiTag(status.label, tone: status.tone),
-    onTap: onTap,
-  );
+  Widget build(BuildContext context) {
+    final String? signal = status.aSignaler;
+    return CpiRow(
+      title: name,
+      subtitle: phone,
+      // L'icône n'est pas étiquetée : la pastille dit déjà l'état, et deux
+      // annonces pour un seul signal font une ligne bavarde.
+      leading: signal == null
+          ? null
+          : SyncStatusIcon(status: status, labelled: false),
+      trailing: signal == null ? null : CpiTag(signal, tone: status.tone),
+      onTap: onTap,
+    );
+  }
 }
 
 /// Chiffre de tableau de bord qui défile jusqu'à sa valeur.

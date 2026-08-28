@@ -13,6 +13,7 @@ import '../../../data/local/database.dart';
 import '../../../ui/widgets/cpi_action_bar.dart';
 import '../../../ui/widgets/cpi_choice_group.dart';
 import '../../../ui/widgets/cpi_kit.dart';
+import '../../../ui/widgets/cpi_pressable.dart';
 import '../../../ui/widgets/cpi_steps.dart';
 import '../../../ui/widgets/phone_field.dart';
 import '../../phase2/presentation/callback_picker.dart';
@@ -72,9 +73,12 @@ class _RepresentantQualificationScreenState
   bool get proposeQuelquUn =>
       resultat == _Resultat.joignable && representantCpi == false;
 
-  /// Le serveur n'enregistre la suggestion qu'avec un numéro : le nom seul ne
-  /// désigne personne à rappeler.
-  bool get suggestionCommencee => suggestionTelephone.text.trim().isNotEmpty;
+  /// N'importe lequel des trois champs suffit à ouvrir la suggestion : ce que
+  /// le téléconseiller a tapé ne doit pas disparaître faute de numéro.
+  bool get suggestionCommencee =>
+      suggestionTelephone.text.trim().isNotEmpty ||
+      suggestionNom.text.trim().isNotEmpty ||
+      suggestionNote.text.trim().isNotEmpty;
 
   /// [context] est pris SOUS la coque : le message passe par son `FToaster`.
   void erreur(BuildContext context, String message) =>
@@ -101,21 +105,21 @@ class _RepresentantQualificationScreenState
     if (choix == _Resultat.rappel && rappelAt == null) {
       return 'Choisissez quand rappeler';
     }
+    if (proposeQuelquUn &&
+        suggestionCommencee &&
+        Phone.parse(suggestionTelephone.text) is! PhoneValid) {
+      // Le serveur jette la suggestion sans numéro : mieux vaut retenir
+      // l'enregistrement que perdre le nom déjà écrit.
+      return suggestionTelephone.text.trim().isEmpty
+          ? 'Écrivez le numéro de la personne proposée'
+          : 'Numéro de la personne proposée incomplet';
+    }
     return null;
   }
 
   /// Ce qui manque encore pour enregistrer, dit en une phrase. Null quand la
   /// réponse est complète : le bouton s'allume alors.
-  String? get manque {
-    final String? amont = manqueResultat;
-    if (amont != null) return amont;
-    if (proposeQuelquUn &&
-        suggestionCommencee &&
-        Phone.parse(suggestionTelephone.text) is! PhoneValid) {
-      return 'Numéro de la personne proposée incomplet';
-    }
-    return null;
-  }
+  String? get manque => manqueResultat;
 
   List<CpiRecapLine> recapDe(RepresentantSyncViewData? representant) =>
       <CpiRecapLine>[
@@ -134,6 +138,14 @@ class _RepresentantQualificationScreenState
           CpiRecapLine(
             'Représentant CPI CHUES',
             representantCpi == null ? null : (representantCpi! ? 'Oui' : 'Non'),
+          ),
+        if (proposeQuelquUn && suggestionCommencee)
+          CpiRecapLine(
+            'Personne proposée',
+            <String>[
+              Phone.format(Phone.toE164(suggestionTelephone.text) ?? ''),
+              suggestionNom.text.trim(),
+            ].where((String s) => s.isNotEmpty).join(' · '),
           ),
       ];
 
@@ -158,11 +170,11 @@ class _RepresentantQualificationScreenState
     popOrHome(context);
   }
 
-  Future<void> avertirDejaQualifie() async {
+  Future<void> avertirDejaQualifie(String titre) async {
     final bool? continuer = await cpiConfirm(
       context,
-      title: 'Cette personne est déjà enregistrée comme ambassadeur.',
-      message: 'Voulez-vous continuer ?',
+      title: titre,
+      message: 'Voulez-vous quand même consigner un nouvel appel ?',
       confirmLabel: 'Continuer',
     );
     if (!mounted) return;
@@ -171,12 +183,20 @@ class _RepresentantQualificationScreenState
     }
   }
 
+  /// Une relation déjà tranchée — acceptée ou refusée — se signale avant toute
+  /// saisie : rappeler quelqu'un qui a dit non se fait sciemment.
   void maybeWarnAlreadyQualified(RepresentantSyncViewData? representant) {
     if (alreadyQualifiedWarned) return;
-    if (representant?.relationStatus != 'AMBASSADEUR') return;
+    final String? titre = switch (representant?.relationStatus) {
+      'AMBASSADEUR' =>
+        'Cette personne a déjà accepté d\'être représentant CPI CHUES.',
+      'REFUS' => 'Cette personne a déjà refusé.',
+      _ => null,
+    };
+    if (titre == null) return;
     alreadyQualifiedWarned = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) unawaited(avertirDejaQualifie());
+      if (mounted) unawaited(avertirDejaQualifie(titre));
     });
   }
 
@@ -423,15 +443,33 @@ class _RepresentantQualificationScreenState
             onChanged: (bool value) =>
                 setState(() => memeNumeroWhatsapp = value),
           ),
-          if (memeNumeroWhatsapp == false) ...<Widget>[
-            const SizedBox(height: CpiSpacing.sm),
-            PhoneField(
-              controller: whatsapp,
-              label: 'Numéro WhatsApp',
-              onChanged: (String _) => setState(() {}),
+          CpiReveal(
+            visible: memeNumeroWhatsapp == false,
+            child: Padding(
+              padding: const EdgeInsets.only(top: CpiSpacing.sm),
+              child: PhoneField(
+                controller: whatsapp,
+                label: 'Numéro WhatsApp',
+                onChanged: (String _) => setState(() {}),
+              ),
             ),
-          ],
+          ),
         ],
+        // Un non n'est pas une impasse : la personne connaît souvent quelqu'un
+        // à appeler à sa place, et c'est là qu'elle le dit.
+        CpiReveal(
+          visible: proposeQuelquUn,
+          child: Padding(
+            padding: const EdgeInsets.only(top: CpiSpacing.lg),
+            child: _PersonneProposee(
+              theme: theme,
+              telephone: suggestionTelephone,
+              nom: suggestionNom,
+              note: suggestionNote,
+              onChanged: () => setState(() {}),
+            ),
+          ),
+        ),
       ],
       if (resultat == _Resultat.rappel) ...<Widget>[
         const SizedBox(height: CpiSpacing.lg),
@@ -457,44 +495,6 @@ class _RepresentantQualificationScreenState
       CpiSpacing.md,
     ),
     children: <Widget>[
-      // Un non n'est pas une impasse : la personne connaît souvent quelqu'un à
-      // appeler à sa place.
-      if (proposeQuelquUn) ...<Widget>[
-        Semantics(
-          header: true,
-          child: Text(
-            'Il propose quelqu\'un d\'autre ? (facultatif)',
-            style: theme.textTheme.titleSmall,
-          ),
-        ),
-        const SizedBox(height: CpiSpacing.sm),
-        PhoneField(
-          controller: suggestionTelephone,
-          label: 'Son numéro',
-          onChanged: (String _) => setState(() {}),
-        ),
-        const SizedBox(height: CpiSpacing.sm),
-        // Le serveur jette le nom et la note sans numéro : les champs restent
-        // éteints tant qu'il n'est pas commencé.
-        CpiField(
-          label: 'Son nom (facultatif)',
-          controller: suggestionNom,
-          hint: 'Ex. Fatou Sarr',
-          enabled: suggestionCommencee,
-          textCapitalization: TextCapitalization.words,
-        ),
-        const SizedBox(height: CpiSpacing.sm),
-        CpiField(
-          label: 'Sa remarque (facultatif)',
-          controller: suggestionNote,
-          hint: 'Ex. Déléguée du personnel',
-          enabled: suggestionCommencee,
-          maxLines: 3,
-          maxLength: 2000,
-          textCapitalization: TextCapitalization.sentences,
-        ),
-        const SizedBox(height: CpiSpacing.lg),
-      ],
       CpiField(
         label: 'Commentaire',
         controller: commentaire,
@@ -506,6 +506,61 @@ class _RepresentantQualificationScreenState
       ),
       const SizedBox(height: CpiSpacing.lg),
       CpiRecap(lines: recapDe(representant)),
+    ],
+  );
+}
+
+/// La personne proposée à la place de celle qui vient de dire non.
+class _PersonneProposee extends StatelessWidget {
+  const _PersonneProposee({
+    required this.theme,
+    required this.telephone,
+    required this.nom,
+    required this.note,
+    required this.onChanged,
+  });
+
+  final ThemeData theme;
+  final TextEditingController telephone;
+  final TextEditingController nom;
+  final TextEditingController note;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: <Widget>[
+      Semantics(
+        header: true,
+        child: Text(
+          'Il propose quelqu\'un d\'autre ? (facultatif)',
+          style: theme.textTheme.titleSmall,
+        ),
+      ),
+      const SizedBox(height: CpiSpacing.sm),
+      PhoneField(
+        controller: telephone,
+        label: 'Son numéro',
+        onChanged: (String _) => onChanged(),
+      ),
+      const SizedBox(height: CpiSpacing.sm),
+      CpiField(
+        label: 'Son nom et prénom (facultatif)',
+        controller: nom,
+        hint: 'Ex. Fatou Sarr',
+        onChanged: (String _) => onChanged(),
+        textCapitalization: TextCapitalization.words,
+      ),
+      const SizedBox(height: CpiSpacing.sm),
+      CpiField(
+        label: 'Sa remarque (facultatif)',
+        controller: note,
+        hint: 'Ex. Déléguée du personnel',
+        onChanged: (String _) => onChanged(),
+        maxLines: 3,
+        maxLength: 2000,
+        textCapitalization: TextCapitalization.sentences,
+      ),
     ],
   );
 }

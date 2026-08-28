@@ -348,8 +348,7 @@ void main() {
   ) async {
     await open(tester, CampagnesRoutes.listeRepresentants);
 
-    expect(find.bySemanticsLabel('Chercher un représentant'), findsWidgets);
-    await tester.tap(find.byType(CpiHeaderAction));
+    await tester.tap(find.text('Chercher un autre représentant'));
     await settle(tester);
 
     expect(find.text('annuaire qualifier'), findsOneWidget);
@@ -372,8 +371,7 @@ void main() {
 
     await open(tester, CampagnesRoutes.repFileFor('rep-camp'));
 
-    expect(find.bySemanticsLabel('Chercher un représentant'), findsWidgets);
-    await tester.tap(find.byType(CpiHeaderAction));
+    await tester.tap(find.text('Chercher un autre représentant'));
     await settle(tester);
 
     expect(find.text('annuaire qualifier'), findsOneWidget);

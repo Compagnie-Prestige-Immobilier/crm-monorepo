@@ -122,6 +122,7 @@ class ProspectTile extends StatelessWidget {
     final String name = '${prospect.prenom} ${prospect.nom}'.trim();
     final String phone = Phone.format(prospect.phoneE164);
     final SyncStatus status = SyncStatus.parse(prospect.syncStatus ?? 'draft');
+    final String? signal = status.aSignaler;
 
     void ouvrir() {
       HapticFeedback.selectionClick().ignore();
@@ -131,7 +132,7 @@ class ProspectTile extends StatelessWidget {
     return Semantics(
       button: true,
       onTap: ouvrir,
-      label: '$name. $phone. ${status.label}.',
+      label: signal == null ? '$name. $phone.' : '$name. $phone. $signal.',
       child: ExcludeSemantics(
         child: CpiCard(
           onTap: ouvrir,
@@ -157,15 +158,15 @@ class ProspectTile extends StatelessWidget {
                         color: scheme.onSurfaceVariant,
                       ),
                     ),
-                    const SizedBox(height: CpiSpacing.xs),
-                    CpiTag(
-                      status.label,
-                      tone: switch (status) {
-                        SyncStatus.synced => CpiTone.success,
-                        _ when status.needsAttention => CpiTone.danger,
-                        _ => CpiTone.warning,
-                      },
-                    ),
+                    if (signal != null) ...<Widget>[
+                      const SizedBox(height: CpiSpacing.xs),
+                      CpiTag(
+                        signal,
+                        tone: status.needsAttention
+                            ? CpiTone.danger
+                            : CpiTone.warning,
+                      ),
+                    ],
                   ],
                 ),
               ),

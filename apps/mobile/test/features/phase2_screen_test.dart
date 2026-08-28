@@ -813,7 +813,7 @@ void main() {
 
     expect(find.text('Dans 1 h'), findsOneWidget);
     expect(find.text('Demain 9 h'), findsOneWidget);
-    expect(find.text('Autre heure'), findsOneWidget);
+    expect(find.text('Choisir une date'), findsOneWidget);
   });
 
   phase2TestWidgets('une autre issue n\'offre pas d\'heure de rappel', (

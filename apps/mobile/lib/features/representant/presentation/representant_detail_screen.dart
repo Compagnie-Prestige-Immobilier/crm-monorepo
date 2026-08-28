@@ -219,7 +219,7 @@ class _Fiche extends ConsumerWidget {
           runSpacing: CpiSpacing.xxs,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: <Widget>[
-            SyncStatusChip(status: status),
+            if (status.aSignaler != null) SyncStatusChip(status: status),
             Semantics(
               label: 'Relation : ${relationLabel(data.relationStatus)}',
               child: ExcludeSemantics(
@@ -546,24 +546,28 @@ class _ProspectList extends ConsumerWidget {
             }
             return CpiCard.rows(<CpiRow>[
               for (final ProspectSyncViewData p in list)
-                CpiRow(
-                  leading: SyncStatusIcon(
-                    status: SyncStatus.parse(p.syncStatus ?? 'draft'),
-                    size: CpiIconSize.md,
-                    labelled: false,
-                  ),
-                  title: '${p.prenom} ${p.nom}',
-                  subtitle:
-                      '${Phone.format(p.phoneE164)} · '
-                      '${SyncStatus.parse(p.syncStatus ?? 'draft').label}',
-                  onTap: () => context.pushOnce(Routes.prospectDetailFor(p.id)),
-                ),
+                _ligneProspect(context, p),
             ]);
           },
         ),
       ],
     );
   }
+}
+
+CpiRow _ligneProspect(BuildContext context, ProspectSyncViewData p) {
+  final SyncStatus status = SyncStatus.parse(p.syncStatus ?? 'draft');
+  final String? signal = status.aSignaler;
+  return CpiRow(
+    leading: signal == null
+        ? null
+        : SyncStatusIcon(status: status, size: CpiIconSize.md, labelled: false),
+    title: '${p.prenom} ${p.nom}',
+    subtitle: signal == null
+        ? Phone.format(p.phoneE164)
+        : '${Phone.format(p.phoneE164)} · $signal',
+    onTap: () => context.pushOnce(Routes.prospectDetailFor(p.id)),
+  );
 }
 
 class _Missing extends StatelessWidget {

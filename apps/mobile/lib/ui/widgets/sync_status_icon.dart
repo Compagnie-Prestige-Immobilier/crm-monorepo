@@ -32,11 +32,15 @@ enum SyncStatus {
   String get label => switch (this) {
     SyncStatus.draft || SyncStatus.pending => 'Pas encore envoyé',
     SyncStatus.syncing => 'Envoi…',
-    SyncStatus.synced => 'Envoyé ✓',
+    SyncStatus.synced => 'Envoyé',
     SyncStatus.conflict ||
     SyncStatus.failed ||
     SyncStatus.blocked => 'À corriger',
   };
+
+  /// Ce qui reste à faire, ou rien. « Envoyé ✓ » collé à un représentant se
+  /// lisait comme « déjà qualifié » : une fiche partie n'affiche plus rien.
+  String? get aSignaler => this == SyncStatus.synced ? null : label;
 
   bool get needsAttention => switch (this) {
     SyncStatus.conflict || SyncStatus.failed || SyncStatus.blocked => true,
