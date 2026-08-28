@@ -67,7 +67,12 @@ export const queryKeys = {
     ['rep-campaigns', repCampaignFiltersQueryKey(filters)] as const,
   repCampaign: (id: string) => ['rep-campaigns', 'detail', id] as const,
   repCampaignPreview: (
-    scope: { departementId: string | null; iefId: string | null; onlyWithoutProspects: boolean },
+    scope: {
+      departementId: string | null;
+      iefId: string | null;
+      onlyWithoutProspects: boolean;
+      relationStatuses: readonly string[];
+    },
     commercialCount: number,
     spreadDays: number,
   ) =>
@@ -77,6 +82,7 @@ export const queryKeys = {
       scope.departementId,
       scope.iefId,
       scope.onlyWithoutProspects,
+      scope.relationStatuses.join('+'),
       commercialCount,
       spreadDays,
     ] as const,

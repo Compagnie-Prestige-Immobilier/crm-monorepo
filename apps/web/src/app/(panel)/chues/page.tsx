@@ -12,7 +12,6 @@ import { fetchRepresentants } from '@/lib/data/representants';
 import { getQueryClient } from '@/lib/query-client';
 import { queryKeys } from '@/lib/query-keys';
 import { guardRoles } from '@/lib/session';
-import { readsOnly } from '@/lib/types';
 
 export const metadata: Metadata = { title: 'Projet CHUES' };
 
@@ -60,10 +59,7 @@ export default async function ProjetChuesPage() {
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <HubView
-        prenom={guard.user.fullName.split(' ')[0] ?? guard.user.fullName}
-        readOnly={readsOnly(guard.user.role)}
-      />
+      <HubView prenom={guard.user.fullName.split(' ')[0] ?? guard.user.fullName} />
     </HydrationBoundary>
   );
 }

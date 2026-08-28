@@ -93,7 +93,9 @@ export default async function EspacesPage({
                     alt=""
                     width={395}
                     height={193}
-                    className="relative z-10 h-10 w-auto shrink-0"
+                    // `self-start` : dans une colonne flex, une image en largeur
+                    // automatique s'étire à toute la tuile et le logo se déforme.
+                    className="relative z-10 h-10 w-auto shrink-0 self-start object-contain"
                   />
                 ) : (
                   <span className="relative z-10 size-12 shrink-0 text-primary-text">

@@ -16,6 +16,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  CampaignTargetField,
+  type CampaignTarget,
+} from '@/components/phase2/campaign-target-field';
+import { RepCampaignCreateDialog } from '@/components/phase2/rep-campaign-create-dialog';
 import { SpreadDaysField, SpreadPreview } from '@/components/phase2/spread-days-field';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,37 +30,67 @@ import { fetchReferenceData } from '@/lib/data/reference';
 import { formatNumber } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
-import {
-  CAMPAIGN_SCOPES,
-  campaignScopeLabel,
-  type CampaignScope,
-  type FilterOption,
-} from '@/lib/types';
+import { campaignScopeLabel, type CampaignScope, type FilterOption } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 type Step = 'saisie' | 'apercu';
 
+/** Point d'entrée unique : la cible choisie décide du formulaire montré. */
 export function CampaignCreateDialog({
   open,
   onOpenChange,
+  defaultTarget = 'ALL',
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  defaultTarget?: CampaignTarget;
+}) {
+  const [target, setTarget] = useState<CampaignTarget>(defaultTarget);
+
+  function handleOpenChange(next: boolean): void {
+    if (!next) setTarget(defaultTarget);
+    onOpenChange(next);
+  }
+
+  if (target === 'REPRESENTANTS') {
+    return (
+      <RepCampaignCreateDialog
+        open={open}
+        onOpenChange={handleOpenChange}
+        onTargetChange={setTarget}
+      />
+    );
+  }
+
+  return (
+    <ProspectCampaignDialog
+      open={open}
+      onOpenChange={handleOpenChange}
+      scope={target}
+      onTargetChange={setTarget}
+    />
+  );
+}
+
+function ProspectCampaignDialog({
+  open,
+  onOpenChange,
+  scope,
+  onTargetChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  scope: CampaignScope;
+  onTargetChange: (target: CampaignTarget) => void;
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const projet = pathname.startsWith('/grand-public') ? 'GRAND_PUBLIC' : 'CHUES';
-  const scopes = CAMPAIGN_SCOPES.filter(
-    (candidate) =>
-      candidate === 'ALL' ||
-      (projet === 'GRAND_PUBLIC' ? candidate.startsWith('GP') : candidate.startsWith('BDD')),
-  );
   const queryClient = useQueryClient();
   const nameId = useId();
 
   const [step, setStep] = useState<Step>('saisie');
   const [name, setName] = useState('');
-  const [scope, setScope] = useState<CampaignScope>('ALL');
   const [selected, setSelected] = useState<string[]>([]);
   const [spreadDays, setSpreadDays] = useState(MIN_SPREAD_DAYS);
 
@@ -103,7 +138,6 @@ export function CampaignCreateDialog({
   function reset(): void {
     setStep('saisie');
     setName('');
-    setScope('ALL');
     setSelected([]);
     setSpreadDays(MIN_SPREAD_DAYS);
   }
@@ -145,6 +179,8 @@ export function CampaignCreateDialog({
 
         {step === 'saisie' ? (
           <div className="flex flex-col gap-5">
+            <CampaignTargetField value={scope} onChange={onTargetChange} projet={projet} />
+
             <div className="flex flex-col gap-1.5">
               <Label htmlFor={nameId}>
                 Nom de la campagne
@@ -167,38 +203,6 @@ export function CampaignCreateDialog({
                 Trois caractères minimum. Repris sur les programmes imprimés.
               </p>
             </div>
-
-            <fieldset className="flex flex-col gap-2">
-              <legend className="pb-1.5 text-[0.8125rem] font-[600] text-foreground">
-                Périmètre
-              </legend>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {scopes.map((candidate) => (
-                  <label
-                    key={candidate}
-                    className={cn(
-                      'flex min-h-11 cursor-pointer items-start gap-3 rounded-md border p-3 text-[0.875rem]',
-                      'transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring',
-                      scope === candidate
-                        ? 'border-primary bg-secondary text-secondary-foreground'
-                        : 'border-border hover:bg-secondary/60',
-                    )}
-                  >
-                    <input
-                      type="radio"
-                      name="scope"
-                      value={candidate}
-                      checked={scope === candidate}
-                      className="mt-0.5 size-4 accent-[var(--primary)]"
-                      onChange={() => {
-                        setScope(candidate);
-                      }}
-                    />
-                    <span className="min-w-0">{campaignScopeLabel(candidate)}</span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
 
             <SpreadDaysField value={spreadDays} onChange={setSpreadDays} />
 

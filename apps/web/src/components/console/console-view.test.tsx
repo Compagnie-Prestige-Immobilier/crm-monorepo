@@ -208,7 +208,9 @@ describe('ConsoleView : file', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Rappel Fiche');
     });
-    expect(screen.getByText('rappel en retard de 2 h')).toBeTruthy();
+    // La fiche jamais appelée passe derrière : elle attend dans le repli.
+    await userEvent.click(screen.getByText(/Suivants à appeler/u));
+    expect(screen.getByRole('button', { name: /Neuve Fiche/u })).toBeTruthy();
   });
 
   it('ne promet une heure que pour les fiches qui en portent une', async () => {
@@ -276,22 +278,24 @@ describe('ConsoleView : une touche, une issue', () => {
     expect(screen.queryByRole('button', { name: /suivant/i })).toBeNull();
   });
 
-  it('compte la session au fil des envois', async () => {
+  it('enchaîne sur la fiche suivante et le dit, une fois l’appel consigné', async () => {
     await renderConsole();
 
     await userEvent.keyboard('1');
     await userEvent.click(await screen.findByRole('button', { name: /Enregistrer l’adhésion/ }));
 
     await waitFor(() => {
-      expect(screen.getByText(/1 appel consigné · 1 méthode/)).toBeTruthy();
+      expect(screen.getByRole('status').textContent).toBe('Enregistré. Personne suivante.');
     });
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Rappel Fiche');
   });
 
   it('chaque touche est doublée d’un bouton qui porte son chiffre', async () => {
     await renderConsole();
 
+    const fiche = within(screen.getByRole('region', { name: 'Fiche courante' }));
     for (const key of ['1', '2', '3', '4', '5', '6', '7', '8', '9']) {
-      expect(screen.getByText(key, { selector: 'kbd' })).toBeTruthy();
+      expect(fiche.getByText(key, { selector: 'kbd' })).toBeTruthy();
     }
   });
 
@@ -744,13 +748,16 @@ describe('ConsoleView : navigation et raccourcis annexes', () => {
     expect(routerMock.push).toHaveBeenCalledWith('/chues/representants/r-9');
   });
 
-  it('affiche la carte clavier sur ?', async () => {
+  it('garde la carte clavier repliée en pied d’écran, dépliable sur ?', async () => {
     await renderConsole();
 
-    expect(screen.queryByText('Copier le numéro')).toBeNull();
+    const carte = (): HTMLDetailsElement | null =>
+      screen.getByText(/Carte clavier/u).closest('details');
+    expect(carte()?.open).toBe(false);
 
     await userEvent.keyboard('?');
 
+    expect(carte()?.open).toBe(true);
     expect(screen.getByText('Copier le numéro')).toBeTruthy();
   });
 });
@@ -771,5 +778,72 @@ describe('ConsoleView : une seule file', () => {
     expect(screen.queryByRole('region', { name: 'File des représentants' })).toBeNull();
     expect(screen.getByRole('button', { name: /Injoignable/ })).toBeTruthy();
     expect(fetchRepScriptQueue).not.toHaveBeenCalled();
+  });
+});
+
+/** Rien à appeler : l'écran ne garde que ce qui décrit quelque chose de réel. */
+describe('ConsoleView : file vide', () => {
+  async function renderVide(): Promise<void> {
+    serve([]);
+    renderWithQuery(<ConsoleView />);
+    await screen.findByText('Aucun prospect à appeler pour l’instant.');
+  }
+
+  it('ne propose que les deux gestes qui refont une file', async () => {
+    await renderVide();
+
+    expect(screen.getByRole('link', { name: 'Ajouter un prospect' }).getAttribute('href')).toBe(
+      '/chues/prospects/nouveau',
+    );
+    expect(
+      screen.getByRole('link', { name: 'Qualifier un représentant' }).getAttribute('href'),
+    ).toBe('/chues/appels-representants');
+  });
+
+  it('ne décrit ni fiche ni file, puisqu’il n’y en a pas', async () => {
+    await renderVide();
+
+    expect(screen.queryByText(/à traiter/u)).toBeNull();
+    expect(screen.queryByText('Pourquoi cet ordre ?')).toBeNull();
+    expect(screen.queryByText('Dernier appel')).toBeNull();
+    expect(screen.queryByText('Session')).toBeNull();
+    expect(screen.queryByText('Carte clavier')).toBeNull();
+    expect(screen.queryByRole('region', { name: 'File d’appel' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Contexte' })).toBeNull();
+  });
+
+  it('rend la fiche, sans rail ni compteur, dès qu’une personne attend', async () => {
+    await renderConsole([NEUVE]);
+
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Neuve Fiche');
+    expect(screen.queryByRole('region', { name: 'File d’appel' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Contexte' })).toBeNull();
+    expect(screen.queryByText(/à traiter/u)).toBeNull();
+    // Seule fiche en file : rien à replier derrière « Suivants à appeler ».
+    expect(screen.queryByText(/Suivants à appeler/u)).toBeNull();
+  });
+});
+
+/** Une fiche à la fois : la file et l'ordre se déroulent à la demande. */
+describe('ConsoleView : une seule colonne', () => {
+  it('replie les suivants derrière une ligne, avec l’ordre et la campagne', async () => {
+    await renderConsole();
+
+    const repli = screen.getByText(/Suivants à appeler/u);
+    expect(repli.textContent).toBe('Suivants à appeler · 1');
+    expect(repli.closest('details')?.open).toBe(false);
+
+    await userEvent.click(repli);
+
+    expect(repli.closest('details')?.open).toBe(true);
+    expect(screen.getByRole('button', { name: 'Pourquoi cet ordre ?' })).toBeTruthy();
+  });
+
+  it('pose le contexte de l’appel sous le numéro, en lignes grises', async () => {
+    await renderConsole([NEUVE]);
+
+    const fiche = within(screen.getByRole('region', { name: 'Fiche courante' }));
+    expect(fiche.getByText(/Représentant Aminata Ndiaye/u)).toBeTruthy();
+    expect(fiche.getByText('Jamais appelée.')).toBeTruthy();
   });
 });

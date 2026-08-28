@@ -6,6 +6,7 @@ import {
   bucketOf,
   buildAttemptBatch,
   buildQueue,
+  callbackHalfHours,
   callbackSlots,
   COMMENT_MAX_LENGTH,
   conversionErrorFor,
@@ -610,6 +611,28 @@ describe('callbackSlots', () => {
 
     expect(sunday.filter((slot) => slot.at === '2026-08-17T09:00:00.000Z')).toHaveLength(1);
     expect(sunday.map((slot) => slot.label)).not.toContain('Lundi 9 h');
+  });
+});
+
+describe('callbackHalfHours', () => {
+  it('couvre les demi-heures ouvrées, de 08 h 00 à 19 h 00', () => {
+    const heures = callbackHalfHours(THURSDAY, '2026-08-14');
+
+    expect(heures).toHaveLength(23);
+    expect(heures[0]).toEqual({ key: '1', label: '08 h 00', at: '2026-08-14T08:00:00.000Z' });
+    expect(heures[1]?.label).toBe('08 h 30');
+    expect(heures.at(-1)).toEqual({ key: '23', label: '19 h 00', at: '2026-08-14T19:00:00.000Z' });
+  });
+
+  it('retire les heures déjà passées du jour même', () => {
+    const heures = callbackHalfHours(THURSDAY, '2026-08-13');
+
+    expect(heures[0]?.label).toBe('10 h 30');
+    expect(heures.map((heure) => heure.label)).not.toContain('08 h 00');
+  });
+
+  it('ne propose rien sur un jour entièrement écoulé', () => {
+    expect(callbackHalfHours(THURSDAY, '2026-08-12')).toEqual([]);
   });
 });
 

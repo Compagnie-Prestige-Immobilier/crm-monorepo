@@ -133,14 +133,23 @@ export interface NavSection {
 }
 
 /**
+ * Les trois rôles qui font eux-mêmes les trois étapes du projet CHUES. Ils
+ * lisent les mêmes intitulés dans le même ordre : une seule suite d'entrées les
+ * sert tous les trois, et on n'explique qu'un seul parcours au téléphone.
+ */
+const TERRAIN: readonly Role[] = ['COMMERCIAL', 'SUPERVISEUR', 'DIRECTION'];
+
+/** Ceux qui, en plus de leurs propres appels, suivent le travail des autres. */
+const ENCADREMENT: readonly Role[] = ['SUPERVISEUR', 'DIRECTION'];
+
+/**
  * Navigation filtrée par coque puis par rôle ; l'autorisation serveur reste la
  * règle.
  *
  * Une SEULE section par coque, et l'ordre des entrées EST l'ordre de la barre.
- * Chaque rôle a sa propre suite d'entrées, écrite d'affilée : deux rôles ne
- * lisent ni les mêmes intitulés ni le même ordre sur les mêmes écrans, et une
- * entrée qui s'appelle « Prospects » pour la supervision et « Mes prospects »
- * pour le téléconseiller ne tient pas dans une seule ligne.
+ * L'ADMIN et l'agent bancaire gardent leur propre suite d'entrées, écrite
+ * d'affilée : ils ne lisent ni les mêmes intitulés ni le même ordre sur les
+ * mêmes écrans.
  */
 const SECTIONS: readonly NavSection[] = [
   {
@@ -191,128 +200,91 @@ const SECTIONS: readonly NavSection[] = [
     coque: 'chues',
     title: null,
     items: [
-      // ─── Téléconseiller : les trois étapes, numérotées ────────────────────
+      // ─── Les trois étapes, numérotées, pour qui les fait ──────────────────
       {
         href: '/chues',
         label: 'Mon travail',
         icon: HouseIcon,
         description: 'Les trois étapes, dans l’ordre',
-        roles: ['COMMERCIAL'],
+        roles: TERRAIN,
       },
       {
         href: '/chues/appels-representants',
-        label: '1 · Appeler les représentants',
+        label: '1 · Qualifier un représentant',
         icon: PhoneCallIcon,
         description: 'Étape 1 sur 3',
-        roles: ['COMMERCIAL'],
+        roles: TERRAIN,
       },
       {
         href: '/chues/prospects/nouveau',
-        label: '2 · Noter un prospect',
+        label: '2 · Ajouter un prospect',
         icon: PlusCircleIcon,
         description: 'Étape 2 sur 3',
-        roles: ['COMMERCIAL'],
+        roles: TERRAIN,
       },
       {
         href: '/chues/console',
-        label: '3 · Appeler les prospects',
+        label: '3 · Convertir un prospect',
         icon: HeadsetIcon,
         description: 'Étape 3 sur 3',
-        roles: ['COMMERCIAL'],
+        roles: TERRAIN,
       },
       {
         href: '/chues/rappels',
         label: 'Rappels promis',
         icon: ClockIcon,
         description: 'Ce qu’on a promis de rappeler',
-        roles: ['COMMERCIAL'],
+        roles: TERRAIN,
+      },
+      {
+        // Le seul écran qui montre le travail de chaque téléconseiller ligne à
+        // ligne : c'est là que l'encadrement passe le reste de sa journée.
+        href: '/chues/supervision',
+        label: 'Mon équipe',
+        icon: ActivityIcon,
+        description: 'Activité et présence des téléconseillers',
+        roles: ENCADREMENT,
       },
       {
         href: '/chues/suggestions',
         label: 'Contacts recommandés',
         icon: PhoneForwardedIcon,
         description: 'Numéros donnés par les représentants',
-        roles: ['COMMERCIAL'],
+        roles: TERRAIN,
         secondary: true,
       },
       {
+        // Sans « Mes » : l'API borne la liste au périmètre de qui la demande
+        // (`scope.ts`), et l'encadrement y lit tout le portefeuille.
         href: '/chues/representants',
-        label: 'Mes représentants',
+        label: 'Représentants',
         icon: UsersRoundIcon,
         description: 'Les enseignants déjà appelés',
-        roles: ['COMMERCIAL'],
+        roles: TERRAIN,
         secondary: true,
-      },
-      {
-        // L'API borne la liste à ses propres fiches (`scope.ts`) : il y relit
-        // ce qu'il a noté, sans voir le portefeuille des autres.
-        href: '/chues/prospects',
-        label: 'Mes prospects',
-        icon: UsersIcon,
-        description: 'Les fiches qu’il a notées',
-        roles: ['COMMERCIAL'],
-        secondary: true,
-      },
-
-      // ─── Supervision et direction : lecture ───────────────────────────────
-      {
-        href: '/chues',
-        label: 'Projet CHUES',
-        icon: LayoutDashboardIcon,
-        description: 'Où en sont les trois étapes',
-        roles: ['SUPERVISEUR', 'DIRECTION'],
-      },
-      {
-        // Le seul écran qui montre le travail de chaque téléconseiller ligne à
-        // ligne : c'est là que la supervision passe sa journée.
-        href: '/chues/supervision',
-        label: 'Mon équipe',
-        icon: ActivityIcon,
-        description: 'Activité et présence des téléconseillers',
-        roles: ['SUPERVISEUR', 'DIRECTION'],
       },
       {
         href: '/chues/prospects',
         label: 'Prospects',
         icon: UsersIcon,
-        description: 'Liste filtrable et export',
-        roles: ['SUPERVISEUR', 'DIRECTION'],
-      },
-      {
-        href: '/chues/representants',
-        label: 'Représentants',
-        icon: UsersRoundIcon,
-        description: 'Enseignants qui donnent les contacts',
-        roles: ['SUPERVISEUR', 'DIRECTION'],
+        description: 'Les fiches déjà notées',
+        roles: TERRAIN,
+        secondary: true,
       },
       {
         href: '/chues/campagnes',
         label: 'Campagnes',
         icon: MegaphoneIcon,
         description: 'Distribuer les appels aux téléconseillers',
-        roles: ['SUPERVISEUR', 'DIRECTION'],
+        roles: ENCADREMENT,
+        secondary: true,
       },
       {
         href: '/chues/statistiques',
         label: 'Chiffres',
         icon: ChartColumnIcon,
         description: 'Téléconseil et banques',
-        roles: ['SUPERVISEUR', 'DIRECTION'],
-      },
-      {
-        href: '/chues/rappels',
-        label: 'Rappels en retard',
-        icon: ClockIcon,
-        description: 'Échéances promises et retards',
-        roles: ['SUPERVISEUR', 'DIRECTION'],
-        secondary: true,
-      },
-      {
-        href: '/chues/suggestions',
-        label: 'Contacts recommandés',
-        icon: PhoneForwardedIcon,
-        description: 'Numéros donnés par les représentants',
-        roles: ['SUPERVISEUR', 'DIRECTION'],
+        roles: ENCADREMENT,
         secondary: true,
       },
 
@@ -432,25 +404,25 @@ const SECTIONS: readonly NavSection[] = [
       // l'écran d'ouverture du projet, les saisies depuis leur liste.
       {
         href: '/chues/appels-representants',
-        label: 'Appeler les représentants',
+        label: 'Qualifier un représentant',
         icon: PhoneCallIcon,
-        description: 'Premier des trois appels',
+        description: 'Première des trois étapes',
         roles: ['ADMIN'],
         hidden: true,
       },
       {
         href: '/chues/console',
-        label: 'Appeler les prospects',
+        label: 'Convertir un prospect',
         icon: HeadsetIcon,
-        description: 'Dernier des trois appels',
+        description: 'Dernière des trois étapes',
         roles: ['ADMIN'],
         hidden: true,
       },
       {
         href: '/chues/prospects/nouveau',
-        label: 'Nouveau prospect',
+        label: 'Ajouter un prospect',
         icon: PlusCircleIcon,
-        description: 'Saisie d’un prospect',
+        description: 'Deuxième des trois étapes',
         roles: ['ADMIN'],
         hidden: true,
       },

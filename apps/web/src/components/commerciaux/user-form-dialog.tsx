@@ -46,8 +46,8 @@ const ROLE_HINTS: Record<Role, string> = {
   ADMIN: 'Accès complet, y compris les comptes et les référentiels.',
   COMMERCIAL: 'Saisit les prospects depuis l’application mobile.',
   BANQUE_FINANCE: 'Accède aux dossiers bancaires, pas aux prospects.',
-  SUPERVISEUR: 'Suit le travail des téléconseillers, en lecture. Ne saisit rien.',
-  DIRECTION: 'Lit tout le téléconseil et tient le registre des visites. Ne purge rien.',
+  SUPERVISEUR: 'Passe lui-même les trois appels et suit le travail de son équipe.',
+  DIRECTION: 'Passe les trois appels, lit tout le téléconseil et tient le registre des visites.',
   ACCUEIL: 'Tient le registre des visites, et rien d’autre.',
 };
 

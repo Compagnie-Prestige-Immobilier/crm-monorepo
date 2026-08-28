@@ -207,6 +207,28 @@ export function callbackSlots(now: number): CallbackSlot[] {
   return slots;
 }
 
+/**
+ * Les demi-heures ouvrées d'un jour, de 08 h 00 à 19 h 00, celles déjà passées
+ * retirées. Même règle et mêmes libellés que `callbackHalfHours` du mobile : un
+ * rappel se prend à la demi-heure, jamais à la minute.
+ */
+export function callbackHalfHours(now: number, day: string): CallbackSlot[] {
+  const slots: CallbackSlot[] = [];
+  for (let half = 16; half <= 38; half++) {
+    const at = Date.parse(
+      `${day}T${pad(Math.floor(half / 2))}:${half % 2 === 0 ? '00' : '30'}:00Z`,
+    );
+    if (Number.isNaN(at) || at <= now) continue;
+    const stamp = new Date(at);
+    slots.push({
+      key: String(slots.length + 1),
+      label: `${pad(stamp.getUTCHours())} h ${pad(stamp.getUTCMinutes())}`,
+      at: stamp.toISOString(),
+    });
+  }
+  return slots;
+}
+
 export type QueueBucket = 'due' | 'never' | 'callback' | 'unreachable' | 'other' | 'closed';
 
 export const QUEUE_BUCKET_LABELS: Record<QueueBucket, string> = {
@@ -732,6 +754,8 @@ export interface RepAnswer {
   readonly suggestedPhone?: string;
   readonly suggestedNote?: string;
   readonly comment?: string;
+  /** Exigée par le serveur pour l'issue CALLBACK, et par elle seule. */
+  readonly callbackAt?: string;
 }
 
 export function buildRepAttempt(
