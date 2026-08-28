@@ -8,35 +8,12 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { AppUpdatesModule } from './app-updates.module.js';
+import type { ReleaseRow } from './app-updates.service.js';
 
-const SETTING_KEY = 'mobile.android.release';
+/** Empreinte du certificat qui signe les APK de `fixtures/`. */
+export const FIXTURE_SIGNER = '9434b1f9594e7f5d20bda74d047e40affdc8003f51d89421d4b79456ad7f3909';
 
-export class FakeReleaseStore {
-  private value: string | null = null;
-
-  readonly appSetting = {
-    findUnique: ({ where }: { where: { key: string } }): Promise<{ value: string } | null> =>
-      Promise.resolve(
-        where.key === SETTING_KEY && this.value !== null ? { value: this.value } : null,
-      ),
-    upsert: ({ create }: { create: { value: string } }): Promise<{ value: string }> => {
-      this.value = create.value;
-      return Promise.resolve({ value: create.value });
-    },
-  };
-
-  seed(release: Record<string, unknown>): void {
-    this.value = JSON.stringify(release);
-  }
-
-  stored(): string | null {
-    return this.value;
-  }
-
-  asService(): PrismaService {
-    return this as unknown as PrismaService;
-  }
-}
+export const AUTRE_SIGNER = '3a22ee16b507e5271312b4365f9b35c9c61cd5a831b453130cefdc22459928a6';
 
 export const FAKE_ADMIN: AuthenticatedUser = {
   id: 'adm-1',
@@ -45,6 +22,69 @@ export const FAKE_ADMIN: AuthenticatedUser = {
   fullName: 'Admin CPI',
   role: Role.ADMIN,
 };
+
+type Mutable = { -readonly [K in keyof ReleaseRow]: ReleaseRow[K] };
+
+const row = (release: Partial<ReleaseRow> & { versionCode: number }): Mutable => ({
+  versionName: `1.0.${String(release.versionCode)}`,
+  fileName: `cpi-go-${String(release.versionCode)}.apk`,
+  fileSize: 10,
+  sha256: 'x'.repeat(64),
+  signerSha256: FIXTURE_SIGNER,
+  mandatory: false,
+  publishedAt: new Date('2026-01-01T00:00:00.000Z'),
+  publishedById: FAKE_ADMIN.id,
+  publishedBy: { fullName: FAKE_ADMIN.fullName },
+  notes: null,
+  withdrawnAt: null,
+  withdrawnById: null,
+  ...release,
+});
+
+export class FakeReleaseStore {
+  private rows: Mutable[] = [];
+  failNextWrite = false;
+
+  readonly androidRelease = {
+    findMany: (): Promise<ReleaseRow[]> =>
+      Promise.resolve([...this.rows].sort((a, b) => b.versionCode - a.versionCode)),
+
+    create: ({ data }: { data: Partial<ReleaseRow> & { versionCode: number } }) => {
+      if (this.failNextWrite) {
+        this.failNextWrite = false;
+        return Promise.reject(new Error('base indisponible'));
+      }
+      const created = row(data);
+      this.rows.push(created);
+      return Promise.resolve(created as ReleaseRow);
+    },
+
+    update: ({
+      where,
+      data,
+    }: {
+      where: { versionCode: number };
+      data: Partial<ReleaseRow>;
+    }): Promise<ReleaseRow> => {
+      const found = this.rows.find((candidate) => candidate.versionCode === where.versionCode);
+      if (!found) return Promise.reject(new Error('release absente'));
+      Object.assign(found, data);
+      return Promise.resolve(found as ReleaseRow);
+    },
+  };
+
+  seed(...releases: (Partial<ReleaseRow> & { versionCode: number })[]): void {
+    this.rows = releases.map(row);
+  }
+
+  stored(): ReleaseRow[] {
+    return this.rows as ReleaseRow[];
+  }
+
+  asService(): PrismaService {
+    return this as unknown as PrismaService;
+  }
+}
 
 export async function createAppUpdatesApp(
   store: FakeReleaseStore,

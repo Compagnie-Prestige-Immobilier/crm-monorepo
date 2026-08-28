@@ -67,6 +67,18 @@ export const envSchema = z
     APK_RELEASE_DIR: z.string().min(1).default('./storage/releases'),
     APK_MAX_SIZE_BYTES: z.coerce.number().int().positive().max(1_073_741_824).default(524_288_000),
 
+    /** Empreinte SHA-256 du certificat de signature attendu, avec ou sans deux-points. */
+    APK_SIGNER_SHA256: z
+      .string()
+      .trim()
+      .transform((value) => value.replaceAll(':', '').toLowerCase())
+      .refine(
+        (value) => value === '' || /^[0-9a-f]{64}$/.test(value),
+        'APK_SIGNER_SHA256 must be a SHA-256 fingerprint (64 hex characters)',
+      )
+      .default(''),
+    APK_DOWNLOAD_RATE_LIMIT: z.coerce.number().int().positive().default(10),
+
     CALL_RECORDING_DIR: z.string().min(1).default('./storage/call-recordings'),
     CALL_RECORDING_MAX_SIZE_BYTES: z.coerce
       .number()
