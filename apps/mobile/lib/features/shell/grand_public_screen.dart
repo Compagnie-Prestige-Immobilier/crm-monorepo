@@ -10,6 +10,7 @@ import '../../core/theme/cpi_tokens.dart';
 import '../../data/local/database.dart';
 import '../../ui/widgets/cpi_kit.dart';
 import '../campagnes/campagnes.dart';
+import '../rappels/presentation/rappels_en_retard_banner.dart';
 import 'app_shell.dart';
 import 'projects.dart';
 import 'workspace_switch.dart';
@@ -85,6 +86,7 @@ class GrandPublicScreen extends ConsumerWidget {
             CpiSpacing.xl,
           ),
           children: <Widget>[
+            const RappelsEnRetardBanner(grandPublic: true, padded: false),
             _GrandeCarte(
               nombre: openCalls,
               loading: campaigns.isLoading,

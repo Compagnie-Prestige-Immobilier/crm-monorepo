@@ -3,6 +3,14 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+    <!--
+      CPI GO est auto-distribuée : c'est elle qui pose ses propres mises à jour,
+      par une session `PackageInstaller` (voir UpdatesChannel). Sans cette
+      permission, `setRequireUserAction(USER_ACTION_NOT_REQUIRED)` est ignoré et
+      CHAQUE mise à jour repasse par l'écran système, y compris quand CPI GO est
+      déjà propriétaire de la mise à jour du paquet.
+    -->
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION"/>
 
     <!--
       POST_NOTIFICATIONS avait été retirée avec Firebase (les annonces
@@ -15,6 +23,25 @@
     -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
+    <!--
+      Le rappel promis est une alarme, pas une annonce : il doit tomber à
+      l'heure convenue, écran éteint et application fermée.
+
+      RECEIVE_BOOT_COMPLETED : sans elle, un redémarrage perd toutes les
+      alarmes posées. Le récepteur du greffon (plus bas) les repose.
+
+      USE_EXACT_ALARM plutôt que SCHEDULE_EXACT_ALARM seule : depuis Android
+      14 la seconde se demande à l'utilisateur et se révoque, la première est
+      accordée d'office aux applications de type réveil. CPI GO est
+      auto-distribuée (voir REQUEST_INSTALL_PACKAGES et le module de mise à
+      jour) : l'audit du Play Store sur USE_EXACT_ALARM ne s'y applique pas.
+      SCHEDULE_EXACT_ALARM reste déclarée pour les appareils sous Android 13,
+      où USE_EXACT_ALARM n'existe pas.
+    -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
     <!--
       CONFIDENTIALITÉ AU REPOS : voir android:allowBackup ci-dessous.
 
@@ -63,15 +90,30 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.fileprovider"
+        <!--
+          Les deux récepteurs de `flutter_local_notifications` : le premier
+          affiche l'alarme à l'heure dite, le second repose les alarmes après
+          un redémarrage ou une mise à jour de l'application.
+
+          PAS de android:showWhenLocked ni de android:turnScreenOn sur
+          MainActivity : ils laisseraient l'application s'ouvrir PAR-DESSUS
+          l'écran verrouillé, annuaire de phase 2 compris (voir
+          android:allowBackup plus haut). L'alarme reste plein écran sur le
+          verrouillage ; ouvrir la fiche demande de déverrouiller.
+        -->
+        <receiver
             android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
-        </provider>
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"/>
+        <receiver
+            android:exported="false"
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

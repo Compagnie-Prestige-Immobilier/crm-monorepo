@@ -995,6 +995,29 @@ class WriteRepository {
     return honores;
   }
 
+  /// Repousse un rappel promis. Rend la ligne à jour, ou `null` si elle a
+  /// disparu entre-temps : un appel consigné pendant que l'alarme sonnait
+  /// l'a déjà honorée, et il n'y a plus rien à reprogrammer.
+  ///
+  /// `notifiedAt` repart à `null` : le popup in-app doit retomber à la
+  /// nouvelle heure.
+  Future<RepCallbackReminder?> snoozeRepCallback({
+    required String id,
+    required Duration by,
+  }) async {
+    await (_db.update(
+      _db.repCallbackReminders,
+    )..where((RepCallbackReminders row) => row.id.equals(id))).write(
+      RepCallbackRemindersCompanion(
+        scheduledAt: Value<DateTime>(_clock.now().add(by)),
+        notifiedAt: const Value<DateTime?>(null),
+      ),
+    );
+    return (_db.select(_db.repCallbackReminders)
+          ..where((RepCallbackReminders row) => row.id.equals(id)))
+        .getSingleOrNull();
+  }
+
   static String? normalizeComment(String? raw) {
     if (raw == null) return null;
     final String trimmed = raw.trim();

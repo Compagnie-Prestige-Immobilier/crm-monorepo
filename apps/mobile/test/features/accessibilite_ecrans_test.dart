@@ -415,7 +415,8 @@ void main() {
       expect(retours.joues, <CpiFeedback>[CpiFeedback.rappel]);
       expect(systeme, isEmpty);
 
-      await tester.tap(find.text('Fermer'));
+      // La feuille n'a plus de « Fermer » : on appelle, ou on reporte.
+      await tester.tap(find.text('Plus tard (10 min)'));
       await tester.pumpAndSettle();
     });
 
@@ -495,7 +496,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Rappel'), findsOneWidget);
 
-      await tester.tap(find.text('Fermer'));
+      await tester.tap(find.text('Plus tard (10 min)'));
       await tester.pumpAndSettle();
 
       // Propriété gardée, pas ligne de code : sous `flutter test` le
@@ -654,8 +655,20 @@ class _RetoursNotes extends CpiFeedbackService {
 class _AlarmesMuettes extends RepCallbackNotifications {
   @override
   Future<void> initialize({
-    required void Function(String representantId) onTap,
+    required void Function(RepCallbackTap tap) onAction,
   }) async {}
+
+  @override
+  Future<void> schedule({
+    required String id,
+    required String representantId,
+    required String fullName,
+    required String phoneE164,
+    required DateTime at,
+  }) async {}
+
+  @override
+  Future<void> cancel(String id) async {}
 }
 
 /// Boîte de réception muette : les tests d'interface ne parlent à aucun serveur.
