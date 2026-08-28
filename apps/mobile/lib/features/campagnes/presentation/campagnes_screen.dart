@@ -83,6 +83,15 @@ class _CampagnesScreenState extends ConsumerState<CampagnesScreen> {
       child: CpiScaffold(
         title: 'Appels',
         leading: const CpiBackButton(),
+        actions: <Widget>[
+          if (representants)
+            CpiHeaderAction(
+              icon: PhosphorIconsRegular.magnifyingGlass,
+              label: 'Chercher un représentant',
+              onPressed: () =>
+                  context.pushOnce(Routes.representantsPourQualifier()),
+            ),
+        ],
         banner: horsLigne
             ? const CpiStatusBand(
                 text: 'Hors ligne. Liste du dernier téléchargement.',

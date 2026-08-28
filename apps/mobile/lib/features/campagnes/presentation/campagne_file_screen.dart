@@ -91,6 +91,18 @@ class CampagneFileScreen extends ConsumerWidget {
               ? CampagnesRoutes.grandPublicListe
               : CampagnesRoutes.liste,
         ),
+        // La file donne l'ordre du jour ; l'annuaire donne tous les autres. Un
+        // représentant appelé hors liste doit pouvoir être consigné sans
+        // attendre qu'une campagne le contienne.
+        actions: <Widget>[
+          if (representants)
+            CpiHeaderAction(
+              icon: PhosphorIconsRegular.magnifyingGlass,
+              label: 'Chercher un représentant',
+              onPressed: () =>
+                  context.pushOnce(Routes.representantsPourQualifier()),
+            ),
+        ],
         banner: horsLigne
             ? const CpiStatusBand(
                 text: 'Hors ligne. Liste du dernier téléchargement.',

@@ -84,6 +84,14 @@ void main() {
           ),
         ),
         GoRoute(
+          path: Routes.representants,
+          builder: (BuildContext context, GoRouterState state) => Scaffold(
+            body: Text(
+              'annuaire ${state.uri.queryParameters[Routes.butParam]}',
+            ),
+          ),
+        ),
+        GoRoute(
           path: Routes.phase2,
           builder: (BuildContext context, GoRouterState state) => Scaffold(
             body: Text(
@@ -329,6 +337,46 @@ void main() {
     await open(tester, CampagnesRoutes.listeRepresentants);
 
     expect(find.text('Relance CHUES'), findsOneWidget);
+
+    await unmount(tester);
+  });
+
+  // Un représentant appelé hors liste se consigne quand même : la recherche de
+  // l'annuaire est à portée depuis la liste ET depuis la file.
+  testWidgets('la liste des représentants mène à l\'annuaire cherchable', (
+    WidgetTester tester,
+  ) async {
+    await open(tester, CampagnesRoutes.listeRepresentants);
+
+    expect(find.bySemanticsLabel('Chercher un représentant'), findsWidgets);
+    await tester.tap(find.byType(CpiHeaderAction));
+    await settle(tester);
+
+    expect(find.text('annuaire qualifier'), findsOneWidget);
+
+    await unmount(tester);
+  });
+
+  testWidgets('la file des représentants mène à l\'annuaire cherchable', (
+    WidgetTester tester,
+  ) async {
+    await db
+        .into(db.repCallCampaigns)
+        .insert(
+          RepCallCampaignsCompanion.insert(
+            id: 'rep-camp',
+            name: 'Relance CHUES',
+            updatedAt: t0,
+          ),
+        );
+
+    await open(tester, CampagnesRoutes.repFileFor('rep-camp'));
+
+    expect(find.bySemanticsLabel('Chercher un représentant'), findsWidgets);
+    await tester.tap(find.byType(CpiHeaderAction));
+    await settle(tester);
+
+    expect(find.text('annuaire qualifier'), findsOneWidget);
 
     await unmount(tester);
   });
