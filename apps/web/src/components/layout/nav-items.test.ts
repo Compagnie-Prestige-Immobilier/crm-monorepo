@@ -105,6 +105,8 @@ const ATTEINT_AUTREMENT: Readonly<Record<string, string>> = {
   '/chues/prospects/nouveau': 'deuxième geste · chues/hub-view.tsx',
   '/chues/console': 'troisième geste · chues/hub-view.tsx',
   '/chues/campagnes/representants': 'onglet · phase2/campaigns-tabs.tsx',
+  '/chues/tableau-de-bord': 'redirige vers « Chiffres », qui l’a absorbé',
+  '/grand-public/tableau-de-bord': 'redirige vers « Chiffres », qui l’a absorbé',
   '/chues/dossiers/nouveau': 'bouton · bank/bank-cases-view.tsx',
   '/chues/representants/import': 'bouton · representants/representants-view.tsx',
   '/notifications': 'cloche · notifications/notification-bell.tsx',
@@ -124,18 +126,31 @@ const MASQUEES: Readonly<Record<Role, readonly string[]>> = {
     '/chues/dossiers/nouveau',
     '/chues/prospects/nouveau',
     '/chues/representants/import',
+    '/chues/tableau-de-bord',
+    '/grand-public/tableau-de-bord',
     '/notifications',
   ],
   DIRECTION: [
     '/accueil/import',
     '/accueil/listes',
     '/accueil/tableau-de-bord',
+    '/chues',
     '/chues/campagnes/representants',
+    '/chues/tableau-de-bord',
+    '/grand-public/tableau-de-bord',
     '/notifications',
   ],
-  SUPERVISEUR: ['/chues/campagnes/representants', '/notifications'],
-  COMMERCIAL: [],
-  BANQUE_FINANCE: ['/chues', '/notifications'],
+  SUPERVISEUR: [
+    '/chues',
+    '/chues/campagnes/representants',
+    '/chues/tableau-de-bord',
+    '/grand-public/tableau-de-bord',
+    '/notifications',
+  ],
+  // Les deux redirections ne portent aucun garde : elles renvoient vers
+  // « Chiffres », qui refuse lui-même qui n'y a pas droit.
+  COMMERCIAL: ['/chues/tableau-de-bord', '/grand-public/tableau-de-bord'],
+  BANQUE_FINANCE: ['/chues', '/chues/tableau-de-bord', '/notifications'],
   ACCUEIL: ['/accueil/tableau-de-bord', '/notifications'],
 };
 
@@ -226,7 +241,6 @@ describe('navigation d’un ADMIN', () => {
       '/chues/dossiers/export',
       '/chues/demandes-clients',
       '/chues/banque',
-      '/chues/tableau-de-bord',
       '/admin/notifications',
       '/chues/representants',
       '/chues/suggestions',
@@ -291,11 +305,14 @@ describe('navigation d’un ADMIN', () => {
     ).toBe('Vue d’ensemble');
   });
 
-  it('ne nomme jamais deux écrans de chiffres pareil', () => {
+  // Les chiffres du projet tiennent en UN écran, « Tableau de bord » : plus de
+  // « Chiffres » à côté, et plus d'entrée qui pointe vers la redirection.
+  it('n’offre qu’un seul écran de chiffres du projet', () => {
     const labels = navItems('ADMIN', 'chues').map((item) => item.label);
     expect(labels.filter((label, rang) => labels.indexOf(label) !== rang)).toEqual([]);
-    expect(navTitle('ADMIN', '/chues/statistiques')).toBe('Chiffres');
-    expect(navTitle('ADMIN', '/chues/tableau-de-bord')).toBe('Tableau de bord');
+    expect(navTitle('ADMIN', '/chues/statistiques')).toBe('Tableau de bord');
+    expect(hrefs('ADMIN', 'chues')).not.toContain('/chues/tableau-de-bord');
+    expect(hrefs('ADMIN', 'grand-public')).not.toContain('/grand-public/tableau-de-bord');
   });
 
   it('range la navigation de CHUES en UNE liste, sans intitulé à lire', () => {
@@ -304,21 +321,20 @@ describe('navigation d’un ADMIN', () => {
     for (const section of sections) expect(section.items.length).toBeGreaterThan(0);
   });
 
-  it('garde six entrées en pleine barre et replie le reste sous « Plus »', () => {
+  it('ouvre sur le tableau de bord, garde cinq entrées en pleine barre et replie le reste', () => {
     const items = navItems('ADMIN', 'chues');
     expect(items.filter((item) => item.secondary !== true).map((item) => item.href)).toEqual([
-      '/chues',
+      '/chues/statistiques',
       '/chues/prospects',
       '/chues/representants',
       '/chues/campagnes',
       '/chues/dossiers',
-      '/chues/statistiques',
     ]);
     expect(items.filter((item) => item.secondary === true).map((item) => item.href)).toEqual([
+      '/chues',
       '/chues/supervision',
       '/chues/rappels',
       '/chues/suggestions',
-      '/chues/tableau-de-bord',
       '/chues/banque',
       '/chues/demandes-clients',
       '/chues/dossiers/export',
@@ -369,9 +385,9 @@ describe('navigation d’un téléconseiller', () => {
     ]);
     expect(navItems('COMMERCIAL', 'chues').map((item) => item.label)).toEqual([
       'Mon travail',
-      '1 · Qualifier un représentant',
-      '2 · Ajouter un prospect',
-      '3 · Convertir un prospect',
+      'Qualifier un représentant',
+      'Ajouter un prospect',
+      'Convertir un prospect',
       'Rappels promis',
       'Contacts recommandés',
       'Représentants',
@@ -453,14 +469,20 @@ describe('navigation d’un téléconseiller', () => {
     expect(navTitle('COMMERCIAL', '/chues/suggestions')).toBe('Contacts recommandés');
   });
 
-  it('compte les trois étapes du parcours CHUES, dans l’ordre', () => {
+  // Le rang se lit dans l'ordre de la barre ; le chiffre collé à l'intitulé
+  // n'apprenait rien qu'un superviseur ne voie déjà.
+  it('range les trois étapes dans l’ordre du travail, sans les numéroter', () => {
     const described = new Map(
       navItems('COMMERCIAL', 'chues').map((item) => [item.href, item.description]),
     );
 
-    expect(described.get('/chues/appels-representants')).toBe('Étape 1 sur 3');
-    expect(described.get('/chues/prospects/nouveau')).toBe('Étape 2 sur 3');
-    expect(described.get('/chues/console')).toBe('Étape 3 sur 3');
+    expect(described.get('/chues/appels-representants')).toBe('Première étape');
+    expect(described.get('/chues/prospects/nouveau')).toBe('Deuxième étape');
+    expect(described.get('/chues/console')).toBe('Dernière étape');
+
+    for (const item of navItems('COMMERCIAL', 'chues')) {
+      expect(item.label).not.toMatch(/^\d/u);
+    }
   });
 
   it('nomme ses écrans d’appel par le geste, sans employer le mot proscrit', () => {
@@ -469,10 +491,8 @@ describe('navigation d’un téléconseiller', () => {
     );
     for (const text of labels) expect(text.toLowerCase()).not.toContain('commercial');
     for (const text of labels) expect(text.toLowerCase()).not.toContain('console');
-    expect(navTitle('COMMERCIAL', '/chues/console')).toBe('3 · Convertir un prospect');
-    expect(navTitle('COMMERCIAL', '/chues/appels-representants')).toBe(
-      '1 · Qualifier un représentant',
-    );
+    expect(navTitle('COMMERCIAL', '/chues/console')).toBe('Convertir un prospect');
+    expect(navTitle('COMMERCIAL', '/chues/appels-representants')).toBe('Qualifier un représentant');
   });
 });
 
@@ -618,10 +638,13 @@ describe('écran d’atterrissage après connexion', () => {
   });
 
   it('mène chaque rôle là où l’API ne lui répondra pas 403', () => {
-    expect(coqueHomePath('ADMIN', 'chues')).toBe('/chues');
+    // L'encadrement et l'admin atterrissent sur les chiffres ; le
+    // téléconseiller sur ses trois étapes.
+    expect(coqueHomePath('ADMIN', 'chues')).toBe('/chues/statistiques');
     expect(coqueHomePath('BANQUE_FINANCE', 'chues')).toBe('/chues/banque');
     expect(coqueHomePath('COMMERCIAL', 'chues')).toBe('/chues');
-    expect(coqueHomePath('SUPERVISEUR', 'chues')).toBe('/chues');
+    expect(coqueHomePath('SUPERVISEUR', 'chues')).toBe('/chues/statistiques');
+    expect(coqueHomePath('DIRECTION', 'chues')).toBe('/chues/statistiques');
     expect(coqueHomePath('DIRECTION', 'accueil')).toBe('/accueil');
     expect(coqueHomePath('ACCUEIL', 'accueil')).toBe('/accueil');
   });
@@ -653,7 +676,7 @@ describe('titre et surbrillance par PRÉFIXE LE PLUS LONG', () => {
     expect(navTitle('ADMIN', '/admin/commerciaux')).toBe('Utilisateurs');
     expect(navTitle('ADMIN', '/admin/commerciaux')).not.toContain('Commerciaux');
     expect(navTitle('ADMIN', '/chues/supervision')).toBe('Équipes');
-    expect(navTitle('ADMIN', '/chues/statistiques')).toBe('Chiffres');
+    expect(navTitle('ADMIN', '/chues/statistiques')).toBe('Tableau de bord');
   });
 
   it('garde « Dossiers bancaires » sur le détail d’un dossier', () => {
@@ -689,9 +712,9 @@ describe('titre et surbrillance par PRÉFIXE LE PLUS LONG', () => {
 });
 
 describe('navigation d’un SUPERVISEUR', () => {
-  it('fait passer ses propres appels avant le suivi de son équipe', () => {
+  it('ouvre sur le tableau de bord, puis ses propres appels, puis le suivi de son équipe', () => {
     expect(hrefs('SUPERVISEUR', 'chues')).toEqual([
-      '/chues',
+      '/chues/statistiques',
       '/chues/appels-representants',
       '/chues/prospects/nouveau',
       '/chues/console',
@@ -702,29 +725,27 @@ describe('navigation d’un SUPERVISEUR', () => {
       '/chues/representants',
       '/chues/prospects',
       '/chues/campagnes',
-      '/chues/statistiques',
     ]);
     expect(navItems('SUPERVISEUR', 'chues').map((item) => item.label)).toEqual([
-      'Mon travail',
-      '1 · Qualifier un représentant',
-      '2 · Ajouter un prospect',
-      '3 · Convertir un prospect',
+      'Tableau de bord',
+      'Qualifier un représentant',
+      'Ajouter un prospect',
+      'Convertir un prospect',
       'Rappels promis',
       'Mon équipe',
       'Contacts recommandés',
       'Représentants',
       'Prospects',
       'Campagnes',
-      'Chiffres',
     ]);
   });
 
-  it('garde le suivi de l’équipe en pleine barre et replie le pilotage', () => {
+  it('garde le tableau de bord et le suivi de l’équipe en pleine barre, replie les campagnes', () => {
     const replies = navItems('SUPERVISEUR', 'chues')
       .filter((item) => item.secondary === true)
       .map((item) => item.href);
     expect(replies).toContain('/chues/campagnes');
-    expect(replies).toContain('/chues/statistiques');
+    expect(replies).not.toContain('/chues/statistiques');
     expect(replies).not.toContain('/chues/supervision');
   });
 
@@ -766,7 +787,6 @@ describe('les trois étapes, lues à l’identique par les trois rôles qui les 
     Object.fromEntries(TERRAIN.map((role) => [role, mesure(role)]));
 
   const PARTAGES = [
-    '/chues',
     '/chues/appels-representants',
     '/chues/prospects/nouveau',
     '/chues/console',
@@ -776,11 +796,17 @@ describe('les trois étapes, lues à l’identique par les trois rôles qui les 
     '/chues/prospects',
   ];
 
-  it('ouvre « Mon travail » puis les trois étapes numérotées, dans le même ordre', () => {
-    const debut = ['/chues', ...ETAPES.map(({ href }) => href)];
+  it('ouvre sur son écran du matin, puis les trois étapes, dans le même ordre', () => {
+    const etapes = ETAPES.map(({ href }) => href);
 
-    expect(parRole((role) => hrefs(role, 'chues').slice(0, 4))).toEqual(parRole(() => debut));
-    expect(parRole((role) => coqueHomePath(role, 'chues'))).toEqual(parRole(() => '/chues'));
+    expect(parRole((role) => hrefs(role, 'chues').slice(1, 4))).toEqual(parRole(() => etapes));
+    // Le téléconseiller ouvre sur ses trois étapes ; qui encadre, sur les
+    // chiffres de l'équipe. Les étapes viennent juste après pour tous.
+    expect(parRole((role) => coqueHomePath(role, 'chues'))).toEqual({
+      COMMERCIAL: '/chues',
+      SUPERVISEUR: '/chues/statistiques',
+      DIRECTION: '/chues/statistiques',
+    });
   });
 
   it('emploie les mots du métier, ceux du sélecteur d’étapes', () => {
@@ -789,10 +815,10 @@ describe('les trois étapes, lues à l’identique par les trois rôles qui les 
       'Ajouter un prospect',
       'Convertir un prospect',
     ]);
-    // La barre latérale ne peut pas dériver du sélecteur : elle numérote les
+    // La barre latérale ne peut pas dériver du sélecteur : elle reprend les
     // mêmes intitulés, mot pour mot.
     expect(ETAPES.map(({ href }) => navTitle('COMMERCIAL', href))).toEqual(
-      ETAPES.map(({ n, titre }) => `${String(n)} · ${titre}`),
+      ETAPES.map(({ titre }) => titre),
     );
   });
 
@@ -847,7 +873,7 @@ describe('navigation de la DIRECTION', () => {
   it('montre le registre, le pilotage et le terrain, jamais la banque', () => {
     expect(hrefs('DIRECTION', 'accueil')).toEqual(['/accueil']);
     expect(hrefs('DIRECTION', 'chues')).toEqual([
-      '/chues',
+      '/chues/statistiques',
       '/chues/appels-representants',
       '/chues/prospects/nouveau',
       '/chues/console',
@@ -858,17 +884,15 @@ describe('navigation de la DIRECTION', () => {
       '/chues/representants',
       '/chues/prospects',
       '/chues/campagnes',
-      '/chues/statistiques',
     ]);
   });
 
   it('range le Grand Public dans le même ordre que CHUES, replis compris', () => {
     expect(hrefs('DIRECTION', 'grand-public')).toEqual([
+      '/grand-public/statistiques',
       '/grand-public',
       '/grand-public/campagnes',
-      '/grand-public/statistiques',
       // Sous « Plus ».
-      '/grand-public/tableau-de-bord',
       '/grand-public/rappels',
     ]);
   });
@@ -929,27 +953,25 @@ describe('boîte de réception, hors coque', () => {
 describe('navigation du pilotage sur le Grand Public et le registre', () => {
   it('range le Grand Public de la supervision comme celui de la direction', () => {
     expect(hrefs('SUPERVISEUR', 'grand-public')).toEqual([
+      '/grand-public/statistiques',
       '/grand-public',
       '/grand-public/campagnes',
-      '/grand-public/statistiques',
       // Sous « Plus ».
-      '/grand-public/tableau-de-bord',
       '/grand-public/rappels',
     ]);
     expect(
       navItems('SUPERVISEUR', 'grand-public')
         .filter((item) => item.secondary === true)
         .map((item) => item.href),
-    ).toEqual(['/grand-public/tableau-de-bord', '/grand-public/rappels']);
+    ).toEqual(['/grand-public/rappels']);
   });
 
   it('donne à l’ADMIN les deux écrans de saisie du Grand Public, sous « Plus »', () => {
     expect(hrefs('ADMIN', 'grand-public')).toEqual([
+      '/grand-public/statistiques',
       '/grand-public',
       '/grand-public/campagnes',
-      '/grand-public/statistiques',
       // Sous « Plus ».
-      '/grand-public/tableau-de-bord',
       '/grand-public/rappels',
       '/grand-public/console',
       '/grand-public/nouveau',

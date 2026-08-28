@@ -200,33 +200,49 @@ const SECTIONS: readonly NavSection[] = [
     coque: 'chues',
     title: null,
     items: [
-      // ─── Les trois étapes, numérotées, pour qui les fait ──────────────────
+      // L'encadrement ouvre sur les chiffres ; le téléconseiller sur ses
+      // trois étapes.
+      {
+        href: '/chues/statistiques',
+        label: 'Tableau de bord',
+        icon: LayoutDashboardIcon,
+        description: 'Appels, adhésions et encaissements',
+        roles: ENCADREMENT,
+      },
       {
         href: '/chues',
         label: 'Mon travail',
         icon: HouseIcon,
         description: 'Les trois étapes, dans l’ordre',
-        roles: TERRAIN,
+        roles: ['COMMERCIAL'],
+      },
+      {
+        href: '/chues',
+        label: 'Les trois étapes',
+        icon: HouseIcon,
+        description: 'Qualifier, ajouter, convertir',
+        roles: ENCADREMENT,
+        hidden: true,
       },
       {
         href: '/chues/appels-representants',
-        label: '1 · Qualifier un représentant',
+        label: 'Qualifier un représentant',
         icon: PhoneCallIcon,
-        description: 'Étape 1 sur 3',
+        description: 'Première étape',
         roles: TERRAIN,
       },
       {
         href: '/chues/prospects/nouveau',
-        label: '2 · Ajouter un prospect',
+        label: 'Ajouter un prospect',
         icon: PlusCircleIcon,
-        description: 'Étape 2 sur 3',
+        description: 'Deuxième étape',
         roles: TERRAIN,
       },
       {
         href: '/chues/console',
-        label: '3 · Convertir un prospect',
+        label: 'Convertir un prospect',
         icon: HeadsetIcon,
-        description: 'Étape 3 sur 3',
+        description: 'Dernière étape',
         roles: TERRAIN,
       },
       {
@@ -279,22 +295,22 @@ const SECTIONS: readonly NavSection[] = [
         roles: ENCADREMENT,
         secondary: true,
       },
-      {
-        href: '/chues/statistiques',
-        label: 'Chiffres',
-        icon: ChartColumnIcon,
-        description: 'Téléconseil et banques',
-        roles: ENCADREMENT,
-        secondary: true,
-      },
 
       // ─── Administration ───────────────────────────────────────────────────
       {
-        href: '/chues',
-        label: 'Projet CHUES',
+        href: '/chues/statistiques',
+        label: 'Tableau de bord',
         icon: LayoutDashboardIcon,
-        description: 'Où en sont les trois étapes',
+        description: 'Appels, adhésions et encaissements',
         roles: ['ADMIN'],
+      },
+      {
+        href: '/chues',
+        label: 'Les trois étapes',
+        icon: HouseIcon,
+        description: 'Qualifier, ajouter, convertir',
+        roles: ['ADMIN'],
+        secondary: true,
       },
       {
         href: '/chues/prospects',
@@ -325,13 +341,6 @@ const SECTIONS: readonly NavSection[] = [
         roles: ['ADMIN'],
       },
       {
-        href: '/chues/statistiques',
-        label: 'Chiffres',
-        icon: ChartColumnIcon,
-        description: 'Téléconseil et banques',
-        roles: ['ADMIN'],
-      },
-      {
         href: '/chues/supervision',
         label: 'Équipes',
         icon: ActivityIcon,
@@ -352,16 +361,6 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Contacts recommandés',
         icon: PhoneForwardedIcon,
         description: 'Numéros donnés par les représentants',
-        roles: ['ADMIN'],
-        secondary: true,
-      },
-      {
-        // Deux écrans de chiffres coexistent : celui-ci porte les graphiques
-        // composables, « Chiffres » porte les totaux du projet.
-        href: '/chues/tableau-de-bord',
-        label: 'Tableau de bord',
-        icon: LayoutDashboardIcon,
-        description: 'Graphiques à composer',
         roles: ['ADMIN'],
         secondary: true,
       },
@@ -535,6 +534,13 @@ const SECTIONS: readonly NavSection[] = [
 
       // ─── Pilotage ─────────────────────────────────────────────────────────
       {
+        href: '/grand-public/statistiques',
+        label: 'Tableau de bord',
+        icon: LayoutDashboardIcon,
+        description: 'Activité et conversion',
+        roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR'],
+      },
+      {
         href: '/grand-public',
         label: 'Prospects',
         icon: UsersIcon,
@@ -547,21 +553,6 @@ const SECTIONS: readonly NavSection[] = [
         icon: MegaphoneIcon,
         description: 'Distribuer les appels aux téléconseillers',
         roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR'],
-      },
-      {
-        href: '/grand-public/statistiques',
-        label: 'Chiffres',
-        icon: ChartColumnIcon,
-        description: 'Activité et conversion',
-        roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR'],
-      },
-      {
-        href: '/grand-public/tableau-de-bord',
-        label: 'Vue d’ensemble',
-        icon: LayoutDashboardIcon,
-        description: 'Indicateurs et graphiques',
-        roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR'],
-        secondary: true,
       },
       {
         href: '/grand-public/rappels',

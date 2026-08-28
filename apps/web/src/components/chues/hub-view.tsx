@@ -79,7 +79,6 @@ export function HubView({ prenom }: { prenom: string }) {
 
       <ol className="grid gap-4 md:grid-cols-3">
         <Etape
-          n={1}
           prioritaire={prioritaire === 1}
           titre="Qualifier un représentant"
           explication="Un enseignant relais accepte de transmettre les contacts de ses collègues."
@@ -101,7 +100,6 @@ export function HubView({ prenom }: { prenom: string }) {
         />
 
         <Etape
-          n={2}
           prioritaire={prioritaire === 2}
           titre="Ajouter un prospect"
           explication="Le représentant a donné des noms : on les note un par un."
@@ -123,7 +121,6 @@ export function HubView({ prenom }: { prenom: string }) {
         />
 
         <Etape
-          n={3}
           prioritaire={prioritaire === 3}
           titre="Convertir un prospect"
           explication="Chaque prospect est rappelé jusqu’à son adhésion."
@@ -158,14 +155,12 @@ export function HubView({ prenom }: { prenom: string }) {
 }
 
 function Etape({
-  n,
   titre,
   explication,
   chiffre,
   action,
   prioritaire = false,
 }: {
-  n: number;
   titre: string;
   explication: string;
   chiffre: ReactNode;
@@ -179,23 +174,12 @@ function Etape({
         prioritaire && 'border-accent-text/40 ring-1 ring-accent-text/25',
       )}
     >
-      <span className="flex items-center gap-2">
-        <span
-          aria-hidden="true"
-          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent-surface font-display text-[1.125rem] font-[800] text-accent-text"
-        >
-          {n}
+      {prioritaire ? (
+        <span className="self-start rounded-full bg-accent-surface px-2 py-0.5 text-[0.75rem] font-[600] text-accent-text">
+          À faire maintenant
         </span>
-        {prioritaire ? (
-          <span className="rounded-full bg-accent-surface px-2 py-0.5 text-[0.75rem] font-[600] text-accent-text">
-            À faire maintenant
-          </span>
-        ) : null}
-      </span>
-      <h2 className="font-display text-h4 font-[700] tracking-[-0.02em]">
-        <span className="sr-only">Étape {n} sur 3 : </span>
-        {titre}
-      </h2>
+      ) : null}
+      <h2 className="font-display text-h4 font-[700] tracking-[-0.02em]">{titre}</h2>
       <p className="text-[0.875rem] text-muted-foreground">{explication}</p>
       {chiffre}
       <div className="mt-auto pt-1">{action}</div>

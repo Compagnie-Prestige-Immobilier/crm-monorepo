@@ -50,6 +50,12 @@ describe('les trois étapes, montrées et cliquables', () => {
     );
   });
 
+  it('ne colle aucun chiffre aux intitulés', () => {
+    render(<EtapesNav courante={2} />);
+
+    for (const lien of liens()) expect(lien.textContent).not.toMatch(/\d/u);
+  });
+
   it('mène de la première à la troisième d’un seul clic', () => {
     render(<EtapesNav courante={1} />);
 

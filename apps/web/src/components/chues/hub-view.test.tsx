@@ -66,6 +66,20 @@ describe('HubView : les trois étapes, dans l’ordre', () => {
     expect(trois?.textContent).toContain('2 rappels dus');
   });
 
+  // L'ordre des cartes porte déjà le rang ; la pastille chiffrée et le « Étape
+  // n sur 3 » lu à voix haute ne faisaient que le répéter.
+  it('ne numérote plus les étapes', async () => {
+    renderWithQuery(<HubView prenom="Fatou" />);
+    await waitFor(() => {
+      expect(screen.getByText('42')).toBeTruthy();
+    });
+
+    expect(screen.queryByText(/Étape \d sur 3/u)).toBeNull();
+    for (const etape of etapes()) {
+      expect(within(etape).getByRole('heading').textContent).not.toMatch(/\d/u);
+    }
+  });
+
   it('n’affiche AUCUN zéro provisoire pendant le chargement', () => {
     renderWithQuery(<HubView prenom="Fatou" />);
 
