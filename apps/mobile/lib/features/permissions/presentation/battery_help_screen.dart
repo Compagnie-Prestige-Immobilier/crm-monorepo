@@ -3,19 +3,22 @@ import 'dart:io';
 
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
+import '../../../core/notifications/rep_callback_notifications.dart';
 import '../../../core/router/back_navigation.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../ui/widgets/cpi_kit.dart';
 import '../../shell/app_shell.dart';
+import '../alarme_permission.dart';
 
-class BatteryHelpScreen extends StatelessWidget {
+class BatteryHelpScreen extends ConsumerWidget {
   const BatteryHelpScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final ThemeData theme = Theme.of(context);
     final String retour = reglagesDeLaCoque(context);
 
@@ -68,6 +71,19 @@ class BatteryHelpScreen extends StatelessWidget {
                 ),
               ]),
               const SizedBox(height: CpiSpacing.lg),
+              Text('Les rappels promis', style: theme.textTheme.titleSmall),
+              const SizedBox(height: CpiSpacing.xs),
+              const CpiCard.rows(<CpiRow>[
+                CpiRow(
+                  leading: _StepNumber(4),
+                  title: 'Alarme sur l\'écran verrouillé',
+                  subtitle:
+                      'Depuis Android 14, l\'alarme d\'un rappel ne s\'affiche '
+                      'par-dessus l\'écran verrouillé qu\'avec cette '
+                      'autorisation.',
+                ),
+              ]),
+              const SizedBox(height: CpiSpacing.lg),
               if (Platform.isAndroid) ...<Widget>[
                 CpiButton(
                   'Ouvrir les réglages du téléphone',
@@ -76,9 +92,18 @@ class BatteryHelpScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: CpiSpacing.xs),
                 CpiButton(
+                  'Autoriser l\'alarme plein écran',
+                  variant: CpiButtonVariant.ghost,
+                  icon: PhosphorIconsRegular.bellRinging,
+                  onPressed: () => ref
+                      .read(repCallbackNotificationsProvider)
+                      .requestFullScreenIntent(),
+                ),
+                const SizedBox(height: CpiSpacing.xs),
+                CpiButton(
                   'Ouvrir la fiche de l\'application',
                   variant: CpiButtonVariant.ghost,
-                  onPressed: () => _openAppSettings(context),
+                  onPressed: () => ouvrirLaFicheApplication(context),
                 ),
               ] else
                 Text(
@@ -105,20 +130,7 @@ class BatteryHelpScreen extends StatelessWidget {
         name: 'cpi.perm',
       );
       if (!context.mounted) return;
-      await _openAppSettings(context);
-    }
-  }
-
-  static Future<void> _openAppSettings(BuildContext context) async {
-    try {
-      await const AndroidIntent(
-        action: 'android.settings.APPLICATION_DETAILS_SETTINGS',
-        data: 'package:sn.cpi.go',
-      ).launch();
-    } on Object catch (e) {
-      developer.log('Fiche application inaccessible : $e', name: 'cpi.perm');
-      if (!context.mounted) return;
-      cpiToast(context, 'Ouvrez : Réglages → Applications → CPI GO.');
+      await ouvrirLaFicheApplication(context);
     }
   }
 }

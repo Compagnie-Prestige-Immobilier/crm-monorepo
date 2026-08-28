@@ -14,6 +14,7 @@ import '../../../ui/async_value_x.dart';
 import '../../../ui/widgets/cpi_kit.dart';
 import '../../../ui/widgets/empty_state.dart';
 import '../../../ui/widgets/error_state.dart';
+import 'rappels_en_retard_banner.dart';
 
 /// Les rappels promis, du plus proche au plus lointain.
 ///
@@ -39,6 +40,7 @@ class RappelsScreen extends ConsumerWidget {
       child: CpiScaffold(
         title: 'Rappels',
         leading: CpiBackButton(fallback: retour),
+        banner: RappelsEnRetardBanner(grandPublic: grandPublic, lien: false),
         body: rappels.whenEchecDAbord(
           loading: () => const Center(
             child: FCircularProgress(semanticsLabel: 'Chargement'),

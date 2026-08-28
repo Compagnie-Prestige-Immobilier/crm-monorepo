@@ -277,6 +277,30 @@ void main() {
 
     expect(await db.select(db.repCallbackReminders).get(), isEmpty);
     expect(alarmes.annulees, <String>[promis]);
+    // Un seul appel d'annulation, mais DEUX alarmes derrière : le pré-rappel
+    // et l'heure convenue partagent l'identifiant du rappel.
+    final (int preAlerte, int heure) =
+        RepCallbackNotifications.notificationIdsFor(promis);
+    expect(preAlerte, isNot(heure));
+
+    await demonter(tester);
+  });
+
+  // Le rappel promis arme l'alarme avec le numéro : c'est ce qu'on lit sur
+  // l'écran verrouillé, sans ouvrir l'application.
+  testWidgets('un rappel promis arme l\'alarme avec le nom et le numéro', (
+    WidgetTester tester,
+  ) async {
+    await ouvrir(tester);
+    await taper(tester, find.text('À rappeler'));
+    await taper(tester, find.text('Demain 9 h'));
+    await versLesDetails(tester);
+    await tester.tap(find.text('Enregistrer'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(alarmes.posees.single.phoneE164, '+221770000001');
+    expect(alarmes.posees.single.at.hour, 9);
 
     await demonter(tester);
   });
@@ -331,14 +355,21 @@ class _WritesEspion extends WriteRepository {
 /// d'implantation dans un test de widget.
 class _AlarmesEspion extends RepCallbackNotifications {
   final List<String> annulees = <String>[];
+  final List<({String id, String phoneE164, DateTime at})> posees =
+      <({String id, String phoneE164, DateTime at})>[];
+
+  @override
+  Future<RepCallbackPermissions> ensurePermissions() async =>
+      (notifications: true, alarmesExactes: true);
 
   @override
   Future<void> schedule({
     required String id,
     required String representantId,
     required String fullName,
+    required String phoneE164,
     required DateTime at,
-  }) async {}
+  }) async => posees.add((id: id, phoneE164: phoneE164, at: at));
 
   @override
   Future<void> cancel(String id) async => annulees.add(id);

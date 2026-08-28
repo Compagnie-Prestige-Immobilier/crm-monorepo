@@ -51,7 +51,10 @@ class _AuthRefreshNotifier extends ChangeNotifier {
   }
 }
 
-final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(
+/// Publique pour ce qui doit ouvrir une feuille SANS être sous le `Router` :
+/// `RepCallbackDueListener` coiffe l'application entière et n'a donc aucun
+/// `Navigator` au-dessus de lui.
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'root',
 );
 
@@ -88,7 +91,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
   );
 
   final GoRouter router = GoRouter(
-    navigatorKey: _rootNavigatorKey,
+    navigatorKey: rootNavigatorKey,
     initialLocation: initial,
     refreshListenable: refresh,
     debugLogDiagnostics: kDebugMode,
@@ -143,7 +146,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: Routes.home,
         name: 'hub',
-        parentNavigatorKey: _rootNavigatorKey,
+        parentNavigatorKey: rootNavigatorKey,
         builder: (BuildContext context, GoRouterState state) =>
             const HubScreen(),
       ),
@@ -203,7 +206,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: Routes.accueilVisiteNew,
         name: 'accueilVisiteNew',
-        parentNavigatorKey: _rootNavigatorKey,
+        parentNavigatorKey: rootNavigatorKey,
         builder: (BuildContext context, GoRouterState state) => ProjectScope(
           project: CpiProject.accueil,
           child: VisiteFormScreen(
@@ -214,7 +217,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: Routes.grandPublicNew,
         name: 'grandPublicNew',
-        parentNavigatorKey: _rootNavigatorKey,
+        parentNavigatorKey: rootNavigatorKey,
         builder: (BuildContext context, GoRouterState state) => ProjectScope(
           project: CpiProject.grandPublic,
           child: ProspectEntryScreen(
@@ -226,7 +229,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: CampagnesRoutes.grandPublicListe,
         name: 'grandPublicCampagnes',
-        parentNavigatorKey: _rootNavigatorKey,
+        parentNavigatorKey: rootNavigatorKey,
         builder: (BuildContext context, GoRouterState state) =>
             const ProjectScope(
               project: CpiProject.grandPublic,
@@ -236,7 +239,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: CampagnesRoutes.grandPublicFile,
         name: 'grandPublicCampagneFile',
-        parentNavigatorKey: _rootNavigatorKey,
+        parentNavigatorKey: rootNavigatorKey,
         builder: (BuildContext context, GoRouterState state) => ProjectScope(
           project: CpiProject.grandPublic,
           child: CampagneFileScreen(
@@ -248,7 +251,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: Routes.grandPublicRappels,
         name: 'grandPublicRappels',
-        parentNavigatorKey: _rootNavigatorKey,
+        parentNavigatorKey: rootNavigatorKey,
         builder: (BuildContext context, GoRouterState state) =>
             const ProjectScope(
               project: CpiProject.grandPublic,
@@ -258,13 +261,13 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: Routes.rappels,
         name: 'rappels',
-        parentNavigatorKey: _rootNavigatorKey,
+        parentNavigatorKey: rootNavigatorKey,
         builder: _chues((GoRouterState state) => const RappelsScreen()),
       ),
       GoRoute(
         path: CampagnesRoutes.grandPublicConsole,
         name: 'grandPublicConsole',
-        parentNavigatorKey: _rootNavigatorKey,
+        parentNavigatorKey: rootNavigatorKey,
         builder: (BuildContext context, GoRouterState state) => ProjectScope(
           project: CpiProject.grandPublic,
           child: Phase2Screen(
@@ -329,7 +332,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: Routes.representants,
         name: 'representants',
-        parentNavigatorKey: _rootNavigatorKey,
+        parentNavigatorKey: rootNavigatorKey,
         builder: _chues(
           (GoRouterState state) => RepresentantPickerScreen(
             pourQualifier:
@@ -341,7 +344,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: Routes.newRepresentant,
         name: 'newRepresentant',
-        parentNavigatorKey: _rootNavigatorKey,
+        parentNavigatorKey: rootNavigatorKey,
         builder: _chues(
           (GoRouterState state) => RepresentantFormScreen(
             draftId: state.uri.queryParameters[Routes.draftParam],
@@ -356,7 +359,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: Routes.representantQualification,
         name: 'representantQualification',
-        parentNavigatorKey: _rootNavigatorKey,
+        parentNavigatorKey: rootNavigatorKey,
         builder: _chues(
           (GoRouterState state) => RepresentantQualificationScreen(
             representantId: state.pathParameters['id'] ?? '',
@@ -366,7 +369,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: Routes.representantDetail,
         name: 'representantDetail',
-        parentNavigatorKey: _rootNavigatorKey,
+        parentNavigatorKey: rootNavigatorKey,
         builder: _chues(
           (GoRouterState state) => RepresentantDetailScreen(
             representantId: state.pathParameters['id'] ?? '',
@@ -376,7 +379,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: Routes.newProspect,
         name: 'newProspect',
-        parentNavigatorKey: _rootNavigatorKey,
+        parentNavigatorKey: rootNavigatorKey,
         builder: _chues(
           (GoRouterState state) => ProspectEntryScreen(
             representantId: state.uri.queryParameters[Routes.repParam],
@@ -389,14 +392,14 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: Routes.prospectDetail,
         name: 'prospectDetail',
-        parentNavigatorKey: _rootNavigatorKey,
+        parentNavigatorKey: rootNavigatorKey,
         builder: (BuildContext context, GoRouterState state) =>
             ProspectDetailScreen(prospectId: state.pathParameters['id'] ?? ''),
       ),
       GoRoute(
         path: Routes.phase2,
         name: 'phase2',
-        parentNavigatorKey: _rootNavigatorKey,
+        parentNavigatorKey: rootNavigatorKey,
         builder: _chues(
           (GoRouterState state) => Phase2Screen(
             prefillPhone: state.uri.queryParameters[Routes.prefillPhoneParam],
@@ -406,7 +409,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: CampagnesRoutes.liste,
         name: 'campagnes',
-        parentNavigatorKey: _rootNavigatorKey,
+        parentNavigatorKey: rootNavigatorKey,
         builder: _chues(
           (GoRouterState state) => CampagnesScreen(
             representantsDabord:
@@ -418,7 +421,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: CampagnesRoutes.repFile,
         name: 'repCampagneFile',
-        parentNavigatorKey: _rootNavigatorKey,
+        parentNavigatorKey: rootNavigatorKey,
         builder: _chues(
           (GoRouterState state) => CampagneFileScreen(
             campaignId: state.pathParameters[CampagnesRoutes.idParam] ?? '',
@@ -429,7 +432,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: CampagnesRoutes.file,
         name: 'campagneFile',
-        parentNavigatorKey: _rootNavigatorKey,
+        parentNavigatorKey: rootNavigatorKey,
         builder: _chues(
           (GoRouterState state) => CampagneFileScreen(
             campaignId: state.pathParameters[CampagnesRoutes.idParam] ?? '',
@@ -439,19 +442,19 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
       GoRoute(
         path: Routes.notifications,
         name: 'notifications',
-        parentNavigatorKey: _rootNavigatorKey,
+        parentNavigatorKey: rootNavigatorKey,
         builder: _chues((GoRouterState state) => const NotificationsScreen()),
       ),
       GoRoute(
         path: Routes.batteryHelp,
         name: 'batteryHelp',
-        parentNavigatorKey: _rootNavigatorKey,
+        parentNavigatorKey: rootNavigatorKey,
         builder: _chues((GoRouterState state) => const BatteryHelpScreen()),
       ),
       GoRoute(
         path: Routes.about,
         name: 'about',
-        parentNavigatorKey: _rootNavigatorKey,
+        parentNavigatorKey: rootNavigatorKey,
         builder: _chues((GoRouterState state) => const AboutScreen()),
       ),
 
