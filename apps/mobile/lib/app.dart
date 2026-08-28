@@ -34,33 +34,6 @@ class CpiGoApp extends ConsumerWidget {
         (MediaQuery.maybeDisableAnimationsOf(context) ?? false);
     final ThemeData clair = still ? AppTheme.lightStill : AppTheme.light;
     final ThemeData sombre = still ? AppTheme.darkStill : AppTheme.dark;
-    final AppUpdateState update = ref.watch(appUpdateControllerProvider);
-    if (update.status == AppUpdateStatus.checking) {
-      return MaterialApp(
-        title: 'CPI GO',
-        debugShowCheckedModeBanner: false,
-        theme: clair,
-        darkTheme: sombre,
-        themeMode: themeMode,
-        locale: const Locale('fr', 'SN'),
-        supportedLocales: _supportedLocales,
-        localizationsDelegates: _localizationsDelegates,
-        home: const _BrandSplash(),
-      );
-    }
-    if (update.requiresPrompt) {
-      return MaterialApp(
-        title: 'CPI GO',
-        debugShowCheckedModeBanner: false,
-        theme: clair,
-        darkTheme: sombre,
-        themeMode: themeMode,
-        locale: const Locale('fr', 'SN'),
-        supportedLocales: _supportedLocales,
-        localizationsDelegates: _localizationsDelegates,
-        home: AppUpdateScreen(state: update),
-      );
-    }
     if (!ref.watch(onboardingControllerProvider)) {
       return MaterialApp(
         title: 'CPI GO',
@@ -93,6 +66,25 @@ class CpiGoApp extends ConsumerWidget {
     if (auth.isAuthenticated) {
       ref.watch(syncCoordinatorProvider.notifier);
       ref.watch(notificationsCoordinatorProvider.notifier);
+    }
+
+    // La porte de mise à jour vient APRÈS l'authentification et après le montage
+    // de la synchronisation : sinon l'écran bloquant prenait l'écran avant que
+    // l'outbox n'ait la moindre chance de partir, et les saisies du jour
+    // restaient sur un téléphone qu'on venait de condamner.
+    final AppUpdateState update = ref.watch(appUpdateControllerProvider);
+    if (update.isBlocking || update.requiresPrompt) {
+      return MaterialApp(
+        title: 'CPI GO',
+        debugShowCheckedModeBanner: false,
+        theme: clair,
+        darkTheme: sombre,
+        themeMode: themeMode,
+        locale: const Locale('fr', 'SN'),
+        supportedLocales: _supportedLocales,
+        localizationsDelegates: _localizationsDelegates,
+        home: AppUpdateScreen(state: update),
+      );
     }
 
     return MaterialApp.router(
