@@ -20,14 +20,17 @@ export class PrismaClients implements OnModuleInit, OnModuleDestroy {
 
   constructor() {
     const poolSize = Math.max(1, Math.floor(readEnv().DATABASE_POOL_SIZE / 2));
-    this.clients = {
-      public: new PrismaClient({
-        adapter: new PrismaPg({ connectionString: databaseUrl('public'), max: poolSize }),
-      }),
-      demo: new PrismaClient({
-        adapter: new PrismaPg({ connectionString: databaseUrl('demo'), max: poolSize }),
-      }),
-    };
+    // Prisma 7 qualifie chaque requête avec le schéma de l'adaptateur, pas
+    // avec `?schema=` ni le `search_path` : sans cette option, les deux
+    // clients écrivaient dans `public`.
+    const client = (workspace: Workspace): PrismaClient =>
+      new PrismaClient({
+        adapter: new PrismaPg(
+          { connectionString: databaseUrl(workspace), max: poolSize },
+          { schema: workspace },
+        ),
+      });
+    this.clients = { public: client('public'), demo: client('demo') };
   }
 
   get(workspace: Workspace): PrismaClient {
