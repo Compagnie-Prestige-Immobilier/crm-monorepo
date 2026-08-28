@@ -1,14 +1,20 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
+import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:cpi_go/core/providers/app_providers.dart';
 import 'package:cpi_go/core/providers/connectivity.dart';
+import 'package:cpi_go/core/sync/clock.dart';
 import 'package:cpi_go/core/updates/app_update_controller.dart';
+import 'package:cpi_go/core/updates/update_installer.dart';
+import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart' show AppLifecycleState;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Mise à jour de l'APK.
@@ -20,10 +26,20 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late SharedPreferences prefs;
+  late Directory support;
+  late FakeClock clock;
 
   setUp(() async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     prefs = await SharedPreferences.getInstance();
+    support = Directory.systemTemp.createTempSync('cpi-updates-test');
+    addTearDown(() => support.deleteSync(recursive: true));
+    clock = FakeClock(DateTime.utc(2026, 8, 27, 8));
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('plugins.flutter.io/path_provider'),
+          (MethodCall call) async => support.path,
+        );
   });
 
   ProviderContainer build({
@@ -31,10 +47,17 @@ void main() {
     List<ConnectivityResult> interfaces = const <ConnectivityResult>[
       ConnectivityResult.wifi,
     ],
+    String buildNumber = '1',
+    UpdateInstaller? installer,
   }) {
     final ProviderContainer container = ProviderContainer(
       overrides: [
         sharedPreferencesProvider.overrideWithValue(prefs),
+        buildNumberProvider.overrideWithValue(buildNumber),
+        clockProvider.overrideWithValue(clock),
+        updateInstallerProvider.overrideWithValue(
+          installer ?? _FakeInstaller(),
+        ),
         connectivitySourceProvider.overrideWithValue(_FakeSource(interfaces)),
         appUpdateClientProvider.overrideWithValue(() {
           final Dio dio = Dio(BaseOptions(baseUrl: 'https://exemple.test'));
@@ -46,6 +69,29 @@ void main() {
     addTearDown(container.dispose);
     return container;
   }
+
+  Future<AppUpdateState> settle(ProviderContainer container) async {
+    container.read(appUpdateControllerProvider);
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    return container.read(appUpdateControllerProvider);
+  }
+
+  /// Une release refusée par le serveur : le plancher est au-dessus du build
+  /// local. `minVersionCode` permet de le REcalculer hors ligne, sur le cache.
+  Map<String, Object?> refusee({
+    int versionCode = 5,
+    int fileSize = 0,
+    String digest = 'abc',
+  }) => <String, Object?>{
+    'available': true,
+    'forceUpdate': true,
+    'minVersionCode': versionCode,
+    'versionName': '2.0.0',
+    'versionCode': versionCode,
+    'fileSize': fileSize,
+    'sha256': digest,
+    'downloadUrl': 'https://exemple.test/cpi.apk',
+  };
 
   test('un serveur muet ne retient pas l\'application au-delà de 3 s', () async {
     // L'écran de démarrage restait bloqué sur `checking` pendant tout le budget
@@ -139,6 +185,288 @@ void main() {
     expect(state.status, AppUpdateStatus.ready);
     expect(state.requiresPrompt, isFalse);
   });
+
+  group('la porte', () {
+    test('plancher inconnu : rien ne bloque', () async {
+      // Le serveur propose une version de plus, sans dire qu'il refuse
+      // celle-ci. Proposer n'est pas condamner.
+      final AppUpdateState state = await settle(
+        build(
+          adapter: _JsonAdapter(<String, Object?>{
+            'available': true,
+            'forceUpdate': false,
+            'versionName': '2.0.0',
+            'versionCode': 5,
+            'fileSize': 0,
+            'sha256': '',
+            'downloadUrl': 'https://exemple.test/cpi.apk',
+          }),
+        ),
+      );
+      expect(state.belowFloor, isFalse);
+      expect(state.gate, AppUpdateGate.none);
+    });
+
+    test(
+      'plancher connu + réseau : blocage, téléchargement, APK vérifié',
+      () async {
+        final List<int> bytes = List<int>.filled(2048, 3);
+        final AppUpdateState state = await settle(
+          build(
+            adapter: _JsonAdapter(
+              refusee(
+                fileSize: bytes.length,
+                digest: sha256.convert(bytes).toString(),
+              ),
+              apk: bytes,
+            ),
+          ),
+        );
+        expect(state.belowFloor, isTrue);
+        expect(state.gate, AppUpdateGate.blocking);
+        expect(state.isReady, isTrue);
+        expect(File(state.localPath!).lengthSync(), bytes.length);
+      },
+    );
+
+    test(
+      'plancher connu + hors ligne : la saisie continue, l\'échéance est dite',
+      () async {
+        await prefs.setString(
+          'cpi.android.release',
+          jsonEncode(refusee()..remove('available')),
+        );
+
+        final AppUpdateState state = await settle(
+          build(adapter: _FailingAdapter()),
+        );
+        expect(state.status, AppUpdateStatus.unreachable);
+        expect(state.belowFloor, isTrue);
+        expect(state.gate, AppUpdateGate.warning);
+        expect(state.deadline, clock.now().add(kAppUpdateGrace));
+      },
+    );
+
+    test('plancher connu + hors ligne + grâce écoulée : blocage', () async {
+      await prefs.setString(
+        'cpi.android.release',
+        jsonEncode(refusee()..remove('available')),
+      );
+      // Le plancher est connu depuis avant-hier : le délai est passé.
+      await prefs.setString(
+        'cpi.android.floor_since',
+        clock
+            .now()
+            .subtract(kAppUpdateGrace + const Duration(hours: 1))
+            .toIso8601String(),
+      );
+
+      final AppUpdateState state = await settle(
+        build(adapter: _FailingAdapter()),
+      );
+      expect(state.gate, AppUpdateGate.blocking);
+    });
+
+    test(
+      'plancher connu + APK vérifié sur disque : blocage dur, prêt à poser',
+      () async {
+        final ({int size, String digest}) apk = await _poserApk(support, 5);
+        await prefs.setString(
+          'cpi.android.release',
+          jsonEncode(
+            refusee(fileSize: apk.size, digest: apk.digest)
+              ..remove('available'),
+          ),
+        );
+
+        // Hors ligne, et pourtant bloquant : il n'y a plus rien à attendre du
+        // réseau, seulement à installer.
+        final AppUpdateState state = await settle(
+          build(adapter: _FailingAdapter()),
+        );
+        expect(state.gate, AppUpdateGate.blocking);
+        expect(state.isReady, isTrue);
+        expect(state.localPath, endsWith('cpi-go-5.apk'));
+      },
+    );
+  });
+
+  test('un APK complet mais corrompu se retélécharge en entier', () async {
+    // Le piège : `Range: bytes=<taille>-` sur un fichier déjà complet vaut un
+    // 416 à chaque essai, et l'écran bloquant n'a plus la moindre issue.
+    final List<int> bytes = List<int>.filled(2048, 3);
+    Directory(p.join(support.path, 'updates')).createSync(recursive: true);
+    File(
+      p.join(support.path, 'updates', 'cpi-go-5.apk'),
+    ).writeAsBytesSync(List<int>.filled(bytes.length, 0));
+
+    final _JsonAdapter adapter = _JsonAdapter(
+      refusee(fileSize: bytes.length, digest: sha256.convert(bytes).toString()),
+      apk: bytes,
+    );
+    final AppUpdateState state = await settle(build(adapter: adapter));
+
+    expect(state.isReady, isTrue);
+    expect(
+      adapter.rangeDemande,
+      isNull,
+      reason: 'aucune reprise possible : le téléchargement repart de zéro',
+    );
+  });
+
+  test(
+    'espace insuffisant : le manque est chiffré, rien n\'est écrit',
+    () async {
+      const int taille = 100 * 1024 * 1024;
+      final _FakeInstaller installer = _FakeInstaller(
+        freeSpace: 10 * 1024 * 1024,
+      );
+      final AppUpdateState state = await settle(
+        build(
+          adapter: _JsonAdapter(refusee(fileSize: taille)),
+          installer: installer,
+        ),
+      );
+
+      expect(state.blocker, AppUpdateBlocker.diskSpace);
+      expect(
+        state.missingBytes,
+        (taille * kAppUpdateDiskHeadroom).ceil() - 10 * 1024 * 1024,
+      );
+      expect(
+        Directory(p.join(support.path, 'updates')).listSync(),
+        isEmpty,
+        reason: 'aucun octet ne part sur un disque plein',
+      );
+    },
+  );
+
+  test(
+    '« sources inconnues » révoquée : l\'installation renvoie aux réglages',
+    () async {
+      final ({int size, String digest}) apk = await _poserApk(support, 5);
+      await prefs.setString(
+        'cpi.android.release',
+        jsonEncode(
+          refusee(fileSize: apk.size, digest: apk.digest)..remove('available'),
+        ),
+      );
+      final _FakeInstaller installer = _FakeInstaller(allowed: false);
+      final ProviderContainer container = build(
+        adapter: _FailingAdapter(),
+        installer: installer,
+      );
+      await settle(container);
+
+      await container.read(appUpdateControllerProvider.notifier).install();
+
+      final AppUpdateState state = container.read(appUpdateControllerProvider);
+      expect(state.canInstall, isFalse);
+      expect(state.blocker, AppUpdateBlocker.installPermission);
+      expect(installer.installed, isEmpty, reason: 'rien n\'a été posé');
+    },
+  );
+
+  test('le retour au premier plan revérifie l\'autorisation', () async {
+    final _FakeInstaller installer = _FakeInstaller(allowed: false);
+    final ProviderContainer container = build(
+      adapter: _NothingAdapter(),
+      installer: installer,
+    );
+    await settle(container);
+    expect(container.read(appUpdateControllerProvider).canInstall, isTrue);
+
+    // L'utilisateur est allé dans les réglages et a accordé la permission.
+    installer.allowed = true;
+    TestWidgetsFlutterBinding.instance.handleAppLifecycleStateChanged(
+      AppLifecycleState.inactive,
+    );
+    TestWidgetsFlutterBinding.instance.handleAppLifecycleStateChanged(
+      AppLifecycleState.resumed,
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    expect(container.read(appUpdateControllerProvider).canInstall, isTrue);
+    expect(installer.permissionChecks, greaterThan(0));
+  });
+}
+
+/// Écrit un APK factice là où le contrôleur ira le chercher, et rend sa taille
+/// et son empreinte.
+Future<({int size, String digest})> _poserApk(
+  Directory support,
+  int versionCode,
+) async {
+  final Directory updates = Directory(p.join(support.path, 'updates'))
+    ..createSync(recursive: true);
+  final List<int> bytes = List<int>.filled(4096, 7);
+  final File file = File(p.join(updates.path, 'cpi-go-$versionCode.apk'))
+    ..writeAsBytesSync(bytes);
+  return (size: file.lengthSync(), digest: sha256.convert(bytes).toString());
+}
+
+class _FakeInstaller implements UpdateInstaller {
+  _FakeInstaller({this.allowed = true, this.freeSpace = 1 << 40});
+
+  bool allowed;
+  final int freeSpace;
+  final List<String> installed = <String>[];
+  int permissionChecks = 0;
+
+  @override
+  Future<bool> canInstall() async {
+    permissionChecks++;
+    return allowed;
+  }
+
+  @override
+  Future<int> freeSpaceBytes(String directory) async => freeSpace;
+
+  @override
+  Future<void> install({required String path, String? signerSha256}) async {
+    installed.add(path);
+  }
+
+  @override
+  Future<void> openUnknownSourcesSettings() async {}
+
+  @override
+  void onFailure(void Function(String message) handler) {}
+}
+
+/// Le contrôle rend [body] ; l'URL de téléchargement rend [apk] quand il est
+/// fourni, pour que l'empreinte annoncée puisse réellement être vérifiée.
+class _JsonAdapter implements HttpClientAdapter {
+  _JsonAdapter(this.body, {this.apk});
+
+  final Map<String, Object?> body;
+  final List<int>? apk;
+
+  /// L'en-tête `Range` du dernier téléchargement, ou `null` s'il n'y en a pas eu.
+  String? rangeDemande;
+
+  @override
+  void close({bool force = false}) {}
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    final List<int>? bytes = apk;
+    if (bytes != null && options.path == body['downloadUrl']) {
+      rangeDemande = options.headers['Range'] as String?;
+      return ResponseBody.fromBytes(bytes, 200);
+    }
+    return ResponseBody.fromString(
+      jsonEncode(body),
+      200,
+      headers: <String, List<String>>{
+        Headers.contentTypeHeader: <String>['application/json'],
+      },
+    );
+  }
 }
 
 class _FakeSource implements ConnectivitySource {

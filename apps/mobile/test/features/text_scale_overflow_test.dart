@@ -536,14 +536,17 @@ void main() {
       ),
     ),
     // Version longue et notes multi-lignes : c'est l'état le plus haut de
-    // l'écran, et `forceUpdate` retire le bouton « Plus tard », ce qui change
+    // l'écran, et `belowFloor` retire le bouton « Plus tard », ce qui change
     // la barre d'actions.
     'Mise à jour obligatoire': () => AppUpdateScreen(
       state: AppUpdateState(
         status: AppUpdateStatus.ready,
         localPath: '/data/cpi-go.apk',
+        belowFloor: true,
+        gate: AppUpdateGate.blocking,
         release: AndroidRelease(
           forceUpdate: true,
+          minVersionCode: 21403,
           versionName: '2.14.0-hotfix.3',
           versionCode: 21403,
           fileSize: 48234567,

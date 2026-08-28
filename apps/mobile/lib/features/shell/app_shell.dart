@@ -10,6 +10,7 @@ import '../../core/providers/app_providers.dart';
 import '../../core/providers/connectivity.dart';
 import '../../core/providers/sync_coordinator.dart';
 import '../../core/router/route_guard.dart';
+import '../../core/updates/app_update_controller.dart';
 import '../../ui/widgets/cpi_forui.dart';
 import '../../ui/widgets/cpi_kit.dart';
 import 'projects.dart';
@@ -209,9 +210,25 @@ class _PendingBannerState extends ConsumerState<PendingBanner> {
     final String pasEncore =
         '$fiches pas encore envoyée${pending > 1 ? 's' : ''}';
 
+    final AppUpdateState update = ref.watch(appUpdateControllerProvider);
+
     final ({String text, CpiTone tone, String? action, VoidCallback? onAction})?
     band;
-    if (pending > 0 && offline) {
+    if (update.gate == AppUpdateGate.warning) {
+      // Le serveur ne reçoit plus cette version, et le réseau ne permet pas
+      // encore de télécharger. La saisie continue jusqu'à l'échéance : c'est la
+      // date qui doit être lisible, pas le principe.
+      band = (
+        text:
+            'Cette version n\'est plus acceptée par le serveur. '
+            'Connectez-vous à Internet avant le ${_echeance(update.deadline)} '
+            'pour installer la mise à jour.',
+        tone: CpiTone.danger,
+        action: 'Réessayer',
+        onAction: () =>
+            unawaited(ref.read(appUpdateControllerProvider.notifier).retry()),
+      );
+    } else if (pending > 0 && offline) {
       band = (
         text: network == CpiConnectivity.unreachable
             ? 'Serveur injoignable. $pasEncore. '
@@ -286,4 +303,13 @@ class _PendingBannerState extends ConsumerState<PendingBanner> {
       onAction: band.onAction,
     );
   }
+}
+
+String _echeance(DateTime? at) {
+  if (at == null) return 'la fin du délai';
+  final DateTime local = at.toLocal();
+  final String jour = local.day.toString().padLeft(2, '0');
+  final String mois = local.month.toString().padLeft(2, '0');
+  final String heure = local.hour.toString().padLeft(2, '0');
+  return '$jour/$mois à ${heure}h';
 }
