@@ -136,19 +136,23 @@ export function NotificationComposer({
    * part, et une variable substituée rallonge. Un dépassement renvoyait
    * l'assistant à l'étape 1 sans qu'aucun champ ne soit marqué.
    */
-  const titleIssue =
-    title.trim() === ''
-      ? 'Le titre est obligatoire.'
-      : rendered.title.length > TITLE_MAX
-        ? `Le titre rendu fait ${String(rendered.title.length)} caractères, ${String(TITLE_MAX)} au maximum.`
-        : null;
+  const titleIssue = (() => {
+    if (title.trim() === '') return 'Le titre est obligatoire.';
+    return (() => {
+      if (rendered.title.length > TITLE_MAX)
+        return `Le titre rendu fait ${String(rendered.title.length)} caractères, ${String(TITLE_MAX)} au maximum.`;
+      return null;
+    })();
+  })();
 
-  const bodyIssue =
-    body.trim() === ''
-      ? 'Le message est obligatoire.'
-      : rendered.body.length > BODY_MAX
-        ? `Le message rendu fait ${String(rendered.body.length)} caractères, ${String(BODY_MAX)} au maximum.`
-        : null;
+  const bodyIssue = (() => {
+    if (body.trim() === '') return 'Le message est obligatoire.';
+    return (() => {
+      if (rendered.body.length > BODY_MAX)
+        return `Le message rendu fait ${String(rendered.body.length)} caractères, ${String(BODY_MAX)} au maximum.`;
+      return null;
+    })();
+  })();
 
   // Une variable non renseignée partait EN CLAIR : le destinataire recevait
   // « Bonjour {{prenom}} ». L'avertissement ne retenait rien.
@@ -669,27 +673,39 @@ function ConfirmationStep({
               : 'border-destructive/30 bg-destructive-surface',
           )}
         >
-          {isPending ? (
-            <p className="flex items-center gap-2 text-[0.9375rem] text-muted-foreground">
-              <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-              Calcul du nombre de destinataires…
-            </p>
-          ) : isError ? (
-            <p className="text-[0.9375rem] text-destructive">
-              Le nombre de destinataires n’a pas pu être calculé. Envoi bloqué.
-            </p>
-          ) : preview ? (
-            <>
-              <p className="font-display text-[1.5rem] font-[700] tracking-[-0.02em]">
-                {preview.recipientCount === 1
-                  ? '1 destinataire'
-                  : `${String(preview.recipientCount)} destinataires`}
-              </p>
-              <p className="mt-1 text-[0.9375rem] text-muted-foreground">
-                {confirmationSentence(preview.recipientCount)}
-              </p>
-            </>
-          ) : null}
+          {(() => {
+            if (isPending)
+              return (
+                <p className="flex items-center gap-2 text-[0.9375rem] text-muted-foreground">
+                  <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+                  Calcul du nombre de destinataires…
+                </p>
+              );
+            return (() => {
+              if (isError)
+                return (
+                  <p className="text-[0.9375rem] text-destructive">
+                    Le nombre de destinataires n’a pas pu être calculé. Envoi bloqué.
+                  </p>
+                );
+              return (() => {
+                if (preview)
+                  return (
+                    <>
+                      <p className="font-display text-[1.5rem] font-[700] tracking-[-0.02em]">
+                        {preview.recipientCount === 1
+                          ? '1 destinataire'
+                          : `${String(preview.recipientCount)} destinataires`}
+                      </p>
+                      <p className="mt-1 text-[0.9375rem] text-muted-foreground">
+                        {confirmationSentence(preview.recipientCount)}
+                      </p>
+                    </>
+                  );
+                return null;
+              })();
+            })();
+          })()}
         </div>
 
         {/* L'avertissement « Aucun push ne sera remis » a disparu avec le push

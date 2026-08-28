@@ -94,7 +94,7 @@ describe('les champs obligatoires', () => {
     mount();
     await screen.findByRole('combobox', { name: /Banque/u });
 
-    await user.click(screen.getByRole('button', { name: 'Enregistrer et suivant' }));
+    await user.click(screen.getByRole('button', { name: 'Enregistrer ce prospect' }));
 
     expect(await screen.findByText('Le prénom est obligatoire.')).toBeTruthy();
     expect(screen.getByText('Le nom est obligatoire.')).toBeTruthy();
@@ -112,7 +112,7 @@ describe('les champs obligatoires', () => {
     await fillIdentity('Moussa', 'Fall', '77 123');
     await choose('Banque', 'CBAO');
     await choose('Syndicat', 'SAES');
-    await user.click(screen.getByRole('button', { name: 'Enregistrer et suivant' }));
+    await user.click(screen.getByRole('button', { name: 'Enregistrer ce prospect' }));
 
     expect(await screen.findByText('Numéro invalide pour le pays choisi.')).toBeTruthy();
     expect(create).not.toHaveBeenCalled();
@@ -123,7 +123,7 @@ describe('les champs obligatoires', () => {
     mount(null);
     await screen.findByRole('combobox', { name: /Représentant/u });
 
-    await user.click(screen.getByRole('button', { name: 'Enregistrer et suivant' }));
+    await user.click(screen.getByRole('button', { name: 'Enregistrer ce prospect' }));
 
     expect(await screen.findByText('Choisissez un représentant.')).toBeTruthy();
     expect(create).not.toHaveBeenCalled();
@@ -149,7 +149,7 @@ describe('la saisie en rafale', () => {
     await screen.findByRole('combobox', { name: /Banque/u });
 
     await fillIdentity('Moussa', 'Fall', '77 123 45 67');
-    await user.click(screen.getByRole('button', { name: 'Enregistrer et suivant' }));
+    await user.click(screen.getByRole('button', { name: 'Enregistrer ce prospect' }));
 
     await waitFor(() => {
       expect(create).toHaveBeenCalledWith({
@@ -202,7 +202,7 @@ describe('la saisie en rafale', () => {
     await screen.findByRole('combobox', { name: /Banque/u });
 
     await fillComplete();
-    await user.click(screen.getByRole('button', { name: 'Enregistrer et suivant' }));
+    await user.click(screen.getByRole('button', { name: 'Enregistrer ce prospect' }));
 
     await waitFor(() => {
       expect(create).toHaveBeenCalledWith({
@@ -224,7 +224,7 @@ describe('la saisie en rafale', () => {
     await screen.findByRole('combobox', { name: /Banque/u });
 
     await fillComplete();
-    await user.click(screen.getByRole('button', { name: 'Enregistrer et suivant' }));
+    await user.click(screen.getByRole('button', { name: 'Enregistrer ce prospect' }));
 
     const value = (label: RegExp): string => screen.getByLabelText<HTMLInputElement>(label).value;
 
@@ -235,7 +235,7 @@ describe('la saisie en rafale', () => {
     expect(value(/Téléphone/u)).toBe('');
     expect(screen.getByRole('combobox', { name: /Banque/u }).textContent).toContain('CBAO');
     expect(screen.getByRole('combobox', { name: /Syndicat/u }).textContent).toContain('SAES');
-    expect(screen.getByText(/1 prospect enregistré/u)).toBeTruthy();
+    expect(screen.getByText(/1 prospect noté pour Cheikh Ba aujourd’hui/u)).toBeTruthy();
   });
 
   it('enchaîne au clavier avec Ctrl + Entrée', async () => {
@@ -254,18 +254,28 @@ describe('la saisie en rafale', () => {
     expect(routerMock.push).not.toHaveBeenCalled();
   });
 
-  it('quitte l’écran sur « Enregistrer et terminer »', async () => {
+  it('ne propose qu’UN bouton, et un lien pour sortir', async () => {
+    mount();
+    await screen.findByRole('combobox', { name: /Banque/u });
+
+    expect(screen.queryByRole('button', { name: 'Enregistrer et terminer' })).toBeNull();
+    const retour = screen.getByRole('link', { name: 'Terminé, revenir au projet' });
+    expect(retour.getAttribute('href')).toBe('/chues');
+  });
+
+  it('reste sur la saisie après un enregistrement : la tournée continue', async () => {
     const user = userEvent.setup();
     create.mockResolvedValue(created());
     mount();
     await screen.findByRole('combobox', { name: /Banque/u });
 
     await fillComplete();
-    await user.click(screen.getByRole('button', { name: 'Enregistrer et terminer' }));
+    await user.click(screen.getByRole('button', { name: 'Enregistrer ce prospect' }));
 
     await waitFor(() => {
-      expect(routerMock.push).toHaveBeenCalledWith('/chues/prospects?search=%2B221771234567');
+      expect(create).toHaveBeenCalledTimes(1);
     });
+    expect(routerMock.push).not.toHaveBeenCalled();
   });
 });
 
@@ -298,7 +308,7 @@ describe('le numéro déjà pris', () => {
     await screen.findByRole('combobox', { name: /Banque/u });
 
     await fillComplete();
-    await user.click(screen.getByRole('button', { name: 'Enregistrer et suivant' }));
+    await user.click(screen.getByRole('button', { name: 'Enregistrer ce prospect' }));
 
     expect(await screen.findByText(/Ce numéro est déjà celui de Fatou Ndiaye/u)).toBeTruthy();
     expect(screen.getByText(/Rattaché à Ousmane Sow/u)).toBeTruthy();
@@ -312,7 +322,7 @@ describe('le numéro déjà pris', () => {
     await screen.findByRole('combobox', { name: /Banque/u });
 
     await fillComplete();
-    await user.click(screen.getByRole('button', { name: 'Enregistrer et suivant' }));
+    await user.click(screen.getByRole('button', { name: 'Enregistrer ce prospect' }));
 
     const link = await screen.findByRole('link', { name: 'Ouvrir la fiche existante' });
     expect(link.getAttribute('href')).toBe('/chues/prospects?search=%2B221771234567');
@@ -325,7 +335,7 @@ describe('le numéro déjà pris', () => {
     await screen.findByRole('combobox', { name: /Banque/u });
 
     await fillComplete();
-    await user.click(screen.getByRole('button', { name: 'Enregistrer et suivant' }));
+    await user.click(screen.getByRole('button', { name: 'Enregistrer ce prospect' }));
     await screen.findByText(/Ce numéro est déjà celui de Fatou Ndiaye/u);
 
     await user.type(screen.getByLabelText(/Téléphone/u), '8');

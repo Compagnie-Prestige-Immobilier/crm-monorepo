@@ -1,5 +1,6 @@
 'use client';
 
+import { useQuery } from '@tanstack/react-query';
 import { PlusIcon } from 'lucide-react';
 import { useState } from 'react';
 
@@ -16,21 +17,42 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { fetchProspects } from '@/lib/data/prospects';
+import { formatNumber } from '@/lib/format';
+import { queryKeys } from '@/lib/query-keys';
 
 export function ProspectsView({
   canAdminister,
   readOnly = false,
+  simplified = false,
 }: {
   canAdminister: boolean;
   readOnly?: boolean;
+  /** Les critères repliés le RESTENT à l'ouverture, même venus d'un lien filtré. */
+  simplified?: boolean;
 }) {
   const { filters } = useProspectFilters();
   const [createOpen, setCreateOpen] = useState(false);
 
+  // Même clé que le tableau : le compte vient du cache, sans seconde requête.
+  const { data } = useQuery({
+    queryKey: queryKeys.prospects(filters),
+    queryFn: () => fetchProspects(filters),
+    placeholderData: (previous) => previous,
+  });
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-[0.9375rem] text-muted-foreground">Filtrables et exportables.</p>
+        {/* Le chiffre réel remplace « Filtrables et exportables. », qui décrivait
+            l'écran à qui l'avait déjà sous les yeux. Pas de `role="status"` ici :
+            celui du pied de tableau annonce déjà la page affichée. */}
+        <p className="text-[0.9375rem] text-muted-foreground">
+          <span aria-live="polite" className="font-[600] text-foreground tabular-nums">
+            {data === undefined ? '–' : formatNumber(data.total)}
+          </span>{' '}
+          prospect{data !== undefined && data.total > 1 ? 's' : ''}
+        </p>
         {readOnly ? null : (
           <div className="flex flex-wrap gap-2">
             <ProspectExportMenu filters={filters} />
@@ -42,7 +64,7 @@ export function ProspectsView({
         )}
       </div>
 
-      <FiltersBar />
+      <FiltersBar startCollapsed={simplified} />
       <ProspectsTable canAdminister={canAdminister} readOnly={readOnly} />
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl">

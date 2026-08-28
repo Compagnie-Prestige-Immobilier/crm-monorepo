@@ -1,5 +1,10 @@
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
+import { ETAPES } from '@/components/chues/etape-banner';
 import {
   COQUES,
   coqueAllowed,
@@ -23,15 +28,144 @@ import type { Role } from '@/lib/types';
 const hrefs = (role: Role, coque: Coque): string[] =>
   navItems(role, coque).map((item) => item.href);
 
+/** Une barre latérale par rôle et par espace autorisé : le plan complet, à plat. */
+const BARRES = PANEL_ROLES.flatMap((role) =>
+  coquesForRole(role)
+    .filter(({ allowed }) => allowed)
+    .map(({ entry }) => {
+      const items = navItems(role, entry.id);
+      return {
+        role,
+        coque: entry.id,
+        items,
+        primaires: items.filter((item) => item.secondary !== true),
+      };
+    }),
+);
+
+const ENTREES = BARRES.flatMap(({ role, items }) => items.map((item) => ({ role, item })));
+
+const PANEL = fileURLToPath(new URL('../../app/(panel)', import.meta.url));
+
+function pagesOf(dir: string, acc: string[] = []): string[] {
+  for (const entry of readdirSync(dir)) {
+    const full = path.join(dir, entry);
+    if (statSync(full).isDirectory()) pagesOf(full, acc);
+    else if (entry === 'page.tsx') acc.push(full);
+  }
+  return acc;
+}
+
+const routeOf = (page: string): string =>
+  `/${path
+    .relative(PANEL, path.dirname(page))
+    .split(path.sep)
+    .filter((segment) => segment !== '' && !segment.startsWith('('))
+    .join('/')}`;
+
+/** Rôles admis par le `guardRoles` de l'écran ou d'un gabarit au-dessus. */
+function guardOf(page: string): Role[] {
+  const fichiers = [page];
+  for (let dir = path.dirname(page); ; dir = path.dirname(dir)) {
+    fichiers.push(path.join(dir, 'layout.tsx'));
+    if (dir === PANEL) break;
+  }
+
+  let admis: Role[] = [...PANEL_ROLES];
+  for (const fichier of fichiers.filter((candidat) => existsSync(candidat))) {
+    const appel = /guardRoles\(\s*(\[[\s\S]*?\]|INBOX_ROLES)/u.exec(readFileSync(fichier, 'utf8'));
+    if (appel?.[1] === undefined) continue;
+    const cites =
+      appel[1] === 'INBOX_ROLES'
+        ? [...INBOX_ROLES]
+        : [...appel[1].matchAll(/'([A-Z_]+)'/gu)].map(([, role]) => role as Role);
+    admis = admis.filter((role) => cites.includes(role));
+  }
+  return admis;
+}
+
+/** Un écran par route servie, les segments dynamiques exclus : ils s'ouvrent depuis leur liste. */
+const ROUTES = pagesOf(PANEL)
+  .filter((page) => !page.includes('['))
+  .map((page) => ({ route: routeOf(page), roles: guardOf(page) }));
+
+/**
+ * Écrans hors barre latérale, avec le geste qui y mène. Masquer n'est pas
+ * supprimer : une entrée retirée de la barre sans ligne ici fait rougir le
+ * balayage des orphelines.
+ */
+const ATTEINT_AUTREMENT: Readonly<Record<string, string>> = {
+  '/accueil/tableau-de-bord': 'onglet · accueil/visites-tabs.tsx',
+  '/accueil/listes': 'onglet · accueil/visites-tabs.tsx',
+  '/accueil/import': 'onglet · accueil/visites-tabs.tsx',
+  '/admin': 'redirige vers le premier écran du rôle',
+  '/admin/referentiels/issues-appel': 'lien · referentiels/referentiels-view.tsx',
+  '/chues': 'redirige l’agent bancaire vers son tableau de bord',
+  '/chues/appels-representants': 'premier geste · chues/hub-view.tsx',
+  '/chues/prospects/nouveau': 'deuxième geste · chues/hub-view.tsx',
+  '/chues/console': 'troisième geste · chues/hub-view.tsx',
+  '/chues/campagnes/representants': 'onglet · phase2/campaigns-tabs.tsx',
+  '/chues/dossiers/nouveau': 'bouton · bank/bank-cases-view.tsx',
+  '/chues/representants/import': 'bouton · representants/representants-view.tsx',
+  '/notifications': 'cloche · notifications/notification-bell.tsx',
+};
+
+/** Ce que chaque rôle a le droit d'ouvrir SANS le trouver dans sa barre. */
+const MASQUEES: Readonly<Record<Role, readonly string[]>> = {
+  ADMIN: [
+    '/accueil/import',
+    '/accueil/listes',
+    '/accueil/tableau-de-bord',
+    '/admin',
+    '/admin/referentiels/issues-appel',
+    '/chues/appels-representants',
+    '/chues/campagnes/representants',
+    '/chues/console',
+    '/chues/dossiers/nouveau',
+    '/chues/prospects/nouveau',
+    '/chues/representants/import',
+    '/notifications',
+  ],
+  DIRECTION: [
+    '/accueil/import',
+    '/accueil/listes',
+    '/accueil/tableau-de-bord',
+    '/chues/campagnes/representants',
+    '/notifications',
+  ],
+  SUPERVISEUR: ['/chues/campagnes/representants', '/notifications'],
+  COMMERCIAL: [],
+  BANQUE_FINANCE: ['/chues', '/notifications'],
+  ACCUEIL: ['/accueil/tableau-de-bord', '/notifications'],
+};
+
+const horsBarre = (role: Role): string[] =>
+  ROUTES.filter(({ route, roles }) => {
+    if (!roles.includes(role)) return false;
+    const coque = coqueOf(route);
+    if (coque === null) return true;
+    return coqueAllowed(role, coque) && !hrefs(role, coque).includes(route);
+  })
+    .map(({ route }) => route)
+    .sort();
+
 describe('navigation d’un agent BANQUE_FINANCE', () => {
   it('ne montre QUE ses écrans, dans la coque CHUES', () => {
     expect(hrefs('BANQUE_FINANCE', 'chues')).toEqual([
       '/chues/banque',
       '/chues/dossiers',
       '/chues/dossiers/nouveau',
-      '/chues/dossiers/export',
       '/chues/demandes-clients',
+      // Sous « Plus » : on exporte une fois par mois, pas une fois par heure.
+      '/chues/dossiers/export',
     ]);
+  });
+
+  it('ne replie que l’export : les quatre gestes du jour restent en pleine barre', () => {
+    const replies = navItems('BANQUE_FINANCE', 'chues')
+      .filter((item) => item.secondary === true)
+      .map((item) => item.href);
+    expect(replies).toEqual(['/chues/dossiers/export']);
   });
 
   it('masque entièrement les écrans de prospection et d’administration', () => {
@@ -62,11 +196,14 @@ describe('navigation d’un agent BANQUE_FINANCE', () => {
     }
   });
 
-  it('son « Tableau de bord » est le tableau de bord BANCAIRE', () => {
+  it('son écran d’ouverture est le tableau de bord BANCAIRE, nommé sans jargon', () => {
     const dashboard = navItems('BANQUE_FINANCE', 'chues').find(
-      (item) => item.label === 'Tableau de bord',
+      (item) => item.label === 'Vue d’ensemble',
     );
     expect(dashboard?.href).toBe('/chues/banque');
+    expect(navItems('BANQUE_FINANCE', 'chues').map((item) => item.label)).not.toContain(
+      'Tableau de bord',
+    );
   });
 });
 
@@ -80,16 +217,16 @@ describe('navigation d’un ADMIN', () => {
     ];
     for (const expected of [
       '/accueil',
-      '/accueil/listes',
-      '/chues/tableau-de-bord',
+      '/chues',
       '/chues/statistiques',
       '/chues/prospects',
       '/chues/campagnes',
       '/chues/dossiers',
-      '/chues/dossiers/nouveau',
-      '/chues/dossiers/export',
       '/chues/dossiers/etapes',
+      '/chues/dossiers/export',
       '/chues/demandes-clients',
+      '/chues/banque',
+      '/chues/tableau-de-bord',
       '/admin/notifications',
       '/chues/representants',
       '/chues/suggestions',
@@ -101,6 +238,26 @@ describe('navigation d’un ADMIN', () => {
     ]) {
       expect(visible).toContain(expected);
     }
+  });
+
+  it('range hors de la barre les écrans qu’un bouton ou un onglet ouvre déjà', () => {
+    const visible = [...hrefs('ADMIN', 'accueil'), ...hrefs('ADMIN', 'chues')];
+    for (const parBouton of [
+      '/accueil/tableau-de-bord',
+      '/accueil/listes',
+      '/accueil/import',
+      '/chues/appels-representants',
+      '/chues/prospects/nouveau',
+      '/chues/console',
+      '/chues/dossiers/nouveau',
+      '/chues/representants/import',
+    ]) {
+      expect(visible, `« ${parBouton} » s’atteint autrement`).not.toContain(parBouton);
+    }
+
+    // Hors barre ne veut pas dire sans nom : le titre et la surbrillance tiennent.
+    expect(navTitle('ADMIN', '/chues/representants/import')).toBe('Importer des représentants');
+    expect(navTitle('ADMIN', '/accueil/listes')).toBe('Listes');
   });
 
   it('propose les deux écrans qui n’étaient joignables qu’en tapant leur URL', () => {
@@ -117,23 +274,56 @@ describe('navigation d’un ADMIN', () => {
     const entry = navItems('BANQUE_FINANCE', 'chues').find(
       (item) => item.href === '/chues/demandes-clients',
     );
-    expect(entry?.label).toBe('Mes demandes');
+    expect(entry?.label).toBe('Mes demandes de création');
     expect(
       navItems('ADMIN', 'chues').find((item) => item.href === '/chues/demandes-clients')?.label,
-    ).toBe('Demandes clients');
+    ).toBe('Créations de client à valider');
   });
 
-  it('ne voit PAS le tableau de bord bancaire en doublon de son propre tableau de bord', () => {
+  it('atteint le tableau de bord bancaire par la barre, sous un nom qui le distingue', () => {
+    const banque = navItems('ADMIN', 'chues').find((item) => item.href === '/chues/banque');
+    expect(banque?.label).toBe('Vue d’ensemble bancaire');
+    expect(banque?.secondary).toBe(true);
+    // Le même écran s'appelle « Vue d'ensemble » chez l'agent bancaire, pour
+    // qui il n'y a rien d'autre à survoler.
     expect(
-      navItems('ADMIN', 'chues').filter((item) => item.label === 'Tableau de bord'),
-    ).toHaveLength(1);
-    expect(hrefs('ADMIN', 'chues')).not.toContain('/chues/banque');
+      navItems('BANQUE_FINANCE', 'chues').find((item) => item.href === '/chues/banque')?.label,
+    ).toBe('Vue d’ensemble');
   });
 
-  it('groupe la navigation de CHUES en sections non vides', () => {
+  it('ne nomme jamais deux écrans de chiffres pareil', () => {
+    const labels = navItems('ADMIN', 'chues').map((item) => item.label);
+    expect(labels.filter((label, rang) => labels.indexOf(label) !== rang)).toEqual([]);
+    expect(navTitle('ADMIN', '/chues/statistiques')).toBe('Chiffres');
+    expect(navTitle('ADMIN', '/chues/tableau-de-bord')).toBe('Tableau de bord');
+  });
+
+  it('range la navigation de CHUES en UNE liste, sans intitulé à lire', () => {
     const sections = navSections('ADMIN', 'chues');
-    expect(sections.map((section) => section.title)).toEqual([null, 'Terrain', 'Banque & Finance']);
+    expect(sections.map((section) => section.title)).toEqual([null]);
     for (const section of sections) expect(section.items.length).toBeGreaterThan(0);
+  });
+
+  it('garde six entrées en pleine barre et replie le reste sous « Plus »', () => {
+    const items = navItems('ADMIN', 'chues');
+    expect(items.filter((item) => item.secondary !== true).map((item) => item.href)).toEqual([
+      '/chues',
+      '/chues/prospects',
+      '/chues/representants',
+      '/chues/campagnes',
+      '/chues/dossiers',
+      '/chues/statistiques',
+    ]);
+    expect(items.filter((item) => item.secondary === true).map((item) => item.href)).toEqual([
+      '/chues/supervision',
+      '/chues/rappels',
+      '/chues/suggestions',
+      '/chues/tableau-de-bord',
+      '/chues/banque',
+      '/chues/demandes-clients',
+      '/chues/dossiers/export',
+      '/chues/dossiers/etapes',
+    ]);
   });
 
   it('ne laisse aucune section vide pour un BANQUE_FINANCE', () => {
@@ -151,18 +341,58 @@ describe('navigation d’un ADMIN', () => {
       '/admin/parametres',
     ]);
   });
+
+  it('nomme chaque écran d’administration par le geste, pas par le jargon', () => {
+    expect(navItems('ADMIN', 'admin').map((item) => item.label)).toEqual([
+      'Utilisateurs',
+      'Listes de référence',
+      'Importer un fichier Excel',
+      'Envoyer une notification',
+      'Paramètres',
+    ]);
+  });
 });
 
 describe('navigation d’un téléconseiller', () => {
-  it('ne montre QUE la section Terrain de CHUES', () => {
-    expect(navSections('COMMERCIAL', 'chues').map((section) => section.title)).toEqual(['Terrain']);
+  it('ouvre sur son travail et numérote les trois étapes, dans l’ordre', () => {
+    expect(navSections('COMMERCIAL', 'chues').map((section) => section.title)).toEqual([null]);
     expect(hrefs('COMMERCIAL', 'chues')).toEqual([
+      '/chues',
+      '/chues/appels-representants',
+      '/chues/prospects/nouveau',
       '/chues/console',
       '/chues/rappels',
-      '/chues/representants',
+      // Sous « Plus » : utile, pas quotidien.
       '/chues/suggestions',
-      '/chues/prospects/nouveau',
+      '/chues/representants',
+      '/chues/prospects',
     ]);
+    expect(navItems('COMMERCIAL', 'chues').map((item) => item.label)).toEqual([
+      'Mon travail',
+      '1 · Appeler les représentants',
+      '2 · Noter un prospect',
+      '3 · Appeler les prospects',
+      'Rappels promis',
+      'Contacts recommandés',
+      'Mes représentants',
+      'Mes prospects',
+    ]);
+  });
+
+  it('ouvre le Grand Public sur l’appel, la liste restant sous « Plus »', () => {
+    expect(hrefs('COMMERCIAL', 'grand-public')).toEqual([
+      '/grand-public/console',
+      '/grand-public/rappels',
+      '/grand-public/nouveau',
+      '/grand-public',
+    ]);
+    expect(coqueHomePath('COMMERCIAL', 'grand-public')).toBe('/grand-public/console');
+  });
+
+  it('lui ouvre SES prospects, que l’API borne déjà à ses fiches', () => {
+    const entry = navItems('COMMERCIAL', 'chues').find((item) => item.href === '/chues/prospects');
+    expect(entry?.label).toBe('Mes prospects');
+    expect(entry?.secondary).toBe(true);
   });
 
   it('masque entièrement le pilotage et l’administration', () => {
@@ -172,7 +402,6 @@ describe('navigation d’un téléconseiller', () => {
       '/chues/tableau-de-bord',
       '/chues/banque',
       '/chues/statistiques',
-      '/chues/prospects',
       '/chues/campagnes',
       '/chues/dossiers',
       '/chues/dossiers/nouveau',
@@ -190,10 +419,12 @@ describe('navigation d’un téléconseiller', () => {
     }
   });
 
-  it('donne à l’ADMIN les mêmes écrans de terrain, sans doublon de « Représentants »', () => {
-    for (const shared of ['/chues/console', '/chues/representants', '/chues/prospects/nouveau']) {
-      expect(hrefs('ADMIN', 'chues')).toContain(shared);
-    }
+  it('laisse les trois appels à l’écran d’ouverture, sans les répéter dans la barre', () => {
+    const barre = hrefs('ADMIN', 'chues');
+    expect(ETAPES.filter(({ href }) => barre.includes(href))).toEqual([]);
+    // Hors barre, l'écran garde son titre et sa surbrillance.
+    expect(ETAPES.filter(({ href }) => navTitle('ADMIN', href) === 'CPI GO')).toEqual([]);
+    expect(navTitle('ADMIN', '/chues/prospects/nouveau')).toBe('Nouveau prospect');
     expect(hrefs('ADMIN', 'chues').filter((href) => href === '/chues/representants')).toHaveLength(
       1,
     );
@@ -202,7 +433,9 @@ describe('navigation d’un téléconseiller', () => {
   it('n’ouvre le terrain à aucun agent bancaire', () => {
     const visible = hrefs('BANQUE_FINANCE', 'chues');
     for (const forbidden of [
+      '/chues',
       '/chues/console',
+      '/chues/appels-representants',
       '/chues/prospects/nouveau',
       '/chues/representants',
       '/chues/suggestions',
@@ -211,21 +444,35 @@ describe('navigation d’un téléconseiller', () => {
     }
   });
 
-  it('range les numéros suggérés dans le Terrain, sous son propre titre', () => {
-    const terrain = navSections('COMMERCIAL', 'chues').find(
-      (section) => section.title === 'Terrain',
+  it('nomme les contacts suggérés par ce qu’ils sont, et les replie sous « Plus »', () => {
+    const entry = navItems('COMMERCIAL', 'chues').find(
+      (item) => item.href === '/chues/suggestions',
     );
-    const entry = terrain?.items.find((item) => item.href === '/chues/suggestions');
-    expect(entry?.label).toBe('Numéros suggérés');
-    expect(navTitle('COMMERCIAL', '/chues/suggestions')).toBe('Numéros suggérés');
+    expect(entry?.label).toBe('Contacts recommandés');
+    expect(entry?.secondary).toBe(true);
+    expect(navTitle('COMMERCIAL', '/chues/suggestions')).toBe('Contacts recommandés');
   });
 
-  it('nomme sa console sans employer le mot proscrit', () => {
+  it('compte les trois étapes du parcours CHUES, dans l’ordre', () => {
+    const described = new Map(
+      navItems('COMMERCIAL', 'chues').map((item) => [item.href, item.description]),
+    );
+
+    expect(described.get('/chues/appels-representants')).toBe('Étape 1 sur 3');
+    expect(described.get('/chues/prospects/nouveau')).toBe('Étape 2 sur 3');
+    expect(described.get('/chues/console')).toBe('Étape 3 sur 3');
+  });
+
+  it('nomme ses écrans d’appel par le geste, sans employer le mot proscrit', () => {
     const labels = navItems('COMMERCIAL', 'chues').map(
       (item) => `${item.label} ${item.description}`,
     );
     for (const text of labels) expect(text.toLowerCase()).not.toContain('commercial');
-    expect(navTitle('COMMERCIAL', '/chues/console')).toBe('Console d’appel');
+    for (const text of labels) expect(text.toLowerCase()).not.toContain('console');
+    expect(navTitle('COMMERCIAL', '/chues/console')).toBe('3 · Appeler les prospects');
+    expect(navTitle('COMMERCIAL', '/chues/appels-representants')).toBe(
+      '1 · Appeler les représentants',
+    );
   });
 });
 
@@ -249,22 +496,25 @@ describe('registre des visites', () => {
   });
 
   it('garde son tableau de bord sous sa propre coque, sans le confondre avec celui de CHUES', () => {
+    // L'écran est un ONGLET du registre : nommé partout, doublé nulle part.
     expect(navTitle('DIRECTION', '/accueil/tableau-de-bord')).toBe('Tableau de bord');
-    expect(hrefs('DIRECTION', 'accueil')).toContain('/accueil/tableau-de-bord');
+    expect(hrefs('DIRECTION', 'accueil')).not.toContain('/accueil/tableau-de-bord');
     expect(hrefs('DIRECTION', 'chues')).not.toContain('/chues/tableau-de-bord');
   });
 
-  it('ouvre les listes à l’ADMIN et à la DIRECTION, jamais à l’ACCUEIL', () => {
+  it('ouvre les listes à l’ADMIN et à la DIRECTION par l’onglet, jamais à l’ACCUEIL', () => {
     for (const role of ['ADMIN', 'DIRECTION'] as const) {
-      expect(hrefs(role, 'accueil'), role).toContain('/accueil/listes');
+      expect(navTitle(role, '/accueil/listes'), role).toBe('Listes');
     }
-    expect(hrefs('ACCUEIL', 'accueil')).toEqual(['/accueil', '/accueil/tableau-de-bord']);
+    expect(navTitle('ACCUEIL', '/accueil/listes')).toBe('Registre des visites');
+    expect(hrefs('ACCUEIL', 'accueil')).toEqual(['/accueil']);
   });
 
   it('ouvre l’import du registre à l’ADMIN et à la DIRECTION, jamais à l’ACCUEIL', () => {
     for (const role of ['ADMIN', 'DIRECTION'] as const) {
-      expect(hrefs(role, 'accueil'), role).toContain('/accueil/import');
+      expect(navTitle(role, '/accueil/import'), role).toBe('Import du registre');
     }
+    expect(navTitle('ACCUEIL', '/accueil/import')).toBe('Registre des visites');
     expect(hrefs('ACCUEIL', 'accueil')).not.toContain('/accueil/import');
   });
 });
@@ -368,12 +618,22 @@ describe('écran d’atterrissage après connexion', () => {
   });
 
   it('mène chaque rôle là où l’API ne lui répondra pas 403', () => {
-    expect(coqueHomePath('ADMIN', 'chues')).toBe('/chues/tableau-de-bord');
+    expect(coqueHomePath('ADMIN', 'chues')).toBe('/chues');
     expect(coqueHomePath('BANQUE_FINANCE', 'chues')).toBe('/chues/banque');
-    expect(coqueHomePath('COMMERCIAL', 'chues')).toBe('/chues/console');
-    expect(coqueHomePath('SUPERVISEUR', 'chues')).toBe('/chues/supervision');
+    expect(coqueHomePath('COMMERCIAL', 'chues')).toBe('/chues');
+    expect(coqueHomePath('SUPERVISEUR', 'chues')).toBe('/chues');
     expect(coqueHomePath('DIRECTION', 'accueil')).toBe('/accueil');
     expect(coqueHomePath('ACCUEIL', 'accueil')).toBe('/accueil');
+  });
+
+  it('n’atterrit JAMAIS sur un écran replié sous « Plus »', () => {
+    for (const role of PANEL_ROLES) {
+      for (const { entry } of coquesForRole(role).filter(({ allowed }) => allowed)) {
+        const home = coqueHomePath(role, entry.id);
+        const item = navItems(role, entry.id).find((candidate) => candidate.href === home);
+        expect(item?.secondary, `${role} · ${entry.id}`).not.toBe(true);
+      }
+    }
   });
 
   it('renvoie au hub une coque qu’un rôle ne peut pas ouvrir, au lieu d’un écran interdit', () => {
@@ -383,32 +643,37 @@ describe('écran d’atterrissage après connexion', () => {
 });
 
 describe('titre et surbrillance par PRÉFIXE LE PLUS LONG', () => {
-  it('distingue « Nouveau dossier » de « Dossiers »', () => {
-    expect(navTitle('BANQUE_FINANCE', '/chues/dossiers/nouveau')).toBe('Nouveau dossier');
-    expect(navTitle('BANQUE_FINANCE', '/chues/dossiers/export')).toBe('Export');
-    expect(navTitle('ADMIN', '/chues/dossiers/etapes')).toBe('Étapes bancaires');
+  it('distingue « Ouvrir un dossier » de « Dossiers bancaires »', () => {
+    expect(navTitle('BANQUE_FINANCE', '/chues/dossiers/nouveau')).toBe('Ouvrir un dossier');
+    expect(navTitle('BANQUE_FINANCE', '/chues/dossiers/export')).toBe('Exporter les dossiers');
+    expect(navTitle('ADMIN', '/chues/dossiers/etapes')).toBe('Étapes des dossiers');
   });
 
   it('nomme l’écran des comptes par ce qu’il contient VRAIMENT', () => {
     expect(navTitle('ADMIN', '/admin/commerciaux')).toBe('Utilisateurs');
     expect(navTitle('ADMIN', '/admin/commerciaux')).not.toContain('Commerciaux');
-    expect(navTitle('ADMIN', '/chues/supervision')).toBe('Supervision');
-    expect(navTitle('ADMIN', '/chues/statistiques')).toBe('Statistiques');
+    expect(navTitle('ADMIN', '/chues/supervision')).toBe('Équipes');
+    expect(navTitle('ADMIN', '/chues/statistiques')).toBe('Chiffres');
   });
 
-  it('garde « Dossiers » sur le détail d’un dossier', () => {
+  it('garde « Dossiers bancaires » sur le détail d’un dossier', () => {
     expect(navTitle('BANQUE_FINANCE', '/chues/dossiers/019ff658-dddd-7489-ab22-1f2ada5ef38a')).toBe(
-      'Dossiers',
+      'Dossiers bancaires',
     );
   });
 
   it('surligne une seule entrée à la fois', () => {
     const items = navItems('ADMIN', 'chues');
-    const active = items.filter((item) =>
-      isNavItemActive('ADMIN', '/chues/dossiers/nouveau', item),
-    );
+    const active = items.filter((item) => isNavItemActive('ADMIN', '/chues/dossiers/etapes', item));
     expect(active).toHaveLength(1);
-    expect(active[0]?.href).toBe('/chues/dossiers/nouveau');
+    expect(active[0]?.href).toBe('/chues/dossiers/etapes');
+  });
+
+  it('ne laisse pas la racine de la coque voler la surbrillance d’un écran plus précis', () => {
+    const items = navItems('COMMERCIAL', 'chues');
+    const active = items.filter((item) => isNavItemActive('COMMERCIAL', '/chues/console', item));
+    expect(active.map((item) => item.href)).toEqual(['/chues/console']);
+    expect(navTitle('COMMERCIAL', '/chues')).toBe('Mon travail');
   });
 
   it('ne surligne rien dans une AUTRE coque que celle de la route', () => {
@@ -424,15 +689,27 @@ describe('titre et surbrillance par PRÉFIXE LE PLUS LONG', () => {
 });
 
 describe('navigation d’un SUPERVISEUR', () => {
-  it('ne montre QUE des écrans de lecture', () => {
+  it('ne montre QUE des écrans de lecture, son équipe en tête', () => {
     expect(hrefs('SUPERVISEUR', 'chues')).toEqual([
+      '/chues',
       '/chues/supervision',
-      '/chues/statistiques',
       '/chues/prospects',
-      '/chues/campagnes',
-      '/chues/rappels',
       '/chues/representants',
+      '/chues/campagnes',
+      '/chues/statistiques',
+      // Sous « Plus ».
+      '/chues/rappels',
       '/chues/suggestions',
+    ]);
+    expect(navItems('SUPERVISEUR', 'chues').map((item) => item.label)).toEqual([
+      'Projet CHUES',
+      'Mon équipe',
+      'Prospects',
+      'Représentants',
+      'Campagnes',
+      'Chiffres',
+      'Rappels en retard',
+      'Contacts recommandés',
     ]);
   });
 
@@ -468,8 +745,9 @@ describe('navigation d’un SUPERVISEUR', () => {
 });
 
 describe('navigation d’un compte d’ACCUEIL', () => {
-  it('ne montre QUE le registre et son tableau de bord', () => {
-    expect(hrefs('ACCUEIL', 'accueil')).toEqual(['/accueil', '/accueil/tableau-de-bord']);
+  it('ne montre QUE le registre : le tableau de bord est un onglet, pas une entrée', () => {
+    expect(hrefs('ACCUEIL', 'accueil')).toEqual(['/accueil']);
+    expect(navTitle('ACCUEIL', '/accueil/tableau-de-bord')).toBe('Tableau de bord');
   });
 
   it('n’a qu’une section, sans intitulé à lire', () => {
@@ -487,20 +765,28 @@ describe('navigation d’un compte d’ACCUEIL', () => {
 
 describe('navigation de la DIRECTION', () => {
   it('montre le registre, le pilotage et le terrain, jamais la banque', () => {
-    expect(hrefs('DIRECTION', 'accueil')).toEqual([
-      '/accueil',
-      '/accueil/tableau-de-bord',
-      '/accueil/listes',
-      '/accueil/import',
-    ]);
+    expect(hrefs('DIRECTION', 'accueil')).toEqual(['/accueil']);
     expect(hrefs('DIRECTION', 'chues')).toEqual([
+      '/chues',
       '/chues/supervision',
-      '/chues/statistiques',
       '/chues/prospects',
-      '/chues/campagnes',
-      '/chues/rappels',
       '/chues/representants',
+      '/chues/campagnes',
+      '/chues/statistiques',
+      // Sous « Plus ».
+      '/chues/rappels',
       '/chues/suggestions',
+    ]);
+  });
+
+  it('range le Grand Public dans le même ordre que CHUES, replis compris', () => {
+    expect(hrefs('DIRECTION', 'grand-public')).toEqual([
+      '/grand-public',
+      '/grand-public/campagnes',
+      '/grand-public/statistiques',
+      // Sous « Plus ».
+      '/grand-public/tableau-de-bord',
+      '/grand-public/rappels',
     ]);
   });
 
@@ -556,5 +842,115 @@ describe('boîte de réception, hors coque', () => {
   it('renvoie l’ADMIN vers le composeur, qui porte le même onglet', () => {
     expect(inboxPathFor('ADMIN')).toBe('/admin/notifications?onglet=reception');
     expect(inboxPathFor('ACCUEIL')).toBe(INBOX_PATH);
+  });
+});
+
+describe('navigation du pilotage sur le Grand Public et le registre', () => {
+  it('range le Grand Public de la supervision comme celui de la direction', () => {
+    expect(hrefs('SUPERVISEUR', 'grand-public')).toEqual([
+      '/grand-public',
+      '/grand-public/campagnes',
+      '/grand-public/statistiques',
+      // Sous « Plus ».
+      '/grand-public/tableau-de-bord',
+      '/grand-public/rappels',
+    ]);
+    expect(
+      navItems('SUPERVISEUR', 'grand-public')
+        .filter((item) => item.secondary === true)
+        .map((item) => item.href),
+    ).toEqual(['/grand-public/tableau-de-bord', '/grand-public/rappels']);
+  });
+
+  it('donne à l’ADMIN les deux écrans de saisie du Grand Public, sous « Plus »', () => {
+    expect(hrefs('ADMIN', 'grand-public')).toEqual([
+      '/grand-public',
+      '/grand-public/campagnes',
+      '/grand-public/statistiques',
+      // Sous « Plus ».
+      '/grand-public/tableau-de-bord',
+      '/grand-public/rappels',
+      '/grand-public/console',
+      '/grand-public/nouveau',
+    ]);
+  });
+
+  it('n’ouvre à l’ADMIN qu’une entrée dans le registre : les trois autres sont des onglets', () => {
+    expect(hrefs('ADMIN', 'accueil')).toEqual(['/accueil']);
+  });
+});
+
+describe('charge de la barre latérale', () => {
+  it('tient à six entrées en pleine barre au plus, pour chaque rôle et chaque espace', () => {
+    const trop = BARRES.filter(({ primaires }) => primaires.length > 6).map(
+      ({ role, coque, primaires }) => `${role} · ${coque} : ${primaires.length}`,
+    );
+    expect(trop).toEqual([]);
+  });
+
+  it('n’ouvre jamais un espace autorisé sur une barre vide', () => {
+    const vides = BARRES.filter(({ items }) => items.length === 0).map(
+      ({ role, coque }) => `${role} · ${coque}`,
+    );
+    expect(vides).toEqual([]);
+  });
+});
+
+describe('mots interdits dans la barre', () => {
+  // « Phase n » est proscrit dans l'interface ; les trois autres sont du
+  // vocabulaire d'équipe que personne n'emploie au téléphone.
+  const PROSCRITS = ['phase', 'pilotage', 'console', 'commercial'];
+
+  it('ne laisse passer aucun jargon, pour aucun rôle', () => {
+    const fautes = ENTREES.flatMap(({ role, item }) => {
+      const texte = `${item.label} ${item.description}`.toLowerCase();
+      return PROSCRITS.filter((mot) => texte.includes(mot)).map(
+        (mot) => `${role} · ${item.href} · « ${mot} »`,
+      );
+    });
+    expect(fautes).toEqual([]);
+  });
+
+  it('nomme chaque entrée par un geste ou un objet, jamais par sa route', () => {
+    const fautes = ENTREES.filter(
+      ({ item }) => item.label.length <= 2 || item.label.includes('/'),
+    ).map(({ role, item }) => `${role} · ${item.href} · « ${item.label} »`);
+    expect(fautes).toEqual([]);
+  });
+});
+
+describe('aucun écran orphelin', () => {
+  it('trouve bien les écrans du panel', () => {
+    expect(ROUTES.length).toBeGreaterThan(25);
+    expect(ROUTES.find(({ route }) => route === '/chues')?.roles).toContain('BANQUE_FINANCE');
+    expect(ROUTES.find(({ route }) => route === '/admin/parametres')?.roles).toEqual(['ADMIN']);
+    expect(ROUTES.find(({ route }) => route === '/notifications')?.roles).not.toContain(
+      'COMMERCIAL',
+    );
+  });
+
+  it('laisse à chaque rôle un chemin cliquable vers chaque écran qu’il a le droit d’ouvrir', () => {
+    const orphelines: string[] = [];
+    for (const { route, roles } of ROUTES) {
+      const coque = coqueOf(route);
+      for (const role of roles) {
+        if (coque !== null && !coqueAllowed(role, coque)) continue;
+        if (coque !== null && hrefs(role, coque).includes(route)) continue;
+        if (route in ATTEINT_AUTREMENT) continue;
+        orphelines.push(`${role} · ${route}`);
+      }
+    }
+    expect(orphelines).toEqual([]);
+  });
+
+  it('masque exactement les écrans prévus, rôle par rôle', () => {
+    expect(Object.fromEntries(PANEL_ROLES.map((role) => [role, horsBarre(role)]))).toEqual(
+      MASQUEES,
+    );
+  });
+
+  it('ne garde aucun renvoi vers un écran disparu', () => {
+    const connues = new Set(ROUTES.map(({ route }) => route));
+    expect(Object.keys(ATTEINT_AUTREMENT).filter((route) => !connues.has(route))).toEqual([]);
   });
 });

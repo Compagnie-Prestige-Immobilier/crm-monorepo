@@ -1,5 +1,6 @@
 import { ArrowLeftIcon, LockIcon } from 'lucide-react';
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
@@ -81,9 +82,24 @@ export default async function EspacesPage({
                 className="animate-rise relative flex h-full min-h-[14rem] flex-col gap-3 overflow-hidden rounded-lg border border-border bg-card p-6 shadow-elev-sm transition-shadow duration-(--dur-2) ease-(--ease-out-cpi) hover:shadow-elev-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >
                 <CoqueArt coque={entry.id} />
-                <span className="relative z-10 size-12 shrink-0 text-primary-text">
-                  <Icon />
-                </span>
+                {/* CHUES a un logo ; les trois autres tuiles gardent le
+                    pictogramme dessiné pour elles. */}
+                {entry.id === 'chues' ? (
+                  /* `alt` VIDE : le nom du projet est écrit juste en dessous, et
+                     un texte de remplacement identique ferait annoncer la tuile
+                     « Projet CHUES Projet CHUES » (axe : image-redundant-alt). */
+                  <Image
+                    src="/brand/chues-logo.png"
+                    alt=""
+                    width={395}
+                    height={193}
+                    className="relative z-10 h-10 w-auto shrink-0"
+                  />
+                ) : (
+                  <span className="relative z-10 size-12 shrink-0 text-primary-text">
+                    <Icon />
+                  </span>
+                )}
                 <span className="relative z-10 max-w-[58%] font-display text-h3 font-[700] tracking-[-0.02em]">
                   {entry.label}
                 </span>

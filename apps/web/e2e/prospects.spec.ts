@@ -27,7 +27,7 @@ async function readMagic(path: string): Promise<number[]> {
 
 test('le jeton de session reste hors de portée du JavaScript de la page', async ({ page }) => {
   await page.goto('/tableau-de-bord');
-  await expect(page.getByRole('heading', { name: 'Tableau de bord', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Chiffres', level: 1 })).toBeVisible();
 
   // C'est toute la raison d'être des cookies httpOnly et du relais `/api/v1/*` :
   // une XSS ne doit pas pouvoir repartir avec la base de prospects.
@@ -115,25 +115,27 @@ test('chaque écran du panel se charge sans état d’erreur', async ({ page }) 
    * layout au-dessus d'une page qui n'a rien rendu.
    */
   for (const [path, heading, marker] of [
-    ['/tableau-de-bord', 'Tableau de bord', null],
+    ['/chues', 'Projet CHUES', 'Trois étapes, dans l’ordre'],
+    ['/tableau-de-bord', 'Chiffres', null],
     ['/prospects', 'Prospects', null],
-    ['/prospects/nouveau', 'Nouveau prospect', 'Enregistrer et suivant'],
-    ['/console', 'Console d’appel', 'Carte clavier'],
+    ['/prospects/nouveau', 'Nouveau prospect', 'Enregistrer ce prospect'],
+    ['/console', 'Appeler les prospects', 'Carte clavier'],
+    ['/chues/appels-representants', 'Appeler les représentants', 'Carte clavier'],
     ['/rappels', 'Rappels', 'En retard'],
-    ['/suggestions', 'Numéros suggérés', 'Numéros donnés par un représentant'],
+    ['/suggestions', 'Contacts recommandés', 'Numéros donnés par un représentant'],
     ['/campagnes', 'Campagnes', 'Appels prospects'],
     ['/campagnes/representants', 'Campagnes', 'Appels représentants'],
-    ['/dossiers', 'Dossiers', null],
+    ['/dossiers', 'Dossiers bancaires', null],
     ['/dossiers/nouveau', 'Nouveau dossier', null],
     ['/dossiers/export', 'Export', null],
-    ['/dossiers/etapes', 'Étapes bancaires', null],
-    ['/demandes-clients', 'Demandes clients', null],
+    ['/dossiers/etapes', 'Étapes des dossiers', null],
+    ['/demandes-clients', 'Créations de client à valider', null],
     ['/representants', 'Représentants', null],
     ['/representants/import', 'Représentants', 'Partir du modèle'],
     ['/commerciaux', 'Utilisateurs', null],
-    ['/supervision', 'Supervision', null],
-    ['/referentiels', 'Référentiels', null],
-    ['/imports', 'Imports', 'Déposer un classeur'],
+    ['/supervision', 'Équipes', null],
+    ['/referentiels', 'Listes de référence', null],
+    ['/imports', 'Importer un fichier Excel', 'Déposer un classeur'],
     ['/parametres', 'Paramètres', null],
     ['/notifications', 'Notifications', null],
   ] as const) {

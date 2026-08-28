@@ -39,18 +39,22 @@ const ORGANISATION: PresetWidget[] = [
 
 const COMPLET: PresetWidget[] = (Object.keys(SOURCES) as DashboardSource[]).map((source) => {
   const forme = SOURCES[source].forme;
-  const marque: DashboardMarque =
-    forme === 'scalaire'
-      ? 'tuile'
-      : forme === 'classement'
-        ? 'barres-horizontales'
-        : forme === 'serie-temporelle'
-          ? 'courbe'
-          : forme === 'cyclique'
-            ? 'aire-polaire'
-            : forme === 'matrice'
-              ? 'carte-de-chaleur'
-              : 'barres-100';
+  const marque: DashboardMarque = (() => {
+    if (forme === 'scalaire') return 'tuile';
+    return (() => {
+      if (forme === 'classement') return 'barres-horizontales';
+      return (() => {
+        if (forme === 'serie-temporelle') return 'courbe';
+        return (() => {
+          if (forme === 'cyclique') return 'aire-polaire';
+          return (() => {
+            if (forme === 'matrice') return 'carte-de-chaleur';
+            return 'barres-100';
+          })();
+        })();
+      })();
+    })();
+  })();
   return { source, marque, taille: forme === 'scalaire' ? 'demi' : 'pleine' };
 });
 

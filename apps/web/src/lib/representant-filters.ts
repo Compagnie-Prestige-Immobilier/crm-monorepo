@@ -21,10 +21,15 @@ export const REPRESENTANT_RELATIONS = [
   'REFUS',
 ] as const satisfies readonly RepresentantRelation[];
 
+/**
+ * « Ambassadeur » était un titre honorifique inventé pour l'écran ; ce que la
+ * relation dit vraiment, c'est qu'il a accepté de donner les contacts de ses
+ * collègues. La valeur envoyée à l'API, elle, ne bouge pas.
+ */
 export const REPRESENTANT_RELATION_LABELS: Record<RepresentantRelation, string> = {
   INCONNU: 'Pas encore contacté',
   CONTACTE: 'Contacté',
-  AMBASSADEUR: 'Ambassadeur',
+  AMBASSADEUR: 'A accepté',
   REFUS: 'Refus',
 };
 

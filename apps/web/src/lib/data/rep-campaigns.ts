@@ -98,3 +98,11 @@ export function repProgrammePdfFileName(
   const suffix = day === undefined ? '' : `-jour-${String(day)}`;
   return `programme-representants-${slugForFileName(campaignName)}-${slugForFileName(commercialName)}${suffix}.pdf`;
 }
+
+export function repProgrammesZipUrl(campaignId: string): string {
+  return `/api/v1/rep-campaigns/${encodeURIComponent(campaignId)}/programmes.zip`;
+}
+
+export function repProgrammesZipFileName(campaignName: string): string {
+  return `programmes-representants-${slugForFileName(campaignName)}.zip`;
+}

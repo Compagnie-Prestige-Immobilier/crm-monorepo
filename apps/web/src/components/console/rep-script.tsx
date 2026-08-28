@@ -38,7 +38,7 @@ type Step =
 
 const QUESTIONS: Record<Step, string> = {
   identite: '',
-  ambassadeur: 'Souhaitez-vous être ambassadeur CPI ?',
+  ambassadeur: 'Acceptez-vous de nous donner les contacts de vos collègues ?',
   whatsapp: 'Son WhatsApp ?',
   profession: 'Sa profession ?',
   echeance: 'Quand rappeler ?',
@@ -55,7 +55,6 @@ const KEYBOARD_MAP: readonly (readonly [string, string])[] = [
   ['C', 'Copier le numéro'],
   ['E', 'Corriger la fiche'],
   ['R', 'Ouvrir la fiche du représentant'],
-  ['M', 'Changer de volet'],
   ['?', 'Afficher cette carte'],
 ];
 
@@ -775,7 +774,7 @@ export function RepScript() {
           </h3>
           <p>
             {formatNumber(sent)} réponse{sent > 1 ? 's' : ''} consignée{sent > 1 ? 's' : ''} ·{' '}
-            {formatNumber(ambassadeurs)} ambassadeur{ambassadeurs > 1 ? 's' : ''}
+            {formatNumber(ambassadeurs)} ont accepté
           </p>
         </div>
 

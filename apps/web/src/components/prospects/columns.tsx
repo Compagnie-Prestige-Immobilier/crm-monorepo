@@ -109,7 +109,7 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
     {
       id: 'phase2Status',
       accessorKey: 'phase2Status',
-      header: 'Phase 2',
+      header: 'Résultat de l’appel',
       cell: ({ row }) => (
         <Badge variant={PHASE2_VARIANT[row.original.phase2Status]}>
           {PHASE2_STATUS_LABELS[row.original.phase2Status]}

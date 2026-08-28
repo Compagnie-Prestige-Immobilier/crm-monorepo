@@ -2,7 +2,9 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ETAPES } from '@/components/chues/etape-banner';
 import { RepScript } from '@/components/console/rep-script';
+import { navTitle } from '@/components/layout/nav-items';
 import type * as ConsoleData from '@/lib/data/console';
 import type { ScriptedRepresentant } from '@/lib/data/representants';
 import { renderWithQuery } from '@/test/render-query';
@@ -176,7 +178,7 @@ describe('RepScript : l’ordre des questions', () => {
     await renderScript();
 
     expect(screen.getByText(/C’est bien Aminata Ndiaye/)).toBeTruthy();
-    expect(screen.queryByText(/ambassadeur CPI/)).toBeNull();
+    expect(screen.queryByText(/contacts de vos collègues/)).toBeNull();
     expect(screen.queryByText(/Son WhatsApp/)).toBeNull();
   });
 
@@ -185,7 +187,7 @@ describe('RepScript : l’ordre des questions', () => {
 
     await userEvent.keyboard('1');
 
-    expect(screen.getByText(/Souhaitez-vous être ambassadeur CPI/)).toBeTruthy();
+    expect(screen.getByText(/donner les contacts de vos collègues/)).toBeTruthy();
     expect(screen.queryByText(/Son WhatsApp/)).toBeNull();
 
     await userEvent.keyboard('1');
@@ -370,6 +372,38 @@ describe('RepScript : ce que la fiche sait', () => {
 
     expect(pushRepCallAttempt).toHaveBeenCalledTimes(2);
     expect(screen.getByText(/Appel consigné/)).toBeTruthy();
+  });
+});
+
+describe('RepScript : son propre écran', () => {
+  it('est l’étape 1, sur sa propre route, et non un volet de la console', () => {
+    expect(ETAPES[0]).toMatchObject({
+      n: 1,
+      titre: 'Appeler les représentants',
+      href: '/chues/appels-representants',
+    });
+    expect(navTitle('COMMERCIAL', '/chues/appels-representants')).toBe(
+      '1 · Appeler les représentants',
+    );
+  });
+
+  it('ne propose plus de changer de volet dans sa carte clavier', async () => {
+    await renderScript();
+
+    await userEvent.keyboard('?');
+
+    expect(screen.getByText('Copier le numéro')).toBeTruthy();
+    expect(screen.queryByText('Changer de volet')).toBeNull();
+  });
+
+  it('demande les contacts des collègues, pas un titre honorifique', async () => {
+    await renderScript();
+
+    await userEvent.keyboard('1');
+
+    expect(
+      screen.getByText(/Acceptez-vous de nous donner les contacts de vos collègues/),
+    ).toBeTruthy();
   });
 });
 

@@ -85,10 +85,12 @@ test('l’espace démo se réinitialise et reste isolé', async ({ page }) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 2. Prospects : surface de phase 2 et double export
+// 2. Prospects : surface de phase 3 (Conversion) et double export
 // ─────────────────────────────────────────────────────────────────────────────
 
-test('les filtres de phase 2 vivent dans l’URL et survivent au rechargement', async ({ page }) => {
+test('les filtres de conversion vivent dans l’URL et survivent au rechargement', async ({
+  page,
+}) => {
   await page.goto('/prospects');
   await expect(page.getByRole('table')).toBeVisible();
 
@@ -100,11 +102,11 @@ test('les filtres de phase 2 vivent dans l’URL et survivent au rechargement', 
   const avances = page.getByRole('button', { name: 'Filtres avancés' });
   if ((await avances.getAttribute('aria-expanded')) !== 'true') await avances.click();
   await expect(avances).toHaveAttribute('aria-expanded', 'true');
-  await page.getByRole('combobox', { name: 'Statut phase 2' }).click();
+  await page.getByRole('combobox', { name: 'Résultat de l’appel' }).click();
   await page.getByRole('option', { name: 'Méthode obtenue' }).click();
   await expect(page).toHaveURL(/phase2Status=METHOD_OBTAINED/);
 
-  await page.getByRole('combobox', { name: 'Segment BDD' }).click();
+  await page.getByRole('combobox', { name: 'Groupe (syndicat × banque)' }).click();
   await page.getByRole('option', { name: /^BDD1/ }).click();
   await expect(page).toHaveURL(/segment=BDD1/);
 
@@ -118,9 +120,15 @@ test('les filtres de phase 2 vivent dans l’URL et survivent au rechargement', 
     filtered,
   );
 
-  // Les colonnes de phase 2 sont bien là, c'est ce qui évitait d'ouvrir
+  // Les colonnes de conversion sont bien là, c'est ce qui évitait d'ouvrir
   // l'export pour savoir qui a obtenu le résultat et quand.
-  for (const header of ['Segment', 'Phase 2', 'Méthode', 'Dernier appel', 'Obtenu par']) {
+  for (const header of [
+    'Segment',
+    'Résultat de l’appel',
+    'Méthode',
+    'Dernier appel',
+    'Obtenu par',
+  ]) {
     await expect(page.getByRole('columnheader', { name: header })).toBeVisible();
   }
 });
@@ -156,7 +164,7 @@ test('le menu d’export produit les DEUX classeurs', async ({ page }) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3. Phase 2 : campagne, aperçu, programme PDF, clôture
+// 3. Phase 3 · Conversion : campagne, aperçu, programme PDF, clôture
 // ─────────────────────────────────────────────────────────────────────────────
 
 test('création d’une campagne : l’aperçu chiffre AVANT la confirmation', async ({ page }) => {
@@ -451,7 +459,9 @@ test('une demande déposée par une banque devient un prospect qui porte sa prov
     // aucun geste d'arbitrage : l'API ne lui renvoie que ses propres demandes,
     // et la décision n'est pas la sienne.
     await bankPage.goto('/demandes-clients');
-    await expect(bankPage.getByRole('heading', { name: 'Mes demandes', level: 1 })).toBeVisible();
+    await expect(
+      bankPage.getByRole('heading', { name: 'Mes demandes de création', level: 1 }),
+    ).toBeVisible();
     const suivi = bankPage.getByRole('main').getByRole('listitem').filter({ hasText: nom });
     await expect(suivi).toContainText('En attente d’arbitrage par l’administration.');
     await expect(suivi.getByRole('button', { name: 'Approuver et créer le prospect' })).toHaveCount(
@@ -460,7 +470,9 @@ test('une demande déposée par une banque devient un prospect qui porte sa prov
 
     // ─── L'administration arbitre ───────────────────────────────────────────
     await page.goto('/demandes-clients');
-    await expect(page.getByRole('heading', { name: 'Demandes clients', level: 1 })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Créations de client à valider', level: 1 }),
+    ).toBeVisible();
 
     const carte = page.getByRole('main').getByRole('listitem').filter({ hasText: nom });
     await expect(carte).toBeVisible({ timeout: 30_000 });
@@ -677,7 +689,7 @@ test('la référence dupliquée est signalée au flou, avec un lien vers le doss
 
 test('la liste, les vues rapides et l’export des dossiers', async ({ page }) => {
   await page.goto('/dossiers');
-  await expect(page.getByRole('heading', { name: 'Dossiers', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Dossiers bancaires', level: 1 })).toBeVisible();
 
   const countLine = page.getByRole('status').filter({ hasText: 'Dossiers affichés' });
   await expect(countLine).not.toHaveText('');
@@ -704,7 +716,9 @@ test('le tableau de bord bancaire mène à la liste filtrée depuis un graphique
   page,
 }) => {
   await page.goto('/banque');
-  await expect(page.getByRole('heading', { name: 'CPI GO', level: 1 })).toBeVisible();
+  // L'ADMIN n'a pas d'entrée « Vue d'ensemble » : le titre retombe sur celui de
+  // la coque, dont l'écran fait partie.
+  await expect(page.getByRole('heading', { name: 'Projet CHUES', level: 1 })).toBeVisible();
   await expectNoErrorState(page);
 
   await expect(page.getByText('Taux de rejet', { exact: true })).toBeVisible();
@@ -718,7 +732,7 @@ test('la configuration des étapes se réordonne au clavier, sans glisser-dépos
   page,
 }) => {
   await page.goto('/dossiers/etapes');
-  await expect(page.getByRole('heading', { name: 'Étapes bancaires', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Étapes des dossiers', level: 1 })).toBeVisible();
 
   // Les boutons NOMMENT l'étape déplacée : « Monter » seul, répété six fois,
   // ne dit pas quoi on déplace.

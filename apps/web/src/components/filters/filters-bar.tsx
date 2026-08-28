@@ -54,7 +54,7 @@ const METHOD_OPTIONS: FilterOption[] = ENROLLMENT_METHODS.map((method) => ({
   label: ENROLLMENT_METHOD_LABELS[method],
 }));
 
-export function FiltersBar() {
+export function FiltersBar({ startCollapsed = false }: { startCollapsed?: boolean }) {
   const { filters, setFilters, resetFilters } = useProspectFilters();
 
   const {
@@ -161,6 +161,7 @@ export function FiltersBar() {
       {/* ─── Filtrage avancé ────────────────────────────────────────────── */}
       <AdvancedPanel
         module="prospects"
+        startCollapsed={startCollapsed}
         chips={chips}
         onRemove={removeAdvanced}
         onClearAll={clearAdvanced}
@@ -248,7 +249,7 @@ export function FiltersBar() {
             }}
           />
 
-          {/* ─── Phase 2 ──────────────────────────────────────────────────
+          {/* ─── Ce que l'appel a donné ───────────────────────────────────
                 Ces cinq critères vivent dans le MÊME objet de filtre que les
                 précédents. C'est ce qui garantit qu'un lien « BDD2, méthode
                 obtenue, campagne d'avril » rouvre le tableau, les graphiques ET
@@ -256,8 +257,8 @@ export function FiltersBar() {
                 filtre, même bien synchronisé, finirait par produire un classeur
                 qui ne correspond pas à l'écran d'où il a été demandé. */}
           <FilterCombobox
-            label="Segment BDD"
-            placeholder="Tous les segments"
+            label="Groupe (syndicat × banque)"
+            placeholder="Tous les groupes"
             options={SEGMENT_OPTIONS}
             value={filters.segment}
             onChange={(value) => {
@@ -265,8 +266,8 @@ export function FiltersBar() {
             }}
           />
           <FilterCombobox
-            label="Statut phase 2"
-            placeholder="Tous les statuts phase 2"
+            label="Résultat de l’appel"
+            placeholder="Tous les résultats"
             options={PHASE2_STATUS_OPTIONS}
             value={filters.phase2Status}
             onChange={(value) => {
@@ -274,8 +275,8 @@ export function FiltersBar() {
             }}
           />
           <FilterCombobox
-            label="Méthode d’enrôlement"
-            placeholder="Toutes les méthodes"
+            label="Comment il a adhéré"
+            placeholder="Toutes les manières"
             options={METHOD_OPTIONS}
             value={filters.enrollmentMethod}
             onChange={(value) => {
@@ -292,7 +293,7 @@ export function FiltersBar() {
             }}
           />
           <FilterCombobox
-            label="Méthode obtenue par"
+            label="Adhésion obtenue par"
             placeholder="Tous les téléconseillers"
             options={reference.commerciaux}
             value={filters.enrollmentCapturedById}

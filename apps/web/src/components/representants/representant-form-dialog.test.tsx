@@ -158,7 +158,7 @@ describe('RepresentantFormDialog, état de la relation', () => {
     await waitFor(() => {
       expect(trigger('Relation').textContent).toContain('Contacté');
     });
-    await choose('Relation', 'Ambassadeur');
+    await choose('Relation', 'A accepté');
     await userEvent.setup().click(screen.getByRole('button', { name: 'Enregistrer' }));
 
     await waitFor(() => {
@@ -177,7 +177,7 @@ describe('RepresentantFormDialog, état de la relation', () => {
     });
     expect(screen.queryByLabelText('Motif du refus')).toBeNull();
 
-    await choose('Relation', 'Ambassadeur');
+    await choose('Relation', 'A accepté');
     expect(screen.queryByLabelText('Motif du refus')).toBeNull();
 
     await choose('Relation', 'Refus');

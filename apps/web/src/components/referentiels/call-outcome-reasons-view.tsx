@@ -207,13 +207,13 @@ function ReasonRow({ reason, onEdit }: { reason: CallOutcomeReason; onEdit: () =
         {required.length === 0 ? 'Rien' : required.join(', ')}
       </TableCell>
       <TableCell>
-        {!reason.isActive ? (
-          <Badge variant="secondary">Retiré des listes</Badge>
-        ) : onFieldPhones(reason) ? (
-          <Badge variant="success">Oui</Badge>
-        ) : (
-          <Badge variant="warning">Après mise à jour de l’application</Badge>
-        )}
+        {(() => {
+          if (!reason.isActive) return <Badge variant="secondary">Retiré des listes</Badge>;
+          return (() => {
+            if (onFieldPhones(reason)) return <Badge variant="success">Oui</Badge>;
+            return <Badge variant="warning">Après mise à jour de l’application</Badge>;
+          })();
+        })()}
       </TableCell>
       <TableCell className="text-right">
         <Button type="button" variant="ghost" size="sm" onClick={onEdit}>

@@ -216,64 +216,75 @@ function QualityCard({
         <CardDescription>
           {/* « Aucun appel enregistré » est une AFFIRMATION sur l'activité. Elle
               ne doit sortir que d'une mesure qui a abouti. */}
-          {showError
-            ? 'Qualité indisponible.'
-            : isPending
-              ? 'Calcul en cours…'
-              : badRate === null
-                ? 'Aucun appel enregistré sur la sélection.'
-                : `${formatRate(badRate)} de numéros inexploitables sur ${formatNumber(attempts)} appels.`}
+          {(() => {
+            if (showError) return 'Qualité indisponible.';
+            return (() => {
+              if (isPending) return 'Calcul en cours…';
+              return (() => {
+                if (badRate === null) return 'Aucun appel enregistré sur la sélection.';
+                return `${formatRate(badRate)} de numéros inexploitables sur ${formatNumber(attempts)} appels.`;
+              })();
+            })();
+          })()}
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">
-        {showError ? (
-          <div className="px-5 pb-5">
-            <QueryErrorInline
-              error={error}
-              onRetry={onRetry}
-              fallback="La qualité des numéros n’a pas pu être calculée."
-            />
-          </div>
-        ) : rows.length === 0 ? (
-          <p className="px-5 pb-5 text-[0.875rem] text-muted-foreground">
-            {isPending ? '' : 'Aucun appel enregistré sur la sélection.'}
-          </p>
-        ) : (
-          <div className="max-h-64 overflow-y-auto scrollbar-thin">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>Représentant</TableHead>
-                  <TableHead className="text-right">Appels</TableHead>
-                  <TableHead className="text-right">Injoignables</TableHead>
-                  <TableHead className="text-right">Faux numéros</TableHead>
-                  <TableHead className="text-right">Part</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.slice(0, 20).map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="font-[600]">{row.label}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatNumber(row.attempts)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatNumber(row.unreachable)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatNumber(row.wrongNumber)}
-                    </TableCell>
-                    <TableCell
-                      className={`text-right tabular-nums ${row.badRate !== null && row.badRate >= 50 ? 'font-[700] text-destructive' : ''}`}
-                    >
-                      {formatRateOrNone(row.badRate)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
+        {(() => {
+          if (showError)
+            return (
+              <div className="px-5 pb-5">
+                <QueryErrorInline
+                  error={error}
+                  onRetry={onRetry}
+                  fallback="La qualité des numéros n’a pas pu être calculée."
+                />
+              </div>
+            );
+          return (() => {
+            if (rows.length === 0)
+              return (
+                <p className="px-5 pb-5 text-[0.875rem] text-muted-foreground">
+                  {isPending ? '' : 'Aucun appel enregistré sur la sélection.'}
+                </p>
+              );
+            return (
+              <div className="max-h-64 overflow-y-auto scrollbar-thin">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead>Représentant</TableHead>
+                      <TableHead className="text-right">Appels</TableHead>
+                      <TableHead className="text-right">Injoignables</TableHead>
+                      <TableHead className="text-right">Faux numéros</TableHead>
+                      <TableHead className="text-right">Part</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rows.slice(0, 20).map((row) => (
+                      <TableRow key={row.id}>
+                        <TableCell className="font-[600]">{row.label}</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatNumber(row.attempts)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatNumber(row.unreachable)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatNumber(row.wrongNumber)}
+                        </TableCell>
+                        <TableCell
+                          className={`text-right tabular-nums ${row.badRate !== null && row.badRate >= 50 ? 'font-[700] text-destructive' : ''}`}
+                        >
+                          {formatRateOrNone(row.badRate)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            );
+          })();
+        })()}
       </CardContent>
     </Card>
   );

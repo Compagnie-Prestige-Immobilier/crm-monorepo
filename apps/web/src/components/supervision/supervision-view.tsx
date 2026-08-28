@@ -118,8 +118,11 @@ function PresenceCard({
   tone: 'success' | 'info' | 'muted';
   index: number;
 }) {
-  const color =
-    tone === 'success' ? 'text-success' : tone === 'info' ? 'text-info' : 'text-muted-foreground';
+  const color = {
+    success: 'text-success',
+    info: 'text-info',
+    muted: 'text-muted-foreground',
+  }[tone];
 
   return (
     <Card className="animate-rise" style={{ animationDelay: `${String(index * 60)}ms` }}>

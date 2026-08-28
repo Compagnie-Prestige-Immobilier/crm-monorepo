@@ -18,6 +18,9 @@ export function LiveIndicator({
   onTogglePause: () => void;
 }) {
   const running = !state.paused && !state.hidden && !state.failing;
+  let dotColor = 'bg-muted-foreground';
+  if (state.failing) dotColor = 'bg-destructive';
+  if (running) dotColor = 'bg-success';
 
   return (
     <div className="flex flex-wrap items-center gap-3">
@@ -27,9 +30,7 @@ export function LiveIndicator({
       >
         <span
           aria-hidden="true"
-          className={`size-2 rounded-full transition-colors duration-(--dur-1) ease-(--ease-out-cpi) ${
-            running ? 'bg-success' : state.failing ? 'bg-destructive' : 'bg-muted-foreground'
-          }`}
+          className={`size-2 rounded-full transition-colors duration-(--dur-1) ease-(--ease-out-cpi) ${dotColor}`}
         />
         <span className={running ? 'text-success' : 'text-muted-foreground'}>{label}</span>
       </span>
