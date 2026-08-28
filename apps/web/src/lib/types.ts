@@ -188,12 +188,14 @@ export const ENROLLMENT_METHODS = [
   'PLATFORM',
   'PHYSICAL',
   'VOICE_OR_ELECTRONIC_MESSAGING',
+  'APPOINTMENT',
 ] as const satisfies readonly EnrollmentMethod[];
 
 export const ENROLLMENT_METHOD_LABELS: Record<EnrollmentMethod, string> = {
   PLATFORM: 'Plateforme',
   PHYSICAL: 'Physique',
   VOICE_OR_ELECTRONIC_MESSAGING: 'Vocal ou messagerie électronique',
+  APPOINTMENT: 'Prise de rendez-vous',
 };
 
 export const CALL_OUTCOME_LABELS: Record<CallOutcome, string> = {

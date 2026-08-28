@@ -34,8 +34,10 @@ export function CampaignsView({
   const activeFilterCount = countActiveCampaignFilters(filters);
   let emptyDescription = 'Élargissez la période ou retirez un critère.';
   if (activeFilterCount === 0) {
+    // Le geste est déjà en tête d'écran : le répéter dans le vide donnait deux
+    // boutons identiques à dix centimètres l'un de l'autre.
     emptyDescription = canManage
-      ? 'Créez une campagne pour répartir les prospects en attente.'
+      ? 'Utilisez « Nouvelle campagne », en haut, pour répartir les prospects en attente.'
       : 'Aucune campagne n’est encore disponible.';
   }
 
@@ -51,7 +53,7 @@ export function CampaignsView({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-2xl text-[0.9375rem] text-muted-foreground">
-          Répartition des prospects en attente entre les téléconseillers choisis. Tirage définitif.
+          Distribuer les appels aux téléconseillers. Tirage définitif.
         </p>
         {canManage ? (
           <Button
@@ -68,125 +70,127 @@ export function CampaignsView({
 
       <CampaignsFiltersBar projet={projet} />
 
-      {isPending ? (
-        <CampaignsSkeleton />
-      ) : isError ? (
-        <QueryErrorState
-          error={error}
-          onRetry={() => {
-            void refetch();
-          }}
-          fallback="La liste des campagnes n’a pas pu être chargée."
-        />
-      ) : data.items.length === 0 ? (
-        <EmptyState
-          icon={MegaphoneIcon}
-          title={
-            activeFilterCount === 0
-              ? 'Aucune campagne d’appels'
-              : 'Aucune campagne ne correspond à ces filtres'
-          }
-          description={emptyDescription}
-          action={
-            activeFilterCount === 0 && canManage ? (
-              <Button
-                type="button"
-                onClick={() => {
-                  setCreating(true);
+      {(() => {
+        if (isPending) return <CampaignsSkeleton />;
+        return (() => {
+          if (isError)
+            return (
+              <QueryErrorState
+                error={error}
+                onRetry={() => {
+                  void refetch();
                 }}
-              >
-                <PlusIcon aria-hidden="true" />
-                Nouvelle campagne
-              </Button>
-            ) : null
-          }
-        />
-      ) : (
-        <>
-          <ul className={isFetching ? 'flex flex-col gap-3 opacity-80' : 'flex flex-col gap-3'}>
-            {data.items.map((campaign) => (
-              <li key={campaign.id}>
-                <Card className="animate-rise transition-shadow hover:shadow-elev-hover">
-                  <CardContent className="flex flex-col gap-3">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <h2 className="truncate font-display text-[1.0625rem] font-[700] tracking-[-0.02em]">
-                          {/* Le lien couvre le titre, pas la carte entière : une
+                fallback="La liste des campagnes n’a pas pu être chargée."
+              />
+            );
+          return (() => {
+            if (data.items.length === 0)
+              return (
+                <EmptyState
+                  icon={MegaphoneIcon}
+                  title={
+                    activeFilterCount === 0
+                      ? 'Aucune campagne d’appels'
+                      : 'Aucune campagne ne correspond à ces filtres'
+                  }
+                  description={emptyDescription}
+                />
+              );
+            return (
+              <>
+                <ul
+                  className={isFetching ? 'flex flex-col gap-3 opacity-80' : 'flex flex-col gap-3'}
+                >
+                  {data.items.map((campaign) => (
+                    <li key={campaign.id}>
+                      <Card className="animate-rise transition-shadow hover:shadow-elev-hover">
+                        <CardContent className="flex flex-col gap-3">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <h2 className="truncate font-display text-[1.0625rem] font-[700] tracking-[-0.02em]">
+                                {/* Le lien couvre le titre, pas la carte entière : une
                               carte cliquable dans son ensemble intercepte la
                               sélection de texte et n'annonce aucun nom
                               accessible utile. */}
-                          <Link
-                            href={`${projet === 'GRAND_PUBLIC' ? '/grand-public' : '/chues'}/campagnes/${campaign.id}`}
-                            className="rounded-sm hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                          >
-                            {campaign.name}
-                          </Link>
-                        </h2>
-                        <p className="mt-0.5 truncate text-[0.8125rem] text-muted-foreground">
-                          {campaignScopeLabel(campaign.scope)}
-                        </p>
-                      </div>
-                      <Badge variant={campaign.status === 'ACTIVE' ? 'info' : 'secondary'}>
-                        {CAMPAIGN_STATUS_LABELS[campaign.status]}
-                      </Badge>
-                    </div>
+                                <Link
+                                  href={`${projet === 'GRAND_PUBLIC' ? '/grand-public' : '/chues'}/campagnes/${campaign.id}`}
+                                  className="rounded-sm hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                                >
+                                  {campaign.name}
+                                </Link>
+                              </h2>
+                              <p className="mt-0.5 truncate text-[0.8125rem] text-muted-foreground">
+                                {campaignScopeLabel(campaign.scope)}
+                              </p>
+                            </div>
+                            <Badge variant={campaign.status === 'ACTIVE' ? 'info' : 'secondary'}>
+                              {CAMPAIGN_STATUS_LABELS[campaign.status]}
+                            </Badge>
+                          </div>
 
-                    <CampaignProgressBar progress={campaign.progress} />
+                          <CampaignProgressBar progress={campaign.progress} />
 
-                    <p className="text-[0.75rem] text-muted-foreground">
-                      {formatNumber(campaign.commercialCount)} commercia
-                      {campaign.commercialCount > 1 ? 'ux' : 'l'} · créée le{' '}
-                      <time dateTime={campaign.createdAt}>{formatDate(campaign.createdAt)}</time>{' '}
-                      par {campaign.createdByName}
-                      {campaign.closedAt !== null ? (
-                        <>
-                          {' '}
-                          · clôturée le{' '}
-                          <time dateTime={campaign.closedAt}>{formatDate(campaign.closedAt)}</time>
-                        </>
-                      ) : null}
-                    </p>
-                  </CardContent>
-                </Card>
-              </li>
-            ))}
-          </ul>
+                          <p className="text-[0.75rem] text-muted-foreground">
+                            {formatNumber(campaign.commercialCount)} commercia
+                            {campaign.commercialCount > 1 ? 'ux' : 'l'} · créée le{' '}
+                            <time dateTime={campaign.createdAt}>
+                              {formatDate(campaign.createdAt)}
+                            </time>{' '}
+                            par {campaign.createdByName}
+                            {campaign.closedAt !== null ? (
+                              <>
+                                {' '}
+                                · clôturée le{' '}
+                                <time dateTime={campaign.closedAt}>
+                                  {formatDate(campaign.closedAt)}
+                                </time>
+                              </>
+                            ) : null}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    </li>
+                  ))}
+                </ul>
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-[0.8125rem] text-muted-foreground" role="status">
-              <span className="sr-only">Campagnes affichées&nbsp;: </span>
-              {formatNumber(data.total)} campagne{data.total > 1 ? 's' : ''}
-            </p>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="icon"
-                aria-label="Page précédente"
-                disabled={data.page <= 1}
-                onClick={() => {
-                  setFilters({ page: data.page - 1 });
-                }}
-              >
-                <ChevronLeftIcon className="size-4" aria-hidden="true" />
-              </Button>
-              <span className="min-w-20 text-center text-[0.8125rem] tabular-nums">
-                {data.page} / {data.pageCount}
-              </span>
-              <Button
-                variant="outline"
-                size="icon"
-                aria-label="Page suivante"
-                disabled={data.page >= data.pageCount}
-                onClick={() => {
-                  setFilters({ page: data.page + 1 });
-                }}
-              >
-                <ChevronRightIcon className="size-4" aria-hidden="true" />
-              </Button>
-            </div>
-          </div>
-        </>
-      )}
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-[0.8125rem] text-muted-foreground" role="status">
+                    <span className="sr-only">Campagnes affichées&nbsp;: </span>
+                    {formatNumber(data.total)} campagne{data.total > 1 ? 's' : ''}
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      aria-label="Page précédente"
+                      disabled={data.page <= 1}
+                      onClick={() => {
+                        setFilters({ page: data.page - 1 });
+                      }}
+                    >
+                      <ChevronLeftIcon className="size-4" aria-hidden="true" />
+                    </Button>
+                    <span className="min-w-20 text-center text-[0.8125rem] tabular-nums">
+                      {data.page} / {data.pageCount}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      aria-label="Page suivante"
+                      disabled={data.page >= data.pageCount}
+                      onClick={() => {
+                        setFilters({ page: data.page + 1 });
+                      }}
+                    >
+                      <ChevronRightIcon className="size-4" aria-hidden="true" />
+                    </Button>
+                  </div>
+                </div>
+              </>
+            );
+          })();
+        })();
+      })()}
 
       {canManage ? <CampaignCreateDialog open={creating} onOpenChange={setCreating} /> : null}
     </div>

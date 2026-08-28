@@ -2,18 +2,27 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { RepCampaignCreateDialog } from '@/components/phase2/rep-campaign-create-dialog';
+import { CampaignCreateDialog } from '@/components/phase2/campaign-create-dialog';
+import type * as RepCampaignsModule from '@/lib/data/rep-campaigns';
 import type * as ReferenceModule from '@/lib/data/reference';
 import { renderWithQuery } from '@/test/render-query';
 
-const reference = vi.hoisted(() => vi.fn());
+const reference = vi.hoisted(() => vi.fn<() => Promise<unknown>>());
+const preview = vi.hoisted(() => vi.fn<(...args: unknown[]) => Promise<unknown>>());
 
 vi.mock('@/lib/data/reference', async () => {
   const actual = await vi.importActual<typeof ReferenceModule>('@/lib/data/reference');
   return { ...actual, fetchReferenceData: reference };
 });
 
-vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('@/lib/data/rep-campaigns', async () => {
+  const actual = await vi.importActual<typeof RepCampaignsModule>('@/lib/data/rep-campaigns');
+  return { ...actual, fetchRepCampaignPreview: preview };
+});
+
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn<() => void>(), error: vi.fn<() => void>() },
+}));
 
 const departement = (id: string, name: string, regionId: string, regionName: string) => ({
   id,
@@ -52,11 +61,24 @@ beforeEach(() => {
     ],
     banques: [],
     syndicats: [],
-    commerciaux: [],
+    commerciaux: [{ value: 'u-1', label: 'Awa Ndiaye' }],
     representants: [],
     campagnes: [],
   });
+
+  preview.mockReset();
+  preview.mockResolvedValue({
+    eligible: 40,
+    perCommercial: 40,
+    perDay: [40],
+    scopeLabel: 'Représentants non qualifiés',
+  });
 });
+
+const renderDialog = () =>
+  renderWithQuery(
+    <CampaignCreateDialog open defaultTarget="REPRESENTANTS" onOpenChange={vi.fn<() => void>()} />,
+  );
 
 const trigger = (field: string): HTMLElement =>
   screen.getByRole('combobox', { name: new RegExp(field, 'u') });
@@ -69,7 +91,7 @@ async function choose(field: string, option: string): Promise<void> {
 
 describe('RepCampaignCreateDialog, cascade région → département', () => {
   it('une région choisie réduit les départements à ceux de cette région', async () => {
-    renderWithQuery(<RepCampaignCreateDialog open onOpenChange={vi.fn()} />);
+    renderDialog();
 
     await choose('Région', 'Tambacounda');
     await userEvent.setup().click(trigger('Département'));
@@ -79,7 +101,7 @@ describe('RepCampaignCreateDialog, cascade région → département', () => {
   });
 
   it('changer de région efface le département ET l’IEF du périmètre', async () => {
-    renderWithQuery(<RepCampaignCreateDialog open onOpenChange={vi.fn()} />);
+    renderDialog();
 
     await choose('Département', '^Tambacounda');
     await choose('IEF', 'IEF Tambacounda');
@@ -87,5 +109,44 @@ describe('RepCampaignCreateDialog, cascade région → département', () => {
 
     expect(trigger('Département').textContent).toContain('Tous les départements');
     expect(trigger('IEF').textContent).toContain('Toutes les IEF');
+  });
+});
+
+describe('RepCampaignCreateDialog, qualification', () => {
+  it('ne filtre sur rien tant que l’utilisateur n’a pas choisi', () => {
+    renderDialog();
+
+    const tous = screen.getByRole('radio', {
+      name: /^Tous les représentants/u,
+    }) as HTMLInputElement;
+    expect(tous.checked).toBe(true);
+  });
+
+  it('« Non qualifiés » demande l’aperçu sans les acceptations ni les refus', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(await screen.findByRole('radio', { name: /Non qualifiés/u }));
+    await user.type(screen.getByRole('textbox', { name: /Nom de la campagne/u }), 'Qualification');
+    await user.click(await screen.findByRole('checkbox', { name: /Awa Ndiaye/u }));
+    await user.click(screen.getByRole('button', { name: 'Voir l’aperçu' }));
+
+    await screen.findByText('Représentants non qualifiés');
+    expect(preview.mock.calls.at(-1)?.[0]).toMatchObject({
+      relationStatuses: ['INCONNU', 'CONTACTE'],
+    });
+  });
+
+  it('« Qualifiés » ne retient que ceux qui ont accepté', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(await screen.findByRole('radio', { name: /Qualifiés/u }));
+    await user.type(screen.getByRole('textbox', { name: /Nom de la campagne/u }), 'Relance relais');
+    await user.click(await screen.findByRole('checkbox', { name: /Awa Ndiaye/u }));
+    await user.click(screen.getByRole('button', { name: 'Voir l’aperçu' }));
+
+    await screen.findByText('Représentants non qualifiés');
+    expect(preview.mock.calls.at(-1)?.[0]).toMatchObject({ relationStatuses: ['AMBASSADEUR'] });
   });
 });

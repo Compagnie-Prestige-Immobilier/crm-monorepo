@@ -91,6 +91,9 @@ enum EnrollmentMethod {
   PLATFORM
   PHYSICAL
   VOICE_OR_ELECTRONIC_MESSAGING
+  /// Prise de rendez-vous. Seule methode qui exige une date : `rendezVousAt`
+  /// sur la tentative, contrainte CHECK comprise.
+  APPOINTMENT
 }
 
 // BDD1..BDD4 ne sont PAS quatre bases physiques : ce sont des segments calculés
@@ -1056,6 +1059,22 @@ model CallAttempt {
   reasonId String?
   reason   CallOutcomeReason? @relation(fields: [reasonId], references: [id], onDelete: Restrict)
 
+  // ── Renseignements de conversion (phase 3) ────────────────────────────────
+  // Ce que l'appel APPREND, et que la fiche ne porte pas. Nom, prénom,
+  // téléphone, profession, syndicat et banque ne sont PAS ici : ils vivent sur
+  // `Prospect`, seule vérité, et la tentative les y écrit.
+  email                  String?
+  fonctionnaire          Boolean?
+  /// Un engagement bancaire est-il en cours. Nul tant que la question n'a pas
+  /// été posée, ce qui n'est pas la même chose que « non ».
+  engagementEnCours      Boolean?
+  /// Ancienneté DANS L'ÉTABLISSEMENT, en mois. Distincte de
+  /// `Prospect.dureeSystemeMois`, qui est la durée du système de PAIEMENT.
+  dureeEtablissementMois Int?
+  /// Date du rendez-vous pris. Obligatoire si et seulement si la méthode vaut
+  /// APPOINTMENT. Contrainte CHECK.
+  rendezVousAt           DateTime?
+
   clientCreatedAt DateTime
   createdAt       DateTime @default(now())
 
@@ -1157,6 +1176,10 @@ model RepCallCampaign {
   /// C'est la campagne de relance des dormants, celle qui a motivé le module.
   onlyWithoutProspects Boolean @default(false)
 
+  /// Statuts de relation retenus par le tirage. Liste VIDE : aucun filtre, la
+  /// campagne prend qualifiés et non qualifiés.
+  relationStatuses RepresentantRelation[] @default([])
+
   createdById String
   createdBy   User   @relation("RepCallCampaignCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
 
@@ -1242,6 +1265,9 @@ model RepCallAttempt {
   /// Nombre de fiches promises par le représentant, quand l'issue le prévoit.
   promisedProspects Int?
   comment           String?
+  /// Date du rappel promis. Renseigné SI ET SEULEMENT SI `outcome` vaut
+  /// CALLBACK : c'est elle qui arme la notification côté mobile.
+  callbackAt        DateTime?
 
   clientCreatedAt DateTime
   createdAt       DateTime @default(now())

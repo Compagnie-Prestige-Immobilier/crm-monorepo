@@ -17,7 +17,7 @@ interface MockTx {
   callAttempt: Record<'findUnique' | 'createMany', MockFn>;
   callTask: Record<'findFirst' | 'updateMany', MockFn>;
   callOutcomeReason: Record<'findUnique', MockFn>;
-  prospect: Record<'findFirst' | 'updateMany', MockFn>;
+  prospect: Record<'findFirst' | 'updateMany' | 'update', MockFn>;
   prospectJourney: Record<'upsert' | 'updateMany', MockFn>;
   scheduledCallback: Record<'updateMany' | 'createMany', MockFn>;
 }
@@ -73,6 +73,7 @@ const prepare = (): void => {
     prospect: {
       findFirst: vi.fn().mockResolvedValue(prospectRow()),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      update: vi.fn().mockResolvedValue({ ...prospectRow(), rev: 4 }),
     },
     prospectJourney: {
       upsert: vi.fn().mockResolvedValue(journeyRow()),
@@ -109,6 +110,128 @@ describe('nature de la tentative écrite', () => {
 
   it('prospect réel : la tentative est réelle', async () => {
     await apply();
+  });
+});
+
+const RENDEZ_VOUS = '2026-08-05T09:00:00.000Z';
+
+const priseDeRendezVous = {
+  outcome: CallOutcome.METHOD_OBTAINED,
+  method: EnrollmentMethod.APPOINTMENT,
+  rendezVousAt: RENDEZ_VOUS,
+} as const;
+
+describe('renseignements de conversion', () => {
+  beforeEach(() => {
+    prepare();
+  });
+
+  it('écrit sur la TENTATIVE ce que l’appel apprend', async () => {
+    await apply({
+      ...priseDeRendezVous,
+      email: 'awa@cpi.sn',
+      fonctionnaire: true,
+      engagementEnCours: false,
+      dureeEtablissementMois: 84,
+      comment: 'rendez-vous à l’agence',
+    });
+
+    const row = writtenRow();
+    expect(row.email).toBe('awa@cpi.sn');
+    expect(row.fonctionnaire).toBe(true);
+    expect(row.engagementEnCours).toBe(false);
+    expect(row.dureeEtablissementMois).toBe(84);
+    expect(row.comment).toBe('rendez-vous à l’agence');
+    expect((row.rendezVousAt as Date).toISOString()).toBe(RENDEZ_VOUS);
+    expect(tx.prospect.update).not.toHaveBeenCalled();
+  });
+
+  it('écrit sur le PROSPECT ce que la fiche porte déjà, et rien d’autre', async () => {
+    await apply({
+      ...priseDeRendezVous,
+      nom: '  Diop ',
+      prenom: 'Awa',
+      profession: 'Enseignante',
+      banqueId: 'b-1',
+      syndicatId: 's-1',
+    });
+
+    const [args] = tx.prospect.update.mock.calls[0] as [
+      { where: Record<string, unknown>; data: Record<string, unknown> },
+    ];
+    expect(args.where).toEqual({ id: 'p-1' });
+    expect(args.data).toEqual({
+      nom: 'Diop',
+      prenom: 'Awa',
+      profession: 'Enseignante',
+      banqueId: 'b-1',
+      syndicatId: 's-1',
+      rev: { increment: 1 },
+    });
+
+    const row = writtenRow();
+    expect(row.nom).toBeUndefined();
+    expect(row.banqueId).toBeUndefined();
+  });
+
+  it('un champ absent laisse la valeur en place : le silence n’efface rien', async () => {
+    await apply({ ...priseDeRendezVous, prenom: 'Awa' });
+
+    const [args] = tx.prospect.update.mock.calls[0] as [{ data: Record<string, unknown> }];
+    expect(args.data).toEqual({ prenom: 'Awa', rev: { increment: 1 } });
+  });
+
+  it('un nom vidé n’écrase pas celui de la fiche', async () => {
+    await apply({ ...priseDeRendezVous, nom: '   ' });
+
+    expect(tx.prospect.update).not.toHaveBeenCalled();
+  });
+
+  it('la révision rendue est celle d’APRÈS la correction', async () => {
+    tx.prospect.update.mockResolvedValue({ ...prospectRow(), rev: 4 });
+    tx.prospect.findFirst.mockResolvedValue({ ...prospectRow(), rev: 5 });
+
+    const result = (await apply({ outcome: CallOutcome.UNREACHABLE, nom: 'Diop' })) as {
+      state: { rev: number };
+    };
+
+    expect(result.state.rev).toBe(4);
+  });
+
+  it('le rejeu d’une tentative déjà reçue ne recorrige pas la fiche', async () => {
+    tx.callAttempt.findUnique.mockResolvedValue({ id: 'att-1', taskId: null, task: null });
+    await apply({ ...priseDeRendezVous, nom: 'Diop' });
+
+    expect(tx.prospect.update).not.toHaveBeenCalled();
+  });
+
+  it('une tentative perdue à l’insertion ne corrige rien', async () => {
+    tx.callAttempt.createMany.mockResolvedValue({ count: 0 });
+    await apply({ ...priseDeRendezVous, nom: 'Diop' });
+
+    expect(tx.prospect.update).not.toHaveBeenCalled();
+  });
+
+  it('la prise de rendez-vous sans date est refusée avant toute écriture', async () => {
+    expect(
+      await codeOf(
+        apply({ outcome: CallOutcome.METHOD_OBTAINED, method: EnrollmentMethod.APPOINTMENT }),
+      ),
+    ).toBe('PHASE2_RENDEZ_VOUS_REQUIRED');
+    expect(tx.callAttempt.createMany).not.toHaveBeenCalled();
+    expect(tx.prospect.update).not.toHaveBeenCalled();
+  });
+
+  it('une date de rendez-vous antérieure à l’appel est refusée', async () => {
+    expect(
+      await codeOf(apply({ ...priseDeRendezVous, rendezVousAt: '2026-07-01T09:00:00.000Z' })),
+    ).toBe('PHASE2_RENDEZ_VOUS_PAST');
+  });
+
+  it('une adresse électronique qui n’en est pas une est refusée', async () => {
+    expect(await codeOf(apply({ ...priseDeRendezVous, email: 'awa' }))).toBe(
+      'PHASE2_EMAIL_INVALID',
+    );
   });
 });
 

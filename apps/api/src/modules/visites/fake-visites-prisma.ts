@@ -82,44 +82,32 @@ interface VisiteWhere {
 
 const matchesVisite = (row: FakeVisiteRow, where: VisiteWhere | undefined): boolean => {
   if (!where) return true;
+  return matchesVisiteFields(row, where) && matchesVisiteSearch(row, where.OR);
+};
+
+function matchesVisiteFields(row: FakeVisiteRow, where: VisiteWhere): boolean {
   if (where.id !== undefined && row.id !== where.id) return false;
-  if (
-    where.reference?.startsWith !== undefined &&
-    !row.reference.startsWith(where.reference.startsWith)
-  ) {
-    return false;
-  }
-  if (
-    where.visitedAt?.gte !== undefined &&
-    row.visitedAt.getTime() < where.visitedAt.gte.getTime()
-  ) {
-    return false;
-  }
-  if (
-    where.visitedAt?.lte !== undefined &&
-    row.visitedAt.getTime() > where.visitedAt.lte.getTime()
-  ) {
-    return false;
-  }
+  const reference = where.reference?.startsWith;
+  if (reference !== undefined && !row.reference.startsWith(reference)) return false;
+  const from = where.visitedAt?.gte;
+  if (from !== undefined && row.visitedAt.getTime() < from.getTime()) return false;
+  const to = where.visitedAt?.lte;
+  if (to !== undefined && row.visitedAt.getTime() > to.getTime()) return false;
   if (where.entrepriseId !== undefined && row.entrepriseId !== where.entrepriseId) return false;
   if (where.objetId !== undefined && row.objetId !== where.objetId) return false;
   if (where.directionId !== undefined && row.directionId !== where.directionId) return false;
-  if (where.destinataireId !== undefined && row.destinataireId !== where.destinataireId)
-    return false;
+  return where.destinataireId === undefined || row.destinataireId === where.destinataireId;
+}
 
-  if (where.OR !== undefined) {
-    const hit = where.OR.some((clause) => {
-      if (clause.visitorName !== undefined) {
-        return row.visitorName.toLowerCase().includes(clause.visitorName.contains.toLowerCase());
-      }
-      if (clause.reference !== undefined) return row.reference.includes(clause.reference.contains);
-      return false;
-    });
-    if (!hit) return false;
-  }
-
-  return true;
-};
+function matchesVisiteSearch(row: FakeVisiteRow, clauses: VisiteWhere['OR']): boolean {
+  if (clauses === undefined) return true;
+  return clauses.some((clause) => {
+    if (clause.visitorName !== undefined) {
+      return row.visitorName.toLowerCase().includes(clause.visitorName.contains.toLowerCase());
+    }
+    return clause.reference !== undefined && row.reference.includes(clause.reference.contains);
+  });
+}
 
 /**
  * Double de la seule surface Prisma que le registre touche. Il applique les

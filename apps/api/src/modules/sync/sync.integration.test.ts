@@ -31,6 +31,7 @@ const TAG = 'it-sync';
 
 let alice: AuthenticatedUser;
 let bob: AuthenticatedUser;
+let sonia: AuthenticatedUser;
 let departementId: string;
 let banqueId: string;
 let syndicatId: string;
@@ -39,12 +40,13 @@ let phoneSeed = 0;
 const nextPhone = (): string => `+22177${String(1_000_000 + ++phoneSeed).slice(-7)}`;
 
 async function cleanup(): Promise<void> {
-  await prisma.syncOperation.deleteMany({ where: { userId: { in: [alice.id, bob.id] } } });
-  await prisma.syncBatch.deleteMany({ where: { userId: { in: [alice.id, bob.id] } } });
-  await prisma.callTask.deleteMany({ where: { assignedToId: { in: [alice.id, bob.id] } } });
-  await prisma.callCampaign.deleteMany({ where: { createdById: { in: [alice.id, bob.id] } } });
-  await prisma.prospect.deleteMany({ where: { createdById: { in: [alice.id, bob.id] } } });
-  await prisma.representant.deleteMany({ where: { createdById: { in: [alice.id, bob.id] } } });
+  const auteurs = [alice.id, bob.id, sonia.id];
+  await prisma.syncOperation.deleteMany({ where: { userId: { in: auteurs } } });
+  await prisma.syncBatch.deleteMany({ where: { userId: { in: auteurs } } });
+  await prisma.callTask.deleteMany({ where: { assignedToId: { in: auteurs } } });
+  await prisma.callCampaign.deleteMany({ where: { createdById: { in: auteurs } } });
+  await prisma.prospect.deleteMany({ where: { createdById: { in: auteurs } } });
+  await prisma.representant.deleteMany({ where: { createdById: { in: auteurs } } });
 }
 
 beforeAll(async () => {
@@ -55,7 +57,11 @@ beforeAll(async () => {
   banqueId = banque.id;
   syndicatId = syndicat.id;
 
-  const makeUser = async (username: string, fullName: string): Promise<AuthenticatedUser> => {
+  const makeUser = async (
+    username: string,
+    fullName: string,
+    role: Role = Role.COMMERCIAL,
+  ): Promise<AuthenticatedUser> => {
     const row = await prisma.user.upsert({
       where: { email: `${username}.${TAG}@cpi.test` },
       create: {
@@ -63,21 +69,22 @@ beforeAll(async () => {
         username: `${username}.${TAG}`,
         fullName,
         passwordHash: 'x',
-        role: Role.COMMERCIAL,
+        role,
       },
-      update: {},
+      update: { role },
     });
     return {
       id: row.id,
       email: row.email,
       username: row.username,
       fullName: row.fullName,
-      role: Role.COMMERCIAL,
+      role,
     };
   };
 
   alice = await makeUser('alice', 'Alice Diop');
   bob = await makeUser('bob', 'Bob Sarr');
+  sonia = await makeUser('sonia', 'Sonia Ba', Role.SUPERVISEUR);
   await cleanup();
 });
 
@@ -281,7 +288,25 @@ describe('pull, pagination keyset', () => {
     expect(response.changes.representants.map((row) => row.id)).not.toContain(repId);
   });
 
-  it('un COMMERCIAL ne reçoit que ses propres lignes', async () => {
+  it('les PROSPECTS d’un autre commercial ne descendent pas', async () => {
+    const repAlice = randomUUID();
+    const repBob = randomUUID();
+    const prospectAlice = randomUUID();
+    const prospectBob = randomUUID();
+    await sync.push(alice, push([repOp(repAlice, nextPhone())]));
+    await sync.push(bob, push([repOp(repBob, nextPhone())]));
+    await sync.push(alice, push([prospectOp(prospectAlice, repAlice, nextPhone(), 0)]));
+    await sync.push(bob, push([prospectOp(prospectBob, repBob, nextPhone(), 0)]));
+    await backdate();
+
+    const forAlice = await sync.pull(alice, { limit: 500 });
+    const ids = forAlice.changes.prospects.map((row) => row.id);
+
+    expect(ids).toContain(prospectAlice);
+    expect(ids).not.toContain(prospectBob);
+  });
+
+  it('l’ANNUAIRE des représentants descend en entier, y compris ceux d’un autre commercial', async () => {
     const repAlice = randomUUID();
     const repBob = randomUUID();
     await sync.push(alice, push([repOp(repAlice, nextPhone())]));
@@ -292,7 +317,7 @@ describe('pull, pagination keyset', () => {
     const ids = forAlice.changes.representants.map((row) => row.id);
 
     expect(ids).toContain(repAlice);
-    expect(ids).not.toContain(repBob);
+    expect(ids).toContain(repBob);
   });
 
   it('les référentiels traversent le même endpoint, avec leur propre position', async () => {
@@ -430,10 +455,35 @@ describe('la file d’une campagne descend sur le téléphone de qui elle est', 
   it('une tâche retirée de la file cesse de tirer la fiche', async () => {
     const { prospectId } = await ficheDeBobConfieeA(alice);
     await prisma.callTask.updateMany({ where: { prospectId }, data: { isActive: false } });
+    await backdate();
 
     const page = await sync.pull(alice, { limit: 500 });
 
     expect(page.changes.prospects.map((row) => row.id)).not.toContain(prospectId);
+  });
+
+  it('la tâche retirée descend une DERNIÈRE fois, marquée inactive', async () => {
+    const { prospectId } = await ficheDeBobConfieeA(alice);
+    await prisma.callTask.updateMany({ where: { prospectId }, data: { isActive: false } });
+    await backdate();
+
+    const page = await sync.pull(alice, { limit: 500 });
+
+    // Filtrée, elle ne descendait plus du tout : le téléphone gardait la file
+    // pour toujours et continuait d'appeler des fiches qu'on lui avait reprises.
+    const tache = page.changes.callTasks.find((row) => row.prospectId === prospectId);
+    expect(tache).toBeDefined();
+    expect(tache?.isActive).toBe(false);
+  });
+
+  it('une tâche encore confiée descend active', async () => {
+    const { prospectId } = await ficheDeBobConfieeA(alice);
+
+    const page = await sync.pull(alice, { limit: 500 });
+
+    expect(page.changes.callTasks.find((row) => row.prospectId === prospectId)?.isActive).toBe(
+      true,
+    );
   });
 
   it('QUALIFIER une fiche confiée n’est plus un conflit', async () => {
@@ -493,5 +543,93 @@ describe('la file d’une campagne descend sur le téléphone de qui elle est', 
     );
 
     expect(statuses(results.body.results)).toEqual([SyncOpStatus.CONFLICT]);
+  });
+});
+
+describe('l’annuaire est commun, l’ÉCRITURE suit la lecture', () => {
+  it('un prospect se rattache au représentant d’un AUTRE commercial', async () => {
+    const repDeBob = randomUUID();
+    const prospectDAlice = randomUUID();
+    await sync.push(bob, push([repOp(repDeBob, nextPhone())]));
+
+    const results = await sync.push(
+      alice,
+      push([prospectOp(prospectDAlice, repDeBob, nextPhone(), 0)]),
+    );
+
+    expect(statuses(results.body.results)).toEqual([SyncOpStatus.APPLIED]);
+    const ligne = await prisma.prospect.findUniqueOrThrow({ where: { id: prospectDAlice } });
+    expect(ligne.representantId).toBe(repDeBob);
+    expect(ligne.createdById).toBe(alice.id);
+  });
+
+  it('un commentaire s’écrit sur le représentant d’un AUTRE commercial', async () => {
+    const repDeBob = randomUUID();
+    const commentaire = randomUUID();
+    await sync.push(bob, push([repOp(repDeBob, nextPhone())]));
+
+    const results = await sync.push(
+      alice,
+      push([
+        {
+          opId: randomUUID(),
+          seq: 0,
+          entity: SyncEntity.REPRESENTANT_COMMENT,
+          op: SyncOp.CREATE,
+          entityId: commentaire,
+          clientUpdatedAt: new Date().toISOString(),
+          data: { representantId: repDeBob, body: 'Rappelle à 15 h.' },
+        },
+      ]),
+    );
+
+    expect(statuses(results.body.results)).toEqual([SyncOpStatus.APPLIED]);
+    expect(
+      await prisma.representantComment.count({
+        where: { id: commentaire, representantId: repDeBob, authorId: alice.id },
+      }),
+    ).toBe(1);
+  });
+
+  it('un SUPERVISEUR saisit depuis la console, et ne tire QUE ses propres prospects', async () => {
+    const repDeSonia = randomUUID();
+    const sien = randomUUID();
+    const celuiDAlice = randomUUID();
+    await sync.push(sonia, push([repOp(repDeSonia, nextPhone())]));
+    await sync.push(sonia, push([prospectOp(sien, repDeSonia, nextPhone(), 1)]));
+    await sync.push(alice, push([prospectOp(celuiDAlice, repDeSonia, nextPhone(), 0)]));
+    await backdate();
+
+    const page = await sync.pull(sonia, { limit: 500 });
+
+    expect(page.changes.prospects.map((row) => row.id)).toEqual([sien]);
+    // L'annuaire, lui, descend en entier : c'est ce qui rend la recherche possible.
+    expect(page.changes.representants.map((row) => row.id)).toContain(repDeSonia);
+  });
+
+  it('la FICHE du représentant d’un autre reste fermée à la modification', async () => {
+    const repDeBob = randomUUID();
+    await sync.push(bob, push([repOp(repDeBob, nextPhone())]));
+
+    const results = await sync.push(
+      alice,
+      push([
+        {
+          opId: randomUUID(),
+          seq: 0,
+          entity: SyncEntity.REPRESENTANT,
+          op: SyncOp.UPDATE,
+          entityId: repDeBob,
+          clientUpdatedAt: new Date().toISOString(),
+          data: { fullName: 'Écrasé', phone: nextPhone(), departementId },
+        },
+      ]),
+    );
+
+    expect(statuses(results.body.results)).toEqual([SyncOpStatus.CONFLICT]);
+    expect(results.body.results[0]?.errorCode).toBe('ENTITY_ID_OWNED_BY_ANOTHER_USER');
+    expect((await prisma.representant.findUniqueOrThrow({ where: { id: repDeBob } })).fullName).toBe(
+      `Rep ${TAG}`,
+    );
   });
 });

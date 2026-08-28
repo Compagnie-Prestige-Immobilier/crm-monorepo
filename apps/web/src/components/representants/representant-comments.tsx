@@ -131,56 +131,67 @@ export function RepresentantComments({
         </div>
       )}
 
-      {thread.isPending ? (
-        <Skeleton className="h-24 w-full" />
-      ) : thread.isError ? (
-        <QueryErrorState
-          error={thread.error}
-          onRetry={() => {
-            void thread.refetch();
-          }}
-          fallback="Le fil n’a pas pu être chargé."
-        />
-      ) : thread.data.length === 0 ? (
-        <p className="text-[0.875rem] text-muted-foreground">
-          Rien dans le fil. Le premier commentaire dit d’où part la relation.
-        </p>
-      ) : (
-        <ol aria-label="Fil de la fiche" className="flex flex-col divide-y divide-border">
-          {thread.data.map((comment) => (
-            <li key={comment.id} className="flex gap-3 py-3 first:pt-0 last:pb-0">
-              <span
-                aria-hidden="true"
-                className="flex size-8 shrink-0 items-center justify-center rounded-full bg-secondary text-[0.6875rem] font-[700] text-secondary-foreground"
-              >
-                {initials(comment.authorName)}
-              </span>
-              <div className="min-w-0 grow">
-                <p className="text-[0.75rem] text-muted-foreground">
-                  <span className="font-[600] text-foreground">{comment.authorName}</span> ·{' '}
-                  <time dateTime={comment.clientCreatedAt} className="tabular-nums">
-                    {formatDateTime(comment.clientCreatedAt)}
-                  </time>
+      {(() => {
+        if (thread.isPending) return <Skeleton className="h-24 w-full" />;
+        return (() => {
+          if (thread.isError)
+            return (
+              <QueryErrorState
+                error={thread.error}
+                onRetry={() => {
+                  void thread.refetch();
+                }}
+                fallback="Le fil n’a pas pu être chargé."
+              />
+            );
+          return (() => {
+            if (thread.data.length === 0)
+              return (
+                <p className="text-[0.875rem] text-muted-foreground">
+                  Rien dans le fil. Le premier commentaire dit d’où part la relation.
                 </p>
-                <p className="max-w-prose whitespace-pre-wrap text-[0.875rem]">{comment.body}</p>
-              </div>
-              {canAdminister ? (
-                <Button
-                  type="button"
-                  size="icon-sm"
-                  variant="ghost"
-                  aria-label="Supprimer ce commentaire"
-                  onClick={() => {
-                    setDeleting(comment);
-                  }}
-                >
-                  <Trash2Icon aria-hidden="true" />
-                </Button>
-              ) : null}
-            </li>
-          ))}
-        </ol>
-      )}
+              );
+            return (
+              <ol aria-label="Fil de la fiche" className="flex flex-col divide-y divide-border">
+                {thread.data.map((comment) => (
+                  <li key={comment.id} className="flex gap-3 py-3 first:pt-0 last:pb-0">
+                    <span
+                      aria-hidden="true"
+                      className="flex size-8 shrink-0 items-center justify-center rounded-full bg-secondary text-[0.6875rem] font-[700] text-secondary-foreground"
+                    >
+                      {initials(comment.authorName)}
+                    </span>
+                    <div className="min-w-0 grow">
+                      <p className="text-[0.75rem] text-muted-foreground">
+                        <span className="font-[600] text-foreground">{comment.authorName}</span> ·{' '}
+                        <time dateTime={comment.clientCreatedAt} className="tabular-nums">
+                          {formatDateTime(comment.clientCreatedAt)}
+                        </time>
+                      </p>
+                      <p className="max-w-prose whitespace-pre-wrap text-[0.875rem]">
+                        {comment.body}
+                      </p>
+                    </div>
+                    {canAdminister ? (
+                      <Button
+                        type="button"
+                        size="icon-sm"
+                        variant="ghost"
+                        aria-label="Supprimer ce commentaire"
+                        onClick={() => {
+                          setDeleting(comment);
+                        }}
+                      >
+                        <Trash2Icon aria-hidden="true" />
+                      </Button>
+                    ) : null}
+                  </li>
+                ))}
+              </ol>
+            );
+          })();
+        })();
+      })()}
 
       <ConfirmDialog
         open={deleting !== null}

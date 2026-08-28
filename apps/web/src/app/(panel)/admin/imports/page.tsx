@@ -5,7 +5,7 @@ import { ImportsView } from '@/components/imports/imports-view';
 import { PermissionDenied } from '@/components/permission-denied';
 import { guardRoles } from '@/lib/session';
 
-export const metadata: Metadata = { title: 'Imports' };
+export const metadata: Metadata = { title: 'Importer un fichier Excel' };
 
 export default async function ImportsPage() {
   const guard = await guardRoles(['ADMIN']);

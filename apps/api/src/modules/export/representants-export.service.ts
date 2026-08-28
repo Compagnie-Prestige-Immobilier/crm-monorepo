@@ -5,7 +5,7 @@ import ExcelJS from 'exceljs';
 import type { Prisma } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { readScope, readsEveryone } from '../../common/scope.js';
+import { readableOwnerId, readScope } from '../../common/scope.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { WorkspaceContext } from '../../workspaces/workspace.js';
 import { IMPORT_COLUMNS, IMPORT_SHEET_NAME } from '../representants/import-template.js';
@@ -193,11 +193,7 @@ export class RepresentantsExportService {
     };
 
     if (query.commercialId) {
-      where.createdById = readsEveryone(user)
-        ? query.commercialId
-        : query.commercialId === user.id
-          ? user.id
-          : '__aucun__';
+      where.createdById = readableOwnerId(user, query.commercialId);
     }
     if (query.departementId) where.departementId = query.departementId;
     if (query.iefId) where.iefId = query.iefId;

@@ -9,6 +9,7 @@ import {
   PlusIcon,
   PrinterIcon,
   RotateCcwIcon,
+  SearchIcon,
 } from 'lucide-react';
 import { useId, useState } from 'react';
 
@@ -108,6 +109,11 @@ export function RegistreView() {
   const [today] = useState(() => dakarNow().date);
   const [corrigeeId, setCorrigeeId] = useState<string | null>(null);
   const [ajoutOuvert, setAjoutOuvert] = useState(false);
+  // Déplié d'emblée SI un critère est déjà posé : sinon le registre paraîtrait
+  // amputé sans qu'on voie pourquoi.
+  const [rechercheOuverte, setRechercheOuverte] = useState(
+    () => countActiveVisiteFilters(filters) > 0,
+  );
   const [impressionOuverte, setImpressionOuverte] = useState(false);
   const [orientation, setOrientation] = useState<'landscape' | 'portrait'>('landscape');
   const [colonnesImprimees, setColonnesImprimees] = useState<ReadonlySet<ImpressionColonne>>(
@@ -171,9 +177,12 @@ export function RegistreView() {
     <div className="flex flex-col gap-6">
       <style media="print">{`@page { size: ${orientation}; margin: 10mm; }`}</style>
 
-      <div className="flex justify-end print:hidden">
+      {/* Le geste du comptoir passe AVANT l'outillage de recherche, et prend
+          toute la largeur là où le pouce le cherche. */}
+      <div className="print:hidden">
         <Button
           type="button"
+          className="w-full sm:w-auto"
           onClick={() => {
             setAjoutOuvert(true);
           }}
@@ -187,117 +196,131 @@ export function RegistreView() {
         aria-label="Rechercher dans le registre"
         className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4 shadow-elev-sm print:hidden"
       >
-        <div className="flex flex-wrap items-end gap-3">
-          <SearchField
-            value={searchDraft}
-            onChange={setSearchDraft}
-            placeholder="Nom ou n° de registre…"
-          />
-
-          <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Période">
-            <Button
-              type="button"
-              variant={jourSeul ? 'default' : 'outline'}
-              aria-pressed={jourSeul}
-              onClick={() => {
-                setFilters({ toutePeriode: false, dateFrom: null, dateTo: null });
-              }}
-            >
-              Aujourd’hui
-            </Button>
-            <Button
-              type="button"
-              variant={filters.toutePeriode ? 'default' : 'outline'}
-              aria-pressed={filters.toutePeriode}
-              onClick={() => {
-                setFilters({ toutePeriode: true, dateFrom: null, dateTo: null });
-              }}
-            >
-              Tout le registre
-            </Button>
-          </div>
-
-          <DatePicker
-            id={duId}
-            label="Du"
-            value={filters.dateFrom}
-            max={filters.dateTo}
-            onChange={(value) => {
-              setFilters({ dateFrom: value });
+        {/* Les deux bascules restent VISIBLES : c'est le réglage qu'on change
+            plusieurs fois par jour, pas un critère de recherche. */}
+        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Période">
+          <Button
+            type="button"
+            variant={jourSeul ? 'default' : 'outline'}
+            aria-pressed={jourSeul}
+            onClick={() => {
+              setFilters({ toutePeriode: false, dateFrom: null, dateTo: null });
             }}
-          />
-          <DatePicker
-            id={auId}
-            label="Au"
-            value={filters.dateTo}
-            min={filters.dateFrom}
-            onChange={(value) => {
-              setFilters({ dateTo: value });
+          >
+            Aujourd’hui
+          </Button>
+          <Button
+            type="button"
+            variant={filters.toutePeriode ? 'default' : 'outline'}
+            aria-pressed={filters.toutePeriode}
+            onClick={() => {
+              setFilters({ toutePeriode: true, dateFrom: null, dateTo: null });
             }}
-          />
+          >
+            Tout le registre
+          </Button>
         </div>
 
-        <AdvancedPanel
-          module="registre"
-          chips={chips}
-          onRemove={removeAdvanced}
-          onClearAll={clearAdvanced}
-          actions={
-            countActiveVisiteFilters(filters) > 0 ? (
-              <Button type="button" variant="outline" onClick={resetFilters}>
-                <RotateCcwIcon aria-hidden="true" />
-                Retirer les filtres
-              </Button>
-            ) : null
-          }
+        <details
+          open={rechercheOuverte}
+          onToggle={(event) => {
+            setRechercheOuverte(event.currentTarget.open);
+          }}
         >
-          <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2">
-            <FilterCombobox
-              label={VISITE_COLONNES.entreprise}
-              placeholder="Toutes"
-              options={options(referentiels.data?.entreprises)}
-              value={filters.entrepriseId}
-              onChange={(value) => {
-                setFilters({ entrepriseId: value });
-              }}
-            />
-            <FilterCombobox
-              label={VISITE_COLONNES.direction}
-              placeholder="Toutes"
-              options={options(referentiels.data?.directions)}
-              value={filters.directionId}
-              onChange={(value) => {
-                setFilters({ directionId: value });
-              }}
-            />
-            <FilterCombobox
-              label={VISITE_COLONNES.destinataire}
-              placeholder="Tous"
-              options={options(referentiels.data?.destinataires)}
-              value={filters.destinataireId}
-              onChange={(value) => {
-                setFilters({ destinataireId: value });
-              }}
-            />
-            <FilterCombobox
-              label={VISITE_COLONNES.objet}
-              placeholder="Tous"
-              options={options(referentiels.data?.objets)}
-              value={filters.objetId}
-              onChange={(value) => {
-                setFilters({ objetId: value });
-              }}
-            />
+          <summary className="flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-md text-[0.875rem] font-[600] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+            <SearchIcon className="size-4 shrink-0" aria-hidden="true" />
+            Rechercher
+          </summary>
+
+          <div className="flex flex-col gap-4 pt-3">
+            <div className="flex flex-wrap items-end gap-3">
+              <SearchField
+                value={searchDraft}
+                onChange={setSearchDraft}
+                placeholder="Nom ou n° de registre…"
+              />
+
+              <DatePicker
+                id={duId}
+                label="Du"
+                value={filters.dateFrom}
+                max={filters.dateTo}
+                onChange={(value) => {
+                  setFilters({ dateFrom: value });
+                }}
+              />
+              <DatePicker
+                id={auId}
+                label="Au"
+                value={filters.dateTo}
+                min={filters.dateFrom}
+                onChange={(value) => {
+                  setFilters({ dateTo: value });
+                }}
+              />
+            </div>
+
+            <AdvancedPanel
+              module="registre"
+              chips={chips}
+              onRemove={removeAdvanced}
+              onClearAll={clearAdvanced}
+              actions={
+                countActiveVisiteFilters(filters) > 0 ? (
+                  <Button type="button" variant="outline" onClick={resetFilters}>
+                    <RotateCcwIcon aria-hidden="true" />
+                    Retirer les filtres
+                  </Button>
+                ) : null
+              }
+            >
+              <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2">
+                <FilterCombobox
+                  label={VISITE_COLONNES.entreprise}
+                  placeholder="Toutes"
+                  options={options(referentiels.data?.entreprises)}
+                  value={filters.entrepriseId}
+                  onChange={(value) => {
+                    setFilters({ entrepriseId: value });
+                  }}
+                />
+                <FilterCombobox
+                  label={VISITE_COLONNES.direction}
+                  placeholder="Toutes"
+                  options={options(referentiels.data?.directions)}
+                  value={filters.directionId}
+                  onChange={(value) => {
+                    setFilters({ directionId: value });
+                  }}
+                />
+                <FilterCombobox
+                  label={VISITE_COLONNES.destinataire}
+                  placeholder="Tous"
+                  options={options(referentiels.data?.destinataires)}
+                  value={filters.destinataireId}
+                  onChange={(value) => {
+                    setFilters({ destinataireId: value });
+                  }}
+                />
+                <FilterCombobox
+                  label={VISITE_COLONNES.objet}
+                  placeholder="Tous"
+                  options={options(referentiels.data?.objets)}
+                  value={filters.objetId}
+                  onChange={(value) => {
+                    setFilters({ objetId: value });
+                  }}
+                />
+              </div>
+            </AdvancedPanel>
           </div>
-        </AdvancedPanel>
+        </details>
       </section>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">
-          {jourSeul ? 'Visites du jour' : 'Registre des visites'}
-          <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[0.875rem] font-[600] text-muted-foreground">
-            {formatNumber(total)}
-          </span>
+          {formatNumber(total)} visite{total > 1 ? 's' : ''}{' '}
+          {jourSeul ? 'aujourd’hui' : 'au registre'}
         </h2>
         <Button
           type="button"
@@ -323,113 +346,122 @@ export function RegistreView() {
         </p>
       ) : null}
 
-      {registre.isPending ? (
-        <Skeleton className="h-64 w-full" />
-      ) : registre.isError ? (
-        <QueryErrorState
-          error={registre.error}
-          onRetry={() => {
-            void registre.refetch();
-          }}
-          fallback="Le registre n’a pas pu être chargé."
-        />
-      ) : visites.length === 0 ? (
-        <EmptyState
-          icon={ClipboardListIcon}
-          title={
-            jourSeul
-              ? 'Aucune visite enregistrée aujourd’hui'
-              : 'Aucune visite pour cette recherche'
-          }
-          description={
-            jourSeul
-              ? 'Enregistrez la première ou consultez les visites précédentes.'
-              : 'Élargissez la période ou retirez un filtre.'
-          }
-          action={
-            jourSeul ? (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setFilters({ toutePeriode: true, dateFrom: null, dateTo: null });
+      {(() => {
+        if (registre.isPending) return <Skeleton className="h-64 w-full" />;
+        return (() => {
+          if (registre.isError)
+            return (
+              <QueryErrorState
+                error={registre.error}
+                onRetry={() => {
+                  void registre.refetch();
                 }}
-              >
-                Voir tout le registre
-              </Button>
-            ) : undefined
-          }
-        />
-      ) : (
-        <div className="rounded-lg border border-border bg-card shadow-elev-sm print:text-[10px]">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead
-                  className={
-                    impressionColonneVisible('N° REGISTRE', colonnesImprimees)
-                      ? undefined
-                      : 'print:hidden'
+                fallback="Le registre n’a pas pu être chargé."
+              />
+            );
+          return (() => {
+            if (visites.length === 0)
+              return (
+                <EmptyState
+                  icon={ClipboardListIcon}
+                  title={
+                    jourSeul
+                      ? 'Aucune visite enregistrée aujourd’hui'
+                      : 'Aucune visite pour cette recherche'
                   }
-                >
-                  N° REGISTRE
-                </TableHead>
-                {COLONNES.map((colonne) => {
-                  const sortField = SORT_FIELD_OF[colonne];
-                  const printClassName = impressionColonneVisible(colonne, colonnesImprimees)
-                    ? undefined
-                    : 'print:hidden';
-                  return sortField === undefined ? (
-                    <TableHead key={colonne} className={printClassName}>
-                      {colonne}
-                    </TableHead>
-                  ) : (
-                    <SortableTableHead
-                      key={colonne}
-                      column={{ id: sortField, label: colonne }}
-                      sortBy={filters.sortBy}
-                      sortDir={filters.sortDir}
-                      onToggle={toggleSort}
-                      className={printClassName}
-                    />
-                  );
-                })}
-                <TableHead className="print:hidden">CORRIGER</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {visites.map((visite) =>
-                visite.id === corrigeeId ? (
-                  <TableRow key={visite.id}>
-                    <TableCell colSpan={COLONNES.length + 2} className="bg-secondary/40 p-4">
-                      <VisiteForm
-                        referentiels={referentiels.data}
-                        visite={visite}
-                        onSaved={() => {
-                          setCorrigeeId(null);
-                          rafraichir();
+                  description={
+                    jourSeul
+                      ? 'Enregistrez la première ou consultez les visites précédentes.'
+                      : 'Élargissez la période ou retirez un filtre.'
+                  }
+                  action={
+                    jourSeul ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setFilters({ toutePeriode: true, dateFrom: null, dateTo: null });
                         }}
-                        onCancel={() => {
-                          setCorrigeeId(null);
-                        }}
-                      />
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  <LigneVisite
-                    key={visite.id}
-                    visite={visite}
-                    colonnesImprimees={colonnesImprimees}
-                    onCorriger={() => {
-                      setCorrigeeId(visite.id);
-                    }}
-                  />
-                ),
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+                      >
+                        Voir tout le registre
+                      </Button>
+                    ) : undefined
+                  }
+                />
+              );
+            return (
+              <div className="rounded-lg border border-border bg-card shadow-elev-sm print:text-[10px]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead
+                        className={
+                          impressionColonneVisible('N° REGISTRE', colonnesImprimees)
+                            ? undefined
+                            : 'print:hidden'
+                        }
+                      >
+                        N° REGISTRE
+                      </TableHead>
+                      {COLONNES.map((colonne) => {
+                        const sortField = SORT_FIELD_OF[colonne];
+                        const printClassName = impressionColonneVisible(colonne, colonnesImprimees)
+                          ? undefined
+                          : 'print:hidden';
+                        return sortField === undefined ? (
+                          <TableHead key={colonne} className={printClassName}>
+                            {colonne}
+                          </TableHead>
+                        ) : (
+                          <SortableTableHead
+                            key={colonne}
+                            column={{ id: sortField, label: colonne }}
+                            sortBy={filters.sortBy}
+                            sortDir={filters.sortDir}
+                            onToggle={toggleSort}
+                            className={printClassName}
+                          />
+                        );
+                      })}
+                      <TableHead className="print:hidden">CORRIGER</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {visites.map((visite) =>
+                      visite.id === corrigeeId ? (
+                        <TableRow key={visite.id}>
+                          <TableCell colSpan={COLONNES.length + 2} className="bg-secondary/40 p-4">
+                            <VisiteForm
+                              referentiels={referentiels.data}
+                              visite={visite}
+                              onSaved={() => {
+                                setCorrigeeId(null);
+                                rafraichir();
+                              }}
+                              onCancel={() => {
+                                setCorrigeeId(null);
+                              }}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        <LigneVisite
+                          key={visite.id}
+                          visite={visite}
+                          colonnesImprimees={colonnesImprimees}
+                          onCorriger={() => {
+                            setCorrigeeId(visite.id);
+                          }}
+                        />
+                      ),
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            );
+          })();
+        })();
+      })()}
 
       {pageCount > 1 ? (
         <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">

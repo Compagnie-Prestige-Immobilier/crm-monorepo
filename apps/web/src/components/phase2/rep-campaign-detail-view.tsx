@@ -26,6 +26,8 @@ import {
   fetchRepCampaign,
   repProgrammePdfFileName,
   repProgrammePdfUrl,
+  repProgrammesZipFileName,
+  repProgrammesZipUrl,
   type RepCampaignCommercial,
 } from '@/lib/data/rep-campaigns';
 import { formatDateTime, formatNumber, formatPhone } from '@/lib/format';
@@ -46,6 +48,7 @@ export function RepCampaignDetailView({
 }) {
   const queryClient = useQueryClient();
   const [closing, setClosing] = useState(false);
+  const programmesDownload = useFileDownload();
 
   const { data, isPending, isError, error, refetch } = useQuery({
     queryKey: queryKeys.repCampaign(campaignId),
@@ -158,10 +161,36 @@ export function RepCampaignDetailView({
       </Card>
 
       <section className="flex flex-col gap-3">
-        <h2 className="flex items-center gap-2 font-display text-[1.0625rem] font-[700] tracking-[-0.02em]">
-          <UsersIcon className="size-4" aria-hidden="true" />
-          Répartition par téléconseiller
-        </h2>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="flex items-center gap-2 font-display text-[1.0625rem] font-[700] tracking-[-0.02em]">
+              <UsersIcon className="size-4" aria-hidden="true" />
+              Répartition par téléconseiller
+            </h2>
+            <p className="mt-1 text-[0.75rem] text-muted-foreground">
+              Imprimez en recto verso, retournement bord long.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={programmesDownload.pending || data.progress.total === 0}
+            onClick={() => {
+              void programmesDownload.download({
+                url: repProgrammesZipUrl(data.id),
+                fileName: repProgrammesZipFileName(data.name),
+                failureMessage: 'Les programmes n’ont pas pu être générés.',
+              });
+            }}
+          >
+            {programmesDownload.pending ? (
+              <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <DownloadIcon aria-hidden="true" />
+            )}
+            Télécharger tous les programmes
+          </Button>
+        </div>
         <ul className="grid gap-3 lg:grid-cols-2">
           {data.commerciaux.map((commercial) => (
             <li key={commercial.userId}>

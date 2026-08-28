@@ -94,6 +94,29 @@ class Phase2DirectoryPage {
   final DateTime serverTime;
 }
 
+/// Les cinq référentiels de saisie, ENTIERS, actifs ou non.
+///
+/// Le flux keyset ne sait dire que ce qui a CHANGÉ. Une ligne SUPPRIMÉE du
+/// serveur — base remontée, référentiel réimporté — n'y apparaît jamais : le
+/// téléphone garderait l'ancienne génération à côté de la nouvelle et
+/// proposerait les deux. La liste entière est le seul moyen de savoir ce qui
+/// existe encore.
+class ReferentielsSnapshot {
+  const ReferentielsSnapshot({
+    required this.departements,
+    required this.iefs,
+    required this.banques,
+    required this.syndicats,
+    required this.canauxProvenance,
+  });
+
+  final List<DepartementDto> departements;
+  final List<IefDto> iefs;
+  final List<BanqueDto> banques;
+  final List<SyndicatDto> syndicats;
+  final List<CanalProvenanceDto> canauxProvenance;
+}
+
 class RepresentantLookup {
   const RepresentantLookup({
     required this.found,
@@ -185,6 +208,10 @@ abstract interface class ApiPort {
     required List<SyncOperationDto> operations,
   });
 
+  Future<RepCallAttemptResultDto> recordRepCallAttempt(
+    CreateRepCallAttemptDto attempt,
+  );
+
   Future<void> uploadCallRecording({
     required String attemptId,
     required String path,
@@ -198,5 +225,34 @@ abstract interface class ApiPort {
     required int payloadVersion,
   });
 
+  /// Les cinq référentiels de saisie, ENTIERS. Voir [ReferentielsSnapshot].
+  Future<ReferentielsSnapshot> pullReferentiels();
+
   Future<RepresentantLookup> lookupRepresentantByPhone(String phone);
+
+  /// Les quatre listes de l'accueil, ENTIÈRES.
+  ///
+  /// Le flux de synchronisation ne sait dire que ce qui a CHANGÉ : quand une
+  /// entrée disparaît du serveur — base remontée, entrée retirée du classeur —
+  /// rien ne l'annonce, et le téléphone la proposerait pour toujours. Cette
+  /// lecture complète est le seul moyen de savoir ce qui existe encore.
+  Future<VisiteReferentielsBundleDto> pullVisiteReferentiels();
+
+  /// Corrige une visite DÉJÀ partie : `PATCH /v1/visites/:id`, hors file.
+  ///
+  /// Les huit champs sont toujours envoyés, un `null` valant « efface »
+  /// (`visites.service.ts`, `update`) : la file, elle, ne sait pas modifier
+  /// une création, et une visite qui porte déjà une référence serveur n'a plus
+  /// d'opération à reprendre. La date et la référence ne se corrigent pas
+  /// d'ici.
+  Future<void> updateVisite({
+    required String id,
+    required String visitorName,
+    required String entrepriseId,
+    required String objetId,
+    String? phone,
+    String? directionId,
+    String? destinataireId,
+    String? comment,
+  });
 }

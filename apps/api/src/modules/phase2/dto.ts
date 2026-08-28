@@ -4,6 +4,8 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   ArrayUnique,
+  IsBoolean,
+  IsEmail,
   IsEnum,
   IsISO8601,
   IsInt,
@@ -25,7 +27,11 @@ import {
   Projet,
 } from '@crm/database';
 
-import { COMMENT_MAX_LENGTH } from './attempt-rules.js';
+import {
+  COMMENT_MAX_LENGTH,
+  DUREE_ETABLISSEMENT_MAX_MOIS,
+  EMAIL_MAX_LENGTH,
+} from './attempt-rules.js';
 import { MAX_SPREAD_DAYS, MIN_SPREAD_DAYS } from './distribution.js';
 import { PageMetaDto } from '../../common/dto/prospect-filter.dto.js';
 
@@ -145,6 +151,19 @@ export class CampaignAttemptDto {
   method!: EnrollmentMethod | null;
 
   @ApiProperty({ type: String, nullable: true }) comment!: string | null;
+
+  @ApiProperty({ type: String, nullable: true }) email!: string | null;
+  @ApiProperty({ type: Boolean, nullable: true }) fonctionnaire!: boolean | null;
+  @ApiProperty({ type: Boolean, nullable: true }) engagementEnCours!: boolean | null;
+  @ApiProperty({ type: Number, nullable: true }) dureeEtablissementMois!: number | null;
+
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description: 'Non nulle si et seulement si method vaut APPOINTMENT.',
+  })
+  rendezVousAt!: string | null;
 
   @ApiProperty({ format: 'uuid', description: 'Commercial qui a RÉELLEMENT passé l’appel.' })
   performedById!: string;
@@ -410,7 +429,9 @@ export class CallAttemptOpDto {
   @ApiPropertyOptional({
     type: String,
     maxLength: COMMENT_MAX_LENGTH,
-    description: 'Obligatoire et non vide si outcome vaut OTHER.',
+    description:
+      'Le commentaire de l’appel. C’est AUSSI le « commentaire » du formulaire de conversion : ' +
+      'il n’y a qu’un champ libre par tentative. Obligatoire et non vide si outcome vaut OTHER.',
   })
   @IsOptional()
   @IsString()
@@ -436,6 +457,102 @@ export class CallAttemptOpDto {
   @IsOptional()
   @IsISO8601()
   callbackAt?: string;
+
+  // ── Renseignements de conversion (phase 3) ────────────────────────────────
+  //
+  // DEUX destinations, et une seule vérité par champ.
+  //
+  //  · `email`, `fonctionnaire`, `engagementEnCours`, `dureeEtablissementMois`
+  //    et `rendezVousAt` sont écrits SUR LA TENTATIVE : ce sont des faits datés
+  //    de l'appel, que la fiche ne porte pas.
+  //  · `nom`, `prenom`, `profession`, `banqueId` et `syndicatId` sont écrits SUR
+  //    LE PROSPECT, qui en reste la seule vérité. Absents, ils laissent la
+  //    valeur en place ; ils ne l'effacent jamais.
+  //
+  // `phoneE164` n'est PAS modifiable ici : c'est la clé de l'annuaire hors
+  // ligne, sous index unique partiel. Une correction de numéro passe par la
+  // mise à jour du prospect.
+
+  @ApiPropertyOptional({
+    type: String,
+    maxLength: EMAIL_MAX_LENGTH,
+    description: 'Adresse électronique recueillie pendant l’appel. Écrite sur la tentative.',
+  })
+  @IsOptional()
+  @IsEmail()
+  @MaxLength(EMAIL_MAX_LENGTH)
+  email?: string;
+
+  @ApiPropertyOptional({
+    type: Boolean,
+    description: 'Le prospect est-il fonctionnaire. Absent : la question n’a pas été posée.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  fonctionnaire?: boolean;
+
+  @ApiPropertyOptional({
+    type: Boolean,
+    description: 'Un engagement bancaire est-il en cours. Absent : question non posée.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  engagementEnCours?: boolean;
+
+  @ApiPropertyOptional({
+    type: Number,
+    minimum: 0,
+    maximum: DUREE_ETABLISSEMENT_MAX_MOIS,
+    description:
+      'Ancienneté dans l’établissement, en MOIS. Distincte de `dureeSystemeMois` du prospect, ' +
+      'qui est la durée du système de paiement.',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(DUREE_ETABLISSEMENT_MAX_MOIS)
+  dureeEtablissementMois?: number;
+
+  @ApiPropertyOptional({
+    type: String,
+    format: 'date-time',
+    description:
+      'Date du rendez-vous pris. Obligatoire si et seulement si method vaut APPOINTMENT, et ' +
+      'postérieure à clientCreatedAt. Refusée sur toute autre méthode.',
+  })
+  @IsOptional()
+  @IsISO8601()
+  rendezVousAt?: string;
+
+  @ApiPropertyOptional({ maxLength: 120, description: 'Corrige le nom DU PROSPECT.' })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  nom?: string;
+
+  @ApiPropertyOptional({ maxLength: 120, description: 'Corrige le prénom DU PROSPECT.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  prenom?: string;
+
+  @ApiPropertyOptional({ maxLength: 120, description: 'Corrige la profession DU PROSPECT.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  profession?: string;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Corrige la banque DU PROSPECT.' })
+  @IsOptional()
+  @IsUUID()
+  banqueId?: string;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Corrige le syndicat DU PROSPECT.' })
+  @IsOptional()
+  @IsUUID()
+  syndicatId?: string;
 }
 
 export class ProspectPhase2StateDto {

@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/providers/app_providers.dart';
-import '../../core/router/route_paths.dart';
+import '../../features/shell/app_shell.dart';
 import 'appbar_badge.dart';
 
 class SyncBadge extends ConsumerWidget {
@@ -31,7 +31,7 @@ class SyncBadge extends ConsumerWidget {
           : '$count élément${count > 1 ? 's' : ''} en attente de synchronisation',
       count: count,
       emphasis: !clean,
-      onTap: () => context.go(Routes.corrections),
+      onTap: () => context.go(correctionsDeLaCoque(context)),
     );
   }
 }

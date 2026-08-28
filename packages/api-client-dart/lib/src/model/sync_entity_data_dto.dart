@@ -84,6 +84,16 @@ class SyncEntityDataDto {
 
     this.callbackAt,
 
+    this.email,
+
+    this.fonctionnaire,
+
+    this.engagementEnCours,
+
+    this.dureeEtablissementMois,
+
+    this.rendezVousAt,
+
     this.visitorName,
 
     this.visitDate,
@@ -250,6 +260,32 @@ class SyncEntityDataDto {
   @JsonKey(name: r'callbackAt', required: false, includeIfNull: false)
   final DateTime? callbackAt;
 
+  /// Tentative d’appel : adresse électronique recueillie pendant l’appel.
+  @JsonKey(name: r'email', required: false, includeIfNull: false)
+  final String? email;
+
+  /// Tentative d’appel : le prospect est-il fonctionnaire.
+  @JsonKey(name: r'fonctionnaire', required: false, includeIfNull: false)
+  final bool? fonctionnaire;
+
+  /// Tentative d’appel : un engagement bancaire est-il en cours.
+  @JsonKey(name: r'engagementEnCours', required: false, includeIfNull: false)
+  final bool? engagementEnCours;
+
+  /// Tentative d’appel : ancienneté dans l’établissement, en MOIS. Distincte de `dureeSystemeMois`, qui est la durée du système de paiement du prospect.
+  // minimum: 0
+  // maximum: 600
+  @JsonKey(
+    name: r'dureeEtablissementMois',
+    required: false,
+    includeIfNull: false,
+  )
+  final num? dureeEtablissementMois;
+
+  /// Tentative d’appel : date du rendez-vous pris. Obligatoire si et seulement si method vaut APPOINTMENT.
+  @JsonKey(name: r'rendezVousAt', required: false, includeIfNull: false)
+  final DateTime? rendezVousAt;
+
   /// Visite : nom et prénom du visiteur.
   @JsonKey(name: r'visitorName', required: false, includeIfNull: false)
   final String? visitorName;
@@ -313,6 +349,11 @@ class SyncEntityDataDto {
                 method,
                 comment,
                 callbackAt,
+                email,
+                fonctionnaire,
+                engagementEnCours,
+                dureeEtablissementMois,
+                rendezVousAt,
                 visitorName,
                 visitDate,
                 visitTime,
@@ -351,6 +392,11 @@ class SyncEntityDataDto {
                 other.method,
                 other.comment,
                 other.callbackAt,
+                other.email,
+                other.fonctionnaire,
+                other.engagementEnCours,
+                other.dureeEtablissementMois,
+                other.rendezVousAt,
                 other.visitorName,
                 other.visitDate,
                 other.visitTime,
@@ -395,6 +441,11 @@ class SyncEntityDataDto {
         method,
         comment,
         callbackAt,
+        email,
+        fonctionnaire,
+        engagementEnCours,
+        dureeEtablissementMois,
+        rendezVousAt,
         visitorName,
         visitDate,
         visitTime,

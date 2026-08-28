@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:forui/forui.dart';
 
 import 'core/providers/app_providers.dart';
 import 'features/notifications/notifications_controller.dart';
 import 'features/notifications/push_deep_link_listener.dart';
+import 'features/notifications/rep_callback_due_listener.dart';
 import 'core/router/app_router.dart';
 import 'core/settings/display_settings.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/cpi_tokens.dart';
+import 'core/theme/forui_theme.dart';
 import 'features/auth/auth_state.dart';
 import 'core/updates/app_update_controller.dart';
 import 'core/onboarding/onboarding_controller.dart';
@@ -20,13 +24,24 @@ class CpiGoApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final DisplaySettings settings = ref.watch(displaySettingsProvider);
+    final ThemeMode themeMode = settings.themeMode;
+    // Les transitions de page vivent dans le `ThemeData` : leur durée est lue
+    // à la construction de la route, pas à chaque image. C'est ici, au-dessus
+    // du `MaterialApp`, qu'il faut choisir la variante figée.
+    final bool still =
+        settings.reduceMotion ||
+        (MediaQuery.maybeDisableAnimationsOf(context) ?? false);
+    final ThemeData clair = still ? AppTheme.lightStill : AppTheme.light;
+    final ThemeData sombre = still ? AppTheme.darkStill : AppTheme.dark;
     final AppUpdateState update = ref.watch(appUpdateControllerProvider);
     if (update.status == AppUpdateStatus.checking) {
       return MaterialApp(
         title: 'CPI GO',
         debugShowCheckedModeBanner: false,
-        theme: AppTheme.light,
-        themeMode: ThemeMode.light,
+        theme: clair,
+        darkTheme: sombre,
+        themeMode: themeMode,
         locale: const Locale('fr', 'SN'),
         supportedLocales: _supportedLocales,
         localizationsDelegates: _localizationsDelegates,
@@ -37,8 +52,9 @@ class CpiGoApp extends ConsumerWidget {
       return MaterialApp(
         title: 'CPI GO',
         debugShowCheckedModeBanner: false,
-        theme: AppTheme.light,
-        themeMode: ThemeMode.light,
+        theme: clair,
+        darkTheme: sombre,
+        themeMode: themeMode,
         locale: const Locale('fr', 'SN'),
         supportedLocales: _supportedLocales,
         localizationsDelegates: _localizationsDelegates,
@@ -49,8 +65,9 @@ class CpiGoApp extends ConsumerWidget {
       return MaterialApp(
         title: 'CPI GO',
         debugShowCheckedModeBanner: false,
-        theme: AppTheme.light,
-        themeMode: ThemeMode.light,
+        theme: clair,
+        darkTheme: sombre,
+        themeMode: themeMode,
         locale: const Locale('fr', 'SN'),
         supportedLocales: _supportedLocales,
         localizationsDelegates: _localizationsDelegates,
@@ -63,8 +80,9 @@ class CpiGoApp extends ConsumerWidget {
       return MaterialApp(
         title: 'CPI GO',
         debugShowCheckedModeBanner: false,
-        theme: AppTheme.light,
-        themeMode: ThemeMode.light,
+        theme: clair,
+        darkTheme: sombre,
+        themeMode: themeMode,
         locale: const Locale('fr', 'SN'),
         supportedLocales: _supportedLocales,
         localizationsDelegates: _localizationsDelegates,
@@ -80,14 +98,15 @@ class CpiGoApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'CPI GO',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
-      themeMode: ThemeMode.light,
+      theme: clair,
+      darkTheme: sombre,
+      themeMode: themeMode,
       locale: const Locale('fr', 'SN'),
       supportedLocales: _supportedLocales,
       localizationsDelegates: _localizationsDelegates,
       routerConfig: ref.watch(routerProvider),
       builder: (BuildContext context, Widget? child) {
-        final DisplaySettings display = ref.watch(displaySettingsProvider);
+        final DisplaySettings display = settings;
         final MediaQueryData media = MediaQuery.of(context);
         return MediaQuery(
           data: media.copyWith(
@@ -99,7 +118,22 @@ class CpiGoApp extends ConsumerWidget {
             ),
             disableAnimations: media.disableAnimations || display.reduceMotion,
           ),
-          child: PushDeepLinkListener(child: child ?? const SizedBox.shrink()),
+          // `FTheme`/`FToaster` racine : tout contexte, y compris celui d'un
+          // `State` d'écran, trouve le thème ForUI et un toaster. `ProjectScope`
+          // re-pose le thème par projet en dessous.
+          child: FTheme(
+            data: cpiForuiTheme(
+              Theme.of(context),
+              reduceMotion: media.disableAnimations || display.reduceMotion,
+            ),
+            child: FToaster(
+              child: RepCallbackDueListener(
+                child: PushDeepLinkListener(
+                  child: child ?? const SizedBox.shrink(),
+                ),
+              ),
+            ),
+          ),
         );
       },
     );
@@ -113,6 +147,9 @@ const List<Locale> _supportedLocales = <Locale>[
 
 const List<LocalizationsDelegate<dynamic>> _localizationsDelegates =
     <LocalizationsDelegate<dynamic>>[
+      // Sans ce délégué, feuilles, fonds et roues ForUI s'annoncent en anglais
+      // (« Sheet », « Barrier ») dans une application française (WCAG 3.1.2).
+      FLocalizations.delegate,
       GlobalMaterialLocalizations.delegate,
       GlobalWidgetsLocalizations.delegate,
       GlobalCupertinoLocalizations.delegate,
@@ -124,45 +161,83 @@ class _BrandSplash extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    return ColoredBox(
-      color: theme.colorScheme.primary,
-      child: Stack(
-        children: <Widget>[
-          const Center(
-            child: Image(
-              image: AssetImage('assets/brand/cpi-header.png'),
-              width: 180,
-              height: 74,
-              fit: BoxFit.contain,
-              semanticLabel: 'CPI',
-            ),
-          ),
-          Positioned(
-            left: CpiSpacing.xl,
-            right: CpiSpacing.xl,
-            bottom: CpiSpacing.xxl,
-            child: Column(
-              children: <Widget>[
-                Text(
-                  'Chargement\u2026',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onPrimary,
-                  ),
-                  semanticsLabel: 'Chargement en cours',
+    final ColorScheme scheme = theme.colorScheme;
+    // Le d\u00e9marrage est le premier \u00e9cran vu : il montre la m\u00eame surface neutre
+    // que l'application, en clair comme en sombre. La marque n'y tient que le
+    // logo et le fil de progression.
+    final bool dark = theme.brightness == Brightness.dark;
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      // Le fond n'est plus l'aplat de marque : les icônes système suivent
+      // maintenant la surface neutre, sans quoi elles disparaissent en clair.
+      value: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: dark ? Brightness.dark : Brightness.light,
+        systemNavigationBarColor: scheme.surface,
+        systemNavigationBarIconBrightness: dark
+            ? Brightness.light
+            : Brightness.dark,
+      ),
+      child: ColoredBox(
+        color: scheme.surface,
+        child: Stack(
+          children: <Widget>[
+            Center(
+              // Le logo couleur est sur fond blanc opaque : sur la surface
+              // sombre il ferait une plaque. Le fichier d'en-t\u00eate est le m\u00eame
+              // dessin d\u00e9tour\u00e9, en blanc.
+              child: Image(
+                image: AssetImage(
+                  dark
+                      ? 'assets/brand/cpi-header.png'
+                      : 'assets/brand/cpi-logo.png',
                 ),
-                const SizedBox(height: CpiSpacing.xs),
-                Semantics(
-                  label: 'Chargement en cours',
-                  child: LinearProgressIndicator(
-                    minHeight: 3,
-                    backgroundColor: cpiTrackOn(theme.colorScheme.primary),
-                    color: theme.colorScheme.onPrimary,
-                  ),
-                ),
-              ],
+                width: 120,
+                fit: BoxFit.contain,
+                semanticLabel: 'CPI',
+              ),
             ),
-          ),
-        ],
+            Positioned(
+              left: CpiSpacing.xl,
+              right: CpiSpacing.xl,
+              bottom: CpiSpacing.xxl,
+              child: Column(
+                children: <Widget>[
+                  Text(
+                    'Chargement\u2026',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                    semanticsLabel: 'Chargement en cours',
+                  ),
+                  const SizedBox(height: CpiSpacing.xs),
+                  FTheme(
+                    data: cpiForuiTheme(theme),
+                    child: FProgress(
+                      semanticsLabel: 'Chargement en cours',
+                      style: FProgressStyleDelta.delta(
+                        constraints: const BoxConstraints.tightFor(height: 3),
+                        trackDecoration: DecorationDelta.value(
+                          BoxDecoration(
+                            color: scheme.surfaceContainerHigh,
+                            borderRadius: CpiRadius.brFull,
+                          ),
+                        ),
+                        fillDecoration: DecorationDelta.value(
+                          BoxDecoration(
+                            color: scheme.primary,
+                            borderRadius: CpiRadius.brFull,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

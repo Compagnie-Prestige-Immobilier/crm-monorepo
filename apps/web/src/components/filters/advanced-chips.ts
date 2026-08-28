@@ -21,11 +21,13 @@ export const ADVANCED_FILTER_LABELS: Record<AdvancedFilterKey, string> = {
   banqueId: 'Banque',
   syndicatId: 'Syndicat',
   statut: 'Statut',
-  segment: 'Segment BDD',
-  phase2Status: 'Statut phase 2',
-  enrollmentMethod: 'Méthode d’enrôlement',
+  // Les mêmes mots que sur les champs repliés : la pastille est ce qu'on lit
+  // quand le panneau est fermé, elle ne peut pas nommer autrement.
+  segment: 'Groupe (syndicat × banque)',
+  phase2Status: 'Résultat de l’appel',
+  enrollmentMethod: 'Comment il a adhéré',
   campaignId: 'Campagne d’appels',
-  enrollmentCapturedById: 'Méthode obtenue par',
+  enrollmentCapturedById: 'Adhésion obtenue par',
 };
 
 const UNKNOWN_VALUE = 'Valeur inconnue';

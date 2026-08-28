@@ -378,15 +378,16 @@ function Figure({
   value: number;
   tone?: 'success' | 'destructive' | 'warning';
 }) {
-  const color =
-    tone === 'success'
-      ? 'text-success'
-      : tone === 'destructive'
-        ? 'text-destructive'
-        : tone === 'warning'
-          ? // §2.3 : `--warning` est la seule déclinaison or lisible en texte.
-            'text-warning'
-          : '';
+  const color = (() => {
+    if (tone === 'success') return 'text-success';
+    return (() => {
+      if (tone === 'destructive') return 'text-destructive';
+      return (() => {
+        if (tone === 'warning') return 'text-warning';
+        return '';
+      })();
+    })();
+  })();
 
   return (
     <div className="rounded-md border border-border p-3">

@@ -14,7 +14,20 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 16;
+  int get schemaVersion => 19;
+
+  /// Les colonnes ajoutées à `call_attempts` par la v19. Déclarées ici parce
+  /// que TROIS paliers recopient cette table : chacun engendre sa forme
+  /// COURANTE et irait sinon lire ces colonnes dans une table qui ne les a pas.
+  static List<GeneratedColumn<Object>> _renseignementsV19(
+    CallAttempts attempts,
+  ) => <GeneratedColumn<Object>>[
+    attempts.email,
+    attempts.fonctionnaire,
+    attempts.engagementEnCours,
+    attempts.dureeEtablissementMois,
+    attempts.rendezVousAt,
+  ];
 
   /// L'effet d'une tentative saisie avant la v10, déduit de son issue. Sans
   /// cette dérivation, la recopie de table poserait le défaut `KEEP_OPEN`
@@ -92,6 +105,7 @@ class AppDatabase extends _$AppDatabase {
             newColumns: <GeneratedColumn<Object>>[
               callAttempts.callbackAt,
               callAttempts.reasonCode,
+              ..._renseignementsV19(callAttempts),
             ],
             columnTransformer: <GeneratedColumn<Object>, Expression<Object>>{
               callAttempts.effect: _effectFromOutcome,
@@ -134,7 +148,10 @@ class AppDatabase extends _$AppDatabase {
           await m.alterTable(
             TableMigration(
               callAttempts,
-              newColumns: <GeneratedColumn<Object>>[callAttempts.reasonCode],
+              newColumns: <GeneratedColumn<Object>>[
+                callAttempts.reasonCode,
+                ..._renseignementsV19(callAttempts),
+              ],
               columnTransformer: <GeneratedColumn<Object>, Expression<Object>>{
                 callAttempts.effect: _effectFromOutcome,
                 callAttempts.requiresComment: _commentRequiredFromOutcome,
@@ -194,6 +211,29 @@ class AppDatabase extends _$AppDatabase {
         // Sert le filtre par entreprise sur la période « Tout » de
         // l'historique de l'accueil. Additif : rien à recopier.
         await m.createIndex(visitesEntrepriseDateIdx);
+      }
+      if (from < 17 && to >= 17) {
+        await m.createTable(repCallCampaigns);
+        await m.createTable(repCallTasks);
+        await m.createIndex(repCallTasksCampaignIdx);
+        await m.createIndex(repCallTasksRepresentantIdx);
+      }
+      if (from < 18 && to >= 18) {
+        await m.createTable(repCallbackReminders);
+        await m.createIndex(repCallbackRemindersPendingIdx);
+      }
+      if (from < 19 && to >= 19) {
+        // Recopie et non `addColumn` : le palier ajoute aussi trois CHECK, que
+        // `ALTER TABLE ADD COLUMN` ne sait pas poser. Venue d'avant la v10, la
+        // table a déjà été recréée plus haut dans sa forme courante.
+        if (from >= 10) {
+          await m.alterTable(
+            TableMigration(
+              callAttempts,
+              newColumns: _renseignementsV19(callAttempts),
+            ),
+          );
+        }
       }
     },
     beforeOpen: (OpeningDetails details) async {

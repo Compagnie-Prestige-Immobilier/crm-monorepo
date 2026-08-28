@@ -158,7 +158,7 @@ describe('RepresentantFormDialog, état de la relation', () => {
     await waitFor(() => {
       expect(trigger('Relation').textContent).toContain('Contacté');
     });
-    await choose('Relation', 'Ambassadeur');
+    await choose('Relation', 'A accepté');
     await userEvent.setup().click(screen.getByRole('button', { name: 'Enregistrer' }));
 
     await waitFor(() => {
@@ -177,7 +177,7 @@ describe('RepresentantFormDialog, état de la relation', () => {
     });
     expect(screen.queryByLabelText('Motif du refus')).toBeNull();
 
-    await choose('Relation', 'Ambassadeur');
+    await choose('Relation', 'A accepté');
     expect(screen.queryByLabelText('Motif du refus')).toBeNull();
 
     await choose('Relation', 'Refus');
@@ -351,5 +351,48 @@ describe('RepresentantFormDialog, correction à froid du script', () => {
     });
     expect(screen.queryByRole('combobox', { name: /WhatsApp/u })).toBeNull();
     expect(screen.queryByLabelText('Profession')).toBeNull();
+  });
+});
+
+/**
+ * Ouverte depuis l'écran d'appel, la boîte ne propose que ce que le mobile
+ * corrige : la relation et le canal WhatsApp sont ce que l'appel décide.
+ */
+describe('RepresentantFormDialog, ouverte pendant un appel', () => {
+  it('retire la relation, son motif et le WhatsApp', async () => {
+    renderWithQuery(
+      <RepresentantFormDialog open onOpenChange={vi.fn()} representant={FICHE} pendantAppel />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Nom complet/u)).toBeTruthy();
+    });
+    expect(screen.queryByRole('combobox', { name: /Relation/u })).toBeNull();
+    expect(screen.queryByLabelText('Motif du refus')).toBeNull();
+    expect(screen.queryByRole('combobox', { name: /WhatsApp/u })).toBeNull();
+    expect(screen.queryByLabelText('Numéro WhatsApp')).toBeNull();
+  });
+
+  it('garde le nom, le téléphone, le lieu, la profession et les notes', async () => {
+    renderWithQuery(
+      <RepresentantFormDialog open onOpenChange={vi.fn()} representant={FICHE} pendantAppel />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Nom complet/u)).toBeTruthy();
+    });
+    expect(screen.getByLabelText(/Téléphone/u)).toBeTruthy();
+    expect(trigger('Département')).toBeTruthy();
+    expect(screen.getByLabelText('Profession')).toBeTruthy();
+    expect(screen.getByLabelText('Notes')).toBeTruthy();
+  });
+
+  it('laisse la relation à sa place hors de l’appel', async () => {
+    renderWithQuery(<RepresentantFormDialog open onOpenChange={vi.fn()} representant={FICHE} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Nom complet/u)).toBeTruthy();
+    });
+    expect(trigger('Relation')).toBeTruthy();
   });
 });

@@ -1,3 +1,4 @@
+import 'package:cpi_go/core/feedback/feedback.dart';
 import 'package:cpi_go/core/providers/app_providers.dart';
 import 'package:cpi_go/core/settings/display_settings.dart';
 import 'package:cpi_go/core/theme/cpi_tokens.dart';
@@ -45,6 +46,24 @@ void main() {
       );
     });
 
+    test('les CINQ tailles survivent au redémarrage', () async {
+      // Les noms sont la clé de persistance : en ajouter deux ne doit pas
+      // déplacer les trois déjà enregistrées sur les téléphones du parc.
+      for (final CpiTextScale scale in CpiTextScale.values) {
+        await container()
+            .read(displaySettingsProvider.notifier)
+            .setTextScale(scale);
+        expect(container().read(displaySettingsProvider).textScale, scale);
+      }
+      expect(CpiTextScale.values.map((CpiTextScale s) => s.name), <String>[
+        'tresPetit',
+        'petit',
+        'normal',
+        'large',
+        'extraLarge',
+      ]);
+    });
+
     test('« réduire les animations » survit aussi', () async {
       await container()
           .read(displaySettingsProvider.notifier)
@@ -60,6 +79,93 @@ void main() {
       expect(
         container().read(displaySettingsProvider).textScale,
         CpiTextScale.normal,
+      );
+    });
+  });
+
+  group('vibrations et sons', () {
+    test('les deux sont allumés par défaut', () {
+      final DisplaySettings display = container().read(displaySettingsProvider);
+      expect(display.haptiques, isTrue);
+      expect(display.sons, isTrue);
+    });
+
+    test('les coupures SURVIVENT au redémarrage', () async {
+      final DisplaySettingsController reglages = container().read(
+        displaySettingsProvider.notifier,
+      );
+      await reglages.setHaptiques(value: false);
+      await reglages.setSons(value: false);
+
+      final DisplaySettings apres = container().read(displaySettingsProvider);
+      expect(apres.haptiques, isFalse);
+      expect(apres.sons, isFalse);
+    });
+
+    test('une valeur inconnue en préférences retombe sur allumé', () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'display.haptiques': 'peut-être',
+      });
+      prefs = await SharedPreferences.getInstance();
+      expect(container().read(displaySettingsProvider).haptiques, isTrue);
+    });
+
+    test('couper les vibrations ne touche pas aux animations', () async {
+      // Deux plaintes différentes : « ça bouge trop » et « ça vibre trop ».
+      await container()
+          .read(displaySettingsProvider.notifier)
+          .setHaptiques(value: false);
+      expect(container().read(displaySettingsProvider).reduceMotion, isFalse);
+    });
+
+    test('le réglage est POUSSÉ au service que le kit appelle', () async {
+      // Le kit est Material pur : il lit `CpiFeedbackService.instance`, jamais
+      // ce provider. Sans cette poussée, l'interrupteur ne coupe rien.
+      final CpiFeedbackService reel = CpiFeedbackService.instance;
+      final _ServiceEspion espion = _ServiceEspion();
+      CpiFeedbackService.instance = espion;
+      addTearDown(() => CpiFeedbackService.instance = reel);
+
+      final DisplaySettingsController reglages = container().read(
+        displaySettingsProvider.notifier,
+      );
+      expect(espion.recus.last, (haptiques: true, sons: true));
+
+      await reglages.setSons(value: false);
+      expect(espion.recus.last, (haptiques: true, sons: false));
+
+      await reglages.setHaptiques(value: false);
+      expect(espion.recus.last, (haptiques: false, sons: false));
+    });
+  });
+
+  group('thème', () {
+    test('le défaut est Système', () {
+      expect(
+        container().read(displaySettingsProvider).themeMode,
+        ThemeMode.system,
+      );
+    });
+
+    test('le choix SURVIT au redémarrage', () async {
+      await container()
+          .read(displaySettingsProvider.notifier)
+          .setThemeMode(ThemeMode.dark);
+
+      expect(
+        container().read(displaySettingsProvider).themeMode,
+        ThemeMode.dark,
+      );
+    });
+
+    test('une valeur inconnue en préférences retombe sur Système', () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'display.themeMode': 'inconnu',
+      });
+      prefs = await SharedPreferences.getInstance();
+      expect(
+        container().read(displaySettingsProvider).themeMode,
+        ThemeMode.system,
       );
     });
   });
@@ -85,7 +191,7 @@ void main() {
       expect(f, closeTo(kCpiMaxSystemTextScale, 0.001));
     });
 
-    test('le total ne descend jamais sous 1,0 ni au-dessus du plafond', () {
+    test('la part système reste entre 1,0 et le plafond', () {
       expect(
         resolveTextScaleFactor(
           system: const TextScaler.linear(0.5),
@@ -100,6 +206,44 @@ void main() {
         ),
         lessThanOrEqualTo(kCpiMaxTextScale),
       );
+    });
+
+    test('« Très petit » rétrécit vraiment, et pas plus bas que 0,85', () {
+      // Le plancher du total est le plus petit choix de l'app : un Android
+      // réglé plus petit que 1,0 ne rétrécit rien de plus.
+      expect(
+        resolveTextScaleFactor(
+          system: TextScaler.noScaling,
+          choice: CpiTextScale.tresPetit,
+        ),
+        closeTo(0.85, 0.001),
+      );
+      expect(
+        resolveTextScaleFactor(
+          system: const TextScaler.linear(0.5),
+          choice: CpiTextScale.tresPetit,
+        ),
+        closeTo(0.85, 0.001),
+      );
+      expect(
+        resolveTextScaleFactor(
+          system: TextScaler.noScaling,
+          choice: CpiTextScale.petit,
+        ),
+        closeTo(0.92, 0.001),
+      );
+    });
+
+    test('le corps reste lisible au plus petit réglage', () {
+      // WCAG 1.4.4 : rétrécir est un choix, l'illisibilité n'en est pas un.
+      // 18 × 0,85 = 15,3, au-dessus du plancher Material 3 de 14.
+      final double corps =
+          CpiTypography.minBodySize *
+          resolveTextScaleFactor(
+            system: TextScaler.noScaling,
+            choice: CpiTextScale.tresPetit,
+          );
+      expect(corps, greaterThanOrEqualTo(15));
     });
 
     test(
@@ -200,4 +344,15 @@ void main() {
       expect(observed.screen, const Duration(milliseconds: 300));
     });
   });
+}
+
+class _ServiceEspion extends CpiFeedbackService {
+  final List<({bool haptiques, bool sons})> recus =
+      <({bool haptiques, bool sons})>[];
+
+  @override
+  void appliquerReglages({required bool haptiques, required bool sons}) {
+    recus.add((haptiques: haptiques, sons: sons));
+    super.appliquerReglages(haptiques: haptiques, sons: sons);
+  }
 }

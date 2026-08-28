@@ -145,7 +145,7 @@ describe('DashboardVisitesView', () => {
     setup();
     await screen.findByText('Par entreprise');
 
-    await user.click(screen.getByRole('button', { name: 'Organiser' }));
+    await user.click(screen.getByRole('button', { name: 'Organiser les graphiques' }));
 
     expect(await screen.findByRole('button', { name: 'Enregistrer' })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Monter Par entreprise/u })).toBeTruthy();
@@ -156,7 +156,7 @@ describe('DashboardVisitesView', () => {
     const user = userEvent.setup();
     setup();
     await screen.findByText('Par entreprise');
-    await user.click(screen.getByRole('button', { name: 'Organiser' }));
+    await user.click(screen.getByRole('button', { name: 'Organiser les graphiques' }));
 
     await user.click(await screen.findByRole('button', { name: /Monter Par entreprise/u }));
 
@@ -169,7 +169,7 @@ describe('DashboardVisitesView', () => {
     const user = userEvent.setup();
     setup();
     await screen.findByText('Par entreprise');
-    await user.click(screen.getByRole('button', { name: 'Organiser' }));
+    await user.click(screen.getByRole('button', { name: 'Organiser les graphiques' }));
 
     await user.click(await screen.findByRole('button', { name: /Retirer Total des visites/u }));
 
@@ -182,14 +182,14 @@ describe('DashboardVisitesView', () => {
     const user = userEvent.setup();
     setup();
     await screen.findByText('Par entreprise');
-    await user.click(screen.getByRole('button', { name: 'Organiser' }));
+    await user.click(screen.getByRole('button', { name: 'Organiser les graphiques' }));
     await user.click(await screen.findByRole('button', { name: /Retirer Total des visites/u }));
     await waitFor(() => {
       expect(screen.queryByText('Total des visites')).toBeNull();
     });
 
-    await user.click(screen.getByRole('button', { name: 'Annuler' }));
-    await user.click(await screen.findByRole('button', { name: 'Annuler les changements' }));
+    await user.click(screen.getByRole('button', { name: 'Quitter' }));
+    await user.click(await screen.findByRole('button', { name: 'Quitter sans enregistrer' }));
 
     await waitFor(() => {
       expect(cardTitles()).toContain('Total des visites');
@@ -200,7 +200,7 @@ describe('DashboardVisitesView', () => {
     const user = userEvent.setup();
     setup();
     await screen.findByText('Par entreprise');
-    await user.click(screen.getByRole('button', { name: 'Organiser' }));
+    await user.click(screen.getByRole('button', { name: 'Organiser les graphiques' }));
 
     await user.click(await screen.findByRole('button', { name: 'Ajouter un graphique' }));
 
@@ -214,7 +214,7 @@ describe('DashboardVisitesView', () => {
     const user = userEvent.setup();
     setup();
     await screen.findByText('Par entreprise');
-    await user.click(screen.getByRole('button', { name: 'Organiser' }));
+    await user.click(screen.getByRole('button', { name: 'Organiser les graphiques' }));
     await user.click(await screen.findByRole('button', { name: 'Enregistrer' }));
 
     await waitFor(() => {
@@ -233,7 +233,7 @@ describe('DashboardVisitesView', () => {
     const user = userEvent.setup();
     setup();
     await screen.findByTestId('marque-tuile');
-    await user.click(screen.getByRole('button', { name: 'Organiser' }));
+    await user.click(screen.getByRole('button', { name: 'Organiser les graphiques' }));
 
     await user.click(
       await screen.findByRole('button', { name: 'Changer la présentation de Total des visites' }),
@@ -248,7 +248,7 @@ describe('DashboardVisitesView', () => {
     const user = userEvent.setup();
     setup();
     await screen.findByTestId('marque-barres-horizontales');
-    await user.click(screen.getByRole('button', { name: 'Organiser' }));
+    await user.click(screen.getByRole('button', { name: 'Organiser les graphiques' }));
 
     await user.click(await screen.findByRole('button', { name: 'Réglages de Par entreprise' }));
     await user.click(await screen.findByRole('button', { name: 'Afficher les valeurs' }));
@@ -262,7 +262,7 @@ describe('DashboardVisitesView', () => {
     const user = userEvent.setup();
     setup();
     await screen.findByTestId('marque-tuile');
-    await user.click(screen.getByRole('button', { name: 'Organiser' }));
+    await user.click(screen.getByRole('button', { name: 'Organiser les graphiques' }));
 
     // « Total des visites » est une tuile : aucun réglage d'aspect ne l'affecte.
     expect(screen.queryByRole('button', { name: 'Réglages de Total des visites' })).toBeNull();

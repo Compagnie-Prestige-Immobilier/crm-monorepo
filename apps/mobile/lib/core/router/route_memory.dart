@@ -4,6 +4,7 @@ import 'dart:developer' as developer;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../features/campagnes/campagnes.dart';
+import 'route_guard.dart';
 import 'route_paths.dart';
 
 class RouteMemory {
@@ -36,7 +37,13 @@ class RouteMemory {
 
   final String buildNumber;
 
-  String? read({required bool authenticated, DateTime? now}) {
+  /// L'adresse à rouvrir au lancement, ou `null`.
+  ///
+  /// [role] filtre : une adresse d'un projet fermé au rôle n'est pas restaurée
+  /// et sort de la mémoire. Sans ce filtre, une seule fuite passée — un
+  /// `/a-corriger` du CHUES atteint depuis l'accueil — rouvrait la coque du
+  /// CHUES à chaque lancement, indéfiniment.
+  String? read({required bool authenticated, String? role, DateTime? now}) {
     if (!authenticated) return null;
     final String? raw = _prefs.getString(_key);
     if (raw == null || raw.isEmpty) return null;
@@ -72,8 +79,15 @@ class RouteMemory {
     final Object? location = record['uri'];
     if (location is! String || location.isEmpty) return null;
     if (!isRestorable(location)) return null;
+    if (!RouteGuard.autorise(_cheminDe(location), role)) {
+      unawaitedClear();
+      return null;
+    }
     return location;
   }
+
+  static String _cheminDe(String location) =>
+      Uri.tryParse(location)?.path ?? location;
 
   Future<void> write(String location, {DateTime? now}) async {
     if (await _wouldBuryADraft(location)) return;

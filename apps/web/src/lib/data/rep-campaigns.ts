@@ -5,6 +5,7 @@ import { getApiClient } from '@/lib/api/browser';
 import { flattenPage } from '@/lib/api/query-params';
 import { slugForFileName } from '@/lib/data/phase2';
 import type { RepCampaignFilters } from '@/lib/rep-campaign-filters';
+import type { RepresentantRelation } from '@/lib/representant-filters';
 import type { Paginated } from '@/lib/types';
 
 type Schemas = components['schemas'];
@@ -66,7 +67,18 @@ export interface RepCampaignScope {
   departementId: string | null;
   iefId: string | null;
   onlyWithoutProspects: boolean;
+  relationStatuses: readonly RepresentantRelation[];
 }
+
+export type RepQualification = 'TOUS' | 'NON_QUALIFIES' | 'QUALIFIES';
+
+/** Qualifié : il a accepté de relayer. Non qualifié : on ne sait pas encore, refus exclus. */
+export const REP_QUALIFICATION_STATUSES: Record<RepQualification, readonly RepresentantRelation[]> =
+  {
+    TOUS: [],
+    NON_QUALIFIES: ['INCONNU', 'CONTACTE'],
+    QUALIFIES: ['AMBASSADEUR'],
+  };
 
 export async function fetchRepCampaignPreview(
   scope: RepCampaignScope,
@@ -81,6 +93,7 @@ export async function fetchRepCampaignPreview(
   };
   if (scope.departementId !== null) query.departementId = scope.departementId;
   if (scope.iefId !== null) query.iefId = scope.iefId;
+  if (scope.relationStatuses.length > 0) query.relationStatuses = [...scope.relationStatuses];
 
   return unwrap(await client.GET('/api/v1/rep-campaigns/preview', { params: { query } }));
 }
@@ -97,4 +110,12 @@ export function repProgrammePdfFileName(
 ): string {
   const suffix = day === undefined ? '' : `-jour-${String(day)}`;
   return `programme-representants-${slugForFileName(campaignName)}-${slugForFileName(commercialName)}${suffix}.pdf`;
+}
+
+export function repProgrammesZipUrl(campaignId: string): string {
+  return `/api/v1/rep-campaigns/${encodeURIComponent(campaignId)}/programmes.zip`;
+}
+
+export function repProgrammesZipFileName(campaignName: string): string {
+  return `programmes-representants-${slugForFileName(campaignName)}.zip`;
 }

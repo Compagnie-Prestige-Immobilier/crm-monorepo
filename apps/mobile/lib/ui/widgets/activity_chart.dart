@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:forui/forui.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/theme/cpi_colors.dart';
 import '../../core/theme/cpi_tokens.dart';
+import 'cpi_forui.dart';
 
 @immutable
 class ActivityDay {
@@ -128,6 +130,8 @@ class ActivityChart extends StatelessWidget {
   }
 }
 
+/// Pastille de légende : le carré reprend EXACTEMENT le remplissage de la
+/// barre qu'il nomme, filet compris, sinon la légende ment sur le graphique.
 class _LegendDot extends StatelessWidget {
   const _LegendDot({required this.color, required this.label, this.border});
 
@@ -136,30 +140,42 @@ class _LegendDot extends StatelessWidget {
   final String label;
 
   @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: CpiRadius.brXs,
-            border: border == null ? null : Border.all(color: border!),
-          ),
+  Widget build(BuildContext context) => CpiForui(
+    builder: (BuildContext context) => FBadge.raw(
+      variant: FBadgeVariant.outline,
+      builder: (BuildContext context, FBadgeStyle style) => Padding(
+        padding: style.contentStyle.padding,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            SizedBox(
+              width: 10,
+              height: 10,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: CpiRadius.brXs,
+                  border: border == null ? null : Border.all(color: border!),
+                ),
+              ),
+            ),
+            const SizedBox(width: CpiSpacing.xxsPlus),
+            // Le `Row` en `min` ne contraint pas son texte : « En attente »
+            // débordait de la carte sur 320 dp.
+            Flexible(
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: style.contentStyle.labelTextStyle.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: CpiSpacing.xxsPlus),
-        Text(
-          label,
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ],
-    );
-  }
+      ),
+    ),
+  );
 }
 
 class _BarsPainter extends CustomPainter {

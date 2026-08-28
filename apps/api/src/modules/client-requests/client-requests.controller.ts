@@ -96,7 +96,7 @@ export class ClientRequestsController {
     operationId: 'approveClientRequest',
     summary: 'Approuve la demande et crée le prospect, en une seule transaction.',
     description:
-      'Le prospect naît en METHOD_OBTAINED avec sa provenance (origin=BANQUE, libellé = nom de la banque demandeuse) : c’est la condition exacte du filtre de recherche bancaire, donc le dossier peut lui être rattaché immédiatement.',
+      'Le prospect naît avec sa provenance (origin=BANQUE, libellé = nom de la banque demandeuse), puis sa qualification CHUES continue côté panel.',
   })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, type: ClientRequestDto })

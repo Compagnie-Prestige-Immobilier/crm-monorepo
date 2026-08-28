@@ -1,11 +1,10 @@
-import 'dart:async';
-
 import 'package:cpi_go/core/providers/app_providers.dart';
 import 'package:cpi_go/core/providers/sync_coordinator.dart';
+import 'package:cpi_go/core/router/route_paths.dart';
+import 'package:cpi_go/core/router/single_push.dart';
 import 'package:cpi_go/core/sync/clock.dart';
 import 'package:cpi_go/core/theme/app_theme.dart';
 import 'package:cpi_go/data/local/database.dart';
-import 'package:cpi_go/data/repositories/write_repository.dart';
 import 'package:cpi_go/features/auth/auth_controller.dart';
 import 'package:cpi_go/features/auth/auth_state.dart';
 import 'package:cpi_go/features/historique/presentation/historique_screen.dart';
@@ -15,15 +14,19 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../support/db_fixture.dart';
 import '../support/fake_api.dart';
 
-/// Le balayage de suppression de l'historique.
+/// L'écran « Mes fiches ».
 ///
-/// Une suppression qui casse est le seul geste de l'écran qui MENT quand elle
-/// échoue : la ligne part de l'écran avant que la base ait répondu.
+/// La suppression a quitté cet écran : elle se faisait par balayage, un geste
+/// que rien n'annonce et qui retirait la ligne avant que la base ait répondu.
+/// Elle vit maintenant dans la feuille « Autres actions » de la fiche ouverte.
+/// Ce fichier garde donc les tests de la liste, et prouve qu'aucun geste caché
+/// n'y subsiste.
 void main() {
   late AppDatabase db;
   late FakeApi api;
@@ -36,17 +39,15 @@ void main() {
 
   tearDown(() async => db.close());
 
-  Future<void> mount(
-    WidgetTester tester, {
-    WriteRepository? writes,
-    double textScale = 1,
+  Future<void> pumpScope(
+    WidgetTester tester,
+    Widget app, {
     List<Override> extra = const <Override>[],
   }) async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          if (writes != null) writeRepositoryProvider.overrideWithValue(writes),
           appDatabaseProvider.overrideWithValue(db),
           apiPortProvider.overrideWithValue(api),
           clockProvider.overrideWithValue(FakeClock(t0)),
@@ -55,36 +56,77 @@ void main() {
           authControllerProvider.overrideWith(_SignedInController.new),
           ...extra,
         ],
-        child: MaterialApp(
-          theme: AppTheme.light,
-          locale: const Locale('fr'),
-          localizationsDelegates: GlobalMaterialLocalizations.delegates,
-          supportedLocales: const <Locale>[Locale('fr')],
-          home: Builder(
-            builder: (BuildContext context) => MediaQuery(
-              data: MediaQuery.of(
-                context,
-              ).copyWith(textScaler: TextScaler.linear(textScale)),
-              child: const HistoriqueScreen(),
-            ),
-          ),
-        ),
+        child: app,
       ),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
   }
 
+  Future<void> mount(
+    WidgetTester tester, {
+    double textScale = 1,
+    List<Override> extra = const <Override>[],
+  }) async {
+    await pumpScope(
+      tester,
+      MaterialApp(
+        theme: AppTheme.light,
+        locale: const Locale('fr'),
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
+        supportedLocales: const <Locale>[Locale('fr')],
+        home: Builder(
+          builder: (BuildContext context) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(textScale)),
+            child: const HistoriqueScreen(),
+          ),
+        ),
+      ),
+      extra: extra,
+    );
+  }
+
+  /// La liste sous un vrai routeur : ouvrir une fiche est le geste de l'écran.
+  Future<void> mountRouted(WidgetTester tester) async {
+    final GoRouter router = GoRouter(
+      initialLocation: Routes.historique,
+      routes: <RouteBase>[
+        GoRoute(
+          path: Routes.historique,
+          builder: (BuildContext context, GoRouterState state) =>
+              const HistoriqueScreen(),
+        ),
+        GoRoute(
+          path: Routes.representantDetail,
+          builder: (BuildContext context, GoRouterState state) => Scaffold(
+            body: Center(child: Text('FICHE ${state.pathParameters['id']}')),
+          ),
+        ),
+        GoRoute(
+          path: Routes.representants,
+          builder: (BuildContext context, GoRouterState state) =>
+              const Scaffold(body: Center(child: Text('CHEZ QUI'))),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await pumpScope(
+      tester,
+      MaterialApp.router(
+        theme: AppTheme.light,
+        locale: const Locale('fr'),
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
+        supportedLocales: const <Locale>[Locale('fr')],
+        routerConfig: router,
+      ),
+    );
+  }
+
   Future<void> teardownTree(WidgetTester tester) async {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 1));
-  }
-
-  Future<void> swipeAndConfirm(WidgetTester tester, String name) async {
-    await tester.drag(find.text(name), const Offset(-500, 0));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Supprimer'));
-    await tester.pumpAndSettle();
   }
 
   // La ligne d'un représentant empile trois actions à côté d'un titre et d'un
@@ -112,7 +154,9 @@ void main() {
     await teardownTree(tester);
   });
 
-  testWidgets('un balayage confirmé supprime la fiche', (
+  // Le balayage supprimait sans rien annoncer : personne ne le découvrait, et
+  // ceux qui le découvraient par accident perdaient une fiche et ses prospects.
+  testWidgets('un balayage sur la ligne ne supprime plus rien', (
     WidgetTester tester,
   ) async {
     await insertRepresentant(
@@ -123,77 +167,76 @@ void main() {
     );
     await mount(tester);
 
-    await swipeAndConfirm(tester, 'Ousmane Fall');
-
-    expect(find.text('Ousmane Fall'), findsNothing);
-
-    await teardownTree(tester);
-  });
-
-  // La ligne partait de l'écran avant l'écriture : une base qui refuse laissait
-  // le téléconseiller devant une liste amputée d'une fiche toujours là, et
-  // l'erreur nulle part.
-  testWidgets('une suppression qui échoue le dit et garde la fiche', (
-    WidgetTester tester,
-  ) async {
-    await insertRepresentant(
-      db,
-      id: 'rep-1',
-      phone: '+221770000001',
-      fullName: 'Ousmane Fall',
-    );
-    await mount(tester, writes: _BrokenWrites(db));
-
-    await swipeAndConfirm(tester, 'Ousmane Fall');
-
-    expect(find.textContaining('Suppression impossible'), findsOneWidget);
-    expect(find.text('Ousmane Fall'), findsOneWidget);
-
-    await teardownTree(tester);
-  });
-
-  // La ligne se démonte avec la confirmation : `nudge()` lu sur son `WidgetRef`
-  // APRÈS l'écriture ne partait jamais, et la suppression restait locale.
-  testWidgets('une suppression confirmée déclenche bien l\'envoi', (
-    WidgetTester tester,
-  ) async {
-    _nudges = 0;
-    final StreamController<List<RepresentantSyncViewData>> liste =
-        StreamController<List<RepresentantSyncViewData>>.broadcast();
-    addTearDown(liste.close);
-    await insertRepresentant(
-      db,
-      id: 'rep-1',
-      phone: '+221770000001',
-      fullName: 'Ousmane Fall',
-    );
-    await mount(
-      tester,
-      writes: _WritesQuiVidentLaListe(db, liste),
-      extra: <Override>[
-        representantListProvider.overrideWith((Ref ref) => liste.stream),
-      ],
-    );
-    liste.add(<RepresentantSyncViewData>[
-      RepresentantSyncViewData(
-        id: 'rep-1',
-        fullName: 'Ousmane Fall',
-        phoneE164: '+221770000001',
-        departementId: 'dep-1',
-        relationStatus: 'ACTIF',
-        whatsappStatus: 'INCONNU',
-        createdById: 'me',
-        clientCreatedAt: t0,
-        rev: 1,
-        localUpdatedAt: t0,
-      ),
-    ]);
+    await tester.drag(find.text('Ousmane Fall'), const Offset(-500, 0));
     await tester.pumpAndSettle();
 
-    await swipeAndConfirm(tester, 'Ousmane Fall');
+    expect(find.byType(Dismissible), findsNothing);
+    expect(find.text('Ousmane Fall'), findsOneWidget);
+    expect(find.text('Supprimer'), findsNothing);
 
-    expect(tester.takeException(), isNull);
-    expect(_nudges, greaterThan(0), reason: 'la suppression n\'est pas partie');
+    await teardownTree(tester);
+  });
+
+  // L'accordéon demandait deux gestes pour ouvrir une fiche, et cachait trois
+  // autres actions derrière le premier.
+  testWidgets('un tap sur la ligne ouvre la fiche, sans panneau à déplier', (
+    WidgetTester tester,
+  ) async {
+    SinglePush.reset();
+    addTearDown(SinglePush.reset);
+    await insertRepresentant(
+      db,
+      id: 'rep-1',
+      phone: '+221770000001',
+      fullName: 'Ousmane Fall',
+    );
+    await mountRouted(tester);
+
+    expect(find.text('Ouvrir la fiche'), findsNothing);
+
+    await tester.tap(find.text('Ousmane Fall'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('FICHE rep-1'), findsOneWidget);
+
+    await teardownTree(tester);
+  });
+
+  // L'état ne tenait que dans la couleur d'une icône : personne ne savait ce
+  // que voulait dire le petit nuage barré.
+  testWidgets('la ligne écrit son état en toutes lettres', (
+    WidgetTester tester,
+  ) async {
+    await insertRepresentant(
+      db,
+      id: 'rep-1',
+      phone: '+221770000001',
+      fullName: 'Ousmane Fall',
+    );
+    await mount(tester);
+
+    expect(find.text('Pas encore envoyé'), findsOneWidget);
+    expect(find.text('1 fiche'), findsOneWidget);
+
+    await teardownTree(tester);
+  });
+
+  // La feuille « Nouvelle fiche » offrait de créer un représentant : la base
+  // des représentants est importée depuis le web, le mobile n'en crée plus.
+  testWidgets('le bouton du pied mène droit au choix du représentant', (
+    WidgetTester tester,
+  ) async {
+    SinglePush.reset();
+    addTearDown(SinglePush.reset);
+    await mountRouted(tester);
+
+    expect(find.text('Nouvelle fiche'), findsNothing);
+
+    await tester.tap(find.text('Ajouter un prospect').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('CHEZ QUI'), findsOneWidget);
+    expect(find.text('Un représentant'), findsNothing);
 
     await teardownTree(tester);
   });
@@ -231,8 +274,8 @@ void main() {
     await mount(tester);
 
     expect(find.byType(CpiEmptyState), findsOneWidget);
-    expect(find.text('Aucun représentant'), findsOneWidget);
-    expect(find.textContaining('Créez une première fiche'), findsOneWidget);
+    expect(find.text('Aucune fiche'), findsOneWidget);
+    expect(find.textContaining('Ajoutez un prospect'), findsOneWidget);
     final CpiEmptyState vide = tester.widget<CpiEmptyState>(
       find.byType(CpiEmptyState),
     );
@@ -252,41 +295,24 @@ void main() {
     );
     await mount(tester);
 
-    await tester.enterText(find.byType(TextField), 'Aminata');
+    // Le champ de recherche est le seul de l'écran ; `EditableText` le retrouve
+    // que la coque soit Material ou ForUI.
+    await tester.enterText(find.byType(EditableText), 'Aminata');
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(find.text('Aucun résultat'), findsOneWidget);
-    expect(find.text('Aucun représentant'), findsNothing);
+    expect(find.text('Aucun résultat.'), findsOneWidget);
+    expect(find.text('Aucune fiche'), findsNothing);
+
+    // Le champ gardait son texte : la liste revenait entière sous une recherche
+    // toujours écrite dans la boîte.
+    await tester.tap(find.text('Effacer la recherche'));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('Ousmane Fall'), findsOneWidget);
+    expect(find.text('Aminata'), findsNothing);
 
     await teardownTree(tester);
   });
-}
-
-/// La ligne quitte l'écran PENDANT l'écriture, comme en vrai : le flux se vide
-/// avant que la suppression ne rende la main.
-class _WritesQuiVidentLaListe extends WriteRepository {
-  _WritesQuiVidentLaListe(super.db, this._liste);
-
-  final StreamController<List<RepresentantSyncViewData>> _liste;
-
-  @override
-  Future<void> deleteRepresentant(String id) async {
-    _liste.add(const <RepresentantSyncViewData>[]);
-    await Future<void>.delayed(const Duration(milliseconds: 50));
-  }
-}
-
-/// Une base qui refuse la suppression.
-class _BrokenWrites extends WriteRepository {
-  _BrokenWrites(super.db);
-
-  @override
-  Future<void> deleteRepresentant(String id) =>
-      Future<void>.error(StateError('base en lecture seule'));
-
-  @override
-  Future<void> deleteProspect(String id) =>
-      Future<void>.error(StateError('base en lecture seule'));
 }
 
 class _SignedInController extends AuthController {
@@ -299,12 +325,10 @@ class _SignedInController extends AuthController {
   );
 }
 
-int _nudges = 0;
-
 class _IdleSyncCoordinator extends SyncCoordinator {
   @override
   SyncUiState build() => const SyncUiState();
 
   @override
-  void nudge() => _nudges += 1;
+  void nudge() {}
 }

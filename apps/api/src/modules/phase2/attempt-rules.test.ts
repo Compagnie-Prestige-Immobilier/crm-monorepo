@@ -6,6 +6,7 @@ import { CallOutcomeEffect, SYSTEM_OUTCOME_REASONS } from '../referentiels/call-
 import {
   CALLBACK_CLOCK_SKEW_TOLERANCE_MS,
   COMMENT_MAX_LENGTH,
+  DUREE_ETABLISSEMENT_MAX_MOIS,
   PHASE2_STATUS_FOR_OUTCOME,
   isTerminalOutcome,
   normalizeAttempt,
@@ -43,10 +44,18 @@ describe('isTerminalOutcome', () => {
   });
 });
 
+const APPEL = '2026-08-18T10:00:00.000Z';
+const RENDEZ_VOUS = '2026-08-25T09:00:00.000Z';
+
 describe('normalizeAttempt, méthode et issue', () => {
-  it('accepte les trois méthodes avec METHOD_OBTAINED', () => {
+  it('accepte toutes les méthodes avec METHOD_OBTAINED', () => {
     for (const method of Object.values(EnrollmentMethod)) {
-      const result = normalizeAttempt({ outcome: CallOutcome.METHOD_OBTAINED, method });
+      const result = normalizeAttempt({
+        outcome: CallOutcome.METHOD_OBTAINED,
+        method,
+        clientCreatedAt: APPEL,
+        ...(method === EnrollmentMethod.APPOINTMENT ? { rendezVousAt: RENDEZ_VOUS } : {}),
+      });
       expect(result.method).toBe(method);
       expect(result.terminal).toBe(true);
     }
@@ -101,8 +110,6 @@ describe('normalizeAttempt, méthode et issue', () => {
 });
 
 describe('normalizeAttempt, date de rappel', () => {
-  const APPEL = '2026-08-18T10:00:00.000Z';
-
   it('retient la date de rappel promise avec CALLBACK', () => {
     const result = normalizeAttempt({
       outcome: CallOutcome.CALLBACK,
@@ -240,9 +247,128 @@ describe('normalizeAttempt, commentaire', () => {
   });
 });
 
-describe('normalizeAttempt, motif du référentiel', () => {
-  const APPEL = '2026-08-18T10:00:00.000Z';
+describe('normalizeAttempt, renseignements de conversion', () => {
+  const priseDeRendezVous = (
+    over: Record<string, unknown> = {},
+  ): Parameters<typeof normalizeAttempt>[0] => ({
+    outcome: CallOutcome.METHOD_OBTAINED,
+    method: EnrollmentMethod.APPOINTMENT,
+    rendezVousAt: RENDEZ_VOUS,
+    clientCreatedAt: APPEL,
+    ...over,
+  });
 
+  it('la prise de rendez-vous sans date est refusée', () => {
+    expect(codeOf(() => normalizeAttempt(priseDeRendezVous({ rendezVousAt: undefined })))).toBe(
+      'PHASE2_RENDEZ_VOUS_REQUIRED',
+    );
+  });
+
+  it('une date de rendez-vous antérieure à l’appel est refusée', () => {
+    expect(
+      codeOf(() =>
+        normalizeAttempt(priseDeRendezVous({ rendezVousAt: '2026-08-17T09:00:00.000Z' })),
+      ),
+    ).toBe('PHASE2_RENDEZ_VOUS_PAST');
+  });
+
+  it('la date se juge sur l’HEURE DE L’APPEL : un lot poussé trois semaines plus tard passe', () => {
+    const vieuxLot = normalizeAttempt(
+      priseDeRendezVous({
+        clientCreatedAt: '2020-01-01T10:00:00.000Z',
+        rendezVousAt: '2020-01-02T09:00:00.000Z',
+      }),
+    );
+    expect(vieuxLot.rendezVousAt?.toISOString()).toBe('2020-01-02T09:00:00.000Z');
+  });
+
+  it('tolère la même dérive d’horloge que le rappel', () => {
+    expect(
+      normalizeAttempt(
+        priseDeRendezVous({ rendezVousAt: '2026-08-18T09:56:00.000Z' }),
+      ).rendezVousAt?.toISOString(),
+    ).toBe('2026-08-18T09:56:00.000Z');
+
+    expect(
+      codeOf(() =>
+        normalizeAttempt(priseDeRendezVous({ rendezVousAt: '2026-08-18T09:54:00.000Z' })),
+      ),
+    ).toBe('PHASE2_RENDEZ_VOUS_PAST');
+  });
+
+  it('une date illisible est refusée', () => {
+    expect(codeOf(() => normalizeAttempt(priseDeRendezVous({ rendezVousAt: 'jeudi' })))).toBe(
+      'PHASE2_RENDEZ_VOUS_INVALID',
+    );
+  });
+
+  it('toute autre méthode refuse la date', () => {
+    for (const method of [
+      EnrollmentMethod.PLATFORM,
+      EnrollmentMethod.PHYSICAL,
+      EnrollmentMethod.VOICE_OR_ELECTRONIC_MESSAGING,
+    ]) {
+      expect(codeOf(() => normalizeAttempt(priseDeRendezVous({ method })))).toBe(
+        'PHASE2_RENDEZ_VOUS_NOT_ALLOWED',
+      );
+    }
+    expect(
+      codeOf(() =>
+        normalizeAttempt({
+          outcome: CallOutcome.UNREACHABLE,
+          rendezVousAt: RENDEZ_VOUS,
+          clientCreatedAt: APPEL,
+        }),
+      ),
+    ).toBe('PHASE2_RENDEZ_VOUS_NOT_ALLOWED');
+  });
+
+  it('rogne l’adresse électronique et refuse ce qui n’en est pas une', () => {
+    expect(normalizeAttempt(priseDeRendezVous({ email: '  awa@cpi.sn ' })).email).toBe(
+      'awa@cpi.sn',
+    );
+    expect(normalizeAttempt(priseDeRendezVous({ email: '   ' })).email).toBeNull();
+    expect(normalizeAttempt(priseDeRendezVous()).email).toBeNull();
+
+    for (const saisie of ['awa', 'awa@', 'awa@cpi', 'a wa@cpi.sn', `${'x'.repeat(160)}@cpi.sn`]) {
+      expect(codeOf(() => normalizeAttempt(priseDeRendezVous({ email: saisie })))).toBe(
+        'PHASE2_EMAIL_INVALID',
+      );
+    }
+  });
+
+  it('borne la durée dans l’établissement sur la contrainte CHECK', () => {
+    expect(
+      normalizeAttempt(priseDeRendezVous({ dureeEtablissementMois: 0 })).dureeEtablissementMois,
+    ).toBe(0);
+    expect(
+      normalizeAttempt({
+        ...priseDeRendezVous(),
+        dureeEtablissementMois: DUREE_ETABLISSEMENT_MAX_MOIS,
+      }).dureeEtablissementMois,
+    ).toBe(DUREE_ETABLISSEMENT_MAX_MOIS);
+
+    for (const mois of [-1, DUREE_ETABLISSEMENT_MAX_MOIS + 1, 12.5]) {
+      expect(
+        codeOf(() => normalizeAttempt(priseDeRendezVous({ dureeEtablissementMois: mois }))),
+      ).toBe('PHASE2_DUREE_ETABLISSEMENT_INVALID');
+    }
+  });
+
+  it('les booléens gardent la distinction entre « non » et « question non posée »', () => {
+    const posee = normalizeAttempt(
+      priseDeRendezVous({ fonctionnaire: false, engagementEnCours: true }),
+    );
+    expect(posee.fonctionnaire).toBe(false);
+    expect(posee.engagementEnCours).toBe(true);
+
+    const muette = normalizeAttempt(priseDeRendezVous());
+    expect(muette.fonctionnaire).toBeNull();
+    expect(muette.engagementEnCours).toBeNull();
+  });
+});
+
+describe('normalizeAttempt, motif du référentiel', () => {
   const reason = (over: Partial<AttemptReason> = {}): AttemptReason => ({
     id: 'motif-1',
     code: 'BOITE_VOCALE',

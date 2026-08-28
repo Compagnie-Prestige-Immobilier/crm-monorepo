@@ -481,31 +481,46 @@ function AnalysePanel({ job, onReset }: { job: VisitesImportJob; onReset: () => 
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <p role="status" className="flex items-center gap-2 text-[0.9375rem] tabular-nums">
-          {running ? (
-            <>
-              <LoaderIcon className="size-4 shrink-0 animate-spin" aria-hidden="true" />
-              Lecture du fichier…
-            </>
-          ) : job.status === 'failed' ? (
-            <>
-              <AlertTriangleIcon className="size-4 shrink-0 text-destructive" aria-hidden="true" />
-              {job.failureMsg ?? 'Le travail a échoué.'}
-            </>
-          ) : job.status === 'expired' ? (
-            <>
-              <AlertTriangleIcon
-                className="size-4 shrink-0 text-muted-foreground"
-                aria-hidden="true"
-              />
-              Échéance passée : redéposez le fichier pour recommencer.
-            </>
-          ) : (
-            <>
-              <CheckCircle2Icon className="size-4 shrink-0 text-success" aria-hidden="true" />
-              Analyse terminée
-              {job.finishedAt === null ? '' : `, le ${formatDateTime(job.finishedAt)}`}.
-            </>
-          )}
+          {(() => {
+            if (running)
+              return (
+                <>
+                  <LoaderIcon className="size-4 shrink-0 animate-spin" aria-hidden="true" />
+                  Lecture du fichier…
+                </>
+              );
+            return (() => {
+              if (job.status === 'failed')
+                return (
+                  <>
+                    <AlertTriangleIcon
+                      className="size-4 shrink-0 text-destructive"
+                      aria-hidden="true"
+                    />
+                    {job.failureMsg ?? 'Le travail a échoué.'}
+                  </>
+                );
+              return (() => {
+                if (job.status === 'expired')
+                  return (
+                    <>
+                      <AlertTriangleIcon
+                        className="size-4 shrink-0 text-muted-foreground"
+                        aria-hidden="true"
+                      />
+                      Échéance passée : redéposez le fichier pour recommencer.
+                    </>
+                  );
+                return (
+                  <>
+                    <CheckCircle2Icon className="size-4 shrink-0 text-success" aria-hidden="true" />
+                    Analyse terminée
+                    {job.finishedAt === null ? '' : `, le ${formatDateTime(job.finishedAt)}`}.
+                  </>
+                );
+              })();
+            })();
+          })()}
         </p>
 
         {running ? null : (
@@ -657,71 +672,79 @@ function RevuePanel({
           </Button>
         </div>
 
-        {revueQuery.isError ? (
-          <div className="px-5">
-            <QueryErrorState
-              error={revueQuery.error}
-              onRetry={() => {
-                void revueQuery.refetch();
-              }}
-              fallback="La revue n’a pas pu être chargée."
-              className="items-center gap-3 border-destructive/30 px-6 py-12 text-center"
-            />
-          </div>
-        ) : data === undefined ? (
-          <div className="flex flex-col gap-2 px-5">
-            {[0, 1, 2].map((row) => (
-              <Skeleton key={row} className="h-16 w-full" />
-            ))}
-          </div>
-        ) : (
-          <>
-            <ul className="flex flex-col divide-y divide-border">
-              {data.items.map((change) => (
-                <ChangeRow
-                  key={change.id}
-                  change={change}
-                  onToggle={(selected) => {
-                    onToggle(change, selected);
+        {(() => {
+          if (revueQuery.isError)
+            return (
+              <div className="px-5">
+                <QueryErrorState
+                  error={revueQuery.error}
+                  onRetry={() => {
+                    void revueQuery.refetch();
                   }}
+                  fallback="La revue n’a pas pu être chargée."
+                  className="items-center gap-3 border-destructive/30 px-6 py-12 text-center"
                 />
-              ))}
-            </ul>
-
-            <div className="flex flex-wrap items-center justify-between gap-3 px-5 pb-4">
-              <p className="text-[0.8125rem] text-muted-foreground" role="status">
-                {formatNumber(data.total)} différence{data.total > 1 ? 's' : ''}
-              </p>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  aria-label="Page précédente"
-                  disabled={data.page <= 1}
-                  onClick={() => {
-                    onPageChange(data.page - 1);
-                  }}
-                >
-                  <ChevronLeftIcon className="size-4" aria-hidden="true" />
-                </Button>
-                <span className="min-w-20 text-center text-[0.8125rem] tabular-nums">
-                  {data.page} / {Math.max(1, data.pageCount)}
-                </span>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  aria-label="Page suivante"
-                  disabled={data.page >= data.pageCount}
-                  onClick={() => {
-                    onPageChange(data.page + 1);
-                  }}
-                >
-                  <ChevronRightIcon className="size-4" aria-hidden="true" />
-                </Button>
               </div>
-            </div>
-          </>
-        )}
+            );
+          return (() => {
+            if (data === undefined)
+              return (
+                <div className="flex flex-col gap-2 px-5">
+                  {[0, 1, 2].map((row) => (
+                    <Skeleton key={row} className="h-16 w-full" />
+                  ))}
+                </div>
+              );
+            return (
+              <>
+                <ul className="flex flex-col divide-y divide-border">
+                  {data.items.map((change) => (
+                    <ChangeRow
+                      key={change.id}
+                      change={change}
+                      onToggle={(selected) => {
+                        onToggle(change, selected);
+                      }}
+                    />
+                  ))}
+                </ul>
+
+                <div className="flex flex-wrap items-center justify-between gap-3 px-5 pb-4">
+                  <p className="text-[0.8125rem] text-muted-foreground" role="status">
+                    {formatNumber(data.total)} différence{data.total > 1 ? 's' : ''}
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      aria-label="Page précédente"
+                      disabled={data.page <= 1}
+                      onClick={() => {
+                        onPageChange(data.page - 1);
+                      }}
+                    >
+                      <ChevronLeftIcon className="size-4" aria-hidden="true" />
+                    </Button>
+                    <span className="min-w-20 text-center text-[0.8125rem] tabular-nums">
+                      {data.page} / {Math.max(1, data.pageCount)}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      aria-label="Page suivante"
+                      disabled={data.page >= data.pageCount}
+                      onClick={() => {
+                        onPageChange(data.page + 1);
+                      }}
+                    >
+                      <ChevronRightIcon className="size-4" aria-hidden="true" />
+                    </Button>
+                  </div>
+                </div>
+              </>
+            );
+          })();
+        })()}
 
         <div className="border-t border-border px-5 py-4">
           <Button type="button" disabled={!canApply} onClick={onApply}>

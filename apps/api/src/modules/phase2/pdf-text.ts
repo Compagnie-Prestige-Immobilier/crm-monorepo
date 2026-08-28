@@ -69,18 +69,18 @@ export function extractPdfText(pdf: Buffer): string {
     const payload = operator[1] ?? operator[2] ?? '';
     let line = '';
 
-    for (const literal of payload.matchAll(/<([0-9a-fA-F]*)>|\(((?:\\.|[^\\()])*)\)/g)) {
-      const hex = literal[1];
-      if (hex !== undefined) {
-        if (hex.length === 0 || hex.length % 2 !== 0) continue;
-        line += decodeWinAnsi(Buffer.from(hex, 'hex'));
-      } else {
-        line += (literal[2] ?? '').replace(/\\([()\\])/g, '$1');
-      }
-    }
+    for (const literal of payload.matchAll(/<([0-9a-fA-F]*)>|\(((?:\\.|[^\\()])*)\)/g))
+      line += decodeLiteral(literal);
 
     if (line !== '') lines.push(line);
   }
 
   return lines.join('\n');
+}
+
+function decodeLiteral(literal: RegExpExecArray): string {
+  const hex = literal[1];
+  if (hex === undefined) return (literal[2] ?? '').replace(/\\([()\\])/g, '$1');
+  if (hex.length === 0 || hex.length % 2 !== 0) return '';
+  return decodeWinAnsi(Buffer.from(hex, 'hex'));
 }

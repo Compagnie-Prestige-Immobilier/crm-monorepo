@@ -4,6 +4,7 @@
 
 // ignore_for_file: unused_element
 import 'package:crm_api_client/src/model/supervision_activity_row_dto.dart';
+import 'package:crm_api_client/src/model/supervision_histogram_bar_dto.dart';
 import 'package:crm_api_client/src/model/supervision_granularity.dart';
 import 'package:crm_api_client/src/model/supervision_teleconseiller_dto.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
@@ -31,6 +32,10 @@ class SupervisionActivityDto {
     required this.items,
 
     required this.teleconseillers,
+
+    required this.prospectsByTeleconseiller,
+
+    required this.prospectsByRepresentant,
   });
 
   @JsonKey(name: r'from', required: true, includeIfNull: true)
@@ -55,18 +60,44 @@ class SupervisionActivityDto {
   @JsonKey(name: r'teleconseillers', required: true, includeIfNull: false)
   final List<SupervisionTeleconseillerDto> teleconseillers;
 
+  /// Stock courant de prospects rattachés à chaque téléconseiller.
+  @JsonKey(
+    name: r'prospectsByTeleconseiller',
+    required: true,
+    includeIfNull: false,
+  )
+  final List<SupervisionHistogramBarDto> prospectsByTeleconseiller;
+
+  /// Stock courant de prospects rattachés à chaque représentant.
+  @JsonKey(
+    name: r'prospectsByRepresentant',
+    required: true,
+    includeIfNull: false,
+  )
+  final List<SupervisionHistogramBarDto> prospectsByRepresentant;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is SupervisionActivityDto &&
             runtimeType == other.runtimeType &&
             equals(
-              [from, to, granularity, items, teleconseillers],
+              [
+                from,
+                to,
+                granularity,
+                items,
+                teleconseillers,
+                prospectsByTeleconseiller,
+                prospectsByRepresentant,
+              ],
               [
                 other.from,
                 other.to,
                 other.granularity,
                 other.items,
                 other.teleconseillers,
+                other.prospectsByTeleconseiller,
+                other.prospectsByRepresentant,
               ],
             );
   }
@@ -74,7 +105,15 @@ class SupervisionActivityDto {
   @override
   int get hashCode =>
       runtimeType.hashCode ^
-      mapPropsToHashCode([from, to, granularity, items, teleconseillers]);
+      mapPropsToHashCode([
+        from,
+        to,
+        granularity,
+        items,
+        teleconseillers,
+        prospectsByTeleconseiller,
+        prospectsByRepresentant,
+      ]);
 
   factory SupervisionActivityDto.fromJson(Map<String, dynamic> json) =>
       _$SupervisionActivityDtoFromJson(json);

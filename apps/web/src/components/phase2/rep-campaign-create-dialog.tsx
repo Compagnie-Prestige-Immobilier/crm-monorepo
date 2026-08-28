@@ -7,6 +7,12 @@ import { useId, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { FilterCombobox } from '@/components/filters/filter-combobox';
+import {
+  CampaignTargetField,
+  RadioCardGroup,
+  type CampaignTarget,
+  type RadioCardOption,
+} from '@/components/phase2/campaign-target-field';
 import { SpreadDaysField, SpreadPreview } from '@/components/phase2/spread-days-field';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -26,8 +32,10 @@ import { fetchReferenceData } from '@/lib/data/reference';
 import {
   createRepCampaign,
   fetchRepCampaignPreview,
+  REP_QUALIFICATION_STATUSES,
   type RepCampaignPreview,
   type RepCampaignScope,
+  type RepQualification,
 } from '@/lib/data/rep-campaigns';
 import { formatNumber } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
@@ -37,12 +45,32 @@ import { cn } from '@/lib/utils';
 
 type Step = 'saisie' | 'apercu';
 
+const QUALIFICATIONS: readonly RadioCardOption<RepQualification>[] = [
+  {
+    value: 'TOUS',
+    label: 'Tous les représentants',
+    hint: 'Tout le périmètre, y compris ceux qui ont déjà refusé.',
+  },
+  {
+    value: 'NON_QUALIFIES',
+    label: 'Non qualifiés',
+    hint: 'Ceux dont on ne sait pas encore s’ils acceptent de relayer nos créations. Les refus sont écartés.',
+  },
+  {
+    value: 'QUALIFIES',
+    label: 'Qualifiés',
+    hint: 'Ceux qui ont déjà accepté de relayer nos créations.',
+  },
+];
+
 export function RepCampaignCreateDialog({
   open,
   onOpenChange,
+  onTargetChange,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onTargetChange: (target: CampaignTarget) => void;
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -55,6 +83,7 @@ export function RepCampaignCreateDialog({
   const [departementId, setDepartementId] = useState<string | null>(null);
   const [iefId, setIefId] = useState<string | null>(null);
   const [onlyWithoutProspects, setOnlyWithoutProspects] = useState(false);
+  const [qualification, setQualification] = useState<RepQualification>('TOUS');
   const [spreadDays, setSpreadDays] = useState(MIN_SPREAD_DAYS);
   const [selected, setSelected] = useState<string[]>([]);
 
@@ -70,7 +99,13 @@ export function RepCampaignCreateDialog({
   const regionId =
     departements.find((departement) => departement.id === departementId)?.regionId ?? regionDraft;
 
-  const scope: RepCampaignScope = { departementId, iefId, onlyWithoutProspects };
+  const relationStatuses = REP_QUALIFICATION_STATUSES[qualification];
+  const scope: RepCampaignScope = {
+    departementId,
+    iefId,
+    onlyWithoutProspects,
+    relationStatuses,
+  };
 
   const preview = useQuery({
     queryKey: queryKeys.repCampaignPreview(scope, selected.length, spreadDays),
@@ -93,6 +128,7 @@ export function RepCampaignCreateDialog({
       };
       if (departementId !== null) body.departementId = departementId;
       if (iefId !== null) body.iefId = iefId;
+      if (relationStatuses.length > 0) body.relationStatuses = [...relationStatuses];
       return createRepCampaign(body);
     },
     onSuccess: (campaign) => {
@@ -117,6 +153,7 @@ export function RepCampaignCreateDialog({
     setDepartementId(null);
     setIefId(null);
     setOnlyWithoutProspects(false);
+    setQualification('TOUS');
     setSpreadDays(MIN_SPREAD_DAYS);
     setSelected([]);
   }
@@ -147,7 +184,7 @@ export function RepCampaignCreateDialog({
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>
-            {step === 'saisie' ? 'Nouvelle campagne représentants' : 'Aperçu du tirage'}
+            {step === 'saisie' ? 'Nouvelle campagne d’appels' : 'Aperçu du tirage'}
           </DialogTitle>
           <DialogDescription>
             {step === 'saisie'
@@ -158,6 +195,8 @@ export function RepCampaignCreateDialog({
 
         {step === 'saisie' ? (
           <div className="flex flex-col gap-5">
+            <CampaignTargetField value="REPRESENTANTS" onChange={onTargetChange} projet="CHUES" />
+
             <div className="flex flex-col gap-1.5">
               <Label htmlFor={nameId}>
                 Nom de la campagne
@@ -228,6 +267,13 @@ export function RepCampaignCreateDialog({
                 onChange={setIefId}
               />
             </div>
+
+            <RadioCardGroup
+              legend="Représentants à appeler"
+              value={qualification}
+              options={QUALIFICATIONS}
+              onChange={setQualification}
+            />
 
             {/* La campagne de relance des dormants : c'est le cas d'usage
                 nommé dans le cahier des charges, et il mérite un interrupteur

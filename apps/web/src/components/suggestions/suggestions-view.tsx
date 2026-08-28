@@ -101,58 +101,67 @@ export function SuggestionsView({ readOnly = false }: { readOnly?: boolean }) {
         ))}
       </div>
 
-      {isPending ? (
-        <Skeleton className="h-64 w-full" />
-      ) : isError ? (
-        <QueryErrorState
-          error={error}
-          onRetry={() => {
-            void refetch();
-          }}
-          fallback="Les numéros suggérés n’ont pas pu être chargés."
-        />
-      ) : items.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-border bg-card py-16 text-center shadow-elev-sm">
-          <PhoneForwardedIcon className="size-8 text-muted-foreground" aria-hidden="true" />
-          <p className="font-[600]">
-            {status === null
-              ? 'Aucun numéro suggéré pour l’instant.'
-              : `Aucun numéro « ${SUGGESTION_STATUS_LABELS[status]} ».`}
-          </p>
-          <p className="max-w-md text-[0.8125rem] text-muted-foreground">
-            {status === null
-              ? 'Un numéro arrive ici quand un représentant en décline un autre depuis la console d’appel ou le mobile.'
-              : 'Retirez le filtre pour voir les autres numéros.'}
-          </p>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-3">
-          {total > items.length ? (
-            <p className="text-[0.8125rem] text-muted-foreground">
-              {formatNumber(total)} numéros au total, les {formatNumber(items.length)} plus récents
-              sont affichés.
-            </p>
-          ) : null}
-          <ul aria-label="Numéros suggérés" className="flex flex-col gap-3">
-            {items.map((suggestion) => (
-              <li key={suggestion.id}>
-                <SuggestionCard
-                  suggestion={suggestion}
-                  sameNumberCount={counts.get(suggestion.suggestedPhoneE164) ?? 1}
-                  readOnly={readOnly}
-                  pending={decide.isPending}
-                  onDecide={(next) => {
-                    decide.mutate({ id: suggestion.id, status: next });
-                  }}
-                  onCreate={() => {
-                    setCreatingFrom(suggestion);
-                  }}
-                />
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {(() => {
+        if (isPending) return <Skeleton className="h-64 w-full" />;
+        return (() => {
+          if (isError)
+            return (
+              <QueryErrorState
+                error={error}
+                onRetry={() => {
+                  void refetch();
+                }}
+                fallback="Les numéros suggérés n’ont pas pu être chargés."
+              />
+            );
+          return (() => {
+            if (items.length === 0)
+              return (
+                <div className="flex flex-col items-center gap-2 rounded-lg border border-border bg-card py-16 text-center shadow-elev-sm">
+                  <PhoneForwardedIcon className="size-8 text-muted-foreground" aria-hidden="true" />
+                  <p className="font-[600]">
+                    {status === null
+                      ? 'Aucun numéro suggéré pour l’instant.'
+                      : `Aucun numéro « ${SUGGESTION_STATUS_LABELS[status]} ».`}
+                  </p>
+                  <p className="max-w-md text-[0.8125rem] text-muted-foreground">
+                    {status === null
+                      ? 'Un numéro arrive ici quand un représentant en décline un autre depuis la console d’appel ou le mobile.'
+                      : 'Retirez le filtre pour voir les autres numéros.'}
+                  </p>
+                </div>
+              );
+            return (
+              <div className="flex flex-col gap-3">
+                {total > items.length ? (
+                  <p className="text-[0.8125rem] text-muted-foreground">
+                    {formatNumber(total)} numéros au total, les {formatNumber(items.length)} plus
+                    récents sont affichés.
+                  </p>
+                ) : null}
+                <ul aria-label="Numéros suggérés" className="flex flex-col gap-3">
+                  {items.map((suggestion) => (
+                    <li key={suggestion.id}>
+                      <SuggestionCard
+                        suggestion={suggestion}
+                        sameNumberCount={counts.get(suggestion.suggestedPhoneE164) ?? 1}
+                        readOnly={readOnly}
+                        pending={decide.isPending}
+                        onDecide={(next) => {
+                          decide.mutate({ id: suggestion.id, status: next });
+                        }}
+                        onCreate={() => {
+                          setCreatingFrom(suggestion);
+                        }}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })();
+        })();
+      })()}
 
       <RepresentantFormDialog
         open={creatingFrom !== null}

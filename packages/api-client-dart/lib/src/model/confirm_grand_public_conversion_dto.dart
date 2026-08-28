@@ -41,6 +41,7 @@ class ConfirmGrandPublicConversionDto {
   final PaymentMode? paymentMode;
 
   // minimum: 0
+  // maximum: 2147483647
   @JsonKey(name: r'amountXof', required: false, includeIfNull: false)
   final num? amountXof;
 

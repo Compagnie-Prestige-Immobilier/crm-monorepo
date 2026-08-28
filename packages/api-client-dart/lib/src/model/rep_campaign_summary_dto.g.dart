@@ -23,6 +23,10 @@ abstract class _$RepCampaignSummaryDtoCWProxy {
 
   RepCampaignSummaryDto onlyWithoutProspects(bool onlyWithoutProspects);
 
+  RepCampaignSummaryDto relationStatuses(
+    List<RepresentantRelation> relationStatuses,
+  );
+
   RepCampaignSummaryDto createdById(String createdById);
 
   RepCampaignSummaryDto createdByName(String createdByName);
@@ -52,6 +56,7 @@ abstract class _$RepCampaignSummaryDtoCWProxy {
     String? departementId,
     String? iefId,
     bool onlyWithoutProspects,
+    List<RepresentantRelation> relationStatuses,
     String createdById,
     String createdByName,
     num commercialCount,
@@ -97,6 +102,11 @@ class _$RepCampaignSummaryDtoCWProxyImpl
       this(onlyWithoutProspects: onlyWithoutProspects);
 
   @override
+  RepCampaignSummaryDto relationStatuses(
+    List<RepresentantRelation> relationStatuses,
+  ) => this(relationStatuses: relationStatuses);
+
+  @override
   RepCampaignSummaryDto createdById(String createdById) =>
       this(createdById: createdById);
 
@@ -140,6 +150,7 @@ class _$RepCampaignSummaryDtoCWProxyImpl
     Object? departementId = const $CopyWithPlaceholder(),
     Object? iefId = const $CopyWithPlaceholder(),
     Object? onlyWithoutProspects = const $CopyWithPlaceholder(),
+    Object? relationStatuses = const $CopyWithPlaceholder(),
     Object? createdById = const $CopyWithPlaceholder(),
     Object? createdByName = const $CopyWithPlaceholder(),
     Object? commercialCount = const $CopyWithPlaceholder(),
@@ -181,6 +192,10 @@ class _$RepCampaignSummaryDtoCWProxyImpl
           ? _value.onlyWithoutProspects
           // ignore: cast_nullable_to_non_nullable
           : onlyWithoutProspects as bool,
+      relationStatuses: relationStatuses == const $CopyWithPlaceholder()
+          ? _value.relationStatuses
+          // ignore: cast_nullable_to_non_nullable
+          : relationStatuses as List<RepresentantRelation>,
       createdById: createdById == const $CopyWithPlaceholder()
           ? _value.createdById
           // ignore: cast_nullable_to_non_nullable
@@ -238,6 +253,7 @@ RepCampaignSummaryDto _$RepCampaignSummaryDtoFromJson(
       'departementId',
       'iefId',
       'onlyWithoutProspects',
+      'relationStatuses',
       'createdById',
       'createdByName',
       'commercialCount',
@@ -265,6 +281,12 @@ RepCampaignSummaryDto _$RepCampaignSummaryDtoFromJson(
     onlyWithoutProspects: $checkedConvert(
       'onlyWithoutProspects',
       (v) => v as bool,
+    ),
+    relationStatuses: $checkedConvert(
+      'relationStatuses',
+      (v) => (v as List<dynamic>)
+          .map((e) => $enumDecode(_$RepresentantRelationEnumMap, e))
+          .toList(),
     ),
     createdById: $checkedConvert('createdById', (v) => v as String),
     createdByName: $checkedConvert('createdByName', (v) => v as String),
@@ -294,6 +316,9 @@ Map<String, dynamic> _$RepCampaignSummaryDtoToJson(
   'departementId': instance.departementId,
   'iefId': instance.iefId,
   'onlyWithoutProspects': instance.onlyWithoutProspects,
+  'relationStatuses': instance.relationStatuses
+      .map((e) => _$RepresentantRelationEnumMap[e]!)
+      .toList(),
   'createdById': instance.createdById,
   'createdByName': instance.createdByName,
   'commercialCount': instance.commercialCount,
@@ -309,4 +334,12 @@ const _$CampaignStatusEnumMap = {
   CampaignStatus.PAUSED: 'PAUSED',
   CampaignStatus.CLOSED: 'CLOSED',
   CampaignStatus.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$RepresentantRelationEnumMap = {
+  RepresentantRelation.INCONNU: 'INCONNU',
+  RepresentantRelation.CONTACTE: 'CONTACTE',
+  RepresentantRelation.AMBASSADEUR: 'AMBASSADEUR',
+  RepresentantRelation.REFUS: 'REFUS',
+  RepresentantRelation.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

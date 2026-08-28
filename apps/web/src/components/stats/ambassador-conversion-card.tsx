@@ -37,38 +37,48 @@ export function AmbassadorConversionCard() {
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        {showError ? (
-          <QueryErrorInline
-            error={error}
-            onRetry={() => {
-              void refetch();
-            }}
-            fallback="Le taux de conversion en ambassadeurs n’a pas pu être calculé."
-          />
-        ) : isPending || data === undefined ? (
-          <Skeleton className="h-24 w-full" aria-hidden="true" />
-        ) : data.conversionRate === null ? (
-          <p className="text-[0.875rem] text-muted-foreground">
-            Aucune relation renseignée sur la période. Renseignez le statut des représentants
-            appelés pour que le taux existe.
-          </p>
-        ) : (
-          <>
-            <p className="font-display text-[2rem] font-[800] leading-none tracking-[-0.02em] tabular-nums text-success">
-              {formatRate(data.conversionRate)}
-            </p>
-            <p className="text-[0.875rem] tabular-nums">
-              {formatNumber(data.ambassadors)} ambassadeurs sur {formatNumber(data.contacted)}{' '}
-              représentants travaillés sur la période.
-            </p>
-            {data.reverted > 0 ? (
-              <p className="text-[0.8125rem] text-muted-foreground tabular-nums">
-                {formatNumber(data.reverted)} d’entre eux ne sont plus ambassadeurs aujourd’hui. La
-                bascule reste comptée : elle a eu lieu, et elle est datée.
-              </p>
-            ) : null}
-          </>
-        )}
+        {(() => {
+          if (showError)
+            return (
+              <QueryErrorInline
+                error={error}
+                onRetry={() => {
+                  void refetch();
+                }}
+                fallback="Le taux de conversion en ambassadeurs n’a pas pu être calculé."
+              />
+            );
+          return (() => {
+            if (isPending || data === undefined)
+              return <Skeleton className="h-24 w-full" aria-hidden="true" />;
+            return (() => {
+              if (data.conversionRate === null)
+                return (
+                  <p className="text-[0.875rem] text-muted-foreground">
+                    Aucune relation renseignée sur la période. Renseignez le statut des
+                    représentants appelés pour que le taux existe.
+                  </p>
+                );
+              return (
+                <>
+                  <p className="font-display text-[2rem] font-[800] leading-none tracking-[-0.02em] tabular-nums text-success">
+                    {formatRate(data.conversionRate)}
+                  </p>
+                  <p className="text-[0.875rem] tabular-nums">
+                    {formatNumber(data.ambassadors)} ambassadeurs sur {formatNumber(data.contacted)}{' '}
+                    représentants travaillés sur la période.
+                  </p>
+                  {data.reverted > 0 ? (
+                    <p className="text-[0.8125rem] text-muted-foreground tabular-nums">
+                      {formatNumber(data.reverted)} d’entre eux ne sont plus ambassadeurs
+                      aujourd’hui. La bascule reste comptée : elle a eu lieu, et elle est datée.
+                    </p>
+                  ) : null}
+                </>
+              );
+            })();
+          })();
+        })()}
 
         {/* Le chiffre a l'air d'un taux sur l'annuaire ; il ne porte que sur la
             population travaillée, et ce qui en est exclu doit se lire ici. */}

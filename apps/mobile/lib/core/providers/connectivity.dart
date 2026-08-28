@@ -17,11 +17,21 @@ unreachableEvidenceProvider = NotifierProvider<UnreachableEvidence, DateTime?>(
 /// La preuve s'efface d'elle-même : lue à la demande, sa fraîcheur ne serait
 /// jamais recalculée et le bandeau « Serveur injoignable » resterait affiché
 /// alors que le réseau est revenu.
+///
+/// Elle s'efface aussi dès que l'interface change : l'échec prouvait l'ancien
+/// lien, pas le nouveau. Sans cela le bandeau attendait le cycle suivant pour
+/// disparaître, et rien du tout tant qu'aucune session n'était ouverte.
 class UnreachableEvidence extends Notifier<DateTime?> {
   Timer? _expiry;
 
   @override
   DateTime? build() {
+    ref.listen<AsyncValue<CpiConnectivity>>(connectivityInterfaceProvider, (
+      AsyncValue<CpiConnectivity>? previous,
+      AsyncValue<CpiConnectivity> next,
+    ) {
+      if (next.value != null && next.value != previous?.value) clear();
+    });
     ref.onDispose(() => _expiry?.cancel());
     return null;
   }
@@ -65,9 +75,17 @@ class PlatformNetworkValidation implements NetworkValidation {
 final Provider<NetworkValidation> networkValidationProvider =
     Provider<NetworkValidation>((Ref ref) => const PlatformNetworkValidation());
 
+/// Le soupçon d'Android, relu à chaque changement d'interface.
+///
+/// Ce n'est qu'un soupçon : le système pose `NET_CAPABILITY_VALIDATED` une fois
+/// SA sonde terminée, donc après l'événement d'interface (4 à 16 s plus tard sur
+/// l'émulateur), et il ne la pose jamais sur certains liens data qui routent
+/// pourtant vers notre API. Un « non » ne prouve donc rien ; il ne fait que
+/// demander une vérification par notre propre trafic, que `SyncCoordinator`
+/// déclenche.
 final FutureProvider<bool?> networkValidatedProvider = FutureProvider<bool?>((
   Ref ref,
-) async {
+) {
   ref.watch(connectivityResultsProvider);
   return ref.watch(networkValidationProvider).isValidated();
 });
@@ -155,15 +173,17 @@ bool isUnmeteredLink(List<ConnectivityResult> results) => results.any(
       r == ConnectivityResult.wifi || r == ConnectivityResult.ethernet,
 );
 
+/// Deux faits décident de ce que la bande annonce, jamais un pronostic : plus
+/// aucune interface, ou notre propre requête qui n'a pas abouti. Tant que rien
+/// n'a été tenté on s'annonce en ligne, y compris avant le premier état
+/// d'interface : une bande de panne sur un réseau qui marche ferme la
+/// connexion à un utilisateur qui pouvait travailler.
 final Provider<CpiConnectivity> connectivityProvider =
     Provider<CpiConnectivity>((Ref ref) {
       final CpiConnectivity interface =
           ref.watch(connectivityInterfaceProvider).value ??
           CpiConnectivity.online;
       if (interface == CpiConnectivity.offline) return CpiConnectivity.offline;
-
-      final bool? validated = ref.watch(networkValidatedProvider).value;
-      if (validated == false) return CpiConnectivity.unreachable;
 
       final DateTime? failedAt = ref.watch(unreachableEvidenceProvider);
       return failedAt == null

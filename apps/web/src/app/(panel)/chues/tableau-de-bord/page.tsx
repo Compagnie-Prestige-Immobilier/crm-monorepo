@@ -12,7 +12,7 @@ import { getQueryClient } from '@/lib/query-client';
 import { queryKeys } from '@/lib/query-keys';
 import { guardRoles } from '@/lib/session';
 
-export const metadata: Metadata = { title: 'Tableau de bord' };
+export const metadata: Metadata = { title: 'Chiffres' };
 
 export default async function TableauDeBordPage({
   searchParams,

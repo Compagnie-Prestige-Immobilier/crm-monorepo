@@ -32,6 +32,8 @@ class ImportJobReportDto {
 
     required this.createdRows,
 
+    required this.updatedRows,
+
     required this.skippedRows,
 
     required this.errorRows,
@@ -70,6 +72,10 @@ class ImportJobReportDto {
   @JsonKey(name: r'createdRows', required: true, includeIfNull: false)
   final num createdRows;
 
+  /// Lignes RÉÉCRITES. Seul l’aller-retour Excel du registre des visites en produit.
+  @JsonKey(name: r'updatedRows', required: true, includeIfNull: false)
+  final num updatedRows;
+
   /// Lignes écartées : doublons dans le fichier, ou déjà présentes en base.
   @JsonKey(name: r'skippedRows', required: true, includeIfNull: false)
   final num skippedRows;
@@ -100,6 +106,7 @@ class ImportJobReportDto {
                 totalRows,
                 processedRows,
                 createdRows,
+                updatedRows,
                 skippedRows,
                 errorRows,
                 truncated,
@@ -112,6 +119,7 @@ class ImportJobReportDto {
                 other.totalRows,
                 other.processedRows,
                 other.createdRows,
+                other.updatedRows,
                 other.skippedRows,
                 other.errorRows,
                 other.truncated,
@@ -130,6 +138,7 @@ class ImportJobReportDto {
         totalRows,
         processedRows,
         createdRows,
+        updatedRows,
         skippedRows,
         errorRows,
         truncated,

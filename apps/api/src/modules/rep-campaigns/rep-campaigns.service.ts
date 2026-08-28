@@ -5,12 +5,12 @@ import {
   ChangeSource,
   Prisma,
   RepCallOutcome,
+  RepresentantRelation,
   Role,
 } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { shortCode } from '../../common/short-code.js';
-import { isAdmin } from '../../common/scope.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import {
   MIN_SPREAD_DAYS,
@@ -21,8 +21,10 @@ import {
   shuffleInPostgres,
 } from '../phase2/distribution.js';
 import { COMMENT_MAX_LENGTH } from '../phase2/attempt-rules.js';
-import type { CheckboxGroup, ProgrammeRow } from '../phase2/programme-pdf.js';
+import type { RepProgrammeData, RepProgrammeRow } from '../phase2/programme-pdf.js';
 import {
+  callbackAtNotAllowed,
+  callbackAtRequired,
   commentRequired,
   commercialInactive,
   commercialNotFound,
@@ -69,11 +71,6 @@ const TERMINAL_OUTCOMES: readonly RepCallOutcome[] = [
   RepCallOutcome.WRONG_NUMBER,
 ];
 
-export const REP_CHECKBOX_GROUPS: readonly CheckboxGroup[] = [
-  { caption: 'Résultat', options: ['Échange fait', 'Fiches promises'] },
-  { caption: 'Autre', options: ['Injoignable', 'Rappeler', 'Refus', 'Faux numéro', 'Autre'] },
-];
-
 const emptyProgress = (): RepCampaignProgressDto => ({ total: 0, open: 0, done: 0, cancelled: 0 });
 
 const zeroes = (length: number): number[] => Array.from({ length: Math.max(1, length) }, () => 0);
@@ -97,6 +94,7 @@ interface ScopeInput {
   readonly departementId?: string | null;
   readonly iefId?: string | null;
   readonly onlyWithoutProspects?: boolean | null;
+  readonly relationStatuses?: readonly RepresentantRelation[] | null;
 }
 
 @Injectable()
@@ -123,6 +121,7 @@ export class RepCampaignsService {
               departementId: body.departementId ?? null,
               iefId: body.iefId ?? null,
               onlyWithoutProspects: body.onlyWithoutProspects ?? false,
+              relationStatuses: body.relationStatuses ?? [],
               createdById: user.id,
             },
           });
@@ -280,10 +279,12 @@ export class RepCampaignsService {
           row.departement?.name ?? null,
           row.ief?.name ?? null,
           row.onlyWithoutProspects,
+          row.relationStatuses,
         ),
         departementId: row.departementId,
         iefId: row.iefId,
         onlyWithoutProspects: row.onlyWithoutProspects,
+        relationStatuses: row.relationStatuses,
         createdById: row.createdById,
         createdByName: row.createdBy.fullName,
         commercialCount: row._count.commerciaux,
@@ -347,10 +348,12 @@ export class RepCampaignsService {
         campaign.departement?.name ?? null,
         campaign.ief?.name ?? null,
         campaign.onlyWithoutProspects,
+        campaign.relationStatuses,
       ),
       departementId: campaign.departementId,
       iefId: campaign.iefId,
       onlyWithoutProspects: campaign.onlyWithoutProspects,
+      relationStatuses: campaign.relationStatuses,
       createdById: campaign.createdById,
       createdByName: campaign.createdBy.fullName,
       commercialCount: campaign.commerciaux.length,
@@ -459,7 +462,7 @@ export class RepCampaignsService {
     campaignName: string;
     commercialName: string;
     segmentLabel: string;
-    rows: ProgrammeRow[];
+    rows: RepProgrammeRow[];
     dayNumber?: number;
     dayCount?: number;
   }> {
@@ -471,6 +474,7 @@ export class RepCampaignsService {
             name: true,
             spreadDays: true,
             onlyWithoutProspects: true,
+            relationStatuses: true,
             departement: { select: { name: true } },
             ief: { select: { name: true } },
           },
@@ -496,7 +500,7 @@ export class RepCampaignsService {
         ...(jour === undefined ? {} : { dayIndex: jour - 1 }),
       },
       orderBy: { position: 'asc' },
-      select: { position: true, representant: { select: { id: true, phoneE164: true } } },
+      select: { position: true, representant: { select: { fullName: true, phoneE164: true } } },
     });
 
     return {
@@ -506,59 +510,122 @@ export class RepCampaignsService {
         membership.campaign.departement?.name ?? null,
         membership.campaign.ief?.name ?? null,
         membership.campaign.onlyWithoutProspects,
+        membership.campaign.relationStatuses,
       ),
       rows: tasks.map((task) => ({
         position: task.position,
-        shortCode: shortCode(task.representant.id),
+        fullName: task.representant.fullName,
         phoneE164: task.representant.phoneE164,
       })),
       ...(jour === undefined ? {} : { dayNumber: jour, dayCount: effectiveDays }),
     };
   }
 
+  async programmes(campaignId: string): Promise<
+    {
+      fileName: string;
+      data: Omit<RepProgrammeData, 'generatedAt'>;
+    }[]
+  > {
+    const campaign = await this.prisma.repCallCampaign.findUnique({
+      where: { id: campaignId },
+      select: {
+        name: true,
+        spreadDays: true,
+        onlyWithoutProspects: true,
+        relationStatuses: true,
+        departement: { select: { name: true } },
+        ief: { select: { name: true } },
+        commerciaux: {
+          orderBy: { position: 'asc' },
+          select: {
+            position: true,
+            user: { select: { id: true, fullName: true, username: true } },
+          },
+        },
+        tasks: {
+          orderBy: [{ assignedToId: 'asc' }, { position: 'asc' }],
+          select: {
+            assignedToId: true,
+            position: true,
+            dayIndex: true,
+            representant: { select: { fullName: true, phoneE164: true } },
+          },
+        },
+      },
+    });
+    if (!campaign) throw repCampaignNotFound();
+
+    const segmentLabel = composeScopeLabel(
+      campaign.departement?.name ?? null,
+      campaign.ief?.name ?? null,
+      campaign.onlyWithoutProspects,
+      campaign.relationStatuses,
+    );
+    const byUser = Map.groupBy(campaign.tasks, (task) => task.assignedToId);
+
+    return campaign.commerciaux.flatMap((membership) => {
+      const tasks = byUser.get(membership.user.id) ?? [];
+      if (tasks.length === 0) return [];
+      const dayCount = Math.max(1, Math.min(campaign.spreadDays, tasks.length));
+      const days =
+        campaign.spreadDays > 1 ? Array.from({ length: dayCount }, (_, day) => day) : [null];
+
+      return days.flatMap((dayIndex) => {
+        const selected =
+          dayIndex === null ? tasks : tasks.filter((task) => task.dayIndex === dayIndex);
+        if (selected.length === 0) return [];
+        const dayNumber = dayIndex === null ? undefined : dayIndex + 1;
+        const suffix = dayNumber === undefined ? '' : `-jour-${String(dayNumber)}`;
+        return [
+          {
+            fileName: `${String(membership.position).padStart(2, '0')}-${membership.user.username}${suffix}.pdf`,
+            data: {
+              campaignName: campaign.name,
+              commercialName: membership.user.fullName,
+              segmentLabel,
+              rows: selected.map((task) => ({
+                position: task.position,
+                fullName: task.representant.fullName,
+                phoneE164: task.representant.phoneE164,
+              })),
+              ...(dayNumber === undefined ? {} : { dayNumber, dayCount }),
+            },
+          },
+        ];
+      });
+    });
+  }
+
   async recordAttempt(
     user: AuthenticatedUser,
     body: CreateRepCallAttemptDto,
   ): Promise<RepCallAttemptResultDto> {
-    const comment = body.comment?.trim() || null;
-    if (body.outcome === RepCallOutcome.OTHER && comment === null) throw commentRequired();
-    if (
-      body.promisedProspects !== undefined &&
-      body.outcome !== RepCallOutcome.PROSPECTS_PROMISED
-    ) {
-      throw promisedNotAllowed();
-    }
-    if (comment !== null && comment.length > COMMENT_MAX_LENGTH) throw commentRequired();
+    const comment = validatedComment(body);
 
-    const suggested = await this.resolveSuggested(user, body.suggestedPhone);
+    const suggested = await this.resolveSuggested(body.suggestedPhone);
 
     const existing = await this.prisma.repCallAttempt.findUnique({
       where: { id: body.id },
       select: { id: true, taskId: true },
     });
     if (existing) {
-      return {
-        status: RepCallAttemptApplyStatus.DUPLICATE,
-        attemptId: existing.id,
-        taskId: existing.taskId,
-        taskClosed: false,
-        suggestion: suggested?.lookup ?? null,
-      };
+      return attemptResult(
+        RepCallAttemptApplyStatus.DUPLICATE,
+        existing.id,
+        existing.taskId,
+        false,
+        suggested,
+      );
     }
 
-    // Sans cette clause, poster le `representantId` d'un collègue suffisait à
-    // écrire sa relation, son WhatsApp, et à clore SA tâche de campagne. La
-    // tâche confiée est cherchée sans `isActive` : une tentative peut arriver
-    // après que la file a été soldée, et elle reste légitime.
+    // N'IMPORTE QUEL représentant vivant de l'annuaire : il descend sur tous les
+    // téléphones, et la qualification est justement le geste que l'on porte sur
+    // une fiche trouvée à l'annuaire, sans campagne qui la confie.
     const representant = await this.prisma.representant.findFirst({
       where: {
         id: body.representantId,
         deletedAt: null,
-        ...(isAdmin(user)
-          ? {}
-          : {
-              OR: [{ createdById: user.id }, { repCallTasks: { some: { assignedToId: user.id } } }],
-            }),
       },
       select: {
         id: true,
@@ -591,6 +658,7 @@ export class RepCampaignsService {
             outcome: body.outcome,
             promisedProspects: body.promisedProspects ?? null,
             comment,
+            callbackAt: body.callbackAt ? new Date(body.callbackAt) : null,
             clientCreatedAt: new Date(body.clientCreatedAt),
           },
         ],
@@ -633,7 +701,7 @@ export class RepCampaignsService {
           fromStatus: representant.relationStatus,
           toStatus: body.relationStatus,
           changedById: user.id,
-          source: ChangeSource.WEB,
+          source: ChangeSource.MOBILE,
         });
       }
 
@@ -652,22 +720,22 @@ export class RepCampaignsService {
     });
 
     if (!applied) {
-      return {
-        status: RepCallAttemptApplyStatus.DUPLICATE,
-        attemptId: body.id,
-        taskId: task?.id ?? null,
-        taskClosed: false,
-        suggestion: suggested?.lookup ?? null,
-      };
+      return attemptResult(
+        RepCallAttemptApplyStatus.DUPLICATE,
+        body.id,
+        task?.id ?? null,
+        false,
+        suggested,
+      );
     }
 
-    return {
-      status: RepCallAttemptApplyStatus.APPLIED,
-      attemptId: body.id,
-      taskId: task?.id ?? null,
-      taskClosed: Boolean(task) && terminal,
-      suggestion: suggested?.lookup ?? null,
-    };
+    return attemptResult(
+      RepCallAttemptApplyStatus.APPLIED,
+      body.id,
+      task?.id ?? null,
+      task !== null && terminal,
+      suggested,
+    );
   }
 
   /**
@@ -676,12 +744,11 @@ export class RepCampaignsService {
    * au téléconseiller qui rencontrerait un jour cette personne pour de vrai.
    */
   private async resolveSuggested(
-    user: AuthenticatedUser,
     phone: string | undefined,
   ): Promise<{ lookup: RepresentantLookupDto; resolvedRepresentantId: string | null } | null> {
     if (phone === undefined) return null;
 
-    const lookup = await this.representants.lookup(user, phone);
+    const lookup = await this.representants.lookup(phone);
     const known = await this.prisma.representant.findFirst({
       where: {
         phoneE164: lookup.phoneE164,
@@ -710,30 +777,76 @@ export class RepCampaignsService {
       departement?.name ?? null,
       ief?.name ?? null,
       scope.onlyWithoutProspects ?? false,
+      scope.relationStatuses ?? [],
     );
   }
 }
 
+function validatedComment(body: CreateRepCallAttemptDto): string | null {
+  const comment = body.comment?.trim() || null;
+  if (body.outcome === RepCallOutcome.OTHER && comment === null) throw commentRequired();
+  if (body.promisedProspects !== undefined && body.outcome !== RepCallOutcome.PROSPECTS_PROMISED) {
+    throw promisedNotAllowed();
+  }
+  if (comment !== null && comment.length > COMMENT_MAX_LENGTH) throw commentRequired();
+  if (body.outcome === RepCallOutcome.CALLBACK && body.callbackAt === undefined) {
+    throw callbackAtRequired();
+  }
+  if (body.callbackAt !== undefined && body.outcome !== RepCallOutcome.CALLBACK) {
+    throw callbackAtNotAllowed();
+  }
+  return comment;
+}
+
+function attemptResult(
+  status: RepCallAttemptApplyStatus,
+  attemptId: string,
+  taskId: string | null,
+  taskClosed: boolean,
+  suggested: { lookup: RepresentantLookupDto } | null,
+): RepCallAttemptResultDto {
+  return { status, attemptId, taskId, taskClosed, suggestion: suggested?.lookup ?? null };
+}
+
 function eligibleWhere(scope: ScopeInput): Prisma.RepresentantWhereInput {
+  const relationStatuses = scope.relationStatuses ?? [];
   return {
     deletedAt: null,
     ...(scope.departementId ? { departementId: scope.departementId } : {}),
     ...(scope.iefId ? { iefId: scope.iefId } : {}),
     ...(scope.onlyWithoutProspects ? { prospects: { none: { deletedAt: null } } } : {}),
+    ...(relationStatuses.length > 0 ? { relationStatus: { in: [...relationStatuses] } } : {}),
     repCallTasks: { none: { isActive: true } },
     repCallAttempts: { none: { outcome: { in: [...TERMINAL_OUTCOMES] } } },
   };
+}
+
+const RELATION_LABELS: Record<RepresentantRelation, string> = {
+  [RepresentantRelation.INCONNU]: 'inconnus',
+  [RepresentantRelation.CONTACTE]: 'contactés',
+  [RepresentantRelation.AMBASSADEUR]: 'ambassadeurs',
+  [RepresentantRelation.REFUS]: 'refus',
+};
+
+function relationLabel(statuses: readonly RepresentantRelation[]): string | null {
+  if (statuses.length === 0) return null;
+  if (statuses.length === 1 && statuses[0] === RepresentantRelation.AMBASSADEUR) return 'qualifiés';
+  if (!statuses.includes(RepresentantRelation.AMBASSADEUR)) return 'non qualifiés';
+  return statuses.map((status) => RELATION_LABELS[status]).join(' ou ');
 }
 
 function composeScopeLabel(
   departement: string | null,
   ief: string | null,
   onlyWithoutProspects: boolean,
+  relationStatuses: readonly RepresentantRelation[],
 ): string {
   const parts: string[] = [];
   if (departement) parts.push(`Département ${departement}`);
   if (ief) parts.push(`IEF ${ief}`);
   if (onlyWithoutProspects) parts.push('sans prospect');
+  const relation = relationLabel(relationStatuses);
+  if (relation) parts.push(relation);
   return parts.length ? parts.join(', ') : 'Tous les représentants';
 }
 

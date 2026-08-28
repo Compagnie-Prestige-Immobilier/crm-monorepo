@@ -65,6 +65,16 @@ abstract class _$SyncEntityDataDtoCWProxy {
 
   SyncEntityDataDto callbackAt(DateTime? callbackAt);
 
+  SyncEntityDataDto email(String? email);
+
+  SyncEntityDataDto fonctionnaire(bool? fonctionnaire);
+
+  SyncEntityDataDto engagementEnCours(bool? engagementEnCours);
+
+  SyncEntityDataDto dureeEtablissementMois(num? dureeEtablissementMois);
+
+  SyncEntityDataDto rendezVousAt(DateTime? rendezVousAt);
+
   SyncEntityDataDto visitorName(String? visitorName);
 
   SyncEntityDataDto visitDate(String? visitDate);
@@ -115,6 +125,11 @@ abstract class _$SyncEntityDataDtoCWProxy {
     EnrollmentMethod? method,
     String? comment,
     DateTime? callbackAt,
+    String? email,
+    bool? fonctionnaire,
+    bool? engagementEnCours,
+    num? dureeEtablissementMois,
+    DateTime? rendezVousAt,
     String? visitorName,
     String? visitDate,
     String? visitTime,
@@ -234,6 +249,25 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
       this(callbackAt: callbackAt);
 
   @override
+  SyncEntityDataDto email(String? email) => this(email: email);
+
+  @override
+  SyncEntityDataDto fonctionnaire(bool? fonctionnaire) =>
+      this(fonctionnaire: fonctionnaire);
+
+  @override
+  SyncEntityDataDto engagementEnCours(bool? engagementEnCours) =>
+      this(engagementEnCours: engagementEnCours);
+
+  @override
+  SyncEntityDataDto dureeEtablissementMois(num? dureeEtablissementMois) =>
+      this(dureeEtablissementMois: dureeEtablissementMois);
+
+  @override
+  SyncEntityDataDto rendezVousAt(DateTime? rendezVousAt) =>
+      this(rendezVousAt: rendezVousAt);
+
+  @override
   SyncEntityDataDto visitorName(String? visitorName) =>
       this(visitorName: visitorName);
 
@@ -295,6 +329,11 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
     Object? method = const $CopyWithPlaceholder(),
     Object? comment = const $CopyWithPlaceholder(),
     Object? callbackAt = const $CopyWithPlaceholder(),
+    Object? email = const $CopyWithPlaceholder(),
+    Object? fonctionnaire = const $CopyWithPlaceholder(),
+    Object? engagementEnCours = const $CopyWithPlaceholder(),
+    Object? dureeEtablissementMois = const $CopyWithPlaceholder(),
+    Object? rendezVousAt = const $CopyWithPlaceholder(),
     Object? visitorName = const $CopyWithPlaceholder(),
     Object? visitDate = const $CopyWithPlaceholder(),
     Object? visitTime = const $CopyWithPlaceholder(),
@@ -420,6 +459,27 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
           ? _value.callbackAt
           // ignore: cast_nullable_to_non_nullable
           : callbackAt as DateTime?,
+      email: email == const $CopyWithPlaceholder()
+          ? _value.email
+          // ignore: cast_nullable_to_non_nullable
+          : email as String?,
+      fonctionnaire: fonctionnaire == const $CopyWithPlaceholder()
+          ? _value.fonctionnaire
+          // ignore: cast_nullable_to_non_nullable
+          : fonctionnaire as bool?,
+      engagementEnCours: engagementEnCours == const $CopyWithPlaceholder()
+          ? _value.engagementEnCours
+          // ignore: cast_nullable_to_non_nullable
+          : engagementEnCours as bool?,
+      dureeEtablissementMois:
+          dureeEtablissementMois == const $CopyWithPlaceholder()
+          ? _value.dureeEtablissementMois
+          // ignore: cast_nullable_to_non_nullable
+          : dureeEtablissementMois as num?,
+      rendezVousAt: rendezVousAt == const $CopyWithPlaceholder()
+          ? _value.rendezVousAt
+          // ignore: cast_nullable_to_non_nullable
+          : rendezVousAt as DateTime?,
       visitorName: visitorName == const $CopyWithPlaceholder()
           ? _value.visitorName
           // ignore: cast_nullable_to_non_nullable
@@ -553,6 +613,20 @@ SyncEntityDataDto _$SyncEntityDataDtoFromJson(Map<String, dynamic> json) =>
           'callbackAt',
           (v) => v == null ? null : DateTime.parse(v as String),
         ),
+        email: $checkedConvert('email', (v) => v as String?),
+        fonctionnaire: $checkedConvert('fonctionnaire', (v) => v as bool?),
+        engagementEnCours: $checkedConvert(
+          'engagementEnCours',
+          (v) => v as bool?,
+        ),
+        dureeEtablissementMois: $checkedConvert(
+          'dureeEtablissementMois',
+          (v) => v as num?,
+        ),
+        rendezVousAt: $checkedConvert(
+          'rendezVousAt',
+          (v) => v == null ? null : DateTime.parse(v as String),
+        ),
         visitorName: $checkedConvert('visitorName', (v) => v as String?),
         visitDate: $checkedConvert('visitDate', (v) => v as String?),
         visitTime: $checkedConvert('visitTime', (v) => v as String?),
@@ -603,6 +677,13 @@ Map<String, dynamic> _$SyncEntityDataDtoToJson(
   if (instance.comment case final value?) 'comment': value,
   if (instance.callbackAt?.toIso8601String() case final value?)
     'callbackAt': value,
+  if (instance.email case final value?) 'email': value,
+  if (instance.fonctionnaire case final value?) 'fonctionnaire': value,
+  if (instance.engagementEnCours case final value?) 'engagementEnCours': value,
+  if (instance.dureeEtablissementMois case final value?)
+    'dureeEtablissementMois': value,
+  if (instance.rendezVousAt?.toIso8601String() case final value?)
+    'rendezVousAt': value,
   if (instance.visitorName case final value?) 'visitorName': value,
   if (instance.visitDate case final value?) 'visitDate': value,
   if (instance.visitTime case final value?) 'visitTime': value,
@@ -665,5 +746,6 @@ const _$EnrollmentMethodEnumMap = {
   EnrollmentMethod.PHYSICAL: 'PHYSICAL',
   EnrollmentMethod.VOICE_OR_ELECTRONIC_MESSAGING:
       'VOICE_OR_ELECTRONIC_MESSAGING',
+  EnrollmentMethod.APPOINTMENT: 'APPOINTMENT',
   EnrollmentMethod.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

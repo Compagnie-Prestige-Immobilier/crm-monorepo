@@ -3,12 +3,13 @@ import 'dart:io';
 
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:flutter/material.dart';
+import 'package:forui/forui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/router/back_navigation.dart';
-import '../../../core/router/route_paths.dart';
-import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
+import '../../../ui/widgets/cpi_kit.dart';
+import '../../shell/app_shell.dart';
 
 class BatteryHelpScreen extends StatelessWidget {
   const BatteryHelpScreen({super.key});
@@ -16,93 +17,84 @@ class BatteryHelpScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    final CpiColors cpi = context.cpi;
+    final String retour = reglagesDeLaCoque(context);
 
     return CpiPopScope(
-      fallback: Routes.reglages,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Autorisations et batterie'),
-          leading: const CpiBackButton(fallback: Routes.reglages),
-        ),
-        body: ListView(
-          padding: const EdgeInsets.all(CpiSpacing.md),
-          children: <Widget>[
-            Container(
-              padding: const EdgeInsets.all(CpiSpacing.sm),
-              decoration: BoxDecoration(
-                color: cpi.infoSurface,
-                borderRadius: CpiRadius.brMd,
+      fallback: retour,
+      child: CpiScaffold(
+        title: 'L\'app s\'arrête toute seule ?',
+        leading: CpiBackButton(fallback: retour),
+        // `Builder` : le message de repli a besoin d'un contexte SOUS le
+        // `FToaster` que pose `CpiScaffold`.
+        body: Builder(
+          builder: (BuildContext context) => ListView(
+            padding: const EdgeInsets.fromLTRB(
+              CpiSpacing.md,
+              CpiSpacing.xs,
+              CpiSpacing.md,
+              CpiSpacing.xl,
+            ),
+            children: <Widget>[
+              const CpiStatusBand(
+                text:
+                    'Ces trois réglages laissent l\'app envoyer quand elle est '
+                    'fermée.',
               ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Icon(
-                    PhosphorIconsRegular.info,
-                    size: CpiIconSize.md,
-                    color: cpi.info,
+              const SizedBox(height: CpiSpacing.lg),
+              Text('Trois réglages', style: theme.textTheme.titleSmall),
+              const SizedBox(height: CpiSpacing.xs),
+              const CpiCard.rows(<CpiRow>[
+                CpiRow(
+                  leading: _StepNumber(1),
+                  title: 'Optimisation de la batterie',
+                  subtitle:
+                      'Réglages → Batterie → Optimisation de la batterie → '
+                      'CPI GO → « Ne pas optimiser ».',
+                ),
+                CpiRow(
+                  leading: _StepNumber(2),
+                  title: 'Démarrage automatique (Xiaomi, Tecno, Infinix, itel)',
+                  subtitle:
+                      'Sécurité → Autorisations → Démarrage automatique → '
+                      'activer CPI GO.',
+                ),
+                CpiRow(
+                  leading: _StepNumber(3),
+                  title: 'Mettre le cadenas sur l\'app',
+                  subtitle:
+                      'Ouvrez les applications récentes, puis touchez le '
+                      'cadenas sur CPI GO. Sur beaucoup de téléphones, seul ce '
+                      'cadenas empêche la fermeture automatique.',
+                ),
+              ]),
+              const SizedBox(height: CpiSpacing.lg),
+              if (Platform.isAndroid) ...<Widget>[
+                CpiButton(
+                  'Ouvrir les réglages du téléphone',
+                  icon: PhosphorIconsRegular.gear,
+                  onPressed: () => _openBatterySettings(context),
+                ),
+                const SizedBox(height: CpiSpacing.xs),
+                CpiButton(
+                  'Ouvrir la fiche de l\'application',
+                  variant: CpiButtonVariant.ghost,
+                  onPressed: () => _openAppSettings(context),
+                ),
+              ] else
+                Text(
+                  'Ces réglages n\'existent que sur Android.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
-                  const SizedBox(width: CpiSpacing.xs),
-                  Expanded(
-                    child: Text(
-                      'Ces réglages permettent l\'envoi pendant que l\'app est '
-                      'fermée.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: cpi.info,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: CpiSpacing.lg),
-            Text('Trois réglages', style: theme.textTheme.titleSmall),
-            const SizedBox(height: CpiSpacing.xs),
-            const _Step(
-              index: 1,
-              title: 'Optimisation de la batterie',
-              body:
-                  'Réglages → Batterie → Optimisation de la batterie → CPI GO → '
-                  '« Ne pas optimiser ».',
-            ),
-            const _Step(
-              index: 2,
-              title: 'Démarrage automatique (Xiaomi, Tecno, Infinix, itel)',
-              body:
-                  'Sécurité → Autorisations → Démarrage automatique → activer '
-                  'CPI GO.',
-            ),
-            const _Step(
-              index: 3,
-              title: 'Verrouiller l\'app dans les tâches récentes',
-              body:
-                  'Ouvrez les applications récentes, puis touchez le cadenas '
-                  'sur CPI GO. Sur beaucoup de ROM, seul ce cadenas empêche la '
-                  'fermeture automatique.',
-            ),
-            const SizedBox(height: CpiSpacing.lg),
-            FilledButton.icon(
-              onPressed: _openBatterySettings,
-              icon: const Icon(PhosphorIconsRegular.gear, size: CpiIconSize.md),
-              label: const Text('Ouvrir les réglages de batterie'),
-            ),
-            const SizedBox(height: CpiSpacing.xs),
-            OutlinedButton.icon(
-              onPressed: _openAppSettings,
-              icon: const Icon(
-                PhosphorIconsRegular.slidersHorizontal,
-                size: CpiIconSize.md,
-              ),
-              label: const Text('Ouvrir la fiche de l\'application'),
-            ),
-          ],
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  static Future<void> _openBatterySettings() async {
-    if (!Platform.isAndroid) return;
+  static Future<void> _openBatterySettings(BuildContext context) async {
     try {
       await const AndroidIntent(
         action: 'android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS',
@@ -112,12 +104,12 @@ class BatteryHelpScreen extends StatelessWidget {
         'Réglages de batterie inaccessibles : $e',
         name: 'cpi.perm',
       );
-      await _openAppSettings();
+      if (!context.mounted) return;
+      await _openAppSettings(context);
     }
   }
 
-  static Future<void> _openAppSettings() async {
-    if (!Platform.isAndroid) return;
+  static Future<void> _openAppSettings(BuildContext context) async {
     try {
       await const AndroidIntent(
         action: 'android.settings.APPLICATION_DETAILS_SETTINGS',
@@ -125,53 +117,18 @@ class BatteryHelpScreen extends StatelessWidget {
       ).launch();
     } on Object catch (e) {
       developer.log('Fiche application inaccessible : $e', name: 'cpi.perm');
+      if (!context.mounted) return;
+      cpiToast(context, 'Ouvrez : Réglages → Applications → CPI GO.');
     }
   }
 }
 
-class _Step extends StatelessWidget {
-  const _Step({required this.index, required this.title, required this.body});
+/// Rang de l'étape, en pastille : le pas à suivre se lit dans l'ordre.
+class _StepNumber extends StatelessWidget {
+  const _StepNumber(this.index);
 
   final int index;
-  final String title;
-  final String body;
 
   @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(top: CpiSpacing.sm),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Container(
-            width: 26,
-            height: 26,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: context.cpi.accent,
-              borderRadius: CpiRadius.brFull,
-            ),
-            child: Text(
-              '$index',
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: context.cpi.accentForeground,
-              ),
-            ),
-          ),
-          const SizedBox(width: CpiSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(title, style: theme.textTheme.titleSmall),
-                const SizedBox(height: 2),
-                Text(body, style: theme.textTheme.bodySmall),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => FBadge(child: Text('$index'));
 }

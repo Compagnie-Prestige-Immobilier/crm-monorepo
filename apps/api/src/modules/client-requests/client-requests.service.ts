@@ -3,7 +3,6 @@ import {
   ClientRequestStatus,
   NotificationAudience,
   NotificationCategory,
-  Phase2Status,
   Prisma,
   Role,
 } from '@crm/database';
@@ -182,10 +181,6 @@ export class ClientRequestsService {
     return toClientRequestDto(row);
   }
 
-  /**
-   * Le prospect naît en `METHOD_OBTAINED` : c'est la condition exacte du filtre de recherche de
-   * la banque (`bank-cases.service.ts`, `prospectSearch`), sans quoi il lui resterait invisible.
-   */
   async approve(
     user: AuthenticatedUser,
     id: string,
@@ -241,10 +236,6 @@ export class ClientRequestsService {
           // renommage du référentiel.
           origin: 'BANQUE',
           originLabel: request.banque.name,
-          phase2Status: Phase2Status.METHOD_OBTAINED,
-          enrollmentMethod: body.enrollmentMethod,
-          enrollmentCapturedAt: now,
-          enrollmentCapturedById: user.id,
           clientCreatedAt: body.clientCreatedAt
             ? new Date(body.clientCreatedAt)
             : request.createdAt,

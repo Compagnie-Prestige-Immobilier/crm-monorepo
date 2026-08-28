@@ -201,6 +201,12 @@ def _key() -> str:
         print(f"{RED}✗ DOKPLOY_KEY n'est pas défini.{RESET}", file=sys.stderr)
         print("  export DOKPLOY_KEY='votre-clé'   puis relancez.", file=sys.stderr)
         sys.exit(1)
+    # Un en-tête HTTP est en latin-1 : le « … » d'un exemple recopié tel quel
+    # sortait une trace d'encodage au lieu de dire que la clé manque.
+    if not key.isascii():
+        print(f"{RED}✗ DOKPLOY_KEY contient un caractère non ASCII.{RESET}", file=sys.stderr)
+        print("  L'exemple « … » a-t-il été recopié à la place de la clé ?", file=sys.stderr)
+        sys.exit(1)
     return key
 
 

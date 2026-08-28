@@ -17,6 +17,10 @@ abstract class _$CreateRepCampaignDtoCWProxy {
 
   CreateRepCampaignDto onlyWithoutProspects(bool? onlyWithoutProspects);
 
+  CreateRepCampaignDto relationStatuses(
+    List<RepresentantRelation>? relationStatuses,
+  );
+
   CreateRepCampaignDto spreadDays(num? spreadDays);
 
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `CreateRepCampaignDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
@@ -31,6 +35,7 @@ abstract class _$CreateRepCampaignDtoCWProxy {
     String? departementId,
     String? iefId,
     bool? onlyWithoutProspects,
+    List<RepresentantRelation>? relationStatuses,
     num? spreadDays,
   });
 }
@@ -61,6 +66,11 @@ class _$CreateRepCampaignDtoCWProxyImpl
       this(onlyWithoutProspects: onlyWithoutProspects);
 
   @override
+  CreateRepCampaignDto relationStatuses(
+    List<RepresentantRelation>? relationStatuses,
+  ) => this(relationStatuses: relationStatuses);
+
+  @override
   CreateRepCampaignDto spreadDays(num? spreadDays) =>
       this(spreadDays: spreadDays);
 
@@ -77,6 +87,7 @@ class _$CreateRepCampaignDtoCWProxyImpl
     Object? departementId = const $CopyWithPlaceholder(),
     Object? iefId = const $CopyWithPlaceholder(),
     Object? onlyWithoutProspects = const $CopyWithPlaceholder(),
+    Object? relationStatuses = const $CopyWithPlaceholder(),
     Object? spreadDays = const $CopyWithPlaceholder(),
   }) {
     return CreateRepCampaignDto(
@@ -100,6 +111,10 @@ class _$CreateRepCampaignDtoCWProxyImpl
           ? _value.onlyWithoutProspects
           // ignore: cast_nullable_to_non_nullable
           : onlyWithoutProspects as bool?,
+      relationStatuses: relationStatuses == const $CopyWithPlaceholder()
+          ? _value.relationStatuses
+          // ignore: cast_nullable_to_non_nullable
+          : relationStatuses as List<RepresentantRelation>?,
       spreadDays: spreadDays == const $CopyWithPlaceholder()
           ? _value.spreadDays
           // ignore: cast_nullable_to_non_nullable
@@ -135,6 +150,12 @@ CreateRepCampaignDto _$CreateRepCampaignDtoFromJson(
       'onlyWithoutProspects',
       (v) => v as bool? ?? false,
     ),
+    relationStatuses: $checkedConvert(
+      'relationStatuses',
+      (v) => (v as List<dynamic>?)
+          ?.map((e) => $enumDecode(_$RepresentantRelationEnumMap, e))
+          .toList(),
+    ),
     spreadDays: $checkedConvert('spreadDays', (v) => v as num? ?? 1),
   );
   return val;
@@ -149,5 +170,18 @@ Map<String, dynamic> _$CreateRepCampaignDtoToJson(
   if (instance.iefId case final value?) 'iefId': value,
   if (instance.onlyWithoutProspects case final value?)
     'onlyWithoutProspects': value,
+  if (instance.relationStatuses
+          ?.map((e) => _$RepresentantRelationEnumMap[e]!)
+          .toList()
+      case final value?)
+    'relationStatuses': value,
   if (instance.spreadDays case final value?) 'spreadDays': value,
+};
+
+const _$RepresentantRelationEnumMap = {
+  RepresentantRelation.INCONNU: 'INCONNU',
+  RepresentantRelation.CONTACTE: 'CONTACTE',
+  RepresentantRelation.AMBASSADEUR: 'AMBASSADEUR',
+  RepresentantRelation.REFUS: 'REFUS',
+  RepresentantRelation.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

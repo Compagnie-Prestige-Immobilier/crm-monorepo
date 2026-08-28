@@ -17,6 +17,8 @@ export const RepCampaignError = {
   REPRESENTANT_NOT_FOUND: 'REP_CAMPAIGN_REPRESENTANT_NOT_FOUND',
   COMMENT_REQUIRED: 'REP_CAMPAIGN_COMMENT_REQUIRED',
   PROMISED_NOT_ALLOWED: 'REP_CAMPAIGN_PROMISED_NOT_ALLOWED',
+  CALLBACK_AT_REQUIRED: 'REP_CAMPAIGN_CALLBACK_AT_REQUIRED',
+  CALLBACK_AT_NOT_ALLOWED: 'REP_CAMPAIGN_CALLBACK_AT_NOT_ALLOWED',
 } as const;
 
 export const repCampaignNotFound = (): NotFoundException =>
@@ -85,4 +87,16 @@ export const promisedNotAllowed = (): BadRequestException =>
   new BadRequestException({
     code: RepCampaignError.PROMISED_NOT_ALLOWED,
     message: 'Un nombre de fiches promises n’est admis que pour l’issue PROSPECTS_PROMISED.',
+  });
+
+export const callbackAtRequired = (): BadRequestException =>
+  new BadRequestException({
+    code: RepCampaignError.CALLBACK_AT_REQUIRED,
+    message: 'L’issue « À rappeler » exige une date de rappel.',
+  });
+
+export const callbackAtNotAllowed = (): BadRequestException =>
+  new BadRequestException({
+    code: RepCampaignError.CALLBACK_AT_NOT_ALLOWED,
+    message: 'Une date de rappel n’est admise que pour l’issue CALLBACK.',
   });

@@ -20,7 +20,7 @@ class SyncApi {
   const SyncApi(this._dio);
 
   /// Récupère les changements depuis un curseur opaque.
-  /// Pagination keyset sur (updatedAt, id) et retard de sécurité de 2 secondes. Un COMMERCIAL ne reçoit que ses propres lignes ; les référentiels sont communs.
+  /// Pagination keyset sur (updatedAt, id) et retard de sécurité de 2 secondes. Un COMMERCIAL ne reçoit que ses propres prospects ; l’annuaire des représentants et les référentiels sont communs.
   ///
   /// Parameters:
   /// * [xCPIPayloadVersion] - Format de données que le client sait lire. En dessous de 4, le tirage est refusé au lieu d’être servi : les liens banque, syndicat et représentant d’un prospect peuvent être nuls, et un client plus ancien échoue à les décoder.

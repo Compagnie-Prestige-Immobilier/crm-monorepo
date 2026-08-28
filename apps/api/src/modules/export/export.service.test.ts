@@ -138,27 +138,27 @@ function matches(where: Prisma.ProspectWhereInput, candidate: Record<string, unk
   const clause = where as Record<string, unknown>;
 
   for (const [key, expected] of Object.entries(clause)) {
-    if (expected === undefined) continue;
-
-    if (key === 'AND') {
-      const list = expected as Prisma.ProspectWhereInput[];
-      if (!list.every((sub) => matches(sub, candidate))) return false;
-      continue;
-    }
-    if (key === 'syndicat' || key === 'banque') {
-      const relation = candidate[key] as Record<string, string>;
-      const field = key === 'syndicat' ? 'sigle' : 'shortName';
-      const rule = (expected as Record<string, StringFilter>)[field];
-      if (!stringMatches(rule, relation[field] ?? '')) return false;
-      continue;
-    }
-    if (key === 'deletedAt') {
-      if ((candidate.deletedAt ?? null) !== expected) return false;
-      continue;
-    }
-    if (!stringMatches(expected as StringFilter, candidate[key] as string)) return false;
+    if (!matchesClause(key, expected, candidate)) return false;
   }
   return true;
+}
+
+function matchesClause(
+  key: string,
+  expected: unknown,
+  candidate: Record<string, unknown>,
+): boolean {
+  if (expected === undefined) return true;
+  if (key === 'AND') {
+    return (expected as Prisma.ProspectWhereInput[]).every((sub) => matches(sub, candidate));
+  }
+  if (key === 'syndicat' || key === 'banque') {
+    const relation = candidate[key] as Record<string, string>;
+    const field = key === 'syndicat' ? 'sigle' : 'shortName';
+    return stringMatches((expected as Record<string, StringFilter>)[field], relation[field] ?? '');
+  }
+  if (key === 'deletedAt') return (candidate.deletedAt ?? null) === expected;
+  return stringMatches(expected as StringFilter, candidate[key] as string);
 }
 
 function stringMatches(rule: StringFilter | undefined, value: string): boolean {
@@ -341,7 +341,7 @@ describe('colonnes', () => {
       'Durée du système (mois)',
       'Segment',
       'Méthode d’enrôlement',
-      'Statut phase 2',
+      'Statut phase 3 (conversion)',
       'Dernier résultat',
       'Dernier commentaire',
       'Dernier appel',
@@ -359,7 +359,7 @@ describe('colonnes', () => {
 
     expect(cell('Nom')).toBe('Un');
     expect(cell('Segment')).toBe('BDD1');
-    expect(cell('Statut phase 2')).toBe('Méthode obtenue');
+    expect(cell('Statut phase 3 (conversion)')).toBe('Méthode obtenue');
     expect(cell('Méthode d’enrôlement')).toBe('Plateforme');
     expect(cell('Méthode obtenue par')).toBe('Omar Ba');
     expect(cell('Dernier résultat')).toBe('Méthode obtenue');
@@ -373,7 +373,7 @@ describe('colonnes', () => {
     const cell = (header: string): string =>
       text(ligne.getCell(PROSPECT_COLUMNS.findIndex((s) => s.header === header) + 1).value);
 
-    expect(cell('Statut phase 2')).toBe('En attente');
+    expect(cell('Statut phase 3 (conversion)')).toBe('En attente');
     expect(cell('Méthode d’enrôlement')).toBe('');
     expect(cell('Méthode obtenue par')).toBe('');
     expect(cell('Dernier résultat')).toBe('');

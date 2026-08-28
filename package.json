@@ -11,6 +11,7 @@
     "dx": "node tools/dev/dx.mjs",
     "build": "turbo build",
     "lint": "turbo lint",
+    "dead-code": "knip --include files,dependencies,unlisted",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "typecheck": "turbo typecheck",
@@ -29,12 +30,14 @@
     "mobile:client:generate": "node tools/dev/generate-dart-client.mjs",
     "codegen": "turbo run generate",
     "codegen:check": "pnpm codegen && git add -A --intent-to-add && git diff --exit-code -- apps/api/openapi.json packages/api-client/src/generated packages/api-client-dart/lib",
-    "verify:local": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm codegen:check"
+    "verify:local": "pnpm format:check && pnpm lint && pnpm dead-code && pnpm typecheck && pnpm test && pnpm codegen:check"
   },
   "devDependencies": {
-    "@crm/eslint-config": "workspace:*",
-    "@crm/typescript-config": "workspace:*",
     "@types/node": "catalog:",
+    "eslint-plugin-sonarjs": "catalog:",
+    "knip": "catalog:",
+    "oxlint": "catalog:",
+    "oxlint-tsgolint": "catalog:",
     "prettier": "catalog:",
     "turbo": "catalog:",
     "typescript": "catalog:"

@@ -436,15 +436,14 @@ function SortButton({
       className="inline-flex min-h-11 items-center gap-1.5 rounded-sm text-inherit hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
     >
       {label}
-      {active ? (
-        direction === 'asc' ? (
-          <ArrowUpIcon className="size-3.5" aria-hidden="true" />
-        ) : (
-          <ArrowDownIcon className="size-3.5" aria-hidden="true" />
-        )
-      ) : (
-        <ChevronsUpDownIcon className="size-3.5 opacity-40" aria-hidden="true" />
-      )}
+      {(() => {
+        if (active)
+          return (() => {
+            if (direction === 'asc') return <ArrowUpIcon className="size-3.5" aria-hidden="true" />;
+            return <ArrowDownIcon className="size-3.5" aria-hidden="true" />;
+          })();
+        return <ChevronsUpDownIcon className="size-3.5 opacity-40" aria-hidden="true" />;
+      })()}
     </button>
   );
 }

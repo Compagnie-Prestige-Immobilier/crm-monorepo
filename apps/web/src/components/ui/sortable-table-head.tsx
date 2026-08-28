@@ -17,11 +17,14 @@ export function SortableTableHead<F extends string>({
   className?: string | undefined;
 }) {
   const active = sortBy === column.id;
+  let icon = <ChevronsUpDownIcon className="size-3.5 text-muted-foreground" aria-hidden="true" />;
+  if (active && sortDir === 'asc') icon = <ArrowUpIcon className="size-3.5" aria-hidden="true" />;
+  if (active && sortDir === 'desc')
+    icon = <ArrowDownIcon className="size-3.5" aria-hidden="true" />;
+  let ariaSort: 'ascending' | 'descending' | 'none' = 'none';
+  if (active) ariaSort = sortDir === 'asc' ? 'ascending' : 'descending';
   return (
-    <TableHead
-      className={className}
-      aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
-    >
+    <TableHead className={className} aria-sort={ariaSort}>
       <button
         type="button"
         onClick={() => {
@@ -30,15 +33,7 @@ export function SortableTableHead<F extends string>({
         className="inline-flex min-h-11 items-center gap-1.5 rounded-sm text-inherit hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
         {column.label}
-        {active ? (
-          sortDir === 'asc' ? (
-            <ArrowUpIcon className="size-3.5" aria-hidden="true" />
-          ) : (
-            <ArrowDownIcon className="size-3.5" aria-hidden="true" />
-          )
-        ) : (
-          <ChevronsUpDownIcon className="size-3.5 text-muted-foreground" aria-hidden="true" />
-        )}
+        {icon}
       </button>
     </TableHead>
   );

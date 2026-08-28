@@ -38,74 +38,85 @@ export function BankAgingCard() {
           <StatInfo stat="bankAging" label="Ancienneté des dossiers en cours" />
         </CardTitle>
         <CardDescription>
-          {showError
-            ? 'Ancienneté indisponible.'
-            : isPending || !hasData
-              ? 'Calcul en cours…'
-              : `${formatNumber(data.total)} dossier${data.total > 1 ? 's' : ''} encore ouvert${data.total > 1 ? 's' : ''}. Les dossiers encaissés ou rejetés sont sortis du portefeuille.`}
+          {(() => {
+            if (showError) return 'Ancienneté indisponible.';
+            return (() => {
+              if (isPending || !hasData) return 'Calcul en cours…';
+              return `${formatNumber(data.total)} dossier${data.total > 1 ? 's' : ''} encore ouvert${data.total > 1 ? 's' : ''}. Les dossiers encaissés ou rejetés sont sortis du portefeuille.`;
+            })();
+          })()}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        {showError ? (
-          <QueryErrorInline
-            error={error}
-            onRetry={() => {
-              void refetch();
-            }}
-            fallback="L’ancienneté des dossiers n’a pas pu être calculée."
-          />
-        ) : data === undefined ? (
-          <Skeleton className="h-40 w-full" aria-hidden="true" />
-        ) : data.total === 0 ? (
-          <p className="text-[0.875rem] text-muted-foreground">
-            Aucun dossier en cours : rien ne vieillit.
-          </p>
-        ) : (
-          <>
-            <ul className="grid gap-2 sm:grid-cols-5">
-              {data.buckets.map((bucket) => (
-                <li key={bucket.bucket} className="rounded-md border border-border p-3">
-                  <p className="text-[0.75rem] text-muted-foreground">{bucket.label}</p>
-                  <p className="mt-0.5 text-[1.125rem] font-[700] tabular-nums">
-                    {formatNumber(bucket.dossiers)}
+        {(() => {
+          if (showError)
+            return (
+              <QueryErrorInline
+                error={error}
+                onRetry={() => {
+                  void refetch();
+                }}
+                fallback="L’ancienneté des dossiers n’a pas pu être calculée."
+              />
+            );
+          return (() => {
+            if (data === undefined) return <Skeleton className="h-40 w-full" aria-hidden="true" />;
+            return (() => {
+              if (data.total === 0)
+                return (
+                  <p className="text-[0.875rem] text-muted-foreground">
+                    Aucun dossier en cours : rien ne vieillit.
                   </p>
-                  <p className="text-[0.75rem] text-muted-foreground tabular-nums">
-                    {formatRateOrNone(bucket.share)}
-                  </p>
-                </li>
-              ))}
-            </ul>
+                );
+              return (
+                <>
+                  <ul className="grid gap-2 sm:grid-cols-5">
+                    {data.buckets.map((bucket) => (
+                      <li key={bucket.bucket} className="rounded-md border border-border p-3">
+                        <p className="text-[0.75rem] text-muted-foreground">{bucket.label}</p>
+                        <p className="mt-0.5 text-[1.125rem] font-[700] tabular-nums">
+                          {formatNumber(bucket.dossiers)}
+                        </p>
+                        <p className="text-[0.75rem] text-muted-foreground tabular-nums">
+                          {formatRateOrNone(bucket.share)}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
 
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead>Étape</TableHead>
-                    <TableHead className="text-right">Dossiers</TableHead>
-                    <TableHead className="text-right">Part</TableHead>
-                    <TableHead className="text-right">Stationnement médian</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.stages.map((stage) => (
-                    <TableRow key={stage.stageId}>
-                      <TableCell className="font-[600]">{stage.label}</TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatNumber(stage.dossiers)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatRateOrNone(stage.share)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatDelayDays(stage.medianStationDays)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </>
-        )}
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead>Étape</TableHead>
+                          <TableHead className="text-right">Dossiers</TableHead>
+                          <TableHead className="text-right">Part</TableHead>
+                          <TableHead className="text-right">Stationnement médian</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {data.stages.map((stage) => (
+                          <TableRow key={stage.stageId}>
+                            <TableCell className="font-[600]">{stage.label}</TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {formatNumber(stage.dossiers)}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {formatRateOrNone(stage.share)}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {formatDelayDays(stage.medianStationDays)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
+              );
+            })();
+          })();
+        })()}
       </CardContent>
     </Card>
   );

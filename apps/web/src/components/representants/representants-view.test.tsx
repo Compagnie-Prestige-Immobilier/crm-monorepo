@@ -200,7 +200,7 @@ describe('RepresentantsView, état de la relation', () => {
     for (const [nom, etat] of [
       ['Ndeye Fall', 'Pas encore contacté'],
       ['Moussa Sow', 'Contacté'],
-      ['Awa Ba', 'Ambassadeur'],
+      ['Awa Ba', 'A accepté'],
       ['Ibou Sy', 'Refus'],
     ]) {
       const ligne = within(table)
@@ -227,7 +227,7 @@ describe('RepresentantsView, état de la relation', () => {
     expect(liens[0]?.getAttribute('href')).toBe('/chues/representants/r-9');
   });
 
-  it('compte les ambassadeurs de la sélection, sur le total et non sur la page', async () => {
+  it('compte ceux qui ont accepté dans la sélection, sur le total et non sur la page', async () => {
     fetchRepresentants.mockImplementation((filters: { relationStatus: string | null }) =>
       Promise.resolve(
         filters.relationStatus === 'AMBASSADEUR'
@@ -238,10 +238,10 @@ describe('RepresentantsView, état de la relation', () => {
     setUrl('/chues/representants');
     renderWithQuery(<RepresentantsView canAdminister />);
 
-    expect(await screen.findByText(/dont 143 ambassadeurs/u)).toBeTruthy();
+    expect(await screen.findByText(/dont 143 qui ont accepté/u)).toBeTruthy();
   });
 
-  it('ne redit pas le décompte quand la sélection ne retient QUE les ambassadeurs', async () => {
+  it('ne redit pas le décompte quand la sélection ne retient QUE ceux qui ont accepté', async () => {
     fetchRepresentants.mockReturnValue(
       Promise.resolve({
         items: [fiche('r-3', 'Awa Ba', 'AMBASSADEUR')],
@@ -254,6 +254,6 @@ describe('RepresentantsView, état de la relation', () => {
     renderWithQuery(<RepresentantsView canAdminister />);
 
     await screen.findAllByText('Awa Ba');
-    expect(screen.queryByText(/ambassadeurs/u)).toBeNull();
+    expect(screen.queryByText(/qui ont accepté/u)).toBeNull();
   });
 });

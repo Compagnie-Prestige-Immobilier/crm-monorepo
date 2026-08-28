@@ -289,24 +289,28 @@ html:has([data-coque='chues']) {
   --switch-background: #9ba9c2;
   --scrim: rgba(6, 10, 20, 0.55);
 
-  /* Le bleu profond du filet sous le « UES ». */
-  --primary: #0f2e6b;
-  --primary-hover: #16408f;
+  /* Le bleu du logo CHUES, mesuré dessus. Couleur d'ACTION, jamais surface de
+     fond : à 9,6:1 sur blanc il porte du texte blanc, et une page entière de
+     cette saturation serait illisible. */
+  --primary: #0201e9;
+  --primary-hover: #0100b0;
   --primary-foreground: #ffffff;
-  --primary-text: #0f2e6b;
+  --primary-text: #0201e9;
   --secondary: #f1f3f8;
   --secondary-foreground: #0f2e6b;
   --muted: #eceff5;
   --muted-foreground: #47546b;
-  --ring: #0f2e6b;
+  --ring: #0201e9;
 
-  /* L'or CPI n'a pas cours ici : le marqueur est le bleu vif du filet. */
-  --accent: #1f63ce;
+  /* L'or CPI n'a pas cours ici : le marqueur est le bleu du logo. */
+  --accent: #0201e9;
   --accent-foreground: #ffffff;
-  --accent-text: #17509e;
-  --accent-border: #2f6fd6;
+  --accent-text: #0201e9;
+  --accent-border: #0201e9;
+  /* Sur le noir de la barre latérale, le bleu du logo tombe à 2,0:1 : le seul
+     endroit où il cède la place à un bleu clair. */
   --accent-on-dark: #7fb4ff;
-  --accent-surface: #eaf1fc;
+  --accent-surface: #ebebfe;
 
   --info: #1f63ce;
   --info-foreground: #ffffff;
@@ -324,7 +328,7 @@ html:has([data-coque='chues']) {
   --sidebar-ring: #7fb4ff;
   --sidebar-muted-foreground: #a8b6ce;
 
-  --chart-1: #0f2e6b;
+  --chart-1: #0201e9;
   --chart-4: #2f6fd6;
   --chart-grid: rgba(15, 46, 107, 0.1);
   --chart-tick: #47546b;
@@ -346,9 +350,10 @@ html.dark:has([data-coque='chues']) {
   --switch-background: #2a3244;
   --scrim: rgba(0, 0, 0, 0.65);
 
-  /* Le bleu profond du mode clair ne porte plus de blanc lisible sur fond
-     sombre ; on remonte d'un cran sans quitter le bleu du filet. */
-  --primary: #2a6ad0;
+  /* Le bleu du logo reste la couleur d'action, blanc dessus. Le survol
+     s'ÉCLAIRCIT au lieu de s'assombrir : sur fond sombre, un cran plus noir ne
+     se voit pas. */
+  --primary: #0201e9;
   --primary-hover: #3172da;
   --primary-foreground: #ffffff;
   --primary-text: #8db8ff;

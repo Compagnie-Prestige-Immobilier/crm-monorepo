@@ -34,21 +34,82 @@ class PhoneValid extends PhoneResult {
 enum PhoneWarning { unknownPrefix }
 
 class PhoneInvalid extends PhoneResult {
-  const PhoneInvalid(this.reason);
+  const PhoneInvalid(this.reason, {this.international = false});
 
   final PhoneProblem reason;
 
+  /// Le numéro s'annonce d'un autre pays : la longueur sénégalaise n'a plus
+  /// rien à lui reprocher.
+  final bool international;
+
   String get message => switch (reason) {
     PhoneProblem.empty => 'Le numéro est obligatoire.',
-    PhoneProblem.tooShort => 'Numéro incomplet : 9 chiffres attendus.',
-    PhoneProblem.tooLong => 'Numéro trop long : 9 chiffres attendus.',
+    PhoneProblem.tooShort =>
+      international
+          ? 'Numéro incomplet.'
+          : 'Numéro incomplet : 9 chiffres attendus.',
+    PhoneProblem.tooLong =>
+      international
+          ? 'Numéro trop long.'
+          : 'Numéro trop long : 9 chiffres attendus.',
     PhoneProblem.notDigits => 'Le numéro ne doit contenir que des chiffres.',
   };
 }
 
 enum PhoneProblem { empty, tooShort, tooLong, notDigits }
 
+/// Bornes d'un numéro écrit à l'internationale (E.164) : de quoi refuser une
+/// coquille sans prétendre connaître le plan de numérotation de chaque pays.
+const int kInternationalMinDigits = 7;
+const int kInternationalMaxDigits = 15;
+
 abstract final class Phone {
+  /// L'utilisateur annonce un autre pays : « + » ou « 00 » en tête. Ni la
+  /// longueur ni le découpage sénégalais ne s'appliquent alors.
+  static bool isInternational(String raw) {
+    final String t = raw.trimLeft();
+    return t.startsWith('+') || t.startsWith('00');
+  }
+
+  /// Le numéro tel qu'il est MONTRÉ, indicatif compris.
+  ///
+  /// Le champ garde « +221 » dans son décor et non dans son texte ; le
+  /// registre, lui, écrit ce que l'accueil a lu (`visites.service.ts` garde le
+  /// numéro tel quel).
+  static String displayed(String text) {
+    final String t = text.trim();
+    if (t.isEmpty) return '';
+    if (isInternational(t)) return t;
+    return '+$kSenegalCallingCode $t';
+  }
+
+  /// L'inverse de [displayed] : ce qu'il faut remettre DANS le champ. Un
+  /// numéro sénégalais y revient en national et regroupé, un numéro étranger
+  /// tel qu'il a été écrit.
+  static String editable(String stored) {
+    final String t = stored.trim();
+    if (t.isEmpty) return '';
+    final String compact = _compact(t);
+    if (compact.startsWith(kSenegalCallingCode) &&
+        compact.length == kSenegalCallingCode.length + kSenegalNationalLength) {
+      return groupNational(compact.substring(kSenegalCallingCode.length));
+    }
+    if (!isInternational(t) && compact.length <= kSenegalNationalLength) {
+      return groupNational(compact);
+    }
+    return t;
+  }
+
+  static String _compact(String raw) {
+    String compact = raw.replaceAll(_separators, '');
+    if (compact.startsWith('+')) {
+      compact = compact.substring(1);
+    } else if (compact.startsWith('00')) {
+      compact = compact.substring(2);
+    }
+    return compact.replaceAll(RegExp(r'[^0-9]'), '');
+  }
+
   static String digitsOf(String raw) {
     String compact = raw.replaceAll(_separators, '');
     if (compact.startsWith('+')) {
@@ -66,10 +127,23 @@ abstract final class Phone {
     return compact;
   }
 
-  static PhoneResult parse(String raw) {
+  /// [strictSenegal] à faux accepte un numéro d'un autre pays, à la seule
+  /// condition qu'il s'annonce comme tel (« + » ou « 00 ») : le Sénégal reste
+  /// la règle par défaut, il n'est plus la seule.
+  static PhoneResult parse(String raw, {bool strictSenegal = true}) {
     if (raw.trim().isEmpty) return const PhoneInvalid(PhoneProblem.empty);
     if (RegExp(r'[a-zA-Z]').hasMatch(raw)) {
       return const PhoneInvalid(PhoneProblem.notDigits);
+    }
+    if (!strictSenegal && isInternational(raw)) {
+      final String compact = _compact(raw);
+      if (compact.length < kInternationalMinDigits) {
+        return const PhoneInvalid(PhoneProblem.tooShort, international: true);
+      }
+      if (compact.length > kInternationalMaxDigits) {
+        return const PhoneInvalid(PhoneProblem.tooLong, international: true);
+      }
+      return PhoneValid('+$compact', compact);
     }
     final String digits = digitsOf(raw);
     if (digits.length < kSenegalNationalLength) {
