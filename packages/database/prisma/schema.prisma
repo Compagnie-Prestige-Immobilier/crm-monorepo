@@ -175,6 +175,11 @@ enum CallTaskStatus {
   CANCELLED
 }
 
+enum LotExportCible {
+  REPRESENTANTS
+  PROSPECTS
+}
+
 enum CallOutcome {
   METHOD_OBTAINED
   UNREACHABLE
@@ -281,6 +286,8 @@ model User {
   // Démonstration
   appSettingsUpdated AppSetting[] @relation("AppSettingUpdatedBy")
 
+  androidReleasesPublished AndroidRelease[] @relation("AndroidReleasePublishedBy")
+
   // Notifications
   deviceTokens           DeviceToken[]          @relation("DeviceTokenUser")
   notificationsCreated   Notification[]         @relation("NotificationCreatedBy")
@@ -296,8 +303,9 @@ model User {
 
   heartbeat AgentHeartbeat?
 
-  visitesEnregistrees Visite[]               @relation("VisiteCreatedBy")
-  visiteDashboard     VisiteDashboardLayout? @relation("VisiteDashboardLayoutUser")
+  visitesEnregistrees Visite[]          @relation("VisiteCreatedBy")
+  dashboardLayouts    DashboardLayout[] @relation("DashboardLayoutUser")
+  lotsExport          LotExport[]       @relation("LotExportCreatedBy")
 
   @@index([role, isActive])
   @@index([deletedAt])
@@ -495,6 +503,7 @@ model Representant {
   comments            RepresentantComment[]
   suggestionsGiven    RepresentantSuggestion[]     @relation("RepresentantSuggestionSource")
   suggestionsResolved RepresentantSuggestion[]     @relation("RepresentantSuggestionResolved")
+  lotItems            LotExportItem[]
 
   @@index([phoneE164])
   @@index([createdById])
@@ -693,6 +702,7 @@ model Prospect {
   callTasks          CallTask[]
   callAttempts       CallAttempt[]
   scheduledCallbacks ScheduledCallback[]
+  lotItems           LotExportItem[]
   bankCases          BankCase[]
   clientRequests     ClientCreationRequest[]
 
@@ -1507,6 +1517,27 @@ model AppSetting {
   @@map("app_settings")
 }
 
+/// Historique des APK publiés depuis le panel. Le plancher de version n'est PAS
+/// une colonne : c'est `max(versionCode)` des lignes `mandatory` non retirées.
+model AndroidRelease {
+  versionCode   Int       @id
+  versionName   String
+  fileName      String
+  fileSize      Int
+  sha256        String
+  signerSha256  String
+  mandatory     Boolean   @default(false)
+  publishedAt   DateTime  @default(now())
+  publishedById String?
+  publishedBy   User?     @relation("AndroidReleasePublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
+  notes         String?
+  withdrawnAt   DateTime?
+  withdrawnById String?
+
+  @@index([publishedAt])
+  @@map("android_releases")
+}
+
 // ═════════════════════════════════════════════════════════════════════════════
 // Notifications
 // ═════════════════════════════════════════════════════════════════════════════
@@ -2247,20 +2278,60 @@ model Visite {
   @@map("visites")
 }
 
-/// La disposition du tableau de bord des visites, telle que l'utilisateur l'a
-/// composée. L'absence de ligne veut dire « suivre la disposition par défaut »,
-/// posée par l'administrateur dans `AppSetting`.
+/// La disposition d'un écran de chiffres, telle que l'utilisateur l'a composée.
+/// L'absence de ligne veut dire « suivre la disposition par défaut », posée par
+/// l'administrateur dans `AppSetting`.
 ///
-/// `userId` est la clé primaire : une ligne par utilisateur par construction.
-model VisiteDashboardLayout {
-  userId String @id
-  user   User   @relation("VisiteDashboardLayoutUser", fields: [userId], references: [id], onDelete: Cascade)
+/// `ecran` distingue les écrans qui partagent le même moteur de composition :
+/// le registre des visites, les chiffres CHUES, les chiffres Grand Public.
+model DashboardLayout {
+  userId String
+  user   User   @relation("DashboardLayoutUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  ecran String
 
   layout Json
 
   updatedAt DateTime @updatedAt
 
-  @@map("visite_dashboard_layouts")
+  @@id([userId, ecran])
+  @@map("dashboard_layouts")
+}
+
+model LotExport {
+  id        String         @id @default(uuid(7))
+  name      String
+  cible     LotExportCible
+  projet    Projet?
+  filters   Json
+  itemCount Int
+
+  createdById String
+  createdBy   User     @relation("LotExportCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime @default(now())
+
+  items LotExportItem[]
+
+  @@index([cible, createdAt])
+  @@index([createdById, createdAt])
+  @@map("lots_export")
+}
+
+model LotExportItem {
+  lotId String
+  lot   LotExport @relation(fields: [lotId], references: [id], onDelete: Cascade)
+
+  representantId String?
+  representant   Representant? @relation(fields: [representantId], references: [id], onDelete: Cascade)
+  prospectId     String?
+  prospect       Prospect?     @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+
+  position Int
+
+  @@id([lotId, position])
+  @@index([representantId])
+  @@index([prospectId])
+  @@map("lot_export_items")
 }
 
 enum VisiteImportChangeKind {

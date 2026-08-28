@@ -2,22 +2,22 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
-import {
-  DISPOSITION_USINE,
-  resolveLayout,
-  sanitize,
-  type DispositionLayout,
-  type DispositionPresentation,
-  type DispositionWidget,
+import { dispositionUsine, resolveLayout, sanitize } from './dashboard-layout.js';
+import type {
+  DispositionLayout,
+  DispositionPresentation,
+  DispositionWidget,
 } from './dashboard-layout.js';
 import type {
+  DashboardEcran,
   DispositionPresentationDto,
   DispositionResponseDto,
   DispositionWidgetDto,
   UpdateDispositionDto,
 } from './dto.js';
 
-const DEFAULT_SETTING_KEY = 'visites.tableau-de-bord.disposition-par-defaut';
+const defaultSettingKey = (ecran: DashboardEcran): string =>
+  `tableau-de-bord.${ecran}.disposition-par-defaut`;
 
 const toResponse = (
   layout: DispositionLayout,
@@ -61,63 +61,77 @@ const toPlainWidgets = (widgets: readonly DispositionWidgetDto[]): DispositionWi
       : { presentation: toPlainPresentation(widget.presentation) }),
   }));
 
-const toStoredLayout = (body: UpdateDispositionDto): DispositionLayout => ({
+const toStoredLayout = (ecran: DashboardEcran, body: UpdateDispositionDto): DispositionLayout => ({
   version: 1,
   preset: body.preset ?? 'essentiel',
-  widgets: sanitize(toPlainWidgets(body.widgets)),
+  widgets: sanitize(ecran, toPlainWidgets(body.widgets)),
 });
 
 /**
- * La disposition d'un tableau de bord : la sienne, sinon celle fixée par
+ * La disposition d'un écran de chiffres : la sienne, sinon celle fixée par
  * l'administrateur dans `AppSetting`, sinon celle d'usine. Chaque niveau passe
  * par `resolveLayout`, qui rejette une version inconnue ou une liste devenue
  * vide une fois nettoyée plutôt que de rendre un écran cassé.
  */
 @Injectable()
-export class VisiteDashboardService {
+export class DashboardsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async get(userId: string): Promise<DispositionResponseDto> {
-    const own = await this.prisma.visiteDashboardLayout.findUnique({ where: { userId } });
+  async get(
+    userId: string,
+    ecran: DashboardEcran,
+    voitLesMontants = false,
+  ): Promise<DispositionResponseDto> {
+    const own = await this.prisma.dashboardLayout.findUnique({
+      where: { userId_ecran: { userId, ecran } },
+    });
     if (own !== null) {
-      const userLayout = resolveLayout(own.layout);
+      const userLayout = resolveLayout(ecran, own.layout);
       if (userLayout !== null)
         return toResponse(userLayout, 'utilisateur', own.updatedAt.toISOString());
     }
 
     const setting = await this.prisma.appSetting.findUnique({
-      where: { key: DEFAULT_SETTING_KEY },
+      where: { key: defaultSettingKey(ecran) },
     });
     if (setting !== null) {
-      const defaultLayout = resolveLayout(parseSettingValue(setting.value));
+      const defaultLayout = resolveLayout(ecran, parseSettingValue(setting.value));
       if (defaultLayout !== null)
         return toResponse(defaultLayout, 'defaut', setting.updatedAt.toISOString());
     }
 
-    return toResponse(DISPOSITION_USINE, 'usine', null);
+    return toResponse(dispositionUsine(ecran, voitLesMontants), 'usine', null);
   }
 
-  async put(userId: string, body: UpdateDispositionDto): Promise<DispositionResponseDto> {
-    const layout = toStoredLayout(body);
+  async put(
+    userId: string,
+    ecran: DashboardEcran,
+    body: UpdateDispositionDto,
+  ): Promise<DispositionResponseDto> {
+    const layout = toStoredLayout(ecran, body);
     const stored = layout as unknown as Prisma.InputJsonValue;
-    const row = await this.prisma.visiteDashboardLayout.upsert({
-      where: { userId },
-      create: { userId, layout: stored },
+    const row = await this.prisma.dashboardLayout.upsert({
+      where: { userId_ecran: { userId, ecran } },
+      create: { userId, ecran, layout: stored },
       update: { layout: stored },
     });
     return toResponse(layout, 'utilisateur', row.updatedAt.toISOString());
   }
 
-  async remove(userId: string): Promise<void> {
-    await this.prisma.visiteDashboardLayout.deleteMany({ where: { userId } });
+  async remove(userId: string, ecran: DashboardEcran): Promise<void> {
+    await this.prisma.dashboardLayout.deleteMany({ where: { userId, ecran } });
   }
 
-  async putDefault(actorId: string, body: UpdateDispositionDto): Promise<DispositionResponseDto> {
-    const layout = toStoredLayout(body);
+  async putDefault(
+    actorId: string,
+    ecran: DashboardEcran,
+    body: UpdateDispositionDto,
+  ): Promise<DispositionResponseDto> {
+    const layout = toStoredLayout(ecran, body);
     const value = JSON.stringify(layout);
     const row = await this.prisma.appSetting.upsert({
-      where: { key: DEFAULT_SETTING_KEY },
-      create: { key: DEFAULT_SETTING_KEY, value, updatedById: actorId },
+      where: { key: defaultSettingKey(ecran) },
+      create: { key: defaultSettingKey(ecran), value, updatedById: actorId },
       update: { value, updatedById: actorId },
     });
     return toResponse(layout, 'defaut', row.updatedAt.toISOString());

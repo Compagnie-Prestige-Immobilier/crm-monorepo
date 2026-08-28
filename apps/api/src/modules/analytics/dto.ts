@@ -1,15 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import {
-  IsBoolean,
-  IsEnum,
-  IsInt,
-  IsOptional,
-  IsString,
-  Max,
-  Min,
-  ValidateNested,
-} from 'class-validator';
+import { IsEnum, IsInt, IsOptional, Max, Min } from 'class-validator';
 import { BddSegment, EnrollmentMethod, Phase2Status } from '@crm/database';
 
 import { ProspectFilterDto } from '../../common/dto/prospect-filter.dto.js';
@@ -20,18 +11,7 @@ export enum TimeGranularity {
   MONTH = 'month',
 }
 
-export enum StatsLayoutScreen {
-  DASHBOARD = 'dashboard',
-  TELECONSEIL = 'teleconseil',
-}
-
 export class AnalyticsQueryDto extends ProspectFilterDto {}
-
-export class StatsLayoutQueryDto {
-  @ApiProperty({ enum: StatsLayoutScreen, enumName: 'StatsLayoutScreen' })
-  @IsEnum(StatsLayoutScreen)
-  screen!: StatsLayoutScreen;
-}
 
 export class TimeSeriesQueryDto extends ProspectFilterDto {
   @ApiPropertyOptional({
@@ -167,27 +147,4 @@ export class EnrollmentMethodListDto {
 export class SegmentListDto {
   @ApiProperty({ type: () => [SegmentCountDto] }) items!: SegmentCountDto[];
   @ApiProperty({ type: Number }) total!: number;
-}
-
-export class StatsLayoutWidgetDto {
-  @ApiProperty() @IsString() id!: string;
-  @ApiProperty({ type: Boolean }) @IsBoolean() visible!: boolean;
-}
-
-export class UpdateStatsLayoutDto {
-  @ApiProperty({ type: () => [StatsLayoutWidgetDto] })
-  @ValidateNested({ each: true })
-  @Type(() => StatsLayoutWidgetDto)
-  widgets!: StatsLayoutWidgetDto[];
-}
-
-export class StatsLayoutDto {
-  @ApiProperty({ enum: StatsLayoutScreen, enumName: 'StatsLayoutScreen' })
-  screen!: StatsLayoutScreen;
-
-  @ApiProperty({ type: () => [StatsLayoutWidgetDto] })
-  widgets!: StatsLayoutWidgetDto[];
-
-  @ApiProperty({ type: String, format: 'date-time', nullable: true })
-  updatedAt!: string | null;
 }

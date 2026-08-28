@@ -48,12 +48,14 @@ describe('saveDisposition', () => {
     const client = { PUT } as unknown as ApiClient;
 
     await saveDisposition(
+      'visites',
       [{ id: 'x', source: 'total-visites', marque: 'tuile' }],
       'essentiel',
       client,
     );
 
-    expect(PUT).toHaveBeenCalledWith('/api/v1/visites/tableau-de-bord/disposition', {
+    expect(PUT).toHaveBeenCalledWith('/api/v1/tableaux-de-bord/{ecran}/disposition', {
+      params: { path: { ecran: 'visites' } },
       body: { preset: 'essentiel', widgets: [{ source: 'total-visites', marque: 'tuile' }] },
     });
   });

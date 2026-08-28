@@ -18,8 +18,10 @@ import { axisScales, baseOptions, radialScale } from '@/components/dashboard/cha
 import type {
   CompositionLigne,
   DispositionPresentation,
+  EquipeDatum,
   MatriceDatum,
 } from '@/components/accueil/tableau-de-bord/sources';
+import { EmptyChart } from '@/components/dashboard/empty-chart';
 import { seriesBorderColor, seriesColor, useChartTheme, type ChartTheme } from '@/lib/chart-theme';
 import { formatNumber } from '@/lib/format';
 import type { NamedCount } from '@/lib/types';
@@ -868,7 +870,7 @@ export function TableauWidget({
               </th>
               <td className="px-2 py-1.5 text-right tabular-nums">{formatNumber(item.value)}</td>
               <td className="px-2 py-1.5 text-right tabular-nums">
-                {total === 0 ? '—' : `${String(Math.round((item.value / total) * 100))} %`}
+                {total === 0 ? '0 %' : `${String(Math.round((item.value / total) * 100))} %`}
               </td>
             </tr>
           ))}
@@ -879,6 +881,51 @@ export function TableauWidget({
               </td>
             </tr>
           ) : null}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/**
+ * Le tableau d'équipe : une ligne par personne, des colonnes d'unités
+ * différentes. Les cellules arrivent déjà mises en forme, la source seule
+ * sachant ce qui est un compte et ce qui est un pourcentage.
+ */
+export function TableauEquipe({ donnee, caption }: { donnee: EquipeDatum; caption: string }) {
+  if (donnee.lignes.length === 0) {
+    return <EmptyChart message="Personne n’a travaillé sur la période." />;
+  }
+
+  return (
+    <div className="h-full overflow-auto">
+      <table className="w-full text-[0.8125rem]">
+        <caption className="sr-only">{caption}</caption>
+        <thead className="border-b border-border">
+          <tr>
+            <th scope="col" className="px-2 py-1.5 text-left font-[600]">
+              Téléconseiller
+            </th>
+            {donnee.colonnes.map((colonne) => (
+              <th key={colonne} scope="col" className="px-2 py-1.5 text-right font-[600]">
+                {colonne}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {donnee.lignes.map((ligne) => (
+            <tr key={ligne.id}>
+              <th scope="row" className="px-2 py-1.5 text-left font-[400]">
+                {ligne.nom}
+              </th>
+              {ligne.cellules.map((cellule) => (
+                <td key={cellule.cle} className="px-2 py-1.5 text-right tabular-nums">
+                  {cellule.texte}
+                </td>
+              ))}
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>

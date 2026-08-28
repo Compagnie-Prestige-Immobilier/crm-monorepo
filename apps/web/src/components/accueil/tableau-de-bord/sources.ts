@@ -13,7 +13,13 @@ export type DispositionPresentation = Schemas['DispositionPresentationDto'];
 export type VisiteStats = Schemas['VisiteStatsDto'];
 
 export type Forme =
-  'scalaire' | 'classement' | 'serie-temporelle' | 'cyclique' | 'matrice' | 'composition';
+  | 'scalaire'
+  | 'classement'
+  | 'serie-temporelle'
+  | 'cyclique'
+  | 'matrice'
+  | 'composition'
+  | 'equipe';
 
 export interface ScalaireDatum {
   libelle: string;
@@ -38,19 +44,44 @@ export interface MatriceDatum {
   cellules: MatriceCellule[];
 }
 
+/** Une ligne de tableau d'équipe : des mesures d'unités DIFFÉRENTES sur une même personne. */
+export interface EquipeLigne {
+  id: string;
+  nom: string;
+  cellules: { cle: string; texte: string }[];
+}
+
+export interface EquipeDatum {
+  colonnes: string[];
+  lignes: EquipeLigne[];
+}
+
 export type DonneesSource =
   | { forme: 'scalaire'; donnee: ScalaireDatum }
   | { forme: 'classement'; donnee: NamedCount[] }
   | { forme: 'serie-temporelle'; donnee: NamedCount[] }
   | { forme: 'cyclique'; donnee: NamedCount[] }
   | { forme: 'matrice'; donnee: MatriceDatum }
-  | { forme: 'composition'; donnee: CompositionLigne[] };
+  | { forme: 'composition'; donnee: CompositionLigne[] }
+  | { forme: 'equipe'; donnee: EquipeDatum };
 
 export interface SourceDefinition {
   label: string;
   forme: Forme;
   extraire: (stats: VisiteStats) => DonneesSource;
 }
+
+/**
+ * Ce que la grille a besoin de savoir d'une source, quel que soit l'écran qui
+ * la sert : son intitulé et la forme de ses données. Le registre des visites et
+ * les chiffres d'un projet fournissent chacun le leur.
+ */
+export interface CatalogueEntree {
+  label: string;
+  forme: Forme;
+}
+
+export type Catalogue = Readonly<Record<string, CatalogueEntree>>;
 
 const JOURS_SEMAINE = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
@@ -91,7 +122,12 @@ function croisement(
   };
 }
 
-export const SOURCES: Record<DashboardSource, SourceDefinition> = {
+/**
+ * Le catalogue du REGISTRE DES VISITES. Le contrat porte les sources de tous
+ * les écrans ; celui-ci n'en sert qu'un, d'où le `satisfies` plutôt qu'un
+ * `Record` exhaustif.
+ */
+export const SOURCES = {
   'total-visites': {
     label: 'Total des visites',
     forme: 'scalaire',
@@ -316,7 +352,14 @@ export const SOURCES: Record<DashboardSource, SourceDefinition> = {
       ],
     }),
   },
-};
+} satisfies Record<string, SourceDefinition>;
+
+export type VisiteSource = keyof typeof SOURCES;
+
+/** Une clé qui n'existe pas dans le contrat de l'API rougit sur cette ligne. */
+export const SOURCES_DU_REGISTRE: readonly DashboardSource[] = Object.keys(
+  SOURCES,
+) as VisiteSource[];
 
 export function mesurerDonnees(donnees: DonneesSource): {
   nombreCategories: number;
@@ -346,6 +389,7 @@ export function mesurerDonnees(donnees: DonneesSource): {
     }
     case 'scalaire':
     case 'matrice':
+    case 'equipe':
     default:
       return { nombreCategories: 0, nombrePoints: 0, partZero: 0 };
   }

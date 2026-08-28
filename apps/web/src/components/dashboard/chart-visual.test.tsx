@@ -71,7 +71,7 @@ describe('MARQUE_TEXTES', () => {
   });
 
   it('marquePhrase nomme la marque avant son usage', () => {
-    expect(marquePhrase('anneau')).toBe('Anneau — voir la part de chacun dans le total');
+    expect(marquePhrase('anneau')).toBe('Anneau : voir la part de chacun dans le total');
   });
 });
 

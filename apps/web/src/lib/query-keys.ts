@@ -48,7 +48,7 @@ export const queryKeys = {
   visiteReferentiel: (kind: string) => ['visites', 'referentiels', kind] as const,
   visiteReferentielUsage: ['visites', 'referentiels', 'usage'] as const,
   visitesStats: (du: string, au: string) => ['visites', 'stats', du, au] as const,
-  visitesDisposition: ['visites', 'disposition'] as const,
+  disposition: (ecran: string) => ['tableau-de-bord', 'disposition', ecran] as const,
   visitesImport: (id: string) => ['visites', 'import', id] as const,
   visitesImportRevue: (id: string, page: number) =>
     ['visites', 'import', id, 'revue', page] as const,
@@ -123,13 +123,15 @@ export const queryKeys = {
   importJobs: (page: number) => ['imports', 'page', page] as const,
   importJob: (id: string) => ['imports', 'detail', id] as const,
 
-  androidUpdate: ['android-update'] as const,
+  /** L'envoi survit à la navigation : sa mutation et sa progression vivent dans le cache, pas dans la carte. */
+  androidReleases: ['androidRelease', 'releases'] as const,
+  androidReleaseUpload: ['androidRelease', 'upload'] as const,
+  androidReleaseProgress: ['androidRelease', 'progress'] as const,
   /** Export intégral de la base : sondé pendant que `pg_dump` tourne. */
   databaseDump: ['database-dump'] as const,
 
   // ─── Statistiques ─────────────────────────────────────────────────────────
   statsRoot: ['stats'] as const,
-  statsLayout: (screen: 'dashboard' | 'teleconseil') => ['stats', 'layout', screen] as const,
   statsTeleconseil: (filters: ProspectFilters) =>
     ['stats', 'teleconseil', filtersQueryKey(filters)] as const,
   /** Des clés séparées évitent de coupler les volets lourds au rafraîchissement live. */

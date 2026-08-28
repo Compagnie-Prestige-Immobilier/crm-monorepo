@@ -1,34 +1,18 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
-import { Suspense } from 'react';
 
+import { ChiffresView } from '@/components/chiffres/vue';
 import { PermissionDenied } from '@/components/permission-denied';
-import { StatisticsView } from '@/components/stats/statistics-view';
-import { StatChartsSkeleton, StatTilesSkeleton } from '@/components/stats/stat-tile';
 import { guardRoles } from '@/lib/session';
 
-export const metadata: Metadata = { title: 'Statistiques Grand Public' };
+export const metadata: Metadata = { title: 'Tableau de bord Grand Public' };
 
-export default async function StatistiquesGrandPublicPage() {
+export default async function ChiffresGrandPublicPage() {
   const guard = await guardRoles(['ADMIN', 'SUPERVISEUR', 'DIRECTION']);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
-    return <PermissionDenied role={guard.user.role} what="Les statistiques Grand Public" />;
+    return <PermissionDenied role={guard.user.role} what="Les chiffres du projet Grand Public" />;
   }
 
-  return (
-    <Suspense
-      fallback={
-        <div className="flex flex-col gap-6">
-          <StatTilesSkeleton />
-          <StatChartsSkeleton />
-        </div>
-      }
-    >
-      {/* Sans volet Banques : `GET /api/v1/bank-cases/analytics` n'accepte aucun
-          filtre de projet, et l'onglet affichait les encaissements CHUES sous
-          l'étiquette Grand Public. */}
-      <StatisticsView showBanks={false} />
-    </Suspense>
-  );
+  return <ChiffresView ecran="grand-public" role={guard.user.role} />;
 }
