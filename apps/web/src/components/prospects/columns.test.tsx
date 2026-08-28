@@ -53,6 +53,14 @@ function statutRendu(projet: Projet | null): string {
   return render(<>{flexRender(column.cell, context)}</>).container.textContent ?? '';
 }
 
+describe('nom des colonnes du parcours CHUES', () => {
+  it('la colonne du statut d’appel dit ce qu’elle contient, sans numéro de phase', () => {
+    const column = prospectColumns(actions({})).find((entry) => entry.id === 'phase2Status');
+
+    expect(column?.header).toBe('Résultat de l’appel');
+  });
+});
+
 describe('colonne « Statut »', () => {
   it('montre le statut du PARCOURS filtré, pas celui du point d’entrée', () => {
     expect(statutRendu('GRAND_PUBLIC')).toBe('Converti');

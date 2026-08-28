@@ -271,74 +271,84 @@ export function DashboardVisitesView({ role }: { role: Role }) {
         <p className="text-[0.8125rem] text-muted-foreground">Comparaison indisponible.</p>
       ) : null}
 
-      {shouldShowError({ isError: statsQuery.isError || dispositionQuery.isError, hasData }) ? (
-        <QueryErrorState
-          error={statsQuery.error ?? dispositionQuery.error}
-          onRetry={() => {
-            void statsQuery.refetch();
-            void dispositionQuery.refetch();
-          }}
-          fallback="Le tableau de bord des visites n’a pas pu être calculé. Réessayez."
-        />
-      ) : shouldShowSkeleton({
-          isPending: statsQuery.isPending || dispositionQuery.isPending,
-          hasData,
-        }) ? (
-        <DashboardVisitesSkeleton />
-      ) : (
-        <div className={isRefetching ? 'opacity-60' : undefined} aria-busy={isRefetching}>
-          <WidgetGrid
-            widgets={widgets}
-            donnees={donneesParWidget}
-            editing={editing}
-            onReorder={(fromId, toId) => {
-              setBrouillon((current) => {
-                if (current === null) return current;
-                const fromIndex = current.findIndex((w) => w.id === fromId);
-                const toIndex = current.findIndex((w) => w.id === toId);
-                if (fromIndex === -1 || toIndex === -1) return current;
-                const next = [...current];
-                const [moved] = next.splice(fromIndex, 1);
-                if (moved === undefined) return current;
-                next.splice(toIndex, 0, moved);
-                return next;
-              });
-            }}
-            onRemove={(id) => {
-              setBrouillon((current) => current?.filter((w) => w.id !== id) ?? current);
-            }}
-            onMove={(id, direction) => {
-              setBrouillon((current) => {
-                if (current === null) return current;
-                const index = current.findIndex((w) => w.id === id);
-                const target = index + direction;
-                if (index === -1 || target < 0 || target >= current.length) return current;
-                const next = [...current];
-                const [moved] = next.splice(index, 1);
-                if (moved === undefined) return current;
-                next.splice(target, 0, moved);
-                return next;
-              });
-            }}
-            onChangeMarque={(id, marque) => {
-              setBrouillon(
-                (current) => current?.map((w) => (w.id === id ? { ...w, marque } : w)) ?? current,
-              );
-            }}
-            onChangeTaille={(id, taille) => {
-              setBrouillon(
-                (current) => current?.map((w) => (w.id === id ? { ...w, taille } : w)) ?? current,
-              );
-            }}
-            onChangePresentation={(id, presentation) => {
-              setBrouillon(
-                (current) =>
-                  current?.map((w) => (w.id === id ? { ...w, presentation } : w)) ?? current,
-              );
-            }}
-          />
-        </div>
-      )}
+      {(() => {
+        if (shouldShowError({ isError: statsQuery.isError || dispositionQuery.isError, hasData }))
+          return (
+            <QueryErrorState
+              error={statsQuery.error ?? dispositionQuery.error}
+              onRetry={() => {
+                void statsQuery.refetch();
+                void dispositionQuery.refetch();
+              }}
+              fallback="Le tableau de bord des visites n’a pas pu être calculé. Réessayez."
+            />
+          );
+        return (() => {
+          if (
+            shouldShowSkeleton({
+              isPending: statsQuery.isPending || dispositionQuery.isPending,
+              hasData,
+            })
+          )
+            return <DashboardVisitesSkeleton />;
+          return (
+            <div className={isRefetching ? 'opacity-60' : undefined} aria-busy={isRefetching}>
+              <WidgetGrid
+                widgets={widgets}
+                donnees={donneesParWidget}
+                editing={editing}
+                onReorder={(fromId, toId) => {
+                  setBrouillon((current) => {
+                    if (current === null) return current;
+                    const fromIndex = current.findIndex((w) => w.id === fromId);
+                    const toIndex = current.findIndex((w) => w.id === toId);
+                    if (fromIndex === -1 || toIndex === -1) return current;
+                    const next = [...current];
+                    const [moved] = next.splice(fromIndex, 1);
+                    if (moved === undefined) return current;
+                    next.splice(toIndex, 0, moved);
+                    return next;
+                  });
+                }}
+                onRemove={(id) => {
+                  setBrouillon((current) => current?.filter((w) => w.id !== id) ?? current);
+                }}
+                onMove={(id, direction) => {
+                  setBrouillon((current) => {
+                    if (current === null) return current;
+                    const index = current.findIndex((w) => w.id === id);
+                    const target = index + direction;
+                    if (index === -1 || target < 0 || target >= current.length) return current;
+                    const next = [...current];
+                    const [moved] = next.splice(index, 1);
+                    if (moved === undefined) return current;
+                    next.splice(target, 0, moved);
+                    return next;
+                  });
+                }}
+                onChangeMarque={(id, marque) => {
+                  setBrouillon(
+                    (current) =>
+                      current?.map((w) => (w.id === id ? { ...w, marque } : w)) ?? current,
+                  );
+                }}
+                onChangeTaille={(id, taille) => {
+                  setBrouillon(
+                    (current) =>
+                      current?.map((w) => (w.id === id ? { ...w, taille } : w)) ?? current,
+                  );
+                }}
+                onChangePresentation={(id, presentation) => {
+                  setBrouillon(
+                    (current) =>
+                      current?.map((w) => (w.id === id ? { ...w, presentation } : w)) ?? current,
+                  );
+                }}
+              />
+            </div>
+          );
+        })();
+      })()}
     </div>
   );
 }

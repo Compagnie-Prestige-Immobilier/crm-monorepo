@@ -27,15 +27,12 @@ export function StatTile({
   index?: number;
   tone?: 'default' | 'success' | 'destructive' | 'warning';
 }) {
-  const valueColor =
-    tone === 'success'
-      ? 'text-success'
-      : tone === 'destructive'
-        ? 'text-destructive'
-        : tone === 'warning'
-          ? // §2.3 : `--warning` vaut #856011, la seule déclinaison or lisible
-            'text-warning'
-          : '';
+  const valueColor = {
+    success: 'text-success',
+    destructive: 'text-destructive',
+    warning: 'text-warning',
+    default: '',
+  }[tone ?? 'default'];
 
   return (
     <Card className="animate-rise" style={{ animationDelay: `${String(index * 60)}ms` }}>

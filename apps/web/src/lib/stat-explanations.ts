@@ -55,9 +55,10 @@ export const STAT_EXPLANATIONS: Record<StatKey, string> = {
   teleconseillersActifs:
     'Comptes téléconseillers actifs ayant saisi au moins une fiche sur la période.',
   departementsCouverts: 'Départements où au moins un prospect a été enregistré.',
-  conversionRate: 'Part des prospects passés au statut Converti, rapportée au total filtré.',
+  conversionRate:
+    'Part des prospects ayant livré une méthode d’enrôlement, rapportée au total filtré. Le classement isole les téléconseillers qui obtiennent le plus souvent une suite exploitable.',
   methodRate:
-    'Part des prospects ayant livré une méthode d’enrôlement. Les autres restent en attente, en refus ou en mauvais numéro.',
+    'Nombre de prospects déjà passés au statut Converti, avec leur part dans la sélection courante.',
   dailyAverage:
     'Moyenne de fiches enregistrées par jour sur les 30 derniers jours, filtres compris.',
   weeklyPace:
@@ -65,9 +66,9 @@ export const STAT_EXPLANATIONS: Record<StatKey, string> = {
   prospectsOverTime:
     'Total cumulé des fiches depuis le début de la période filtrée. La pente indique le rythme de saisie.',
   topTeleconseillers:
-    'Fiches apportées par chaque téléconseiller. Au-delà de cinq, les suivants sont regroupés sous Autres.',
+    'Fiches apportées par chaque téléconseiller. Le graphique voisin les trie par taux de méthode obtenue.',
   parStatutPhase2:
-    'Répartition des prospects entre les quatre issues de la phase 2. Les statuts sans prospect apparaissent à zéro.',
+    'Répartition des prospects entre les quatre issues de la phase 3 (Conversion). Les statuts sans prospect apparaissent à zéro.',
   parMethode:
     'Répartition des méthodes obtenues. Le total porte sur les seuls prospects ayant livré une méthode, pas sur toute la sélection.',
   parSegment:

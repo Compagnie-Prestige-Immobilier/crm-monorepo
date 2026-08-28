@@ -99,91 +99,100 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
 
   const body = (
     <>
-      {list.isPending ? (
-        <Skeleton className="h-64" />
-      ) : list.isError ? (
-        <QueryErrorState
-          error={list.error}
-          fallback="La file des rappels n’a pas pu être chargée."
-          onRetry={() => {
-            void list.refetch();
-          }}
-        />
-      ) : list.data.items.length === 0 ? (
-        <EmptyState
-          icon={ClockIcon}
-          title={EMPTY_TEXT[scope].title}
-          description={EMPTY_TEXT[scope].description}
-        />
-      ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Prospect</TableHead>
-              <TableHead>Échéance</TableHead>
-              <TableHead>Retard</TableHead>
-              <TableHead>Commentaire</TableHead>
-              {canFilter ? <TableHead>Téléconseiller</TableHead> : null}
-              <TableHead>
-                <span className="sr-only">Actions</span>
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {list.data.items.map((callback) => (
-              <TableRow key={callback.id}>
-                <TableCell>
-                  <span className="font-[600]">{formatPhone(callback.phoneE164)}</span>
-                  <span className="block text-[0.75rem] text-muted-foreground">
-                    Fiche {callback.shortCode}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <time dateTime={callback.scheduledAt}>
-                    {formatCallbackAt(callback.scheduledAt, Date.parse(list.data.serverTime))}
-                  </time>
-                </TableCell>
-                <TableCell>
-                  {callback.overdue ? (
-                    <Badge variant="destructive">
-                      {formatDelay(
-                        Date.parse(list.data.serverTime) - Date.parse(callback.scheduledAt),
-                      )}
-                    </Badge>
-                  ) : (
-                    <span className="text-muted-foreground">Sans objet</span>
-                  )}
-                </TableCell>
-                <TableCell className="max-w-80 text-muted-foreground">
-                  {callback.comment ?? ''}
-                </TableCell>
-                {canFilter ? <TableCell>{callback.assignedToName}</TableCell> : null}
-                <TableCell>
-                  <div className="flex justify-end gap-2">
-                    <Link
-                      href={`/chues/console?fiche=${encodeURIComponent(callback.prospectId)}`}
-                      className={buttonVariants({ variant: 'outline', size: 'sm' })}
-                    >
-                      <PhoneCallIcon aria-hidden="true" />
-                      Ouvrir dans la console
-                    </Link>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={cancel.isPending}
-                      onClick={() => {
-                        cancel.mutate(callback);
-                      }}
-                    >
-                      Annuler
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
+      {(() => {
+        if (list.isPending) return <Skeleton className="h-64" />;
+        return (() => {
+          if (list.isError)
+            return (
+              <QueryErrorState
+                error={list.error}
+                fallback="La file des rappels n’a pas pu être chargée."
+                onRetry={() => {
+                  void list.refetch();
+                }}
+              />
+            );
+          return (() => {
+            if (list.data.items.length === 0)
+              return (
+                <EmptyState
+                  icon={ClockIcon}
+                  title={EMPTY_TEXT[scope].title}
+                  description={EMPTY_TEXT[scope].description}
+                />
+              );
+            return (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Prospect</TableHead>
+                    <TableHead>Échéance</TableHead>
+                    <TableHead>Retard</TableHead>
+                    <TableHead>Commentaire</TableHead>
+                    {canFilter ? <TableHead>Téléconseiller</TableHead> : null}
+                    <TableHead>
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {list.data.items.map((callback) => (
+                    <TableRow key={callback.id}>
+                      <TableCell>
+                        <span className="font-[600]">{formatPhone(callback.phoneE164)}</span>
+                        <span className="block text-[0.75rem] text-muted-foreground">
+                          Fiche {callback.shortCode}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <time dateTime={callback.scheduledAt}>
+                          {formatCallbackAt(callback.scheduledAt, Date.parse(list.data.serverTime))}
+                        </time>
+                      </TableCell>
+                      <TableCell>
+                        {callback.overdue ? (
+                          <Badge variant="destructive">
+                            {formatDelay(
+                              Date.parse(list.data.serverTime) - Date.parse(callback.scheduledAt),
+                            )}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">Sans objet</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="max-w-80 text-muted-foreground">
+                        {callback.comment ?? ''}
+                      </TableCell>
+                      {canFilter ? <TableCell>{callback.assignedToName}</TableCell> : null}
+                      <TableCell>
+                        <div className="flex justify-end gap-2">
+                          <Link
+                            href={`/chues/console?fiche=${encodeURIComponent(callback.prospectId)}`}
+                            className={buttonVariants({ variant: 'outline', size: 'sm' })}
+                          >
+                            <PhoneCallIcon aria-hidden="true" />
+                            Ouvrir dans la console
+                          </Link>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={cancel.isPending}
+                            onClick={() => {
+                              cancel.mutate(callback);
+                            }}
+                          >
+                            Annuler
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            );
+          })();
+        })();
+      })()}
     </>
   );
 

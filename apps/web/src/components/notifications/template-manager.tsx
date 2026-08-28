@@ -83,79 +83,90 @@ export function TemplateManager() {
         </Button>
       </div>
 
-      {templates.isPending ? (
-        <Skeleton className="h-40 w-full" />
-      ) : templates.isError ? (
-        <QueryErrorState
-          error={templates.error}
-          onRetry={() => {
-            void templates.refetch();
-          }}
-          fallback="Les gabarits n’ont pas pu être chargés."
-        />
-      ) : templates.data.items.length === 0 ? (
-        <EmptyState
-          icon={FileTextIcon}
-          title="Aucun gabarit"
-          description="Textes réutilisables à variables."
-        />
-      ) : (
-        <div className="overflow-hidden rounded-lg border border-border bg-card shadow-elev-sm">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Nom</TableHead>
-                <TableHead>Titre</TableHead>
-                <TableHead>Variables</TableHead>
-                <TableHead>
-                  <span className="sr-only">Actions</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {templates.data.items.map((template) => (
-                <TableRow key={template.id}>
-                  <TableCell>
-                    <span className="block font-[600]">{template.name}</span>
-                    <span className="block text-[0.75rem] text-muted-foreground">
-                      {CATEGORY_LABELS[template.category]}
-                      {template.isActive ? '' : ' · désactivé'}
-                    </span>
-                  </TableCell>
-                  <TableCell className="max-w-xs truncate">{template.titleTemplate}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {template.variables.length === 0 ? (
-                        <span className="text-[0.8125rem] text-muted-foreground">Aucune</span>
-                      ) : (
-                        template.variables.map((variable) => (
-                          <Badge key={variable} variant="secondary" className="font-mono">
-                            {variable}
-                          </Badge>
-                        ))
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setEditing(template);
-                        setFormOpen(true);
-                      }}
-                    >
-                      <PencilIcon aria-hidden="true" />
-                      Modifier
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+      {(() => {
+        if (templates.isPending) return <Skeleton className="h-40 w-full" />;
+        return (() => {
+          if (templates.isError)
+            return (
+              <QueryErrorState
+                error={templates.error}
+                onRetry={() => {
+                  void templates.refetch();
+                }}
+                fallback="Les gabarits n’ont pas pu être chargés."
+              />
+            );
+          return (() => {
+            if (templates.data.items.length === 0)
+              return (
+                <EmptyState
+                  icon={FileTextIcon}
+                  title="Aucun gabarit"
+                  description="Textes réutilisables à variables."
+                />
+              );
+            return (
+              <div className="overflow-hidden rounded-lg border border-border bg-card shadow-elev-sm">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead>Nom</TableHead>
+                      <TableHead>Titre</TableHead>
+                      <TableHead>Variables</TableHead>
+                      <TableHead>
+                        <span className="sr-only">Actions</span>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {templates.data.items.map((template) => (
+                      <TableRow key={template.id}>
+                        <TableCell>
+                          <span className="block font-[600]">{template.name}</span>
+                          <span className="block text-[0.75rem] text-muted-foreground">
+                            {CATEGORY_LABELS[template.category]}
+                            {template.isActive ? '' : ' · désactivé'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="max-w-xs truncate">
+                          {template.titleTemplate}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {template.variables.length === 0 ? (
+                              <span className="text-[0.8125rem] text-muted-foreground">Aucune</span>
+                            ) : (
+                              template.variables.map((variable) => (
+                                <Badge key={variable} variant="secondary" className="font-mono">
+                                  {variable}
+                                </Badge>
+                              ))
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setEditing(template);
+                              setFormOpen(true);
+                            }}
+                          >
+                            <PencilIcon aria-hidden="true" />
+                            Modifier
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            );
+          })();
+        })();
+      })()}
 
       <TemplateFormDialog open={formOpen} onOpenChange={setFormOpen} template={editing} />
     </div>
@@ -196,26 +207,32 @@ function TemplateFormDialog({
 
   const routeIssue = routeProblem(route);
 
-  const nameIssue =
-    name.trim().length < NAME_MIN
-      ? 'Le nom doit faire au moins deux caractères.'
-      : name.trim().length > NAME_MAX
-        ? `Le nom fait ${String(name.trim().length)} caractères, ${String(NAME_MAX)} au maximum.`
-        : null;
+  const nameIssue = (() => {
+    if (name.trim().length < NAME_MIN) return 'Le nom doit faire au moins deux caractères.';
+    return (() => {
+      if (name.trim().length > NAME_MAX)
+        return `Le nom fait ${String(name.trim().length)} caractères, ${String(NAME_MAX)} au maximum.`;
+      return null;
+    })();
+  })();
 
-  const titleIssue =
-    titleTemplate.trim() === ''
-      ? 'Le titre est obligatoire.'
-      : titleTemplate.length > TITLE_MAX
-        ? `Le titre fait ${String(titleTemplate.length)} caractères, ${String(TITLE_MAX)} au maximum.`
-        : null;
+  const titleIssue = (() => {
+    if (titleTemplate.trim() === '') return 'Le titre est obligatoire.';
+    return (() => {
+      if (titleTemplate.length > TITLE_MAX)
+        return `Le titre fait ${String(titleTemplate.length)} caractères, ${String(TITLE_MAX)} au maximum.`;
+      return null;
+    })();
+  })();
 
-  const bodyIssue =
-    bodyTemplate.trim() === ''
-      ? 'Le message est obligatoire.'
-      : bodyTemplate.length > BODY_MAX
-        ? `Le message fait ${String(bodyTemplate.length)} caractères, ${String(BODY_MAX)} au maximum.`
-        : null;
+  const bodyIssue = (() => {
+    if (bodyTemplate.trim() === '') return 'Le message est obligatoire.';
+    return (() => {
+      if (bodyTemplate.length > BODY_MAX)
+        return `Le message fait ${String(bodyTemplate.length)} caractères, ${String(BODY_MAX)} au maximum.`;
+      return null;
+    })();
+  })();
 
   const blocking = nameIssue ?? titleIssue ?? bodyIssue ?? routeIssue;
 

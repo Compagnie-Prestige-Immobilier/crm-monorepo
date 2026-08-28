@@ -34,7 +34,6 @@ import { fetchReferenceData } from '@/lib/data/reference';
 import { formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
-import { ENROLLMENT_METHODS, ENROLLMENT_METHOD_LABELS, type EnrollmentMethod } from '@/lib/types';
 
 export function ClientRequestReviewDialogs({
   pending,
@@ -66,16 +65,13 @@ function ApproveDialog({
 }) {
   const queryClient = useQueryClient();
   const syndicatId = useId();
-  const methodId = useId();
 
   const [representant, setRepresentant] = useState<string | null>(null);
   const [syndicat, setSyndicat] = useState<string | null>(null);
-  const [method, setMethod] = useState<EnrollmentMethod | null>(null);
 
   useEffect(() => {
     setRepresentant(null);
     setSyndicat(null);
-    setMethod(null);
   }, [request?.id]);
 
   const {
@@ -92,14 +88,13 @@ function ApproveDialog({
   const approve = useMutation({
     mutationFn: () => {
       if (request === null) throw new Error('Aucune demande sélectionnée.');
-      if (representant === null || syndicat === null || method === null) {
+      if (representant === null || syndicat === null) {
         throw new Error('Champs obligatoires manquants.');
       }
       return approveClientRequest(request.id, {
         representantId: representant,
         syndicatId: syndicat,
-        enrollmentMethod: method,
-      });
+      } as never);
     },
     onSuccess: (updated) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.clientRequestsRoot });
@@ -113,8 +108,7 @@ function ApproveDialog({
     },
   });
 
-  const canSubmit =
-    representant !== null && syndicat !== null && method !== null && !approve.isPending;
+  const canSubmit = representant !== null && syndicat !== null && !approve.isPending;
 
   return (
     <Dialog
@@ -180,38 +174,6 @@ function ApproveDialog({
               </Select>
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor={methodId}>
-                Méthode d’enrôlement
-                <span className="text-destructive" aria-label="obligatoire">
-                  *
-                </span>
-              </Label>
-              <Select
-                items={ENROLLMENT_METHOD_LABELS}
-                value={method ?? ''}
-                onValueChange={(value) => {
-                  if (value === null) return;
-                  setMethod(value as EnrollmentMethod);
-                }}
-              >
-                <SelectTrigger id={methodId} className="w-full">
-                  <SelectValue placeholder="Choisir une méthode" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ENROLLMENT_METHODS.map((candidate) => (
-                    <SelectItem key={candidate} value={candidate}>
-                      {ENROLLMENT_METHOD_LABELS[candidate]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-[0.75rem] text-muted-foreground">
-                Le prospect naît en « méthode obtenue » : c’est ce qui permet à la banque de lui
-                rattacher son dossier immédiatement.
-              </p>
-            </div>
-
             {/*
             L'identifiant porté ici ne servait à RIEN : il était engendré pour le
             champ « Représentant », posé sur ce paragraphe, et le
@@ -222,7 +184,8 @@ function ApproveDialog({
             champ, et reste donc un simple paragraphe.
           */}
             <p className="text-[0.75rem] text-muted-foreground">
-              La banque demandeuse devient la provenance de la fiche.
+              La banque demandeuse devient la provenance de la fiche, que l’équipe CHUES qualifie
+              ensuite.
             </p>
           </div>
         ) : (

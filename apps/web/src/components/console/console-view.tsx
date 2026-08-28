@@ -1,13 +1,14 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CopyIcon, SparklesIcon } from 'lucide-react';
+import { CopyIcon } from 'lucide-react';
+import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
+import { ConversionFields } from '@/components/console/conversion-fields';
 import { copyPhone, Kbd } from '@/components/console/console-ui';
-import { RepScript } from '@/components/console/rep-script';
 import { useShortcuts } from '@/components/console/use-shortcuts';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { QueryErrorState } from '@/components/query-error-state';
@@ -24,7 +25,6 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useLive } from '@/components/live/use-live';
 import {
@@ -34,6 +34,8 @@ import {
   callbackKeys,
   callbackSlots,
   consoleKeys,
+  conversionErrorFor,
+  conversionFrom,
   fetchCallbacks,
   fetchConsoleCampaigns,
   fetchConsoleQueue,
@@ -46,9 +48,12 @@ import {
   schedulesOf,
   undatedCallbacks,
   validateAttempt,
+  validateConversion,
   type AttemptDraft,
   type CallbackSlot,
   type CallbackSchedules,
+  type ConversionDraft,
+  type ConversionErrors,
 } from '@/lib/data/console';
 import { dakarLocalToIso, formatDateTime, formatNumber, formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
@@ -67,6 +72,7 @@ const METHOD_KEYS: readonly { key: string; method: EnrollmentMethod }[] = [
   { key: '1', method: 'PLATFORM' },
   { key: '2', method: 'PHYSICAL' },
   { key: '3', method: 'VOICE_OR_ELECTRONIC_MESSAGING' },
+  { key: '9', method: 'APPOINTMENT' },
 ];
 
 const OUTCOME_KEYS: readonly { key: string; outcome: CallOutcome }[] = [
@@ -76,7 +82,7 @@ const OUTCOME_KEYS: readonly { key: string; outcome: CallOutcome }[] = [
 ];
 
 const KEYBOARD_MAP: readonly (readonly [string, string])[] = [
-  ['1 2 3', 'Méthode obtenue, envoi immédiat'],
+  ['1 2 3 9', 'Méthode obtenue, ouvre la conversion'],
   ['4', 'Injoignable'],
   ['5', 'À rappeler, puis échéance'],
   ['6', 'Refus'],
@@ -92,57 +98,16 @@ const KEYBOARD_MAP: readonly (readonly [string, string])[] = [
   ['N', 'Nouveau prospect sur ce représentant'],
   ['R', 'Fiche du représentant'],
   ['Ctrl/Cmd K', 'Palette'],
-  ['M', 'Changer de volet'],
   ['?', 'Afficher cette carte'],
 ];
 
-const VOLETS = [
-  { value: 'prospects', label: 'Prospects' },
-  { value: 'representants', label: 'Représentants' },
-] as const;
-
-type Volet = (typeof VOLETS)[number]['value'];
-
 /**
- * Deux files, un seul poste : la téléconseillère appelle des prospects et des
- * représentants dans la même session, avec le même clavier.
+ * UNE file, UN écran : les prospects. Les représentants ont désormais le leur
+ * (`/chues/appels-representants`), qui est l'étape 1 du projet ; les empiler
+ * derrière un onglet et une touche cachée faisait de deux étapes du parcours
+ * un seul écran, que personne ne savait nommer.
  */
 export function ConsoleView() {
-  const [volet, setVolet] = useState<Volet>('prospects');
-
-  useShortcuts({
-    m: () => {
-      setVolet((current) => (current === 'prospects' ? 'representants' : 'prospects'));
-    },
-  });
-
-  return (
-    <Tabs
-      value={volet}
-      onValueChange={(value) => {
-        setVolet(value as Volet);
-      }}
-    >
-      <TabsList>
-        {VOLETS.map((tab) => (
-          <TabsTrigger key={tab.value} value={tab.value}>
-            {tab.label}
-            {tab.value === 'prospects' ? <Kbd>M</Kbd> : null}
-          </TabsTrigger>
-        ))}
-      </TabsList>
-
-      <TabsContent value="prospects">
-        {volet === 'prospects' ? <ProspectConsole /> : null}
-      </TabsContent>
-      <TabsContent value="representants">
-        {volet === 'representants' ? <RepScript /> : null}
-      </TabsContent>
-    </Tabs>
-  );
-}
-
-function ProspectConsole() {
   const router = useRouter();
   const pathname = usePathname();
   const projet = pathname.startsWith('/grand-public') ? 'GRAND_PUBLIC' : 'CHUES';
@@ -158,6 +123,8 @@ function ProspectConsole() {
   const [openedId, setOpenedId] = useState<string | null>(requestedId);
   const [comment, setComment] = useState('');
   const [draftOutcome, setDraftOutcome] = useState<CallOutcome | null>(null);
+  const [conversion, setConversion] = useState<ConversionDraft | null>(null);
+  const [conversionErrors, setConversionErrors] = useState<ConversionErrors>({});
   const [slots, setSlots] = useState<readonly CallbackSlot[] | null>(null);
   const [freeCallback, setFreeCallback] = useState('');
   const [done, setDone] = useState<readonly string[]>([]);
@@ -226,6 +193,8 @@ function ProspectConsole() {
       setComment('');
       setDraftOutcome(null);
       setSlots(null);
+      setConversion(null);
+      setConversionErrors({});
       void queryClient.invalidateQueries({ queryKey: consoleKeys.root });
       void queryClient.invalidateQueries({ queryKey: callbackKeys.root });
     },
@@ -236,6 +205,10 @@ function ProspectConsole() {
         return;
       }
       if (error instanceof AttemptRefused) {
+        // Le verdict du serveur revient SOUS le champ qu'il refuse ; un simple
+        // bandeau ferait relire onze champs pour en corriger un.
+        const refused = conversionErrorFor(error.code);
+        if (refused !== null) setConversionErrors({ [refused.field]: refused.message });
         toast.error(error.message);
         return;
       }
@@ -244,10 +217,21 @@ function ProspectConsole() {
   });
 
   const record = useCallback(
-    (outcome: CallOutcome, method: EnrollmentMethod | null, callbackAt: string | null = null) => {
+    (
+      outcome: CallOutcome,
+      method: EnrollmentMethod | null,
+      callbackAt: string | null = null,
+      renseignements?: ConversionDraft,
+    ) => {
       if (current === undefined || closed || send.isPending) return;
 
-      const draft: AttemptDraft = { outcome, method, comment, callbackAt };
+      const draft: AttemptDraft = {
+        outcome,
+        method,
+        comment,
+        callbackAt,
+        ...(renseignements === undefined ? {} : { conversion: renseignements }),
+      };
       const problem = validateAttempt(draft);
       if (problem !== null) {
         toast.error(problem);
@@ -257,6 +241,31 @@ function ProspectConsole() {
     },
     [current, closed, send, comment],
   );
+
+  /**
+   * La méthode n'envoie plus rien à elle seule : elle ouvre les renseignements
+   * de conversion, que l'adhésion exige désormais.
+   */
+  const startConversion = useCallback(
+    (method: EnrollmentMethod) => {
+      if (current === undefined || closed || send.isPending) return;
+      setDraftOutcome(null);
+      setSlots(null);
+      setConversionErrors({});
+      setConversion(conversionFrom(current, method));
+    },
+    [current, closed, send.isPending],
+  );
+
+  const submitConversion = useCallback(() => {
+    if (conversion === null) return;
+
+    const problems = validateConversion(conversion);
+    setConversionErrors(problems);
+    if (Object.keys(problems).length > 0) return;
+
+    record('METHOD_OBTAINED', conversion.method, null, conversion);
+  }, [conversion, record]);
 
   const move = useCallback(
     (step: number) => {
@@ -277,6 +286,8 @@ function ProspectConsole() {
     setComment('');
     setDraftOutcome(null);
     setSlots(null);
+    setConversion(null);
+    setConversionErrors({});
   }, [current, items]);
 
   const copyCurrentPhone = useCallback(() => {
@@ -297,6 +308,10 @@ function ProspectConsole() {
   }, [current, closed]);
 
   const validate = useCallback(() => {
+    if (conversion !== null) {
+      submitConversion();
+      return;
+    }
     if (slots !== null) {
       const iso = dakarLocalToIso(freeCallback);
       if (iso === null) {
@@ -311,17 +326,20 @@ function ProspectConsole() {
       return;
     }
     skip();
-  }, [slots, freeCallback, draftOutcome, record, skip]);
+  }, [conversion, submitConversion, slots, freeCallback, draftOutcome, record, skip]);
 
   const outcomeShortcuts: Record<string, () => void> = {
     '1': () => {
-      record('METHOD_OBTAINED', 'PLATFORM');
+      startConversion('PLATFORM');
     },
     '2': () => {
-      record('METHOD_OBTAINED', 'PHYSICAL');
+      startConversion('PHYSICAL');
     },
     '3': () => {
-      record('METHOD_OBTAINED', 'VOICE_OR_ELECTRONIC_MESSAGING');
+      startConversion('VOICE_OR_ELECTRONIC_MESSAGING');
+    },
+    '9': () => {
+      startConversion('APPOINTMENT');
     },
     '4': () => {
       record('UNREACHABLE', null);
@@ -348,14 +366,22 @@ function ProspectConsole() {
     callbackRef.current?.focus();
   };
 
+  // Le formulaire de conversion rend les chiffres inertes : ils y sont de la
+  // saisie, pas des issues.
+  let digitShortcuts = outcomeShortcuts;
+  if (slots !== null) digitShortcuts = slotShortcuts;
+  if (conversion !== null) digitShortcuts = {};
+
   useShortcuts(
     {
-      ...(slots === null ? outcomeShortcuts : slotShortcuts),
+      ...digitShortcuts,
       Enter: validate,
       Escape: () => {
         setDraftOutcome(null);
         setComment('');
         setSlots(null);
+        setConversion(null);
+        setConversionErrors({});
         commentRef.current?.blur();
       },
       ArrowDown: () => {
@@ -392,6 +418,8 @@ function ProspectConsole() {
     setComment('');
     setDraftOutcome(null);
     setSlots(null);
+    setConversion(null);
+    setConversionErrors({});
   }, [current?.id]);
 
   if (queue.isPending) return <ConsoleSkeleton />;
@@ -418,7 +446,9 @@ function ProspectConsole() {
   return (
     <div className="grid gap-4 lg:grid-cols-[20rem_minmax(0,1fr)_22.5rem]">
       <section aria-label="File d’appel" className="flex flex-col gap-3">
-        {campaigns.data !== undefined && campaigns.data.length > 0 ? (
+        {/* Une seule campagne ne se choisit pas : le sélecteur ne proposerait
+            que ce qui est déjà à l'écran. */}
+        {campaigns.data !== undefined && campaigns.data.length > 1 ? (
           <FilterCombobox
             label="Campagne"
             placeholder="Toutes mes fiches"
@@ -470,8 +500,8 @@ function ProspectConsole() {
 
         {total > loaded.length ? (
           <p className="text-[0.75rem] text-muted-foreground">
-            {formatNumber(loaded.length)} fiches chargées sur {formatNumber(total)}. Choisissez une
-            campagne pour resserrer la file.
+            {formatNumber(loaded.length)} fiches affichées sur {formatNumber(total)}. Choisissez une
+            campagne pour en voir moins.
           </p>
         ) : null}
       </section>
@@ -490,8 +520,14 @@ function ProspectConsole() {
         <div className="flex items-start justify-between gap-4">
           {current === undefined ? (
             <p className="text-[0.9375rem]">
-              Plus aucune fiche à traiter. Choisissez une autre campagne, ou revenez quand une
-              nouvelle campagne aura été tirée.
+              Vous avez appelé tout le monde. Revenez demain, ou passez à{' '}
+              <Link
+                href="/chues/appels-representants"
+                className="rounded-sm font-[600] underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                l’étape 1
+              </Link>
+              .
             </p>
           ) : (
             <div className="flex items-center gap-3">
@@ -543,11 +579,23 @@ function ProspectConsole() {
               </div>
             ) : (
               <>
-                {slots === null ? (
+                {conversion === null || slots !== null ? null : (
+                  <ConversionFields
+                    draft={conversion}
+                    errors={conversionErrors}
+                    phoneE164={current.phoneE164}
+                    disabled={send.isPending}
+                    onChange={(patch) => {
+                      setConversion((draft) => (draft === null ? null : { ...draft, ...patch }));
+                    }}
+                  />
+                )}
+
+                {conversion !== null || slots !== null ? null : (
                   <>
                     <fieldset className="flex flex-col gap-2" disabled={send.isPending}>
                       <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
-                        Méthode obtenue
+                        Il accepte — de quelle manière ?
                       </legend>
                       <div className="flex flex-wrap gap-2">
                         {METHOD_KEYS.map(({ key, method }) => (
@@ -555,7 +603,7 @@ function ProspectConsole() {
                             key={key}
                             variant="outline"
                             onClick={() => {
-                              record('METHOD_OBTAINED', method);
+                              startConversion(method);
                             }}
                           >
                             <Kbd>{key}</Kbd>
@@ -567,7 +615,7 @@ function ProspectConsole() {
 
                     <fieldset className="flex flex-col gap-2" disabled={send.isPending}>
                       <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
-                        Non obtenue
+                        Il n’accepte pas (pas encore)
                       </legend>
                       <div className="flex flex-wrap gap-2">
                         <Button variant="outline" onClick={startCallback}>
@@ -596,7 +644,9 @@ function ProspectConsole() {
                       </div>
                     </fieldset>
                   </>
-                ) : (
+                )}
+
+                {slots === null ? null : (
                   <fieldset className="flex flex-col gap-3" disabled={send.isPending}>
                     <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
                       Quand rappeler
@@ -673,6 +723,26 @@ function ProspectConsole() {
                     placeholder="Entrée valide, Maj+Entrée passe à la ligne."
                   />
                 </div>
+
+                {conversion === null ? null : (
+                  <div className="flex flex-wrap gap-2">
+                    <Button onClick={submitConversion} disabled={send.isPending}>
+                      Enregistrer l’adhésion
+                      <Kbd>Entrée</Kbd>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      disabled={send.isPending}
+                      onClick={() => {
+                        setConversion(null);
+                        setConversionErrors({});
+                      }}
+                    >
+                      Annuler
+                      <Kbd>Échap</Kbd>
+                    </Button>
+                  </div>
+                )}
               </>
             )}
           </>
@@ -700,8 +770,7 @@ function ProspectConsole() {
             </>
           )}
           <p className="text-[0.75rem] text-muted-foreground">
-            L’API ne renvoie que la dernière tentative : les appels antérieurs ne sont pas
-            consultables ici.
+            Seul le dernier appel est visible ici.
           </p>
         </div>
 
@@ -831,9 +900,11 @@ function SortExplainer({
 
   return (
     <Popover>
-      <PopoverTrigger render={<Button variant="ghost" size="sm" aria-label="Pourquoi cet ordre" />}>
-        <SparklesIcon aria-hidden="true" />
-        {rawOrder ? 'Tri désactivé' : `${String(rules.length)} règles de tri`}
+      {/* Un LIEN, pas un bouton d'action : la question qu'on se pose devant la
+          file (« pourquoi celle-là en tête ? ») n'est pas un geste de travail,
+          et « 4 règles de tri » n'était pas une réponse. */}
+      <PopoverTrigger render={<Button variant="link" size="sm" />}>
+        {rawOrder ? 'Tri désactivé — pourquoi ?' : 'Pourquoi cet ordre ?'}
       </PopoverTrigger>
       <PopoverContent className="w-80 text-[0.8125rem]">
         <ul className="flex flex-col gap-1">
@@ -864,7 +935,7 @@ function SortExplainer({
         ) : null}
 
         <Button variant="outline" size="sm" className="mt-3 w-full" onClick={onToggleOrder}>
-          {rawOrder ? 'Rétablir le tri' : 'Tout défaire'}
+          {rawOrder ? 'Rétablir le tri' : 'Voir dans l’ordre du fichier'}
         </Button>
       </PopoverContent>
     </Popover>

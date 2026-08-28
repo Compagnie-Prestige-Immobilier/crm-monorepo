@@ -80,198 +80,207 @@ export function BankDashboardView() {
 
       <BankFiltersBar agentOptions={agentOptions} />
 
-      {shouldShowError({ isError, hasData }) ? (
-        <QueryErrorState
-          error={error}
-          onRetry={() => {
-            void refetch();
-          }}
-          fallback="Les agrégats bancaires n’ont pas pu être calculés. Réessayez."
-        />
-      ) : shouldShowSkeleton({ isPending, hasData }) || data === undefined ? (
-        <BankDashboardSkeleton />
-      ) : (
-        <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <Kpi
-              index={0}
-              label="Dossiers"
-              value={formatNumber(data.totals.total)}
-              hint={`${formatNumber(data.totals.aTraiter)} à traiter · ${formatNumber(data.totals.enTraitement)} en cours`}
-              icon={FolderOpenIcon}
+      {(() => {
+        if (shouldShowError({ isError, hasData }))
+          return (
+            <QueryErrorState
+              error={error}
+              onRetry={() => {
+                void refetch();
+              }}
+              fallback="Les agrégats bancaires n’ont pas pu être calculés. Réessayez."
             />
-            <Kpi
-              index={1}
-              label="Encaissés"
-              value={formatNumber(data.totals.encaisses)}
-              hint={<MoneyText value={data.totals.totalAmountCashed} placeholder="0 FCFA" />}
-              icon={BanknoteIcon}
-            />
-            <Kpi
-              index={2}
-              label="Taux de rejet"
-              value={`${formatDecimal(data.totals.rejectionRate)} %`}
-              hint={`${formatNumber(data.totals.rejetes)} dossiers rejetés`}
-              icon={PercentIcon}
-            />
-            <Kpi
-              index={3}
-              label="Délai moyen"
-              value={
-                data.totals.meanDelayHours === null
-                  ? '–'
-                  : `${formatDecimal(data.totals.meanDelayHours / 24)} j`
-              }
-              hint={
-                data.totals.meanDelayHours === null
-                  ? 'Aucun dossier encore clos'
-                  : `${formatNumber(Math.round(data.totals.meanDelayHours))} heures entre ouverture et issue`
-              }
-              icon={ClockIcon}
-            />
-          </div>
-
-          <div className="grid gap-4 xl:grid-cols-2">
-            <ChartCard title="Dossiers par étape">
-              <BankRankChart
-                label="Dossiers"
-                items={data.byStage.map((stage): ClickableSlice => ({
-                  label: stage.label,
-                  value: stage.cases,
-                  onSelect: drillTo({ stageId: stage.stageId, stageType: null }),
-                }))}
-              />
-            </ChartCard>
-
-            <ChartCard
-              title="Encaissements dans le temps"
-              description="Nombre (barres) et montant (courbe)"
-            >
-              <CashingsOverTimeChart buckets={data.cashingsOverTime} />
-            </ChartCard>
-
-            <ChartCard title="Par banque" description="Banque de traitement">
-              <BankShareChart
-                items={data.byBank.map((bank): ClickableSlice => ({
-                  label: bank.label,
-                  value: bank.cases,
-                  onSelect: drillTo({ banqueId: bank.banqueId }),
-                }))}
-              />
-            </ChartCard>
-
-            <ChartCard title="Motifs de rejet" description="Dossiers rejetés uniquement">
-              {data.byRejectionReason.length === 0 ? (
-                <EmptyChart message="Aucun dossier rejeté sur la période filtrée." />
-              ) : (
-                <BankRankChart
-                  label="Rejets"
-                  items={data.byRejectionReason.map((reason): ClickableSlice => ({
-                    label: reason.label,
-                    value: reason.cases,
-                    onSelect: drillTo({
-                      rejectionReasonId: reason.reasonId,
-                      stageType: 'REJECTED',
-                      stageId: null,
-                    }),
-                  }))}
+          );
+        return (() => {
+          if (shouldShowSkeleton({ isPending, hasData }) || data === undefined)
+            return <BankDashboardSkeleton />;
+          return (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <Kpi
+                  index={0}
+                  label="Dossiers"
+                  value={formatNumber(data.totals.total)}
+                  hint={`${formatNumber(data.totals.aTraiter)} à traiter · ${formatNumber(data.totals.enTraitement)} en cours`}
+                  icon={FolderOpenIcon}
                 />
-              )}
-            </ChartCard>
-
-            <ChartCard title="Activité par agent" description="Dossiers menés à l’encaissement">
-              {data.byAgent.length === 0 ? (
-                <EmptyChart message="Aucune activité d’agent sur la période filtrée." />
-              ) : (
-                <BankRankChart
+                <Kpi
+                  index={1}
                   label="Encaissés"
-                  items={data.byAgent.map((agent): ClickableSlice => ({
-                    label: agent.label,
-                    value: agent.cashed,
-                    onSelect: drillTo({ agentId: agent.agentId }),
-                  }))}
+                  value={formatNumber(data.totals.encaisses)}
+                  hint={<MoneyText value={data.totals.totalAmountCashed} placeholder="0 FCFA" />}
+                  icon={BanknoteIcon}
                 />
-              )}
-            </ChartCard>
+                <Kpi
+                  index={2}
+                  label="Taux de rejet"
+                  value={`${formatDecimal(data.totals.rejectionRate)} %`}
+                  hint={`${formatNumber(data.totals.rejetes)} dossiers rejetés`}
+                  icon={PercentIcon}
+                />
+                <Kpi
+                  index={3}
+                  label="Délai moyen"
+                  value={
+                    data.totals.meanDelayHours === null
+                      ? '–'
+                      : `${formatDecimal(data.totals.meanDelayHours / 24)} j`
+                  }
+                  hint={
+                    data.totals.meanDelayHours === null
+                      ? 'Aucun dossier encore clos'
+                      : `${formatNumber(Math.round(data.totals.meanDelayHours))} heures entre ouverture et issue`
+                  }
+                  icon={ClockIcon}
+                />
+              </div>
 
-            <ChartCard title="Délai moyen par banque" description="Heures entre ouverture et issue">
-              {data.byBank.every((bank) => bank.meanProcessingHours === null) ? (
-                <EmptyChart message="Aucun dossier clos." />
-              ) : (
-                <MeanDelayChart
-                  items={data.byBank
-                    .filter((bank) => bank.meanProcessingHours !== null)
-                    .map((bank) => ({
-                      label: bank.label,
-                      hours: bank.meanProcessingHours ?? 0,
+              <div className="grid gap-4 xl:grid-cols-2">
+                <ChartCard title="Dossiers par étape">
+                  <BankRankChart
+                    label="Dossiers"
+                    items={data.byStage.map((stage): ClickableSlice => ({
+                      label: stage.label,
+                      value: stage.cases,
+                      onSelect: drillTo({ stageId: stage.stageId, stageType: null }),
                     }))}
-                />
-              )}
-            </ChartCard>
-          </div>
+                  />
+                </ChartCard>
 
-          {/* Montants par banque : un tableau et non un graphique. Comparer des
+                <ChartCard
+                  title="Encaissements dans le temps"
+                  description="Nombre (barres) et montant (courbe)"
+                >
+                  <CashingsOverTimeChart buckets={data.cashingsOverTime} />
+                </ChartCard>
+
+                <ChartCard title="Par banque" description="Banque de traitement">
+                  <BankShareChart
+                    items={data.byBank.map((bank): ClickableSlice => ({
+                      label: bank.label,
+                      value: bank.cases,
+                      onSelect: drillTo({ banqueId: bank.banqueId }),
+                    }))}
+                  />
+                </ChartCard>
+
+                <ChartCard title="Motifs de rejet" description="Dossiers rejetés uniquement">
+                  {data.byRejectionReason.length === 0 ? (
+                    <EmptyChart message="Aucun dossier rejeté sur la période filtrée." />
+                  ) : (
+                    <BankRankChart
+                      label="Rejets"
+                      items={data.byRejectionReason.map((reason): ClickableSlice => ({
+                        label: reason.label,
+                        value: reason.cases,
+                        onSelect: drillTo({
+                          rejectionReasonId: reason.reasonId,
+                          stageType: 'REJECTED',
+                          stageId: null,
+                        }),
+                      }))}
+                    />
+                  )}
+                </ChartCard>
+
+                <ChartCard title="Activité par agent" description="Dossiers menés à l’encaissement">
+                  {data.byAgent.length === 0 ? (
+                    <EmptyChart message="Aucune activité d’agent sur la période filtrée." />
+                  ) : (
+                    <BankRankChart
+                      label="Encaissés"
+                      items={data.byAgent.map((agent): ClickableSlice => ({
+                        label: agent.label,
+                        value: agent.cashed,
+                        onSelect: drillTo({ agentId: agent.agentId }),
+                      }))}
+                    />
+                  )}
+                </ChartCard>
+
+                <ChartCard
+                  title="Délai moyen par banque"
+                  description="Heures entre ouverture et issue"
+                >
+                  {data.byBank.every((bank) => bank.meanProcessingHours === null) ? (
+                    <EmptyChart message="Aucun dossier clos." />
+                  ) : (
+                    <MeanDelayChart
+                      items={data.byBank
+                        .filter((bank) => bank.meanProcessingHours !== null)
+                        .map((bank) => ({
+                          label: bank.label,
+                          hours: bank.meanProcessingHours ?? 0,
+                        }))}
+                    />
+                  )}
+                </ChartCard>
+              </div>
+
+              {/* Montants par banque : un tableau et non un graphique. Comparer des
               sommes en francs CFA se fait sur des chiffres alignés : un axe de
               barres à sept chiffres est illisible, et le montant exact est
               justement ce qu'on vient chercher. */}
-          <Card>
-            <CardContent className="overflow-x-auto scrollbar-thin p-0">
-              <table className="w-full text-[0.875rem]">
-                <caption className="px-5 py-3 text-left font-display text-[1.0625rem] font-[700] tracking-[-0.02em]">
-                  Montants encaissés par banque
-                </caption>
-                <thead className="border-b border-border">
-                  <tr>
-                    <th scope="col" className="px-5 py-2 text-left font-[600]">
-                      Banque
-                    </th>
-                    <th scope="col" className="px-5 py-2 text-right font-[600]">
-                      Dossiers
-                    </th>
-                    <th scope="col" className="px-5 py-2 text-right font-[600]">
-                      Encaissés
-                    </th>
-                    <th scope="col" className="px-5 py-2 text-right font-[600]">
-                      Rejetés
-                    </th>
-                    <th scope="col" className="px-5 py-2 text-right font-[600]">
-                      Montant
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {data.byBank.map((bank) => (
-                    <tr key={bank.banqueId}>
-                      <th scope="row" className="px-5 py-2 text-left font-[400]">
-                        {bank.label}
-                      </th>
-                      <td className="px-5 py-2 text-right tabular-nums">
-                        {formatNumber(bank.cases)}
-                      </td>
-                      <td className="px-5 py-2 text-right tabular-nums">
-                        {formatNumber(bank.cashed)}
-                      </td>
-                      <td className="px-5 py-2 text-right tabular-nums">
-                        {formatNumber(bank.rejected)}
-                      </td>
-                      <td className="px-5 py-2 text-right font-[600] tabular-nums">
-                        {formatXof(bank.amountXof, '0 FCFA')}
-                      </td>
-                    </tr>
-                  ))}
-                  {data.byBank.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-5 py-6 text-center text-muted-foreground">
-                        Aucun dossier sur la période filtrée.
-                      </td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              </table>
-            </CardContent>
-          </Card>
-        </>
-      )}
+              <Card>
+                <CardContent className="overflow-x-auto scrollbar-thin p-0">
+                  <table className="w-full text-[0.875rem]">
+                    <caption className="px-5 py-3 text-left font-display text-[1.0625rem] font-[700] tracking-[-0.02em]">
+                      Montants encaissés par banque
+                    </caption>
+                    <thead className="border-b border-border">
+                      <tr>
+                        <th scope="col" className="px-5 py-2 text-left font-[600]">
+                          Banque
+                        </th>
+                        <th scope="col" className="px-5 py-2 text-right font-[600]">
+                          Dossiers
+                        </th>
+                        <th scope="col" className="px-5 py-2 text-right font-[600]">
+                          Encaissés
+                        </th>
+                        <th scope="col" className="px-5 py-2 text-right font-[600]">
+                          Rejetés
+                        </th>
+                        <th scope="col" className="px-5 py-2 text-right font-[600]">
+                          Montant
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {data.byBank.map((bank) => (
+                        <tr key={bank.banqueId}>
+                          <th scope="row" className="px-5 py-2 text-left font-[400]">
+                            {bank.label}
+                          </th>
+                          <td className="px-5 py-2 text-right tabular-nums">
+                            {formatNumber(bank.cases)}
+                          </td>
+                          <td className="px-5 py-2 text-right tabular-nums">
+                            {formatNumber(bank.cashed)}
+                          </td>
+                          <td className="px-5 py-2 text-right tabular-nums">
+                            {formatNumber(bank.rejected)}
+                          </td>
+                          <td className="px-5 py-2 text-right font-[600] tabular-nums">
+                            {formatXof(bank.amountXof, '0 FCFA')}
+                          </td>
+                        </tr>
+                      ))}
+                      {data.byBank.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-5 py-6 text-center text-muted-foreground">
+                            Aucun dossier sur la période filtrée.
+                          </td>
+                        </tr>
+                      ) : null}
+                    </tbody>
+                  </table>
+                </CardContent>
+              </Card>
+            </>
+          );
+        })();
+      })()}
     </div>
   );
 }

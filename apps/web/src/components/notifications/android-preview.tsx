@@ -22,6 +22,11 @@ export function AndroidPreview({
   const shownTitle = previewClamp(title === '' ? 'Titre de la notification' : title, TITLE_CLAMP);
   const shownBody = previewClamp(body === '' ? 'Corps du message' : body, BODY_CLAMP);
   const isPlaceholder = title === '' && body === '';
+  let truncation = 'Corps coupé une fois replié.';
+  if (shownTitle.truncated) truncation = 'Titre coupé une fois replié.';
+  if (shownTitle.truncated && shownBody.truncated) {
+    truncation = 'Titre et corps coupés une fois repliés.';
+  }
 
   return (
     <figure className={cn('flex flex-col gap-2', className)}>
@@ -64,11 +69,7 @@ export function AndroidPreview({
       <div className="flex flex-col gap-1 text-[0.75rem] text-muted-foreground">
         {shownTitle.truncated || shownBody.truncated ? (
           <p role="status" className="text-warning">
-            {shownTitle.truncated && shownBody.truncated
-              ? 'Titre et corps coupés une fois repliés.'
-              : shownTitle.truncated
-                ? 'Titre coupé une fois replié.'
-                : 'Corps coupé une fois replié.'}
+            {truncation}
           </p>
         ) : null}
         <p>

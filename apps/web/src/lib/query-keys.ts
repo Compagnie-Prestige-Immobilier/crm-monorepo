@@ -123,6 +123,7 @@ export const queryKeys = {
 
   // ─── Statistiques ─────────────────────────────────────────────────────────
   statsRoot: ['stats'] as const,
+  statsLayout: (screen: 'dashboard' | 'teleconseil') => ['stats', 'layout', screen] as const,
   statsTeleconseil: (filters: ProspectFilters) =>
     ['stats', 'teleconseil', filtersQueryKey(filters)] as const,
   /** Des clés séparées évitent de coupler les volets lourds au rafraîchissement live. */
