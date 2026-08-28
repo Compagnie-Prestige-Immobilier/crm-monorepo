@@ -396,13 +396,20 @@ class AppUpdateController extends Notifier<AppUpdateState> {
     try {
       await _download(dio, release);
     } on Object catch (error) {
+      // Un téléchargement raté n'est PAS toujours une absence de réseau : le
+      // serveur a répondu au contrôle juste avant. Mais une coupure EN COURS de
+      // transfert, elle, doit rendre l'écran au travail : sans cette relecture
+      // de l'interface, l'écran bloquant restait planté sur un téléphone qui
+      // venait de perdre le réseau, et il fallait appuyer sur « Réessayer ».
+      final bool connecte = (await _interfaces()).any(
+        (ConnectivityResult r) => r != ConnectivityResult.none,
+      );
       if (!ref.mounted) return;
-      // Un téléchargement raté n'est PAS une absence de réseau : le serveur a
-      // répondu au contrôle juste avant. Lui ouvrir le délai de grâce donnerait
-      // trois jours de sursis à un appareil parfaitement connecté.
       state = _withGate(
         AppUpdateState(
-          status: AppUpdateStatus.error,
+          status: connecte
+              ? AppUpdateStatus.error
+              : AppUpdateStatus.unreachable,
           release: release,
           error: '$error',
           belowFloor: belowFloor,

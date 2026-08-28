@@ -35,17 +35,10 @@ export const readScope = (
  * affichait « aucun prospect à appeler » à la personne dont le mobile comptait
  * six fiches à appeler.
  */
-const mineOrAssignedProspect = (userId: string): Prisma.ProspectWhereInput => ({
-  OR: [
-    { createdById: userId },
-    { callTasks: { some: { assignedToId: userId, isActive: true } } },
-  ],
-});
-
-/** Portée de lecture des PROSPECTS à l'écran. Supervision et direction lisent tout. */
+/** Portée de lecture des PROSPECTS à l'écran. Tous les téléconseillers lisent leur coque. */
 export const prospectReadScope = (
-  user: Pick<AuthenticatedUser, 'id' | 'role'>,
-): Prisma.ProspectWhereInput => (readsEveryone(user) ? {} : mineOrAssignedProspect(user.id));
+  _user: Pick<AuthenticatedUser, 'id' | 'role'>,
+): Prisma.ProspectWhereInput => ({});
 
 /**
  * Portée des prospects sur le TÉLÉPHONE. Volontairement plus étroite que
@@ -53,8 +46,8 @@ export const prospectReadScope = (
  * tirer le portefeuille national sur un appareil en est une autre.
  */
 export const prospectSyncScope = (
-  user: Pick<AuthenticatedUser, 'id' | 'role'>,
-): Prisma.ProspectWhereInput => (isAdmin(user) ? {} : mineOrAssignedProspect(user.id));
+  _user: Pick<AuthenticatedUser, 'id' | 'role'>,
+): Prisma.ProspectWhereInput => ({});
 
 export function readableOwnerId(
   user: Pick<AuthenticatedUser, 'id' | 'role'>,

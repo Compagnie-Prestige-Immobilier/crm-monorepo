@@ -5,15 +5,17 @@
 // ignore_for_file: unused_element
 import 'package:json_annotation/json_annotation.dart';
 
-enum StatsLayoutScreen {
-  @JsonValue(r'dashboard')
-  dashboard(r'dashboard'),
-  @JsonValue(r'teleconseil')
-  teleconseil(r'teleconseil'),
+enum DashboardEcran {
+  @JsonValue(r'visites')
+  visites(r'visites'),
+  @JsonValue(r'chues')
+  chues(r'chues'),
+  @JsonValue(r'grand-public')
+  grandPublic(r'grand-public'),
   @JsonValue(r'unknown_default_open_api')
   unknownDefaultOpenApi(r'unknown_default_open_api');
 
-  const StatsLayoutScreen(this.value);
+  const DashboardEcran(this.value);
 
   final String value;
 

@@ -185,6 +185,23 @@ export class ExportService {
     await workbook.commit();
   }
 
+  async writeProspectsForIds(
+    user: AuthenticatedUser,
+    ids: readonly string[],
+    stream: Writable,
+  ): Promise<void> {
+    const demoEnabled = this.demo.current() === 'demo';
+    const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({ stream, useStyles: true });
+    markWorkbook(workbook, demoEnabled);
+    await this.writeProspectSheet(
+      workbook,
+      'Prospects',
+      { id: { in: [...ids] }, deletedAt: null },
+      demoEnabled,
+    );
+    await workbook.commit();
+  }
+
   private async writeFiltered(
     user: AuthenticatedUser,
     filter: ProspectFilterDto,

@@ -401,6 +401,11 @@ export class CallAttemptOpDto {
   @IsUUID()
   prospectId!: string;
 
+  @ApiPropertyOptional({ enum: Projet, enumName: 'Projet' })
+  @IsOptional()
+  @IsEnum(Projet)
+  projet?: Projet;
+
   @ApiProperty({ enum: CallOutcome, enumName: 'CallOutcome' })
   @IsEnum(CallOutcome)
   outcome!: CallOutcome;
@@ -586,22 +591,6 @@ export class CallAttemptResultDto {
   status!: CallAttemptApplyStatus;
 
   @ApiProperty({ format: 'uuid' }) attemptId!: string;
-
-  @ApiProperty({
-    type: String,
-    format: 'uuid',
-    nullable: true,
-    description: 'Tâche close par cette tentative, si le prospect en avait une active.',
-  })
-  taskId!: string | null;
-
-  @ApiProperty({
-    enum: CallTaskStatus,
-    enumName: 'CallTaskStatus',
-    nullable: true,
-    description: 'Statut de cette tâche après application.',
-  })
-  taskStatus!: CallTaskStatus | null;
 
   @ApiProperty({ type: () => ProspectPhase2StateDto }) state!: ProspectPhase2StateDto;
 }

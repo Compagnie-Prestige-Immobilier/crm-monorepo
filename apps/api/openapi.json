@@ -6790,244 +6790,6 @@
         "tags": ["visites"]
       }
     },
-    "/api/v1/visites/tableau-de-bord/disposition": {
-      "get": {
-        "operationId": "getVisiteDashboardLayout",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DispositionResponseDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "La disposition du tableau de bord : la sienne, sinon celle par défaut, sinon celle d’usine.",
-        "tags": ["visites"]
-      },
-      "put": {
-        "description": "La version de la disposition est fixée par le serveur ; la transmettre est refusé.",
-        "operationId": "putVisiteDashboardLayout",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateDispositionDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DispositionResponseDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Enregistre sa propre disposition du tableau de bord.",
-        "tags": ["visites"]
-      },
-      "delete": {
-        "operationId": "deleteVisiteDashboardLayout",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OkDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Efface sa propre disposition ; retombe sur celle par défaut, puis celle d’usine.",
-        "tags": ["visites"]
-      }
-    },
-    "/api/v1/visites/tableau-de-bord/disposition-par-defaut": {
-      "put": {
-        "description": "La version de la disposition est fixée par le serveur ; la transmettre est refusé.",
-        "operationId": "putVisiteDashboardDefaultLayout",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateDispositionDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DispositionResponseDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Fixe la disposition proposée par défaut à tous les comptes du registre.",
-        "tags": ["visites"]
-      }
-    },
     "/api/v1/visites/{id}": {
       "get": {
         "operationId": "getVisite",
@@ -12148,204 +11910,6 @@
         ],
         "summary": "Substitue les variables, pour l’aperçu du compositeur.",
         "tags": ["notification-templates"]
-      }
-    },
-    "/api/v1/analytics/layout": {
-      "get": {
-        "operationId": "getStatsLayout",
-        "parameters": [
-          {
-            "name": "screen",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "$ref": "#/components/schemas/StatsLayoutScreen"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StatsLayoutDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Organisation des graphiques de statistiques pour l’utilisateur courant.",
-        "tags": ["analytics"]
-      },
-      "put": {
-        "operationId": "putStatsLayout",
-        "parameters": [
-          {
-            "name": "screen",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "$ref": "#/components/schemas/StatsLayoutScreen"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateStatsLayoutDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StatsLayoutDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Enregistre l’organisation des graphiques de statistiques.",
-        "tags": ["analytics"]
-      },
-      "delete": {
-        "operationId": "deleteStatsLayout",
-        "parameters": [
-          {
-            "name": "screen",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "$ref": "#/components/schemas/StatsLayoutScreen"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StatsLayoutDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Efface l’organisation personnelle des statistiques pour revenir à l’ordre par défaut.",
-        "tags": ["analytics"]
       }
     },
     "/api/v1/analytics/funnel": {
@@ -17471,6 +17035,35 @@
             "schema": {
               "$ref": "#/components/schemas/SupervisionGranularity"
             }
+          },
+          {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux. Un représentant n’existe que dans CHUES : sous `GRAND_PUBLIC`, toutes les colonnes `rep*` valent 0 ou `null`.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "commercialId",
+            "required": false,
+            "in": "query",
+            "description": "Un seul téléconseiller : borne les lignes, la liste et les histogrammes.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "campaignId",
+            "required": false,
+            "in": "query",
+            "description": "Campagne d’appels. L’identifiant vaut pour une campagne prospects OU une campagne représentants : l’autre famille tombe alors à zéro.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -18403,6 +17996,7 @@
     },
     "/api/v1/app-updates/android/current": {
       "get": {
+        "description": "`minVersionCode` est le plus haut `versionCode` marqué obligatoire encore en ligne, ou `null`. `forceUpdate` vaut `versionCode < minVersionCode`.",
         "operationId": "getAndroidUpdate",
         "parameters": [
           {
@@ -18432,8 +18026,18 @@
     },
     "/api/v1/app-updates/android/download": {
       "get": {
+        "description": "`v` sert exactement cette version, avec un cache immuable. Sans `v`, la release courante est servie, pour les APK déjà installés qui ignorent ce paramètre.",
         "operationId": "downloadAndroidUpdate",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "v",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -18449,6 +18053,16 @@
           "206": {
             "description": "Reprise de téléchargement (en-tête Range)."
           },
+          "404": {
+            "description": "APK_VERSION_WITHDRAWN · la version demandée est retirée ou inconnue.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
           "416": {
             "description": "Plage demandée hors du fichier.",
             "content": {
@@ -18458,15 +18072,70 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Trop de téléchargements depuis cette adresse (APK_DOWNLOAD_RATE_LIMIT).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
           }
         },
-        "summary": "Télécharge la dernière release Android.",
+        "summary": "Télécharge une release Android.",
+        "tags": ["app-updates"]
+      }
+    },
+    "/api/v1/app-updates/android/releases": {
+      "get": {
+        "operationId": "listAndroidReleases",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AndroidReleaseListDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Historique des releases Android.",
         "tags": ["app-updates"]
       }
     },
     "/api/v1/app-updates/android": {
       "post": {
-        "description": "`versionName` et `versionCode` ne sont PAS envoyés : ils sont lus dans le `AndroidManifest.xml` de l’APK. Les envoyer quand même produit un 400, la validation refusant tout champ inconnu. La publication est refusée si le manifeste est illisible, si le paquet n’est pas `sn.cpi.go`, ou si le `versionCode` n’est pas STRICTEMENT supérieur à celui de la release en ligne.",
+        "description": "`versionName` et `versionCode` ne sont PAS envoyés : ils sont lus dans le `AndroidManifest.xml` de l’APK. Les envoyer quand même produit un 400, la validation refusant tout champ inconnu. La publication est refusée si le manifeste est illisible, si le paquet n’est pas `sn.cpi.go`, si le `versionCode` n’est pas STRICTEMENT supérieur au plus haut publié, ou si le certificat signataire diffère de celui du parc. Une release naît NON obligatoire : le plancher se pose ensuite.",
         "operationId": "uploadAndroidUpdate",
         "parameters": [],
         "requestBody": {
@@ -18475,14 +18144,11 @@
             "multipart/form-data": {
               "schema": {
                 "type": "object",
-                "required": ["file", "forceUpdate"],
+                "required": ["file"],
                 "properties": {
                   "file": {
                     "type": "string",
                     "format": "binary"
-                  },
-                  "forceUpdate": {
-                    "type": "boolean"
                   },
                   "notes": {
                     "type": "string"
@@ -18498,7 +18164,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AppUpdateDto"
+                  "$ref": "#/components/schemas/AndroidReleaseDto"
                 }
               }
             }
@@ -18534,7 +18200,7 @@
             }
           },
           "422": {
-            "description": "APK_FOREIGN_PACKAGE · le manifeste déclare un autre paquet que `sn.cpi.go`. APK_VERSION_NOT_GREATER · le versionCode lu ne dépasse pas celui en ligne.",
+            "description": "APK_FOREIGN_PACKAGE · le manifeste déclare un autre paquet que `sn.cpi.go`. APK_VERSION_NOT_GREATER · le versionCode lu ne dépasse pas le plus haut publié. APK_UNSIGNED · aucun bloc de signature v2/v3 lisible. APK_SIGNER_MISMATCH · l’APK est signé par une autre clé que celle du parc.",
             "content": {
               "application/json": {
                 "schema": {
@@ -18550,6 +18216,146 @@
           }
         ],
         "summary": "Publie une release Android.",
+        "tags": ["app-updates"]
+      }
+    },
+    "/api/v1/app-updates/android/{versionCode}/mandatory": {
+      "post": {
+        "description": "Pose le plancher : tout poste sous ce `versionCode` reçoit `forceUpdate`. Idempotent.",
+        "operationId": "markAndroidReleaseMandatory",
+        "parameters": [
+          {
+            "name": "versionCode",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AndroidReleaseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "APK_RELEASE_UNKNOWN · aucune release en ligne ne porte ce versionCode.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Rend une release obligatoire.",
+        "tags": ["app-updates"]
+      }
+    },
+    "/api/v1/app-updates/android/{versionCode}/withdraw": {
+      "post": {
+        "description": "Le fichier est supprimé et la version cesse d’être téléchargeable. Idempotent sur une release déjà retirée.",
+        "operationId": "withdrawAndroidRelease",
+        "parameters": [
+          {
+            "name": "versionCode",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AndroidReleaseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "APK_RELEASE_UNKNOWN · aucune release ne porte ce versionCode.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "APK_LAST_RELEASE · c’est la seule release en ligne.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retire une release de la distribution.",
         "tags": ["app-updates"]
       }
     },
@@ -18748,6 +18554,280 @@
         ],
         "summary": "Télécharge l’export prêt, puis le détruit.",
         "tags": ["admin"]
+      }
+    },
+    "/api/v1/tableaux-de-bord/{ecran}/disposition": {
+      "get": {
+        "operationId": "getDashboardLayout",
+        "parameters": [
+          {
+            "name": "ecran",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/DashboardEcran"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DispositionResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "La disposition d’un écran : la sienne, sinon celle par défaut, sinon celle d’usine.",
+        "tags": ["tableaux-de-bord"]
+      },
+      "put": {
+        "description": "La version de la disposition est fixée par le serveur ; la transmettre est refusé.",
+        "operationId": "putDashboardLayout",
+        "parameters": [
+          {
+            "name": "ecran",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/DashboardEcran"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDispositionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DispositionResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Enregistre sa propre disposition pour cet écran.",
+        "tags": ["tableaux-de-bord"]
+      },
+      "delete": {
+        "operationId": "deleteDashboardLayout",
+        "parameters": [
+          {
+            "name": "ecran",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/DashboardEcran"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Efface sa propre disposition ; retombe sur celle par défaut, puis celle d’usine.",
+        "tags": ["tableaux-de-bord"]
+      }
+    },
+    "/api/v1/tableaux-de-bord/{ecran}/disposition/par-defaut": {
+      "put": {
+        "description": "La version de la disposition est fixée par le serveur ; la transmettre est refusé.",
+        "operationId": "putDashboardDefaultLayout",
+        "parameters": [
+          {
+            "name": "ecran",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/DashboardEcran"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDispositionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DispositionResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fixe la disposition proposée par défaut à tous les comptes de cet écran.",
+        "tags": ["tableaux-de-bord"]
       }
     }
   },
@@ -23413,166 +23493,6 @@
         },
         "required": ["items", "meta"]
       },
-      "DashboardSource": {
-        "type": "string",
-        "enum": [
-          "total-visites",
-          "moyenne-journaliere",
-          "jour-le-plus-charge",
-          "par-entreprise",
-          "par-objet",
-          "par-direction",
-          "par-destinataire",
-          "par-jour",
-          "par-mois",
-          "par-heure",
-          "par-jour-semaine",
-          "par-heure-jour-semaine",
-          "par-agent",
-          "par-entreprise-objet",
-          "par-destinataire-direction",
-          "par-objet-mois",
-          "visiteurs-recurrents",
-          "avec-telephone",
-          "qualite-de-saisie"
-        ]
-      },
-      "DashboardMarque": {
-        "type": "string",
-        "enum": [
-          "barres-verticales",
-          "barres-horizontales",
-          "barres-empilees",
-          "barres-100",
-          "barres-groupees",
-          "courbe",
-          "aire",
-          "escalier",
-          "anneau",
-          "camembert",
-          "aire-polaire",
-          "radar",
-          "nuage",
-          "bulles",
-          "mixte",
-          "jauge",
-          "carte-de-chaleur",
-          "tableau",
-          "tuile",
-          "tuile-courbe"
-        ]
-      },
-      "DashboardTaille": {
-        "type": "string",
-        "enum": ["demi", "pleine"]
-      },
-      "DispositionPresentationDto": {
-        "type": "object",
-        "properties": {
-          "palette": {
-            "type": "string",
-            "enum": ["neutre", "serie", "categorielle"]
-          },
-          "valeurs": {
-            "type": "boolean"
-          },
-          "legende": {
-            "type": "boolean"
-          },
-          "tri": {
-            "type": "string",
-            "enum": ["valeur-desc", "valeur-asc", "alphabetique"]
-          },
-          "autresApres": {
-            "type": "number",
-            "minimum": 1,
-            "maximum": 50
-          }
-        }
-      },
-      "DispositionWidgetDto": {
-        "type": "object",
-        "properties": {
-          "source": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/DashboardSource"
-              }
-            ]
-          },
-          "marque": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/DashboardMarque"
-              }
-            ]
-          },
-          "taille": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/DashboardTaille"
-              }
-            ]
-          },
-          "presentation": {
-            "$ref": "#/components/schemas/DispositionPresentationDto"
-          }
-        },
-        "required": ["source"]
-      },
-      "DashboardPreset": {
-        "type": "string",
-        "enum": ["essentiel", "affluence", "organisation", "complet"]
-      },
-      "DispositionResponseDto": {
-        "type": "object",
-        "properties": {
-          "widgets": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/DispositionWidgetDto"
-            }
-          },
-          "preset": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/DashboardPreset"
-              }
-            ]
-          },
-          "source": {
-            "type": "string",
-            "enum": ["utilisateur", "defaut", "usine"],
-            "description": "D’où vient la disposition rendue : la sienne, celle fixée par l’administrateur, ou celle d’usine."
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          }
-        },
-        "required": ["widgets", "preset", "source", "updatedAt"]
-      },
-      "UpdateDispositionDto": {
-        "type": "object",
-        "properties": {
-          "preset": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/DashboardPreset"
-              }
-            ]
-          },
-          "widgets": {
-            "description": "Les éléments du tableau de bord. `version` est fixé par le serveur et refusé s’il est transmis.",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/DispositionWidgetDto"
-            }
-          }
-        },
-        "required": ["widgets"]
-      },
       "CreateVisiteDto": {
         "type": "object",
         "properties": {
@@ -26280,58 +26200,6 @@
         },
         "required": ["title", "body", "missing"]
       },
-      "StatsLayoutScreen": {
-        "type": "string",
-        "enum": ["dashboard", "teleconseil"]
-      },
-      "StatsLayoutWidgetDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "visible": {
-            "type": "boolean"
-          }
-        },
-        "required": ["id", "visible"]
-      },
-      "StatsLayoutDto": {
-        "type": "object",
-        "properties": {
-          "screen": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/StatsLayoutScreen"
-              }
-            ]
-          },
-          "widgets": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/StatsLayoutWidgetDto"
-            }
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          }
-        },
-        "required": ["screen", "widgets", "updatedAt"]
-      },
-      "UpdateStatsLayoutDto": {
-        "type": "object",
-        "properties": {
-          "widgets": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/StatsLayoutWidgetDto"
-            }
-          }
-        },
-        "required": ["widgets"]
-      },
       "FunnelStageDto": {
         "type": "object",
         "properties": {
@@ -27482,17 +27350,6 @@
       "SupervisionActivityRowDto": {
         "type": "object",
         "properties": {
-          "bucket": {
-            "type": "string",
-            "description": "Début de la journée ou de la semaine, en AAAA-MM-JJ."
-          },
-          "teleconseillerId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "teleconseillerName": {
-            "type": "string"
-          },
           "calls": {
             "type": "number",
             "description": "Appels passés à des prospects."
@@ -27537,12 +27394,63 @@
           "tasksClosed": {
             "type": "number",
             "description": "Tâches d’appel clôturées sur la période."
+          },
+          "repCalls": {
+            "type": "number",
+            "description": "Appels à des représentants, issues encore saisissables seulement : REACHED, REFUSED, CALLBACK, UNREACHABLE. Dénominateur de `repContactRate` et de `repCallbackRate`."
+          },
+          "repReached": {
+            "type": "number",
+            "description": "Représentants qui ont DÉCROCHÉ et répondu : REACHED ou REFUSED. Un refus est un contact ; un rappel promis n’en est pas encore un."
+          },
+          "repCallback": {
+            "type": "number",
+            "description": "Issue CALLBACK : rappel promis, date posée."
+          },
+          "repUnreachable": {
+            "type": "number",
+            "description": "Issue UNREACHABLE : n’a pas décroché."
+          },
+          "repOther": {
+            "type": "number",
+            "description": "Issues d’héritage que le terrain ne saisit plus : PROSPECTS_PROMISED, WRONG_NUMBER, OTHER. Hors de tous les taux."
+          },
+          "repContactRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Part des appels représentants où quelqu’un a répondu, en pourcentage. `null` sans aucun appel."
+          },
+          "repCallbackRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Part des appels représentants finissant en rappel, en pourcentage."
+          },
+          "repQuestioned": {
+            "type": "number",
+            "description": "Représentants DISTINCTS dont la dernière réponse de la fenêtre a été obtenue par ce téléconseiller. Attribué à qui a obtenu la réponse, pas à qui a appelé le premier. NON SOMMABLE entre périodes ni entre téléconseillers."
+          },
+          "repQualified": {
+            "type": "number",
+            "description": "Parmi `repQuestioned`, ceux dont cette dernière réponse est REACHED. NON SOMMABLE."
+          },
+          "repQualificationRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Part des représentants interrogés qui ont dit oui, en pourcentage. `null` sans aucun représentant interrogé."
+          },
+          "bucket": {
+            "type": "string",
+            "description": "Début de la journée ou de la semaine, en AAAA-MM-JJ."
+          },
+          "teleconseillerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "teleconseillerName": {
+            "type": "string"
           }
         },
         "required": [
-          "bucket",
-          "teleconseillerId",
-          "teleconseillerName",
           "calls",
           "unreachable",
           "wrongNumber",
@@ -27553,7 +27461,136 @@
           "reachRate",
           "prospectsCreated",
           "representantsContacted",
-          "tasksClosed"
+          "tasksClosed",
+          "repCalls",
+          "repReached",
+          "repCallback",
+          "repUnreachable",
+          "repOther",
+          "repContactRate",
+          "repCallbackRate",
+          "repQuestioned",
+          "repQualified",
+          "repQualificationRate",
+          "bucket",
+          "teleconseillerId",
+          "teleconseillerName"
+        ]
+      },
+      "SupervisionActivityCountsDto": {
+        "type": "object",
+        "properties": {
+          "calls": {
+            "type": "number",
+            "description": "Appels passés à des prospects."
+          },
+          "unreachable": {
+            "type": "number",
+            "description": "Issue UNREACHABLE : NRP ou injoignable."
+          },
+          "wrongNumber": {
+            "type": "number",
+            "description": "Issue WRONG_NUMBER : faux numéro."
+          },
+          "refused": {
+            "type": "number",
+            "description": "Issue REFUSED : refus."
+          },
+          "other": {
+            "type": "number",
+            "description": "Issue OTHER."
+          },
+          "methodObtained": {
+            "type": "number",
+            "description": "Issue METHOD_OBTAINED."
+          },
+          "callback": {
+            "type": "number",
+            "description": "Issue CALLBACK : à rappeler."
+          },
+          "reachRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Part des appels dont le numéro s’est révélé exploitable, en pourcentage. `null` sans aucun appel : « personne appelé » n’est pas « personne joint »."
+          },
+          "prospectsCreated": {
+            "type": "number",
+            "description": "Fiches prospect saisies sur la période."
+          },
+          "representantsContacted": {
+            "type": "number",
+            "description": "Représentants distincts appelés sur la période."
+          },
+          "tasksClosed": {
+            "type": "number",
+            "description": "Tâches d’appel clôturées sur la période."
+          },
+          "repCalls": {
+            "type": "number",
+            "description": "Appels à des représentants, issues encore saisissables seulement : REACHED, REFUSED, CALLBACK, UNREACHABLE. Dénominateur de `repContactRate` et de `repCallbackRate`."
+          },
+          "repReached": {
+            "type": "number",
+            "description": "Représentants qui ont DÉCROCHÉ et répondu : REACHED ou REFUSED. Un refus est un contact ; un rappel promis n’en est pas encore un."
+          },
+          "repCallback": {
+            "type": "number",
+            "description": "Issue CALLBACK : rappel promis, date posée."
+          },
+          "repUnreachable": {
+            "type": "number",
+            "description": "Issue UNREACHABLE : n’a pas décroché."
+          },
+          "repOther": {
+            "type": "number",
+            "description": "Issues d’héritage que le terrain ne saisit plus : PROSPECTS_PROMISED, WRONG_NUMBER, OTHER. Hors de tous les taux."
+          },
+          "repContactRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Part des appels représentants où quelqu’un a répondu, en pourcentage. `null` sans aucun appel."
+          },
+          "repCallbackRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Part des appels représentants finissant en rappel, en pourcentage."
+          },
+          "repQuestioned": {
+            "type": "number",
+            "description": "Représentants DISTINCTS dont la dernière réponse de la fenêtre a été obtenue par ce téléconseiller. Attribué à qui a obtenu la réponse, pas à qui a appelé le premier. NON SOMMABLE entre périodes ni entre téléconseillers."
+          },
+          "repQualified": {
+            "type": "number",
+            "description": "Parmi `repQuestioned`, ceux dont cette dernière réponse est REACHED. NON SOMMABLE."
+          },
+          "repQualificationRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Part des représentants interrogés qui ont dit oui, en pourcentage. `null` sans aucun représentant interrogé."
+          }
+        },
+        "required": [
+          "calls",
+          "unreachable",
+          "wrongNumber",
+          "refused",
+          "other",
+          "methodObtained",
+          "callback",
+          "reachRate",
+          "prospectsCreated",
+          "representantsContacted",
+          "tasksClosed",
+          "repCalls",
+          "repReached",
+          "repCallback",
+          "repUnreachable",
+          "repOther",
+          "repContactRate",
+          "repCallbackRate",
+          "repQuestioned",
+          "repQualified",
+          "repQualificationRate"
         ]
       },
       "SupervisionTeleconseillerDto": {
@@ -27620,6 +27657,14 @@
               "$ref": "#/components/schemas/SupervisionActivityRowDto"
             }
           },
+          "totals": {
+            "description": "L’équipe entière sur TOUTE la fenêtre, filtres compris. Calculé côté serveur : `representantsContacted`, `repQuestioned` et `repQualified` comptent des personnes distinctes, et la somme des lignes en compterait certaines deux fois.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SupervisionActivityCountsDto"
+              }
+            ]
+          },
           "teleconseillers": {
             "description": "Tous les téléconseillers, y compris ceux sans aucun acte sur la fenêtre.",
             "type": "array",
@@ -27647,6 +27692,7 @@
           "to",
           "granularity",
           "items",
+          "totals",
           "teleconseillers",
           "prospectsByTeleconseiller",
           "prospectsByRepresentant"
@@ -27947,7 +27993,8 @@
             "type": "boolean"
           },
           "forceUpdate": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Le poste est sous le plancher obligatoire."
           },
           "versionName": {
             "type": "string"
@@ -27964,11 +28011,20 @@
           "sha256": {
             "type": "string"
           },
+          "signerSha256": {
+            "type": "string",
+            "description": "Empreinte SHA-256 du certificat signataire de l’APK servi."
+          },
           "downloadUrl": {
             "type": "string"
           },
           "publishedAt": {
             "type": "string"
+          },
+          "minVersionCode": {
+            "type": "number",
+            "nullable": true,
+            "description": "Plus haut versionCode obligatoire encore en ligne, ou null."
           },
           "notes": {
             "type": "string",
@@ -27983,10 +28039,92 @@
           "fileName",
           "fileSize",
           "sha256",
+          "signerSha256",
           "downloadUrl",
           "publishedAt",
+          "minVersionCode",
           "notes"
         ]
+      },
+      "AndroidReleaseDto": {
+        "type": "object",
+        "properties": {
+          "versionCode": {
+            "type": "number"
+          },
+          "versionName": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "fileSize": {
+            "type": "number"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "signerSha256": {
+            "type": "string"
+          },
+          "mandatory": {
+            "type": "boolean"
+          },
+          "publishedAt": {
+            "type": "string"
+          },
+          "publishedById": {
+            "type": "string",
+            "nullable": true
+          },
+          "publishedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "withdrawnAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "withdrawnById": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "versionCode",
+          "versionName",
+          "fileName",
+          "fileSize",
+          "sha256",
+          "signerSha256",
+          "mandatory",
+          "publishedAt",
+          "publishedById",
+          "publishedByName",
+          "notes",
+          "withdrawnAt",
+          "withdrawnById"
+        ]
+      },
+      "AndroidReleaseListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AndroidReleaseDto"
+            }
+          },
+          "minVersionCode": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": ["items", "minVersionCode"]
       },
       "DatabaseDumpJobDto": {
         "type": "object",
@@ -28064,6 +28202,184 @@
           "noticeDetail",
           "downloadable"
         ]
+      },
+      "DashboardEcran": {
+        "type": "string",
+        "enum": ["visites", "chues", "grand-public"]
+      },
+      "DashboardSource": {
+        "type": "string",
+        "enum": [
+          "total-visites",
+          "moyenne-journaliere",
+          "jour-le-plus-charge",
+          "par-entreprise",
+          "par-objet",
+          "par-direction",
+          "par-destinataire",
+          "par-jour",
+          "par-mois",
+          "par-heure",
+          "par-jour-semaine",
+          "par-heure-jour-semaine",
+          "par-agent",
+          "par-entreprise-objet",
+          "par-destinataire-direction",
+          "par-objet-mois",
+          "visiteurs-recurrents",
+          "avec-telephone",
+          "qualite-de-saisie",
+          "appels-de-qualification",
+          "taux-de-contact",
+          "a-rappeler",
+          "taux-de-qualification",
+          "prospects-notes",
+          "adhesions",
+          "reste-a-appeler",
+          "par-teleconseiller",
+          "encaisse",
+          "de-l-appel-a-l-encaissement",
+          "methodes-d-adhesion",
+          "par-banque",
+          "delais-medians",
+          "rendement-par-departement"
+        ]
+      },
+      "DashboardMarque": {
+        "type": "string",
+        "enum": [
+          "barres-verticales",
+          "barres-horizontales",
+          "barres-empilees",
+          "barres-100",
+          "barres-groupees",
+          "courbe",
+          "aire",
+          "escalier",
+          "anneau",
+          "camembert",
+          "aire-polaire",
+          "radar",
+          "nuage",
+          "bulles",
+          "mixte",
+          "jauge",
+          "carte-de-chaleur",
+          "tableau",
+          "tuile",
+          "tuile-courbe"
+        ]
+      },
+      "DashboardTaille": {
+        "type": "string",
+        "enum": ["demi", "pleine"]
+      },
+      "DispositionPresentationDto": {
+        "type": "object",
+        "properties": {
+          "palette": {
+            "type": "string",
+            "enum": ["neutre", "serie", "categorielle"]
+          },
+          "valeurs": {
+            "type": "boolean"
+          },
+          "legende": {
+            "type": "boolean"
+          },
+          "tri": {
+            "type": "string",
+            "enum": ["valeur-desc", "valeur-asc", "alphabetique"]
+          },
+          "autresApres": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 50
+          }
+        }
+      },
+      "DispositionWidgetDto": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DashboardSource"
+              }
+            ]
+          },
+          "marque": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DashboardMarque"
+              }
+            ]
+          },
+          "taille": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DashboardTaille"
+              }
+            ]
+          },
+          "presentation": {
+            "$ref": "#/components/schemas/DispositionPresentationDto"
+          }
+        },
+        "required": ["source"]
+      },
+      "DashboardPreset": {
+        "type": "string",
+        "enum": ["essentiel", "affluence", "organisation", "complet"]
+      },
+      "DispositionResponseDto": {
+        "type": "object",
+        "properties": {
+          "widgets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DispositionWidgetDto"
+            }
+          },
+          "preset": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DashboardPreset"
+              }
+            ]
+          },
+          "source": {
+            "type": "string",
+            "enum": ["utilisateur", "defaut", "usine"],
+            "description": "D’où vient la disposition rendue : la sienne, celle fixée par l’administrateur, ou celle d’usine."
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": ["widgets", "preset", "source", "updatedAt"]
+      },
+      "UpdateDispositionDto": {
+        "type": "object",
+        "properties": {
+          "preset": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DashboardPreset"
+              }
+            ]
+          },
+          "widgets": {
+            "description": "Les éléments du tableau de bord. `version` est fixé par le serveur et refusé s’il est transmis.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DispositionWidgetDto"
+            }
+          }
+        },
+        "required": ["widgets"]
       }
     }
   }

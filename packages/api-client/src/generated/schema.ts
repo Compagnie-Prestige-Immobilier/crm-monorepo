@@ -1211,48 +1211,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/visites/tableau-de-bord/disposition': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** La disposition du tableau de bord : la sienne, sinon celle par défaut, sinon celle d’usine. */
-    get: operations['getVisiteDashboardLayout'];
-    /**
-     * Enregistre sa propre disposition du tableau de bord.
-     * @description La version de la disposition est fixée par le serveur ; la transmettre est refusé.
-     */
-    put: operations['putVisiteDashboardLayout'];
-    post?: never;
-    /** Efface sa propre disposition ; retombe sur celle par défaut, puis celle d’usine. */
-    delete: operations['deleteVisiteDashboardLayout'];
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/visites/tableau-de-bord/disposition-par-defaut': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    /**
-     * Fixe la disposition proposée par défaut à tous les comptes du registre.
-     * @description La version de la disposition est fixée par le serveur ; la transmettre est refusé.
-     */
-    put: operations['putVisiteDashboardDefaultLayout'];
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/v1/visites/{id}': {
     parameters: {
       query?: never;
@@ -2205,25 +2163,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/analytics/layout': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Organisation des graphiques de statistiques pour l’utilisateur courant. */
-    get: operations['getStatsLayout'];
-    /** Enregistre l’organisation des graphiques de statistiques. */
-    put: operations['putStatsLayout'];
-    post?: never;
-    /** Efface l’organisation personnelle des statistiques pour revenir à l’ordre par défaut. */
-    delete: operations['deleteStatsLayout'];
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/v1/analytics/funnel': {
     parameters: {
       query?: never;
@@ -2811,7 +2750,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Vérifie la dernière release Android. */
+    /**
+     * Vérifie la dernière release Android.
+     * @description `minVersionCode` est le plus haut `versionCode` marqué obligatoire encore en ligne, ou `null`. `forceUpdate` vaut `versionCode < minVersionCode`.
+     */
     get: operations['getAndroidUpdate'];
     put?: never;
     post?: never;
@@ -2828,8 +2770,28 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Télécharge la dernière release Android. */
+    /**
+     * Télécharge une release Android.
+     * @description `v` sert exactement cette version, avec un cache immuable. Sans `v`, la release courante est servie, pour les APK déjà installés qui ignorent ce paramètre.
+     */
     get: operations['downloadAndroidUpdate'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/app-updates/android/releases': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Historique des releases Android. */
+    get: operations['listAndroidReleases'];
     put?: never;
     post?: never;
     delete?: never;
@@ -2849,9 +2811,49 @@ export interface paths {
     put?: never;
     /**
      * Publie une release Android.
-     * @description `versionName` et `versionCode` ne sont PAS envoyés : ils sont lus dans le `AndroidManifest.xml` de l’APK. Les envoyer quand même produit un 400, la validation refusant tout champ inconnu. La publication est refusée si le manifeste est illisible, si le paquet n’est pas `sn.cpi.go`, ou si le `versionCode` n’est pas STRICTEMENT supérieur à celui de la release en ligne.
+     * @description `versionName` et `versionCode` ne sont PAS envoyés : ils sont lus dans le `AndroidManifest.xml` de l’APK. Les envoyer quand même produit un 400, la validation refusant tout champ inconnu. La publication est refusée si le manifeste est illisible, si le paquet n’est pas `sn.cpi.go`, si le `versionCode` n’est pas STRICTEMENT supérieur au plus haut publié, ou si le certificat signataire diffère de celui du parc. Une release naît NON obligatoire : le plancher se pose ensuite.
      */
     post: operations['uploadAndroidUpdate'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/app-updates/android/{versionCode}/mandatory': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Rend une release obligatoire.
+     * @description Pose le plancher : tout poste sous ce `versionCode` reçoit `forceUpdate`. Idempotent.
+     */
+    post: operations['markAndroidReleaseMandatory'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/app-updates/android/{versionCode}/withdraw': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Retire une release de la distribution.
+     * @description Le fichier est supprimé et la version cesse d’être téléchargeable. Idempotent sur une release déjà retirée.
+     */
+    post: operations['withdrawAndroidRelease'];
     delete?: never;
     options?: never;
     head?: never;
@@ -2895,6 +2897,48 @@ export interface paths {
      */
     get: operations['downloadDatabaseDump'];
     put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tableaux-de-bord/{ecran}/disposition': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** La disposition d’un écran : la sienne, sinon celle par défaut, sinon celle d’usine. */
+    get: operations['getDashboardLayout'];
+    /**
+     * Enregistre sa propre disposition pour cet écran.
+     * @description La version de la disposition est fixée par le serveur ; la transmettre est refusé.
+     */
+    put: operations['putDashboardLayout'];
+    post?: never;
+    /** Efface sa propre disposition ; retombe sur celle par défaut, puis celle d’usine. */
+    delete: operations['deleteDashboardLayout'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tableaux-de-bord/{ecran}/disposition/par-defaut': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Fixe la disposition proposée par défaut à tous les comptes de cet écran.
+     * @description La version de la disposition est fixée par le serveur ; la transmettre est refusé.
+     */
+    put: operations['putDashboardDefaultLayout'];
     post?: never;
     delete?: never;
     options?: never;
@@ -4601,84 +4645,6 @@ export interface components {
       items: components['schemas']['VisiteDto'][];
       meta: components['schemas']['PageMetaDto'];
     };
-    /** @enum {string} */
-    DashboardSource:
-      | 'total-visites'
-      | 'moyenne-journaliere'
-      | 'jour-le-plus-charge'
-      | 'par-entreprise'
-      | 'par-objet'
-      | 'par-direction'
-      | 'par-destinataire'
-      | 'par-jour'
-      | 'par-mois'
-      | 'par-heure'
-      | 'par-jour-semaine'
-      | 'par-heure-jour-semaine'
-      | 'par-agent'
-      | 'par-entreprise-objet'
-      | 'par-destinataire-direction'
-      | 'par-objet-mois'
-      | 'visiteurs-recurrents'
-      | 'avec-telephone'
-      | 'qualite-de-saisie';
-    /** @enum {string} */
-    DashboardMarque:
-      | 'barres-verticales'
-      | 'barres-horizontales'
-      | 'barres-empilees'
-      | 'barres-100'
-      | 'barres-groupees'
-      | 'courbe'
-      | 'aire'
-      | 'escalier'
-      | 'anneau'
-      | 'camembert'
-      | 'aire-polaire'
-      | 'radar'
-      | 'nuage'
-      | 'bulles'
-      | 'mixte'
-      | 'jauge'
-      | 'carte-de-chaleur'
-      | 'tableau'
-      | 'tuile'
-      | 'tuile-courbe';
-    /** @enum {string} */
-    DashboardTaille: 'demi' | 'pleine';
-    DispositionPresentationDto: {
-      /** @enum {string} */
-      palette?: 'neutre' | 'serie' | 'categorielle';
-      valeurs?: boolean;
-      legende?: boolean;
-      /** @enum {string} */
-      tri?: 'valeur-desc' | 'valeur-asc' | 'alphabetique';
-      autresApres?: number;
-    };
-    DispositionWidgetDto: {
-      source: components['schemas']['DashboardSource'];
-      marque?: components['schemas']['DashboardMarque'];
-      taille?: components['schemas']['DashboardTaille'];
-      presentation?: components['schemas']['DispositionPresentationDto'];
-    };
-    /** @enum {string} */
-    DashboardPreset: 'essentiel' | 'affluence' | 'organisation' | 'complet';
-    DispositionResponseDto: {
-      widgets: components['schemas']['DispositionWidgetDto'][];
-      preset: components['schemas']['DashboardPreset'];
-      /**
-       * @description D’où vient la disposition rendue : la sienne, celle fixée par l’administrateur, ou celle d’usine.
-       * @enum {string}
-       */
-      source: 'utilisateur' | 'defaut' | 'usine';
-      /** Format: date-time */
-      updatedAt: string | null;
-    };
-    UpdateDispositionDto: {
-      preset?: components['schemas']['DashboardPreset'];
-      /** @description Les éléments du tableau de bord. `version` est fixé par le serveur et refusé s’il est transmis. */
-      widgets: components['schemas']['DispositionWidgetDto'][];
-    };
     CreateVisiteDto: {
       /** @example 2026-01-06 */
       date: string;
@@ -5627,21 +5593,6 @@ export interface components {
       /** @description Variables citées et non fournies. Le marqueur `{{nom}}` reste visible dans le texte rendu. */
       missing: string[];
     };
-    /** @enum {string} */
-    StatsLayoutScreen: 'dashboard' | 'teleconseil';
-    StatsLayoutWidgetDto: {
-      id: string;
-      visible: boolean;
-    };
-    StatsLayoutDto: {
-      screen: components['schemas']['StatsLayoutScreen'];
-      widgets: components['schemas']['StatsLayoutWidgetDto'][];
-      /** Format: date-time */
-      updatedAt: string | null;
-    };
-    UpdateStatsLayoutDto: {
-      widgets: components['schemas']['StatsLayoutWidgetDto'][];
-    };
     FunnelStageDto: {
       /** @description Nom de l’étape, prêt à afficher. */
       label: string;
@@ -6053,11 +6004,6 @@ export interface components {
     /** @enum {string} */
     SupervisionGranularity: 'day' | 'week';
     SupervisionActivityRowDto: {
-      /** @description Début de la journée ou de la semaine, en AAAA-MM-JJ. */
-      bucket: string;
-      /** Format: uuid */
-      teleconseillerId: string;
-      teleconseillerName: string;
       /** @description Appels passés à des prospects. */
       calls: number;
       /** @description Issue UNREACHABLE : NRP ou injoignable. */
@@ -6080,6 +6026,75 @@ export interface components {
       representantsContacted: number;
       /** @description Tâches d’appel clôturées sur la période. */
       tasksClosed: number;
+      /** @description Appels à des représentants, issues encore saisissables seulement : REACHED, REFUSED, CALLBACK, UNREACHABLE. Dénominateur de `repContactRate` et de `repCallbackRate`. */
+      repCalls: number;
+      /** @description Représentants qui ont DÉCROCHÉ et répondu : REACHED ou REFUSED. Un refus est un contact ; un rappel promis n’en est pas encore un. */
+      repReached: number;
+      /** @description Issue CALLBACK : rappel promis, date posée. */
+      repCallback: number;
+      /** @description Issue UNREACHABLE : n’a pas décroché. */
+      repUnreachable: number;
+      /** @description Issues d’héritage que le terrain ne saisit plus : PROSPECTS_PROMISED, WRONG_NUMBER, OTHER. Hors de tous les taux. */
+      repOther: number;
+      /** @description Part des appels représentants où quelqu’un a répondu, en pourcentage. `null` sans aucun appel. */
+      repContactRate: number | null;
+      /** @description Part des appels représentants finissant en rappel, en pourcentage. */
+      repCallbackRate: number | null;
+      /** @description Représentants DISTINCTS dont la dernière réponse de la fenêtre a été obtenue par ce téléconseiller. Attribué à qui a obtenu la réponse, pas à qui a appelé le premier. NON SOMMABLE entre périodes ni entre téléconseillers. */
+      repQuestioned: number;
+      /** @description Parmi `repQuestioned`, ceux dont cette dernière réponse est REACHED. NON SOMMABLE. */
+      repQualified: number;
+      /** @description Part des représentants interrogés qui ont dit oui, en pourcentage. `null` sans aucun représentant interrogé. */
+      repQualificationRate: number | null;
+      /** @description Début de la journée ou de la semaine, en AAAA-MM-JJ. */
+      bucket: string;
+      /** Format: uuid */
+      teleconseillerId: string;
+      teleconseillerName: string;
+    };
+    SupervisionActivityCountsDto: {
+      /** @description Appels passés à des prospects. */
+      calls: number;
+      /** @description Issue UNREACHABLE : NRP ou injoignable. */
+      unreachable: number;
+      /** @description Issue WRONG_NUMBER : faux numéro. */
+      wrongNumber: number;
+      /** @description Issue REFUSED : refus. */
+      refused: number;
+      /** @description Issue OTHER. */
+      other: number;
+      /** @description Issue METHOD_OBTAINED. */
+      methodObtained: number;
+      /** @description Issue CALLBACK : à rappeler. */
+      callback: number;
+      /** @description Part des appels dont le numéro s’est révélé exploitable, en pourcentage. `null` sans aucun appel : « personne appelé » n’est pas « personne joint ». */
+      reachRate: number | null;
+      /** @description Fiches prospect saisies sur la période. */
+      prospectsCreated: number;
+      /** @description Représentants distincts appelés sur la période. */
+      representantsContacted: number;
+      /** @description Tâches d’appel clôturées sur la période. */
+      tasksClosed: number;
+      /** @description Appels à des représentants, issues encore saisissables seulement : REACHED, REFUSED, CALLBACK, UNREACHABLE. Dénominateur de `repContactRate` et de `repCallbackRate`. */
+      repCalls: number;
+      /** @description Représentants qui ont DÉCROCHÉ et répondu : REACHED ou REFUSED. Un refus est un contact ; un rappel promis n’en est pas encore un. */
+      repReached: number;
+      /** @description Issue CALLBACK : rappel promis, date posée. */
+      repCallback: number;
+      /** @description Issue UNREACHABLE : n’a pas décroché. */
+      repUnreachable: number;
+      /** @description Issues d’héritage que le terrain ne saisit plus : PROSPECTS_PROMISED, WRONG_NUMBER, OTHER. Hors de tous les taux. */
+      repOther: number;
+      /** @description Part des appels représentants où quelqu’un a répondu, en pourcentage. `null` sans aucun appel. */
+      repContactRate: number | null;
+      /** @description Part des appels représentants finissant en rappel, en pourcentage. */
+      repCallbackRate: number | null;
+      /** @description Représentants DISTINCTS dont la dernière réponse de la fenêtre a été obtenue par ce téléconseiller. Attribué à qui a obtenu la réponse, pas à qui a appelé le premier. NON SOMMABLE entre périodes ni entre téléconseillers. */
+      repQuestioned: number;
+      /** @description Parmi `repQuestioned`, ceux dont cette dernière réponse est REACHED. NON SOMMABLE. */
+      repQualified: number;
+      /** @description Part des représentants interrogés qui ont dit oui, en pourcentage. `null` sans aucun représentant interrogé. */
+      repQualificationRate: number | null;
     };
     SupervisionTeleconseillerDto: {
       /** Format: uuid */
@@ -6103,6 +6118,8 @@ export interface components {
       granularity: components['schemas']['SupervisionGranularity'];
       /** @description Une ligne par téléconseiller et par période, seulement là où il s’est passé quelque chose. */
       items: components['schemas']['SupervisionActivityRowDto'][];
+      /** @description L’équipe entière sur TOUTE la fenêtre, filtres compris. Calculé côté serveur : `representantsContacted`, `repQuestioned` et `repQualified` comptent des personnes distinctes, et la somme des lignes en compterait certaines deux fois. */
+      totals: components['schemas']['SupervisionActivityCountsDto'];
       /** @description Tous les téléconseillers, y compris ceux sans aucun acte sur la fenêtre. */
       teleconseillers: components['schemas']['SupervisionTeleconseillerDto'][];
       /** @description Stock courant de prospects rattachés à chaque téléconseiller. */
@@ -6232,15 +6249,39 @@ export interface components {
     ExportMode: 'filtered' | 'consolidated';
     AppUpdateDto: {
       available: boolean;
+      /** @description Le poste est sous le plancher obligatoire. */
       forceUpdate: boolean;
       versionName: string;
       versionCode: number;
       fileName: string;
       fileSize: number;
       sha256: string;
+      /** @description Empreinte SHA-256 du certificat signataire de l’APK servi. */
+      signerSha256: string;
       downloadUrl: string;
       publishedAt: string;
+      /** @description Plus haut versionCode obligatoire encore en ligne, ou null. */
+      minVersionCode: number | null;
       notes: string | null;
+    };
+    AndroidReleaseDto: {
+      versionCode: number;
+      versionName: string;
+      fileName: string;
+      fileSize: number;
+      sha256: string;
+      signerSha256: string;
+      mandatory: boolean;
+      publishedAt: string;
+      publishedById: string | null;
+      publishedByName: string | null;
+      notes: string | null;
+      withdrawnAt: string | null;
+      withdrawnById: string | null;
+    };
+    AndroidReleaseListDto: {
+      items: components['schemas']['AndroidReleaseDto'][];
+      minVersionCode: number | null;
     };
     DatabaseDumpJobDto: {
       /**
@@ -6273,6 +6314,100 @@ export interface components {
       noticeDetail: string | null;
       /** @description Vrai quand le fichier est servi par GET /admin/database-dump/download. Le téléchargement le détruit. */
       downloadable: boolean;
+    };
+    /** @enum {string} */
+    DashboardEcran: 'visites' | 'chues' | 'grand-public';
+    /** @enum {string} */
+    DashboardSource:
+      | 'total-visites'
+      | 'moyenne-journaliere'
+      | 'jour-le-plus-charge'
+      | 'par-entreprise'
+      | 'par-objet'
+      | 'par-direction'
+      | 'par-destinataire'
+      | 'par-jour'
+      | 'par-mois'
+      | 'par-heure'
+      | 'par-jour-semaine'
+      | 'par-heure-jour-semaine'
+      | 'par-agent'
+      | 'par-entreprise-objet'
+      | 'par-destinataire-direction'
+      | 'par-objet-mois'
+      | 'visiteurs-recurrents'
+      | 'avec-telephone'
+      | 'qualite-de-saisie'
+      | 'appels-de-qualification'
+      | 'taux-de-contact'
+      | 'a-rappeler'
+      | 'taux-de-qualification'
+      | 'prospects-notes'
+      | 'adhesions'
+      | 'reste-a-appeler'
+      | 'par-teleconseiller'
+      | 'encaisse'
+      | 'de-l-appel-a-l-encaissement'
+      | 'methodes-d-adhesion'
+      | 'par-banque'
+      | 'delais-medians'
+      | 'rendement-par-departement';
+    /** @enum {string} */
+    DashboardMarque:
+      | 'barres-verticales'
+      | 'barres-horizontales'
+      | 'barres-empilees'
+      | 'barres-100'
+      | 'barres-groupees'
+      | 'courbe'
+      | 'aire'
+      | 'escalier'
+      | 'anneau'
+      | 'camembert'
+      | 'aire-polaire'
+      | 'radar'
+      | 'nuage'
+      | 'bulles'
+      | 'mixte'
+      | 'jauge'
+      | 'carte-de-chaleur'
+      | 'tableau'
+      | 'tuile'
+      | 'tuile-courbe';
+    /** @enum {string} */
+    DashboardTaille: 'demi' | 'pleine';
+    DispositionPresentationDto: {
+      /** @enum {string} */
+      palette?: 'neutre' | 'serie' | 'categorielle';
+      valeurs?: boolean;
+      legende?: boolean;
+      /** @enum {string} */
+      tri?: 'valeur-desc' | 'valeur-asc' | 'alphabetique';
+      autresApres?: number;
+    };
+    DispositionWidgetDto: {
+      source: components['schemas']['DashboardSource'];
+      marque?: components['schemas']['DashboardMarque'];
+      taille?: components['schemas']['DashboardTaille'];
+      presentation?: components['schemas']['DispositionPresentationDto'];
+    };
+    /** @enum {string} */
+    DashboardPreset: 'essentiel' | 'affluence' | 'organisation' | 'complet';
+    DispositionResponseDto: {
+      widgets: components['schemas']['DispositionWidgetDto'][];
+      preset: components['schemas']['DashboardPreset'];
+      /**
+       * @description D’où vient la disposition rendue : la sienne, celle fixée par l’administrateur, ou celle d’usine.
+       * @enum {string}
+       */
+      source: 'utilisateur' | 'defaut' | 'usine';
+      /** Format: date-time */
+      updatedAt: string | null;
+    };
+    UpdateDispositionDto: {
+      preset?: components['schemas']['DashboardPreset'];
+      /** @description Les éléments du tableau de bord. `version` est fixé par le serveur et refusé s’il est transmis. */
+      widgets: components['schemas']['DispositionWidgetDto'][];
     };
   };
   responses: never;
@@ -10882,198 +11017,6 @@ export interface operations {
       };
     };
   };
-  getVisiteDashboardLayout: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DispositionResponseDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  putVisiteDashboardLayout: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateDispositionDto'];
-      };
-    };
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DispositionResponseDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  deleteVisiteDashboardLayout: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['OkDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  putVisiteDashboardDefaultLayout: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateDispositionDto'];
-      };
-    };
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DispositionResponseDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
   getVisite: {
     parameters: {
       query?: never;
@@ -14512,154 +14455,6 @@ export interface operations {
       };
     };
   };
-  getStatsLayout: {
-    parameters: {
-      query: {
-        screen: components['schemas']['StatsLayoutScreen'];
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['StatsLayoutDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  putStatsLayout: {
-    parameters: {
-      query: {
-        screen: components['schemas']['StatsLayoutScreen'];
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateStatsLayoutDto'];
-      };
-    };
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['StatsLayoutDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  deleteStatsLayout: {
-    parameters: {
-      query: {
-        screen: components['schemas']['StatsLayoutScreen'];
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['StatsLayoutDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
   getAnalyticsFunnel: {
     parameters: {
       query?: {
@@ -16373,6 +16168,12 @@ export interface operations {
         /** @description Borne haute sur la date de l’acte, incluse. Une date seule finit à 23:59:59.999. */
         actTo?: string;
         granularity?: components['schemas']['SupervisionGranularity'];
+        /** @description Le projet. ABSENT veut dire les deux. Un représentant n’existe que dans CHUES : sous `GRAND_PUBLIC`, toutes les colonnes `rep*` valent 0 ou `null`. */
+        projet?: components['schemas']['Projet'];
+        /** @description Un seul téléconseiller : borne les lignes, la liste et les histogrammes. */
+        commercialId?: string;
+        /** @description Campagne d’appels. L’identifiant vaut pour une campagne prospects OU une campagne représentants : l’autre famille tombe alors à zéro. */
+        campaignId?: string;
       };
       header?: never;
       path?: never;
@@ -16930,7 +16731,9 @@ export interface operations {
   };
   downloadAndroidUpdate: {
     parameters: {
-      query?: never;
+      query?: {
+        v?: number;
+      };
       header?: never;
       path?: never;
       cookie?: never;
@@ -16952,8 +16755,63 @@ export interface operations {
         };
         content?: never;
       };
+      /** @description APK_VERSION_WITHDRAWN · la version demandée est retirée ou inconnue. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
       /** @description Plage demandée hors du fichier. */
       416: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Trop de téléchargements depuis cette adresse (APK_DOWNLOAD_RATE_LIMIT). */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listAndroidReleases: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AndroidReleaseListDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
         headers: {
           [name: string]: unknown;
         };
@@ -16975,7 +16833,6 @@ export interface operations {
         'multipart/form-data': {
           /** Format: binary */
           file: string;
-          forceUpdate: boolean;
           notes?: string;
         };
       };
@@ -16986,7 +16843,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['AppUpdateDto'];
+          'application/json': components['schemas']['AndroidReleaseDto'];
         };
       };
       /** @description APK_MANIFEST_UNREADABLE · fichier absent, non-APK, trop volumineux, ou manifeste illisible. */
@@ -17016,8 +16873,113 @@ export interface operations {
           'application/json': components['schemas']['ApiErrorDto'];
         };
       };
-      /** @description APK_FOREIGN_PACKAGE · le manifeste déclare un autre paquet que `sn.cpi.go`. APK_VERSION_NOT_GREATER · le versionCode lu ne dépasse pas celui en ligne. */
+      /** @description APK_FOREIGN_PACKAGE · le manifeste déclare un autre paquet que `sn.cpi.go`. APK_VERSION_NOT_GREATER · le versionCode lu ne dépasse pas le plus haut publié. APK_UNSIGNED · aucun bloc de signature v2/v3 lisible. APK_SIGNER_MISMATCH · l’APK est signé par une autre clé que celle du parc. */
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  markAndroidReleaseMandatory: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        versionCode: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AndroidReleaseDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description APK_RELEASE_UNKNOWN · aucune release en ligne ne porte ce versionCode. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  withdrawAndroidRelease: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        versionCode: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AndroidReleaseDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description APK_RELEASE_UNKNOWN · aucune release ne porte ce versionCode. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description APK_LAST_RELEASE · c’est la seule release en ligne. */
+      409: {
         headers: {
           [name: string]: unknown;
         };
@@ -17183,6 +17145,206 @@ export interface operations {
       };
       /** @description DATABASE_DUMP_NOT_READY · aucun export disponible, échu, ou déjà téléchargé. */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getDashboardLayout: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        ecran: components['schemas']['DashboardEcran'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DispositionResponseDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  putDashboardLayout: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        ecran: components['schemas']['DashboardEcran'];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateDispositionDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DispositionResponseDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  deleteDashboardLayout: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        ecran: components['schemas']['DashboardEcran'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OkDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  putDashboardDefaultLayout: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        ecran: components['schemas']['DashboardEcran'];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateDispositionDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DispositionResponseDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
         headers: {
           [name: string]: unknown;
         };

@@ -44,6 +44,34 @@ enum DashboardSource {
   avecTelephone(r'avec-telephone'),
   @JsonValue(r'qualite-de-saisie')
   qualiteDeSaisie(r'qualite-de-saisie'),
+  @JsonValue(r'appels-de-qualification')
+  appelsDeQualification(r'appels-de-qualification'),
+  @JsonValue(r'taux-de-contact')
+  tauxDeContact(r'taux-de-contact'),
+  @JsonValue(r'a-rappeler')
+  aRappeler(r'a-rappeler'),
+  @JsonValue(r'taux-de-qualification')
+  tauxDeQualification(r'taux-de-qualification'),
+  @JsonValue(r'prospects-notes')
+  prospectsNotes(r'prospects-notes'),
+  @JsonValue(r'adhesions')
+  adhesions(r'adhesions'),
+  @JsonValue(r'reste-a-appeler')
+  resteAAppeler(r'reste-a-appeler'),
+  @JsonValue(r'par-teleconseiller')
+  parTeleconseiller(r'par-teleconseiller'),
+  @JsonValue(r'encaisse')
+  encaisse(r'encaisse'),
+  @JsonValue(r'de-l-appel-a-l-encaissement')
+  deLAppelALEncaissement(r'de-l-appel-a-l-encaissement'),
+  @JsonValue(r'methodes-d-adhesion')
+  methodesDAdhesion(r'methodes-d-adhesion'),
+  @JsonValue(r'par-banque')
+  parBanque(r'par-banque'),
+  @JsonValue(r'delais-medians')
+  delaisMedians(r'delais-medians'),
+  @JsonValue(r'rendement-par-departement')
+  rendementParDepartement(r'rendement-par-departement'),
   @JsonValue(r'unknown_default_open_api')
   unknownDefaultOpenApi(r'unknown_default_open_api');
 

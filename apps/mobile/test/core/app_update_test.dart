@@ -49,6 +49,7 @@ void main() {
     ],
     String buildNumber = '1',
     UpdateInstaller? installer,
+    ConnectivitySource? source,
   }) {
     final ProviderContainer container = ProviderContainer(
       overrides: [
@@ -58,7 +59,9 @@ void main() {
         updateInstallerProvider.overrideWithValue(
           installer ?? _FakeInstaller(),
         ),
-        connectivitySourceProvider.overrideWithValue(_FakeSource(interfaces)),
+        connectivitySourceProvider.overrideWithValue(
+          _FakeSource(interfaces, puis: puisInterfaces),
+        ),
         appUpdateClientProvider.overrideWithValue(() {
           final Dio dio = Dio(BaseOptions(baseUrl: 'https://exemple.test'));
           dio.httpClientAdapter = adapter;
@@ -291,6 +294,25 @@ void main() {
     );
   });
 
+  test(
+    'réseau coupé PENDANT le téléchargement : l\'écran rend la main',
+    () async {
+      // Le contrôle avait abouti : sans relire l'interface, l'échec du
+      // transfert laissait un blocage dur sur un téléphone hors ligne.
+      final AppUpdateState state = await settle(
+        build(
+          adapter: _JsonAdapter(
+            refusee(fileSize: 2048),
+            coupeLeTransfert: true,
+          ),
+          puisInterfaces: const <ConnectivityResult>[ConnectivityResult.none],
+        ),
+      );
+      expect(state.status, AppUpdateStatus.unreachable);
+      expect(state.gate, AppUpdateGate.warning);
+    },
+  );
+
   test('un APK complet mais corrompu se retélécharge en entier', () async {
     // Le piège : `Range: bytes=<taille>-` sur un fichier déjà complet vaut un
     // 416 à chaque essai, et l'écran bloquant n'a plus la moindre issue.
@@ -437,10 +459,14 @@ class _FakeInstaller implements UpdateInstaller {
 /// Le contrôle rend [body] ; l'URL de téléchargement rend [apk] quand il est
 /// fourni, pour que l'empreinte annoncée puisse réellement être vérifiée.
 class _JsonAdapter implements HttpClientAdapter {
-  _JsonAdapter(this.body, {this.apk});
+  _JsonAdapter(this.body, {this.apk, this.coupeLeTransfert = false});
 
   final Map<String, Object?> body;
   final List<int>? apk;
+
+  /// Le transfert s'interrompt en cours de flux, comme un mode avion activé
+  /// pendant le téléchargement.
+  final bool coupeLeTransfert;
 
   /// L'en-tête `Range` du dernier téléchargement, ou `null` s'il n'y en a pas eu.
   String? rangeDemande;
@@ -454,10 +480,18 @@ class _JsonAdapter implements HttpClientAdapter {
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async {
-    final List<int>? bytes = apk;
-    if (bytes != null && options.path == body['downloadUrl']) {
+    if (options.path == body['downloadUrl']) {
       rangeDemande = options.headers['Range'] as String?;
-      return ResponseBody.fromBytes(bytes, 200);
+      if (coupeLeTransfert) {
+        return ResponseBody(
+          Stream<Uint8List>.error(
+            const SocketException('Connection closed while receiving data'),
+          ),
+          200,
+        );
+      }
+      final List<int>? bytes = apk;
+      if (bytes != null) return ResponseBody.fromBytes(bytes, 200);
     }
     return ResponseBody.fromString(
       jsonEncode(body),
@@ -470,9 +504,10 @@ class _JsonAdapter implements HttpClientAdapter {
 }
 
 class _FakeSource implements ConnectivitySource {
-  const _FakeSource(this.interfaces);
+  _FakeSource(this.interfaces);
 
-  final List<ConnectivityResult> interfaces;
+  /// Mutable : un test coupe le réseau EN COURS de téléchargement.
+  List<ConnectivityResult> interfaces;
 
   @override
   Future<List<ConnectivityResult>> current() async => interfaces;

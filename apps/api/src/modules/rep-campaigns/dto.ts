@@ -491,20 +491,6 @@ export class RepCallAttemptResultDto {
   @ApiProperty({ format: 'uuid' }) attemptId!: string;
 
   @ApiProperty({
-    type: String,
-    format: 'uuid',
-    nullable: true,
-    description: 'Tâche close par cette tentative, si le représentant en avait une active.',
-  })
-  taskId!: string | null;
-
-  @ApiProperty({
-    type: Boolean,
-    description: 'Vrai si l’issue a clos la tâche. Les issues « à rappeler » la laissent ouverte.',
-  })
-  taskClosed!: boolean;
-
-  @ApiProperty({
     type: () => RepresentantLookupDto,
     nullable: true,
     description:

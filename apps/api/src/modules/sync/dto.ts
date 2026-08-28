@@ -25,8 +25,6 @@ import {
 import { ValidatorConstraint } from 'class-validator';
 import {
   CallOutcome,
-  CallTaskStatus,
-  CampaignStatus,
   EnrollmentMethod,
   Projet,
   ProspectStatut,
@@ -667,60 +665,6 @@ export class SyncPullQueryDto {
 }
 
 /**
- * La campagne telle que le terrain la voit : son nom, son etat, rien de son
- * tirage. Le telephone en a besoin pour dire A QUELLE FILE une fiche appartient,
- * sans quoi deux campagnes se melangent dans une seule liste.
- */
-export class SyncCallCampaignDto {
-  @ApiProperty({ format: 'uuid' }) id!: string;
-  @ApiProperty() name!: string;
-  @ApiProperty({ enum: CampaignStatus, enumName: 'CampaignStatus' }) status!: CampaignStatus;
-  @ApiProperty({ type: Number, description: 'Journees d’etalement de la file.' })
-  spreadDays!: number;
-  @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
-  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
-  closedAt!: string | null;
-}
-
-/** Une ligne de la file d’un teleconseiller : quelle fiche, quel rang, quel jour. */
-export class SyncCallTaskDto {
-  @ApiProperty({ format: 'uuid' }) id!: string;
-  @ApiProperty({ format: 'uuid' }) campaignId!: string;
-  @ApiProperty({ format: 'uuid' }) prospectId!: string;
-  @ApiProperty({ type: Number, description: 'Rang dans le programme, a partir de 1.' })
-  position!: number;
-  @ApiProperty({ type: Number, description: 'Journee d’etalement, a partir de 0.' })
-  dayIndex!: number;
-  @ApiProperty({ enum: CallTaskStatus, enumName: 'CallTaskStatus' }) status!: CallTaskStatus;
-  @ApiProperty({
-    type: Boolean,
-    description:
-      'Faux quand la file a été retirée au commercial. La ligne descend alors ' +
-      'une dernière fois pour que le téléphone la retire de son programme : ' +
-      'sans elle, il continuerait d’appeler des fiches qui ne lui sont plus ' +
-      'confiées.',
-  })
-  isActive!: boolean;
-  @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
-}
-
-export class SyncRepCallCampaignDto extends SyncCallCampaignDto {}
-
-export class SyncRepCallTaskDto {
-  @ApiProperty({ format: 'uuid' }) id!: string;
-  @ApiProperty({ format: 'uuid' }) campaignId!: string;
-  @ApiProperty({ format: 'uuid' }) representantId!: string;
-  @ApiProperty({ type: Number, description: 'Rang dans le programme, à partir de 1.' })
-  position!: number;
-  @ApiProperty({ type: Number, description: 'Journée d’étalement, à partir de 0.' })
-  dayIndex!: number;
-  @ApiProperty({ enum: CallTaskStatus, enumName: 'CallTaskStatus' }) status!: CallTaskStatus;
-  @ApiProperty({ type: Boolean, description: 'Voir `SyncCallTaskDto.isActive`.' })
-  isActive!: boolean;
-  @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
-}
-
-/**
  * Une ligne du registre, telle qu'elle voyage vers le téléphone. Le serveur
  * seul l'écrit : pas de `rev`, un pull rejoué recopie simplement la même ligne.
  */
@@ -775,11 +719,6 @@ export class SyncChangesDto {
   visiteReferentiels!: SyncVisiteReferentielDto[];
   @ApiProperty({ type: () => [RepresentantDto] }) representants!: RepresentantDto[];
   @ApiProperty({ type: () => [ProspectDto] }) prospects!: ProspectDto[];
-  @ApiProperty({ type: () => [SyncCallCampaignDto] }) callCampaigns!: SyncCallCampaignDto[];
-  @ApiProperty({ type: () => [SyncCallTaskDto] }) callTasks!: SyncCallTaskDto[];
-  @ApiProperty({ type: () => [SyncRepCallCampaignDto] })
-  repCallCampaigns!: SyncRepCallCampaignDto[];
-  @ApiProperty({ type: () => [SyncRepCallTaskDto] }) repCallTasks!: SyncRepCallTaskDto[];
   @ApiProperty({ type: () => [SyncVisiteDto] }) visites!: SyncVisiteDto[];
 }
 

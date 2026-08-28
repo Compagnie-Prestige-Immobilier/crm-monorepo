@@ -6,6 +6,7 @@
 import 'package:crm_api_client/src/model/supervision_activity_row_dto.dart';
 import 'package:crm_api_client/src/model/supervision_histogram_bar_dto.dart';
 import 'package:crm_api_client/src/model/supervision_granularity.dart';
+import 'package:crm_api_client/src/model/supervision_activity_counts_dto.dart';
 import 'package:crm_api_client/src/model/supervision_teleconseiller_dto.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
@@ -31,6 +32,8 @@ class SupervisionActivityDto {
 
     required this.items,
 
+    required this.totals,
+
     required this.teleconseillers,
 
     required this.prospectsByTeleconseiller,
@@ -55,6 +58,10 @@ class SupervisionActivityDto {
   /// Une ligne par téléconseiller et par période, seulement là où il s’est passé quelque chose.
   @JsonKey(name: r'items', required: true, includeIfNull: false)
   final List<SupervisionActivityRowDto> items;
+
+  /// L’équipe entière sur TOUTE la fenêtre, filtres compris. Calculé côté serveur : `representantsContacted`, `repQuestioned` et `repQualified` comptent des personnes distinctes, et la somme des lignes en compterait certaines deux fois.
+  @JsonKey(name: r'totals', required: true, includeIfNull: false)
+  final SupervisionActivityCountsDto totals;
 
   /// Tous les téléconseillers, y compris ceux sans aucun acte sur la fenêtre.
   @JsonKey(name: r'teleconseillers', required: true, includeIfNull: false)
@@ -86,6 +93,7 @@ class SupervisionActivityDto {
                 to,
                 granularity,
                 items,
+                totals,
                 teleconseillers,
                 prospectsByTeleconseiller,
                 prospectsByRepresentant,
@@ -95,6 +103,7 @@ class SupervisionActivityDto {
                 other.to,
                 other.granularity,
                 other.items,
+                other.totals,
                 other.teleconseillers,
                 other.prospectsByTeleconseiller,
                 other.prospectsByRepresentant,
@@ -110,6 +119,7 @@ class SupervisionActivityDto {
         to,
         granularity,
         items,
+        totals,
         teleconseillers,
         prospectsByTeleconseiller,
         prospectsByRepresentant,
