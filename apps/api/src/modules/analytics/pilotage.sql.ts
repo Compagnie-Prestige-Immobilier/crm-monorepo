@@ -13,6 +13,16 @@ export const RELATION_CHANGE = Prisma.sql`rc`;
 export const UNUSABLE_OUTCOMES = Prisma.sql`('UNREACHABLE', 'WRONG_NUMBER')`;
 
 /**
+ * Les seules issues de `RepCallOutcome` que le terrain sait encore saisir.
+ * `PROSPECTS_PROMISED`, `WRONG_NUMBER` et `OTHER` sont de l'héritage : ni
+ * numérateur ni dénominateur, sinon les taux dépendraient de l'âge des données.
+ */
+export const REP_LIVE_OUTCOMES = Prisma.sql`('REACHED', 'REFUSED', 'CALLBACK', 'UNREACHABLE')`;
+
+/** Joignable côté représentant : il a répondu, qu'il dise oui ou non. */
+export const REP_ANSWERED_OUTCOMES = Prisma.sql`('REACHED', 'REFUSED')`;
+
+/**
  * Sous-requêtes et non jointures : un prospect porte plusieurs dossiers, une
  * jointure multiplierait sa ligne. Encaissé se lit sur l'ÉTAPE COURANTE.
  */

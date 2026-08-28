@@ -739,6 +739,33 @@ export const countingPrisma = (db: FakePrisma): { prisma: PrismaService; calls: 
   return { prisma, calls };
 };
 
+const LIGNE_VIDE = {
+  bucket: '',
+  teleconseillerId: '',
+  teleconseillerName: '',
+  calls: 0,
+  unreachable: 0,
+  wrongNumber: 0,
+  refused: 0,
+  other: 0,
+  methodObtained: 0,
+  callback: 0,
+  reachRate: null,
+  prospectsCreated: 0,
+  representantsContacted: 0,
+  tasksClosed: 0,
+  repCalls: 0,
+  repReached: 0,
+  repCallback: 0,
+  repUnreachable: 0,
+  repOther: 0,
+  repContactRate: null,
+  repCallbackRate: null,
+  repQuestioned: 0,
+  repQualified: 0,
+  repQualificationRate: null,
+} satisfies SupervisionActivityRowDto;
+
 /** Le module analytics rendu par son service réel ; ici on ne fournit que sa réponse. */
 export class FakeActivity {
   readonly items: SupervisionActivityRowDto[] = [];
@@ -749,22 +776,9 @@ export class FakeActivity {
   readonly windows: { from: string | undefined; to: string | undefined }[] = [];
 
   addRow(row: Partial<SupervisionActivityRowDto> & { teleconseillerId: string }): void {
-    this.items.push({
-      bucket: row.bucket ?? '',
-      teleconseillerName: row.teleconseillerName ?? row.teleconseillerId,
-      calls: row.calls ?? 0,
-      unreachable: row.unreachable ?? 0,
-      wrongNumber: row.wrongNumber ?? 0,
-      refused: row.refused ?? 0,
-      other: row.other ?? 0,
-      methodObtained: row.methodObtained ?? 0,
-      callback: row.callback ?? 0,
-      reachRate: row.reachRate ?? null,
-      prospectsCreated: row.prospectsCreated ?? 0,
-      representantsContacted: row.representantsContacted ?? 0,
-      tasksClosed: row.tasksClosed ?? 0,
-      teleconseillerId: row.teleconseillerId,
-    });
+    this.items.push(
+      Object.assign({ ...LIGNE_VIDE, teleconseillerName: row.teleconseillerId }, row),
+    );
   }
 
   addTeleconseiller(row: Partial<SupervisionTeleconseillerDto> & { id: string }): void {
@@ -782,6 +796,7 @@ export class FakeActivity {
       from: null,
       to: null,
       granularity: SupervisionGranularity.DAY,
+      totals: LIGNE_VIDE,
       items: this.items,
       teleconseillers: this.teleconseillers,
       prospectsByTeleconseiller: this.prospectsByTeleconseiller,
