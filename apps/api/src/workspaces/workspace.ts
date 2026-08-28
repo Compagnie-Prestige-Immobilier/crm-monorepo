@@ -8,14 +8,24 @@ export type Workspace = (typeof WORKSPACES)[number];
 
 @Injectable()
 export class WorkspaceContext {
-  private readonly storage = new AsyncLocalStorage<Workspace>();
+  private readonly storage = new AsyncLocalStorage<{ workspace: Workspace }>();
+
+  /**
+   * Ouvre le store d'une requête. `enterWith` posé dans un garde Nest ne
+   * survivait pas jusqu'au handler : le service retombait sur `public`.
+   */
+  run<T>(fn: () => T): T {
+    return this.storage.run({ workspace: 'public' }, fn);
+  }
 
   enter(workspace: Workspace): void {
-    this.storage.enterWith(workspace);
+    const store = this.storage.getStore();
+    if (store) store.workspace = workspace;
+    else this.storage.enterWith({ workspace });
   }
 
   current(): Workspace {
-    return this.storage.getStore() ?? 'public';
+    return this.storage.getStore()?.workspace ?? 'public';
   }
 }
 

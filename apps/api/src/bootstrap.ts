@@ -17,6 +17,7 @@ import { DEMO_MODE_HEADER } from './modules/export/demo-marking.js';
 import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter.js';
 import { normalizeErrorBody } from './common/errors/normalize.js';
 import { readEnv, type ApiEnv } from './env.js';
+import { WorkspaceContext } from './workspaces/workspace.js';
 
 interface FastifyErrorReply {
   code: (status: number) => { send: (payload: unknown) => unknown };
@@ -64,6 +65,12 @@ export async function createApiApp(): Promise<NestFastifyApplication> {
   });
 
   app.useLogger(app.get(Logger));
+
+  const workspace = app.get(WorkspaceContext);
+  app
+    .getHttpAdapter()
+    .getInstance()
+    .addHook('onRequest', (_request, _reply, done) => workspace.run(done));
 
   await app.register(helmet, env.API_DOCS_ENABLED ? { contentSecurityPolicy: false } : {});
   await app.register(rateLimit, { max: 600, timeWindow: '1 minute' });
