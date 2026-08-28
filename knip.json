@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/knip/schema.json",
+  "ignoreDependencies": ["pino-pretty"],
+  "workspaces": {
+    "apps/api": {
+      "entry": ["src/main.ts", "src/openapi.ts", "src/**/*.test.ts"]
+    },
+    "apps/web": {
+      "entry": ["e2e/**/*.ts", "src/test/server-only-stub.ts"]
+    },
+    "packages/api-client": {
+      "ignoreDependencies": ["openapi-typescript", "prettier"]
+    },
+    "packages/api-client-dart": {
+      "ignoreDependencies": ["@openapitools/openapi-generator-cli"]
+    }
+  }
+}
