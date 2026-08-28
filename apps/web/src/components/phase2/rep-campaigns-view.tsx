@@ -7,7 +7,7 @@ import { useState } from 'react';
 
 import { EmptyState } from '@/components/empty-state';
 import { CampaignsTabs } from '@/components/phase2/campaigns-tabs';
-import { RepCampaignCreateDialog } from '@/components/phase2/rep-campaign-create-dialog';
+import { CampaignCreateDialog } from '@/components/phase2/campaign-create-dialog';
 import { RepCampaignsFiltersBar } from '@/components/phase2/rep-campaigns-filters-bar';
 import { useRepCampaignFilters } from '@/components/phase2/use-rep-campaign-filters';
 import { CampaignProgressBar } from '@/components/phase2/campaign-progress-bar';
@@ -205,7 +205,13 @@ export function RepCampaignsView({ canManage }: { canManage: boolean }) {
         })();
       })()}
 
-      {canManage ? <RepCampaignCreateDialog open={creating} onOpenChange={setCreating} /> : null}
+      {canManage ? (
+        <CampaignCreateDialog
+          open={creating}
+          onOpenChange={setCreating}
+          defaultTarget="REPRESENTANTS"
+        />
+      ) : null}
     </div>
   );
 }

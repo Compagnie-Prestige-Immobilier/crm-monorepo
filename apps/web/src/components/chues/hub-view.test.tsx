@@ -50,7 +50,7 @@ const etapes = (): HTMLElement[] => within(screen.getByRole('list')).getAllByRol
 
 describe('HubView : les trois étapes, dans l’ordre', () => {
   it('salue et compte les étapes une fois les chiffres arrivés', async () => {
-    renderWithQuery(<HubView prenom="Fatou" readOnly={false} />);
+    renderWithQuery(<HubView prenom="Fatou" />);
 
     expect(screen.getByText('Bonjour Fatou. Trois étapes, dans l’ordre.')).toBeTruthy();
 
@@ -58,7 +58,7 @@ describe('HubView : les trois étapes, dans l’ordre', () => {
       expect(screen.getByText('42')).toBeTruthy();
     });
     const [une, deux, trois] = etapes();
-    expect(une?.textContent).toContain('Appeler les représentants');
+    expect(une?.textContent).toContain('Qualifier un représentant');
     expect(une?.textContent).toContain('pas encore appelés');
     expect(deux?.textContent).toContain('7');
     expect(deux?.textContent).toContain('ont dit oui, sans contacts notés');
@@ -67,14 +67,14 @@ describe('HubView : les trois étapes, dans l’ordre', () => {
   });
 
   it('n’affiche AUCUN zéro provisoire pendant le chargement', () => {
-    renderWithQuery(<HubView prenom="Fatou" readOnly={false} />);
+    renderWithQuery(<HubView prenom="Fatou" />);
 
     expect(screen.queryByText('0')).toBeNull();
     expect(document.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(3);
   });
 
   it('ne propose qu’UN geste par étape, et c’est un lien', async () => {
-    renderWithQuery(<HubView prenom="Fatou" readOnly={false} />);
+    renderWithQuery(<HubView prenom="Fatou" />);
     await waitFor(() => {
       expect(screen.getByText('42')).toBeTruthy();
     });
@@ -92,22 +92,9 @@ describe('HubView : les trois étapes, dans l’ordre', () => {
     ]);
   });
 
-  it('mène la lecture seule vers les listes, jamais vers une saisie', async () => {
-    renderWithQuery(<HubView prenom="Awa" readOnly />);
-    await waitFor(() => {
-      expect(screen.getByText('42')).toBeTruthy();
-    });
-
-    expect(etapes().map((etape) => within(etape).getByRole('link').getAttribute('href'))).toEqual([
-      '/chues/representants?relationStatus=INCONNU',
-      '/chues/representants?relationStatus=AMBASSADEUR&hasProspects=non',
-      '/chues/prospects?phase2Status=PENDING',
-    ]);
-  });
-
   it('montre un tiret plutôt qu’un chiffre faux quand l’API refuse', async () => {
     countPendingProspects.mockRejectedValue(new Error('503'));
-    renderWithQuery(<HubView prenom="Awa" readOnly={false} />);
+    renderWithQuery(<HubView prenom="Awa" />);
 
     await waitFor(() => {
       expect(screen.getByText('–')).toBeTruthy();

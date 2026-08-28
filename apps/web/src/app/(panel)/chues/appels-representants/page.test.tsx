@@ -35,17 +35,17 @@ beforeEach(() => {
   prefetchQuery.mockResolvedValue(undefined);
 });
 
-describe('garde de l’étape 1, « Appeler les représentants »', () => {
+describe('garde de l’étape 1, « Qualifier un représentant »', () => {
   it('renvoie un visiteur sans session vers la connexion', async () => {
     guardRoles.mockResolvedValue({ status: 'anonymous' });
 
     await expect(AppelsRepresentantsPage()).rejects.toThrow('REDIRECT /connexion');
   });
 
-  it('refuse la supervision au lieu de lui servir la file d’appel', async () => {
+  it('refuse l’agent bancaire au lieu de lui servir la file d’appel', async () => {
     guardRoles.mockResolvedValue({
       status: 'denied',
-      user: { id: 'u-1', role: 'SUPERVISEUR' },
+      user: { id: 'u-1', role: 'BANQUE_FINANCE' },
     });
 
     render(await AppelsRepresentantsPage());
@@ -54,11 +54,11 @@ describe('garde de l’étape 1, « Appeler les représentants »', () => {
     expect(redirect).not.toHaveBeenCalled();
   });
 
-  it('n’ouvre l’écran qu’à ceux qui passent les appels', async () => {
+  it('ouvre l’écran à tous ceux qui passent eux-mêmes les appels', async () => {
     guardRoles.mockResolvedValue({ status: 'anonymous' });
 
     await AppelsRepresentantsPage().catch(() => undefined);
 
-    expect(guardRoles).toHaveBeenCalledWith(['ADMIN', 'COMMERCIAL']);
+    expect(guardRoles).toHaveBeenCalledWith(['ADMIN', 'COMMERCIAL', 'SUPERVISEUR', 'DIRECTION']);
   });
 });

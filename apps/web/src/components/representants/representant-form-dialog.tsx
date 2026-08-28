@@ -69,6 +69,7 @@ export function RepresentantFormDialog({
   representant,
   prefill = null,
   onSaved,
+  pendantAppel = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -76,6 +77,12 @@ export function RepresentantFormDialog({
   /** Amorce d'une création : un numéro suggéré par un représentant. */
   prefill?: RepresentantPrefill | null;
   onSaved?: ((representant: RepresentantRow) => void) | undefined;
+  /**
+   * Ouverte depuis l'écran d'appel. La relation, son motif et le canal WhatsApp
+   * sont ce que l'appel en cours est en train de décider : les régler à la main
+   * ici écraserait la réponse qui va suivre.
+   */
+  pendantAppel?: boolean;
 }) {
   const queryClient = useQueryClient();
   const nameId = useId();
@@ -346,7 +353,7 @@ export function RepresentantFormDialog({
             portent pas, et l’exiger les invaliderait rétroactivement.
           </p>
 
-          {isEdit ? (
+          {isEdit && !pendantAppel ? (
             <div className="flex flex-col gap-1.5">
               <Label htmlFor={relationId}>Relation</Label>
               <Select
@@ -393,7 +400,7 @@ export function RepresentantFormDialog({
             </div>
           ) : null}
 
-          {isEdit ? (
+          {isEdit && !pendantAppel ? (
             <>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor={whatsappId}>WhatsApp</Label>
@@ -438,26 +445,28 @@ export function RepresentantFormDialog({
                   />
                 </div>
               ) : null}
-
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor={professionId}>Profession</Label>
-                <Input
-                  id={professionId}
-                  value={profession}
-                  maxLength={120}
-                  autoComplete="off"
-                  list={`${professionId}-frequentes`}
-                  onChange={(event) => {
-                    setProfession(event.target.value);
-                  }}
-                />
-                <datalist id={`${professionId}-frequentes`}>
-                  {PROFESSIONS.map((item) => (
-                    <option key={item} value={item} />
-                  ))}
-                </datalist>
-              </div>
             </>
+          ) : null}
+
+          {isEdit ? (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor={professionId}>Profession</Label>
+              <Input
+                id={professionId}
+                value={profession}
+                maxLength={120}
+                autoComplete="off"
+                list={`${professionId}-frequentes`}
+                onChange={(event) => {
+                  setProfession(event.target.value);
+                }}
+              />
+              <datalist id={`${professionId}-frequentes`}>
+                {PROFESSIONS.map((item) => (
+                  <option key={item} value={item} />
+                ))}
+              </datalist>
+            </div>
           ) : null}
 
           <div className="flex flex-col gap-1.5">
