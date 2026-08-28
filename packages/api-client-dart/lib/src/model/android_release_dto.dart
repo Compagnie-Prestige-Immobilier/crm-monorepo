@@ -7,7 +7,7 @@ import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/src/equatable_utils.dart';
 
-part 'app_update_dto.g.dart';
+part 'android_release_dto.g.dart';
 
 @CopyWith()
 @JsonSerializable(
@@ -16,16 +16,12 @@ part 'app_update_dto.g.dart';
   disallowUnrecognizedKeys: false,
   explicitToJson: true,
 )
-class AppUpdateDto {
-  /// Returns a new [AppUpdateDto] instance.
-  AppUpdateDto({
-    required this.available,
-
-    required this.forceUpdate,
+class AndroidReleaseDto {
+  /// Returns a new [AndroidReleaseDto] instance.
+  AndroidReleaseDto({
+    required this.versionCode,
 
     required this.versionName,
-
-    required this.versionCode,
 
     required this.fileName,
 
@@ -35,27 +31,26 @@ class AppUpdateDto {
 
     required this.signerSha256,
 
-    required this.downloadUrl,
+    required this.mandatory,
 
     required this.publishedAt,
 
-    required this.minVersionCode,
+    required this.publishedById,
+
+    required this.publishedByName,
 
     required this.notes,
+
+    required this.withdrawnAt,
+
+    required this.withdrawnById,
   });
-
-  @JsonKey(name: r'available', required: true, includeIfNull: false)
-  final bool available;
-
-  /// Le poste est sous le plancher obligatoire.
-  @JsonKey(name: r'forceUpdate', required: true, includeIfNull: false)
-  final bool forceUpdate;
-
-  @JsonKey(name: r'versionName', required: true, includeIfNull: false)
-  final String versionName;
 
   @JsonKey(name: r'versionCode', required: true, includeIfNull: false)
   final num versionCode;
+
+  @JsonKey(name: r'versionName', required: true, includeIfNull: false)
+  final String versionName;
 
   @JsonKey(name: r'fileName', required: true, includeIfNull: false)
   final String fileName;
@@ -66,55 +61,64 @@ class AppUpdateDto {
   @JsonKey(name: r'sha256', required: true, includeIfNull: false)
   final String sha256;
 
-  /// Empreinte SHA-256 du certificat signataire de l’APK servi.
   @JsonKey(name: r'signerSha256', required: true, includeIfNull: false)
   final String signerSha256;
 
-  @JsonKey(name: r'downloadUrl', required: true, includeIfNull: false)
-  final String downloadUrl;
+  @JsonKey(name: r'mandatory', required: true, includeIfNull: false)
+  final bool mandatory;
 
   @JsonKey(name: r'publishedAt', required: true, includeIfNull: false)
   final String publishedAt;
 
-  /// Plus haut versionCode obligatoire encore en ligne, ou null.
-  @JsonKey(name: r'minVersionCode', required: true, includeIfNull: true)
-  final num? minVersionCode;
+  @JsonKey(name: r'publishedById', required: true, includeIfNull: true)
+  final String? publishedById;
+
+  @JsonKey(name: r'publishedByName', required: true, includeIfNull: true)
+  final String? publishedByName;
 
   @JsonKey(name: r'notes', required: true, includeIfNull: true)
   final String? notes;
 
+  @JsonKey(name: r'withdrawnAt', required: true, includeIfNull: true)
+  final String? withdrawnAt;
+
+  @JsonKey(name: r'withdrawnById', required: true, includeIfNull: true)
+  final String? withdrawnById;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
-        other is AppUpdateDto &&
+        other is AndroidReleaseDto &&
             runtimeType == other.runtimeType &&
             equals(
               [
-                available,
-                forceUpdate,
-                versionName,
                 versionCode,
+                versionName,
                 fileName,
                 fileSize,
                 sha256,
                 signerSha256,
-                downloadUrl,
+                mandatory,
                 publishedAt,
-                minVersionCode,
+                publishedById,
+                publishedByName,
                 notes,
+                withdrawnAt,
+                withdrawnById,
               ],
               [
-                other.available,
-                other.forceUpdate,
-                other.versionName,
                 other.versionCode,
+                other.versionName,
                 other.fileName,
                 other.fileSize,
                 other.sha256,
                 other.signerSha256,
-                other.downloadUrl,
+                other.mandatory,
                 other.publishedAt,
-                other.minVersionCode,
+                other.publishedById,
+                other.publishedByName,
                 other.notes,
+                other.withdrawnAt,
+                other.withdrawnById,
               ],
             );
   }
@@ -123,24 +127,25 @@ class AppUpdateDto {
   int get hashCode =>
       runtimeType.hashCode ^
       mapPropsToHashCode([
-        available,
-        forceUpdate,
-        versionName,
         versionCode,
+        versionName,
         fileName,
         fileSize,
         sha256,
         signerSha256,
-        downloadUrl,
+        mandatory,
         publishedAt,
-        minVersionCode,
+        publishedById,
+        publishedByName,
         notes,
+        withdrawnAt,
+        withdrawnById,
       ]);
 
-  factory AppUpdateDto.fromJson(Map<String, dynamic> json) =>
-      _$AppUpdateDtoFromJson(json);
+  factory AndroidReleaseDto.fromJson(Map<String, dynamic> json) =>
+      _$AndroidReleaseDtoFromJson(json);
 
-  Map<String, dynamic> toJson() => _$AppUpdateDtoToJson(this);
+  Map<String, dynamic> toJson() => _$AndroidReleaseDtoToJson(this);
 
   @override
   String toString() {

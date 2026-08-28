@@ -2,7 +2,7 @@ import type { Writable } from 'node:stream';
 
 import { Injectable } from '@nestjs/common';
 import ExcelJS from 'exceljs';
-import type { Prisma } from '@crm/database';
+import { WhatsappStatus, type Prisma } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { readableOwnerId, readScope } from '../../common/scope.js';
@@ -113,9 +113,10 @@ export class RepresentantsExportService {
     user: AuthenticatedUser,
     query: RepresentantExportQueryDto,
     stream: Writable,
+    ids?: readonly string[],
   ): Promise<void> {
     const demoEnabled = this.demo.current() === 'demo';
-    const where = this.buildWhere(user, query);
+    const where = this.buildWhere(user, query, ids);
 
     const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({ stream, useStyles: true });
     markWorkbook(workbook, demoEnabled);
@@ -186,6 +187,7 @@ export class RepresentantsExportService {
   private buildWhere(
     user: AuthenticatedUser,
     query: RepresentantExportQueryDto,
+    ids?: readonly string[],
   ): Prisma.RepresentantWhereInput {
     const where: Prisma.RepresentantWhereInput = {
       deletedAt: null,
@@ -207,6 +209,21 @@ export class RepresentantsExportService {
 
     if (query.hasProspects === true) where.prospects = { some: { deletedAt: null } };
     if (query.hasProspects === false) where.prospects = { none: { deletedAt: null } };
+    if (query.relationStatus) where.relationStatus = query.relationStatus;
+    if (query.whatsappStatus || query.hasWhatsapp !== undefined) {
+      const reachable: readonly WhatsappStatus[] = [
+        WhatsappStatus.MEME_NUMERO,
+        WhatsappStatus.AUTRE_NUMERO,
+      ];
+      let statuses = Object.values(WhatsappStatus);
+      if (query.whatsappStatus) statuses = [query.whatsappStatus];
+      if (query.hasWhatsapp === true)
+        statuses = statuses.filter((status) => reachable.includes(status as WhatsappStatus));
+      if (query.hasWhatsapp === false)
+        statuses = statuses.filter((status) => !reachable.includes(status as WhatsappStatus));
+      where.whatsappStatus = { in: statuses };
+    }
+    if (ids) where.id = { in: [...ids] };
 
     const search = query.search?.trim();
     if (search) {

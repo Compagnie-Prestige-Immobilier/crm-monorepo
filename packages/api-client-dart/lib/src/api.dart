@@ -28,6 +28,7 @@ import 'package:crm_api_client/src/api/representants_api.dart';
 import 'package:crm_api_client/src/api/suggestions_api.dart';
 import 'package:crm_api_client/src/api/supervision_api.dart';
 import 'package:crm_api_client/src/api/sync_api.dart';
+import 'package:crm_api_client/src/api/tableaux_de_bord_api.dart';
 import 'package:crm_api_client/src/api/users_api.dart';
 import 'package:crm_api_client/src/api/visites_api.dart';
 
@@ -278,6 +279,12 @@ class CrmApiClient {
   /// by doing that all interceptors will not be executed
   SyncApi getSyncApi() {
     return SyncApi(dio);
+  }
+
+  /// Get TableauxDeBordApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  TableauxDeBordApi getTableauxDeBordApi() {
+    return TableauxDeBordApi(dio);
   }
 
   /// Get UsersApi instance, base route and serializer can be overridden by a given but be careful,

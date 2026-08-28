@@ -101,7 +101,9 @@ function PublishedDialog({
           <dt className="text-muted-foreground">Empreinte</dt>
           <dd className="break-all font-mono text-[0.8125rem]">{shortHash(release.sha256)}</dd>
           <dt className="text-muted-foreground">Signataire</dt>
-          <dd className="break-all font-mono text-[0.8125rem]">{shortHash(release.signerSha256)}</dd>
+          <dd className="break-all font-mono text-[0.8125rem]">
+            {shortHash(release.signerSha256)}
+          </dd>
         </dl>
 
         {release.mandatory ? (

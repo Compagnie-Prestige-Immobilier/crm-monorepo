@@ -41,7 +41,6 @@ interface ActivityRow {
   joignables: number;
   prospects: number;
   representants: number;
-  taches: number;
 }
 
 type TotalRow = Omit<ActivityRow, 'jour' | 'id' | 'nom'>;
@@ -57,7 +56,6 @@ const TOTAL_VIDE: TotalRow = {
   joignables: 0,
   prospects: 0,
   representants: 0,
-  taches: 0,
 };
 
 type RepTotalRow = Omit<RepRow, 'jour' | 'id'>;
@@ -88,7 +86,6 @@ interface RosterRow {
   id: string;
   nom: string;
   actif: boolean;
-  ouvertes: number;
 }
 
 interface HistogramRow {
@@ -107,11 +104,7 @@ export class SupervisionActivityService {
     const unit =
       granularity === SupervisionGranularity.WEEK ? Prisma.sql`'week'` : Prisma.sql`'day'`;
 
-    const campaign = (column: Prisma.Sql): Prisma.Sql =>
-      query.campaignId ? Prisma.sql`${column} = ${query.campaignId}` : ALL_ROWS;
-
-    const attemptScope = campaign(Prisma.sql`ca."campaignId"`);
-    const taskScope = campaign(Prisma.sql`ct."campaignId"`);
+    const attemptScope = ALL_ROWS;
     const userScope = query.commercialId ? Prisma.sql`u."id" = ${query.commercialId}` : ALL_ROWS;
     const rolesDuPlateau = Prisma.join(
       TELECONSEIL_ROLES.map((role) => Prisma.sql`${role}::"Role"`),
@@ -122,7 +115,7 @@ export class SupervisionActivityService {
     const repScope =
       query.projet === Projet.GRAND_PUBLIC
         ? Prisma.sql`FALSE`
-        : campaign(Prisma.sql`rca."campaignId"`);
+        : ALL_ROWS;
 
     const repWindow = withinWindow(Prisma.sql`rca."clientCreatedAt"`, query);
     const projetScope = (prospectId: Prisma.Sql): Prisma.Sql =>
@@ -151,8 +144,7 @@ export class SupervisionActivityService {
             (ca."outcome" = 'CALLBACK')::int                AS rappel,
             (ca."outcome" NOT IN ${UNUSABLE_OUTCOMES})::int AS joignable,
             0                                               AS prospect,
-            NULL::text                                      AS representant,
-            0                                               AS tache
+            NULL::text                                      AS representant
           FROM "call_attempts" ca
           WHERE ${attemptScope} AND ${projetScope(Prisma.sql`ca."prospectId"`)}
             AND ${withinWindow(Prisma.sql`ca."clientCreatedAt"`, query)}
@@ -160,7 +152,7 @@ export class SupervisionActivityService {
           UNION ALL
           SELECT
             p."createdById", date_trunc(${unit}, p."clientCreatedAt"),
-            0, 0, 0, 0, 0, 0, 0, 0, 1, NULL::text, 0
+            0, 0, 0, 0, 0, 0, 0, 0, 1, NULL::text
           FROM "prospects" p
           WHERE p."deletedAt" IS NULL AND ${projetScope(Prisma.sql`p."id"`)}
             AND ${withinWindow(Prisma.sql`p."clientCreatedAt"`, query)}
@@ -168,19 +160,11 @@ export class SupervisionActivityService {
           UNION ALL
           SELECT
             rca."performedById", date_trunc(${unit}, rca."clientCreatedAt"),
-            0, 0, 0, 0, 0, 0, 0, 0, 0, rca."representantId", 0
+            0, 0, 0, 0, 0, 0, 0, 0, 0, rca."representantId"
           FROM "rep_call_attempts" rca
           WHERE ${repScope}
             AND ${repWindow}
 
-          UNION ALL
-          SELECT
-            ct."assignedToId", date_trunc(${unit}, ct."completedAt"),
-            0, 0, 0, 0, 0, 0, 0, 0, 0, NULL::text, 1
-          FROM "call_tasks" ct
-          WHERE ct."completedAt" IS NOT NULL AND ${taskScope}
-            AND ${projetScope(Prisma.sql`ct."prospectId"`)}
-            AND ${withinWindow(Prisma.sql`ct."completedAt"`, query)}
     `;
 
     const repTentatives = Prisma.sql`
@@ -234,8 +218,7 @@ export class SupervisionActivityService {
           SUM(f.rappel)::int                   AS rappels,
           SUM(f.joignable)::int                AS joignables,
           SUM(f.prospect)::int                 AS prospects,
-          COUNT(DISTINCT f.representant)::int  AS representants,
-          SUM(f.tache)::int                    AS taches
+          COUNT(DISTINCT f.representant)::int  AS representants
         FROM faits f
         INNER JOIN "users" u ON u."id" = f."userId"
         WHERE ${teleconseiller}
@@ -277,7 +260,6 @@ export class SupervisionActivityService {
           COALESCE(SUM(f.joignable), 0)::int   AS joignables,
           COALESCE(SUM(f.prospect), 0)::int    AS prospects,
           COUNT(DISTINCT f.representant)::int  AS representants,
-          COALESCE(SUM(f.tache), 0)::int       AS taches
         FROM faits f
         WHERE ${membreEquipe(Prisma.sql`f."userId"`)}
       `,
@@ -305,11 +287,8 @@ export class SupervisionActivityService {
         SELECT
           u."id"              AS id,
           u."fullName"        AS nom,
-          u."isActive"        AS actif,
-          COUNT(ct."id")::int AS ouvertes
+          u."isActive"        AS actif
         FROM "users" u
-        LEFT JOIN "call_tasks" ct
-          ON ct."assignedToId" = u."id" AND ct."status" = 'OPEN' AND ${taskScope}
         WHERE ${teleconseiller}
         GROUP BY u."id", u."fullName", u."isActive"
         ORDER BY u."fullName" ASC
@@ -364,7 +343,6 @@ export class SupervisionActivityService {
         id: row.id,
         fullName: row.nom,
         isActive: row.actif,
-        openTasks: row.ouvertes,
       })),
       prospectsByTeleconseiller: prospectsByTeleconseiller.map(toHistogramBar),
       prospectsByRepresentant: prospectsByRepresentant.map(toHistogramBar),
@@ -384,7 +362,6 @@ function chiffres(base: TotalRow, rep: RepTotalRow): SupervisionActivityCountsDt
     reachRate: rate(base.joignables, base.appels),
     prospectsCreated: base.prospects,
     representantsContacted: base.representants,
-    tasksClosed: base.taches,
     repCalls: rep.appels,
     repReached: rep.joints,
     repCallback: rep.rappels,

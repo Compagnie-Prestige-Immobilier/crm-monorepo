@@ -136,23 +136,11 @@ export class ProspectFilterDto {
 
   @ApiPropertyOptional({
     format: 'uuid',
-    description:
-      'Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.',
+    description: 'Téléconseiller ayant consigné au moins une tentative sur la fiche.',
   })
   @IsOptional()
   @IsUUID()
-  campaignId?: string;
-
-  @ApiPropertyOptional({
-    format: 'uuid',
-    description:
-      'Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec ' +
-      '`commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui ' +
-      'demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.',
-  })
-  @IsOptional()
-  @IsUUID()
-  assignedToId?: string;
+  appelePar?: string;
 
   @ApiPropertyOptional({
     format: 'uuid',

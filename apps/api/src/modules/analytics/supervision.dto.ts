@@ -55,15 +55,6 @@ export class SupervisionQueryDto {
   @IsUUID()
   commercialId?: string;
 
-  @ApiPropertyOptional({
-    format: 'uuid',
-    description:
-      'Campagne d’appels. L’identifiant vaut pour une campagne prospects OU une ' +
-      'campagne représentants : l’autre famille tombe alors à zéro.',
-  })
-  @IsOptional()
-  @IsUUID()
-  campaignId?: string;
 }
 
 /**
@@ -98,8 +89,6 @@ export class SupervisionActivityCountsDto {
   @ApiProperty({ type: Number, description: 'Représentants distincts appelés sur la période.' })
   representantsContacted!: number;
 
-  @ApiProperty({ type: Number, description: 'Tâches d’appel clôturées sur la période.' })
-  tasksClosed!: number;
 
   @ApiProperty({
     type: Number,
@@ -187,11 +176,6 @@ export class SupervisionTeleconseillerDto {
   @ApiProperty() fullName!: string;
   @ApiProperty({ type: Boolean }) isActive!: boolean;
 
-  @ApiProperty({
-    type: Number,
-    description: 'Tâches d’appel encore OUVERTES. Instantané : la fenêtre ne le borne pas.',
-  })
-  openTasks!: number;
 }
 
 export class SupervisionHistogramBarDto {

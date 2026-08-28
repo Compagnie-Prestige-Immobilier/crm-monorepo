@@ -4,6 +4,8 @@ import 'package:crm_api_client/src/model/analytics_finance_dto.dart';
 import 'package:crm_api_client/src/model/analytics_funnel_dto.dart';
 import 'package:crm_api_client/src/model/analytics_series_dto.dart';
 import 'package:crm_api_client/src/model/analytics_totals_dto.dart';
+import 'package:crm_api_client/src/model/android_release_dto.dart';
+import 'package:crm_api_client/src/model/android_release_list_dto.dart';
 import 'package:crm_api_client/src/model/api_error_dto.dart';
 import 'package:crm_api_client/src/model/app_update_dto.dart';
 import 'package:crm_api_client/src/model/approve_client_request_dto.dart';
@@ -175,11 +177,10 @@ import 'package:crm_api_client/src/model/set_bank_case_stage_active_dto.dart';
 import 'package:crm_api_client/src/model/set_call_outcome_reason_active_dto.dart';
 import 'package:crm_api_client/src/model/set_visite_import_change_selection_dto.dart';
 import 'package:crm_api_client/src/model/set_visite_referentiel_active_dto.dart';
-import 'package:crm_api_client/src/model/stats_layout_dto.dart';
-import 'package:crm_api_client/src/model/stats_layout_widget_dto.dart';
 import 'package:crm_api_client/src/model/suggestion_dto.dart';
 import 'package:crm_api_client/src/model/suggestion_list_dto.dart';
 import 'package:crm_api_client/src/model/supervised_user_dto.dart';
+import 'package:crm_api_client/src/model/supervision_activity_counts_dto.dart';
 import 'package:crm_api_client/src/model/supervision_activity_dto.dart';
 import 'package:crm_api_client/src/model/supervision_activity_row_dto.dart';
 import 'package:crm_api_client/src/model/supervision_dto.dart';
@@ -220,7 +221,6 @@ import 'package:crm_api_client/src/model/update_offer_dto.dart';
 import 'package:crm_api_client/src/model/update_profession_dto.dart';
 import 'package:crm_api_client/src/model/update_prospect_dto.dart';
 import 'package:crm_api_client/src/model/update_representant_dto.dart';
-import 'package:crm_api_client/src/model/update_stats_layout_dto.dart';
 import 'package:crm_api_client/src/model/update_suggestion_status_dto.dart';
 import 'package:crm_api_client/src/model/update_syndicat_dto.dart';
 import 'package:crm_api_client/src/model/update_user_dto.dart';
@@ -292,6 +292,12 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'AnalyticsTotalsDto':
       return AnalyticsTotalsDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'AndroidReleaseDto':
+      return AndroidReleaseDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'AndroidReleaseListDto':
+      return AndroidReleaseListDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'ApiErrorDto':
       return ApiErrorDto.fromJson(value as Map<String, dynamic>) as ReturnType;
@@ -505,6 +511,7 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'CreateVisiteReferentielDto':
       return CreateVisiteReferentielDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'DashboardEcran':
     case 'DashboardMarque':
     case 'DashboardPreset':
     case 'DashboardSource':
@@ -847,13 +854,6 @@ ReturnType deserialize<ReturnType, BaseType>(
           )
           as ReturnType;
     case 'SortOrder':
-    case 'StatsLayoutDto':
-      return StatsLayoutDto.fromJson(value as Map<String, dynamic>)
-          as ReturnType;
-    case 'StatsLayoutScreen':
-    case 'StatsLayoutWidgetDto':
-      return StatsLayoutWidgetDto.fromJson(value as Map<String, dynamic>)
-          as ReturnType;
     case 'SuggestionDto':
       return SuggestionDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -863,6 +863,11 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'SuggestionStatus':
     case 'SupervisedUserDto':
       return SupervisedUserDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'SupervisionActivityCountsDto':
+      return SupervisionActivityCountsDto.fromJson(
+            value as Map<String, dynamic>,
+          )
           as ReturnType;
     case 'SupervisionActivityDto':
       return SupervisionActivityDto.fromJson(value as Map<String, dynamic>)
@@ -990,9 +995,6 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'UpdateRepresentantDto':
       return UpdateRepresentantDto.fromJson(value as Map<String, dynamic>)
-          as ReturnType;
-    case 'UpdateStatsLayoutDto':
-      return UpdateStatsLayoutDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'UpdateSuggestionStatusDto':
       return UpdateSuggestionStatusDto.fromJson(value as Map<String, dynamic>)

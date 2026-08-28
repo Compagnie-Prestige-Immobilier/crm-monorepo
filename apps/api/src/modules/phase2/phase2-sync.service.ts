@@ -5,7 +5,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
-  CallTaskStatus,
   Phase2Status,
   Prisma,
   ScheduledCallbackStatus,
@@ -37,12 +36,6 @@ interface JourneyState {
   enrollmentMethod: EnrollmentMethod | null;
   enrollmentCapturedById: string | null;
   enrollmentCapturedAt: Date | null;
-}
-
-interface ActiveTask {
-  id: string;
-  campaignId: string;
-  campaign: { projet: Projet };
 }
 
 const PROSPECT_STATE_SELECT = {
@@ -103,29 +96,15 @@ export class Phase2SyncService {
 
     const known = await tx.callAttempt.findUnique({
       where: { id: op.id },
-      select: { id: true, taskId: true, task: { select: { status: true } } },
+      select: { id: true },
     });
 
     if (known) {
-      return this.duplicateResult(tx, op, known.id, known.taskId, known.task?.status ?? null);
+      return this.duplicateResult(tx, op, known.id);
     }
 
     const prospect = await this.loadProspect(tx, op.prospectId);
-
-    const activeTask = await tx.callTask.findFirst({
-      where: { prospectId: op.prospectId, isActive: true },
-      select: { id: true, campaignId: true, campaign: { select: { projet: true } } },
-      orderBy: { createdAt: 'asc' },
-    });
-
-    // La phase 2 est un état du PARCOURS. Portée par la fiche, elle rendait un
-    // prospect refusé en CHUES définitivement inappelable en Grand Public : la
-    // campagne le tirait quand même et chaque tentative revenait en 409, ce qui
-    // bloquait sur le téléphone toute la partition de file de ce prospect.
-    //
-    // Le projet vient de la CAMPAGNE qui a confié la tâche ; sans tâche, c'est
-    // le projet d'entrée de la fiche.
-    const projet = activeTask?.campaign.projet ?? prospect.projet;
+    const projet = op.projet ?? prospect.projet;
     const journey = await this.loadJourney(tx, op.prospectId, projet);
     if (journey.phase2Status !== Phase2Status.PENDING) {
       throw alreadyCompleted(toState(prospect, journey));
@@ -136,8 +115,6 @@ export class Phase2SyncService {
         {
           id: op.id,
           prospectId: op.prospectId,
-          taskId: activeTask?.id ?? null,
-          campaignId: activeTask?.campaignId ?? null,
           performedById: userId,
           outcome: attempt.outcome,
           reasonId: attempt.reasonId,
@@ -155,31 +132,27 @@ export class Phase2SyncService {
     });
 
     if (inserted.count === 0) {
-      return this.duplicateResult(tx, op, op.id, activeTask?.id ?? null, null, projet);
+      return this.duplicateResult(tx, op, op.id, projet);
     }
 
     const corrige = await this.correctProspect(tx, op, prospect);
-    await this.scheduleCallback(tx, userId, op, attempt, activeTask);
+    await this.scheduleCallback(tx, userId, op, attempt);
 
     if (!attempt.terminal || attempt.phase2Status === null) {
       return {
         status: CallAttemptApplyStatus.APPLIED,
         attemptId: op.id,
-        taskId: activeTask?.id ?? null,
-        taskStatus: activeTask ? CallTaskStatus.OPEN : null,
         state: toState(corrige, journey),
       };
     }
 
-    return this.completeAttempt(tx, userId, op, attempt, activeTask, corrige, journey, projet);
+    return this.completeAttempt(tx, userId, op, attempt, corrige, journey, projet);
   }
 
   private async duplicateResult(
     tx: Phase2TransactionClient,
     op: CallAttemptOpDto,
     attemptId: string,
-    taskId: string | null,
-    taskStatus: CallTaskStatus | null,
     projet?: Projet,
   ): Promise<CallAttemptResultDto> {
     const current = await this.loadProspect(tx, op.prospectId);
@@ -187,8 +160,6 @@ export class Phase2SyncService {
     return {
       status: CallAttemptApplyStatus.DUPLICATE,
       attemptId,
-      taskId,
-      taskStatus,
       state: toState(current, journey),
     };
   }
@@ -232,7 +203,6 @@ export class Phase2SyncService {
     userId: string,
     op: CallAttemptOpDto,
     attempt: ReturnType<typeof normalizeAttempt>,
-    task: ActiveTask | null,
   ): Promise<void> {
     if (attempt.callbackAt === null) return;
     await tx.scheduledCallback.updateMany({
@@ -243,8 +213,6 @@ export class Phase2SyncService {
       data: [
         {
           prospectId: op.prospectId,
-          taskId: task?.id ?? null,
-          campaignId: task?.campaignId ?? null,
           assignedToId: userId,
           scheduledAt: attempt.callbackAt,
           comment: attempt.comment,
@@ -260,7 +228,6 @@ export class Phase2SyncService {
     userId: string,
     op: CallAttemptOpDto,
     attempt: ReturnType<typeof normalizeAttempt>,
-    task: ActiveTask | null,
     prospect: ProspectState,
     journey: JourneyState,
     projet: Projet,
@@ -292,10 +259,6 @@ export class Phase2SyncService {
         },
       });
     }
-    await tx.callTask.updateMany({
-      where: { prospectId: op.prospectId, isActive: true },
-      data: { status: CallTaskStatus.DONE, isActive: false, completedAt },
-    });
     await tx.scheduledCallback.updateMany({
       where: { prospectId: op.prospectId, status: ScheduledCallbackStatus.PENDING },
       data: { status: ScheduledCallbackStatus.DONE, closedAttemptId: op.id },
@@ -303,8 +266,6 @@ export class Phase2SyncService {
     return {
       status: CallAttemptApplyStatus.APPLIED,
       attemptId: op.id,
-      taskId: task?.id ?? null,
-      taskStatus: task === null ? null : CallTaskStatus.DONE,
       state: toState(
         await this.loadProspect(tx, op.prospectId),
         await this.loadJourney(tx, op.prospectId, projet),

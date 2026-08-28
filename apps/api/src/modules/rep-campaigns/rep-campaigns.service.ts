@@ -1,670 +1,54 @@
-import { Injectable, Logger } from '@nestjs/common';
-import {
-  CallTaskStatus,
-  CampaignStatus,
-  ChangeSource,
-  Prisma,
-  RepCallOutcome,
-  RepresentantRelation,
-  Role,
-} from '@crm/database';
+import { Injectable } from '@nestjs/common';
+import { ChangeSource, RepCallOutcome } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { shortCode } from '../../common/short-code.js';
-import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
-import {
-  MIN_SPREAD_DAYS,
-  dayHistogram,
-  dayIndexFor,
-  distributeRoundRobin,
-  newCampaignSeed,
-  shuffleInPostgres,
-} from '../phase2/distribution.js';
+import { type AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { COMMENT_MAX_LENGTH } from '../phase2/attempt-rules.js';
-import type { RepProgrammeData, RepProgrammeRow } from '../phase2/programme-pdf.js';
-import {
-  callbackAtNotAllowed,
-  callbackAtRequired,
-  commentRequired,
-  commercialInactive,
-  commercialNotFound,
-  dayNotFound,
-  noEligibleRepresentant,
-  notACommercial,
-  programmeNotFound,
-  promisedNotAllowed,
-  repCampaignNotFound,
-  representantAlreadyAssigned,
-  representantNotFound,
-} from './errors.js';
 import { applyRelationChange } from '../representants/relation-change.js';
 import { resolveWhatsappPatch } from '../representants/whatsapp.js';
 import { RepresentantsService } from '../representants/representants.service.js';
 import type { RepresentantLookupDto } from '../representants/dto.js';
-import { RepCallAttemptApplyStatus } from './dto.js';
-import type {
-  CreateRepCallAttemptDto,
-  CreateRepCampaignDto,
-  RepCallAttemptResultDto,
-  RepCampaignCommercialDto,
-  RepCampaignDetailDto,
-  RepCampaignListDto,
-  RepCampaignPreviewDto,
-  RepCampaignPreviewQueryDto,
-  RepCampaignProgressDto,
-  RepCampaignQueryDto,
-  RepCampaignSummaryDto,
+import {
+  RepCallAttemptApplyStatus,
+  type CreateRepCallAttemptDto,
+  type RepCallAttemptResultDto,
 } from './dto.js';
-import { inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
-
-const CAMPAIGN_TRANSACTION_TIMEOUT_MS = 120_000;
-const CAMPAIGN_TRANSACTION_MAX_WAIT_MS = 15_000;
-
-const TASK_INSERT_CHUNK = 5_000;
-
-const RECENT_ATTEMPTS = 20;
-
-const TERMINAL_OUTCOMES: readonly RepCallOutcome[] = [
-  RepCallOutcome.REACHED,
-  RepCallOutcome.PROSPECTS_PROMISED,
-  RepCallOutcome.REFUSED,
-  RepCallOutcome.WRONG_NUMBER,
-];
-
-const emptyProgress = (): RepCampaignProgressDto => ({ total: 0, open: 0, done: 0, cancelled: 0 });
-
-const zeroes = (length: number): number[] => Array.from({ length: Math.max(1, length) }, () => 0);
-
-type ProgressIndex = Map<string, RepCampaignProgressDto>;
-
-function tally(progress: RepCampaignProgressDto, status: CallTaskStatus, count: number): void {
-  progress.total += count;
-  if (status === CallTaskStatus.OPEN) progress.open += count;
-  else if (status === CallTaskStatus.DONE) progress.done += count;
-  else progress.cancelled += count;
-}
-
-function tallyInto(index: ProgressIndex, key: string, status: CallTaskStatus, count: number): void {
-  const progress = index.get(key) ?? emptyProgress();
-  tally(progress, status, count);
-  index.set(key, progress);
-}
-
-interface ScopeInput {
-  readonly departementId?: string | null;
-  readonly iefId?: string | null;
-  readonly onlyWithoutProspects?: boolean | null;
-  readonly relationStatuses?: readonly RepresentantRelation[] | null;
-}
+import { callbackAtNotAllowed, callbackAtRequired, commentRequired, promisedNotAllowed, representantNotFound } from './errors.js';
 
 @Injectable()
 export class RepCampaignsService {
-  private readonly logger = new Logger(RepCampaignsService.name);
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly representants: RepresentantsService,
   ) {}
 
-  async create(user: AuthenticatedUser, body: CreateRepCampaignDto): Promise<RepCampaignDetailDto> {
-    const commerciaux = await this.resolveCommerciaux(body.commercialIds);
-    const seed = newCampaignSeed();
-    const spreadDays = body.spreadDays ?? MIN_SPREAD_DAYS;
-    const campaignId = await this.prisma
-      .$transaction(
-        async (tx) => {
-          const campaign = await tx.repCallCampaign.create({
-            data: {
-              name: body.name.trim(),
-              seed,
-              spreadDays,
-              departementId: body.departementId ?? null,
-              iefId: body.iefId ?? null,
-              onlyWithoutProspects: body.onlyWithoutProspects ?? false,
-              relationStatuses: body.relationStatuses ?? [],
-              createdById: user.id,
-            },
-          });
-
-          await tx.repCallCampaignCommercial.createMany({
-            data: commerciaux.map((commercial, index) => ({
-              campaignId: campaign.id,
-              userId: commercial.id,
-              position: index + 1,
-            })),
-          });
-
-          const eligible = await tx.representant.findMany({
-            where: eligibleWhere(body),
-            select: { id: true },
-            orderBy: { id: 'asc' },
-          });
-
-          if (eligible.length === 0) throw noEligibleRepresentant();
-
-          const ordered = await shuffleInPostgres(
-            tx,
-            seed,
-            eligible.map((row) => row.id),
-          );
-
-          const assignments = distributeRoundRobin(ordered, commerciaux.length);
-          const queueSize = assignments.reduce<number[]>((sizes, assignment) => {
-            sizes[assignment.bucket] = (sizes[assignment.bucket] ?? 0) + 1;
-            return sizes;
-          }, []);
-
-          const rows = assignments.flatMap((assignment) => {
-            const commercial = commerciaux[assignment.bucket];
-            if (!commercial) return [];
-            return [
-              {
-                campaignId: campaign.id,
-                representantId: assignment.item,
-                assignedToId: commercial.id,
-                position: assignment.position,
-                dayIndex: dayIndexFor(
-                  assignment.position,
-                  queueSize[assignment.bucket] ?? 0,
-                  spreadDays,
-                ),
-              },
-            ];
-          });
-
-          for (let start = 0; start < rows.length; start += TASK_INSERT_CHUNK) {
-            await tx.repCallTask.createMany({ data: rows.slice(start, start + TASK_INSERT_CHUNK) });
-          }
-
-          this.logger.log(
-            `Campagne représentants ${campaign.id} : ${String(rows.length)} tâches réparties entre ${String(commerciaux.length)} commerciaux sur ${String(spreadDays)} jour(s)`,
-          );
-          return campaign.id;
-        },
-        { timeout: CAMPAIGN_TRANSACTION_TIMEOUT_MS, maxWait: CAMPAIGN_TRANSACTION_MAX_WAIT_MS },
-      )
-      .catch((error: unknown) => {
-        throw translateWriteError(error);
-      });
-
-    return this.get(campaignId);
-  }
-
-  private async resolveCommerciaux(
-    ids: readonly string[],
-  ): Promise<{ id: string; fullName: string; username: string }[]> {
-    const found = await this.prisma.user.findMany({
-      where: { id: { in: [...ids] }, deletedAt: null },
-      select: { id: true, fullName: true, username: true, role: true, isActive: true },
-    });
-
-    const byId = new Map(found.map((row) => [row.id, row]));
-
-    const missing = ids.filter((id) => !byId.has(id));
-    if (missing.length > 0) throw commercialNotFound(missing);
-
-    const wrongRole = ids.filter((id) => byId.get(id)?.role !== Role.COMMERCIAL);
-    if (wrongRole.length > 0) throw notACommercial(wrongRole);
-
-    const inactive = ids.filter((id) => byId.get(id)?.isActive !== true);
-    if (inactive.length > 0) throw commercialInactive(inactive);
-
-    return ids.flatMap((id) => {
-      const row = byId.get(id);
-      if (!row) return [];
-      return { id: row.id, fullName: row.fullName, username: row.username };
-    });
-  }
-
-  async preview(query: RepCampaignPreviewQueryDto): Promise<RepCampaignPreviewDto> {
-    const eligible = await this.prisma.representant.count({
-      where: eligibleWhere(query),
-    });
-
-    const commercialCount = Math.max(1, query.commercialCount ?? 1);
-    const perCommercial = Math.ceil(eligible / commercialCount);
-
-    return {
-      eligible,
-      perCommercial,
-      perDay: dayHistogram(perCommercial, query.spreadDays ?? MIN_SPREAD_DAYS),
-      scopeLabel: await this.scopeLabel(query),
-    };
-  }
-
-  async list(query: RepCampaignQueryDto): Promise<RepCampaignListDto> {
-    const page = query.page ?? 1;
-    const pageSize = query.pageSize ?? 25;
-    const search = query.search?.trim();
-
-    const where: Prisma.RepCallCampaignWhereInput = {
-      ...(query.status ? { status: query.status } : {}),
-      ...(query.createdById ? { createdById: query.createdById } : {}),
-      ...(search ? { name: { contains: search, mode: 'insensitive' } } : {}),
-      ...(query.dateFrom || query.dateTo
-        ? {
-            createdAt: {
-              ...(query.dateFrom ? { gte: inclusiveDateFrom(query.dateFrom) } : {}),
-              ...(query.dateTo ? { lte: inclusiveDateTo(query.dateTo) } : {}),
-            },
-          }
-        : {}),
-    };
-
-    const [total, campaigns] = await Promise.all([
-      this.prisma.repCallCampaign.count({ where }),
-      this.prisma.repCallCampaign.findMany({
-        where,
-        include: {
-          createdBy: { select: { fullName: true } },
-          departement: { select: { name: true } },
-          ief: { select: { name: true } },
-          _count: { select: { commerciaux: true } },
-        },
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        skip: (page - 1) * pageSize,
-        take: pageSize,
-      }),
-    ]);
-
-    const progress = await this.progressByCampaign(campaigns.map((row) => row.id));
-
-    return {
-      items: campaigns.map((row): RepCampaignSummaryDto => ({
-        id: row.id,
-        name: row.name,
-        status: row.status,
-        seed: row.seed,
-        scopeLabel: composeScopeLabel(
-          row.departement?.name ?? null,
-          row.ief?.name ?? null,
-          row.onlyWithoutProspects,
-          row.relationStatuses,
-        ),
-        departementId: row.departementId,
-        iefId: row.iefId,
-        onlyWithoutProspects: row.onlyWithoutProspects,
-        relationStatuses: row.relationStatuses,
-        createdById: row.createdById,
-        createdByName: row.createdBy.fullName,
-        commercialCount: row._count.commerciaux,
-        spreadDays: row.spreadDays,
-        progress: progress.get(row.id) ?? emptyProgress(),
-        createdAt: row.createdAt.toISOString(),
-        closedAt: row.closedAt?.toISOString() ?? null,
-      })),
-      meta: { total, page, pageSize, pageCount: Math.max(1, Math.ceil(total / pageSize)) },
-    };
-  }
-
-  async get(id: string): Promise<RepCampaignDetailDto> {
-    const campaign = await this.prisma.repCallCampaign.findFirst({
-      where: { id },
-      include: {
-        createdBy: { select: { fullName: true } },
-        departement: { select: { name: true } },
-        ief: { select: { name: true } },
-        commerciaux: {
-          orderBy: { position: 'asc' },
-          include: { user: { select: { id: true, fullName: true, username: true } } },
-        },
-      },
-    });
-
-    if (!campaign) throw repCampaignNotFound();
-
-    const grouped = await this.prisma.repCallTask.groupBy({
-      by: ['assignedToId', 'status'],
-      where: { campaignId: id },
-      _count: { _all: true },
-    });
-
-    const perCommercial: ProgressIndex = new Map();
-    const overall = emptyProgress();
-    for (const row of grouped) {
-      tallyInto(perCommercial, row.assignedToId, row.status, row._count._all);
-      tally(overall, row.status, row._count._all);
-    }
-
-    const perDay = await this.dayCounts(id, campaign.spreadDays);
-
-    const attempts = await this.prisma.repCallAttempt.findMany({
-      where: { campaignId: id },
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      take: RECENT_ATTEMPTS,
-      include: {
-        representant: { select: { id: true, phoneE164: true } },
-        performedBy: { select: { fullName: true } },
-        task: { select: { assignedToId: true } },
-      },
-    });
-
-    return {
-      id: campaign.id,
-      name: campaign.name,
-      status: campaign.status,
-      seed: campaign.seed,
-      scopeLabel: composeScopeLabel(
-        campaign.departement?.name ?? null,
-        campaign.ief?.name ?? null,
-        campaign.onlyWithoutProspects,
-        campaign.relationStatuses,
-      ),
-      departementId: campaign.departementId,
-      iefId: campaign.iefId,
-      onlyWithoutProspects: campaign.onlyWithoutProspects,
-      relationStatuses: campaign.relationStatuses,
-      createdById: campaign.createdById,
-      createdByName: campaign.createdBy.fullName,
-      commercialCount: campaign.commerciaux.length,
-      spreadDays: campaign.spreadDays,
-      progress: overall,
-      createdAt: campaign.createdAt.toISOString(),
-      closedAt: campaign.closedAt?.toISOString() ?? null,
-      perDay: perDay.overall,
-      commerciaux: campaign.commerciaux.map((row): RepCampaignCommercialDto => ({
-        userId: row.user.id,
-        fullName: row.user.fullName,
-        username: row.user.username,
-        position: row.position,
-        progress: perCommercial.get(row.user.id) ?? emptyProgress(),
-        perDay: perDay.byUser.get(row.user.id) ?? zeroes(campaign.spreadDays),
-      })),
-      recentAttempts: attempts.map((row) => ({
-        id: row.id,
-        representantId: row.representant.id,
-        shortCode: shortCode(row.representant.id),
-        phoneE164: row.representant.phoneE164,
-        outcome: row.outcome,
-        promisedProspects: row.promisedProspects,
-        comment: row.comment,
-        performedById: row.performedById,
-        performedByName: row.performedBy.fullName,
-        assignedToId: row.task?.assignedToId ?? null,
-        createdAt: row.createdAt.toISOString(),
-      })),
-    };
-  }
-
-  private async progressByCampaign(ids: readonly string[]): Promise<ProgressIndex> {
-    if (ids.length === 0) return new Map();
-
-    const grouped = await this.prisma.repCallTask.groupBy({
-      by: ['campaignId', 'status'],
-      where: { campaignId: { in: [...ids] } },
-      _count: { _all: true },
-    });
-
-    const index: ProgressIndex = new Map();
-    for (const row of grouped) tallyInto(index, row.campaignId, row.status, row._count._all);
-    return index;
-  }
-
-  private async dayCounts(
-    campaignId: string,
-    spreadDays: number,
-  ): Promise<{ overall: number[]; byUser: Map<string, number[]> }> {
-    const grouped = await this.prisma.repCallTask.groupBy({
-      by: ['assignedToId', 'dayIndex'],
-      where: { campaignId },
-      _count: { _all: true },
-    });
-
-    const overall = zeroes(spreadDays);
-    const byUser = new Map<string, number[]>();
-
-    for (const row of grouped) {
-      if (row.dayIndex < 0 || row.dayIndex >= overall.length) {
-        this.logger.warn(
-          `Campagne représentants ${campaignId} : ${String(row._count._all)} tâche(s) au ` +
-            `jour ${String(row.dayIndex)}, hors des ${String(spreadDays)} journée(s) de la ` +
-            `campagne. Lignes écartées du décompte par journée.`,
-        );
-        continue;
-      }
-      overall[row.dayIndex] = (overall[row.dayIndex] ?? 0) + row._count._all;
-
-      const bucket = byUser.get(row.assignedToId) ?? zeroes(spreadDays);
-      bucket[row.dayIndex] = (bucket[row.dayIndex] ?? 0) + row._count._all;
-      byUser.set(row.assignedToId, bucket);
-    }
-
-    return { overall, byUser };
-  }
-
-  async close(id: string): Promise<RepCampaignDetailDto> {
-    await this.prisma.$transaction(async (tx) => {
-      const campaign = await tx.repCallCampaign.findFirst({
-        where: { id },
-        select: { status: true },
-      });
-      if (!campaign) throw repCampaignNotFound();
-      if (campaign.status === CampaignStatus.CLOSED) return;
-
-      await tx.repCallCampaign.update({
-        where: { id },
-        data: { status: CampaignStatus.CLOSED, closedAt: new Date() },
-      });
-      await tx.repCallTask.updateMany({
-        where: { campaignId: id, isActive: true },
-        data: { status: CallTaskStatus.CANCELLED, isActive: false },
-      });
-    });
-
-    return this.get(id);
-  }
-
-  async programme(
-    campaignId: string,
-    userId: string,
-    jour?: number,
-  ): Promise<{
-    campaignName: string;
-    commercialName: string;
-    segmentLabel: string;
-    rows: RepProgrammeRow[];
-    dayNumber?: number;
-    dayCount?: number;
-  }> {
-    const membership = await this.prisma.repCallCampaignCommercial.findUnique({
-      where: { campaignId_userId: { campaignId, userId } },
-      include: {
-        campaign: {
-          select: {
-            name: true,
-            spreadDays: true,
-            onlyWithoutProspects: true,
-            relationStatuses: true,
-            departement: { select: { name: true } },
-            ief: { select: { name: true } },
-          },
-        },
-        user: { select: { fullName: true } },
-      },
-    });
-
-    if (!membership) throw programmeNotFound();
-
-    const spreadDays = membership.campaign.spreadDays;
-    const taskCount = await this.prisma.repCallTask.count({
-      where: { campaignId, assignedToId: userId },
-    });
-    const effectiveDays = Math.max(1, Math.min(spreadDays, taskCount));
-
-    if (jour !== undefined && (jour < 1 || jour > effectiveDays)) throw dayNotFound(effectiveDays);
-
-    const tasks = await this.prisma.repCallTask.findMany({
-      where: {
-        campaignId,
-        assignedToId: userId,
-        ...(jour === undefined ? {} : { dayIndex: jour - 1 }),
-      },
-      orderBy: { position: 'asc' },
-      select: { position: true, representant: { select: { fullName: true, phoneE164: true } } },
-    });
-
-    return {
-      campaignName: membership.campaign.name,
-      commercialName: membership.user.fullName,
-      segmentLabel: composeScopeLabel(
-        membership.campaign.departement?.name ?? null,
-        membership.campaign.ief?.name ?? null,
-        membership.campaign.onlyWithoutProspects,
-        membership.campaign.relationStatuses,
-      ),
-      rows: tasks.map((task) => ({
-        position: task.position,
-        fullName: task.representant.fullName,
-        phoneE164: task.representant.phoneE164,
-      })),
-      ...(jour === undefined ? {} : { dayNumber: jour, dayCount: effectiveDays }),
-    };
-  }
-
-  async programmes(campaignId: string): Promise<
-    {
-      fileName: string;
-      data: Omit<RepProgrammeData, 'generatedAt'>;
-    }[]
-  > {
-    const campaign = await this.prisma.repCallCampaign.findUnique({
-      where: { id: campaignId },
-      select: {
-        name: true,
-        spreadDays: true,
-        onlyWithoutProspects: true,
-        relationStatuses: true,
-        departement: { select: { name: true } },
-        ief: { select: { name: true } },
-        commerciaux: {
-          orderBy: { position: 'asc' },
-          select: {
-            position: true,
-            user: { select: { id: true, fullName: true, username: true } },
-          },
-        },
-        tasks: {
-          orderBy: [{ assignedToId: 'asc' }, { position: 'asc' }],
-          select: {
-            assignedToId: true,
-            position: true,
-            dayIndex: true,
-            representant: { select: { fullName: true, phoneE164: true } },
-          },
-        },
-      },
-    });
-    if (!campaign) throw repCampaignNotFound();
-
-    const segmentLabel = composeScopeLabel(
-      campaign.departement?.name ?? null,
-      campaign.ief?.name ?? null,
-      campaign.onlyWithoutProspects,
-      campaign.relationStatuses,
-    );
-    const byUser = Map.groupBy(campaign.tasks, (task) => task.assignedToId);
-
-    return campaign.commerciaux.flatMap((membership) => {
-      const tasks = byUser.get(membership.user.id) ?? [];
-      if (tasks.length === 0) return [];
-      const dayCount = Math.max(1, Math.min(campaign.spreadDays, tasks.length));
-      const days =
-        campaign.spreadDays > 1 ? Array.from({ length: dayCount }, (_, day) => day) : [null];
-
-      return days.flatMap((dayIndex) => {
-        const selected =
-          dayIndex === null ? tasks : tasks.filter((task) => task.dayIndex === dayIndex);
-        if (selected.length === 0) return [];
-        const dayNumber = dayIndex === null ? undefined : dayIndex + 1;
-        const suffix = dayNumber === undefined ? '' : `-jour-${String(dayNumber)}`;
-        return [
-          {
-            fileName: `${String(membership.position).padStart(2, '0')}-${membership.user.username}${suffix}.pdf`,
-            data: {
-              campaignName: campaign.name,
-              commercialName: membership.user.fullName,
-              segmentLabel,
-              rows: selected.map((task) => ({
-                position: task.position,
-                fullName: task.representant.fullName,
-                phoneE164: task.representant.phoneE164,
-              })),
-              ...(dayNumber === undefined ? {} : { dayNumber, dayCount }),
-            },
-          },
-        ];
-      });
-    });
-  }
-
-  async recordAttempt(
-    user: AuthenticatedUser,
-    body: CreateRepCallAttemptDto,
-  ): Promise<RepCallAttemptResultDto> {
+  async recordAttempt(user: AuthenticatedUser, body: CreateRepCallAttemptDto): Promise<RepCallAttemptResultDto> {
     const comment = validatedComment(body);
-
     const suggested = await this.resolveSuggested(body.suggestedPhone);
+    const existing = await this.prisma.repCallAttempt.findUnique({ where: { id: body.id }, select: { id: true } });
+    if (existing) return attemptResult(RepCallAttemptApplyStatus.DUPLICATE, existing.id, suggested);
 
-    const existing = await this.prisma.repCallAttempt.findUnique({
-      where: { id: body.id },
-      select: { id: true, taskId: true },
-    });
-    if (existing) {
-      return attemptResult(
-        RepCallAttemptApplyStatus.DUPLICATE,
-        existing.id,
-        existing.taskId,
-        false,
-        suggested,
-      );
-    }
-
-    // N'IMPORTE QUEL représentant vivant de l'annuaire : il descend sur tous les
-    // téléphones, et la qualification est justement le geste que l'on porte sur
-    // une fiche trouvée à l'annuaire, sans campagne qui la confie.
     const representant = await this.prisma.representant.findFirst({
-      where: {
-        id: body.representantId,
-        deletedAt: null,
-      },
-      select: {
-        id: true,
-        relationStatus: true,
-        whatsappStatus: true,
-        whatsappE164: true,
-      },
+      where: { id: body.representantId, deletedAt: null },
+      select: { id: true, relationStatus: true, whatsappStatus: true, whatsappE164: true },
     });
     if (!representant) throw representantNotFound();
-
     const whatsapp = resolveWhatsappPatch(body, representant);
-
-    const task = await this.prisma.repCallTask.findFirst({
-      where: { representantId: body.representantId, isActive: true },
-      select: { id: true, campaignId: true },
-      orderBy: { createdAt: 'asc' },
-    });
-
-    const terminal = TERMINAL_OUTCOMES.includes(body.outcome);
 
     const applied = await this.prisma.$transaction(async (tx) => {
       const inserted = await tx.repCallAttempt.createMany({
-        data: [
-          {
-            id: body.id,
-            representantId: body.representantId,
-            taskId: task?.id ?? null,
-            campaignId: task?.campaignId ?? null,
-            performedById: user.id,
-            outcome: body.outcome,
-            promisedProspects: body.promisedProspects ?? null,
-            comment,
-            callbackAt: body.callbackAt ? new Date(body.callbackAt) : null,
-            clientCreatedAt: new Date(body.clientCreatedAt),
-          },
-        ],
+        data: [{
+          id: body.id,
+          representantId: body.representantId,
+          performedById: user.id,
+          outcome: body.outcome,
+          promisedProspects: body.promisedProspects ?? null,
+          comment,
+          callbackAt: body.callbackAt ? new Date(body.callbackAt) : null,
+          clientCreatedAt: new Date(body.clientCreatedAt),
+        }],
         skipDuplicates: true,
       });
-
       if (inserted.count === 0) return false;
 
       if (suggested) {
@@ -681,21 +65,10 @@ export class RepCampaignsService {
           },
         });
       }
-
-      // Sous le même verrou d'idempotence que la suggestion : un rejeu s'arrête
-      // au `return false` ci-dessus et n'écrit donc pas le WhatsApp deux fois.
       if (Object.keys(whatsapp).length > 0) {
-        await tx.representant.update({
-          where: { id: body.representantId },
-          data: { ...whatsapp, rev: { increment: 1 } },
-        });
+        await tx.representant.update({ where: { id: body.representantId }, data: { ...whatsapp, rev: { increment: 1 } } });
       }
-
       if (body.relationStatus !== undefined) {
-        // WEB en dur : aucune entrée de synchronisation mobile n'écrit de
-        // tentative représentant, et laisser le canal se déclarer depuis le
-        // corps de la requête permettrait à n'importe quel appelant de se faire
-        // passer pour l'autre.
         await applyRelationChange(tx, {
           representantId: body.representantId,
           fromStatus: representant.relationStatus,
@@ -704,160 +77,34 @@ export class RepCampaignsService {
           source: ChangeSource.MOBILE,
         });
       }
-
-      if (task && terminal) {
-        await tx.repCallTask.updateMany({
-          where: { representantId: body.representantId, isActive: true },
-          data: {
-            status: CallTaskStatus.DONE,
-            isActive: false,
-            completedAt: new Date(),
-          },
-        });
-      }
-
       return true;
     });
 
-    if (!applied) {
-      return attemptResult(
-        RepCallAttemptApplyStatus.DUPLICATE,
-        body.id,
-        task?.id ?? null,
-        false,
-        suggested,
-      );
-    }
-
-    return attemptResult(
-      RepCallAttemptApplyStatus.APPLIED,
-      body.id,
-      task?.id ?? null,
-      task !== null && terminal,
-      suggested,
-    );
+    return attemptResult(applied ? RepCallAttemptApplyStatus.APPLIED : RepCallAttemptApplyStatus.DUPLICATE, body.id, suggested);
   }
 
-  /**
-   * Le numéro suggéré n'est PAS enregistré comme représentant : `phoneE164` y
-   * porte un index unique partiel, et une fiche jamais rencontrée le réserverait
-   * au téléconseiller qui rencontrerait un jour cette personne pour de vrai.
-   */
-  private async resolveSuggested(
-    phone: string | undefined,
-  ): Promise<{ lookup: RepresentantLookupDto; resolvedRepresentantId: string | null } | null> {
+  private async resolveSuggested(phone: string | undefined): Promise<{ lookup: RepresentantLookupDto; resolvedRepresentantId: string | null } | null> {
     if (phone === undefined) return null;
-
     const lookup = await this.representants.lookup(phone);
-    const known = await this.prisma.representant.findFirst({
-      where: {
-        phoneE164: lookup.phoneE164,
-        deletedAt: null,
-      },
-      select: { id: true },
-    });
-
+    const known = await this.prisma.representant.findFirst({ where: { phoneE164: lookup.phoneE164, deletedAt: null }, select: { id: true } });
     return { lookup, resolvedRepresentantId: known?.id ?? null };
-  }
-
-  private async scopeLabel(scope: ScopeInput): Promise<string> {
-    const [departement, ief] = await Promise.all([
-      scope.departementId
-        ? this.prisma.departement.findUnique({
-            where: { id: scope.departementId },
-            select: { name: true },
-          })
-        : Promise.resolve(null),
-      scope.iefId
-        ? this.prisma.ief.findUnique({ where: { id: scope.iefId }, select: { name: true } })
-        : Promise.resolve(null),
-    ]);
-
-    return composeScopeLabel(
-      departement?.name ?? null,
-      ief?.name ?? null,
-      scope.onlyWithoutProspects ?? false,
-      scope.relationStatuses ?? [],
-    );
   }
 }
 
 function validatedComment(body: CreateRepCallAttemptDto): string | null {
   const comment = body.comment?.trim() || null;
   if (body.outcome === RepCallOutcome.OTHER && comment === null) throw commentRequired();
-  if (body.promisedProspects !== undefined && body.outcome !== RepCallOutcome.PROSPECTS_PROMISED) {
-    throw promisedNotAllowed();
-  }
+  if (body.promisedProspects !== undefined && body.outcome !== RepCallOutcome.PROSPECTS_PROMISED) throw promisedNotAllowed();
   if (comment !== null && comment.length > COMMENT_MAX_LENGTH) throw commentRequired();
-  if (body.outcome === RepCallOutcome.CALLBACK && body.callbackAt === undefined) {
-    throw callbackAtRequired();
-  }
-  if (body.callbackAt !== undefined && body.outcome !== RepCallOutcome.CALLBACK) {
-    throw callbackAtNotAllowed();
-  }
+  if (body.outcome === RepCallOutcome.CALLBACK && body.callbackAt === undefined) throw callbackAtRequired();
+  if (body.callbackAt !== undefined && body.outcome !== RepCallOutcome.CALLBACK) throw callbackAtNotAllowed();
   return comment;
 }
 
 function attemptResult(
   status: RepCallAttemptApplyStatus,
   attemptId: string,
-  taskId: string | null,
-  taskClosed: boolean,
   suggested: { lookup: RepresentantLookupDto } | null,
 ): RepCallAttemptResultDto {
-  return { status, attemptId, taskId, taskClosed, suggestion: suggested?.lookup ?? null };
-}
-
-function eligibleWhere(scope: ScopeInput): Prisma.RepresentantWhereInput {
-  const relationStatuses = scope.relationStatuses ?? [];
-  return {
-    deletedAt: null,
-    ...(scope.departementId ? { departementId: scope.departementId } : {}),
-    ...(scope.iefId ? { iefId: scope.iefId } : {}),
-    ...(scope.onlyWithoutProspects ? { prospects: { none: { deletedAt: null } } } : {}),
-    ...(relationStatuses.length > 0 ? { relationStatus: { in: [...relationStatuses] } } : {}),
-    repCallTasks: { none: { isActive: true } },
-    repCallAttempts: { none: { outcome: { in: [...TERMINAL_OUTCOMES] } } },
-  };
-}
-
-const RELATION_LABELS: Record<RepresentantRelation, string> = {
-  [RepresentantRelation.INCONNU]: 'inconnus',
-  [RepresentantRelation.CONTACTE]: 'contactés',
-  [RepresentantRelation.AMBASSADEUR]: 'ambassadeurs',
-  [RepresentantRelation.REFUS]: 'refus',
-};
-
-function relationLabel(statuses: readonly RepresentantRelation[]): string | null {
-  if (statuses.length === 0) return null;
-  if (statuses.length === 1 && statuses[0] === RepresentantRelation.AMBASSADEUR) return 'qualifiés';
-  if (!statuses.includes(RepresentantRelation.AMBASSADEUR)) return 'non qualifiés';
-  return statuses.map((status) => RELATION_LABELS[status]).join(' ou ');
-}
-
-function composeScopeLabel(
-  departement: string | null,
-  ief: string | null,
-  onlyWithoutProspects: boolean,
-  relationStatuses: readonly RepresentantRelation[],
-): string {
-  const parts: string[] = [];
-  if (departement) parts.push(`Département ${departement}`);
-  if (ief) parts.push(`IEF ${ief}`);
-  if (onlyWithoutProspects) parts.push('sans prospect');
-  const relation = relationLabel(relationStatuses);
-  if (relation) parts.push(relation);
-  return parts.length ? parts.join(', ') : 'Tous les représentants';
-}
-
-function translateWriteError(error: unknown): unknown {
-  if (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as { code?: unknown }).code === 'P2002'
-  ) {
-    return representantAlreadyAssigned();
-  }
-  return error;
+  return { status, attemptId, suggestion: suggested?.lookup ?? null };
 }

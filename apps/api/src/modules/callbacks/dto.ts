@@ -50,9 +50,6 @@ export class CallbackDto {
   @ApiProperty({ format: 'uuid' }) assignedToId!: string;
   @ApiProperty() assignedToName!: string;
 
-  @ApiProperty({ type: String, format: 'uuid', nullable: true }) campaignId!: string | null;
-  @ApiProperty({ type: String, format: 'uuid', nullable: true }) taskId!: string | null;
-
   @ApiProperty({
     type: Boolean,
     description:

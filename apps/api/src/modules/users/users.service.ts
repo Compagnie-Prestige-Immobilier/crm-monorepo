@@ -309,17 +309,6 @@ export class UsersService {
         where: { createdById: id, deletedAt: null },
         data: { createdById: handoverToId },
       });
-      // Les tâches suivent le portefeuille : laissées derrière, elles restent
-      // assignées à un compte qui ne se connectera plus et bloquent les fiches.
-      await tx.callTask.updateMany({
-        where: { assignedToId: id, isActive: true },
-        data: { assignedToId: handoverToId },
-      });
-      await tx.repCallTask.updateMany({
-        where: { assignedToId: id, isActive: true },
-        data: { assignedToId: handoverToId },
-      });
-
       await audit(tx, actor, {
         action: AuditAction.PORTFOLIO_HANDOVER,
         entity: 'user',

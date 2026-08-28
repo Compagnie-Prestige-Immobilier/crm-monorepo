@@ -7,7 +7,7 @@ import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/src/equatable_utils.dart';
 
-part 'supervision_activity_row_dto.g.dart';
+part 'supervision_activity_counts_dto.g.dart';
 
 @CopyWith()
 @JsonSerializable(
@@ -16,9 +16,9 @@ part 'supervision_activity_row_dto.g.dart';
   disallowUnrecognizedKeys: false,
   explicitToJson: true,
 )
-class SupervisionActivityRowDto {
-  /// Returns a new [SupervisionActivityRowDto] instance.
-  SupervisionActivityRowDto({
+class SupervisionActivityCountsDto {
+  /// Returns a new [SupervisionActivityCountsDto] instance.
+  SupervisionActivityCountsDto({
     required this.calls,
 
     required this.unreachable,
@@ -60,12 +60,6 @@ class SupervisionActivityRowDto {
     required this.repQualified,
 
     required this.repQualificationRate,
-
-    required this.bucket,
-
-    required this.teleconseillerId,
-
-    required this.teleconseillerName,
   });
 
   /// Appels passés à des prospects.
@@ -156,19 +150,9 @@ class SupervisionActivityRowDto {
   @JsonKey(name: r'repQualificationRate', required: true, includeIfNull: true)
   final num? repQualificationRate;
 
-  /// Début de la journée ou de la semaine, en AAAA-MM-JJ.
-  @JsonKey(name: r'bucket', required: true, includeIfNull: false)
-  final String bucket;
-
-  @JsonKey(name: r'teleconseillerId', required: true, includeIfNull: false)
-  final String teleconseillerId;
-
-  @JsonKey(name: r'teleconseillerName', required: true, includeIfNull: false)
-  final String teleconseillerName;
-
   bool operator ==(Object other) {
     return identical(this, other) ||
-        other is SupervisionActivityRowDto &&
+        other is SupervisionActivityCountsDto &&
             runtimeType == other.runtimeType &&
             equals(
               [
@@ -193,9 +177,6 @@ class SupervisionActivityRowDto {
                 repQuestioned,
                 repQualified,
                 repQualificationRate,
-                bucket,
-                teleconseillerId,
-                teleconseillerName,
               ],
               [
                 other.calls,
@@ -219,9 +200,6 @@ class SupervisionActivityRowDto {
                 other.repQuestioned,
                 other.repQualified,
                 other.repQualificationRate,
-                other.bucket,
-                other.teleconseillerId,
-                other.teleconseillerName,
               ],
             );
   }
@@ -251,15 +229,12 @@ class SupervisionActivityRowDto {
         repQuestioned,
         repQualified,
         repQualificationRate,
-        bucket,
-        teleconseillerId,
-        teleconseillerName,
       ]);
 
-  factory SupervisionActivityRowDto.fromJson(Map<String, dynamic> json) =>
-      _$SupervisionActivityRowDtoFromJson(json);
+  factory SupervisionActivityCountsDto.fromJson(Map<String, dynamic> json) =>
+      _$SupervisionActivityCountsDtoFromJson(json);
 
-  Map<String, dynamic> toJson() => _$SupervisionActivityRowDtoToJson(this);
+  Map<String, dynamic> toJson() => _$SupervisionActivityCountsDtoToJson(this);
 
   @override
   String toString() {

@@ -41,6 +41,14 @@ if (!('ResizeObserver' in globalThis)) {
   };
 }
 
+if (typeof Element.prototype.setPointerCapture !== 'function') {
+  // jsdom ne l'implemente pas, et sonner capture le pointeur des qu'on touche un
+  // toast pour gerer le balayage : sans elle, tout clic dans un toast leve.
+  Element.prototype.setPointerCapture = (): void => {};
+  Element.prototype.releasePointerCapture = (): void => {};
+  Element.prototype.hasPointerCapture = (): boolean => false;
+}
+
 if (typeof Element.prototype.scrollIntoView !== 'function') {
   // jsdom ne l'implemente pas, et cmdk fait defiler l'option active a chaque rendu:
   // sans lui la liste de FilterCombobox ne peut pas s'ouvrir.

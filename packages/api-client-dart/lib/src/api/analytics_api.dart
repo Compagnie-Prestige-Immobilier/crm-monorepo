@@ -32,98 +32,15 @@ import 'package:crm_api_client/src/model/prospect_type.dart';
 import 'package:crm_api_client/src/model/representant_productivity_list_dto.dart';
 import 'package:crm_api_client/src/model/segment_conversion_list_dto.dart';
 import 'package:crm_api_client/src/model/segment_list_dto.dart';
-import 'package:crm_api_client/src/model/stats_layout_dto.dart';
-import 'package:crm_api_client/src/model/stats_layout_screen.dart';
 import 'package:crm_api_client/src/model/time_granularity.dart';
 import 'package:crm_api_client/src/model/top_commercial_list_dto.dart';
 import 'package:crm_api_client/src/model/top_representant_list_dto.dart';
-import 'package:crm_api_client/src/model/update_stats_layout_dto.dart';
 import 'package:crm_api_client/src/model/weekly_cohort_list_dto.dart';
 
 class AnalyticsApi {
   final Dio _dio;
 
   const AnalyticsApi(this._dio);
-
-  /// Efface l’organisation personnelle des statistiques pour revenir à l’ordre par défaut.
-  ///
-  ///
-  /// Parameters:
-  /// * [screen]
-  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
-  /// * [headers] - Can be used to add additional headers to the request
-  /// * [extras] - Can be used to add flags to the request
-  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
-  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
-  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
-  ///
-  /// Returns a [Future] containing a [Response] with a [StatsLayoutDto] as data
-  /// Throws [DioException] if API call or serialization fails
-  Future<Response<StatsLayoutDto>> deleteStatsLayout({
-    required StatsLayoutScreen screen,
-    CancelToken? cancelToken,
-    Map<String, dynamic>? headers,
-    Map<String, dynamic>? extra,
-    ValidateStatus? validateStatus,
-    ProgressCallback? onSendProgress,
-    ProgressCallback? onReceiveProgress,
-  }) async {
-    final _path = r'/api/v1/analytics/layout';
-    final _options = Options(
-      method: r'DELETE',
-      headers: <String, dynamic>{...?headers},
-      extra: <String, dynamic>{
-        'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
-        ],
-        ...?extra,
-      },
-      validateStatus: validateStatus,
-    );
-
-    final _queryParameters = <String, dynamic>{r'screen': screen};
-
-    final _response = await _dio.request<Object>(
-      _path,
-      options: _options,
-      queryParameters: _queryParameters,
-      cancelToken: cancelToken,
-      onSendProgress: onSendProgress,
-      onReceiveProgress: onReceiveProgress,
-    );
-
-    StatsLayoutDto? _responseData;
-
-    try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<StatsLayoutDto, StatsLayoutDto>(
-              rawData,
-              'StatsLayoutDto',
-              growable: true,
-            );
-    } catch (error, stackTrace) {
-      throw DioException(
-        requestOptions: _response.requestOptions,
-        response: _response,
-        type: DioExceptionType.unknown,
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
-
-    return Response<StatsLayoutDto>(
-      data: _responseData,
-      headers: _response.headers,
-      isRedirect: _response.isRedirect,
-      requestOptions: _response.requestOptions,
-      redirects: _response.redirects,
-      statusCode: _response.statusCode,
-      statusMessage: _response.statusMessage,
-      extra: _response.extra,
-    );
-  }
 
   /// Part des représentants travaillés devenus ambassadeurs.
   /// La période borne la DATE DE LA BASCULE, pas l’arrivée en base : un statut poussé avec trois jours de retard reste compté le jour où il a été décidé. Le dénominateur ne retient que les représentants dont la relation a bougé dans la période ; &#x60;untracked&#x60; compte, hors période, ceux de l’annuaire sans aucune trace, qui ne sont donc mesurés ni au numérateur ni au dénominateur. Seuls &#x60;dateFrom&#x60;, &#x60;dateTo&#x60;, &#x60;commercialId&#x60;, &#x60;departementId&#x60; et &#x60;representantId&#x60; agissent : les autres filtres qualifient un prospect, pas un représentant.
@@ -2614,86 +2531,6 @@ class AnalyticsApi {
     );
   }
 
-  /// Organisation des graphiques de statistiques pour l’utilisateur courant.
-  ///
-  ///
-  /// Parameters:
-  /// * [screen]
-  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
-  /// * [headers] - Can be used to add additional headers to the request
-  /// * [extras] - Can be used to add flags to the request
-  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
-  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
-  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
-  ///
-  /// Returns a [Future] containing a [Response] with a [StatsLayoutDto] as data
-  /// Throws [DioException] if API call or serialization fails
-  Future<Response<StatsLayoutDto>> getStatsLayout({
-    required StatsLayoutScreen screen,
-    CancelToken? cancelToken,
-    Map<String, dynamic>? headers,
-    Map<String, dynamic>? extra,
-    ValidateStatus? validateStatus,
-    ProgressCallback? onSendProgress,
-    ProgressCallback? onReceiveProgress,
-  }) async {
-    final _path = r'/api/v1/analytics/layout';
-    final _options = Options(
-      method: r'GET',
-      headers: <String, dynamic>{...?headers},
-      extra: <String, dynamic>{
-        'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
-        ],
-        ...?extra,
-      },
-      validateStatus: validateStatus,
-    );
-
-    final _queryParameters = <String, dynamic>{r'screen': screen};
-
-    final _response = await _dio.request<Object>(
-      _path,
-      options: _options,
-      queryParameters: _queryParameters,
-      cancelToken: cancelToken,
-      onSendProgress: onSendProgress,
-      onReceiveProgress: onReceiveProgress,
-    );
-
-    StatsLayoutDto? _responseData;
-
-    try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<StatsLayoutDto, StatsLayoutDto>(
-              rawData,
-              'StatsLayoutDto',
-              growable: true,
-            );
-    } catch (error, stackTrace) {
-      throw DioException(
-        requestOptions: _response.requestOptions,
-        response: _response,
-        type: DioExceptionType.unknown,
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
-
-    return Response<StatsLayoutDto>(
-      data: _responseData,
-      headers: _response.headers,
-      isRedirect: _response.isRedirect,
-      requestOptions: _response.requestOptions,
-      redirects: _response.redirects,
-      statusCode: _response.statusCode,
-      statusMessage: _response.statusMessage,
-      extra: _response.extra,
-    );
-  }
-
   /// Classement des commerciaux.
   ///
   ///
@@ -3109,107 +2946,6 @@ class AnalyticsApi {
     }
 
     return Response<WeeklyCohortListDto>(
-      data: _responseData,
-      headers: _response.headers,
-      isRedirect: _response.isRedirect,
-      requestOptions: _response.requestOptions,
-      redirects: _response.redirects,
-      statusCode: _response.statusCode,
-      statusMessage: _response.statusMessage,
-      extra: _response.extra,
-    );
-  }
-
-  /// Enregistre l’organisation des graphiques de statistiques.
-  ///
-  ///
-  /// Parameters:
-  /// * [screen]
-  /// * [updateStatsLayoutDto]
-  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
-  /// * [headers] - Can be used to add additional headers to the request
-  /// * [extras] - Can be used to add flags to the request
-  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
-  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
-  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
-  ///
-  /// Returns a [Future] containing a [Response] with a [StatsLayoutDto] as data
-  /// Throws [DioException] if API call or serialization fails
-  Future<Response<StatsLayoutDto>> putStatsLayout({
-    required StatsLayoutScreen screen,
-    required UpdateStatsLayoutDto updateStatsLayoutDto,
-    CancelToken? cancelToken,
-    Map<String, dynamic>? headers,
-    Map<String, dynamic>? extra,
-    ValidateStatus? validateStatus,
-    ProgressCallback? onSendProgress,
-    ProgressCallback? onReceiveProgress,
-  }) async {
-    final _path = r'/api/v1/analytics/layout';
-    final _options = Options(
-      method: r'PUT',
-      headers: <String, dynamic>{...?headers},
-      extra: <String, dynamic>{
-        'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
-        ],
-        ...?extra,
-      },
-      contentType: 'application/json',
-      validateStatus: validateStatus,
-    );
-
-    final _queryParameters = <String, dynamic>{r'screen': screen};
-
-    dynamic _bodyData;
-
-    try {
-      _bodyData = jsonEncode(updateStatsLayoutDto);
-    } catch (error, stackTrace) {
-      throw DioException(
-        requestOptions: _options.compose(
-          _dio.options,
-          _path,
-          queryParameters: _queryParameters,
-        ),
-        type: DioExceptionType.unknown,
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
-
-    final _response = await _dio.request<Object>(
-      _path,
-      data: _bodyData,
-      options: _options,
-      queryParameters: _queryParameters,
-      cancelToken: cancelToken,
-      onSendProgress: onSendProgress,
-      onReceiveProgress: onReceiveProgress,
-    );
-
-    StatsLayoutDto? _responseData;
-
-    try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<StatsLayoutDto, StatsLayoutDto>(
-              rawData,
-              'StatsLayoutDto',
-              growable: true,
-            );
-    } catch (error, stackTrace) {
-      throw DioException(
-        requestOptions: _response.requestOptions,
-        response: _response,
-        type: DioExceptionType.unknown,
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
-
-    return Response<StatsLayoutDto>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

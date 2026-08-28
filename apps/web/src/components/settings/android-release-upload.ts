@@ -46,6 +46,9 @@ export function useAndroidReleaseUpload() {
 
   return useMutation({
     mutationKey: queryKeys.androidReleaseUpload,
+    // La fenêtre de confirmation se lit dans la mutation : ramassée au bout de
+    // cinq minutes, elle disparaîtrait sous les yeux de qui la lit.
+    gcTime: 30 * 60 * 1_000,
     mutationFn: ({ file, notes, controller }: AndroidUploadVariables) => {
       queryClient.setQueryData<AndroidUploadProgress>(queryKeys.androidReleaseProgress, {
         fileName: file.name,

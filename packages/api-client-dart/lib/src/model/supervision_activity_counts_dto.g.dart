@@ -1,67 +1,63 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'supervision_activity_row_dto.dart';
+part of 'supervision_activity_counts_dto.dart';
 
 // **************************************************************************
 // CopyWithGenerator
 // **************************************************************************
 
-abstract class _$SupervisionActivityRowDtoCWProxy {
-  SupervisionActivityRowDto calls(num calls);
+abstract class _$SupervisionActivityCountsDtoCWProxy {
+  SupervisionActivityCountsDto calls(num calls);
 
-  SupervisionActivityRowDto unreachable(num unreachable);
+  SupervisionActivityCountsDto unreachable(num unreachable);
 
-  SupervisionActivityRowDto wrongNumber(num wrongNumber);
+  SupervisionActivityCountsDto wrongNumber(num wrongNumber);
 
-  SupervisionActivityRowDto refused(num refused);
+  SupervisionActivityCountsDto refused(num refused);
 
-  SupervisionActivityRowDto other(num other);
+  SupervisionActivityCountsDto other(num other);
 
-  SupervisionActivityRowDto methodObtained(num methodObtained);
+  SupervisionActivityCountsDto methodObtained(num methodObtained);
 
-  SupervisionActivityRowDto callback(num callback);
+  SupervisionActivityCountsDto callback(num callback);
 
-  SupervisionActivityRowDto reachRate(num? reachRate);
+  SupervisionActivityCountsDto reachRate(num? reachRate);
 
-  SupervisionActivityRowDto prospectsCreated(num prospectsCreated);
+  SupervisionActivityCountsDto prospectsCreated(num prospectsCreated);
 
-  SupervisionActivityRowDto representantsContacted(num representantsContacted);
+  SupervisionActivityCountsDto representantsContacted(
+    num representantsContacted,
+  );
 
-  SupervisionActivityRowDto tasksClosed(num tasksClosed);
+  SupervisionActivityCountsDto tasksClosed(num tasksClosed);
 
-  SupervisionActivityRowDto repCalls(num repCalls);
+  SupervisionActivityCountsDto repCalls(num repCalls);
 
-  SupervisionActivityRowDto repReached(num repReached);
+  SupervisionActivityCountsDto repReached(num repReached);
 
-  SupervisionActivityRowDto repCallback(num repCallback);
+  SupervisionActivityCountsDto repCallback(num repCallback);
 
-  SupervisionActivityRowDto repUnreachable(num repUnreachable);
+  SupervisionActivityCountsDto repUnreachable(num repUnreachable);
 
-  SupervisionActivityRowDto repOther(num repOther);
+  SupervisionActivityCountsDto repOther(num repOther);
 
-  SupervisionActivityRowDto repContactRate(num? repContactRate);
+  SupervisionActivityCountsDto repContactRate(num? repContactRate);
 
-  SupervisionActivityRowDto repCallbackRate(num? repCallbackRate);
+  SupervisionActivityCountsDto repCallbackRate(num? repCallbackRate);
 
-  SupervisionActivityRowDto repQuestioned(num repQuestioned);
+  SupervisionActivityCountsDto repQuestioned(num repQuestioned);
 
-  SupervisionActivityRowDto repQualified(num repQualified);
+  SupervisionActivityCountsDto repQualified(num repQualified);
 
-  SupervisionActivityRowDto repQualificationRate(num? repQualificationRate);
+  SupervisionActivityCountsDto repQualificationRate(num? repQualificationRate);
 
-  SupervisionActivityRowDto bucket(String bucket);
-
-  SupervisionActivityRowDto teleconseillerId(String teleconseillerId);
-
-  SupervisionActivityRowDto teleconseillerName(String teleconseillerName);
-
-  /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SupervisionActivityRowDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
+  /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SupervisionActivityCountsDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
   /// ```dart
-  /// SupervisionActivityRowDto(...).copyWith(id: 12, name: "My name")
+  /// SupervisionActivityCountsDto(...).copyWith(id: 12, name: "My name")
   /// ````
-  SupervisionActivityRowDto call({
+  SupervisionActivityCountsDto call({
     num calls,
     num unreachable,
     num wrongNumber,
@@ -83,117 +79,107 @@ abstract class _$SupervisionActivityRowDtoCWProxy {
     num repQuestioned,
     num repQualified,
     num? repQualificationRate,
-    String bucket,
-    String teleconseillerId,
-    String teleconseillerName,
   });
 }
 
-/// Proxy class for `copyWith` functionality. This is a callable class and can be used as follows: `instanceOfSupervisionActivityRowDto.copyWith(...)`. Additionally contains functions for specific fields e.g. `instanceOfSupervisionActivityRowDto.copyWith.fieldName(...)`
-class _$SupervisionActivityRowDtoCWProxyImpl
-    implements _$SupervisionActivityRowDtoCWProxy {
-  const _$SupervisionActivityRowDtoCWProxyImpl(this._value);
+/// Proxy class for `copyWith` functionality. This is a callable class and can be used as follows: `instanceOfSupervisionActivityCountsDto.copyWith(...)`. Additionally contains functions for specific fields e.g. `instanceOfSupervisionActivityCountsDto.copyWith.fieldName(...)`
+class _$SupervisionActivityCountsDtoCWProxyImpl
+    implements _$SupervisionActivityCountsDtoCWProxy {
+  const _$SupervisionActivityCountsDtoCWProxyImpl(this._value);
 
-  final SupervisionActivityRowDto _value;
-
-  @override
-  SupervisionActivityRowDto calls(num calls) => this(calls: calls);
+  final SupervisionActivityCountsDto _value;
 
   @override
-  SupervisionActivityRowDto unreachable(num unreachable) =>
+  SupervisionActivityCountsDto calls(num calls) => this(calls: calls);
+
+  @override
+  SupervisionActivityCountsDto unreachable(num unreachable) =>
       this(unreachable: unreachable);
 
   @override
-  SupervisionActivityRowDto wrongNumber(num wrongNumber) =>
+  SupervisionActivityCountsDto wrongNumber(num wrongNumber) =>
       this(wrongNumber: wrongNumber);
 
   @override
-  SupervisionActivityRowDto refused(num refused) => this(refused: refused);
+  SupervisionActivityCountsDto refused(num refused) => this(refused: refused);
 
   @override
-  SupervisionActivityRowDto other(num other) => this(other: other);
+  SupervisionActivityCountsDto other(num other) => this(other: other);
 
   @override
-  SupervisionActivityRowDto methodObtained(num methodObtained) =>
+  SupervisionActivityCountsDto methodObtained(num methodObtained) =>
       this(methodObtained: methodObtained);
 
   @override
-  SupervisionActivityRowDto callback(num callback) => this(callback: callback);
+  SupervisionActivityCountsDto callback(num callback) =>
+      this(callback: callback);
 
   @override
-  SupervisionActivityRowDto reachRate(num? reachRate) =>
+  SupervisionActivityCountsDto reachRate(num? reachRate) =>
       this(reachRate: reachRate);
 
   @override
-  SupervisionActivityRowDto prospectsCreated(num prospectsCreated) =>
+  SupervisionActivityCountsDto prospectsCreated(num prospectsCreated) =>
       this(prospectsCreated: prospectsCreated);
 
   @override
-  SupervisionActivityRowDto representantsContacted(
+  SupervisionActivityCountsDto representantsContacted(
     num representantsContacted,
   ) => this(representantsContacted: representantsContacted);
 
   @override
-  SupervisionActivityRowDto tasksClosed(num tasksClosed) =>
+  SupervisionActivityCountsDto tasksClosed(num tasksClosed) =>
       this(tasksClosed: tasksClosed);
 
   @override
-  SupervisionActivityRowDto repCalls(num repCalls) => this(repCalls: repCalls);
+  SupervisionActivityCountsDto repCalls(num repCalls) =>
+      this(repCalls: repCalls);
 
   @override
-  SupervisionActivityRowDto repReached(num repReached) =>
+  SupervisionActivityCountsDto repReached(num repReached) =>
       this(repReached: repReached);
 
   @override
-  SupervisionActivityRowDto repCallback(num repCallback) =>
+  SupervisionActivityCountsDto repCallback(num repCallback) =>
       this(repCallback: repCallback);
 
   @override
-  SupervisionActivityRowDto repUnreachable(num repUnreachable) =>
+  SupervisionActivityCountsDto repUnreachable(num repUnreachable) =>
       this(repUnreachable: repUnreachable);
 
   @override
-  SupervisionActivityRowDto repOther(num repOther) => this(repOther: repOther);
+  SupervisionActivityCountsDto repOther(num repOther) =>
+      this(repOther: repOther);
 
   @override
-  SupervisionActivityRowDto repContactRate(num? repContactRate) =>
+  SupervisionActivityCountsDto repContactRate(num? repContactRate) =>
       this(repContactRate: repContactRate);
 
   @override
-  SupervisionActivityRowDto repCallbackRate(num? repCallbackRate) =>
+  SupervisionActivityCountsDto repCallbackRate(num? repCallbackRate) =>
       this(repCallbackRate: repCallbackRate);
 
   @override
-  SupervisionActivityRowDto repQuestioned(num repQuestioned) =>
+  SupervisionActivityCountsDto repQuestioned(num repQuestioned) =>
       this(repQuestioned: repQuestioned);
 
   @override
-  SupervisionActivityRowDto repQualified(num repQualified) =>
+  SupervisionActivityCountsDto repQualified(num repQualified) =>
       this(repQualified: repQualified);
 
   @override
-  SupervisionActivityRowDto repQualificationRate(num? repQualificationRate) =>
-      this(repQualificationRate: repQualificationRate);
+  SupervisionActivityCountsDto repQualificationRate(
+    num? repQualificationRate,
+  ) => this(repQualificationRate: repQualificationRate);
 
   @override
-  SupervisionActivityRowDto bucket(String bucket) => this(bucket: bucket);
-
-  @override
-  SupervisionActivityRowDto teleconseillerId(String teleconseillerId) =>
-      this(teleconseillerId: teleconseillerId);
-
-  @override
-  SupervisionActivityRowDto teleconseillerName(String teleconseillerName) =>
-      this(teleconseillerName: teleconseillerName);
-
-  @override
-  /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SupervisionActivityRowDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
+  /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SupervisionActivityCountsDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
   /// ```dart
-  /// SupervisionActivityRowDto(...).copyWith(id: 12, name: "My name")
+  /// SupervisionActivityCountsDto(...).copyWith(id: 12, name: "My name")
   /// ````
-  SupervisionActivityRowDto call({
+  SupervisionActivityCountsDto call({
     Object? calls = const $CopyWithPlaceholder(),
     Object? unreachable = const $CopyWithPlaceholder(),
     Object? wrongNumber = const $CopyWithPlaceholder(),
@@ -215,11 +201,8 @@ class _$SupervisionActivityRowDtoCWProxyImpl
     Object? repQuestioned = const $CopyWithPlaceholder(),
     Object? repQualified = const $CopyWithPlaceholder(),
     Object? repQualificationRate = const $CopyWithPlaceholder(),
-    Object? bucket = const $CopyWithPlaceholder(),
-    Object? teleconseillerId = const $CopyWithPlaceholder(),
-    Object? teleconseillerName = const $CopyWithPlaceholder(),
   }) {
-    return SupervisionActivityRowDto(
+    return SupervisionActivityCountsDto(
       calls: calls == const $CopyWithPlaceholder()
           ? _value.calls
           // ignore: cast_nullable_to_non_nullable
@@ -305,36 +288,25 @@ class _$SupervisionActivityRowDtoCWProxyImpl
           ? _value.repQualificationRate
           // ignore: cast_nullable_to_non_nullable
           : repQualificationRate as num?,
-      bucket: bucket == const $CopyWithPlaceholder()
-          ? _value.bucket
-          // ignore: cast_nullable_to_non_nullable
-          : bucket as String,
-      teleconseillerId: teleconseillerId == const $CopyWithPlaceholder()
-          ? _value.teleconseillerId
-          // ignore: cast_nullable_to_non_nullable
-          : teleconseillerId as String,
-      teleconseillerName: teleconseillerName == const $CopyWithPlaceholder()
-          ? _value.teleconseillerName
-          // ignore: cast_nullable_to_non_nullable
-          : teleconseillerName as String,
     );
   }
 }
 
-extension $SupervisionActivityRowDtoCopyWith on SupervisionActivityRowDto {
-  /// Returns a callable class that can be used as follows: `instanceOfSupervisionActivityRowDto.copyWith(...)` or like so:`instanceOfSupervisionActivityRowDto.copyWith.fieldName(...)`.
+extension $SupervisionActivityCountsDtoCopyWith
+    on SupervisionActivityCountsDto {
+  /// Returns a callable class that can be used as follows: `instanceOfSupervisionActivityCountsDto.copyWith(...)` or like so:`instanceOfSupervisionActivityCountsDto.copyWith.fieldName(...)`.
   // ignore: library_private_types_in_public_api
-  _$SupervisionActivityRowDtoCWProxy get copyWith =>
-      _$SupervisionActivityRowDtoCWProxyImpl(this);
+  _$SupervisionActivityCountsDtoCWProxy get copyWith =>
+      _$SupervisionActivityCountsDtoCWProxyImpl(this);
 }
 
 // **************************************************************************
 // JsonSerializableGenerator
 // **************************************************************************
 
-SupervisionActivityRowDto _$SupervisionActivityRowDtoFromJson(
+SupervisionActivityCountsDto _$SupervisionActivityCountsDtoFromJson(
   Map<String, dynamic> json,
-) => $checkedCreate('SupervisionActivityRowDto', json, ($checkedConvert) {
+) => $checkedCreate('SupervisionActivityCountsDto', json, ($checkedConvert) {
   $checkKeys(
     json,
     requiredKeys: const [
@@ -359,12 +331,9 @@ SupervisionActivityRowDto _$SupervisionActivityRowDtoFromJson(
       'repQuestioned',
       'repQualified',
       'repQualificationRate',
-      'bucket',
-      'teleconseillerId',
-      'teleconseillerName',
     ],
   );
-  final val = SupervisionActivityRowDto(
+  final val = SupervisionActivityCountsDto(
     calls: $checkedConvert('calls', (v) => v as num),
     unreachable: $checkedConvert('unreachable', (v) => v as num),
     wrongNumber: $checkedConvert('wrongNumber', (v) => v as num),
@@ -392,18 +361,12 @@ SupervisionActivityRowDto _$SupervisionActivityRowDtoFromJson(
       'repQualificationRate',
       (v) => v as num?,
     ),
-    bucket: $checkedConvert('bucket', (v) => v as String),
-    teleconseillerId: $checkedConvert('teleconseillerId', (v) => v as String),
-    teleconseillerName: $checkedConvert(
-      'teleconseillerName',
-      (v) => v as String,
-    ),
   );
   return val;
 });
 
-Map<String, dynamic> _$SupervisionActivityRowDtoToJson(
-  SupervisionActivityRowDto instance,
+Map<String, dynamic> _$SupervisionActivityCountsDtoToJson(
+  SupervisionActivityCountsDto instance,
 ) => <String, dynamic>{
   'calls': instance.calls,
   'unreachable': instance.unreachable,
@@ -426,7 +389,4 @@ Map<String, dynamic> _$SupervisionActivityRowDtoToJson(
   'repQuestioned': instance.repQuestioned,
   'repQualified': instance.repQualified,
   'repQualificationRate': instance.repQualificationRate,
-  'bucket': instance.bucket,
-  'teleconseillerId': instance.teleconseillerId,
-  'teleconseillerName': instance.teleconseillerName,
 };
