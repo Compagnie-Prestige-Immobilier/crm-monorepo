@@ -31,6 +31,8 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   reporter: process.env.CI === undefined ? [['list']] : [['list'], ['html', { open: 'never' }]],
   globalSetup: './e2e/global-setup.ts',
+  // Un dossier par exécution : plusieurs suites lancées en parallèle s'effaçaient mutuellement leurs traces.
+  outputDir: `test-results/${String(process.pid)}`,
   use: {
     baseURL: WEB_URL,
     locale: 'fr-FR',
@@ -78,13 +80,12 @@ export default defineConfig({
     },
   ],
   /**
-   * Le serveur Next est démarré si le port est libre, et réutilisé sinon :
-   * pendant le développement, on garde son `pnpm dev` ouvert.
+   * Le serveur Next n'est démarré que sur demande (`E2E_START_WEB=1`). Par
+   * défaut il est supposé lancé, comme l'API : sous charge, la sonde d'URL
+   * échouait, Playwright relançait `pnpm dev` puis le tuait en fin de suite,
+   * coupant le serveur sous les suites voisines.
    */
-  webServer: {
-    command: 'pnpm dev',
-    url: WEB_URL,
-    reuseExistingServer: true,
-    timeout: 120_000,
-  },
+  ...(process.env.E2E_START_WEB === '1'
+    ? { webServer: { command: 'pnpm dev', url: WEB_URL, reuseExistingServer: true, timeout: 120_000 } }
+    : {}),
 });

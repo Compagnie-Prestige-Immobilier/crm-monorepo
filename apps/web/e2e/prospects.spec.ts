@@ -26,8 +26,12 @@ async function readMagic(path: string): Promise<number[]> {
 }
 
 test('le jeton de session reste hors de portée du JavaScript de la page', async ({ page }) => {
-  await page.goto('/tableau-de-bord');
-  await expect(page.getByRole('heading', { name: 'Chiffres', level: 1 })).toBeVisible();
+  await page.goto('/chues/statistiques');
+  // Le titre vient de la barre supérieure (`navTitle`) : pour un ADMIN,
+  // `/chues/statistiques` s'intitule « Tableau de bord » depuis la fusion des
+  // deux écrans de chiffres. « Chiffres » ne subsiste que dans le renvoi
+  // `/chues/tableau-de-bord`.
+  await expect(page.getByRole('heading', { name: 'Tableau de bord', level: 1 })).toBeVisible();
 
   // C'est toute la raison d'être des cookies httpOnly et du relais `/api/v1/*` :
   // une XSS ne doit pas pouvoir repartir avec la base de prospects.
@@ -41,7 +45,7 @@ test('le jeton de session reste hors de portée du JavaScript de la page', async
 });
 
 test('filtrage du tableau puis export xlsx', async ({ page }) => {
-  await page.goto('/prospects');
+  await page.goto('/chues/prospects');
   await expect(page.getByRole('table')).toBeVisible();
 
   /**
@@ -110,37 +114,71 @@ test('chaque écran du panel se charge sans état d’erreur', async ({ page }) 
    *
    * Le troisième élément nomme un repère PROPRE à l'écran, pour les routes
    * dont le titre de niveau 1 est celui de leur parent : `navTitle` le dérive
-   * de la route, si bien que `/representants/import` affiche « Représentants ».
-   * Sans ce repère, le balayage se satisferait d'une coquille montée par le
-   * layout au-dessus d'une page qui n'a rien rendu.
+   * de la route, si bien que `/chues/dossiers/abc` affiche « Dossiers
+   * bancaires ». Sans ce repère, le balayage se satisferait d'une coquille
+   * montée par le layout au-dessus d'une page qui n'a rien rendu.
+   *
+   * Les adresses sont celles des QUATRE COQUES. Les anciennes racines ne sont
+   * plus que les renvois de `app/moved-routes.ts` : elles balayaient la page
+   * d'arrivée sous le titre d'avant le découpage.
    */
   for (const [path, heading, marker] of [
     ['/chues', 'Projet CHUES', 'Trois étapes, dans l’ordre'],
-    ['/tableau-de-bord', 'Chiffres', null],
-    ['/prospects', 'Prospects', null],
-    ['/prospects/nouveau', 'Nouveau prospect', 'Enregistrer ce prospect'],
-    ['/console', 'Appeler les prospects', 'Carte clavier'],
-    ['/chues/appels-representants', 'Appeler les représentants', 'Carte clavier'],
-    ['/rappels', 'Rappels', 'En retard'],
-    ['/suggestions', 'Contacts recommandés', 'Numéros donnés par un représentant'],
-    ['/campagnes', 'Campagnes', 'Appels prospects'],
-    ['/campagnes/representants', 'Campagnes', 'Appels représentants'],
-    ['/dossiers', 'Dossiers bancaires', null],
-    ['/dossiers/nouveau', 'Nouveau dossier', null],
-    ['/dossiers/export', 'Export', null],
-    ['/dossiers/etapes', 'Étapes des dossiers', null],
-    ['/demandes-clients', 'Créations de client à valider', null],
-    ['/representants', 'Représentants', null],
-    ['/representants/import', 'Représentants', 'Partir du modèle'],
-    ['/commerciaux', 'Utilisateurs', null],
-    ['/supervision', 'Équipes', null],
-    ['/referentiels', 'Listes de référence', null],
-    ['/imports', 'Importer un fichier Excel', 'Déposer un classeur'],
-    ['/parametres', 'Paramètres', null],
-    ['/notifications', 'Notifications', null],
+    ['/chues/prospects', 'Prospects', null],
+    ['/chues/prospects/nouveau', 'Ajouter un prospect', 'Enregistrer ce prospect'],
+    // `ConsoleView` a été vidé : ni file d'appels ni carte clavier, un titre de
+    // page et un lien vers l'annuaire.
+    ['/chues/console', 'Convertir un prospect', 'Ouvrir l’annuaire'],
+    // `RepScript` s'ouvre désormais sur un ANNUAIRE cherchable ; la carte
+    // clavier n'apparaît qu'une fois un représentant choisi.
+    [
+      '/chues/appels-representants',
+      'Qualifier un représentant',
+      'Choisissez qui vous venez d’appeler.',
+    ],
+    ['/chues/rappels', 'Rappels', 'En retard'],
+    ['/chues/suggestions', 'Contacts recommandés', 'Numéros donnés par un représentant'],
+    ['/chues/campagnes', 'Lots d’export', 'Fiches figées pour Excel, impression ou terrain.'],
+    /**
+     * L'écran des campagnes de représentants a été SUPPRIMÉ, mais son adresse
+     * n'est pas devenue une 404 : le segment dynamique `chues/campagnes/[id]`
+     * la capte avec `id = "representants"`, l'API refuse l'identifiant et
+     * `LotExportDetailView` rend « Ce lot n’a pas pu être chargé. ». Même
+     * défaut que le lien mort de la console vers `/grand-public/prospects`.
+     * Ce qui est écrit ici est ce que l'écran rend AUJOURD'HUI, pas un contrat.
+     */
+    ['/chues/campagnes/representants', 'Lots d’export', 'Ce lot n’a pas pu être chargé.'],
+    ['/chues/dossiers', 'Dossiers bancaires', null],
+    ['/chues/dossiers/nouveau', 'Nouveau dossier', null],
+    ['/chues/dossiers/export', 'Exporter les dossiers', null],
+    ['/chues/dossiers/etapes', 'Étapes des dossiers', null],
+    ['/chues/demandes-clients', 'Créations de client à valider', null],
+    ['/chues/representants', 'Représentants', null],
+    ['/chues/representants/import', 'Importer des représentants', 'Partir du modèle'],
+    ['/admin/commerciaux', 'Utilisateurs', null],
+    ['/chues/supervision', 'Équipes', null],
+    ['/admin/referentiels', 'Listes de référence', null],
+    ['/admin/imports', 'Importer un fichier Excel', 'Déposer un classeur'],
+    ['/admin/parametres', 'Paramètres', null],
+    // `/notifications` renvoie l'ADMIN sur le composeur.
+    ['/admin/notifications', 'Envoyer une notification', null],
+    /**
+     * EN DERNIER, et à dessein : `/chues/statistiques` lit
+     * `GET /v1/supervision/activite`, dont la requête SQL porte une virgule de
+     * trop (`analytics/supervision.service.ts`, ligne 259) et répond 500. Les
+     * autres jeux répondent, la page garde donc des données et rend l'échec
+     * carte par carte, en `QueryErrorInline` : aucun titre d'erreur, rien que
+     * ce balayage puisse voir. Si la panne s'étend et emporte la page entière,
+     * c'est ici qu'elle rougira — et seulement après les vingt-deux autres.
+     */
+    ['/chues/statistiques', 'Tableau de bord', 'Composer l’écran'],
   ] as const) {
     await page.goto(path);
-    await expect(page.getByRole('heading', { name: heading, level: 1 })).toBeVisible();
+    // `/chues/campagnes` porte DEUX titres de niveau 1 identiques : celui de la
+    // barre supérieure et celui de `LotsExportView`. Le mode strict refuse les
+    // deux : on vise celui de la page.
+    const portee = path === '/chues/campagnes' ? page.getByRole('main') : page;
+    await expect(portee.getByRole('heading', { name: heading, level: 1 })).toBeVisible();
     if (marker !== null) {
       await expect(page.getByText(marker).first()).toBeVisible();
     }
@@ -150,11 +188,16 @@ test('chaque écran du panel se charge sans état d’erreur', async ({ page }) 
      * court : en développement, Next injecte lui-même un élément `alert`
      * portant le titre du document, et le `Toaster` de Sonner monte une région
      * vide. Compter les `alert` revenait à échouer sur du décor.
+     *
+     * La liste est celle de `components/query-error-state.tsx` : « Erreur
+     * serveur » y manquait, et c'est précisément le titre qu'un 500 rend. Un
+     * balayage qui ne le nomme pas ne peut pas attraper la panne qu'il cherche.
      */
     await expect(
       page.getByRole('heading', {
-        name: /Serveur injoignable|Chargement impossible|Le serveur CPI a rencontré une erreur|Accès refusé/,
+        name: /Serveur injoignable|Chargement impossible|Erreur serveur|Requête refusée|Introuvable|Configuration incomplète|Accès refusé/,
       }),
+      `${path} rend un état d’erreur`,
     ).toHaveCount(0);
   }
 });
