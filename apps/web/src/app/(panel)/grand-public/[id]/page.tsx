@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import { redirect, unstable_rethrow } from 'next/navigation';
+import { notFound, redirect, unstable_rethrow } from 'next/navigation';
+import { ApiError } from '@crm/api-client/query';
 
 import { GrandPublicProspectDetail } from '@/components/grand-public/prospect-detail';
 import { PermissionDenied } from '@/components/permission-denied';
@@ -32,6 +33,8 @@ export default async function GrandPublicProspectPage({
     [prospect, offers] = await Promise.all([fetchProspect(id, client), fetchOffers(client)]);
   } catch (error) {
     unstable_rethrow(error);
+    // Un identifiant mal formé ou inconnu est une fiche introuvable, pas une panne.
+    if (error instanceof ApiError && (error.status === 400 || error.status === 404)) notFound();
     return <QueryErrorState error={error} fallback="Cette fiche n’a pas pu être chargée." />;
   }
 

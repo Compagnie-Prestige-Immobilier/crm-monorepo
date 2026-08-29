@@ -265,7 +265,6 @@ export function toAuthUser(user: User, workspace: Workspace = 'public'): AuthUse
     role: user.role,
     isActive: user.isActive,
     workspace,
-    departementId: user.departementId,
     phoneE164: user.phoneE164,
     lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
   };

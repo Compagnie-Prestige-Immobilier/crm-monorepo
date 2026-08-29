@@ -15,7 +15,6 @@ import type {
   UpdateTemplateInput,
 } from '@/components/notifications/types';
 import { getApiClient } from '@/lib/api/browser';
-import { fetchDepartements } from '@/lib/data/reference';
 
 export interface NotificationFilters {
   page: number;
@@ -96,8 +95,6 @@ export async function updateTemplate(
   );
 }
 
-export { fetchDepartements };
-
 export const notificationKeys = {
   root: ['notifications'] as const,
   list: (filters: NotificationFilters) => ['notifications', 'list', filters] as const,
@@ -111,5 +108,4 @@ export const notificationKeys = {
    * désactivés disparaissaient de l'onglet et devenaient irréactivables.
    */
   templates: (includeInactive: boolean) => ['notifications', 'templates', includeInactive] as const,
-  departements: ['notifications', 'departements'] as const,
 };

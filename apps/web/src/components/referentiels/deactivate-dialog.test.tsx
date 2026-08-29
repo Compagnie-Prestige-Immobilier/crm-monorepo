@@ -52,7 +52,7 @@ describe('désactivation d’un référentiel', () => {
 
   it('distingue zéro d’inconnu', () => {
     monter(0);
-    expect(screen.getByRole('dialog').textContent).toContain('0 prospects référencent');
+    expect(screen.getByRole('dialog').textContent).toContain('0 prospect référence');
     expect(screen.getByRole('button', { name: 'Désactiver' })).toBeTruthy();
     expect(screen.queryByRole('alert')).toBeNull();
   });

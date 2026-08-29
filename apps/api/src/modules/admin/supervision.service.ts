@@ -80,7 +80,6 @@ export class SupervisionService {
           role: true,
           isActive: true,
           lastLoginAt: true,
-          departement: { select: { name: true } },
         },
         orderBy: [{ fullName: 'asc' }],
       }),
@@ -143,7 +142,6 @@ export class SupervisionService {
         pendingOps: null,
         appVersion: null,
       };
-      const departement = user.departement ?? { name: null };
       const pushedAt = latest(syncAt.get(user.id), optionalDate(beat.lastPushAt));
 
       const signals: ActivitySignals = {
@@ -168,7 +166,6 @@ export class SupervisionService {
         email: user.email,
         role: user.role,
         isActive: user.isActive,
-        departementName: departement.name,
         presence: presenceOf(signals, now),
         hasLiveSession: signals.hasLiveSession,
         sessionCount: sessionCounts.get(user.id) ?? 0,

@@ -5,12 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithQuery } from '@/test/render-query';
 import type { UserRow } from '@/lib/types';
 
-const fetchReferenceData = vi.fn();
 const updateUser = vi.fn();
-
-vi.mock('@/lib/data/reference', () => ({
-  fetchReferenceData: () => fetchReferenceData() as unknown,
-}));
 
 vi.mock('@/lib/data/users', () => ({
   createUser: vi.fn(),
@@ -26,8 +21,6 @@ const account = {
   fullName: 'Awa Diop',
   role: 'COMMERCIAL',
   isActive: true,
-  departementId: 'd-1',
-  departementName: 'Dakar',
   phoneE164: '+221771234567',
   lastLoginAt: null,
   createdAt: '2026-01-01T00:00:00.000Z',
@@ -36,26 +29,25 @@ const account = {
 
 describe('UserFormDialog', () => {
   beforeEach(() => {
-    fetchReferenceData.mockResolvedValue({
-      departements: [{ id: 'd-1', name: 'Dakar', isActive: true }],
-    });
-    updateUser.mockResolvedValue({ ...account, departementId: null, phoneE164: null });
+    updateUser.mockResolvedValue({ ...account, phoneE164: null });
   });
 
-  it('efface réellement le téléphone et le département', async () => {
+  it('efface réellement le téléphone', async () => {
     const user = userEvent.setup();
     renderWithQuery(<UserFormDialog open onOpenChange={vi.fn()} user={account} />);
 
     await user.clear(await screen.findByRole('textbox', { name: 'Téléphone' }));
-    await user.click(screen.getByRole('combobox', { name: 'Département' }));
-    await user.click(await screen.findByRole('option', { name: 'Aucun' }));
     await user.click(screen.getByRole('button', { name: 'Enregistrer' }));
 
     await waitFor(() => {
-      expect(updateUser).toHaveBeenCalledWith(
-        'u-1',
-        expect.objectContaining({ phone: '', departementId: '' }),
-      );
+      expect(updateUser).toHaveBeenCalledWith('u-1', expect.objectContaining({ phone: '' }));
     });
+  });
+
+  it('ne propose aucun champ Département', async () => {
+    renderWithQuery(<UserFormDialog open onOpenChange={vi.fn()} user={account} />);
+
+    await screen.findByRole('textbox', { name: 'Téléphone' });
+    expect(screen.queryByRole('combobox', { name: 'Département' })).toBeNull();
   });
 });

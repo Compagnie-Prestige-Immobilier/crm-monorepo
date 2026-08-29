@@ -58,7 +58,7 @@ export function Topbar({ user }: { user: SessionUser }) {
         className={buttonVariants({ variant: 'ghost', className: 'h-11 gap-2 px-3' })}
       >
         <LayoutGridIcon className="size-5" aria-hidden="true" />
-        <span className="hidden sm:block">Espaces</span>
+        <span className="sr-only sm:not-sr-only">Espaces</span>
       </Link>
 
       {/* La cloche ne se montre qu'aux rôles qui ont une boîte de réception à

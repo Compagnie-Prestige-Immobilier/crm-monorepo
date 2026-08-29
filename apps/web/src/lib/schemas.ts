@@ -36,7 +36,6 @@ const userBaseSchema = z.object({
   username: usernameField,
   fullName: z.string().trim().min(1, 'Le nom complet est obligatoire.').max(160, 'Nom trop long.'),
   phone: z.string().trim().max(40, 'Numéro trop long.'),
-  departementId: z.string().trim(),
   role: z.enum(['ADMIN', 'COMMERCIAL', 'BANQUE_FINANCE', 'SUPERVISEUR', 'DIRECTION', 'ACCUEIL'], {
     message: 'Choisissez le rôle du compte.',
   }),
@@ -59,8 +58,9 @@ export const resetPasswordSchema = z
 
 export type ResetPasswordFormInput = z.infer<typeof resetPasswordSchema>;
 
+// Un champ vidé devenait 0 par coercition, et l'entrée passait en tête des listes.
 const sortOrderField = z.coerce
-  .number<number>()
+  .number<number>({ error: "L'ordre est un nombre entier." })
   .int("L'ordre est un nombre entier.")
   .min(0, "L'ordre ne peut pas être négatif.")
   .max(9999, 'Ordre trop grand.');

@@ -32,6 +32,7 @@ import { AndroidPreview } from './android-preview';
 import {
   EMPTY_AUDIENCE,
   KNOWN_ROUTES,
+  SENDABLE_AUDIENCES,
   audienceProblem,
   audienceQuery,
   confirmationSentence,
@@ -41,7 +42,6 @@ import {
 import {
   createNotification,
   fetchAudiencePreview,
-  fetchDepartements,
   fetchTemplates,
   notificationKeys,
 } from '@/lib/data/notifications';
@@ -50,7 +50,6 @@ import {
   AUDIENCE_LABELS,
   CATEGORY_LABELS,
   ROLE_LABELS,
-  type NotificationAudience,
   type NotificationCategory,
   type Role,
 } from './types';
@@ -59,7 +58,6 @@ type Step = 'redaction' | 'confirmation';
 type When = 'now' | 'later';
 
 const CATEGORIES: NotificationCategory[] = ['ANNONCE', 'RAPPEL', 'CAMPAGNE', 'DOSSIER', 'SYSTEME'];
-const AUDIENCES: NotificationAudience[] = ['ALL', 'ROLE', 'DEPARTEMENT', 'USERS'];
 const ROLES: Role[] = [
   'ADMIN',
   'COMMERCIAL',
@@ -70,7 +68,10 @@ const ROLES: Role[] = [
 ];
 
 const CATEGORY_ITEMS = CATEGORIES.map((item) => ({ value: item, label: CATEGORY_LABELS[item] }));
-const AUDIENCE_ITEMS = AUDIENCES.map((item) => ({ value: item, label: AUDIENCE_LABELS[item] }));
+const AUDIENCE_ITEMS = SENDABLE_AUDIENCES.map((item) => ({
+  value: item,
+  label: AUDIENCE_LABELS[item],
+}));
 const ROLE_ITEMS = ROLES.map((item) => ({ value: item, label: ROLE_LABELS[item] }));
 
 const TITLE_MAX = 120;
@@ -107,13 +108,6 @@ export function NotificationComposer({
     queryFn: () => fetchTemplates(false),
     enabled: open,
     staleTime: 60_000,
-  });
-
-  const departements = useQuery({
-    queryKey: notificationKeys.departements,
-    queryFn: () => fetchDepartements(),
-    enabled: open && selection.audience === 'DEPARTEMENT',
-    staleTime: 300_000,
   });
 
   const template = templates.data?.items.find((item) => item.id === templateId);
@@ -181,9 +175,6 @@ export function NotificationComposer({
         audience: selection.audience,
         ...(route.trim() === '' ? {} : { route: route.trim() }),
         ...(selection.audienceRole === null ? {} : { audienceRole: selection.audienceRole }),
-        ...(selection.audienceDepartementId === null
-          ? {}
-          : { audienceDepartementId: selection.audienceDepartementId }),
         ...(selection.audienceUserIds.length === 0
           ? {}
           : { audienceUserIds: selection.audienceUserIds }),
@@ -442,42 +433,6 @@ export function NotificationComposer({
                         {ROLE_ITEMS.map((item) => (
                           <SelectItem key={item.value} value={item.value}>
                             {item.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </Field>
-              ) : null}
-
-              {selection.audience === 'DEPARTEMENT' ? (
-                <Field label="Département" required>
-                  {(props) => (
-                    <Select
-                      items={(departements.data ?? []).map((item) => ({
-                        value: item.id,
-                        label: item.name,
-                      }))}
-                      value={selection.audienceDepartementId ?? ''}
-                      onValueChange={(value) => {
-                        if (value === null) return;
-                        setSelection((current) => ({
-                          ...current,
-                          audienceDepartementId: value,
-                        }));
-                      }}
-                    >
-                      <SelectTrigger id={props.id}>
-                        <SelectValue
-                          placeholder={
-                            departements.isPending ? 'Chargement…' : 'Choisir un département'
-                          }
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(departements.data ?? []).map((item) => (
-                          <SelectItem key={item.id} value={item.id}>
-                            {item.name}
                           </SelectItem>
                         ))}
                       </SelectContent>

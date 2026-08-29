@@ -80,12 +80,6 @@ describe('validation du public', () => {
     ).toBeNull();
   });
 
-  it('« par département » exige un département', () => {
-    expect(audienceProblem({ ...EMPTY_AUDIENCE, audience: 'DEPARTEMENT' })).toBe(
-      'Choisissez un département.',
-    );
-  });
-
   it('« comptes choisis » exige au moins un compte', () => {
     expect(audienceProblem({ ...EMPTY_AUDIENCE, audience: 'USERS' })).toBe(
       'Choisissez au moins un compte.',
@@ -102,7 +96,6 @@ describe('paramètres de l’aperçu', () => {
       audienceQuery({
         audience: 'ROLE',
         audienceRole: 'COMMERCIAL',
-        audienceDepartementId: 'dep-1',
         audienceUserIds: ['a', 'b'],
       }),
     ).toEqual({ audience: 'ROLE', audienceRole: 'COMMERCIAL' });
@@ -115,8 +108,8 @@ describe('paramètres de l’aperçu', () => {
   });
 
   it('omet un champ vide plutôt que d’envoyer une chaîne vide', () => {
-    expect(audienceQuery({ ...EMPTY_AUDIENCE, audience: 'DEPARTEMENT' })).toEqual({
-      audience: 'DEPARTEMENT',
+    expect(audienceQuery({ ...EMPTY_AUDIENCE, audience: 'USERS' })).toEqual({
+      audience: 'USERS',
     });
   });
 });
@@ -146,8 +139,8 @@ describe('description du public dans l’historique', () => {
     );
   });
 
-  it('nomme le département quand il est connu', () => {
-    expect(describeAudience(row({ audience: 'DEPARTEMENT' }), 'Dakar')).toBe('Département Dakar');
+  it('garde une étiquette lisible pour les envois « par département » déjà partis', () => {
+    expect(describeAudience(row({ audience: 'DEPARTEMENT' }))).toBe('Par département');
   });
 });
 
