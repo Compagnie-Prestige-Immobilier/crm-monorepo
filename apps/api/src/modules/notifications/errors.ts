@@ -6,7 +6,7 @@ export const NotificationError = {
   ALREADY_SENT: 'NOTIFICATION_ALREADY_SENT',
   AUDIENCE_EMPTY: 'NOTIFICATION_AUDIENCE_EMPTY',
   AUDIENCE_ROLE_REQUIRED: 'NOTIFICATION_AUDIENCE_ROLE_REQUIRED',
-  AUDIENCE_DEPARTEMENT_REQUIRED: 'NOTIFICATION_AUDIENCE_DEPARTEMENT_REQUIRED',
+  AUDIENCE_DEPARTEMENT_RETIRED: 'NOTIFICATION_AUDIENCE_DEPARTEMENT_RETIRED',
   AUDIENCE_USERS_REQUIRED: 'NOTIFICATION_AUDIENCE_USERS_REQUIRED',
   SCHEDULE_IN_PAST: 'NOTIFICATION_SCHEDULE_IN_PAST',
   TEMPLATE_NOT_FOUND: 'NOTIFICATION_TEMPLATE_NOT_FOUND',
@@ -52,10 +52,10 @@ export const audienceRoleRequired = (): UnprocessableEntityException =>
     message: 'Un public « par rôle » exige `audienceRole`.',
   });
 
-export const audienceDepartementRequired = (): UnprocessableEntityException =>
+export const audienceDepartementRetired = (): UnprocessableEntityException =>
   new UnprocessableEntityException({
-    code: NotificationError.AUDIENCE_DEPARTEMENT_REQUIRED,
-    message: 'Un public « par département » exige `audienceDepartementId`.',
+    code: NotificationError.AUDIENCE_DEPARTEMENT_RETIRED,
+    message: 'Le public « par département » n’existe plus : les comptes n’ont pas de département.',
   });
 
 export const audienceUsersRequired = (): UnprocessableEntityException =>

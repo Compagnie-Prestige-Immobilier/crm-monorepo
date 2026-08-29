@@ -106,12 +106,10 @@ describe('résolution du public', () => {
     expect(preview.recipientCount).toBe(2);
   });
 
-  it('« par département » ne retient que ce département', async () => {
-    const preview = await service.previewAudience({
-      audience: NotificationAudience.DEPARTEMENT,
-      audienceDepartementId: 'dep-1',
-    });
-    expect(preview.recipientCount).toBe(2); // usr-1 + usr-3
+  it('« par département » est refusé : un compte n’a plus de département', async () => {
+    await expect(
+      service.previewAudience({ audience: NotificationAudience.DEPARTEMENT }),
+    ).rejects.toMatchObject({ response: { code: 'NOTIFICATION_AUDIENCE_DEPARTEMENT_RETIRED' } });
   });
 
   it('« comptes choisis » déduplique avant de compter', async () => {

@@ -66,6 +66,8 @@ export function LoginForm({ next }: { next?: string | null }) {
   return (
     <form
       noValidate
+      // Avant hydratation, un envoi natif partirait en GET avec le mot de passe dans l'URL.
+      method="post"
       onSubmit={(event) => {
         void handleSubmit(onSubmit)(event);
       }}

@@ -33,6 +33,12 @@ export interface DashboardFilters {
   comparaison: Comparaison;
 }
 
+const LIBELLES_COMPARAISON: Record<Comparaison, string> = {
+  aucune: 'Comparer à : rien',
+  precedente: 'Comparer à : période précédente',
+  'annee-precedente': 'Comparer à : même période l’an dernier',
+};
+
 function defaultRange(): Plage {
   return plageDuPreset('ce-mois', new Date());
 }
@@ -164,12 +170,16 @@ export function SelecteurPeriode({
           }}
         >
           <SelectTrigger aria-label="Comparer à" size="sm" className="w-48">
-            <SelectValue />
+            <SelectValue>
+              {(valeur: Comparaison) => LIBELLES_COMPARAISON[valeur]}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="aucune">Comparer à : rien</SelectItem>
-            <SelectItem value="precedente">Comparer à : période précédente</SelectItem>
-            <SelectItem value="annee-precedente">Comparer à : même période l’an dernier</SelectItem>
+            {Object.entries(LIBELLES_COMPARAISON).map(([valeur, libelle]) => (
+              <SelectItem key={valeur} value={valeur}>
+                {libelle}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>

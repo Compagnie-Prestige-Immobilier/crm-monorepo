@@ -68,8 +68,6 @@ export class NotificationDto {
   audience!: NotificationAudience;
   @ApiProperty({ enum: Role, enumName: 'Role', nullable: true })
   audienceRole!: Role | null;
-  @ApiProperty({ type: String, format: 'uuid', nullable: true })
-  audienceDepartementId!: string | null;
   @ApiProperty({ type: [String] }) audienceUserIds!: string[];
 
   @ApiProperty({ enum: NotificationStatus, enumName: 'NotificationStatus' })
@@ -181,11 +179,6 @@ export class CreateNotificationDto {
   @IsEnum(Role)
   audienceRole?: Role;
 
-  @ApiPropertyOptional({ format: 'uuid' })
-  @IsOptional()
-  @IsUUID()
-  audienceDepartementId?: string;
-
   @ApiPropertyOptional({ type: [String], maxItems: 1000 })
   @IsOptional()
   @IsArray()
@@ -266,11 +259,6 @@ export class AudiencePreviewQueryDto {
   @IsOptional()
   @IsEnum(Role)
   audienceRole?: Role;
-
-  @ApiPropertyOptional({ format: 'uuid' })
-  @IsOptional()
-  @IsUUID()
-  audienceDepartementId?: string;
 
   @ApiPropertyOptional({
     type: String,

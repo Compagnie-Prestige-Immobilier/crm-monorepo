@@ -142,7 +142,7 @@ export class ReorderVisiteReferentielDto {
     format: 'uuid',
     description: 'Les entrées dans leur nouvel ordre. Celles omises gardent leur rang.',
   })
-  @IsUUID('4', { each: true })
+  @IsUUID(undefined, { each: true })
   @ArrayMinSize(2)
   @ArrayMaxSize(200)
   @ArrayUnique()

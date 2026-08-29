@@ -7,16 +7,19 @@ import {
 } from './types';
 
 export interface AudienceSelection {
-  audience: NotificationAudience;
+  audience: SendableAudience;
   audienceRole: Role | null;
-  audienceDepartementId: string | null;
   audienceUserIds: string[];
 }
+
+/** `DEPARTEMENT` reste dans l'enum pour relire les envois passés ; le serveur le refuse. */
+export type SendableAudience = Exclude<NotificationAudience, 'DEPARTEMENT'>;
+
+export const SENDABLE_AUDIENCES: SendableAudience[] = ['ALL', 'ROLE', 'USERS'];
 
 export const EMPTY_AUDIENCE: AudienceSelection = {
   audience: 'ALL',
   audienceRole: null,
-  audienceDepartementId: null,
   audienceUserIds: [],
 };
 
@@ -26,17 +29,14 @@ export function audienceProblem(selection: AudienceSelection): string | null {
       return null;
     case 'ROLE':
       return selection.audienceRole === null ? 'Choisissez un rôle.' : null;
-    case 'DEPARTEMENT':
-      return selection.audienceDepartementId === null ? 'Choisissez un département.' : null;
     case 'USERS':
       return selection.audienceUserIds.length === 0 ? 'Choisissez au moins un compte.' : null;
   }
 }
 
 export interface AudienceQuery {
-  audience: NotificationAudience;
+  audience: SendableAudience;
   audienceRole?: Role;
-  audienceDepartementId?: string;
   audienceUserIds?: string;
 }
 
@@ -46,9 +46,6 @@ export function audienceQuery(selection: AudienceSelection): AudienceQuery {
     ...(selection.audience === 'ROLE' && selection.audienceRole !== null
       ? { audienceRole: selection.audienceRole }
       : {}),
-    ...(selection.audience === 'DEPARTEMENT' && selection.audienceDepartementId !== null
-      ? { audienceDepartementId: selection.audienceDepartementId }
-      : {}),
     ...(selection.audience === 'USERS' && selection.audienceUserIds.length > 0
       ? { audienceUserIds: selection.audienceUserIds.join(',') }
       : {}),
@@ -57,7 +54,6 @@ export function audienceQuery(selection: AudienceSelection): AudienceQuery {
 
 export function describeAudience(
   row: Pick<NotificationRow, 'audience' | 'audienceRole' | 'audienceUserIds'>,
-  departementName?: string,
 ): string {
   switch (row.audience) {
     case 'ALL':
@@ -65,9 +61,7 @@ export function describeAudience(
     case 'ROLE':
       return row.audienceRole === null ? AUDIENCE_LABELS.ROLE : ROLE_LABELS[row.audienceRole];
     case 'DEPARTEMENT':
-      return departementName === undefined
-        ? AUDIENCE_LABELS.DEPARTEMENT
-        : `Département ${departementName}`;
+      return AUDIENCE_LABELS.DEPARTEMENT;
     case 'USERS': {
       const count = row.audienceUserIds.length;
       return count === 1 ? '1 compte choisi' : `${String(count)} comptes choisis`;

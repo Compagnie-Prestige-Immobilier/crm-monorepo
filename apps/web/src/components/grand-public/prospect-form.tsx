@@ -108,7 +108,6 @@ export function GrandPublicProspectForm({
       setPhone('');
       setProfessionId(null);
       setIncomeBandId(null);
-      setPaymentMode(null);
       setType(null);
       setBanqueId(null);
       setSyndicatId(null);

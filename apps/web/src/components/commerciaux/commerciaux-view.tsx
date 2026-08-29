@@ -266,7 +266,6 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
                   <TableRow className="hover:bg-transparent">
                     <TableHead>Utilisateur</TableHead>
                     <TableHead>Identifiants</TableHead>
-                    <TableHead>Département</TableHead>
                     <TableHead className="text-right">Prospects</TableHead>
                     <TableHead>Dernière connexion</TableHead>
                     <TableHead>
@@ -277,7 +276,7 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
                 <TableBody>
                   {data.items.length === 0 ? (
                     <TableRow className="hover:bg-transparent">
-                      <TableCell colSpan={6} className="py-16 text-center">
+                      <TableCell colSpan={5} className="py-16 text-center">
                         <p className="font-[600]">Aucun compte ne correspond à ces critères.</p>
                         <p className="mt-1 text-[0.8125rem] text-muted-foreground">
                           Élargissez la recherche ou créez un compte.
@@ -322,7 +321,6 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
                             </span>
                           </div>
                         </TableCell>
-                        <TableCell>{user.departementName ?? '–'}</TableCell>
                         <TableCell className="text-right tabular-nums">
                           {formatNumber(user.prospectCount)}
                         </TableCell>

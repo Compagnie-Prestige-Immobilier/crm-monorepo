@@ -167,9 +167,11 @@ export class RepresentantsService {
 
     const search = query.search?.trim();
     if (search) {
+      const digits = search.replace(/[^\d+]/g, '');
       where.OR = [
         { fullName: { contains: search, mode: 'insensitive' } },
-        { phoneE164: { contains: search.replace(/[^\d+]/g, '') } },
+        // Sans chiffres, `contains: ''` rendrait tout l'annuaire.
+        ...(digits.replace(/\D/g, '').length >= 3 ? [{ phoneE164: { contains: digits } }] : []),
       ];
     }
 

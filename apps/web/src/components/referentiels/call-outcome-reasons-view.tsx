@@ -110,6 +110,13 @@ export function CallOutcomeReasonsView() {
             </TableRow>
           </TableHeader>
           <TableBody>
+            {query.data.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                  Aucun motif d’issue. Ajoutez-en un pour qualifier les appels.
+                </TableCell>
+              </TableRow>
+            ) : null}
             {query.data.map((reason) => (
               <ReasonRow
                 key={reason.id}
@@ -426,7 +433,9 @@ function ReasonFormDialog({
                   }}
                 >
                   <SelectTrigger id={props.id}>
-                    <SelectValue />
+                    <SelectValue>
+                      {(value: CallOutcomeEffect) => CALL_OUTCOME_EFFECT_LABELS[value]}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {CALL_OUTCOME_EFFECTS.map((value) => (

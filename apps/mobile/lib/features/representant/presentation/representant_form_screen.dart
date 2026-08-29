@@ -77,7 +77,6 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
 
   String? _regionId;
   String? _departementId;
-  String? _defaultDepartementId;
   String? _iefId;
   String _whatsappStatus = WhatsappStatus.nonDemande.code;
   String? _professionId;
@@ -113,7 +112,7 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
       _notes.text.trim().isEmpty &&
       _profession.text.trim().isEmpty &&
       _whatsappStatus == WhatsappStatus.nonDemande.code &&
-      _departementId == _defaultDepartementId &&
+      _departementId == null &&
       _iefId == null;
 
   @override
@@ -148,11 +147,6 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
       if (phone != null && phone.isNotEmpty) {
         _phone.text = Phone.groupNational(Phone.digitsOf(phone));
         _scheduleLookup();
-      }
-      _defaultDepartementId = ref.read(authControllerProvider).departementId;
-      if (_defaultDepartementId != null) {
-        _departementId = _defaultDepartementId;
-        unawaited(_labelDepartement(_defaultDepartementId!));
       }
     }
     for (final FocusNode node in <FocusNode>[

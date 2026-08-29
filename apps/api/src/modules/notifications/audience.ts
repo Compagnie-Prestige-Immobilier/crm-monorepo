@@ -1,15 +1,10 @@
 import { NotificationAudience, type Prisma, type Role } from '@crm/database';
 
-import {
-  audienceDepartementRequired,
-  audienceRoleRequired,
-  audienceUsersRequired,
-} from './errors.js';
+import { audienceDepartementRetired, audienceRoleRequired, audienceUsersRequired } from './errors.js';
 
 export interface AudienceSelector {
   readonly audience: NotificationAudience;
   readonly audienceRole?: Role | null;
-  readonly audienceDepartementId?: string | null;
   readonly audienceUserIds?: readonly string[] | null;
 }
 
@@ -25,10 +20,9 @@ export const buildAudienceWhere = (selector: AudienceSelector): Prisma.UserWhere
       return { ...ACTIVE_USER, role: selector.audienceRole };
     }
 
-    case NotificationAudience.DEPARTEMENT: {
-      if (!selector.audienceDepartementId) throw audienceDepartementRequired();
-      return { ...ACTIVE_USER, departementId: selector.audienceDepartementId };
-    }
+    // Un compte n'a plus de département : la valeur ne survit que dans les envois passés.
+    case NotificationAudience.DEPARTEMENT:
+      throw audienceDepartementRetired();
 
     case NotificationAudience.USERS: {
       const ids = dedupe(selector.audienceUserIds ?? []);

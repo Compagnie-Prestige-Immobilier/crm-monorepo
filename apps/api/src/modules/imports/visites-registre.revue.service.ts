@@ -83,7 +83,8 @@ export class VisiteImportChangeQueryDto {
 
 export class SetVisiteImportChangeSelectionDto {
   @ApiProperty({ type: [String], format: 'uuid', description: 'Les lignes visées par ce geste.' })
-  @IsUUID('4', { each: true })
+  // Les lignes de revue portent des UUID v7.
+  @IsUUID(undefined, { each: true })
   @ArrayMinSize(1)
   @ArrayMaxSize(5_000)
   ids!: string[];

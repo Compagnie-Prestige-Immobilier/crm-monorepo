@@ -11,7 +11,6 @@ class AuthTokens {
     required this.fullName,
     this.role,
     this.email,
-    this.departementId,
   });
 
   final String accessToken;
@@ -23,8 +22,6 @@ class AuthTokens {
   final String? role;
 
   final String? email;
-
-  final String? departementId;
 }
 
 class PushResult {

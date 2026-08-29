@@ -21,16 +21,11 @@ import type {
   UserListQueryDto,
 } from './dto.js';
 
-type UserRow = Prisma.UserGetPayload<{
-  include: { departement: { select: { name: true } }; _count: { select: { prospects: true } } };
-}>;
+type UserRow = Prisma.UserGetPayload<{ include: { _count: { select: { prospects: true } } } }>;
 
 type UserChanges = UpdateUserDto & Partial<SetActiveDto>;
 
-const INCLUDE = {
-  departement: { select: { name: true } },
-  _count: { select: { prospects: true } },
-} satisfies Prisma.UserInclude;
+const INCLUDE = { _count: { select: { prospects: true } } } satisfies Prisma.UserInclude;
 
 function toDto(user: UserRow): UserDto {
   return {
@@ -40,8 +35,6 @@ function toDto(user: UserRow): UserDto {
     fullName: user.fullName,
     role: user.role,
     isActive: user.isActive,
-    departementId: user.departementId,
-    departementName: user.departement?.name ?? null,
     phoneE164: user.phoneE164,
     lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
     createdAt: user.createdAt.toISOString(),
@@ -109,7 +102,6 @@ export class UsersService {
           fullName: input.fullName.trim(),
           passwordHash: await hashPassword(input.password),
           role: input.role ?? Role.COMMERCIAL,
-          ...(input.departementId ? { departementId: input.departementId } : {}),
           ...(input.phone ? { phoneE164: normalizePhone(input.phone) } : {}),
         },
         include: INCLUDE,
@@ -196,12 +188,6 @@ export class UsersService {
           ...(input.fullName ? { fullName: input.fullName.trim() } : {}),
           ...(input.role ? { role: input.role } : {}),
           ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
-          // La chaine VIDE efface, l'absence ne change rien. Sans cette
-          // distinction, « Aucun » cote panneau ne pouvait que taire le champ, et
-          // un departement pose par erreur ne se retirait jamais.
-          ...(input.departementId !== undefined
-            ? { departementId: input.departementId === '' ? null : input.departementId }
-            : {}),
           ...(input.phone !== undefined
             ? { phoneE164: input.phone ? normalizePhone(input.phone) : null }
             : {}),

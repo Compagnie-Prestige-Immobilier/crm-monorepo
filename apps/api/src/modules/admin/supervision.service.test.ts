@@ -39,7 +39,6 @@ const teleconseiller = {
   role: Role.COMMERCIAL,
   isActive: true,
   lastLoginAt: null,
-  departement: null,
 };
 
 describe('qui figure dans l’écran des comptes supervisés', () => {

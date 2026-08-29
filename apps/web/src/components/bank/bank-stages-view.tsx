@@ -308,6 +308,7 @@ export function BankStagesView() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-56">
                         <DropdownMenuItem
+                          className="min-h-11"
                           disabled={!canMoveUp || reorder.isPending}
                           onClick={() => {
                             move(index, -1);
@@ -317,6 +318,7 @@ export function BankStagesView() {
                           Monter
                         </DropdownMenuItem>
                         <DropdownMenuItem
+                          className="min-h-11"
                           disabled={!canMoveDown || reorder.isPending}
                           onClick={() => {
                             move(index, 1);

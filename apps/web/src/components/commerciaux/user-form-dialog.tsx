@@ -1,7 +1,7 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { LoaderIcon } from 'lucide-react';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
@@ -25,9 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { fetchReferenceData } from '@/lib/data/reference';
 import { createUser, updateUser } from '@/lib/data/users';
-import { withRetired } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import { userFormSchema, type UserFormInput } from '@/lib/schemas';
@@ -39,8 +37,6 @@ import {
   type UserRow,
 } from '@/lib/types';
 import { ROLES } from '@/lib/user-filters';
-
-const NO_DEPARTEMENT = '__aucun__';
 
 const ROLE_HINTS: Record<Role, string> = {
   ADMIN: 'Accès complet, y compris les comptes et les référentiels.',
@@ -63,12 +59,6 @@ export function UserFormDialog({
   const isEdit = user !== undefined;
   const queryClient = useQueryClient();
 
-  const { data: reference } = useQuery({
-    queryKey: queryKeys.reference,
-    queryFn: () => fetchReferenceData(),
-    staleTime: 5 * 60_000,
-  });
-
   const form = useForm<UserFormInput>({
     resolver: zodResolver(userFormSchema(isEdit ? 'edit' : 'create')),
     defaultValues: {
@@ -76,7 +66,6 @@ export function UserFormDialog({
       username: '',
       fullName: '',
       phone: '',
-      departementId: NO_DEPARTEMENT,
       password: '',
     },
   });
@@ -90,7 +79,6 @@ export function UserFormDialog({
       username: user?.username ?? '',
       fullName: user?.fullName ?? '',
       phone: user?.phoneE164 ?? '',
-      departementId: user?.departementId ?? NO_DEPARTEMENT,
       password: '',
       ...(user ? { role: user.role } : {}),
     });
@@ -98,13 +86,6 @@ export function UserFormDialog({
 
   const mutation = useMutation({
     mutationFn: async (values: UserFormInput) => {
-      // La chaine VIDE et non `undefined` : sur un PATCH, un champ absent veut
-      // dire « ne change rien ». « Aucun » ne retirait donc jamais le
-      // rattachement, il le laissait en place en silence.
-      const departementId =
-        values.departementId === NO_DEPARTEMENT || values.departementId === ''
-          ? ''
-          : values.departementId;
       const phone = values.phone;
 
       if (isEdit) {
@@ -114,8 +95,8 @@ export function UserFormDialog({
           fullName: values.fullName,
           role: values.role,
         };
-        // Toujours poses, vides compris : c'est ce qui EFFACE.
-        patch.departementId = departementId;
+        // La chaine VIDE et non `undefined` : sur un PATCH, un champ absent veut
+        // dire « ne change rien », et le telephone ne s'effacerait jamais.
         patch.phone = phone;
         return updateUser(user.id, patch);
       }
@@ -128,7 +109,6 @@ export function UserFormDialog({
         role: values.role,
       };
       // A la creation, en revanche, un vide n'a rien a effacer : on l'omet.
-      if (departementId !== '') body.departementId = departementId;
       if (phone !== '') body.phone = phone;
       return createUser(body);
     },
@@ -148,17 +128,9 @@ export function UserFormDialog({
     },
   });
 
-  const departementId = watch('departementId');
   const role = watch('role') as UserFormInput['role'] | undefined;
 
   const roleItems = ROLES.map((value) => ({ value, label: ROLE_LABELS[value] }));
-  const departementItems = [
-    { value: NO_DEPARTEMENT, label: 'Aucun' },
-    ...(reference?.departements ?? []).map((departement) => ({
-      value: departement.id,
-      label: withRetired(departement.name, departement.isActive),
-    })),
-  ];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -218,10 +190,6 @@ export function UserFormDialog({
           </Field>
 
           {/*
-            LE RÔLE, PLACÉ AVANT LE DÉPARTEMENT parce qu'il commande la suite :
-            c'est lui qui décide de ce que le compte verra en se connectant, et
-            le département n'a de sens que pour un téléconseiller.
-
             Sans ce champ, la création posait « COMMERCIAL » en dur : aucun
             compte bancaire ne pouvait naître depuis le panel, alors que tout
             l'espace « Dossiers » leur est destiné.
@@ -251,30 +219,6 @@ export function UserFormDialog({
                 </SelectTrigger>
                 <SelectContent>
                   {roleItems.map((item) => (
-                    <SelectItem key={item.value} value={item.value}>
-                      {item.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </Field>
-
-          <Field label="Département" error={formState.errors.departementId?.message}>
-            {(props) => (
-              <Select
-                items={departementItems}
-                value={departementId}
-                onValueChange={(value) => {
-                  if (value === null) return;
-                  setValue('departementId', value, { shouldDirty: true });
-                }}
-              >
-                <SelectTrigger id={props.id} aria-describedby={props['aria-describedby']}>
-                  <SelectValue placeholder="Aucun" />
-                </SelectTrigger>
-                <SelectContent>
-                  {departementItems.map((item) => (
                     <SelectItem key={item.value} value={item.value}>
                       {item.label}
                     </SelectItem>

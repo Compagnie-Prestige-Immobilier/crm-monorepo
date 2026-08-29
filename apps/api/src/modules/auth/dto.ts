@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsIn, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import { IsEnum, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { Role } from '@crm/database';
 import { WORKSPACES, type Workspace } from '../../workspaces/workspace.js';
 
@@ -37,11 +37,6 @@ export class AuthUserDto {
   @ApiProperty({ enum: Role, enumName: 'Role' }) role!: Role;
   @ApiProperty() isActive!: boolean;
   @ApiProperty({ enum: WORKSPACES }) workspace!: Workspace;
-
-  @ApiPropertyOptional({ format: 'uuid', nullable: true, type: String })
-  @IsOptional()
-  @IsUUID()
-  departementId!: string | null;
 
   @ApiPropertyOptional({ nullable: true, type: String })
   phoneE164!: string | null;
