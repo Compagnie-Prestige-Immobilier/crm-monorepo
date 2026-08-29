@@ -63,5 +63,6 @@ const proxy: NextProxy = async (request) => {
 export default proxy;
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|api/auth|brand|favicon.ico).*)'],
+  // api/app-updates relaie des APK de plus de 10 Mo : le proxy Next tronque tout corps au-delà.
+  matcher: ['/((?!_next/static|_next/image|api/auth|api/app-updates|brand|favicon.ico).*)'],
 };
