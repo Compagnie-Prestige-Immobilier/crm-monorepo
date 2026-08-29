@@ -1,36 +1,57 @@
-import { expect, test as setup } from '@playwright/test';
+import { expect, request, test as setup } from '@playwright/test';
 
 /**
- * Se connecte UNE fois et range les cookies de session sur disque.
+ * Une session par rôle, posée une seule fois et rangée sur disque.
  *
- * Ce n'est pas seulement une optimisation. L'API applique deux limiteurs de
- * débit : 10 connexions par minute et par IP, 300 requêtes par minute, et le
- * panel émet une dizaine d'appels par écran. Une suite qui se reconnecte à
- * chaque test épuise le quota, l'API répond 429, et les tests échouent pour une
- * raison qui n'a rien à voir avec ce qu'ils vérifient.
- *
- * Le parcours de connexion lui-même reste testé en propre dans
- * `prospects.spec.ts` : c'est sa RÉPÉTITION qu'on supprime, pas sa couverture.
+ * L'API limite les connexions à 10 par minute et par IP. Un état encore
+ * valide est réutilisé tel quel : plusieurs suites lancées à la suite ou en
+ * parallèle ne dépensent aucune connexion.
  */
 
-const IDENTIFIER = process.env.E2E_ADMIN_IDENTIFIER ?? 'admin@cpi.sn';
-const PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? 'ChangeMoiEnProd2026';
+const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:3000';
+const ADMIN_IDENTIFIER = process.env.E2E_ADMIN_IDENTIFIER ?? 'admin@cpi.sn';
+const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? 'ChangeMoiEnProd2026';
+const FIXTURE_PASSWORD = process.env.SEED_FIXTURE_PASSWORD ?? 'ChangeMoi123456';
 
 export const STORAGE_STATE = 'e2e/.auth/admin.json';
 
-setup('authentifier l’administrateur', async ({ page }) => {
-  await page.goto('/connexion');
-  await page.getByLabel('E-mail ou identifiant').fill(IDENTIFIER);
-  await page.getByLabel('Mot de passe').fill(PASSWORD);
-  await page.getByRole('button', { name: 'Se connecter' }).click();
+export const SESSIONS = {
+  admin: { identifier: ADMIN_IDENTIFIER, password: ADMIN_PASSWORD, path: STORAGE_STATE },
+  accueil: { identifier: 'fixture.accueil@cpi.sn', password: FIXTURE_PASSWORD, path: 'e2e/.auth/accueil.json' },
+  superviseur: { identifier: 'fixture.superviseur@cpi.sn', password: FIXTURE_PASSWORD, path: 'e2e/.auth/superviseur.json' },
+  direction: { identifier: 'fixture.direction@cpi.sn', password: FIXTURE_PASSWORD, path: 'e2e/.auth/direction.json' },
+  commercial: { identifier: 'fixture.awa@cpi.sn', password: FIXTURE_PASSWORD, path: 'e2e/.auth/commercial.json' },
+  commercial2: { identifier: 'fixture.fatou@cpi.sn', password: FIXTURE_PASSWORD, path: 'e2e/.auth/commercial2.json' },
+  banque: { identifier: 'fixture.banque@cpi.sn', password: FIXTURE_PASSWORD, path: 'e2e/.auth/banque.json' },
+} as const;
 
-  // Le hub des quatre espaces, seul atterrissage d'après connexion depuis le
-  // découpage en coques : aucun rôle ne tombe plus directement sur un écran.
-  await page.waitForURL('**/espaces');
-  // On attend un élément RENDU PAR LE SERVEUR avec la session : si le layout
-  // avait renvoyé vers /connexion, l'état sauvegardé serait inutilisable et
-  // tous les tests suivants échoueraient sans raison lisible.
-  await expect(page.getByRole('heading', { name: 'Choisissez un espace', level: 1 })).toBeVisible();
+export type SessionRole = keyof typeof SESSIONS;
 
-  await page.context().storageState({ path: STORAGE_STATE });
-});
+async function sessionStillValid(path: string): Promise<boolean> {
+  const api = await request.newContext({ baseURL: WEB_URL, storageState: path }).catch(() => null);
+  if (api === null) return false;
+  try {
+    const response = await api.get('/api/v1/auth/me');
+    return response.ok();
+  } catch {
+    return false;
+  } finally {
+    await api.dispose();
+  }
+}
+
+for (const [role, session] of Object.entries(SESSIONS)) {
+  setup(`authentifier ${role}`, async ({ page }) => {
+    if (await sessionStillValid(session.path)) return;
+
+    await page.goto('/connexion');
+    await page.getByLabel('E-mail ou identifiant').fill(session.identifier);
+    await page.getByLabel('Mot de passe').fill(session.password);
+    await page.getByRole('button', { name: 'Se connecter' }).click();
+
+    await page.waitForURL('**/espaces');
+    await expect(page.getByRole('heading', { name: 'Choisissez un espace', level: 1 })).toBeVisible();
+
+    await page.context().storageState({ path: session.path });
+  });
+}
