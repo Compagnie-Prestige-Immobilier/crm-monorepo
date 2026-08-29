@@ -734,7 +734,7 @@ Titre du document : **Téléconseillers**. Titre de niveau 1 (barre) : **Utilisa
 | Champ de recherche | label `Recherche`, placeholder `Nom, e-mail, identifiant…` |
 | Filtre rôle | label `Rôle`, valeurs `Tous les rôles`, `Administrateur`, `Téléconseiller`, `Banque & Finance`, `Supervision`, `Direction`, `Accueil` |
 | Filtre état | label `État du compte`, valeurs `Tous`, `Actifs`, `Désactivés` |
-| Colonnes | `Utilisateur`, `Identifiants`, `Département`, `Prospects`, `Dernière connexion` |
+| Colonnes | `Utilisateur`, `Identifiants`, `Prospects`, `Dernière connexion` |
 | État vide | `Aucun compte ne correspond à ces critères.` + `Élargissez la recherche ou créez un compte.` |
 | Menu de ligne | `Actions pour <nom complet>` (aria-label) |
 | Entrées du menu | `Modifier`, `Réinitialiser le mot de passe`, `Désactiver le compte` / `Réactiver le compte` |
@@ -746,7 +746,7 @@ Dialogue de création (`user-form-dialog.tsx`) : titre `Nouvel utilisateur`,
 description `Le rôle décide de ce que le compte pourra consulter.`, champs
 `Nom complet`, `Adresse e-mail`, `Identifiant` (description
 `Utilisé pour la connexion, avec l’e-mail.`), `Téléphone` (description
-`Format libre.`), `Rôle`, `Département`, `Mot de passe` (description
+`Format libre.`), `Rôle`, `Mot de passe` (description
 `12 caractères minimum.`), boutons `Annuler` et `Créer le compte`.
 En modification : titre `Modifier le compte`, description
 `Le mot de passe n’est pas modifiable ici.`, bouton `Enregistrer`.
@@ -949,8 +949,7 @@ descriptions `Envoi push aux destinataires choisis.` puis `L’envoi est irréve
 champs `Gabarit` (facultatif, placeholder `Aucun gabarit`), `Titre` (120 car.),
 `Message` (500 car.), `Catégorie`, `Lien profond` (description
 `Route interne ouverte au tap.`, placeholder `/phase2`), `Destinataires`,
-`Rôle` (si audience ROLE), `Département` (si audience DEPARTEMENT),
-`Identifiants des comptes` (si audience USERS, description
+`Rôle` (si audience ROLE), `Identifiants des comptes` (si audience USERS, description
 `Un identifiant par ligne.`), `Quand` avec `Envoyer maintenant` / `Programmer`,
 `Date et heure` si `Programmer`.
 Boutons finaux : `Envoyer maintenant` ou `Programmer`.

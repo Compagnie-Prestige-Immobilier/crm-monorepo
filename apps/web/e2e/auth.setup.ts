@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { expect, request, test as setup } from '@playwright/test';
 
 /**
@@ -27,12 +29,39 @@ export const SESSIONS = {
 
 export type SessionRole = keyof typeof SESSIONS;
 
+/** Marge sous laquelle un jeton d'accès est refait plutôt que réutilisé. */
+const MARGE_ACCES_MS = 45 * 60_000;
+
+/**
+ * Un état partagé entre plusieurs contextes ne doit jamais avoir à faire
+ * tourner son jeton de rafraîchissement en cours de suite : le premier contexte
+ * qui tourne invalide les autres (détection de rejeu). On exige donc un jeton
+ * d'accès encore long, sinon on se reconnecte.
+ */
+function accesEncoreLong(path: string): boolean {
+  let contenu: string;
+  try {
+    contenu = readFileSync(path, 'utf8');
+  } catch {
+    return false;
+  }
+  const etat = JSON.parse(contenu) as { cookies?: { name: string; value: string }[] };
+  const acces = etat.cookies?.find((cookie) => cookie.name === 'cpi_at');
+  const charge = acces?.value.split('.')[1];
+  if (charge === undefined) return false;
+  const { exp } = JSON.parse(Buffer.from(charge, 'base64url').toString()) as { exp?: number };
+  return exp !== undefined && exp * 1000 - Date.now() > MARGE_ACCES_MS;
+}
+
 async function sessionStillValid(path: string): Promise<boolean> {
+  if (!accesEncoreLong(path)) return false;
   const api = await request.newContext({ baseURL: WEB_URL, storageState: path }).catch(() => null);
   if (api === null) return false;
   try {
     const response = await api.get('/api/v1/auth/me');
-    return response.ok();
+    if (!response.ok()) return false;
+    await api.storageState({ path });
+    return true;
   } catch {
     return false;
   } finally {

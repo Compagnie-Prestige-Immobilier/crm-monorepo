@@ -106,7 +106,11 @@ La mention **vérifié** signifie : constaté dans le code source au moment de l
 rédaction de ce document. La mention **à confirmer en navigateur** signifie :
 déduit de la lecture, jamais observé à l'écran.
 
-### 1.1 `GET /v1/supervision/activite` répond 500 (virgule SQL) : vérifié
+### 1.1 `GET /v1/supervision/activite` répond 500 (virgule SQL) : corrigé le 29 août 2026
+
+**Corrigé** : la virgule a été retirée et l'API relancée ; la route répond 200.
+Les scénarios listés ci-dessous ne sont **plus** attendus rouges. Le paragraphe
+reste comme trace de ce que ces scénarios doivent attraper.
 
 - `apps/api/src/modules/analytics/supervision.service.ts`, ligne 259 :
   `COUNT(DISTINCT f.representant)::int  AS representants,` suivi directement de
@@ -148,17 +152,16 @@ déduit de la lecture, jamais observé à l'écran.
 - Consigne : `auth.anon.spec.ts` est un fichier **existant**. Aucun agent ne le
   modifie ; l'écart est signalé au mainteneur central.
 
-### 1.4 `/accueil` ne pose aucun `guardRoles` : vérifié
+### 1.4 `/accueil` : garde posée dans le layout, trou bouché
 
-- `apps/web/src/app/(panel)/accueil/page.tsx` rend `<RegistreView />` sans appeler
-  `guardRoles`, alors que ses trois sous-routes le font.
-- Symptôme observable : un COMMERCIAL ou un BANQUE_FINANCE qui tape `/accueil`
-  obtient la coquille du registre, l'API répond 403 sur les visites, et l'écran
-  affiche un état d'erreur de chargement au lieu d'un refus lisible.
-- Attrapé par : **ROL-28**.
-- Consigne : le test attend « Accès refusé » et **reste rouge**. Le retour
-  nomme `apps/web/src/app/(panel)/accueil/page.tsx` et l'absence de
-  `guardRoles(['ADMIN','DIRECTION','ACCUEIL'])`.
+- La garde n'est pas dans `page.tsx` mais dans
+  `apps/web/src/app/(panel)/accueil/layout.tsx` :
+  `guardRoles(['ADMIN','DIRECTION','ACCUEIL'])`, `what="Le registre des visites"`,
+  et elle couvre `/accueil` et ses trois onglets.
+- Relevé en navigateur : COMMERCIAL et BANQUE_FINANCE voient un vrai
+  `PermissionDenied`, aucune requête `/api/v1/visites` ne part.
+- Attrapé par : **ROL-28**, qui est **vert** et distingue le refus d'un état
+  d'erreur de chargement (§6.5).
 
 ### 1.5 Lien mort « Ouvrir l'annuaire » vers `/grand-public/prospects` : vérifié
 
@@ -380,7 +383,11 @@ Contraintes :
 
 - Les six connexions sont **séquentielles**, jamais six passages parallèles.
 - Un état encore valide est réutilisé tel quel : la préparation ne dépense
-  aucune connexion si les fichiers sont frais.
+  aucune connexion si les fichiers sont frais. « Frais » veut dire un jeton
+  d'accès qui vit encore au moins 45 minutes (`accesEncoreLong`) et un
+  `GET /api/v1/auth/me` qui répond 200 ; sinon la préparation se reconnecte,
+  parce qu'un état partagé qui doit faire tourner son jeton en cours de suite
+  invalide les autres contextes (§3.4, `JWT_ACCESS_TTL`).
 - Une connexion qui échoue fait **échouer la préparation en nommant le compte**
   et le message rendu par le formulaire. Elle ne rend jamais la main en silence.
 - Il n'existe **pas** de fichier `e2e/roles.setup.ts`. Un des trois plans
@@ -429,6 +436,12 @@ Conséquences, à faire respecter :
    `APK_SIGNER_SHA256=9434b1f9594e7f5d20bda74d047e40affdc8003f51d89421d4b79456ad7f3909`.
    Sans cette variable, `AppUpdatesService.expectedSigner()` prend le signataire
    de la première release publiée et **ADM-APK-06** n'est pas reproductible.
+   Et avec `JWT_ACCESS_TTL=4h` (défaut `15m`) : les sept états de session sont
+   partagés entre le projet `setup`, les contextes de navigateur et les
+   `APIRequestContext` des `beforeAll`. Au bout de 15 min, le premier contexte
+   qui fait tourner le jeton de rafraîchissement invalide celui des autres
+   (détection de rejeu, famille révoquée) et toute la suite tombe en
+   `SESSION_EXPIRED`. Le cookie `cpi_at` suit la durée du jeton.
 3. Statuer sur `DB_DUMP_ENABLED` (§8, **Q-16**) : la carte « Export intégral de
    la base » n'est rendue que si la variable est posée.
 4. Relever la volumétrie du registre des visites (§8, **Q-06**) et décider s'il
@@ -716,6 +729,7 @@ Alloué aux nouvelles specs, sans recouvrement :
 | `+221 78 100 48 01` à `48 09` | `chues-lots-export.spec.ts` |
 | `+221 78 100 49 01` à `49 09` | `chues-demandes.banque.spec.ts` |
 | `+221 78 100 50 01` à `50 09` | specs de l'espace Accueil, si un numéro unique devient nécessaire |
+| `+221 78 100 51 01` à `51 09` | `chues-dossiers.banque.spec.ts` (fiches client des dossiers) |
 | `+221781002000` à `+221781002019` | `grand-public-liste.spec.ts` |
 | `+221781002020` à `+221781002039` | `grand-public-saisie.spec.ts` |
 | `+221781002040` à `+221781002059` | `grand-public-fiche.spec.ts` |
@@ -748,7 +762,7 @@ Aucun de ces cinq fichiers ne s'appelle `.anon.spec.ts` : ils consomment des
 | `accueil-connexion.anon.spec.ts` | aucune, projet `chromium-anonyme` | ACC-CNX-01 à ACC-CNX-09 | libre | aucune | nouveau |
 | `accueil-session.spec.ts` | admin, accueil | ACC-CNX-10 à ACC-CNX-14 | libre | aucune | nouveau |
 | `accueil-espaces.spec.ts` | admin, accueil | ACC-HUB-01 à ACC-HUB-05 | libre | aucune | nouveau |
-| `accueil-coque.spec.ts` | admin, accueil, commercial | ACC-COQ-01 à ACC-COQ-12 | libre | aucune | nouveau |
+| `accueil-coque.spec.ts` | admin, accueil | ACC-COQ-01 à ACC-COQ-12 | libre | aucune | nouveau |
 | `accueil-registre.spec.ts` | accueil | ACC-REG-01 à ACC-REG-18 | serial | `E2E-ACC-REG-<RUN>` | nouveau |
 | `accueil-impression.spec.ts` | accueil | ACC-IMP-01 à ACC-IMP-07 | libre | `E2E-ACC-IMP-<RUN>` | nouveau |
 | `accueil-tableau-de-bord.spec.ts` | accueil | ACC-TDB-01 à ACC-TDB-14 | serial | disposition du compte ACCUEIL | nouveau |
@@ -807,7 +821,7 @@ Aucun de ces cinq fichiers ne s'appelle `.anon.spec.ts` : ils consomment des
 | `admin-imports.spec.ts` | admin | ADM-IMP-01 à ADM-IMP-08 | libre | `E2E-ADM-IMP-` (fichiers déposés, aucune ligne appliquée) | nouveau |
 | `admin-notifications.spec.ts` | admin | ADM-NOT-01 à ADM-NOT-10 | serial | `E2E-ADM-NOT-` | nouveau |
 | `admin-parametres.spec.ts` | admin, plus les cinq autres pour ADM-PAR-05 | ADM-ROOT-01, ADM-PAR-01 à ADM-PAR-05 | libre | aucune | nouveau |
-| `android-release.spec.ts` | admin | ADM-APK-01 à ADM-APK-18 | serial | `E2E-APK-`, `versionCode` 900 000 à 999 999 | nouveau |
+| `android-release.spec.ts` | admin | ADM-APK-01 à ADM-APK-18 | serial | `E2E-APK-`, fixtures `cpi-go-v7.apk`/`cpi-go-v12.apk` (900 000 à 999 999 réservés aux APK fabriqués) ; **non relançable** sans réamorçage : `assertPublishable` compare à toutes les releases, retirées comprises | nouveau |
 
 ### 5.7 Espace Projet Grand Public
 
@@ -882,8 +896,9 @@ voir avec le défaut cherché.
   région vide du `Toaster` de Sonner. Filtrer :
   `page.locator('form').getByRole('alert')` ou
   `page.getByRole('alert').filter({ hasText: '…' })`.
-- `getByRole('status')` seul attrape la région `aria-live` de Sonner. Filtrer sur
-  le texte attendu.
+- Un toast Sonner n'a **aucun** rôle (`<li data-sonner-toast>`), et son conteneur
+  est une `<section aria-live="polite">`, donc un `region` : `getByRole('status')`
+  ne le trouve jamais. Viser le texte : `getByText(/^Visite V-… enregistrée\.$/)`.
 - Un en-tête de colonne triable et un filtre portent parfois le même nom
   accessible : distinguer par le rôle (`button` contre `combobox`).
 - `FilterCombobox` compose son nom accessible avec le libellé **et** la valeur
@@ -892,6 +907,33 @@ voir avec le défaut cherché.
   options du menu portent le rôle `option`. Voir §8, **Q-09**.
 - Les listes sont rendues deux fois, en cartes puis en tableau selon le point de
   rupture (§1.13) : viser `getByRole('table')`.
+- `getByLabel('Recherche')` viole le mode strict (section
+  `aria-label="Rechercher dans le registre"`, bouton « Effacer la recherche ») :
+  viser `getByRole('textbox', { name: 'Recherche', exact: true })`.
+- `CardTitle` rend un `<div data-slot="card-title">`, pas un `heading` :
+  « Le prospect », « Rattachements », « Suivi », « Étapes ouvertes »… se visent
+  par `getByText`. Les cartes de graphique se visent par
+  `getByRole('group', { name: '<titre> graphique' })`.
+- Les liens d'un `<details>` fermé (repli « Plus ») sont hors de l'arbre
+  d'accessibilité : `toHaveCount(0)` avant le clic est fiable, et un lien replié
+  se vise par `a[href="…"]`.
+- Un popover Base UI (calendrier, combobox) reste monté pendant son animation
+  de sortie : attendre `toHaveCount(0)` avant d'ouvrir le suivant, sinon deux
+  champs « Chercher… » ou deux boutons « Aujourd’hui » coexistent.
+- Hydratation : sur les écrans de chiffres, « Composer l’écran » est cliquable
+  avant que la disposition ne soit chargée et le clic est perdu sans trace ;
+  attendre la réponse `…/disposition` (et `…/supervision/activite`) avant de
+  cliquer. Un `setInputFiles` posé avant l'hydratation est avalé : attendre
+  `networkidle` avant un dépôt de fichier.
+- Le toast Sonner se pose en bas à droite, sur les boutons d'enregistrement, et
+  reste ouvert tant que le pointeur le survole : `page.mouse.move(0, 0)` avant
+  d'attendre sa disparition. Synchroniser un enregistrement sur
+  `waitForResponse`, pas sur le toast (4 s).
+- Préchargement serveur : les écrans qui `prefetchQuery` (hub CHUES, liste des
+  prospects, listes du registre, disposition, décomptes de désactivation)
+  n'émettent aucune requête depuis le navigateur ; `page.route(...).abort()`
+  n'y produit aucun état d'erreur. Les scénarios de panne ne se jouent que sur
+  les requêtes émises côté client.
 
 ### 6.4 Libellés du refus d'accès
 
@@ -1212,7 +1254,7 @@ Relevé exhaustif de `guardRoles([...])` dans chaque `page.tsx`.
 | Route | Autorisés | Refusés | Comportement du refus |
 | --- | --- | --- | --- |
 | `/espaces` | tous | aucun | sans objet |
-| `/accueil` | **aucune garde** | sans objet | voir ROL-28 |
+| `/accueil` | ADMIN, DIRECTION, ACCUEIL (layout) | « Le registre des visites » | ROL-28 |
 | `/accueil/tableau-de-bord` | A, D, Ac | S, C, B | Accès refusé |
 | `/accueil/listes` | A, D | S, C, B, Ac | Accès refusé, « La gestion des listes du registre » |
 | `/accueil/import` | A, D | S, C, B, Ac | Accès refusé, « L’import du registre des visites » |
@@ -1346,17 +1388,15 @@ Origine : ADM ROLE-27.
 
 #### 7.1.5 Trous relevés en lecture
 
-**ROL-28 | P1 | `/accueil` refuse les rôles sans droit sur le registre** · **attendu rouge**
+**ROL-28 | P1 | `/accueil` refuse les rôles sans droit sur le registre**
 Route : `/accueil`. Sessions : COMMERCIAL puis BANQUE_FINANCE. Fichier :
 `roles-trous.spec.ts`.
 Gestes : `page.goto('/accueil')` avec chaque session.
 Assertions : `getByRole('heading', { name: 'Accès refusé', level: 2 })` est
-visible.
-Échoue si : un rôle sans droit sur le registre voit autre chose qu'un refus. En
-l'état, l'écran rend la coquille du registre et un état d'erreur de chargement,
-l'API répondant 403 sur les visites : **le test reste rouge** et le retour nomme
-`apps/web/src/app/(panel)/accueil/page.tsx`, qui ne pose pas
-`guardRoles(['ADMIN','DIRECTION','ACCUEIL'])` comme ses trois sous-routes.
+visible ; aucune requête `/api/v1/visites` n'est partie.
+Échoue si : un rôle sans droit sur le registre voit autre chose qu'un refus, ou
+si la garde de `apps/web/src/app/(panel)/accueil/layout.tsx` est retirée et
+l'écran rend la coquille du registre avec un état d'erreur de chargement.
 Origine : ADM ROLE-28. Voir §1.4.
 
 **ROL-29 | P1 | « Ouvrir l'annuaire » mène à la liste Grand Public** · **attendu rouge**
@@ -1393,8 +1433,9 @@ Origine : ADM ROLE-30.
 
 Routes : `/connexion`, `/`, `/[ancien]/[[...segments]]`, gardes de
 `(panel)/layout.tsx` et `(hub)/layout.tsx`. Précondition ACC-CNX-01 à
-ACC-CNX-09 : navigateur vierge, projet `chromium-anonyme`, au plus trois
-connexions dépensées dans tout le fichier.
+ACC-CNX-09 : navigateur vierge, projet `chromium-anonyme`, au plus quatre
+connexions dépensées dans tout le fichier (ACC-CNX-04, ACC-CNX-05 et les deux
+cas d'ACC-CNX-06 exigent chacun un envoi abouti).
 
 **ACC-CNX-01 | P1 | le champ identifiant vide refuse l'envoi et nomme le champ**
 Route : `/connexion`. Session : anonyme. Fichier :
@@ -1646,9 +1687,12 @@ Origine : ACC C4. Recouvrement assumé avec **ROL-20**, qui balaie la même rout
 sans asserter le libellé « quoi ».
 
 **ACC-COQ-04 | P2 | la section « Plus » se déplie et retient son état**
-Route : `/chues` (la coque Accueil n'a qu'une entrée, elle n'a pas de repli).
+Route : `/chues/prospects` (la coque Accueil n'a qu'une entrée, elle n'a pas de
+repli ; sur `/chues`, l'entrée active de l'ADMIN est elle-même repliée et « Plus »
+s'ouvre à l'hydratation, ce qui rend la précondition impossible).
 Session : ADMIN. Fichier : `accueil-coque.spec.ts`.
-Gestes : cliquer le résumé `Plus` ; recharger ; replier ; recharger.
+Gestes : attendre l'hydratation (`next-route-announcer` présent), cliquer le
+résumé `Plus` ; recharger ; replier ; recharger.
 Assertions : avant le clic, `Contacts recommandés` a un compte de 0 ; après, il
 est visible ; après `page.reload()`, il est **encore** visible (le cookie
 `sidebar-more` a été posé) ; replié puis rechargé, il est de nouveau à 0.
@@ -1732,7 +1776,10 @@ Assertions : un titre `Serveur injoignable` **ou**
 `role="alert"` ; la page ne reste pas vide ; aucun texte anglais de Next
 n'apparaît. Dans la variante, la coque (barre latérale, barre supérieure)
 **reste** rendue tandis que le corps affiche
-`Le registre n’a pas pu être chargé.` avec un bouton `Réessayer`.
+`Serveur injoignable. Vérifiez la connexion, puis réessayez.` avec un bouton
+`Réessayer` (`apiErrorText`, `lib/mutation-feedback.ts`, ignore le repli
+`Le registre n’a pas pu être chargé.` pour tout ce qui n'est pas une `ApiError` ;
+ce repli ne sort que sur un 400/422 sans motif serveur).
 Échoue si : une panne d'API produit un écran blanc sans message, ce qui au
 comptoir se traduit par « l'ordinateur ne marche plus » sans plus de diagnostic ;
 ou l'erreur d'une requête emporte toute la coque.
@@ -1740,9 +1787,11 @@ Origine : ACC C12.
 
 **ACC-COQ-11 | P2 | « Réessayer » relance vraiment la requête**
 Route : `/accueil`. Session : ADMIN. Fichier : `accueil-coque.spec.ts`.
-Gestes : couper `**/api/v1/visites?**` (abort), ouvrir `/accueil`, constater
-`Le registre n’a pas pu être chargé.` ; rétablir la route (`page.unroute`),
-cliquer `Réessayer`.
+Gestes : couper `/\/api\/v1\/visites\?/` (abort ; le motif glob
+`**/api/v1/visites?**` n'intercepte rien en Playwright 1.61, et la regex laisse
+passer `/api/v1/visites/referentiels`), ouvrir `/accueil`, constater
+`Serveur injoignable. Vérifiez la connexion, puis réessayez.` ; rétablir la
+route (`page.unroute`), cliquer `Réessayer`.
 Assertions : le message d'erreur disparaît ; le tableau du registre ou l'état
 vide est rendu ; `page.reload()` est **interdit** ici, le but étant de prouver le
 bouton.
@@ -2144,7 +2193,13 @@ Origine : ACC F6.
 Gestes : en mode Organiser, cliquer `Ajouter un graphique`, choisir une source
 absente de la disposition, par exemple `Par heure`.
 Assertions : le tiroir a pour titre `Ajouter un graphique` et pour description
-`Choisissez ce que vous voulez suivre. L’image montre la forme conseillée.` ;
+`Choisissez ce que vous voulez suivre. L’image montre la forme conseillée.`
+(**cible mouvante depuis le 29 août 2026** : le tiroir est en refonte dans
+`tiroir-widgets.tsx`, description observée « Choisissez une question simple.
+Nous vous proposons l’affichage le plus facile à lire. », champ « Chercher une
+question ou un indicateur », un `article` par source avec « Ajouter en … » /
+« Voir les autres façons » ; ACC-TDB-07, CHU-DSP-04/05/07, GP-36 et GP-44
+restent rouges tant que ce document n'est pas réaligné sur le tiroir final) ;
 après le choix, le tiroir se ferme, une carte titrée `Par heure` apparaît dans la
 grille et **reçoit le focus** ; le bouton `Enregistrer` est actif.
 Échoue si : la source ajoutée n'est ni défilée ni focalisée et disparaît hors de
@@ -2354,8 +2409,13 @@ le bouton par `Réessayer le décompte`) : une Direction retirerait d'un clic un
 entrée portée par des milliers de visites.
 Origine : ACC G10.
 
-**ACC-LST-11 | P1 | le décompte indisponible bloque la désactivation**
-Gestes :
+**ACC-LST-11 | P1 | le décompte indisponible bloque la désactivation** · **non jouable en navigateur**
+Le décompte est préchargé côté serveur (`accueil/listes/page.tsx`,
+`prefetchQuery(visiteReferentielUsage)`) et hydraté avec `staleTime` 60 s :
+aucune requête ne part du navigateur, `page.route` n'y change rien, et un
+refetch en échec garde la donnée précédente. La garde `unknown` du dialogue
+reste couverte par le test de composant. Non écrit dans `accueil-listes.spec.ts`.
+Gestes (inapplicables) :
 `page.route('**/api/v1/visites/referentiels/usage', route => route.abort('failed'))`,
 recharger, ouvrir la désactivation d'une entrée du test.
 Assertions : le `role="alert"` contient
@@ -3151,7 +3211,8 @@ Session : SUPERVISEUR. Fichier : `chues-chiffres-taux.superviseur.spec.ts`.
 Données : R1 à R5 et les cinq tentatives ci-dessus.
 Assertions : la carte « Appels aux représentants » affiche le chiffre `4` et le
 détail « dont 2 ont répondu » ; la carte « Représentants joints » affiche le
-chiffre `50` ; le texte accessible de cette carte (`sr-only`) contient exactement
+chiffre `50,0 %` (un taux s'affiche avec son unité, `affichage` de la tuile) ;
+le texte accessible de cette carte (`sr-only`) contient exactement
 « 50,0 % des appels aboutissent ». Relever d'abord la réponse à **Q-01**.
 Échoue si : `REP_LIVE_OUTCOMES` change et le rappel promis ou l'injoignable
 sortent du dénominateur (le taux passerait à 100 % ou 66,7 %) ; un `CALLBACK` est
@@ -3161,8 +3222,8 @@ R5 est comptée (5 appels, 40 %).
 Origine : CHU CHF-13.
 
 **CHU-CHF-14 | P1 | le taux de rappel vaut exactement 25 % sur 1 rappel pour 4 appels**
-Assertions : la carte « Rappels promis » affiche le chiffre `1` ; son texte
-accessible contient « 25,0 % des appels ».
+Assertions : la carte « Rappels promis » affiche le chiffre `25,0 %` (un taux
+porte son unité) et le détail `1 appel à rappeler`.
 Échoue si : `repCallbackRate` est calculé sur les seuls appels joints (1/2 =
 50 %) au lieu de tous les appels vivants.
 Origine : CHU CHF-14.
@@ -4352,7 +4413,7 @@ Interdits : `admin@cpi.sn`, tous les `fixture.*`, tout compte préexistant.
 | Champ de recherche | label `Recherche`, placeholder `Nom, e-mail, identifiant…` |
 | Filtre rôle | label `Rôle` : `Tous les rôles`, `Administrateur`, `Téléconseiller`, `Banque & Finance`, `Supervision`, `Direction`, `Accueil` |
 | Filtre état | label `État du compte` : `Tous`, `Actifs`, `Désactivés` |
-| Colonnes | `Utilisateur`, `Identifiants`, `Département`, `Prospects`, `Dernière connexion` |
+| Colonnes | `Utilisateur`, `Identifiants`, `Prospects`, `Dernière connexion` |
 | État vide | `Aucun compte ne correspond à ces critères.` puis `Élargissez la recherche ou créez un compte.` |
 | Menu de ligne | `Actions pour <nom complet>` |
 | Entrées du menu | `Modifier`, `Réinitialiser le mot de passe`, `Désactiver le compte` ou `Réactiver le compte` |
@@ -4363,7 +4424,7 @@ Dialogue de création : titre `Nouvel utilisateur`, description
 `Le rôle décide de ce que le compte pourra consulter.`, champs `Nom complet`,
 `Adresse e-mail`, `Identifiant` (description
 `Utilisé pour la connexion, avec l’e-mail.`), `Téléphone` (description
-`Format libre.`), `Rôle`, `Département`, `Mot de passe` (description
+`Format libre.`), `Rôle`, `Mot de passe` (description
 `12 caractères minimum.`), boutons `Annuler` et `Créer le compte`. En
 modification : titre `Modifier le compte`, description
 `Le mot de passe n’est pas modifiable ici.`, bouton `Enregistrer`.
@@ -5084,7 +5145,7 @@ signature sur disque, et la barre survit à une **vraie** navigation de page.
 
 **ADM-APK-01 | P1 | publication réussie de `cpi-go-v7.apk`**
 Gestes : `setInputFiles` sur l'entrée `.apk`, puis `Publier`.
-Assertions : le nom du fichier et sa taille (`8 Ko`) s'affichent sous la zone de
+Assertions : le nom du fichier et sa taille (`9 Ko`, arrondi au Ko supérieur) s'affichent sous la zone de
 dépôt ; la barre apparaît avec `Envoi de cpi-go-v7.apk` ; à la fin, toast
 `CPI GO <versionName> publiée.` (constante nommée dans la spec, relevée une fois,
 §8 **Q-23**) et la popup `Version publiée` s'ouvre.
@@ -5180,7 +5241,9 @@ Assertions : toast local `Déposez un fichier .apk.` et **aucune requête** vers
 refuser après transfert.
 Origine : ADM APK-11.
 
-**ADM-APK-12 | P1 | `APK_LAST_RELEASE`**
+**ADM-APK-12 | P1 | `APK_LAST_RELEASE`** · **non jouable sur cette base** : des
+releases hors périmètre (builds 5 et 6, preuves manuelles) restent en ligne et
+le test n'a pas le droit de les retirer. Exige une base sans release.
 Gestes : quand une seule version est en ligne, cliquer `Retirer` puis confirmer.
 Assertions : toast contenant `C’est la seule release en ligne` ; la ligne reste
 `En ligne`.
@@ -5212,7 +5275,7 @@ Origine : ADM APK-14.
 
 **ADM-APK-15 | P2 | l'historique**
 Assertions : les huit en-têtes sont présents ; la ligne la plus récente porte le
-`Build`, la `Version`, la taille formatée (`8 Ko`), le nom du publieur (`Par`) et
+`Build`, la `Version`, la taille formatée (`9 Ko` : `formatFileSize` arrondit au Ko supérieur, 8 339 octets), le nom du publieur (`Par`) et
 le badge `En ligne` ; une version retirée reste listée.
 Échoue si : l'historique perd une colonne ou une version retirée, et la trace de
 ce qui a été distribué disparaît.
@@ -5221,8 +5284,9 @@ Origine : ADM APK-15.
 **ADM-APK-16 | P2 | historique en panne**
 Gestes :
 `page.route('**/api/v1/app-updates/android/releases', r => r.fulfill({ status: 500 }))`.
-Assertions : la carte affiche
-`L’historique des versions Android n’a pas pu être lu.` avec un bouton
+Assertions : la carte affiche `Erreur serveur (500). Réessayez.` (titre
+`Erreur serveur` ; `apiErrorText` ignore le repli
+`L’historique des versions Android n’a pas pu être lu.` sur un 5xx) avec un bouton
 `Réessayer` ; le reste de `/admin/parametres` (carte `Espace démo`, carte de
 suppression) reste rendu.
 Échoue si : la panne d'un bloc fait tomber tout l'écran des paramètres.
@@ -5239,9 +5303,11 @@ Origine : ADM APK-17.
 
 **ADM-APK-18 | P3 | l'envoi survit à une navigation dure**
 Gestes : pendant l'envoi ralenti, tenter `page.goto('/')`.
-Assertions : l'assertion réelle porte sur l'après : la barre est toujours montée
-et l'envoi se termine. Les dialogues `beforeunload` étant auto-acceptés par
-Playwright, l'avertissement de fermeture lui-même n'est pas observable.
+Assertions : l'assertion réelle porte sur l'après. `page.goto` traverse
+`beforeunload` (auto-accepté) et détruit le document, donc la barre ne survit
+pas : ce qui se prouve, c'est que le corps entier a atteint le serveur (réponse
+retenue après `route.fetch()`) et que la navigation dure ne laisse **aucune
+ligne de plus** dans l'historique.
 Échoue si : une navigation dure interrompt l'envoi sans rien dire, et une
 publication partielle atteint le serveur.
 Origine : ADM APK-18.
@@ -5526,9 +5592,12 @@ Origine : ADM GP-26.
 
 **GP-27 | P1 | identifiant invalide**
 Gestes : ouvrir `/grand-public/pas-un-uuid`.
-Assertions : l'écran rend un état d'erreur lisible en français, pas une trace ni
-une page blanche : `Cette fiche n’a pas pu être chargée.` ou le titre
-`Requête refusée` de `QueryErrorState` (§8, **Q-26**).
+Assertions : l'écran rend la page « Page introuvable » (`<h1>`,
+`Cette adresse ne correspond à aucun écran du panel.`) : un identifiant mal
+formé ou inconnu est une fiche introuvable, `grand-public/[id]/page.tsx`
+appelle `notFound()` sur un 400/404 (avant le 29 août 2026, une `ApiError`
+traversait la frontière RSC sans prototype et l'écran disait « Serveur
+injoignable », §8 **Q-26**).
 Échoue si : un identifiant invalide casse l'écran ou rend un message anglais.
 Origine : ADM GP-27.
 
@@ -5579,7 +5648,8 @@ téléconseiller seulement si le rôle n'est pas COMMERCIAL.
 
 **GP-31 | P1 | les requêtes portent bien le projet Grand Public**
 Session : COMMERCIAL.
-Gestes : intercepter `GET /api/v1/callbacks*`.
+Gestes : intercepter `GET /api/v1/phase2/callbacks*` (route réelle,
+`callbacks.controller.ts`).
 Assertions : le paramètre de projet vaut `GRAND_PUBLIC`.
 Échoue si : la file Grand Public affiche des rappels CHUES sous une étiquette
 Grand Public. C'est la seule preuve que la page réexportée ne sert pas l'autre
@@ -5612,7 +5682,7 @@ ADMIN, SUPERVISEUR, DIRECTION. Disposition :
 Libellés de cet écran : **« Composer l’écran »** et **« Revenir à l’écran par
 défaut »** (§1.9) ; état vide
 `Cet écran est vide. Ouvrez « Composer l’écran » pour y poser vos chiffres.` ;
-erreur `Les chiffres n’ont pas pu être calculés. Réessayez.` ; message par carte
+erreur `Erreur serveur (500). Réessayez.` (titre `Erreur serveur` ; `apiErrorText` ignore le repli sur un 5xx) ; message par carte
 `Rien sur la période.` ; sélecteur `Téléconseiller regardé` avec
 `Toute l’équipe`.
 
@@ -5696,7 +5766,7 @@ Origine : ADM GP-43.
 **GP-43 | P2 | chiffres en panne**
 Gestes :
 `page.route('**/api/v1/analytics/**', r => r.fulfill({ status: 500 }))`.
-Assertions : `Les chiffres n’ont pas pu être calculés. Réessayez.` avec un bouton
+Assertions : `Erreur serveur (500). Réessayez.` (titre `Erreur serveur` ; `apiErrorText` ignore le repli sur un 5xx) avec un bouton
 `Réessayer` ; la barre latérale reste montée.
 Échoue si : la panne des chiffres emporte toute la coque.
 Origine : ADM GP-44.
@@ -6242,7 +6312,6 @@ assertion (interdit, §4.5).
 | Cause | Scénarios | Nombre |
 | --- | --- | --- |
 | Virgule SQL de `supervision.service.ts:259` (§1.1) | CHU-CHF-01, CHU-CHF-02, CHU-CHF-05 à CHU-CHF-21, CHU-DSP-01 à CHU-DSP-12, CHU-SUP-01 à CHU-SUP-07, CHU-TRV-03, CHU-TRV-04, ROL-26 (partie CHUES) | 41 |
-| `/accueil` sans `guardRoles` (§1.4) | ROL-28 | 1 |
 | Lien mort `/grand-public/prospects` (§1.5) | ROL-29 | 1 |
 | Console vidée, `?fiche=` ignoré (§2.1) | CHU-ET3-01, CHU-RAP-04, CHU-RAP-08 | 3 |
 | Aucune pagination sur `/admin/commerciaux` (§1.10) | ADM-USR-17 | 1 |

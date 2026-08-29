@@ -34,6 +34,16 @@ import { BANQUIER, ensureWorkspaceFixtures, FIXTURE_PASSWORD, TELECONSEILLERS } 
  * `.anon.spec.ts` : ces parcours doivent partir d'un navigateur VIERGE, sans
  * l'état d'administrateur partagé, puisque c'est justement la connexion qu'ils
  * éprouvent.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * DEUX connexions pour cinq parcours.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Chaque `test` ouvrait sa propre session : cinq connexions sur un point
+ * d'entrée limité à DIX par minute et par IP, partagé avec tout ce qui tourne
+ * en même temps. Les parcours d'un même rôle se suivent désormais en série sur
+ * un contexte ouvert une fois : une connexion par rôle, et le navigateur reste
+ * vierge au démarrage, ce que ces parcours éprouvent.
  */
 
 const BANK_IDENTIFIER = process.env.E2E_BANK_IDENTIFIER ?? BANQUIER.email;
@@ -139,119 +149,138 @@ async function attendreTuilesFermees(page: Page, labels: readonly string[]): Pro
   }
 }
 
-test('un agent Banque & Finance atterrit sur le hub, dont une seule tuile lui est ouverte', async ({
-  page,
-}) => {
-  await login(page, BANK_IDENTIFIER, BANK_PASSWORD);
+test.describe('Agent Banque & Finance', () => {
+  // Une seule connexion pour les trois parcours : ils se suivent sur le même
+  // contexte, et l'ordre compte.
+  test.describe.configure({ mode: 'serial' });
 
-  await expect(page).toHaveURL(/\/espaces$/);
-  await attendreTuilesFermees(page, ['Accueil', 'Projet Grand Public', 'Admin']);
+  let page: Page;
 
-  // Sa tuile CHUES ouvre le tableau de bord BANCAIRE : celui des prospects lui
-  // vaudrait un 403 dès la première seconde d'utilisation.
-  await ouvrirEspace(page, 'Projet CHUES');
-  await page.waitForURL('**/chues/banque');
-  // Le titre du DOCUMENT, que seule la page pose : le titre de niveau 1 est
-  // dérivé de la route par la barre supérieure et vaudrait aussi pour une page
-  // qui n'a rien rendu.
-  await expect(page).toHaveTitle(/Tableau de bord bancaire/);
-});
+  test.beforeAll(async ({ browser }) => {
+    page = await browser.newPage();
+    await login(page, BANK_IDENTIFIER, BANK_PASSWORD);
+  });
 
-test('sa navigation ne montre QUE ses écrans', async ({ page }) => {
-  await login(page, BANK_IDENTIFIER, BANK_PASSWORD);
-  await ouvrirEspace(page, 'Projet CHUES');
+  test.afterAll(async () => {
+    await page.close();
+  });
 
-  const nav = page.getByRole('navigation', { name: 'Navigation principale' });
+  test('un agent Banque & Finance atterrit sur le hub, dont une seule tuile lui est ouverte', async () => {
+    await expect(page).toHaveURL(/\/espaces$/);
+    await attendreTuilesFermees(page, ['Accueil', 'Projet Grand Public', 'Admin']);
 
-  for (const visible of [
-    'Vue d’ensemble',
-    'Dossiers bancaires',
-    'Ouvrir un dossier',
-    // Le suivi de SES demandes de création de client : sans cette entrée, la
-    // notification qui lui annonce un refus était le seul chemin vers l'écran.
-    'Mes demandes de création',
-  ]) {
-    await expect(nav.getByRole('link', { name: visible, exact: true })).toBeVisible();
-  }
+    // Sa tuile CHUES ouvre le tableau de bord BANCAIRE : celui des prospects lui
+    // vaudrait un 403 dès la première seconde d'utilisation.
+    await ouvrirEspace(page, 'Projet CHUES');
+    await page.waitForURL('**/chues/banque');
+    // Le titre du DOCUMENT, que seule la page pose : le titre de niveau 1 est
+    // dérivé de la route par la barre supérieure et vaudrait aussi pour une page
+    // qui n'a rien rendu.
+    await expect(page).toHaveTitle(/Tableau de bord bancaire/);
+  });
 
-  // L'export est rangé sous « Plus », replié : présent, mais après un clic.
-  await nav.getByText('Plus', { exact: true }).click();
-  await expect(nav.getByRole('link', { name: 'Exporter les dossiers', exact: true })).toBeVisible();
+  test('sa navigation ne montre QUE ses écrans', async () => {
+    await page.goto('/espaces');
+    await ouvrirEspace(page, 'Projet CHUES');
 
-  /**
-   * Le point de l'exigence : ces entrées sont ABSENTES, pas grisées. Une entrée
-   * qui mène à un refus de droits est un défaut de conception.
-   *
-   * Les libellés sont ceux que `nav-items.ts` écrit RÉELLEMENT. « Commerciaux »
-   * figurait ici alors qu'aucune entrée n'a jamais porté ce nom : l'assertion
-   * passait à vide, et aurait continué de passer si le lien était devenu
-   * visible. C'est le même défaut que les ignorés ci-dessus, sous une autre
-   * forme.
-   */
-  for (const hidden of [
-    'Prospects',
-    'Représentants',
-    'Utilisateurs',
-    'Campagnes',
-    'Listes de référence',
-    'Paramètres',
-    'Étapes des dossiers',
-    'Équipes',
-    'Notifications',
-    'Créations de client à valider',
-  ]) {
-    await expect(nav.getByRole('link', { name: hidden, exact: true })).toHaveCount(0);
-  }
+    const nav = page.getByRole('navigation', { name: 'Navigation principale' });
 
-  // Et sa « Vue d'ensemble » est bien le tableau de bord BANCAIRE. L'adresse
-  // est vérifiée EN ENTIER : `/banque` seul se satisferait de n'importe quelle
-  // route qui contient le mot.
-  await nav.getByRole('link', { name: 'Vue d’ensemble', exact: true }).click();
-  await expect(page).toHaveURL(/\/chues\/banque$/);
-});
+    for (const visible of [
+      'Vue d’ensemble',
+      'Dossiers bancaires',
+      'Ouvrir un dossier',
+      // Le suivi de SES demandes de création de client : sans cette entrée, la
+      // notification qui lui annonce un refus était le seul chemin vers l'écran.
+      'Mes demandes de création',
+    ]) {
+      await expect(nav.getByRole('link', { name: visible, exact: true })).toBeVisible();
+    }
 
-test('une URL interdite tapée à la main rend un refus lisible, pas une page cassée', async ({
-  page,
-}) => {
-  await login(page, BANK_IDENTIFIER, BANK_PASSWORD);
+    // L'export est rangé sous « Plus », replié : présent, mais après un clic.
+    await nav.getByText('Plus', { exact: true }).click();
+    await expect(
+      nav.getByRole('link', { name: 'Exporter les dossiers', exact: true }),
+    ).toBeVisible();
 
-  // Le masquage du menu ne protège rien : une URL se tape, et un onglet resté
-  // ouvert rejoue la route.
-  await page.goto('/chues/prospects');
-  await expect(page.getByRole('heading', { name: 'Accès refusé' })).toBeVisible();
-  // Le refus NOMME le rôle en cours : sans lui, l'utilisateur ne sait pas quoi
-  // demander à son administrateur.
-  // Filtré : `getByRole('alert')` seul attraperait aussi le route-announcer de
-  // Next, et le mode strict refuserait les deux correspondances.
-  await expect(page.getByRole('alert').filter({ hasText: 'Accès refusé' })).toContainText(
-    'Banque & Finance',
-  );
-  // Et il propose une sortie : le hub, désormais, et non plus un écran de
-  // travail. C'est le seul endroit qui vaille pour tous les rôles.
-  await expect(page.getByRole('link', { name: 'Retour à l’accueil', exact: true })).toHaveAttribute(
-    'href',
-    '/espaces',
-  );
+    /**
+     * Le point de l'exigence : ces entrées sont ABSENTES, pas grisées. Une entrée
+     * qui mène à un refus de droits est un défaut de conception.
+     *
+     * Les libellés sont ceux que `nav-items.ts` écrit RÉELLEMENT. « Commerciaux »
+     * figurait ici alors qu'aucune entrée n'a jamais porté ce nom : l'assertion
+     * passait à vide, et aurait continué de passer si le lien était devenu
+     * visible. C'est le même défaut que les ignorés ci-dessus, sous une autre
+     * forme. « Campagnes » y était pour la même raison : l'entrée s'appelle
+     * « Lots d’export » depuis le retrait des listes d'appel.
+     */
+    for (const hidden of [
+      'Prospects',
+      'Représentants',
+      'Utilisateurs',
+      'Lots d’export',
+      'Listes de référence',
+      'Paramètres',
+      'Étapes des dossiers',
+      'Équipes',
+      'Notifications',
+      'Créations de client à valider',
+    ]) {
+      await expect(nav.getByRole('link', { name: hidden, exact: true })).toHaveCount(0);
+    }
 
-  await page.goto('/admin/parametres');
-  await expect(page.getByRole('heading', { name: 'Accès refusé' })).toBeVisible();
+    // Et sa « Vue d'ensemble » est bien le tableau de bord BANCAIRE. L'adresse
+    // est vérifiée EN ENTIER : `/banque` seul se satisferait de n'importe quelle
+    // route qui contient le mot.
+    await nav.getByRole('link', { name: 'Vue d’ensemble', exact: true }).click();
+    await expect(page).toHaveURL(/\/chues\/banque$/);
+  });
 
-  // Les deux écrans ajoutés depuis, fermés au même rôle et par la même garde.
-  await page.goto('/chues/campagnes/representants');
-  await expect(page.getByRole('heading', { name: 'Accès refusé' })).toBeVisible();
+  test('une URL interdite tapée à la main rend un refus lisible, pas une page cassée', async () => {
+    // Le masquage du menu ne protège rien : une URL se tape, et un onglet resté
+    // ouvert rejoue la route.
+    await page.goto('/chues/prospects');
+    await expect(page.getByRole('heading', { name: 'Accès refusé' })).toBeVisible();
+    // Le refus NOMME le rôle en cours : sans lui, l'utilisateur ne sait pas quoi
+    // demander à son administrateur.
+    // Filtré : `getByRole('alert')` seul attraperait aussi le route-announcer de
+    // Next, et le mode strict refuserait les deux correspondances.
+    await expect(page.getByRole('alert').filter({ hasText: 'Accès refusé' })).toContainText(
+      'Banque & Finance',
+    );
+    // Et il propose une sortie : le hub, désormais, et non plus un écran de
+    // travail. C'est le seul endroit qui vaille pour tous les rôles.
+    await expect(
+      page.getByRole('link', { name: 'Retour à l’accueil', exact: true }),
+    ).toHaveAttribute('href', '/espaces');
 
-  await page.goto('/chues/representants/import');
-  await expect(page.getByRole('heading', { name: 'Accès refusé' })).toBeVisible();
+    await page.goto('/admin/parametres');
+    await expect(page.getByRole('heading', { name: 'Accès refusé' })).toBeVisible();
 
-  // `/chues/demandes-clients` lui est en revanche OUVERT, et c'est le point :
-  // l'API y restreint la liste à ses propres demandes, l'écran ne lui propose
-  // aucun geste d'arbitrage. Un refus ici casserait la notification qui l'y
-  // envoie.
-  await page.goto('/chues/demandes-clients');
-  await expect(page.getByRole('heading', { name: 'Accès refusé' })).toHaveCount(0);
-  await expect(
-    page.getByRole('heading', { name: 'Mes demandes de création', level: 1 }),
-  ).toBeVisible();
+    await page.goto('/chues/representants/import');
+    await expect(page.getByRole('heading', { name: 'Accès refusé' })).toBeVisible();
+
+    /**
+     * `/chues/campagnes/representants` ne rend plus un refus LISIBLE : l'écran
+     * a été supprimé (`Plan.md`, retrait des listes d'appel) et l'adresse est
+     * captée par le segment `chues/campagnes/[id]`, dont la garde
+     * (`ADMIN`, `SUPERVISEUR`, `DIRECTION`) fait `redirect('/chues')` au lieu
+     * de rendre `PermissionDenied`. Pour un agent bancaire, `/chues` renvoie à
+     * son tour sur son propre tableau de bord. L'écran reste hors de portée,
+     * mais sans un mot : c'est ce qu'on constate, pas un contrat.
+     */
+    await page.goto('/chues/campagnes/representants');
+    await expect(page).toHaveURL(/\/chues\/banque$/);
+
+    // `/chues/demandes-clients` lui est en revanche OUVERT, et c'est le point :
+    // l'API y restreint la liste à ses propres demandes, l'écran ne lui propose
+    // aucun geste d'arbitrage. Un refus ici casserait la notification qui l'y
+    // envoie.
+    await page.goto('/chues/demandes-clients');
+    await expect(page.getByRole('heading', { name: 'Accès refusé' })).toHaveCount(0);
+    await expect(
+      page.getByRole('heading', { name: 'Mes demandes de création', level: 1 }),
+    ).toBeVisible();
+  });
 });
 
 /**
@@ -259,109 +288,155 @@ test('une URL interdite tapée à la main rend un refus lisible, pas une page ca
  * teleconseillers, avec une section Terrain ». Ce fichier éprouvait l'inverse,
  * et c'est la seule couverture du nouvel atterrissage.
  */
-test('un téléconseiller ouvre CHUES sur ses trois étapes, sans boucle de redirection', async ({
-  page,
-}) => {
-  await login(page, TELECONSEILLER_IDENTIFIER, TELECONSEILLER_PASSWORD);
+test.describe('Téléconseiller', () => {
+  // Une seule connexion pour les deux parcours, comme ci-dessus.
+  test.describe.configure({ mode: 'serial' });
 
-  await expect(page).toHaveURL(/\/espaces$/);
-  await attendreTuilesFermees(page, ['Accueil', 'Admin']);
+  let page: Page;
 
-  await ouvrirEspace(page, 'Projet CHUES');
-  await page.waitForURL('**/chues');
-  // Le titre du DOCUMENT, posé par la page et non par la barre supérieure : il
-  // ne dépend pas de ce que la file d'appels contient ce jour-là.
-  await expect(page).toHaveTitle(/Projet CHUES/);
-  await expect(page.getByText('Trois étapes, dans l’ordre.')).toBeVisible();
+  test.beforeAll(async ({ browser }) => {
+    page = await browser.newPage();
+    await login(page, TELECONSEILLER_IDENTIFIER, TELECONSEILLER_PASSWORD);
+  });
 
-  /**
-   * Les deux routes qui ont déjà bouclé : `/` et `/connexion` renvoient toutes
-   * deux vers le hub, et le hub ne doit pas renvoyer ailleurs. Un aller-retour
-   * infini se solderait ici par un délai dépassé, pas par une assertion
-   * fausse : `waitForURL` est ce qui le nomme.
-   */
-  for (const entry of ['/', '/connexion']) {
-    await page.goto(entry);
-    await page.waitForURL('**/espaces');
+  test.afterAll(async () => {
+    await page.close();
+  });
+
+  test('un téléconseiller ouvre CHUES sur ses trois étapes, sans boucle de redirection', async () => {
+    await expect(page).toHaveURL(/\/espaces$/);
+    await attendreTuilesFermees(page, ['Accueil', 'Admin']);
+
+    await ouvrirEspace(page, 'Projet CHUES');
+    await page.waitForURL('**/chues');
+    // Le titre du DOCUMENT, posé par la page et non par la barre supérieure : il
+    // ne dépend pas de ce que la file d'appels contient ce jour-là.
+    await expect(page).toHaveTitle(/Projet CHUES/);
+    await expect(page.getByText('Trois étapes, dans l’ordre.')).toBeVisible();
+
+    /**
+     * Les deux routes qui ont déjà bouclé : `/` et `/connexion` renvoient toutes
+     * deux vers le hub, et le hub ne doit pas renvoyer ailleurs. Un aller-retour
+     * infini se solderait ici par un délai dépassé, pas par une assertion
+     * fausse : `waitForURL` est ce qui le nomme.
+     */
+    for (const entry of ['/', '/connexion']) {
+      await page.goto(entry);
+      await page.waitForURL('**/espaces');
+      await expect(
+        page.getByRole('heading', { name: 'Choisissez un espace', level: 1 }),
+      ).toBeVisible();
+    }
+  });
+
+  test('sa navigation compte ses étapes, et le pilotage lui reste fermé', async () => {
+    await page.goto('/espaces');
+    await ouvrirEspace(page, 'Projet CHUES');
+
+    const nav = page.getByRole('navigation', { name: 'Navigation principale' });
+
+    /**
+     * Cinq entrées, dans l'ordre du travail : le hub, les trois étapes, les
+     * rappels. Les intitulés sont ceux de `nav-items.ts` : les trois étapes ont
+     * perdu leur numérotation et disent maintenant le GESTE
+     * (« Qualifier un représentant ») et non l'objet appelé
+     * (« 1 · Appeler les représentants »).
+     */
+    for (const visible of [
+      'Mon travail',
+      'Qualifier un représentant',
+      'Ajouter un prospect',
+      'Convertir un prospect',
+      'Rappels promis',
+    ]) {
+      await expect(nav.getByRole('link', { name: visible, exact: true })).toBeVisible();
+    }
+
+    // Ce qui sert moins souvent est REPLIÉ, pas retiré. « Mes représentants » et
+    // « Mes prospects » ont perdu leur possessif : l'API borne déjà la liste au
+    // périmètre de qui la demande.
+    await expect(nav.getByRole('link', { name: 'Prospects', exact: true })).toHaveCount(0);
+    await nav.getByText('Plus', { exact: true }).click();
+    for (const replie of ['Contacts recommandés', 'Représentants', 'Prospects']) {
+      await expect(nav.getByRole('link', { name: replie, exact: true })).toBeVisible();
+    }
+
+    /**
+     * `exact` : sans lui, « Équipes » matcherait aussi une entrée dont le
+     * libellé la contient. Les entrées d'administration relèvent maintenant
+     * d'une AUTRE coque : ce qui les tient hors de portée est la tuile grisée du
+     * hub, éprouvée dans le parcours d'atterrissage.
+     *
+     * « Chiffres » et « Campagnes » n'existent plus nulle part : l'écran de
+     * pilotage s'appelle « Tableau de bord », les listes d'appel sont devenues
+     * des « Lots d’export », et l'activité de l'équipe « Mon équipe » pour
+     * l'encadrement. Les trois sont nommés ici sous leur intitulé réel, sans
+     * quoi l'assertion passait à vide.
+     */
+    for (const hidden of [
+      'Tableau de bord',
+      'Lots d’export',
+      'Mon équipe',
+      'Équipes',
+      'Utilisateurs',
+      'Listes de référence',
+      'Importer un fichier Excel',
+      'Paramètres',
+      'Dossiers bancaires',
+      'Étapes des dossiers',
+      'Créations de client à valider',
+    ]) {
+      await expect(nav.getByRole('link', { name: hidden, exact: true })).toHaveCount(0);
+    }
+
+    /**
+     * Le masquage du menu ne protège rien : c'est la garde serveur qui décide.
+     * Chaque écran de pilotage est donc redemandé PAR SON URL.
+     */
+    for (const forbidden of [
+      '/chues/tableau-de-bord',
+      '/chues/statistiques',
+      '/admin/commerciaux',
+      '/chues/supervision',
+      '/admin/referentiels',
+      '/admin/imports',
+      '/admin/parametres',
+      '/chues/representants/import',
+      '/chues/dossiers',
+    ]) {
+      await page.goto(forbidden);
+      await expect(
+        page.getByRole('heading', { name: 'Accès refusé', level: 2 }),
+        `${forbidden} devrait être refusé à un téléconseiller`,
+      ).toBeVisible();
+    }
+
+    /**
+     * Les deux adresses des listes d'appel, sorties de la boucle : elles ne
+     * rendent plus un refus lisible.
+     *
+     * Les deux font `redirect('/chues')` au lieu de rendre `PermissionDenied`
+     * (`app/(panel)/chues/campagnes/page.tsx` et `campagnes/[id]/page.tsx`) :
+     * le téléconseiller est renvoyé sans savoir pourquoi. L'écran des
+     * campagnes de représentants a en outre été supprimé, et son adresse est
+     * captée par le segment `[id]`. Écrans en réécriture.
+     */
+    for (const renvoi of ['/chues/campagnes', '/chues/campagnes/representants']) {
+      await page.goto(renvoi);
+      await expect(page, `${renvoi} devrait renvoyer un téléconseiller sur /chues`).toHaveURL(
+        /\/chues$/,
+      );
+    }
+
+    // Le dernier refus lisible de la boucle, à relire pour le rôle nommé.
+    await page.goto('/chues/dossiers');
+
+    // Le refus NOMME le rôle en cours, et propose une sortie vers le hub.
+    await expect(page.getByRole('alert').filter({ hasText: 'Accès refusé' })).toContainText(
+      'Téléconseiller',
+    );
     await expect(
-      page.getByRole('heading', { name: 'Choisissez un espace', level: 1 }),
-    ).toBeVisible();
-  }
-});
-
-test('sa navigation compte ses étapes, et le pilotage lui reste fermé', async ({ page }) => {
-  await login(page, TELECONSEILLER_IDENTIFIER, TELECONSEILLER_PASSWORD);
-  await ouvrirEspace(page, 'Projet CHUES');
-
-  const nav = page.getByRole('navigation', { name: 'Navigation principale' });
-
-  // Cinq entrées, dans l'ordre du travail : le hub, les trois étapes, les rappels.
-  for (const visible of [
-    'Mon travail',
-    '1 · Appeler les représentants',
-    '2 · Noter un prospect',
-    '3 · Appeler les prospects',
-    'Rappels promis',
-  ]) {
-    await expect(nav.getByRole('link', { name: visible, exact: true })).toBeVisible();
-  }
-
-  // Ce qui sert moins souvent est REPLIÉ, pas retiré.
-  await expect(nav.getByRole('link', { name: 'Mes prospects', exact: true })).toHaveCount(0);
-  await nav.getByText('Plus', { exact: true }).click();
-  for (const replie of ['Contacts recommandés', 'Mes représentants', 'Mes prospects']) {
-    await expect(nav.getByRole('link', { name: replie, exact: true })).toBeVisible();
-  }
-
-  // `exact` : sans lui, « Équipes » matcherait aussi une entrée dont le
-  // libellé la contient. Les entrées d'administration relèvent maintenant
-  // d'une AUTRE coque : ce qui les tient hors de portée est la tuile grisée du
-  // hub, éprouvée dans le parcours d'atterrissage.
-  for (const hidden of [
-    'Chiffres',
-    'Campagnes',
-    'Équipes',
-    'Utilisateurs',
-    'Listes de référence',
-    'Importer un fichier Excel',
-    'Paramètres',
-    'Dossiers bancaires',
-    'Étapes des dossiers',
-    'Créations de client à valider',
-  ]) {
-    await expect(nav.getByRole('link', { name: hidden, exact: true })).toHaveCount(0);
-  }
-
-  /**
-   * Le masquage du menu ne protège rien : c'est la garde serveur qui décide.
-   * Chaque écran de pilotage est donc redemandé PAR SON URL.
-   */
-  for (const forbidden of [
-    '/chues/tableau-de-bord',
-    '/chues/statistiques',
-    '/chues/campagnes',
-    '/chues/campagnes/representants',
-    '/admin/commerciaux',
-    '/chues/supervision',
-    '/admin/referentiels',
-    '/admin/imports',
-    '/admin/parametres',
-    '/chues/representants/import',
-    '/chues/dossiers',
-  ]) {
-    await page.goto(forbidden);
-    await expect(
-      page.getByRole('heading', { name: 'Accès refusé', level: 2 }),
-      `${forbidden} devrait être refusé à un téléconseiller`,
-    ).toBeVisible();
-  }
-
-  // Le refus NOMME le rôle en cours, et propose une sortie vers le hub.
-  await expect(page.getByRole('alert').filter({ hasText: 'Accès refusé' })).toContainText(
-    'Téléconseiller',
-  );
-  await expect(page.getByRole('link', { name: 'Retour à l’accueil', exact: true })).toHaveAttribute(
-    'href',
-    '/espaces',
-  );
+      page.getByRole('link', { name: 'Retour à l’accueil', exact: true }),
+    ).toHaveAttribute('href', '/espaces');
+  });
 });
