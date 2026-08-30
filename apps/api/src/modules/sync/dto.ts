@@ -39,6 +39,7 @@ import {
   CanalProvenanceDto,
   DepartementDto,
   IefDto,
+  IncomeBandDto,
   SyndicatDto,
 } from '../referentiels/dto.js';
 import {
@@ -727,6 +728,11 @@ export class SyncChangesDto {
   @ApiProperty({ type: () => [IefDto] }) iefs!: IefDto[];
   @ApiProperty({ type: () => [BanqueDto] }) banques!: BanqueDto[];
   @ApiProperty({ type: () => [SyndicatDto] }) syndicats!: SyndicatDto[];
+  @ApiProperty({
+    type: () => [IncomeBandDto],
+    description: 'Tranches de revenu mensuel : la conversion les demande hors réseau.',
+  })
+  incomeBands!: IncomeBandDto[];
   @ApiProperty({ type: () => [CanalProvenanceDto] }) canauxProvenance!: CanalProvenanceDto[];
 
   @ApiProperty({

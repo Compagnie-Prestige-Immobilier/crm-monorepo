@@ -288,10 +288,22 @@ describe('ConsoleView : fiche', () => {
     expect(fiche.getByText('Jamais appelée.')).toBeTruthy();
   });
 
+  it('demande d’abord si la personne était joignable, rien d’autre', async () => {
+    await renderConsole([NEUVE]);
+
+    const fiche = within(screen.getByRole('region', { name: 'Fiche courante' }));
+    expect(fiche.getByRole('group', { name: 'Comment s’est passé l’appel ?' })).toBeTruthy();
+    for (const label of ['Joignable', 'À rappeler', 'Injoignable', 'Mauvais numéro', 'Autre']) {
+      expect(fiche.getByRole('button', { name: new RegExp(label) })).toBeTruthy();
+    }
+    expect(fiche.queryByRole('button', { name: /Plateforme/ })).toBeNull();
+    expect(fiche.queryByRole('button', { name: /Prise de rendez-vous/ })).toBeNull();
+  });
+
   it('revient à la liste après enregistrement, sans sauter sur quelqu’un', async () => {
     await renderConsole();
 
-    await userEvent.keyboard('4');
+    await userEvent.keyboard('3');
 
     expect((await screen.findByRole('status')).textContent).toBe(
       'Appel enregistré pour Neuve Fiche.',
@@ -332,13 +344,12 @@ describe('ConsoleView : fiche', () => {
 });
 
 describe('ConsoleView : une touche, une issue', () => {
-  const immediate: readonly [string, CallOutcome, string | null][] = [
-    ['4', 'UNREACHABLE', null],
-    ['6', 'REFUSED', null],
-    ['7', 'WRONG_NUMBER', null],
+  const immediate: readonly [string, CallOutcome][] = [
+    ['3', 'UNREACHABLE'],
+    ['4', 'WRONG_NUMBER'],
   ];
 
-  for (const [key, outcome, method] of immediate) {
+  for (const [key, outcome] of immediate) {
     it(`consigne ${outcome} sans confirmation sur la touche ${key}`, async () => {
       await renderConsole();
 
@@ -347,7 +358,7 @@ describe('ConsoleView : une touche, une issue', () => {
       await waitFor(() => {
         expect(pushCallAttempt).toHaveBeenCalledTimes(1);
       });
-      expect(lastDraft()).toMatchObject({ outcome, method });
+      expect(lastDraft()).toMatchObject({ outcome, method: null });
     });
   }
 
@@ -355,7 +366,7 @@ describe('ConsoleView : une touche, une issue', () => {
     await renderConsole();
 
     const fiche = within(screen.getByRole('region', { name: 'Fiche courante' }));
-    for (const key of ['1', '2', '3', '4', '5', '6', '7', '8', '9']) {
+    for (const key of ['1', '2', '3', '4', '5']) {
       expect(fiche.getByText(key, { selector: 'kbd' })).toBeTruthy();
     }
   });
@@ -376,7 +387,7 @@ describe('ConsoleView : échéance du rappel', () => {
   it('demande quand rappeler au lieu d’envoyer aussitôt', async () => {
     await renderConsole();
 
-    await userEvent.keyboard('5');
+    await userEvent.keyboard('2');
 
     expect(screen.getByText('Demain 9 h')).toBeTruthy();
     expect(pushCallAttempt).not.toHaveBeenCalled();
@@ -385,7 +396,7 @@ describe('ConsoleView : échéance du rappel', () => {
   it('consigne l’issue et l’heure promise sur le chiffre de la puce', async () => {
     await renderConsole();
 
-    await userEvent.keyboard('5');
+    await userEvent.keyboard('2');
     const demain = screen.getByRole('button', { name: /Demain 9 h/ });
     await userEvent.keyboard(within(demain).getByText(/^\d$/).textContent);
 
@@ -399,7 +410,7 @@ describe('ConsoleView : échéance du rappel', () => {
   it('la puce cliquée consigne la même échéance que son chiffre', async () => {
     await renderConsole();
 
-    await userEvent.keyboard('5');
+    await userEvent.keyboard('2');
     await userEvent.click(screen.getByRole('button', { name: /Demain 15 h/ }));
 
     await waitFor(() => {
@@ -411,7 +422,7 @@ describe('ConsoleView : échéance du rappel', () => {
   it('accepte une échéance saisie à la main, à l’heure de Dakar', async () => {
     await renderConsole();
 
-    await userEvent.keyboard('5');
+    await userEvent.keyboard('2');
     await userEvent.type(screen.getByLabelText(/Autre échéance/), '2027-03-04T11:30');
     await userEvent.keyboard('{Enter}');
 
@@ -424,7 +435,7 @@ describe('ConsoleView : échéance du rappel', () => {
   it('n’envoie rien tant qu’aucune échéance n’est choisie', async () => {
     await renderConsole();
 
-    await userEvent.keyboard('5');
+    await userEvent.keyboard('2');
     await userEvent.keyboard('{Enter}');
 
     expect(pushCallAttempt).not.toHaveBeenCalled();
@@ -434,7 +445,7 @@ describe('ConsoleView : échéance du rappel', () => {
   it('Échap ramène aux issues, sans rien consigner', async () => {
     await renderConsole();
 
-    await userEvent.keyboard('5');
+    await userEvent.keyboard('2');
     await userEvent.keyboard('{Escape}');
 
     expect(screen.queryByText('Demain 9 h')).toBeNull();
@@ -445,7 +456,7 @@ describe('ConsoleView : échéance du rappel', () => {
   it('aucune autre issue n’emporte de date', async () => {
     await renderConsole();
 
-    await userEvent.keyboard('4');
+    await userEvent.keyboard('3');
 
     await waitFor(() => {
       expect(pushCallAttempt).toHaveBeenCalledTimes(1);
@@ -454,11 +465,15 @@ describe('ConsoleView : échéance du rappel', () => {
   });
 });
 
-describe('ConsoleView : phase 3 · Conversion', () => {
+describe('ConsoleView : joignable, le dossier', () => {
   const lastConversion = (): ConversionDraft | undefined => lastDraft().conversion;
 
   const submit = async (): Promise<void> => {
     await userEvent.click(screen.getByRole('button', { name: /Enregistrer l’adhésion/ }));
+  };
+
+  const choisirMethode = async (nom: string): Promise<void> => {
+    await userEvent.click(await screen.findByRole('radio', { name: nom }));
   };
 
   /** Un enseignant CHUES dont la fiche sait déjà l'essentiel. */
@@ -475,8 +490,7 @@ describe('ConsoleView : phase 3 · Conversion', () => {
 
   /** Ce que l'appel apprend et que la fiche ne porte pas encore. */
   const completerDossier = async (): Promise<void> => {
-    await userEvent.type(await screen.findByLabelText(/^E-mail/), 'neuve@example.sn');
-    await userEvent.type(screen.getByLabelText(/Durée dans l’établissement/), '36');
+    await userEvent.type(await screen.findByLabelText(/Durée dans l’établissement/), '36');
     await userEvent.click(
       within(screen.getByRole('group', { name: 'Fonctionnaire' })).getByRole('radio', {
         name: 'Oui',
@@ -487,6 +501,7 @@ describe('ConsoleView : phase 3 · Conversion', () => {
         name: 'Non',
       }),
     );
+    await choisirMethode('Plateforme');
   };
 
   const GRAND_PUBLIC = prospect({
@@ -502,7 +517,7 @@ describe('ConsoleView : phase 3 · Conversion', () => {
     dureeSystemeMois: 24,
   });
 
-  it('la méthode ouvre les renseignements au lieu d’envoyer l’appel', async () => {
+  it('« Joignable » ouvre le dossier au lieu d’envoyer l’appel', async () => {
     await renderConsole();
 
     await userEvent.keyboard('1');
@@ -534,6 +549,7 @@ describe('ConsoleView : phase 3 · Conversion', () => {
       expect(screen.getByRole('combobox', { name: liste })).toBeTruthy();
     }
     expect(screen.getByRole('radio', { name: 'Prise de rendez-vous' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Il refuse' })).toBeTruthy();
     expect(screen.getByLabelText(/Commentaire/)).toBeTruthy();
 
     expect(screen.queryByRole('group', { name: 'Situation' })).toBeNull();
@@ -569,7 +585,7 @@ describe('ConsoleView : phase 3 · Conversion', () => {
     expect(await screen.findByLabelText(/^Téléphone/)).toHaveProperty('readOnly', true);
   });
 
-  it('s’ouvre rempli de ce que la fiche sait déjà', async () => {
+  it('s’ouvre rempli de ce que la fiche sait déjà, sans méthode choisie d’office', async () => {
     await renderConsole([RENSEIGNE]);
 
     await userEvent.keyboard('1');
@@ -587,6 +603,11 @@ describe('ConsoleView : phase 3 · Conversion', () => {
     expect(
       screen.getByRole('combobox', { name: /Durée du système de paiement/ }).textContent,
     ).toContain('2 ans (24 mois)');
+    for (const radio of screen.getAllByRole('radio', {
+      name: /Plateforme|Physique|rendez-vous|Vocal/,
+    })) {
+      expect(radio).toHaveProperty('checked', false);
+    }
   });
 
   it('sur CHUES, n’enregistre pas l’adhésion tant que le dossier est incomplet', async () => {
@@ -596,16 +617,18 @@ describe('ConsoleView : phase 3 · Conversion', () => {
     await screen.findByText('Phase 3 · Conversion');
     await submit();
 
-    expect(await screen.findByText('L’adresse électronique est obligatoire.')).toBeTruthy();
-    expect(screen.getByText('Dites s’il est fonctionnaire.')).toBeTruthy();
+    expect(await screen.findByText('Dites s’il est fonctionnaire.')).toBeTruthy();
+    expect(screen.getByText('Choisissez la méthode d’enrôlement.')).toBeTruthy();
+    expect(screen.queryByText(/adresse électronique est obligatoire/)).toBeNull();
     expect(pushCallAttempt).not.toHaveBeenCalled();
   });
 
-  it('envoie tout le dossier avec l’appel', async () => {
+  it('envoie tout le dossier avec l’appel, e-mail compris quand il est donné', async () => {
     await renderConsole([RENSEIGNE]);
 
     await userEvent.keyboard('1');
     await completerDossier();
+    await userEvent.type(screen.getByLabelText(/^E-mail/), 'neuve@example.sn');
     await userEvent.type(screen.getByLabelText(/Commentaire/), 'adhésion confirmée');
     await submit();
 
@@ -635,11 +658,37 @@ describe('ConsoleView : phase 3 · Conversion', () => {
     });
   });
 
+  it('enregistre l’adhésion sans e-mail', async () => {
+    await renderConsole([RENSEIGNE]);
+
+    await userEvent.keyboard('1');
+    await completerDossier();
+    await submit();
+
+    await waitFor(() => {
+      expect(pushCallAttempt).toHaveBeenCalledTimes(1);
+    });
+    expect(lastConversion()?.email).toBe('');
+  });
+
+  it('« Il refuse » consigne le refus depuis le dossier, sans rien exiger', async () => {
+    await renderConsole([NEUVE]);
+
+    await userEvent.keyboard('1');
+    await userEvent.click(await screen.findByRole('button', { name: 'Il refuse' }));
+
+    await waitFor(() => {
+      expect(pushCallAttempt).toHaveBeenCalledTimes(1);
+    });
+    expect(lastDraft()).toMatchObject({ outcome: 'REFUSED', method: null });
+    expect(lastDraft().conversion).toBeUndefined();
+  });
+
   it('sur le Grand Public, laisse « non demandé » quand la question n’a pas été posée', async () => {
     await renderConsole([GRAND_PUBLIC]);
 
     await userEvent.keyboard('1');
-    await screen.findByText('Phase 3 · Conversion');
+    await choisirMethode('Plateforme');
     await submit();
 
     await waitFor(() => {
@@ -654,6 +703,7 @@ describe('ConsoleView : phase 3 · Conversion', () => {
 
     await userEvent.keyboard('1');
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Diaspora' }));
+    await choisirMethode('Plateforme');
     await submit();
 
     await waitFor(() => {
@@ -668,9 +718,10 @@ describe('ConsoleView : phase 3 · Conversion', () => {
   });
 
   it('la prise de rendez-vous réclame sa date, et ne part pas sans elle', async () => {
-    await renderConsole([RENSEIGNE]);
+    await renderConsole([GRAND_PUBLIC]);
 
-    await userEvent.keyboard('9');
+    await userEvent.keyboard('1');
+    await choisirMethode('Prise de rendez-vous');
     await submit();
 
     expect(await screen.findByText(/exige la date du rendez-vous/)).toBeTruthy();
@@ -680,7 +731,8 @@ describe('ConsoleView : phase 3 · Conversion', () => {
   it('consigne la date du rendez-vous à l’heure de Dakar', async () => {
     await renderConsole([GRAND_PUBLIC]);
 
-    await userEvent.keyboard('9');
+    await userEvent.keyboard('1');
+    await choisirMethode('Prise de rendez-vous');
     await userEvent.type(await screen.findByLabelText(/Date du rendez-vous/), '2027-03-04T11:30');
     await submit();
 
@@ -694,9 +746,10 @@ describe('ConsoleView : phase 3 · Conversion', () => {
   it('change de méthode sans laisser traîner la date du rendez-vous', async () => {
     await renderConsole([GRAND_PUBLIC]);
 
-    await userEvent.keyboard('9');
+    await userEvent.keyboard('1');
+    await choisirMethode('Prise de rendez-vous');
     await userEvent.type(await screen.findByLabelText(/Date du rendez-vous/), '2027-03-04T11:30');
-    await userEvent.click(screen.getByRole('radio', { name: 'Plateforme' }));
+    await choisirMethode('Plateforme');
     await submit();
 
     await waitFor(() => {
@@ -723,7 +776,7 @@ describe('ConsoleView : phase 3 · Conversion', () => {
     await renderConsole([GRAND_PUBLIC]);
 
     await userEvent.keyboard('1');
-    await screen.findByText('Phase 3 · Conversion');
+    await choisirMethode('Plateforme');
     await submit();
 
     const message = await screen.findByText(/mois entiers, de 0 à 600/);
@@ -732,7 +785,7 @@ describe('ConsoleView : phase 3 · Conversion', () => {
     ).toContain(message.id);
   });
 
-  it('Échap referme les renseignements sans rien consigner', async () => {
+  it('Échap referme le dossier sans rien consigner', async () => {
     await renderConsole([RENSEIGNE]);
 
     await userEvent.keyboard('1');
@@ -744,12 +797,12 @@ describe('ConsoleView : phase 3 · Conversion', () => {
     expect(pushCallAttempt).not.toHaveBeenCalled();
   });
 
-  it('rend les chiffres inertes tant que les renseignements sont ouverts', async () => {
+  it('rend les chiffres inertes tant que le dossier est ouvert', async () => {
     await renderConsole([RENSEIGNE]);
 
     await userEvent.keyboard('1');
     await screen.findByText('Phase 3 · Conversion');
-    await userEvent.keyboard('4');
+    await userEvent.keyboard('3');
 
     expect(pushCallAttempt).not.toHaveBeenCalled();
     expect(screen.getByText('Phase 3 · Conversion')).toBeTruthy();
@@ -773,7 +826,7 @@ describe('ConsoleView : Autre et commentaire', () => {
   it('place le curseur dans le commentaire sans rien envoyer', async () => {
     await renderConsole();
 
-    await userEvent.keyboard('8');
+    await userEvent.keyboard('5');
 
     expect(document.activeElement).toBe(screen.getByLabelText(/Commentaire/));
     expect(pushCallAttempt).not.toHaveBeenCalled();
@@ -782,7 +835,7 @@ describe('ConsoleView : Autre et commentaire', () => {
   it('refuse un commentaire vide, comme le fera le serveur', async () => {
     await renderConsole();
 
-    await userEvent.keyboard('8');
+    await userEvent.keyboard('5');
     await userEvent.keyboard('{Enter}');
 
     expect(pushCallAttempt).not.toHaveBeenCalled();
@@ -792,7 +845,7 @@ describe('ConsoleView : Autre et commentaire', () => {
   it('valide sur Entrée une fois le commentaire saisi', async () => {
     await renderConsole();
 
-    await userEvent.keyboard('8');
+    await userEvent.keyboard('5');
     await userEvent.keyboard('ligne coupée{Enter}');
 
     await waitFor(() => {
@@ -804,17 +857,17 @@ describe('ConsoleView : Autre et commentaire', () => {
   it('ne consigne rien quand un chiffre est tapé DANS le commentaire', async () => {
     await renderConsole();
 
-    await userEvent.keyboard('8');
-    await userEvent.keyboard('4');
+    await userEvent.keyboard('5');
+    await userEvent.keyboard('3');
 
     expect(pushCallAttempt).not.toHaveBeenCalled();
-    expect(screen.getByLabelText(/Commentaire/)).toHaveProperty('value', '4');
+    expect(screen.getByLabelText(/Commentaire/)).toHaveProperty('value', '3');
   });
 
   it('Échap vide la saisie en cours, puis seulement revient à la liste', async () => {
     await renderConsole();
 
-    await userEvent.keyboard('8');
+    await userEvent.keyboard('5');
     await userEvent.keyboard('brouillon');
     await userEvent.keyboard('{Escape}');
 
@@ -848,7 +901,7 @@ describe('ConsoleView : fiche déjà close', () => {
   it('ignore les touches d’issue sur une fiche close', async () => {
     await renderConsole([CLOSE]);
 
-    await userEvent.keyboard('4');
+    await userEvent.keyboard('3');
 
     expect(pushCallAttempt).not.toHaveBeenCalled();
   });
@@ -859,7 +912,7 @@ describe('ConsoleView : fiche déjà close', () => {
     );
     await renderConsole([NEUVE]);
 
-    await userEvent.keyboard('4');
+    await userEvent.keyboard('3');
 
     await waitFor(() => {
       expect(screen.getByRole('status').textContent).toMatch(/déjà close/);

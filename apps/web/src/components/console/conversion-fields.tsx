@@ -129,7 +129,7 @@ export function ConversionFields({
         {(props) => <Input {...props} readOnly value={formatPhone(phoneE164)} />}
       </Field>
 
-      <Field label="E-mail" required={complet} error={errors.email}>
+      <Field label="E-mail" error={errors.email}>
         {(props) => (
           <Input
             {...props}
@@ -325,6 +325,11 @@ export function ConversionFields({
             />
           ))}
         </div>
+        {errors.method === undefined ? null : (
+          <p role="alert" className="text-[0.75rem] text-destructive">
+            {errors.method}
+          </p>
+        )}
       </fieldset>
 
       {draft.method === 'APPOINTMENT' ? (

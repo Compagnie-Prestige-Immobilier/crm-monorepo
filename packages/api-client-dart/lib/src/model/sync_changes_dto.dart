@@ -8,6 +8,7 @@ import 'package:crm_api_client/src/model/representant_dto.dart';
 import 'package:crm_api_client/src/model/prospect_dto.dart';
 import 'package:crm_api_client/src/model/ief_dto.dart';
 import 'package:crm_api_client/src/model/sync_visite_referentiel_dto.dart';
+import 'package:crm_api_client/src/model/income_band_dto.dart';
 import 'package:crm_api_client/src/model/canal_provenance_dto.dart';
 import 'package:crm_api_client/src/model/sync_visite_dto.dart';
 import 'package:crm_api_client/src/model/syndicat_dto.dart';
@@ -36,6 +37,8 @@ class SyncChangesDto {
 
     required this.syndicats,
 
+    required this.incomeBands,
+
     required this.canauxProvenance,
 
     required this.visiteReferentiels,
@@ -58,6 +61,10 @@ class SyncChangesDto {
 
   @JsonKey(name: r'syndicats', required: true, includeIfNull: false)
   final List<SyndicatDto> syndicats;
+
+  /// Tranches de revenu mensuel : la conversion les demande hors réseau.
+  @JsonKey(name: r'incomeBands', required: true, includeIfNull: false)
+  final List<IncomeBandDto> incomeBands;
 
   @JsonKey(name: r'canauxProvenance', required: true, includeIfNull: false)
   final List<CanalProvenanceDto> canauxProvenance;
@@ -85,6 +92,7 @@ class SyncChangesDto {
                 iefs,
                 banques,
                 syndicats,
+                incomeBands,
                 canauxProvenance,
                 visiteReferentiels,
                 representants,
@@ -96,6 +104,7 @@ class SyncChangesDto {
                 other.iefs,
                 other.banques,
                 other.syndicats,
+                other.incomeBands,
                 other.canauxProvenance,
                 other.visiteReferentiels,
                 other.representants,
@@ -113,6 +122,7 @@ class SyncChangesDto {
         iefs,
         banques,
         syndicats,
+        incomeBands,
         canauxProvenance,
         visiteReferentiels,
         representants,

@@ -784,12 +784,14 @@ vingt fiches récentes du projet CHUES ; aucune fiche ouverte d'office.
 **ET3-2 | P1 | `?fiche=<id>` ouvre directement la fiche visée**
 Lecture par identifiant ; aucun avertissement ; « Revenir à la liste » rend la
 recherche. **ET3-2b** rejoue le chemin réel : un rappel promis depuis la fiche
-apparaît dans `/chues/rappels`, et « Ouvrir la fiche » rouvre la fiche.
+apparaît dans `/chues/rappels`, et « Consigner l'appel » rouvre la fiche.
 
-**ET3-3 | P1 | les touches ouvrent l'échéance, les renseignements, et consignent**
-`5` ouvre « Quand rappeler », Échap le referme ; `1` ouvre « Phase 3 ·
-Conversion », Échap le referme ; `4` consigne `UNREACHABLE` (relu par l'API,
-fiche toujours `PENDING`).
+**ET3-3 | P1 | les touches ouvrent l'échéance, le dossier, et consignent**
+Premier écran : « Comment s'est passé l'appel ? » (`1` joignable, `2` à
+rappeler, `3` injoignable, `4` mauvais numéro, `5` autre). `2` ouvre « Quand
+rappeler », Échap le referme ; `1` ouvre le dossier (« Phase 3 · Conversion »,
+méthode d'enrôlement incluse, bouton « Il refuse »), Échap le referme ; `3`
+consigne `UNREACHABLE` (relu par l'API, fiche toujours `PENDING`).
 
 **ET3-4 | P1 | après enregistrement, retour à la liste**
 `role=status` « Appel enregistré pour X. », aucune fiche ouverte à la place.
@@ -797,17 +799,18 @@ fiche toujours `PENDING`).
 **ET3-5 | P2 | la carte clavier ne mentionne plus « ↑ ↓ » ni « Espace »**
 
 **ET3-6 | P2 | une fiche déjà close refuse un nouvel appel en le disant**
-Après un refus (`6`), la fiche rouverte affiche « Fiche déjà close (refus) »,
-sans bouton d'issue ; `4` ne consigne rien.
+Après un refus (`1` puis « Il refuse »), la fiche rouverte affiche « Fiche déjà
+close (refus) », sans bouton d'issue ; `3` ne consigne rien.
 
 **ET3-7 | P1 | l'adhésion exige le dossier complet, et le serveur l'enregistre**
-Sur CHUES : ni « Situation » ni « Paiement » (le prospect est enseignant) ;
-« Enregistrer l'adhésion » sur un dossier incomplet nomme chaque manque sous son
-champ et n'envoie rien ; une fois e-mail, profession, durée dans
-l'établissement, fonctionnaire, syndicat, banque, engagement, revenu mensuel et
-durée du système renseignés, l'API relit `METHOD_OBTAINED`, la profession, le
-syndicat, la tranche de revenu et la durée du système, `type` et `paymentMode`
-restant nuls.
+Sur CHUES : ni « Situation » ni « Paiement » (le prospect est enseignant,
+crédit de consommation CBAO) ; « Enregistrer l'adhésion » sur un dossier
+incomplet nomme chaque manque sous son champ (profession, fonctionnaire,
+méthode d'enrôlement…) et n'envoie rien ; l'e-mail reste facultatif ; une fois
+profession, durée dans l'établissement, fonctionnaire, syndicat, banque,
+engagement, revenu mensuel, durée du système et méthode renseignés, l'API relit
+`METHOD_OBTAINED`, la profession, le syndicat, la tranche de revenu et la durée
+du système, `type` et `paymentMode` restant nuls.
 
 ---
 

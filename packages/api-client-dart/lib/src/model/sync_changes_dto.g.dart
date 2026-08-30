@@ -15,6 +15,8 @@ abstract class _$SyncChangesDtoCWProxy {
 
   SyncChangesDto syndicats(List<SyndicatDto> syndicats);
 
+  SyncChangesDto incomeBands(List<IncomeBandDto> incomeBands);
+
   SyncChangesDto canauxProvenance(List<CanalProvenanceDto> canauxProvenance);
 
   SyncChangesDto visiteReferentiels(
@@ -38,6 +40,7 @@ abstract class _$SyncChangesDtoCWProxy {
     List<IefDto> iefs,
     List<BanqueDto> banques,
     List<SyndicatDto> syndicats,
+    List<IncomeBandDto> incomeBands,
     List<CanalProvenanceDto> canauxProvenance,
     List<SyncVisiteReferentielDto> visiteReferentiels,
     List<RepresentantDto> representants,
@@ -65,6 +68,10 @@ class _$SyncChangesDtoCWProxyImpl implements _$SyncChangesDtoCWProxy {
   @override
   SyncChangesDto syndicats(List<SyndicatDto> syndicats) =>
       this(syndicats: syndicats);
+
+  @override
+  SyncChangesDto incomeBands(List<IncomeBandDto> incomeBands) =>
+      this(incomeBands: incomeBands);
 
   @override
   SyncChangesDto canauxProvenance(List<CanalProvenanceDto> canauxProvenance) =>
@@ -98,6 +105,7 @@ class _$SyncChangesDtoCWProxyImpl implements _$SyncChangesDtoCWProxy {
     Object? iefs = const $CopyWithPlaceholder(),
     Object? banques = const $CopyWithPlaceholder(),
     Object? syndicats = const $CopyWithPlaceholder(),
+    Object? incomeBands = const $CopyWithPlaceholder(),
     Object? canauxProvenance = const $CopyWithPlaceholder(),
     Object? visiteReferentiels = const $CopyWithPlaceholder(),
     Object? representants = const $CopyWithPlaceholder(),
@@ -121,6 +129,10 @@ class _$SyncChangesDtoCWProxyImpl implements _$SyncChangesDtoCWProxy {
           ? _value.syndicats
           // ignore: cast_nullable_to_non_nullable
           : syndicats as List<SyndicatDto>,
+      incomeBands: incomeBands == const $CopyWithPlaceholder()
+          ? _value.incomeBands
+          // ignore: cast_nullable_to_non_nullable
+          : incomeBands as List<IncomeBandDto>,
       canauxProvenance: canauxProvenance == const $CopyWithPlaceholder()
           ? _value.canauxProvenance
           // ignore: cast_nullable_to_non_nullable
@@ -165,6 +177,7 @@ SyncChangesDto _$SyncChangesDtoFromJson(
       'iefs',
       'banques',
       'syndicats',
+      'incomeBands',
       'canauxProvenance',
       'visiteReferentiels',
       'representants',
@@ -195,6 +208,12 @@ SyncChangesDto _$SyncChangesDtoFromJson(
       'syndicats',
       (v) => (v as List<dynamic>)
           .map((e) => SyndicatDto.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    ),
+    incomeBands: $checkedConvert(
+      'incomeBands',
+      (v) => (v as List<dynamic>)
+          .map((e) => IncomeBandDto.fromJson(e as Map<String, dynamic>))
           .toList(),
     ),
     canauxProvenance: $checkedConvert(
@@ -240,6 +259,7 @@ Map<String, dynamic> _$SyncChangesDtoToJson(
   'iefs': instance.iefs.map((e) => e.toJson()).toList(),
   'banques': instance.banques.map((e) => e.toJson()).toList(),
   'syndicats': instance.syndicats.map((e) => e.toJson()).toList(),
+  'incomeBands': instance.incomeBands.map((e) => e.toJson()).toList(),
   'canauxProvenance': instance.canauxProvenance.map((e) => e.toJson()).toList(),
   'visiteReferentiels': instance.visiteReferentiels
       .map((e) => e.toJson())

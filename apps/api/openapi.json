@@ -20886,6 +20886,13 @@
               "$ref": "#/components/schemas/SyndicatDto"
             }
           },
+          "incomeBands": {
+            "description": "Tranches de revenu mensuel : la conversion les demande hors réseau.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IncomeBandDto"
+            }
+          },
           "canauxProvenance": {
             "type": "array",
             "items": {
@@ -20923,6 +20930,7 @@
           "iefs",
           "banques",
           "syndicats",
+          "incomeBands",
           "canauxProvenance",
           "visiteReferentiels",
           "representants",
