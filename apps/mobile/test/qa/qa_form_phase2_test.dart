@@ -19,13 +19,15 @@ void main() {
 
     final Phase2FormFields champs = Phase2FormFields();
     addTearDown(champs.dispose);
+    champs.nom.text = 'Sow';
+    champs.prenom.text = 'Awa';
     champs.email.text = 'awa@exemple.s';
     expect(
       champs.erreurEmail,
       isNull,
       reason: 'aucun reproche sous le champ, aucune retenue à l\'étape 2',
     );
-    expect(champs.manque, isNull);
+    expect(champs.manqueQui, isNull);
   });
 
   // ── FOR-07 ────────────────────────────────────────────────────────────────

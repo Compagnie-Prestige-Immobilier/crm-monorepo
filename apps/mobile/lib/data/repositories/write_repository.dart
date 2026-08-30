@@ -735,9 +735,10 @@ class WriteRepository {
   /// premier reste le point d'entrée des six codes système, dont le référentiel
   /// garantit qu'ils portent le code de leur issue.
   ///
-  /// [nom], [prenom], [profession], [banqueId] et [syndicatId] ne sont PAS
-  /// écrits en local : c'est le serveur qui les pose sur le prospect lié, et
-  /// les recopier ici donnerait deux vérités à tenir d'accord jusqu'au pull.
+  /// [nom], [prenom], [profession], [banqueId], [syndicatId], [incomeBandId] et
+  /// [dureeSystemeMois] ne sont PAS écrits en local : c'est le serveur qui les
+  /// pose sur le prospect lié, et les recopier ici donnerait deux vérités à
+  /// tenir d'accord jusqu'au pull.
   Future<String> recordCallAttempt({
     required String prospectId,
     required String outcome,
@@ -753,6 +754,8 @@ class WriteRepository {
     String? profession,
     String? banqueId,
     String? syndicatId,
+    String? incomeBandId,
+    int? dureeSystemeMois,
     String? email,
     bool? fonctionnaire,
     bool? engagementEnCours,
@@ -826,6 +829,8 @@ class WriteRepository {
           'profession': ?normalizeComment(profession),
           'banqueId': ?banqueId,
           'syndicatId': ?syndicatId,
+          'incomeBandId': ?incomeBandId,
+          'dureeSystemeMois': ?dureeSystemeMois,
           'email': ?normalizedEmail,
           // Le `?` n'omet que le NUL : `false` est une réponse et part, là où
           // son absence se lirait « question non posée ».

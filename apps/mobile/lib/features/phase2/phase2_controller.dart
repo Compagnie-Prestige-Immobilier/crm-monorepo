@@ -10,9 +10,9 @@ import '../../data/repositories/write_repository.dart';
 
 enum Phase2Stage { search, notFound, alreadyClosed, capture, confirmed }
 
-/// Ce que l'étape « Renseignements » a recueilli. Tout y est facultatif : un
-/// téléconseiller n'obtient pas toujours une réponse, et un champ manquant ne
-/// doit jamais empêcher l'appel d'être consigné.
+/// Ce que l'étape « Renseignements » a recueilli. Le dossier complet est exigé
+/// avant une adhésion, mais pas avant un appel qui n'a pas abouti : tout y reste
+/// donc facultatif, et c'est l'écran qui retient le passage.
 @immutable
 class Phase2Renseignements {
   const Phase2Renseignements({
@@ -25,6 +25,8 @@ class Phase2Renseignements {
     this.syndicatId,
     this.banqueId,
     this.engagementEnCours,
+    this.incomeBandId,
+    this.dureeSystemeMois,
   });
 
   final String? nom;
@@ -39,6 +41,13 @@ class Phase2Renseignements {
   final String? syndicatId;
   final String? banqueId;
   final bool? engagementEnCours;
+
+  /// Tranche de revenu du référentiel serveur.
+  final String? incomeBandId;
+
+  /// Durée du système de paiement, en mois. Distincte de
+  /// [dureeEtablissementMois], qui est l'ancienneté au poste.
+  final int? dureeSystemeMois;
 }
 
 @immutable
@@ -244,6 +253,8 @@ class Phase2Controller extends Notifier<Phase2State> {
         profession: renseignements?.profession,
         banqueId: renseignements?.banqueId,
         syndicatId: renseignements?.syndicatId,
+        incomeBandId: renseignements?.incomeBandId,
+        dureeSystemeMois: renseignements?.dureeSystemeMois,
         email: renseignements?.email,
         fonctionnaire: renseignements?.fonctionnaire,
         engagementEnCours: renseignements?.engagementEnCours,

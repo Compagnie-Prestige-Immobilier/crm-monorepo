@@ -1058,6 +1058,8 @@ void main() {
           profession: 'Institutrice',
           banqueId: 'bq-1',
           syndicatId: 'sy-1',
+          incomeBandId: 'rev-1',
+          dureeSystemeMois: 24,
           email: 'awa.sow@exemple.sn',
           fonctionnaire: false,
           engagementEnCours: true,
@@ -1072,6 +1074,8 @@ void main() {
         expect(payload['profession'], 'Institutrice');
         expect(payload['banqueId'], 'bq-1');
         expect(payload['syndicatId'], 'sy-1');
+        expect(payload['incomeBandId'], 'rev-1');
+        expect(payload['dureeSystemeMois'], 24);
         // `false` et `0` sont des réponses : les omettre les lirait comme
         // « question non posée ».
         expect(payload['fonctionnaire'], isFalse);

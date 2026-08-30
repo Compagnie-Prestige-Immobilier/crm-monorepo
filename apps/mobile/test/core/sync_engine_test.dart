@@ -60,6 +60,16 @@ void main() {
       expect(source, isNot(contains('package:flutter/')));
       expect(source, isNot(contains('package:drift_flutter/')));
     });
+
+    // La migration ne peut pas importer le moteur : elle cite la clé en clair.
+    // Renommée d'un côté seulement, le palier 21 effacerait une ligne qui
+    // n'existe pas et le miroir ne serait jamais redemandé.
+    test('le palier 21 efface bien le marqueur que lit le moteur', () {
+      final String source = File(
+        'lib/data/local/database.dart',
+      ).readAsStringSync();
+      expect(source, contains(SyncEngine.referentielsMirrorKey));
+    });
   });
 
   group('buildSyncEngine', () {
@@ -1770,6 +1780,7 @@ void main() {
             banques: const <BanqueDto>[],
             syndicats: const <SyndicatDto>[],
             canauxProvenance: const <CanalProvenanceDto>[],
+            incomeBands: const <IncomeBandDto>[],
             visiteReferentiels: const <SyncVisiteReferentielDto>[],
             representants: <RepresentantDto>[
               representantDto(
@@ -1810,6 +1821,7 @@ void main() {
             banques: const <BanqueDto>[],
             syndicats: const <SyndicatDto>[],
             canauxProvenance: const <CanalProvenanceDto>[],
+            incomeBands: const <IncomeBandDto>[],
             visiteReferentiels: const <SyncVisiteReferentielDto>[],
             representants: const <RepresentantDto>[],
             prospects: <ProspectDto>[
@@ -1861,6 +1873,7 @@ void main() {
             banques: const <BanqueDto>[],
             syndicats: const <SyndicatDto>[],
             canauxProvenance: const <CanalProvenanceDto>[],
+            incomeBands: const <IncomeBandDto>[],
             visiteReferentiels: const <SyncVisiteReferentielDto>[],
             representants: <RepresentantDto>[
               representantDto(
@@ -1906,6 +1919,7 @@ void main() {
             banques: const <BanqueDto>[],
             syndicats: const <SyndicatDto>[],
             canauxProvenance: const <CanalProvenanceDto>[],
+            incomeBands: const <IncomeBandDto>[],
             visiteReferentiels: const <SyncVisiteReferentielDto>[],
             representants: const <RepresentantDto>[],
             prospects: const <ProspectDto>[],
@@ -1928,6 +1942,132 @@ void main() {
       expect(rep.deletedAt, t0);
     });
 
+    test('le pull range les tranches de revenu en local', () async {
+      api.pullPages.add(
+        PullPage(
+          changes: SyncChangesDto(
+            departements: const <DepartementDto>[],
+            iefs: const <IefDto>[],
+            banques: const <BanqueDto>[],
+            syndicats: const <SyndicatDto>[],
+            canauxProvenance: const <CanalProvenanceDto>[],
+            incomeBands: <IncomeBandDto>[
+              IncomeBandDto(
+                id: 'rev-2',
+                code: 'B300_500',
+                label: '300 000 à 500 000',
+                minXof: 300000,
+                maxXof: 500000,
+                position: 20,
+                isActive: true,
+                updatedAt: t0,
+              ),
+            ],
+            visiteReferentiels: const <SyncVisiteReferentielDto>[],
+            representants: const <RepresentantDto>[],
+            prospects: const <ProspectDto>[],
+            visites: const <SyncVisiteDto>[],
+          ),
+          deletions: const <SyncDeletionDto>[],
+          nextCursor: '',
+          hasMore: false,
+          serverTime: t0,
+        ),
+      );
+
+      await engine.pullChanges();
+
+      final IncomeBand band = await (db.select(
+        db.incomeBands,
+      )..where((IncomeBands t) => t.id.equals('rev-2'))).getSingle();
+      expect(band.label, '300 000 à 500 000');
+      expect(band.minXof, 300000);
+      expect(band.maxXof, 500000);
+      expect(band.sortOrder, 20);
+      expect(band.serverUpdatedAt, t0);
+    });
+
+    // Le pendant du palier 21 : c'est l'effacement du marqueur qui rend la
+    // liste entière, donc les tranches, à un appareil déjà mis au miroir.
+    test('sans marqueur de miroir, le sync repose les tranches', () async {
+      api.referentiels = ReferentielsSnapshot(
+        departements: const <DepartementDto>[],
+        iefs: const <IefDto>[],
+        banques: const <BanqueDto>[],
+        syndicats: const <SyndicatDto>[],
+        canauxProvenance: const <CanalProvenanceDto>[],
+        incomeBands: <IncomeBandDto>[
+          IncomeBandDto(
+            id: 'rev-3',
+            code: 'B500_800',
+            label: '500 000 à 800 000',
+            minXof: 500000,
+            maxXof: 800000,
+            position: 30,
+            isActive: true,
+            updatedAt: t0,
+          ),
+        ],
+      );
+
+      // L'appareil d'AVANT le palier : miroir déjà fait, et une page vide ne
+      // bouge aucun référentiel. Rien n'est relu, la table reste vide.
+      await db
+          .into(db.syncState)
+          .insert(
+            SyncStateCompanion.insert(
+              collection: SyncEngine.referentielsMirrorKey,
+              lastPulledAt: Value<DateTime?>(t0),
+            ),
+          );
+      api.pullPages.add(emptyPullPage());
+      await engine.pullChanges();
+      expect(api.referentielsPulls, 0);
+      expect(
+        await (db.select(
+          db.incomeBands,
+        )..where((IncomeBands t) => t.id.equals('rev-3'))).getSingleOrNull(),
+        isNull,
+      );
+
+      // Ce que fait la migration 20 → 21.
+      await (db.delete(db.syncState)..where(
+            (SyncState t) =>
+                t.collection.equals(SyncEngine.referentielsMirrorKey),
+          ))
+          .go();
+
+      api.pullPages.add(emptyPullPage());
+      await engine.pullChanges();
+
+      expect(api.referentielsPulls, 1);
+      final IncomeBand band = await (db.select(
+        db.incomeBands,
+      )..where((IncomeBands t) => t.id.equals('rev-3'))).getSingle();
+      expect(band.label, '500 000 à 800 000');
+      expect(band.deletedAt, isNull);
+      // Le miroir rend la liste ENTIÈRE : la tranche que le serveur ne sert
+      // plus se retire, elle ne cohabite pas avec la génération neuve.
+      expect(
+        await (db.select(db.incomeBands)
+              ..where((IncomeBands t) => t.id.equals('rev-1')))
+            .getSingle()
+            .then((IncomeBand row) => row.deletedAt),
+        isNotNull,
+      );
+      expect(
+        await (db.select(db.syncState)..where(
+              (SyncState t) =>
+                  t.collection.equals(SyncEngine.referentielsMirrorKey),
+            ))
+            .getSingle()
+            .then((SyncStateData row) => row.lastPulledAt),
+        isNotNull,
+        reason:
+            'le marqueur se repose, le miroir ne se refait pas à chaque pull',
+      );
+    });
+
     test('un pull raté n\'annule pas un push réussi', () async {
       await insertRepresentant(db, id: 'repA', phone: '+221770000001');
       await queueOp(db, id: 'A1', entityType: 'representant', entityId: 'repA');
@@ -1939,6 +2079,7 @@ void main() {
             banques: const <BanqueDto>[],
             syndicats: const <SyndicatDto>[],
             canauxProvenance: const <CanalProvenanceDto>[],
+            incomeBands: const <IncomeBandDto>[],
             visiteReferentiels: const <SyncVisiteReferentielDto>[],
             representants: const <RepresentantDto>[],
             prospects: const <ProspectDto>[],
@@ -1966,6 +2107,7 @@ void main() {
               banques: const <BanqueDto>[],
               syndicats: const <SyndicatDto>[],
               canauxProvenance: const <CanalProvenanceDto>[],
+              incomeBands: const <IncomeBandDto>[],
               visiteReferentiels: const <SyncVisiteReferentielDto>[],
               representants: const <RepresentantDto>[],
               prospects: const <ProspectDto>[],
@@ -1979,7 +2121,6 @@ void main() {
         );
 
         await engine.pullChanges();
-
       },
     );
 
@@ -2012,6 +2153,7 @@ void main() {
               banques: const <BanqueDto>[],
               syndicats: const <SyndicatDto>[],
               canauxProvenance: const <CanalProvenanceDto>[],
+              incomeBands: const <IncomeBandDto>[],
               visiteReferentiels: const <SyncVisiteReferentielDto>[],
               representants: const <RepresentantDto>[],
               prospects: const <ProspectDto>[],

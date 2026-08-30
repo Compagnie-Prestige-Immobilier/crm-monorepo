@@ -21,6 +21,7 @@ import 'generated_migrations/schema_v14.dart' as v14;
 import 'generated_migrations/schema_v15.dart' as v15;
 import 'generated_migrations/schema_v18.dart' as v18;
 import 'generated_migrations/schema_v19.dart' as v19;
+import 'generated_migrations/schema_v20.dart' as v20;
 
 /// Test doré de migration.
 ///
@@ -1854,6 +1855,107 @@ void main() {
     );
     await db.close();
   });
+
+  test(
+    'v20 -> v21 ouvre les tranches de revenu sans toucher aux saisies',
+    () async {
+      final schema = await verifier.schemaAt(20);
+      final v20.DatabaseAtV20 old = v20.DatabaseAtV20(schema.newConnection());
+      await old.customStatement(
+        'INSERT INTO call_attempts '
+        '(id, prospect_id, outcome, effect, method, client_created_at, created_by_id) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?)',
+        <Object?>[
+          'attempt-21',
+          'prospect-21',
+          'METHOD_OBTAINED',
+          'CLOSE_METHOD',
+          'PLATFORM',
+          _iso,
+          'me',
+        ],
+      );
+      await old.customStatement(
+        'INSERT INTO outbox '
+        '(id, entity_type, entity_id, op, payload, next_attempt_at, created_at) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?)',
+        <Object?>[
+          'op-21',
+          'call_attempt',
+          'attempt-21',
+          'create',
+          '{}',
+          _iso,
+          _iso,
+        ],
+      );
+      // Un appareil DÉJÀ mis au miroir : c'est celui qui ne redemanderait
+      // jamais la liste entière, donc celui qui n'aurait jamais de tranche.
+      await old.customStatement(
+        'INSERT INTO sync_state (collection, cursor, last_pulled_at) '
+        'VALUES (?, ?, ?)',
+        <Object?>['referentiels_mirror', null, _iso],
+      );
+      await old.customStatement(
+        'INSERT INTO sync_state (collection, cursor, last_pulled_at) '
+        'VALUES (?, ?, ?)',
+        <Object?>['all', 'cur-20', _iso],
+      );
+      await old.close();
+
+      final AppDatabase db = AppDatabase(schema.newConnection());
+      await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
+      await db.customStatement(
+        'INSERT INTO income_bands '
+        '(id, code, label, min_xof, max_xof, sort_order, local_updated_at) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?)',
+        <Object?>[
+          'band-21',
+          'B150_300',
+          '150 000 à 300 000',
+          150000,
+          300000,
+          10,
+          _iso,
+        ],
+      );
+      expect(
+        await db.customSelect('SELECT id FROM income_bands').get(),
+        hasLength(1),
+      );
+      // Le marqueur du miroir est effacé : la prochaine synchronisation relit
+      // les référentiels ENTIERS et pose enfin les tranches.
+      expect(
+        await db
+            .customSelect(
+              'SELECT collection FROM sync_state '
+              'WHERE collection = \'referentiels_mirror\'',
+            )
+            .get(),
+        isEmpty,
+      );
+      // Le curseur de pull, lui, ne bouge pas : une page de saisies perdue ne
+      // se rattrape pas.
+      expect(
+        await db
+            .customSelect(
+              'SELECT cursor FROM sync_state WHERE collection = \'all\'',
+            )
+            .getSingle()
+            .then((QueryRow row) => row.read<String>('cursor')),
+        'cur-20',
+      );
+      expect(await db.countMyAttempts().getSingle(), 1);
+      expect(
+        await db
+            .customSelect('SELECT id FROM outbox')
+            .getSingle()
+            .then((QueryRow row) => row.read<String>('id')),
+        'op-21',
+      );
+      await db.close();
+    },
+  );
 
   test('v11 -> courant traverse sans créer les tables de campagne', () async {
     final schema = await verifier.schemaAt(11);

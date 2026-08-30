@@ -493,6 +493,7 @@ SyncChangesDto _changesVides() => SyncChangesDto(
   banques: const <BanqueDto>[],
   syndicats: const <SyndicatDto>[],
   canauxProvenance: const <CanalProvenanceDto>[],
+  incomeBands: const <IncomeBandDto>[],
   visiteReferentiels: const <SyncVisiteReferentielDto>[],
   representants: const <RepresentantDto>[],
   prospects: const <ProspectDto>[],
