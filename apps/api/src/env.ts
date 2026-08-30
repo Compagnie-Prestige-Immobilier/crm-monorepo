@@ -63,6 +63,8 @@ export const envSchema = z
       .default('SN'),
     SYNC_MAX_BATCH_SIZE: z.coerce.number().int().positive().max(2000).default(200),
     IDEMPOTENCY_TTL_DAYS: z.coerce.number().int().positive().default(7),
+    PASSWORD_MIN_LENGTH: z.coerce.number().int().min(1).default(8),
+    PASSWORD_MAX_LENGTH: z.coerce.number().int().positive().max(200).default(24),
 
     APK_RELEASE_DIR: z.string().min(1).default('./storage/releases'),
     APK_MAX_SIZE_BYTES: z.coerce.number().int().positive().max(1_073_741_824).default(524_288_000),

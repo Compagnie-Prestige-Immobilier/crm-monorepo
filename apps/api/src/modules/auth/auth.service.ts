@@ -6,10 +6,12 @@ import type { User } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { readEnv } from '../../env.js';
+import { AuditAction, audit } from '../../common/audit.js';
 import { WorkspaceContext, type Workspace } from '../../workspaces/workspace.js';
 import { DemoService } from '../demo/demo.service.js';
 import { hashPassword, verifyPassword } from './password.js';
 import type { AuthTokensDto, AuthUserDto } from './dto.js';
+import type { OkDto } from '../../common/dto/ok.dto.js';
 
 // `refresh_tokens` ne stocke JAMAIS le jeton en clair. SHA-256 nu et non argon2 :
 // le jeton est déjà une valeur aléatoire de haute entropie, et le refresh doit rester rapide.
@@ -185,6 +187,49 @@ export class AuthService {
       });
     }
     return toAuthUser(user, workspace);
+  }
+
+  // Changement volontaire de son propre mot de passe : la session courante reste
+  // ouverte. On ne révoque AUCUNE session : le contexte (@CurrentUser, jeton
+  // d'accès) ne porte pas la famille du refresh token courant — seul le refresh
+  // token lui-même, absent ici, la désigne — donc on ne peut pas révoquer « les
+  // autres » sans couper aussi la session en cours. Les autres appareils gardent
+  // leur session jusqu'à expiration ou déconnexion.
+  async changeMyPassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<OkDto> {
+    const user = await this.prisma.user.findFirst({ where: { id: userId, deletedAt: null } });
+    if (!user) {
+      throw new UnauthorizedException({
+        code: 'ACCOUNT_NOT_FOUND',
+        message: 'Compte introuvable.',
+      });
+    }
+
+    if (!(await verifyPassword(user.passwordHash, currentPassword))) {
+      throw new UnauthorizedException({
+        code: 'INVALID_CURRENT_PASSWORD',
+        message: 'Le mot de passe actuel est incorrect.',
+      });
+    }
+
+    const passwordHash = await hashPassword(newPassword);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({ where: { id: userId }, data: { passwordHash } });
+      await audit(
+        tx,
+        { id: userId },
+        {
+          action: AuditAction.USER_CHANGE_OWN_PASSWORD,
+          entity: 'user',
+          entityId: userId,
+        },
+      );
+    });
+
+    return { ok: true };
   }
 
   private async revokeFamily(familyId: string): Promise<void> {

@@ -58,6 +58,31 @@ export const resetPasswordSchema = z
 
 export type ResetPasswordFormInput = z.infer<typeof resetPasswordSchema>;
 
+export const NEW_PASSWORD_MIN_LENGTH = 8;
+export const NEW_PASSWORD_MAX_LENGTH = 24;
+
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, 'Le mot de passe actuel est obligatoire.'),
+    newPassword: z
+      .string()
+      .min(
+        NEW_PASSWORD_MIN_LENGTH,
+        `Le nouveau mot de passe compte au moins ${String(NEW_PASSWORD_MIN_LENGTH)} caractères.`,
+      )
+      .max(
+        NEW_PASSWORD_MAX_LENGTH,
+        `Le nouveau mot de passe compte au plus ${String(NEW_PASSWORD_MAX_LENGTH)} caractères.`,
+      ),
+    confirmation: z.string(),
+  })
+  .refine((values) => values.newPassword === values.confirmation, {
+    message: 'Les deux mots de passe diffèrent.',
+    path: ['confirmation'],
+  });
+
+export type ChangePasswordFormInput = z.infer<typeof changePasswordSchema>;
+
 // Un champ vidé devenait 0 par coercition, et l'entrée passait en tête des listes.
 const sortOrderField = z.coerce
   .number<number>({ error: "L'ordre est un nombre entier." })

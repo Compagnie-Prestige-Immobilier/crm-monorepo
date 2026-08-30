@@ -1,6 +1,13 @@
 'use client';
 
-import { ChevronDownIcon, FlaskConicalIcon, LogOutIcon, UserIcon } from 'lucide-react';
+import {
+  ChevronDownIcon,
+  FlaskConicalIcon,
+  KeyRoundIcon,
+  LogOutIcon,
+  UserIcon,
+} from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -86,6 +93,11 @@ export function UserMenu({ user }: { user: SessionUser }) {
         <DropdownMenuItem disabled>
           <UserIcon aria-hidden="true" />
           {ROLE_LABELS[user.role]}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem render={<Link href="/compte" />}>
+          <KeyRoundIcon aria-hidden="true" />
+          Mot de passe
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem

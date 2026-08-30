@@ -108,6 +108,7 @@ const ATTEINT_AUTREMENT: Readonly<Record<string, string>> = {
   '/grand-public/tableau-de-bord': 'redirige vers « Chiffres », qui l’a absorbé',
   '/chues/dossiers/nouveau': 'bouton · bank/bank-cases-view.tsx',
   '/chues/representants/import': 'bouton · representants/representants-view.tsx',
+  '/compte': 'menu du compte · layout/user-menu.tsx',
   '/notifications': 'cloche · notifications/notification-bell.tsx',
 };
 
@@ -125,6 +126,7 @@ const MASQUEES: Readonly<Record<Role, readonly string[]>> = {
     '/chues/prospects/nouveau',
     '/chues/representants/import',
     '/chues/tableau-de-bord',
+    '/compte',
     '/grand-public/tableau-de-bord',
     '/notifications',
   ],
@@ -134,20 +136,22 @@ const MASQUEES: Readonly<Record<Role, readonly string[]>> = {
     '/accueil/tableau-de-bord',
     '/chues',
     '/chues/tableau-de-bord',
+    '/compte',
     '/grand-public/tableau-de-bord',
     '/notifications',
   ],
   SUPERVISEUR: [
     '/chues',
     '/chues/tableau-de-bord',
+    '/compte',
     '/grand-public/tableau-de-bord',
     '/notifications',
   ],
   // Les deux redirections ne portent aucun garde : elles renvoient vers
   // « Chiffres », qui refuse lui-même qui n'y a pas droit.
-  COMMERCIAL: ['/chues/tableau-de-bord', '/grand-public/tableau-de-bord'],
-  BANQUE_FINANCE: ['/chues', '/chues/tableau-de-bord', '/notifications'],
-  ACCUEIL: ['/accueil/tableau-de-bord', '/notifications'],
+  COMMERCIAL: ['/chues/tableau-de-bord', '/compte', '/grand-public/tableau-de-bord'],
+  BANQUE_FINANCE: ['/chues', '/chues/tableau-de-bord', '/compte', '/notifications'],
+  ACCUEIL: ['/accueil/tableau-de-bord', '/compte', '/notifications'],
 };
 
 const horsBarre = (role: Role): string[] =>

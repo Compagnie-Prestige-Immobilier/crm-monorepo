@@ -46,6 +46,18 @@ class StubApi implements ApiPort {
   Future<void> logout({required String refreshToken}) async {}
 
   @override
+  Future<void> changeMyPassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    throw const ApiException(
+      'api_not_configured',
+      message: 'Aucun serveur configuré : le mot de passe ne peut pas changer.',
+      kind: FailureKind.retryable,
+    );
+  }
+
+  @override
   Future<PullPage> pull({
     String? cursor,
     int limit = 200,
