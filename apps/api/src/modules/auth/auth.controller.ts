@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Post, Put } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
 import { seconds, Throttle } from '@nestjs/throttler';
@@ -8,10 +8,12 @@ import {
   CurrentUser,
   type AuthenticatedUser,
 } from '../../common/decorators/current-user.decorator.js';
+import { OkDto } from '../../common/dto/ok.dto.js';
 import { AuthService } from './auth.service.js';
 import {
   AuthTokensDto,
   AuthUserDto,
+  ChangeMyPasswordDto,
   LoginDto,
   LogoutResponseDto,
   RefreshDto,
@@ -84,6 +86,23 @@ export class AuthController {
   @ApiResponse({ status: 200, type: AuthUserDto })
   me(@CurrentUser() user: AuthenticatedUser): Promise<AuthUserDto> {
     return this.auth.me(user.id, user.workspace ?? 'public');
+  }
+
+  @Put('me/password')
+  @Roles(...ANY_AUTHENTICATED)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    operationId: 'changeMyPassword',
+    summary: 'Change son propre mot de passe.',
+  })
+  @ApiResponse({ status: 200, type: OkDto })
+  @ApiResponse({ status: 401, type: ApiErrorDto, description: 'Mot de passe actuel incorrect.' })
+  changeMyPassword(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: ChangeMyPasswordDto,
+  ): Promise<OkDto> {
+    return this.auth.changeMyPassword(user.id, body.currentPassword, body.newPassword);
   }
 
   @Post('workspace')

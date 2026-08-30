@@ -75,6 +75,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/auth/me/password': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Change son propre mot de passe. */
+    put: operations['changeMyPassword'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/auth/workspace': {
     parameters: {
       query?: never;
@@ -2870,6 +2887,15 @@ export interface components {
     LogoutResponseDto: {
       revoked: boolean;
     };
+    ChangeMyPasswordDto: {
+      /** Format: password */
+      currentPassword: string;
+      /** Format: password */
+      newPassword: string;
+    };
+    OkDto: {
+      ok: boolean;
+    };
     SwitchWorkspaceDto: {
       /** @enum {string} */
       workspace: 'public' | 'demo';
@@ -2946,9 +2972,6 @@ export interface components {
     ResetPasswordDto: {
       /** Format: password */
       password: string;
-    };
-    OkDto: {
-      ok: boolean;
     };
     BanqueDto: {
       /** Format: uuid */
@@ -6152,6 +6175,38 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['AuthUserDto'];
+        };
+      };
+    };
+  };
+  changeMyPassword: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ChangeMyPasswordDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OkDto'];
+        };
+      };
+      /** @description Mot de passe actuel incorrect. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
         };
       };
     };

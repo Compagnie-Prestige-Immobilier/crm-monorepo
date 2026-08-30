@@ -91,6 +91,29 @@ class FakeApi implements ApiPort {
   @override
   Future<void> logout({required String refreshToken}) async {}
 
+  /// Chaque appel à [changeMyPassword], dans l'ordre de réception.
+  final List<({String currentPassword, String newPassword})>
+  changePasswordCalls = <({String currentPassword, String newPassword})>[];
+
+  /// Erreur à lever au prochain [changeMyPassword].
+  ApiException? failNextChangePassword;
+
+  @override
+  Future<void> changeMyPassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    changePasswordCalls.add((
+      currentPassword: currentPassword,
+      newPassword: newPassword,
+    ));
+    final ApiException? failure = failNextChangePassword;
+    if (failure != null) {
+      failNextChangePassword = null;
+      throw failure;
+    }
+  }
+
   @override
   Future<PullPage> pull({
     String? cursor,
@@ -604,6 +627,12 @@ class ExplodingApi implements ApiPort {
 
   @override
   Future<void> logout({required String refreshToken}) => _boom();
+
+  @override
+  Future<void> changeMyPassword({
+    required String currentPassword,
+    required String newPassword,
+  }) => _boom();
 
   @override
   Future<PullPage> pull({

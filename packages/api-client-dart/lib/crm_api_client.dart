@@ -80,6 +80,7 @@ export 'package:crm_api_client/src/model/callback_dto.dart';
 export 'package:crm_api_client/src/model/callback_list_dto.dart';
 export 'package:crm_api_client/src/model/callback_scope.dart';
 export 'package:crm_api_client/src/model/canal_provenance_dto.dart';
+export 'package:crm_api_client/src/model/change_my_password_dto.dart';
 export 'package:crm_api_client/src/model/change_prospect_segment_dto.dart';
 export 'package:crm_api_client/src/model/change_source.dart';
 export 'package:crm_api_client/src/model/client_request_dto.dart';

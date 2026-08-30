@@ -108,6 +108,16 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
+  /// Laisse l'appelant distinguer un mot de passe actuel refusé
+  /// (`ApiException.code == invalidCurrentPasswordCode`) des autres échecs.
+  Future<void> changeMyPassword({
+    required String currentPassword,
+    required String newPassword,
+  }) => _api.changeMyPassword(
+    currentPassword: currentPassword,
+    newPassword: newPassword,
+  );
+
   void onSessionExpired() {
     if (state.status == AuthStatus.unauthenticated) return;
     state = const AuthState.signedOut(

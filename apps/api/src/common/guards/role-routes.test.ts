@@ -152,6 +152,7 @@ const ADMISES: readonly string[] = [
   'HealthController.live',
   'HealthController.ready',
 
+  'AuthController.changeMyPassword',
   'AuthController.me',
   'CallOutcomeReasonsController.list',
   'CallbacksController.list',
@@ -205,6 +206,7 @@ const ADMISES: readonly string[] = [
 const SOCLE: readonly string[] = [
   'AppUpdatesController.current',
   'AppUpdatesController.download',
+  'AuthController.changeMyPassword',
   'AuthController.login',
   'AuthController.logout',
   'AuthController.me',

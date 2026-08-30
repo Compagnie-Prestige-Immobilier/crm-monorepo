@@ -49,6 +49,7 @@ export const AuditAction = {
   USER_SET_ACTIVE: 'user.set_active',
   USER_DELETE: 'user.delete',
   USER_RESET_PASSWORD: 'user.reset_password',
+  USER_CHANGE_OWN_PASSWORD: 'user.change_own_password',
   PROSPECT_REASSIGN: 'prospect.reassign',
   PROSPECT_MERGE: 'prospect.merge',
   PROSPECT_DELETE: 'prospect.delete',
