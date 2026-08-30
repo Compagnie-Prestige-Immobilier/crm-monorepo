@@ -1,8 +1,10 @@
 'use client';
 
 import { PanelLeftCloseIcon, PanelLeftOpenIcon } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 import { useCallback, useState } from 'react';
 
+import { coqueOf } from '@/components/layout/nav-items';
 import { SIDEBAR_COOKIE, SIDEBAR_COOKIE_MAX_AGE } from '@/components/layout/sidebar-cookie';
 import { SidebarNav } from '@/components/layout/sidebar-nav';
 import type { Role } from '@/lib/types';
@@ -21,6 +23,7 @@ export function SidebarShell({
   role: Role;
   defaultCollapsed: boolean;
 }) {
+  const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
 
   const toggle = useCallback(() => {
@@ -29,6 +32,8 @@ export function SidebarShell({
       return !current;
     });
   }, []);
+
+  if (coqueOf(pathname) === 'accueil') return null;
 
   const width = collapsed ? 'w-[4.5rem]' : 'w-[17rem]';
 

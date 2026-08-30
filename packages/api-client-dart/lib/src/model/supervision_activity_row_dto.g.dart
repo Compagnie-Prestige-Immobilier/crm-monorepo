@@ -7,12 +7,6 @@ part of 'supervision_activity_row_dto.dart';
 // **************************************************************************
 
 abstract class _$SupervisionActivityRowDtoCWProxy {
-  SupervisionActivityRowDto bucket(String bucket);
-
-  SupervisionActivityRowDto teleconseillerId(String teleconseillerId);
-
-  SupervisionActivityRowDto teleconseillerName(String teleconseillerName);
-
   SupervisionActivityRowDto calls(num calls);
 
   SupervisionActivityRowDto unreachable(num unreachable);
@@ -33,7 +27,31 @@ abstract class _$SupervisionActivityRowDtoCWProxy {
 
   SupervisionActivityRowDto representantsContacted(num representantsContacted);
 
-  SupervisionActivityRowDto tasksClosed(num tasksClosed);
+  SupervisionActivityRowDto repCalls(num repCalls);
+
+  SupervisionActivityRowDto repReached(num repReached);
+
+  SupervisionActivityRowDto repCallback(num repCallback);
+
+  SupervisionActivityRowDto repUnreachable(num repUnreachable);
+
+  SupervisionActivityRowDto repOther(num repOther);
+
+  SupervisionActivityRowDto repContactRate(num? repContactRate);
+
+  SupervisionActivityRowDto repCallbackRate(num? repCallbackRate);
+
+  SupervisionActivityRowDto repQuestioned(num repQuestioned);
+
+  SupervisionActivityRowDto repQualified(num repQualified);
+
+  SupervisionActivityRowDto repQualificationRate(num? repQualificationRate);
+
+  SupervisionActivityRowDto bucket(String bucket);
+
+  SupervisionActivityRowDto teleconseillerId(String teleconseillerId);
+
+  SupervisionActivityRowDto teleconseillerName(String teleconseillerName);
 
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SupervisionActivityRowDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
@@ -42,9 +60,6 @@ abstract class _$SupervisionActivityRowDtoCWProxy {
   /// SupervisionActivityRowDto(...).copyWith(id: 12, name: "My name")
   /// ````
   SupervisionActivityRowDto call({
-    String bucket,
-    String teleconseillerId,
-    String teleconseillerName,
     num calls,
     num unreachable,
     num wrongNumber,
@@ -55,7 +70,19 @@ abstract class _$SupervisionActivityRowDtoCWProxy {
     num? reachRate,
     num prospectsCreated,
     num representantsContacted,
-    num tasksClosed,
+    num repCalls,
+    num repReached,
+    num repCallback,
+    num repUnreachable,
+    num repOther,
+    num? repContactRate,
+    num? repCallbackRate,
+    num repQuestioned,
+    num repQualified,
+    num? repQualificationRate,
+    String bucket,
+    String teleconseillerId,
+    String teleconseillerName,
   });
 }
 
@@ -65,17 +92,6 @@ class _$SupervisionActivityRowDtoCWProxyImpl
   const _$SupervisionActivityRowDtoCWProxyImpl(this._value);
 
   final SupervisionActivityRowDto _value;
-
-  @override
-  SupervisionActivityRowDto bucket(String bucket) => this(bucket: bucket);
-
-  @override
-  SupervisionActivityRowDto teleconseillerId(String teleconseillerId) =>
-      this(teleconseillerId: teleconseillerId);
-
-  @override
-  SupervisionActivityRowDto teleconseillerName(String teleconseillerName) =>
-      this(teleconseillerName: teleconseillerName);
 
   @override
   SupervisionActivityRowDto calls(num calls) => this(calls: calls);
@@ -115,8 +131,53 @@ class _$SupervisionActivityRowDtoCWProxyImpl
   ) => this(representantsContacted: representantsContacted);
 
   @override
-  SupervisionActivityRowDto tasksClosed(num tasksClosed) =>
-      this(tasksClosed: tasksClosed);
+  SupervisionActivityRowDto repCalls(num repCalls) => this(repCalls: repCalls);
+
+  @override
+  SupervisionActivityRowDto repReached(num repReached) =>
+      this(repReached: repReached);
+
+  @override
+  SupervisionActivityRowDto repCallback(num repCallback) =>
+      this(repCallback: repCallback);
+
+  @override
+  SupervisionActivityRowDto repUnreachable(num repUnreachable) =>
+      this(repUnreachable: repUnreachable);
+
+  @override
+  SupervisionActivityRowDto repOther(num repOther) => this(repOther: repOther);
+
+  @override
+  SupervisionActivityRowDto repContactRate(num? repContactRate) =>
+      this(repContactRate: repContactRate);
+
+  @override
+  SupervisionActivityRowDto repCallbackRate(num? repCallbackRate) =>
+      this(repCallbackRate: repCallbackRate);
+
+  @override
+  SupervisionActivityRowDto repQuestioned(num repQuestioned) =>
+      this(repQuestioned: repQuestioned);
+
+  @override
+  SupervisionActivityRowDto repQualified(num repQualified) =>
+      this(repQualified: repQualified);
+
+  @override
+  SupervisionActivityRowDto repQualificationRate(num? repQualificationRate) =>
+      this(repQualificationRate: repQualificationRate);
+
+  @override
+  SupervisionActivityRowDto bucket(String bucket) => this(bucket: bucket);
+
+  @override
+  SupervisionActivityRowDto teleconseillerId(String teleconseillerId) =>
+      this(teleconseillerId: teleconseillerId);
+
+  @override
+  SupervisionActivityRowDto teleconseillerName(String teleconseillerName) =>
+      this(teleconseillerName: teleconseillerName);
 
   @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SupervisionActivityRowDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
@@ -126,9 +187,6 @@ class _$SupervisionActivityRowDtoCWProxyImpl
   /// SupervisionActivityRowDto(...).copyWith(id: 12, name: "My name")
   /// ````
   SupervisionActivityRowDto call({
-    Object? bucket = const $CopyWithPlaceholder(),
-    Object? teleconseillerId = const $CopyWithPlaceholder(),
-    Object? teleconseillerName = const $CopyWithPlaceholder(),
     Object? calls = const $CopyWithPlaceholder(),
     Object? unreachable = const $CopyWithPlaceholder(),
     Object? wrongNumber = const $CopyWithPlaceholder(),
@@ -139,21 +197,21 @@ class _$SupervisionActivityRowDtoCWProxyImpl
     Object? reachRate = const $CopyWithPlaceholder(),
     Object? prospectsCreated = const $CopyWithPlaceholder(),
     Object? representantsContacted = const $CopyWithPlaceholder(),
-    Object? tasksClosed = const $CopyWithPlaceholder(),
+    Object? repCalls = const $CopyWithPlaceholder(),
+    Object? repReached = const $CopyWithPlaceholder(),
+    Object? repCallback = const $CopyWithPlaceholder(),
+    Object? repUnreachable = const $CopyWithPlaceholder(),
+    Object? repOther = const $CopyWithPlaceholder(),
+    Object? repContactRate = const $CopyWithPlaceholder(),
+    Object? repCallbackRate = const $CopyWithPlaceholder(),
+    Object? repQuestioned = const $CopyWithPlaceholder(),
+    Object? repQualified = const $CopyWithPlaceholder(),
+    Object? repQualificationRate = const $CopyWithPlaceholder(),
+    Object? bucket = const $CopyWithPlaceholder(),
+    Object? teleconseillerId = const $CopyWithPlaceholder(),
+    Object? teleconseillerName = const $CopyWithPlaceholder(),
   }) {
     return SupervisionActivityRowDto(
-      bucket: bucket == const $CopyWithPlaceholder()
-          ? _value.bucket
-          // ignore: cast_nullable_to_non_nullable
-          : bucket as String,
-      teleconseillerId: teleconseillerId == const $CopyWithPlaceholder()
-          ? _value.teleconseillerId
-          // ignore: cast_nullable_to_non_nullable
-          : teleconseillerId as String,
-      teleconseillerName: teleconseillerName == const $CopyWithPlaceholder()
-          ? _value.teleconseillerName
-          // ignore: cast_nullable_to_non_nullable
-          : teleconseillerName as String,
       calls: calls == const $CopyWithPlaceholder()
           ? _value.calls
           // ignore: cast_nullable_to_non_nullable
@@ -195,10 +253,58 @@ class _$SupervisionActivityRowDtoCWProxyImpl
           ? _value.representantsContacted
           // ignore: cast_nullable_to_non_nullable
           : representantsContacted as num,
-      tasksClosed: tasksClosed == const $CopyWithPlaceholder()
-          ? _value.tasksClosed
+      repCalls: repCalls == const $CopyWithPlaceholder()
+          ? _value.repCalls
           // ignore: cast_nullable_to_non_nullable
-          : tasksClosed as num,
+          : repCalls as num,
+      repReached: repReached == const $CopyWithPlaceholder()
+          ? _value.repReached
+          // ignore: cast_nullable_to_non_nullable
+          : repReached as num,
+      repCallback: repCallback == const $CopyWithPlaceholder()
+          ? _value.repCallback
+          // ignore: cast_nullable_to_non_nullable
+          : repCallback as num,
+      repUnreachable: repUnreachable == const $CopyWithPlaceholder()
+          ? _value.repUnreachable
+          // ignore: cast_nullable_to_non_nullable
+          : repUnreachable as num,
+      repOther: repOther == const $CopyWithPlaceholder()
+          ? _value.repOther
+          // ignore: cast_nullable_to_non_nullable
+          : repOther as num,
+      repContactRate: repContactRate == const $CopyWithPlaceholder()
+          ? _value.repContactRate
+          // ignore: cast_nullable_to_non_nullable
+          : repContactRate as num?,
+      repCallbackRate: repCallbackRate == const $CopyWithPlaceholder()
+          ? _value.repCallbackRate
+          // ignore: cast_nullable_to_non_nullable
+          : repCallbackRate as num?,
+      repQuestioned: repQuestioned == const $CopyWithPlaceholder()
+          ? _value.repQuestioned
+          // ignore: cast_nullable_to_non_nullable
+          : repQuestioned as num,
+      repQualified: repQualified == const $CopyWithPlaceholder()
+          ? _value.repQualified
+          // ignore: cast_nullable_to_non_nullable
+          : repQualified as num,
+      repQualificationRate: repQualificationRate == const $CopyWithPlaceholder()
+          ? _value.repQualificationRate
+          // ignore: cast_nullable_to_non_nullable
+          : repQualificationRate as num?,
+      bucket: bucket == const $CopyWithPlaceholder()
+          ? _value.bucket
+          // ignore: cast_nullable_to_non_nullable
+          : bucket as String,
+      teleconseillerId: teleconseillerId == const $CopyWithPlaceholder()
+          ? _value.teleconseillerId
+          // ignore: cast_nullable_to_non_nullable
+          : teleconseillerId as String,
+      teleconseillerName: teleconseillerName == const $CopyWithPlaceholder()
+          ? _value.teleconseillerName
+          // ignore: cast_nullable_to_non_nullable
+          : teleconseillerName as String,
     );
   }
 }
@@ -220,9 +326,6 @@ SupervisionActivityRowDto _$SupervisionActivityRowDtoFromJson(
   $checkKeys(
     json,
     requiredKeys: const [
-      'bucket',
-      'teleconseillerId',
-      'teleconseillerName',
       'calls',
       'unreachable',
       'wrongNumber',
@@ -233,16 +336,22 @@ SupervisionActivityRowDto _$SupervisionActivityRowDtoFromJson(
       'reachRate',
       'prospectsCreated',
       'representantsContacted',
-      'tasksClosed',
+      'repCalls',
+      'repReached',
+      'repCallback',
+      'repUnreachable',
+      'repOther',
+      'repContactRate',
+      'repCallbackRate',
+      'repQuestioned',
+      'repQualified',
+      'repQualificationRate',
+      'bucket',
+      'teleconseillerId',
+      'teleconseillerName',
     ],
   );
   final val = SupervisionActivityRowDto(
-    bucket: $checkedConvert('bucket', (v) => v as String),
-    teleconseillerId: $checkedConvert('teleconseillerId', (v) => v as String),
-    teleconseillerName: $checkedConvert(
-      'teleconseillerName',
-      (v) => v as String,
-    ),
     calls: $checkedConvert('calls', (v) => v as num),
     unreachable: $checkedConvert('unreachable', (v) => v as num),
     wrongNumber: $checkedConvert('wrongNumber', (v) => v as num),
@@ -256,7 +365,25 @@ SupervisionActivityRowDto _$SupervisionActivityRowDtoFromJson(
       'representantsContacted',
       (v) => v as num,
     ),
-    tasksClosed: $checkedConvert('tasksClosed', (v) => v as num),
+    repCalls: $checkedConvert('repCalls', (v) => v as num),
+    repReached: $checkedConvert('repReached', (v) => v as num),
+    repCallback: $checkedConvert('repCallback', (v) => v as num),
+    repUnreachable: $checkedConvert('repUnreachable', (v) => v as num),
+    repOther: $checkedConvert('repOther', (v) => v as num),
+    repContactRate: $checkedConvert('repContactRate', (v) => v as num?),
+    repCallbackRate: $checkedConvert('repCallbackRate', (v) => v as num?),
+    repQuestioned: $checkedConvert('repQuestioned', (v) => v as num),
+    repQualified: $checkedConvert('repQualified', (v) => v as num),
+    repQualificationRate: $checkedConvert(
+      'repQualificationRate',
+      (v) => v as num?,
+    ),
+    bucket: $checkedConvert('bucket', (v) => v as String),
+    teleconseillerId: $checkedConvert('teleconseillerId', (v) => v as String),
+    teleconseillerName: $checkedConvert(
+      'teleconseillerName',
+      (v) => v as String,
+    ),
   );
   return val;
 });
@@ -264,9 +391,6 @@ SupervisionActivityRowDto _$SupervisionActivityRowDtoFromJson(
 Map<String, dynamic> _$SupervisionActivityRowDtoToJson(
   SupervisionActivityRowDto instance,
 ) => <String, dynamic>{
-  'bucket': instance.bucket,
-  'teleconseillerId': instance.teleconseillerId,
-  'teleconseillerName': instance.teleconseillerName,
   'calls': instance.calls,
   'unreachable': instance.unreachable,
   'wrongNumber': instance.wrongNumber,
@@ -277,5 +401,17 @@ Map<String, dynamic> _$SupervisionActivityRowDtoToJson(
   'reachRate': instance.reachRate,
   'prospectsCreated': instance.prospectsCreated,
   'representantsContacted': instance.representantsContacted,
-  'tasksClosed': instance.tasksClosed,
+  'repCalls': instance.repCalls,
+  'repReached': instance.repReached,
+  'repCallback': instance.repCallback,
+  'repUnreachable': instance.repUnreachable,
+  'repOther': instance.repOther,
+  'repContactRate': instance.repContactRate,
+  'repCallbackRate': instance.repCallbackRate,
+  'repQuestioned': instance.repQuestioned,
+  'repQualified': instance.repQualified,
+  'repQualificationRate': instance.repQualificationRate,
+  'bucket': instance.bucket,
+  'teleconseillerId': instance.teleconseillerId,
+  'teleconseillerName': instance.teleconseillerName,
 };

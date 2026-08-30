@@ -186,3 +186,6 @@ temp/
 *.tgz
 *.zip
 !**/fixtures/**/*.zip
+
+# Données d'exécution de l'API (APK publiés, imports, enregistrements, dumps)
+apps/api/storage/

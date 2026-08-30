@@ -114,7 +114,6 @@ class DioApi implements ApiPort {
       fullName: dto.user.fullName,
       role: dto.user.role.value,
       email: dto.user.email,
-      departementId: dto.user.departementId,
     );
   }
 
@@ -271,6 +270,10 @@ class DioApi implements ApiPort {
             activeOnly: false,
             extra: TimeoutProfile.read.extra,
           );
+      final Response<List<IncomeBandDto>> tranches = await api.listIncomeBands(
+        activeOnly: false,
+        extra: TimeoutProfile.read.extra,
+      );
       final ReferentielsBundleDto body = _body('referentiels', bundle);
       return ReferentielsSnapshot(
         departements: body.departements,
@@ -278,6 +281,7 @@ class DioApi implements ApiPort {
         banques: body.banques,
         syndicats: body.syndicats,
         canauxProvenance: _body('canauxProvenance', canaux),
+        incomeBands: _body('incomeBands', tranches),
       );
     });
   }

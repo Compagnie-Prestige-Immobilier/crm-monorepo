@@ -25,14 +25,13 @@ export class DemoService {
 
   async status(): Promise<DemoWorkspaceStatusDto> {
     const demo = this.clients.get('demo');
-    const [users, representants, prospects, campaigns, bankCases] = await Promise.all([
+    const [users, representants, prospects, bankCases] = await Promise.all([
       demo.user.count({ where: { isActive: true, deletedAt: null } }),
       demo.representant.count({ where: { deletedAt: null } }),
       demo.prospect.count({ where: { deletedAt: null } }),
-      demo.callCampaign.count(),
       demo.bankCase.count({ where: { deletedAt: null } }),
     ]);
-    return { workspace: 'demo', counts: { users, representants, prospects, campaigns, bankCases } };
+    return { workspace: 'demo', counts: { users, representants, prospects, bankCases } };
   }
 
   async reset(): Promise<DemoWorkspaceStatusDto> {

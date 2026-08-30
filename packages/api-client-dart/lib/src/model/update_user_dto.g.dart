@@ -15,8 +15,6 @@ abstract class _$UpdateUserDtoCWProxy {
 
   UpdateUserDto role(Role? role);
 
-  UpdateUserDto departementId(String? departementId);
-
   UpdateUserDto phone(String? phone);
 
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `UpdateUserDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
@@ -30,7 +28,6 @@ abstract class _$UpdateUserDtoCWProxy {
     String? username,
     String? fullName,
     Role? role,
-    String? departementId,
     String? phone,
   });
 }
@@ -54,10 +51,6 @@ class _$UpdateUserDtoCWProxyImpl implements _$UpdateUserDtoCWProxy {
   UpdateUserDto role(Role? role) => this(role: role);
 
   @override
-  UpdateUserDto departementId(String? departementId) =>
-      this(departementId: departementId);
-
-  @override
   UpdateUserDto phone(String? phone) => this(phone: phone);
 
   @override
@@ -72,7 +65,6 @@ class _$UpdateUserDtoCWProxyImpl implements _$UpdateUserDtoCWProxy {
     Object? username = const $CopyWithPlaceholder(),
     Object? fullName = const $CopyWithPlaceholder(),
     Object? role = const $CopyWithPlaceholder(),
-    Object? departementId = const $CopyWithPlaceholder(),
     Object? phone = const $CopyWithPlaceholder(),
   }) {
     return UpdateUserDto(
@@ -92,10 +84,6 @@ class _$UpdateUserDtoCWProxyImpl implements _$UpdateUserDtoCWProxy {
           ? _value.role
           // ignore: cast_nullable_to_non_nullable
           : role as Role?,
-      departementId: departementId == const $CopyWithPlaceholder()
-          ? _value.departementId
-          // ignore: cast_nullable_to_non_nullable
-          : departementId as String?,
       phone: phone == const $CopyWithPlaceholder()
           ? _value.phone
           // ignore: cast_nullable_to_non_nullable
@@ -130,7 +118,6 @@ UpdateUserDto _$UpdateUserDtoFromJson(Map<String, dynamic> json) =>
               ) ??
               Role.COMMERCIAL,
         ),
-        departementId: $checkedConvert('departementId', (v) => v as String?),
         phone: $checkedConvert('phone', (v) => v as String?),
       );
       return val;
@@ -142,7 +129,6 @@ Map<String, dynamic> _$UpdateUserDtoToJson(UpdateUserDto instance) =>
       if (instance.username case final value?) 'username': value,
       if (instance.fullName case final value?) 'fullName': value,
       if (_$RoleEnumMap[instance.role] case final value?) 'role': value,
-      if (instance.departementId case final value?) 'departementId': value,
       if (instance.phone case final value?) 'phone': value,
     };
 

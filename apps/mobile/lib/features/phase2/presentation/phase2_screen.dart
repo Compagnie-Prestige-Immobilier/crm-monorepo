@@ -35,7 +35,7 @@ class Phase2Screen extends ConsumerStatefulWidget {
   const Phase2Screen({super.key, this.prefillPhone});
 
   /// Le numero de la fiche depuis laquelle on arrive, quand on vient d'une file
-  /// de campagne. Sans lui, ouvrir une ligne du programme rendait un ecran vide
+  /// d’appel. Sans lui, ouvrir une fiche rendait un écran vide
   /// et le teleconseiller retapait le numero qu'il venait de choisir.
   final String? prefillPhone;
 
@@ -197,6 +197,9 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
       await HapticFeedback.heavyImpact();
       return;
     }
+    // La confirmation vit à la dernière étape : consignée depuis une étape de
+    // renseignements, elle n'aurait sinon aucun endroit où s'afficher.
+    setState(() => _step = _etapes);
     await HapticFeedback.mediumImpact();
   }
 
@@ -225,6 +228,8 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
     final List<Banque> banques = ref.watch(banquesProvider).value ?? const [];
     final List<Syndicat> syndicats =
         ref.watch(syndicatsProvider).value ?? const [];
+    final List<IncomeBand> tranches =
+        ref.watch(incomeBandsProvider).value ?? const [];
     final int etape = _etape;
 
     final Widget screen = CpiScaffold(
@@ -247,6 +252,9 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
         _ => _EtapeAction(
           manque: _form.manqueEtape(etape),
           onContinue: _suivant,
+          // Le dossier complet n'est exigé que pour une adhésion : un appel qui
+          // n'a pas abouti se consigne sans quitter l'étape où il s'est arrêté.
+          onNegative: phase2.saving ? null : () => _openNegativeSheet(reasons),
         ),
       },
       body: ListView(
@@ -283,6 +291,7 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
                   fields: _form,
                   banques: banques,
                   syndicats: syndicats,
+                  tranches: tranches,
                   onChanged: () => setState(() {}),
                 ),
                 _ => _EtapeResultat(
@@ -384,6 +393,7 @@ class Phase2FormFields {
   final TextEditingController duree = TextEditingController();
   final TextEditingController banque = TextEditingController();
   final TextEditingController syndicat = TextEditingController();
+  final TextEditingController revenu = TextEditingController();
 
   final FocusNode nomFocus = FocusNode();
   final FocusNode prenomFocus = FocusNode();
@@ -392,20 +402,26 @@ class Phase2FormFields {
   final FocusNode dureeFocus = FocusNode();
   final FocusNode banqueFocus = FocusNode();
   final FocusNode syndicatFocus = FocusNode();
+  final FocusNode revenuFocus = FocusNode();
 
   String? banqueId;
   String? syndicatId;
+  String? incomeBandId;
+  int? dureeSystemeMois;
   Tri fonctionnaire = Tri.nonDemande;
   Tri engagementEnCours = Tri.nonDemande;
 
-  /// Redessine l'étape à chaque frappe des DEUX champs qui peuvent la retenir.
+  /// Redessine l'étape à chaque frappe des champs qui peuvent la retenir.
   ///
   /// Sur l'écouteur du contrôleur et non sur `onChanged` du champ : ForUI
   /// notifie le changement AVANT de poser le texte, si bien que le reproche et
   /// le bouton étaient en retard d'une frappe : la dernière lettre, celle qui
   /// invalide l'adresse, laissait « Continuer » allumé.
   void watch(VoidCallback onChanged) {
+    nom.addListener(onChanged);
+    prenom.addListener(onChanged);
     email.addListener(onChanged);
+    profession.addListener(onChanged);
     duree.addListener(onChanged);
   }
 
@@ -426,19 +442,41 @@ class Phase2FormFields {
         : 'De 0 à $kDureeEtablissementMaxMois mois';
   }
 
-  /// Ce qui empêche de continuer, nommé. Tout le reste est facultatif : un
-  /// renseignement qu'on n'a pas obtenu ne doit pas retenir l'appel.
-  String? get manque {
-    if (erreurEmail != null) return 'Vérifiez l\'e-mail';
-    if (erreurDuree != null) return 'Vérifiez la durée en mois';
-    return null;
+  /// Ce qui manque à l'identité. L'e-mail reste FACULTATIF : il n'est reproché
+  /// que mal écrit.
+  String? get manqueQui {
+    if (nom.text.trim().isEmpty) return 'Indiquez le nom';
+    if (prenom.text.trim().isEmpty) return 'Indiquez le prénom';
+    return erreurEmail == null ? null : 'Vérifiez l\'e-mail';
   }
+
+  String? get manqueTravail {
+    if (profession.text.trim().isEmpty) return 'Indiquez la profession';
+    if (duree.text.trim().isEmpty) return 'Indiquez l\'ancienneté';
+    if (erreurDuree != null) return 'Vérifiez la durée en mois';
+    return fonctionnaire.value == null ? 'Répondez à « Fonctionnaire »' : null;
+  }
+
+  String? get manqueBanque {
+    if (syndicatId == null) return 'Choisissez le syndicat';
+    if (banqueId == null) return 'Choisissez la banque';
+    if (engagementEnCours.value == null) {
+      return 'Répondez à « Engagement en cours »';
+    }
+    if (incomeBandId == null) return 'Choisissez le revenu mensuel';
+    return dureeSystemeMois == null ? 'Choisissez la durée du système' : null;
+  }
+
+  /// Le premier champ qui manque au dossier. Une adhésion l'exige entier ; un
+  /// appel qui n'a pas abouti, non.
+  String? get manque => manqueQui ?? manqueTravail ?? manqueBanque;
 
   /// Le même reproche, ramené à l'étape qui porte le champ fautif : une étape
   /// ne retient jamais sur une saisie qu'elle ne montre pas.
   String? manqueEtape(int etape) => switch (etape) {
-    2 => erreurEmail == null ? null : 'Vérifiez l\'e-mail',
-    3 => erreurDuree == null ? null : 'Vérifiez la durée en mois',
+    2 => manqueQui,
+    3 => manqueTravail,
+    4 => manqueBanque,
     _ => null,
   };
 
@@ -447,6 +485,11 @@ class Phase2FormFields {
     CpiRecapLine('Nom complet', '${prenom.text} ${nom.text}'.trim()),
     CpiRecapLine('Téléphone', telephone.text),
     CpiRecapLine('Profession', profession.text),
+    CpiRecapLine('Revenu mensuel', revenu.text),
+    CpiRecapLine(
+      'Durée du système',
+      dureeSystemeMois == null ? null : formatDureeMois(dureeSystemeMois!),
+    ),
   ];
 
   Phase2Renseignements read() => Phase2Renseignements(
@@ -459,6 +502,8 @@ class Phase2FormFields {
     syndicatId: syndicatId,
     banqueId: banqueId,
     engagementEnCours: engagementEnCours.value,
+    incomeBandId: incomeBandId,
+    dureeSystemeMois: dureeSystemeMois,
   );
 
   /// Reprend ce que la fiche locale sait déjà, sans jamais écraser une saisie.
@@ -493,6 +538,11 @@ class Phase2FormFields {
         syndicatId = found.id;
       }
     }
+    // La fiche locale ne porte pas de tranche de revenu : seule la durée du
+    // système se reprend.
+    dureeSystemeMois ??= kDureesSystemeMois.contains(prospect.dureeSystemeMois)
+        ? prospect.dureeSystemeMois
+        : null;
   }
 
   void clear() {
@@ -501,6 +551,8 @@ class Phase2FormFields {
     }
     banqueId = null;
     syndicatId = null;
+    incomeBandId = null;
+    dureeSystemeMois = null;
     fonctionnaire = Tri.nonDemande;
     engagementEnCours = Tri.nonDemande;
   }
@@ -523,6 +575,7 @@ class Phase2FormFields {
     duree,
     banque,
     syndicat,
+    revenu,
   ];
 
   List<FocusNode> get _focusNodes => <FocusNode>[
@@ -533,6 +586,7 @@ class Phase2FormFields {
     dureeFocus,
     banqueFocus,
     syndicatFocus,
+    revenuFocus,
   ];
 
   static void _fill(TextEditingController controller, String? value) {
@@ -549,6 +603,10 @@ class Phase2FormFields {
 
 /// Oui, non, ou question non posée. `null` n'est PAS « non » : le serveur
 /// distingue les deux, et douze mille fiches sont dans le troisième état.
+///
+/// [nonDemande] ne se PROPOSE plus : sur CHUES le dossier d'adhésion est
+/// complet ou il n'y a pas d'adhésion. Il reste l'état de DÉPART, celui qui
+/// part avec un appel qui n'a pas abouti.
 enum Tri {
   oui('Oui', true),
   non('Non', false),
@@ -558,6 +616,34 @@ enum Tri {
 
   final String label;
   final bool? value;
+
+  /// Les deux seules réponses offertes à l'écran.
+  static const List<Tri> proposees = <Tri>[oui, non];
+}
+
+/// Les durées du système de paiement, en mois. Liste FERMÉE, la même que le web.
+const List<int> kDureesSystemeMois = <int>[
+  6,
+  12,
+  18,
+  24,
+  36,
+  48,
+  60,
+  72,
+  84,
+  96,
+  120,
+  144,
+  180,
+  240,
+  300,
+];
+
+String formatDureeMois(int mois) {
+  if (mois % 12 != 0) return '$mois mois';
+  final int ans = mois ~/ 12;
+  return '$ans an${ans > 1 ? 's' : ''} ($mois mois)';
 }
 
 /// Étape 1 : le numéro, ce que la liste en dit, et la phrase sur la liste.
@@ -604,14 +690,15 @@ class _EtapeQui extends StatelessWidget {
   );
 }
 
-/// Étapes 2 à 4 : ce que l'appel a appris de la personne, trois ou quatre
-/// questions à la fois. Tout y est facultatif.
+/// Étapes 2 à 4 : ce que l'appel a appris de la personne, trois à cinq questions
+/// à la fois. Une adhésion les exige toutes, sauf l'e-mail.
 class _EtapeRenseignements extends StatelessWidget {
   const _EtapeRenseignements({
     required this.etape,
     required this.fields,
     required this.banques,
     required this.syndicats,
+    required this.tranches,
     required this.onChanged,
   });
 
@@ -619,6 +706,7 @@ class _EtapeRenseignements extends StatelessWidget {
   final Phase2FormFields fields;
   final List<Banque> banques;
   final List<Syndicat> syndicats;
+  final List<IncomeBand> tranches;
   final VoidCallback onChanged;
 
   @override
@@ -745,7 +833,6 @@ class _EtapeRenseignements extends StatelessWidget {
       label: 'Banque',
       hint: 'Ex. BICIS',
       selectedId: fields.banqueId,
-      textInputAction: TextInputAction.done,
       emptyHint: banques.isEmpty
           ? 'La liste n\'est pas encore arrivée.'
           : 'Aucun résultat',
@@ -777,10 +864,53 @@ class _EtapeRenseignements extends StatelessWidget {
         onChanged();
       },
     ),
+    LocalTypeahead(
+      controller: fields.revenu,
+      focusNode: fields.revenuFocus,
+      label: 'Revenu mensuel',
+      hint: 'Ex. 150 000 à 300 000',
+      selectedId: fields.incomeBandId,
+      textInputAction: TextInputAction.done,
+      emptyHint: tranches.isEmpty
+          ? 'La liste n\'est pas encore arrivée.'
+          : 'Aucun résultat',
+      options: tranches
+          .map(
+            (IncomeBand t) => TypeaheadOption(
+              id: t.id,
+              label: t.label,
+              keywords: <String>[t.code],
+            ),
+          )
+          .toList(growable: false),
+      onChanged: (String _) {
+        if (fields.incomeBandId == null) return;
+        fields.incomeBandId = null;
+        onChanged();
+      },
+      onSelected: (TypeaheadOption o) {
+        fields.incomeBandId = o.id;
+        onChanged();
+      },
+    ),
+    CpiChoiceGroup<int>(
+      label: 'Durée du système de paiement',
+      value: fields.dureeSystemeMois,
+      options: <CpiChoice<int>>[
+        for (final int mois in kDureesSystemeMois)
+          CpiChoice<int>(value: mois, label: formatDureeMois(mois)),
+      ],
+      onChanged: (int mois) {
+        if (mois == fields.dureeSystemeMois) return;
+        unawaited(HapticFeedback.selectionClick());
+        fields.dureeSystemeMois = mois;
+        onChanged();
+      },
+    ),
   ];
 }
 
-/// Une question à trois réponses : oui, non, et « on ne l'a pas demandé ».
+/// Une question à deux réponses : oui ou non.
 class _ChoixTri extends StatelessWidget {
   const _ChoixTri({
     required this.label,
@@ -797,7 +927,7 @@ class _ChoixTri extends StatelessWidget {
     label: label,
     value: value,
     options: <CpiChoice<Tri>>[
-      for (final Tri choix in Tri.values)
+      for (final Tri choix in Tri.proposees)
         CpiChoice<Tri>(value: choix, label: choix.label),
     ],
     onChanged: (Tri choix) {
@@ -808,21 +938,40 @@ class _ChoixTri extends StatelessWidget {
   );
 }
 
-/// Le pied des étapes de renseignements : rien n'y est obligatoire, seule une
-/// saisie fautive retient le passage, et le bouton dit laquelle.
+/// Le pied des étapes de renseignements : le dossier d'adhésion se remplit en
+/// entier, et le bouton nomme ce qui manque. La seconde action est la sortie de
+/// l'appel qui n'a pas abouti : elle, n'attend rien.
 class _EtapeAction extends StatelessWidget {
-  const _EtapeAction({required this.manque, required this.onContinue});
+  const _EtapeAction({
+    required this.manque,
+    required this.onContinue,
+    required this.onNegative,
+  });
 
   final String? manque;
   final VoidCallback onContinue;
+  final VoidCallback? onNegative;
 
   @override
   Widget build(BuildContext context) => CpiActionBar(
-    child: CpiButton(
-      'Continuer',
-      icon: PhosphorIconsRegular.arrowRight,
-      subtitle: manque,
-      onPressed: manque == null ? onContinue : null,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        CpiButton(
+          'Continuer',
+          icon: PhosphorIconsRegular.arrowRight,
+          subtitle: manque,
+          onPressed: manque == null ? onContinue : null,
+        ),
+        const SizedBox(height: CpiSpacing.xs),
+        CpiButton(
+          'L\'appel n\'a pas abouti',
+          variant: CpiButtonVariant.ghost,
+          icon: PhosphorIconsRegular.phoneX,
+          onPressed: onNegative,
+        ),
+      ],
     ),
   );
 }

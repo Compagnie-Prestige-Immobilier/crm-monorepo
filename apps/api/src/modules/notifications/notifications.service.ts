@@ -262,7 +262,6 @@ const NOTIFICATION_SELECT = {
   route: true,
   audience: true,
   audienceRole: true,
-  audienceDepartementId: true,
   audienceUserIds: true,
   status: true,
   scheduledFor: true,
@@ -314,7 +313,6 @@ export class NotificationsService {
     const recipients = await this.resolveRecipients({
       audience: body.audience,
       audienceRole: body.audienceRole ?? null,
-      audienceDepartementId: body.audienceDepartementId ?? null,
       audienceUserIds: body.audienceUserIds ?? null,
     });
     if (!recipients.length) throw audienceEmpty();
@@ -327,7 +325,6 @@ export class NotificationsService {
         route: body.route ?? null,
         audience: body.audience,
         audienceRole: body.audienceRole ?? null,
-        audienceDepartementId: body.audienceDepartementId ?? null,
         audienceUserIds:
           body.audience === NotificationAudience.USERS ? dedupe(body.audienceUserIds ?? []) : [],
         status: scheduledFor ? NotificationStatus.SCHEDULED : NotificationStatus.SENDING,
@@ -1454,7 +1451,6 @@ const toNotificationDto = (row: NotificationRow, counts: Counts | undefined): No
   route: row.route,
   audience: row.audience,
   audienceRole: row.audienceRole,
-  audienceDepartementId: row.audienceDepartementId,
   audienceUserIds: row.audienceUserIds,
   status: row.status,
   scheduledFor: row.scheduledFor?.toISOString() ?? null,

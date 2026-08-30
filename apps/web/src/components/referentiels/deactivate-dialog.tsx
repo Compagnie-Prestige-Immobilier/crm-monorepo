@@ -101,7 +101,7 @@ export function DeactivateReferentielDialog({
               <span className="font-display text-[1.5rem] font-[800] tabular-nums">
                 {formatNumber(usageCount)}
               </span>{' '}
-              {usageCount === 1 ? `${noun.singular} référence` : `${noun.plural} référencent`}{' '}
+              {usageCount <= 1 ? `${noun.singular} référence` : `${noun.plural} référencent`}{' '}
               {ARTICLES[kind]} {kind}.
             </p>
           )}

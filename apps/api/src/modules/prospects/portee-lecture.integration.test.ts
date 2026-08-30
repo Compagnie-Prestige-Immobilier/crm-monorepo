@@ -25,7 +25,6 @@ let admin: AuthenticatedUser;
 let confiee = '';
 let orpheline = '';
 let dOmar = '';
-let campaignId = '';
 
 const identity = (row: {
   id: string;
@@ -77,21 +76,11 @@ beforeAll(async () => {
   orpheline = await creerProspect(`Orpheline${RUN}`, admin.id, 2);
   dOmar = await creerProspect(`DOmar${RUN}`, omar.id, 3);
 
-  const campaign = await prisma.callCampaign.create({
-    data: { name: `Portée ${RUN}`, scope: 'ALL', seed: RUN, createdById: admin.id },
-  });
-  campaignId = campaign.id;
-
-  await prisma.callTask.create({
-    data: { campaignId, prospectId: confiee, assignedToId: awa.id, position: 1 },
-  });
 });
 
 afterAll(async () => {
   const ids = [confiee, orpheline, dOmar];
-  await prisma.callTask.deleteMany({ where: { prospectId: { in: ids } } });
   await prisma.prospect.deleteMany({ where: { id: { in: ids } } });
-  await prisma.callCampaign.deleteMany({ where: { id: campaignId } });
   await prisma.user.deleteMany({ where: { id: { in: [awa.id, omar.id, admin.id] } } });
   await prisma.$disconnect();
 });
@@ -102,40 +91,30 @@ const nomsVusPar = async (user: AuthenticatedUser): Promise<string[]> => {
 };
 
 describe('la portée des prospects est la MÊME au panneau et sur le téléphone', () => {
-  it('la fiche confiée par une campagne remonte dans la liste du téléconseiller', async () => {
-    expect(await nomsVusPar(awa)).toEqual([`Confiee${RUN}`]);
+  it('le téléconseiller voit toutes les fiches vivantes', async () => {
+    expect(await nomsVusPar(awa)).toEqual([`Confiee${RUN}`, `DOmar${RUN}`, `Orpheline${RUN}`]);
   });
 
-  it('la fiche que personne n’a reçue reste invisible, comme celle d’un collègue', async () => {
+  it('une fiche créée par un collègue reste visible', async () => {
     const vus = await nomsVusPar(awa);
 
-    expect(vus).not.toContain(`Orpheline${RUN}`);
-    expect(vus).not.toContain(`DOmar${RUN}`);
+    expect(vus).toContain(`Orpheline${RUN}`);
+    expect(vus).toContain(`DOmar${RUN}`);
   });
 
   it('la file d’appel du web compte ce que le téléphone compte', async () => {
     const page = await prospects.list(awa, { pageSize: 200, search: RUN, phase2Status: 'PENDING' });
 
-    expect(page.meta.total).toBe(1);
-    expect(page.items[0]?.id).toBe(confiee);
+    expect(page.meta.total).toBe(3);
+    expect(page.items.map((item) => item.id)).toContain(confiee);
   });
 
-  it('la fiche confiée s’ouvre en détail, elle ne répond plus 403', async () => {
+  it('une fiche s’ouvre en détail', async () => {
     await expect(prospects.get(awa, confiee)).resolves.toMatchObject({ id: confiee });
   });
 
-  it('la fiche d’un collègue reste refusée en détail', async () => {
-    await expect(prospects.get(awa, dOmar)).rejects.toMatchObject({ status: 403 });
-  });
-
-  it('une tâche retirée de la file retire aussi la fiche de la liste', async () => {
-    await prisma.callTask.updateMany({ where: { prospectId: confiee }, data: { isActive: false } });
-
-    try {
-      expect(await nomsVusPar(awa)).toEqual([]);
-    } finally {
-      await prisma.callTask.updateMany({ where: { prospectId: confiee }, data: { isActive: true } });
-    }
+  it('la fiche d’un collègue reste accessible en détail', async () => {
+    await expect(prospects.get(awa, dOmar)).resolves.toMatchObject({ id: dOmar });
   });
 
   it('l’ADMIN, lui, voit les trois fiches', async () => {

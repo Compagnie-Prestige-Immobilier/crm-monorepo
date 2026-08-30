@@ -24,8 +24,6 @@ class SupervisionTeleconseillerDto {
     required this.fullName,
 
     required this.isActive,
-
-    required this.openTasks,
   });
 
   @JsonKey(name: r'id', required: true, includeIfNull: false)
@@ -37,24 +35,19 @@ class SupervisionTeleconseillerDto {
   @JsonKey(name: r'isActive', required: true, includeIfNull: false)
   final bool isActive;
 
-  /// Tâches d’appel encore OUVERTES. Instantané : la fenêtre ne le borne pas.
-  @JsonKey(name: r'openTasks', required: true, includeIfNull: false)
-  final num openTasks;
-
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is SupervisionTeleconseillerDto &&
             runtimeType == other.runtimeType &&
             equals(
-              [id, fullName, isActive, openTasks],
-              [other.id, other.fullName, other.isActive, other.openTasks],
+              [id, fullName, isActive],
+              [other.id, other.fullName, other.isActive],
             );
   }
 
   @override
   int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([id, fullName, isActive, openTasks]);
+      runtimeType.hashCode ^ mapPropsToHashCode([id, fullName, isActive]);
 
   factory SupervisionTeleconseillerDto.fromJson(Map<String, dynamic> json) =>
       _$SupervisionTeleconseillerDtoFromJson(json);

@@ -272,6 +272,11 @@ final StreamProvider<List<CanauxProvenanceData>> canauxProvenanceProvider =
       return ref.watch(referenceRepositoryProvider).watchCanauxProvenance();
     });
 
+final StreamProvider<List<IncomeBand>> incomeBandsProvider =
+    StreamProvider<List<IncomeBand>>((Ref ref) {
+      return ref.watch(referenceRepositoryProvider).watchIncomeBands();
+    });
+
 final NotifierProvider<HistoriqueSearch, String> historiqueSearchProvider =
     NotifierProvider<HistoriqueSearch, String>(HistoriqueSearch.new);
 

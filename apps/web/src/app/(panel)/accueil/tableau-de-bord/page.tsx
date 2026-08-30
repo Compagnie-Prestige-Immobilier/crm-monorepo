@@ -30,8 +30,8 @@ export default async function TableauDeBordVisitesPage() {
       queryFn: () => fetchVisiteDashboardStats(plage.du, plage.au, client),
     }),
     queryClient.prefetchQuery({
-      queryKey: queryKeys.visitesDisposition,
-      queryFn: () => fetchDisposition(client),
+      queryKey: queryKeys.disposition('visites'),
+      queryFn: () => fetchDisposition('visites', client),
     }),
   ]);
 

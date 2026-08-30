@@ -210,6 +210,23 @@ describe('DashboardVisitesView', () => {
     expect(within(tiroir).getByText('Par objet')).toBeTruthy();
   });
 
+  it('montre un exemple animé avant d’ajouter une forme', async () => {
+    const user = userEvent.setup();
+    setup();
+    await screen.findByText('Par entreprise');
+    await user.click(screen.getByRole('button', { name: 'Organiser les graphiques' }));
+    await user.click(await screen.findByRole('button', { name: 'Ajouter un graphique' }));
+    const tiroir = await screen.findByRole('dialog');
+    const source = within(tiroir).getByText('Par objet').closest('article');
+    if (source === null) throw new Error('source introuvable');
+
+    await user.click(within(source).getByRole('button', { name: 'Voir cet exemple' }));
+
+    expect(within(source).getByRole('img', { name: /Exemple visuel/u })).toBeTruthy();
+    expect(within(source).getByRole('button', { name: 'Ajouter cette forme' })).toBeTruthy();
+    expect(cardTitles()).not.toContain('Par objet');
+  });
+
   it('Enregistrer envoie exactement le corps attendu au client', async () => {
     const user = userEvent.setup();
     setup();
@@ -220,7 +237,8 @@ describe('DashboardVisitesView', () => {
     await waitFor(() => {
       expect(saveDispositionMock).toHaveBeenCalled();
     });
-    const [sentWidgets] = saveDispositionMock.mock.calls[0] as [DashboardWidget[]];
+    const [ecran, sentWidgets] = saveDispositionMock.mock.calls[0] as [string, DashboardWidget[]];
+    expect(ecran).toBe('visites');
     expect(sentWidgets.map((widget) => ({ source: widget.source, marque: widget.marque }))).toEqual(
       [
         { source: 'total-visites', marque: 'tuile' },
@@ -229,19 +247,15 @@ describe('DashboardVisitesView', () => {
     );
   });
 
-  it('changer la marque change le composant rendu', async () => {
+  it('ne propose pas une jauge sans objectif mesurable', async () => {
     const user = userEvent.setup();
     setup();
     await screen.findByTestId('marque-tuile');
     await user.click(screen.getByRole('button', { name: 'Organiser les graphiques' }));
 
-    await user.click(
-      await screen.findByRole('button', { name: 'Changer la présentation de Total des visites' }),
-    );
-    await user.click(await screen.findByText('Jauge'));
-
-    expect(await screen.findByTestId('marque-jauge')).toBeTruthy();
-    expect(screen.queryByTestId('marque-tuile')).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Changer la présentation de Total des visites' }),
+    ).toBeNull();
   });
 
   it('un réglage changé modifie ce qui est passé au composant de marque', async () => {

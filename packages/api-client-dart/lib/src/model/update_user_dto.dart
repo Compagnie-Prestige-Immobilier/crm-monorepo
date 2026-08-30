@@ -28,8 +28,6 @@ class UpdateUserDto {
 
     this.role = Role.COMMERCIAL,
 
-    this.departementId,
-
     this.phone,
   });
 
@@ -52,10 +50,6 @@ class UpdateUserDto {
   )
   final Role? role;
 
-  /// Chaîne vide pour retirer le rattachement.
-  @JsonKey(name: r'departementId', required: false, includeIfNull: false)
-  final String? departementId;
-
   /// Téléphone, normalisé en E.164 par le serveur.
   @JsonKey(name: r'phone', required: false, includeIfNull: false)
   final String? phone;
@@ -65,13 +59,12 @@ class UpdateUserDto {
         other is UpdateUserDto &&
             runtimeType == other.runtimeType &&
             equals(
-              [email, username, fullName, role, departementId, phone],
+              [email, username, fullName, role, phone],
               [
                 other.email,
                 other.username,
                 other.fullName,
                 other.role,
-                other.departementId,
                 other.phone,
               ],
             );
@@ -80,14 +73,7 @@ class UpdateUserDto {
   @override
   int get hashCode =>
       runtimeType.hashCode ^
-      mapPropsToHashCode([
-        email,
-        username,
-        fullName,
-        role,
-        departementId,
-        phone,
-      ]);
+      mapPropsToHashCode([email, username, fullName, role, phone]);
 
   factory UpdateUserDto.fromJson(Map<String, dynamic> json) =>
       _$UpdateUserDtoFromJson(json);

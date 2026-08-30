@@ -256,6 +256,10 @@ export function ImportsView() {
 
   function accept(candidate: File | null): void {
     if (candidate === null) return;
+    if (!candidate.name.toLowerCase().endsWith('.xlsx')) {
+      toast.error('Seul un classeur Excel (.xlsx) est accepté.');
+      return;
+    }
     if (candidate.size > MAX_FILE_BYTES) {
       toast.error('Fichier trop volumineux : 25 Mo au maximum.');
       return;

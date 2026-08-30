@@ -49,19 +49,19 @@ const EMPTY_TEXT: Record<CallbackScope, { title: string; description: string }> 
   },
   today: {
     title: 'Aucun rappel aujourd’hui',
-    description:
-      'Une échéance se promet depuis la console d’appel : touche 5, puis le chiffre de l’heure.',
+    description: 'Une échéance se promet en consignant un appel.',
   },
   week: {
     title: 'Aucun rappel cette semaine',
-    description:
-      'Une échéance se promet depuis la console d’appel : touche 5, puis le chiffre de l’heure.',
+    description: 'Une échéance se promet en consignant un appel.',
   },
 };
 
 export function RappelsView({ canFilter }: { canFilter: boolean }) {
   const pathname = usePathname();
-  const projet = pathname.startsWith('/grand-public') ? 'GRAND_PUBLIC' : 'CHUES';
+  const grandPublic = pathname.startsWith('/grand-public');
+  const projet = grandPublic ? 'GRAND_PUBLIC' : 'CHUES';
+  const racine = grandPublic ? '/grand-public' : '/chues';
   const queryClient = useQueryClient();
   const [scope, setScope] = useState<CallbackScope>('overdue');
   const [assignedToId, setAssignedToId] = useState<string | null>(null);
@@ -106,7 +106,7 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
             return (
               <QueryErrorState
                 error={list.error}
-                fallback="La file des rappels n’a pas pu être chargée."
+                fallback="Les rappels n’ont pas pu être lus."
                 onRetry={() => {
                   void list.refetch();
                 }}
@@ -167,11 +167,11 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
                       <TableCell>
                         <div className="flex justify-end gap-2">
                           <Link
-                            href={`/chues/console?fiche=${encodeURIComponent(callback.prospectId)}`}
+                            href={`${racine}/console?fiche=${encodeURIComponent(callback.prospectId)}`}
                             className={buttonVariants({ variant: 'outline', size: 'sm' })}
                           >
                             <PhoneCallIcon aria-hidden="true" />
-                            Ouvrir dans la console
+                            Consigner l’appel
                           </Link>
                           <Button
                             variant="ghost"

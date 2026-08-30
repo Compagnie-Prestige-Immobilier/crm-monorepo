@@ -114,8 +114,6 @@ beforeEach(() => {
   pushRepCallAttempt.mockResolvedValue({
     status: 'applied',
     attemptId: 'a-1',
-    taskId: null,
-    taskClosed: true,
     suggestion: null,
   });
   fetchRepresentants.mockReset();
@@ -146,7 +144,7 @@ describe('RepScript : rien n’est choisi d’office', () => {
   it('montre la liste confiée d’abord, l’annuaire dès qu’on cherche', async () => {
     await renderListe();
 
-    expect(screen.getByText(/Votre liste d’appel/u)).toBeTruthy();
+    expect(screen.getByText('Choisissez qui vous venez d’appeler.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Bineta Diop/u })).toBeNull();
 
     await userEvent.type(screen.getByLabelText('Qui avez-vous appelé ?'), 'Bineta');
@@ -529,7 +527,7 @@ describe('RepScript : l’écran d’appel ne montre que le nom et le numéro', 
       href: '/chues/appels-representants',
     });
     expect(navTitle('COMMERCIAL', '/chues/appels-representants')).toBe(
-      '1 · Qualifier un représentant',
+      'Qualifier un représentant',
     );
   });
 });

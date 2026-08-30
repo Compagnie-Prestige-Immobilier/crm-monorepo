@@ -5,8 +5,6 @@ import {
   CBAO_SHORT_NAME,
   CHUES_SIGLE,
   classifySegment,
-  eligibleForCampaignWhere,
-  scopeWhere,
   segmentAxes,
   segmentWhere,
 } from './segment.js';
@@ -90,41 +88,6 @@ describe('segmentWhere : cohérence avec classifySegment', () => {
       expect(where.syndicat).toBeDefined();
       expect(where.banque).toBeDefined();
     }
-  });
-});
-
-describe('scopeWhere', () => {
-  it('ALL ne pose aucune contrainte de segment', () => {
-    expect(scopeWhere('ALL')).toEqual({});
-  });
-
-  it('un segment nommé délègue à segmentWhere', () => {
-    for (const segment of ALL_SEGMENTS) {
-      expect(scopeWhere(segment)).toEqual(segmentWhere(segment));
-    }
-  });
-});
-
-describe('eligibleForCampaignWhere', () => {
-  it('exclut les supprimés, les non-PENDING, ceux déjà pourvus et ceux déjà attribués', () => {
-    const where = eligibleForCampaignWhere('ALL');
-
-    expect(where.deletedAt).toBeNull();
-    expect(where.phase2Status).toBe('PENDING');
-    expect(where.enrollmentMethod).toBeNull();
-    expect(where.callTasks).toEqual({ none: { isActive: true } });
-  });
-
-  it('combine le périmètre de segment avec les conditions d’éligibilité', () => {
-    const where = eligibleForCampaignWhere('BDD1');
-
-    expect(where.syndicat).toEqual({ sigle: CHUES_SIGLE });
-    expect(where.banque).toEqual({ shortName: CBAO_SHORT_NAME });
-    expect(where.phase2Status).toBe('PENDING');
-  });
-
-  it('ne borne PAS le blocage par population, l’index ne le fait pas non plus', () => {
-    expect(eligibleForCampaignWhere('ALL').callTasks).toEqual({ none: { isActive: true } });
   });
 });
 

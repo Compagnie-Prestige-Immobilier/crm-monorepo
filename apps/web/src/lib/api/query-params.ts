@@ -30,7 +30,6 @@ export function toFilterQuery(filters: ProspectFilters): AnalyticsQuery {
   if (filters.segment !== null) query.segment = filters.segment;
   if (filters.phase2Status !== null) query.phase2Status = filters.phase2Status;
   if (filters.enrollmentMethod !== null) query.enrollmentMethod = filters.enrollmentMethod;
-  if (filters.campaignId !== null) query.campaignId = filters.campaignId;
   if (filters.enrollmentCapturedById !== null) {
     query.enrollmentCapturedById = filters.enrollmentCapturedById;
   }

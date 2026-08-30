@@ -3,26 +3,17 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   ALREADY_COMPLETED,
   AttemptRefused,
-  bucketOf,
   buildAttemptBatch,
-  buildQueue,
   callbackHalfHours,
   callbackSlots,
   COMMENT_MAX_LENGTH,
   conversionErrorFor,
   conversionFrom,
-  daysSince,
   fetchCallbacks,
-  fetchConsoleQueue,
   formatCallbackAt,
   formatDelay,
-  nextAfter,
   pushCallAttempt,
-  queueLabel,
-  schedulesOf,
   sortCallbacks,
-  sortQueue,
-  undatedCallbacks,
   uuidV7,
   validateAttempt,
   validateConversion,
@@ -30,7 +21,7 @@ import {
   type Callback,
   type ConversionDraft,
 } from '@/lib/data/console';
-import type { CallOutcome, Phase2Status, ProspectRow } from '@/lib/types';
+import type { ProspectRow } from '@/lib/types';
 
 const NOW = Date.parse('2026-08-16T12:00:00.000Z');
 
@@ -84,135 +75,6 @@ function prospect(over: Partial<ProspectRow> & { id: string }): ProspectRow {
     ...over,
   };
 }
-
-const attempted = (
-  id: string,
-  outcome: CallOutcome,
-  at: string,
-  phase2Status: Phase2Status = 'PENDING',
-): ProspectRow => prospect({ id, lastOutcome: outcome, lastAttemptAt: at, phase2Status });
-
-describe('sortQueue', () => {
-  it('met les jamais appelées en tête, puis rappels, puis injoignables, puis le reste', () => {
-    const queue = sortQueue([
-      attempted('other', 'OTHER', '2026-08-01T00:00:00.000Z'),
-      attempted('nrp', 'UNREACHABLE', '2026-08-01T00:00:00.000Z'),
-      prospect({ id: 'neuf' }),
-      attempted('rappel', 'CALLBACK', '2026-08-01T00:00:00.000Z'),
-    ]);
-
-    expect(queue.map((row) => row.id)).toEqual(['neuf', 'rappel', 'nrp', 'other']);
-  });
-
-  it('sert le plus ancien d’abord dans un même groupe', () => {
-    const queue = sortQueue([
-      attempted('recent', 'CALLBACK', '2026-08-10T00:00:00.000Z'),
-      attempted('ancien', 'CALLBACK', '2026-07-01T00:00:00.000Z'),
-      attempted('median', 'CALLBACK', '2026-08-01T00:00:00.000Z'),
-    ]);
-
-    expect(queue.map((row) => row.id)).toEqual(['ancien', 'median', 'recent']);
-  });
-
-  it('rejette en fin de file toute fiche déjà close, quel que soit son dernier appel', () => {
-    const queue = sortQueue([
-      attempted('close', 'METHOD_OBTAINED', '2026-08-01T00:00:00.000Z', 'METHOD_OBTAINED'),
-      prospect({ id: 'neuf' }),
-      attempted('refus', 'REFUSED', '2026-01-01T00:00:00.000Z', 'REFUSED'),
-    ]);
-
-    expect(queue.map((row) => row.id)).toEqual(['neuf', 'refus', 'close']);
-  });
-
-  it('départage par identifiant, pour que deux chargements donnent le même ordre', () => {
-    const first = sortQueue([prospect({ id: 'b' }), prospect({ id: 'a' })]);
-    const second = sortQueue([prospect({ id: 'a' }), prospect({ id: 'b' })]);
-
-    expect(first.map((row) => row.id)).toEqual(['a', 'b']);
-    expect(second.map((row) => row.id)).toEqual(['a', 'b']);
-  });
-
-  it('ne modifie pas la liste reçue', () => {
-    const input = [prospect({ id: 'b' }), prospect({ id: 'a' })];
-    sortQueue(input);
-    expect(input.map((row) => row.id)).toEqual(['b', 'a']);
-  });
-});
-
-describe('bucketOf', () => {
-  it('classe une fiche close avant de regarder son dernier appel', () => {
-    expect(bucketOf(attempted('x', 'CALLBACK', '2026-08-01T00:00:00.000Z', 'REFUSED'))).toBe(
-      'closed',
-    );
-  });
-
-  it('range les issues sans groupe dédié dans « déjà tentées »', () => {
-    expect(bucketOf(attempted('x', 'OTHER', '2026-08-01T00:00:00.000Z'))).toBe('other');
-  });
-});
-
-describe('buildQueue', () => {
-  it('compte les fiches restantes hors closes', () => {
-    const queue = buildQueue([
-      prospect({ id: 'a' }),
-      attempted('b', 'CALLBACK', '2026-08-01T00:00:00.000Z'),
-      attempted('c', 'REFUSED', '2026-08-01T00:00:00.000Z', 'REFUSED'),
-    ]);
-
-    expect(queue.pendingCount).toBe(2);
-    expect(queue.counts.never).toBe(1);
-    expect(queue.counts.callback).toBe(1);
-    expect(queue.counts.closed).toBe(1);
-  });
-});
-
-describe('nextAfter', () => {
-  const items = [prospect({ id: 'a' }), prospect({ id: 'b' }), prospect({ id: 'c' })];
-
-  it('donne la fiche suivante', () => {
-    expect(nextAfter(items, 'b')).toBe('c');
-  });
-
-  it('recule sur la dernière, faute de suivante', () => {
-    expect(nextAfter(items, 'c')).toBe('b');
-  });
-
-  it('rend null quand la file ne contient que la fiche envoyée', () => {
-    expect(nextAfter([prospect({ id: 'a' })], 'a')).toBeNull();
-  });
-});
-
-describe('queueLabel', () => {
-  it('nomme une fiche jamais appelée sans inventer d’ancienneté', () => {
-    expect(queueLabel(prospect({ id: 'a' }), NOW)).toBe('jamais appelé');
-  });
-
-  it('donne l’ancienneté en jours quand aucune échéance n’a été promise', () => {
-    expect(queueLabel(attempted('a', 'CALLBACK', '2026-08-04T12:00:00.000Z'), NOW)).toBe(
-      'rappel sans échéance · 12 j',
-    );
-    expect(queueLabel(attempted('a', 'UNREACHABLE', '2026-08-13T12:00:00.000Z'), NOW)).toBe(
-      'injoignable · 3 j',
-    );
-  });
-
-  it('nomme l’état d’une fiche close', () => {
-    expect(queueLabel(attempted('a', 'REFUSED', '2026-08-01T00:00:00.000Z', 'REFUSED'), NOW)).toBe(
-      'refus',
-    );
-  });
-});
-
-describe('daysSince', () => {
-  it('ne descend pas sous zéro sur un horodatage futur', () => {
-    expect(daysSince('2026-09-01T00:00:00.000Z', NOW)).toBe(0);
-  });
-
-  it('rend null sur une date illisible', () => {
-    expect(daysSince('pas une date', NOW)).toBeNull();
-    expect(daysSince(null, NOW)).toBeNull();
-  });
-});
 
 describe('validateAttempt', () => {
   it('exige une méthode sur METHOD_OBTAINED', () => {
@@ -321,6 +183,10 @@ describe('buildAttemptBatch', () => {
       profession: 'Instituteur',
       syndicatId: 's-1',
       banqueId: 'b-1',
+      type: 'FONCTIONNAIRE',
+      incomeBandId: 'i-1',
+      paymentMode: 'ECHELONNE',
+      dureeSystemeMois: 24,
       dureeEtablissementMois: 36,
       fonctionnaire: true,
       engagementEnCours: false,
@@ -346,6 +212,10 @@ describe('buildAttemptBatch', () => {
           engagementEnCours: null,
           syndicatId: '',
           banqueId: '',
+          type: null,
+          incomeBandId: '',
+          paymentMode: null,
+          dureeSystemeMois: '',
         },
       },
     });
@@ -360,6 +230,10 @@ describe('buildAttemptBatch', () => {
       'engagementEnCours',
       'syndicatId',
       'banqueId',
+      'type',
+      'incomeBandId',
+      'paymentMode',
+      'dureeSystemeMois',
       'rendezVousAt',
     ]) {
       expect(data).not.toHaveProperty(field);
@@ -384,15 +258,20 @@ describe('buildAttemptBatch', () => {
 
 function conversion(over: Partial<ConversionDraft> = {}): ConversionDraft {
   return {
+    projet: 'CHUES',
     nom: 'Diallo',
     prenom: 'Mamadou',
     email: 'mamadou@example.sn',
     profession: 'Instituteur',
+    type: 'FONCTIONNAIRE',
     dureeEtablissementMois: '36',
     fonctionnaire: true,
     syndicatId: 's-1',
     banqueId: 'b-1',
     engagementEnCours: false,
+    incomeBandId: 'i-1',
+    paymentMode: 'ECHELONNE',
+    dureeSystemeMois: '24',
     method: 'PLATFORM',
     rendezVousAt: '',
     ...over,
@@ -444,6 +323,74 @@ describe('validateConversion', () => {
     }
     expect(
       validateConversion(conversion({ dureeEtablissementMois: '600' }), NOW).dureeEtablissementMois,
+    ).toBeUndefined();
+  });
+
+  it('sur CHUES, l’adhésion exige le dossier complet', () => {
+    const vide = conversion({
+      prenom: '',
+      email: '',
+      profession: '',
+      dureeEtablissementMois: '',
+      fonctionnaire: null,
+      syndicatId: '',
+      banqueId: '',
+      engagementEnCours: null,
+      incomeBandId: '',
+      dureeSystemeMois: '',
+    });
+
+    expect(Object.keys(validateConversion(vide, NOW)).sort()).toEqual(
+      [
+        'banqueId',
+        'dureeEtablissementMois',
+        'dureeSystemeMois',
+        'engagementEnCours',
+        'fonctionnaire',
+        'incomeBandId',
+        'prenom',
+        'profession',
+        'syndicatId',
+      ].sort(),
+    );
+    expect(validateConversion(vide, NOW).fonctionnaire).toMatch(/fonctionnaire/);
+  });
+
+  it('l’e-mail reste facultatif, même sur CHUES', () => {
+    expect(validateConversion(conversion({ email: '' }), NOW)).toEqual({});
+  });
+
+  it('exige la méthode d’enrôlement', () => {
+    expect(validateConversion(conversion({ method: null }), NOW).method).toMatch(/méthode/);
+  });
+
+  it('sur le Grand Public, seul le nom est exigé', () => {
+    const vide = conversion({
+      projet: 'GRAND_PUBLIC',
+      prenom: '',
+      email: '',
+      profession: '',
+      dureeEtablissementMois: '',
+      fonctionnaire: null,
+      syndicatId: '',
+      banqueId: '',
+      engagementEnCours: null,
+      incomeBandId: '',
+      dureeSystemeMois: '',
+    });
+
+    expect(validateConversion(vide, NOW)).toEqual({});
+  });
+
+  it('borne la durée du système à des mois entiers de 1 à 300', () => {
+    for (const mois of ['0', '301', '12,5']) {
+      expect(
+        validateConversion(conversion({ dureeSystemeMois: mois }), NOW).dureeSystemeMois,
+      ).toMatch(/mois entiers/);
+    }
+    expect(
+      validateConversion(conversion({ projet: 'GRAND_PUBLIC', dureeSystemeMois: '' }), NOW)
+        .dureeSystemeMois,
     ).toBeUndefined();
   });
 
@@ -557,33 +504,6 @@ describe('pushCallAttempt', () => {
   });
 });
 
-describe('fetchConsoleQueue', () => {
-  it('n’envoie aucun filtre de campagne quand aucune n’est choisie', async () => {
-    const get = vi.fn().mockResolvedValue({
-      data: { items: [], meta: { total: 0, page: 1, pageSize: 200, pageCount: 1 } },
-      response: new Response(),
-    });
-
-    await fetchConsoleQueue(null, { GET: get } as never);
-
-    const [, init] = get.mock.calls[0] as QueryCall;
-    expect(init.params.query).not.toHaveProperty('campaignId');
-  });
-
-  it('restreint la file à la campagne choisie', async () => {
-    const get = vi.fn().mockResolvedValue({
-      data: { items: [], meta: { total: 3, page: 1, pageSize: 200, pageCount: 1 } },
-      response: new Response(),
-    });
-
-    const page = await fetchConsoleQueue('c-1', { GET: get } as never);
-
-    const [, init] = get.mock.calls[0] as QueryCall;
-    expect(init.params.query.campaignId).toBe('c-1');
-    expect(page.total).toBe(3);
-  });
-});
-
 const THURSDAY = Date.parse('2026-08-13T10:00:00.000Z');
 
 describe('callbackSlots', () => {
@@ -661,8 +581,6 @@ function callback(over: Partial<Callback> & { id: string }): Callback {
     comment: null,
     assignedToId: 'u-1',
     assignedToName: 'Fatou Sow',
-    campaignId: null,
-    taskId: null,
     overdue: false,
     ...over,
   };
@@ -677,69 +595,6 @@ describe('sortCallbacks', () => {
     ]);
 
     expect(sorted.map((row) => row.id)).toEqual(['retard-ancien', 'retard-recent', 'a-venir']);
-  });
-});
-
-describe('schedulesOf', () => {
-  it('garde une échéance par prospect, la plus urgente', () => {
-    const schedules = schedulesOf([
-      callback({ id: 'tard', prospectId: 'p-1', scheduledAt: '2026-08-18T09:00:00.000Z' }),
-      callback({
-        id: 'tot',
-        prospectId: 'p-1',
-        scheduledAt: '2026-08-16T09:00:00.000Z',
-        overdue: true,
-      }),
-    ]);
-
-    expect(schedules.get('p-1')).toBe('2026-08-16T09:00:00.000Z');
-  });
-});
-
-describe('file d’appel et échéances', () => {
-  const RETARD = attempted('retard', 'CALLBACK', '2026-08-01T00:00:00.000Z');
-  const A_VENIR = attempted('a-venir', 'CALLBACK', '2026-08-01T00:00:00.000Z');
-  const SANS_DATE = attempted('sans-date', 'CALLBACK', '2026-07-01T00:00:00.000Z');
-  const schedules = new Map([
-    ['retard', '2026-08-16T09:00:00.000Z'],
-    ['a-venir', '2026-08-17T09:00:00.000Z'],
-  ]);
-
-  it('sert le rappel dont l’heure est passée avant tout le reste', () => {
-    const queue = sortQueue([prospect({ id: 'neuf' }), A_VENIR, RETARD], schedules, NOW);
-
-    expect(queue.map((row) => row.id)).toEqual(['retard', 'neuf', 'a-venir']);
-  });
-
-  it('remonte une échéance proche, pas encore atteinte', () => {
-    expect(bucketOf(RETARD, schedules, NOW)).toBe('due');
-    expect(bucketOf(A_VENIR, new Map([['a-venir', '2026-08-16T12:30:00.000Z']]), NOW)).toBe('due');
-    expect(bucketOf(A_VENIR, schedules, NOW)).toBe('callback');
-  });
-
-  it('laisse une fiche « à rappeler » sans échéance à sa place d’avant', () => {
-    const recente = attempted('sans-date', 'CALLBACK', '2026-08-10T00:00:00.000Z');
-    const queue = sortQueue(
-      [attempted('a-venir', 'CALLBACK', '2026-07-01T00:00:00.000Z'), recente],
-      schedules,
-      NOW,
-    );
-
-    expect(queue.map((row) => row.id)).toEqual(['sans-date', 'a-venir']);
-    expect(queueLabel(SANS_DATE, NOW, schedules)).toBe('rappel sans échéance · 46 j');
-    expect(undatedCallbacks([RETARD, A_VENIR, SANS_DATE], schedules)).toBe(1);
-  });
-
-  it('dit le retard en clair, et l’heure promise sinon', () => {
-    expect(queueLabel(RETARD, NOW, schedules)).toBe('rappel en retard de 3 h');
-    expect(queueLabel(A_VENIR, NOW, schedules)).toBe('rappel demain à 09:00');
-  });
-
-  it('compte les rappels dus à part', () => {
-    const queue = buildQueue([prospect({ id: 'neuf' }), A_VENIR, RETARD], schedules, NOW);
-
-    expect(queue.counts.due).toBe(1);
-    expect(queue.counts.callback).toBe(1);
   });
 });
 

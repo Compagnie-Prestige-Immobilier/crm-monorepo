@@ -5,6 +5,7 @@ import { ThemeProvider } from 'next-themes';
 import type { ReactNode } from 'react';
 
 import { ExactAmountsProvider } from '@/components/money/exact-amounts';
+import { AndroidReleaseUploadToast } from '@/components/settings/android-release-upload-toast';
 import { Toaster } from '@/components/ui/sonner';
 import { getQueryClient } from '@/lib/query-client';
 
@@ -20,6 +21,9 @@ export function Providers({ children }: { children: ReactNode }) {
             désynchroniseraient dès la première navigation. */}
         <ExactAmountsProvider>{children}</ExactAmountsProvider>
         <Toaster />
+        {/* Hors de l'arbre des écrans : l'envoi d'un APK garde sa barre et sa
+            fenêtre de confirmation quand l'administrateur quitte Paramètres. */}
+        <AndroidReleaseUploadToast />
       </ThemeProvider>
     </QueryClientProvider>
   );

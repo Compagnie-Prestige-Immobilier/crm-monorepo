@@ -16,7 +16,6 @@ const LABELS = {
   users: 'comptes',
   representants: 'représentants',
   prospects: 'prospects',
-  campaigns: 'campagnes',
   bankCases: 'dossiers bancaires',
 } as const;
 

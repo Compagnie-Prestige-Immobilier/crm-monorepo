@@ -86,7 +86,7 @@ enum CpiProject {
 
   /// Le projet à qui appartient une adresse, ou `null` si elle est hors projet.
   /// Tout ce qui n'est ni l'accueil ni le grand public est du CHUES : ses
-  /// écrans (représentants, prospects, campagnes, phase 2) vivent à la racine
+  /// écrans (représentants, prospects et appels) vivent à la racine
   /// pour des raisons historiques, sans préfixe qui les rattache.
   static CpiProject? duChemin(String path) {
     if (path.isEmpty || horsProjet.contains(path)) return null;

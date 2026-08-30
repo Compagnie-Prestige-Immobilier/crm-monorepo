@@ -29,8 +29,6 @@ const CALLBACK_SELECT = {
   scheduledAt: true,
   comment: true,
   assignedToId: true,
-  campaignId: true,
-  taskId: true,
   prospect: { select: { phoneE164: true } },
   assignedTo: { select: { fullName: true } },
 } satisfies Prisma.ScheduledCallbackSelect;
@@ -46,8 +44,6 @@ const toDto = (row: CallbackRow, now: Date): CallbackDto => ({
   comment: row.comment,
   assignedToId: row.assignedToId,
   assignedToName: row.assignedTo.fullName,
-  campaignId: row.campaignId,
-  taskId: row.taskId,
   overdue: row.scheduledAt.getTime() < now.getTime(),
 });
 

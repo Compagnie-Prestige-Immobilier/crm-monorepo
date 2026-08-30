@@ -18,6 +18,7 @@ import 'package:crm_api_client/src/api/client_requests_api.dart';
 import 'package:crm_api_client/src/api/demo_api.dart';
 import 'package:crm_api_client/src/api/export_api.dart';
 import 'package:crm_api_client/src/api/imports_api.dart';
+import 'package:crm_api_client/src/api/lots_export_api.dart';
 import 'package:crm_api_client/src/api/notification_templates_api.dart';
 import 'package:crm_api_client/src/api/notifications_api.dart';
 import 'package:crm_api_client/src/api/phase2_api.dart';
@@ -28,6 +29,7 @@ import 'package:crm_api_client/src/api/representants_api.dart';
 import 'package:crm_api_client/src/api/suggestions_api.dart';
 import 'package:crm_api_client/src/api/supervision_api.dart';
 import 'package:crm_api_client/src/api/sync_api.dart';
+import 'package:crm_api_client/src/api/tableaux_de_bord_api.dart';
 import 'package:crm_api_client/src/api/users_api.dart';
 import 'package:crm_api_client/src/api/visites_api.dart';
 
@@ -220,6 +222,12 @@ class CrmApiClient {
     return ImportsApi(dio);
   }
 
+  /// Get LotsExportApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  LotsExportApi getLotsExportApi() {
+    return LotsExportApi(dio);
+  }
+
   /// Get NotificationTemplatesApi instance, base route and serializer can be overridden by a given but be careful,
   /// by doing that all interceptors will not be executed
   NotificationTemplatesApi getNotificationTemplatesApi() {
@@ -278,6 +286,12 @@ class CrmApiClient {
   /// by doing that all interceptors will not be executed
   SyncApi getSyncApi() {
     return SyncApi(dio);
+  }
+
+  /// Get TableauxDeBordApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  TableauxDeBordApi getTableauxDeBordApi() {
+    return TableauxDeBordApi(dio);
   }
 
   /// Get UsersApi instance, base route and serializer can be overridden by a given but be careful,

@@ -35,10 +35,6 @@ class CallbackDto {
 
     required this.assignedToName,
 
-    required this.campaignId,
-
-    required this.taskId,
-
     required this.overdue,
   });
 
@@ -67,12 +63,6 @@ class CallbackDto {
   @JsonKey(name: r'assignedToName', required: true, includeIfNull: false)
   final String assignedToName;
 
-  @JsonKey(name: r'campaignId', required: true, includeIfNull: true)
-  final String? campaignId;
-
-  @JsonKey(name: r'taskId', required: true, includeIfNull: true)
-  final String? taskId;
-
   /// Le rappel est passé. État DÉRIVÉ de scheduledAt et de l’heure du serveur, jamais stocké.
   @JsonKey(name: r'overdue', required: true, includeIfNull: false)
   final bool overdue;
@@ -91,8 +81,6 @@ class CallbackDto {
                 comment,
                 assignedToId,
                 assignedToName,
-                campaignId,
-                taskId,
                 overdue,
               ],
               [
@@ -104,8 +92,6 @@ class CallbackDto {
                 other.comment,
                 other.assignedToId,
                 other.assignedToName,
-                other.campaignId,
-                other.taskId,
                 other.overdue,
               ],
             );
@@ -123,8 +109,6 @@ class CallbackDto {
         comment,
         assignedToId,
         assignedToName,
-        campaignId,
-        taskId,
         overdue,
       ]);
 

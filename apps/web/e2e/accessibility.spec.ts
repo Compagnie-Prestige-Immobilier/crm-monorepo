@@ -9,49 +9,83 @@ import { expect, test, type Page } from '@playwright/test';
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * Le titre de niveau 1 est celui de la barre supérieure, DÉRIVÉ DE LA ROUTE par
- * `navTitle` et non rendu par la page. Trois écrans héritent donc de celui de
- * leur parent : `/campagnes/representants` affiche « Campagnes »,
- * `/representants/import` affiche « Représentants ». S'arrêter à ce titre
- * reviendrait à analyser une coquille montée par le layout alors que la page,
- * elle, n'a peut-être rien affiché : axe ne trouverait aucune violation, et
- * pour cause.
+ * `navTitle` et non rendu par la page. Plusieurs écrans héritent donc d'un
+ * titre qui n'est pas le leur : `/chues/representants/import` affiche
+ * « Importer des représentants », `/chues/console` affiche « Convertir un
+ * prospect ». S'arrêter à ce titre reviendrait à analyser une coquille montée
+ * par le layout alors que la page, elle, n'a peut-être rien affiché : axe ne
+ * trouverait aucune violation, et pour cause.
  *
  * Le troisième élément nomme donc un repère PROPRE à l'écran, quand le titre
  * ne suffit pas à prouver qu'on est bien arrivé.
+ *
+ * Les adresses sont celles des QUATRE COQUES. Les anciennes racines
+ * (`/prospects`, `/console`, `/campagnes`…) ne sont plus que des renvois tenus
+ * par `app/moved-routes.ts` : les balayer auditait la page d'arrivée après une
+ * redirection, et sous le titre de niveau 1 d'AVANT le découpage.
  */
 const PANEL_ROUTES: readonly (readonly [path: string, heading: string, marker: string | null])[] = [
   // Le hub, atterrissage de tous les rôles. Son titre est celui de la PAGE et
   // non de la barre supérieure, qu'il ne porte pas : aucun repère à ajouter.
   ['/espaces', 'Choisissez un espace', null],
   ['/chues', 'Projet CHUES', 'Trois étapes, dans l’ordre'],
-  ['/tableau-de-bord', 'Chiffres', null],
-  ['/statistiques', 'Chiffres', null],
-  ['/prospects', 'Prospects', null],
-  ['/prospects/nouveau', 'Nouveau prospect', 'Enregistrer ce prospect'],
-  ['/accueil/tableau-de-bord', 'Tableau de bord', 'Organiser'],
-  ['/campagnes', 'Campagnes', 'Appels prospects'],
-  ['/campagnes/representants', 'Campagnes', 'Appels représentants'],
-  ['/console', 'Appeler les prospects', 'Carte clavier'],
-  ['/chues/appels-representants', 'Appeler les représentants', 'Carte clavier'],
-  ['/rappels', 'Rappels', 'En retard'],
-  ['/suggestions', 'Contacts recommandés', 'Numéros donnés par un représentant'],
-  ['/dossiers', 'Dossiers bancaires', null],
-  ['/dossiers/nouveau', 'Nouveau dossier', null],
-  ['/dossiers/export', 'Export', null],
-  ['/dossiers/etapes', 'Étapes des dossiers', null],
-  ['/demandes-clients', 'Créations de client à valider', null],
-  ['/representants', 'Représentants', null],
-  ['/representants/import', 'Représentants', 'Partir du modèle'],
-  ['/commerciaux', 'Utilisateurs', null],
-  ['/supervision', 'Équipes', 'Activité'],
-  ['/referentiels', 'Listes de référence', null],
-  ['/imports', 'Importer un fichier Excel', 'Déposer un classeur'],
-  ['/parametres', 'Paramètres', null],
-  ['/notifications', 'Notifications', null],
-  // `/banque` n'appartient pas à la navigation d'un ADMIN : `navTitle` remonte
-  // à l'entrée la plus proche, la racine de la coque.
-  ['/banque', 'Projet CHUES', null],
+  // Une seule adresse pour un seul écran : `/tableau-de-bord` et
+  // `/statistiques` menaient déjà tous deux ici, et `/chues/tableau-de-bord`
+  // n'est plus qu'un `permanentRedirect`. Les auditer séparément analysait
+  // deux fois la même page pour le prix de deux minutes de quota.
+  ['/chues/statistiques', 'Tableau de bord', 'Composer l’écran'],
+  ['/chues/prospects', 'Prospects', null],
+  ['/chues/prospects/nouveau', 'Ajouter un prospect', 'Enregistrer ce prospect'],
+  // « Organiser les graphiques » ici, « Composer l’écran » sur les écrans de
+  // chiffres : `BarreEdition` porte deux intitulés, un par écran.
+  ['/accueil/tableau-de-bord', 'Tableau de bord', 'Organiser les graphiques'],
+  ['/chues/campagnes', 'Lots d’export', 'Fiches figées pour Excel, impression ou terrain.'],
+  /**
+   * L'écran des campagnes de représentants a été SUPPRIMÉ (`Plan.md`), mais son
+   * adresse n'est pas devenue une 404 : le segment dynamique
+   * `chues/campagnes/[id]` la capte avec `id = "representants"` et
+   * `LotExportDetailView` rend « Ce lot n’a pas pu être chargé. ». La ligne
+   * reste : c'est cet écran-là que le terrain voit, et c'est lui qu'on audite.
+   */
+  ['/chues/campagnes/representants', 'Lots d’export', 'Ce lot n’a pas pu être chargé.'],
+  // `ConsoleView` a été vidé : plus de file d'appels ni de carte clavier, un
+  // titre de page et un lien vers l'annuaire.
+  ['/chues/console', 'Convertir un prospect', 'Ouvrir l’annuaire'],
+  // `RepScript` s'ouvre désormais sur un ANNUAIRE cherchable ; la carte clavier
+  // n'apparaît qu'une fois un représentant choisi.
+  [
+    '/chues/appels-representants',
+    'Qualifier un représentant',
+    'Choisissez qui vous venez d’appeler.',
+  ],
+  ['/chues/rappels', 'Rappels', 'En retard'],
+  ['/chues/suggestions', 'Contacts recommandés', 'Numéros donnés par un représentant'],
+  ['/chues/dossiers', 'Dossiers bancaires', null],
+  ['/chues/dossiers/nouveau', 'Nouveau dossier', null],
+  ['/chues/dossiers/export', 'Exporter les dossiers', null],
+  ['/chues/dossiers/etapes', 'Étapes des dossiers', null],
+  ['/chues/demandes-clients', 'Créations de client à valider', null],
+  ['/chues/representants', 'Représentants', null],
+  ['/chues/representants/import', 'Importer des représentants', 'Partir du modèle'],
+  ['/admin/commerciaux', 'Utilisateurs', null],
+  ['/chues/supervision', 'Équipes', 'Activité'],
+  ['/admin/referentiels', 'Listes de référence', null],
+  ['/admin/imports', 'Importer un fichier Excel', 'Déposer un classeur'],
+  ['/admin/parametres', 'Paramètres', null],
+  // `/notifications` renvoie l'ADMIN sur le COMPOSEUR, qui porte le même
+  // onglet « Boîte de réception » : c'est le composeur qu'on audite.
+  ['/admin/notifications', 'Envoyer une notification', 'Boîte de réception'],
+  // `/chues/banque` appartient désormais à la navigation de l'ADMIN, replié
+  // sous « Plus » : `navTitle` y lit son propre intitulé.
+  ['/chues/banque', 'Vue d’ensemble bancaire', null],
 ];
+
+/**
+ * Les écrans qui portent DEUX titres de niveau 1 identiques : celui de la
+ * barre supérieure et celui de la page. Le mode strict refuse les deux, on
+ * vise celui de la page.
+ */
+const DOUBLE_TITRE = new Set(['/chues/campagnes']);
 
 async function analyze(page: Page, where: string): Promise<void> {
   // Le serveur de developpement compile la route a la demande: sans cette
@@ -65,17 +99,29 @@ async function analyze(page: Page, where: string): Promise<void> {
   expect(results.violations, `${where}: ${JSON.stringify(results.violations)}`).toEqual([]);
 }
 
-test('aucune violation axe sur tous les écrans panel', async ({ page }) => {
-  await page.emulateMedia({ colorScheme: 'light' });
+/**
+ * UN TEST PAR ÉCRAN, et non plus une seule boucle.
+ *
+ * La boucle unique s'arrêtait sur le premier écran fautif : les vingt suivants
+ * n'étaient jamais audités, et le rapport ne nommait qu'un défaut. Elle passait
+ * en outre les soixante secondes de `timeout` dès que toutes les routes
+ * répondaient, ce qui rendait le fichier rouge sans nommer quoi que ce soit.
+ * Aucun écran n'est retiré : chacun a désormais sa ligne dans le rapport.
+ */
+test.describe('aucune violation axe sur tous les écrans panel', () => {
   for (const [path, heading, marker] of PANEL_ROUTES) {
-    await page.goto(path);
-    await expect(page.getByRole('heading', { name: heading, level: 1 })).toBeVisible();
-    if (marker !== null) {
-      await expect(page.getByText(marker).first()).toBeVisible();
-    }
-    await expect(page.locator('html.light')).toHaveCount(1);
+    test(path, async ({ page }) => {
+      await page.emulateMedia({ colorScheme: 'light' });
+      await page.goto(path);
+      const portee = DOUBLE_TITRE.has(path) ? page.getByRole('main') : page;
+      await expect(portee.getByRole('heading', { name: heading, level: 1 })).toBeVisible();
+      if (marker !== null) {
+        await expect(page.getByText(marker).first()).toBeVisible();
+      }
+      await expect(page.locator('html.light')).toHaveCount(1);
 
-    await analyze(page, path);
+      await analyze(page, path);
+    });
   }
 });
 
@@ -89,19 +135,20 @@ test('aucune violation axe sur tous les écrans panel', async ({ page }) => {
 test('aucune violation axe sur la fiche représentant et le volet des comptes', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light' });
 
-  await page.goto('/representants');
-  // Depuis le TABLEAU : « Import Excel » pointe lui aussi sous `/representants/`.
-  const premier = page.getByRole('table').locator('a[href^="/representants/"]').first();
+  await page.goto('/chues/representants');
+  // Depuis le TABLEAU : « Import Excel » pointe lui aussi sous
+  // `/chues/representants/`.
+  const premier = page.getByRole('table').locator('a[href^="/chues/representants/"]').first();
   await expect(premier).toBeVisible();
   await premier.click();
-  await page.waitForURL(/\/representants\/[0-9a-f-]+$/);
+  await page.waitForURL(/\/chues\/representants\/[0-9a-f-]+$/);
   await expect(page.getByText('Histoire de la relation').first()).toBeVisible();
-  await analyze(page, '/representants/<id>');
+  await analyze(page, '/chues/representants/<id>');
 
-  await page.goto('/supervision');
+  await page.goto('/chues/supervision');
   await page.getByRole('tab', { name: 'Comptes' }).click();
   await expect(page.getByText('Présence et dernière activité des comptes.')).toBeVisible();
-  await analyze(page, '/supervision?volet=comptes');
+  await analyze(page, '/chues/supervision?volet=comptes');
 });
 
 /**
@@ -115,7 +162,7 @@ test('aucune violation axe sur le mode Organiser du tableau de bord des visites'
 
   await page.goto('/accueil/tableau-de-bord');
   await expect(page.getByRole('heading', { name: 'Tableau de bord', level: 1 })).toBeVisible();
-  await page.getByRole('button', { name: 'Organiser' }).click();
+  await page.getByRole('button', { name: 'Organiser les graphiques', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Enregistrer' })).toBeVisible();
   await analyze(page, '/accueil/tableau-de-bord (Organiser)');
 });

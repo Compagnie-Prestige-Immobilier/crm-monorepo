@@ -248,7 +248,7 @@ function Timeline({ changes }: { changes: readonly RepresentantRelationChange[] 
   if (changes.length === 0) {
     return (
       <p className="text-[0.875rem] text-muted-foreground">
-        Aucune bascule enregistrée. Le statut se pose depuis la console d’appel, ou en modifiant la
+        Aucune bascule enregistrée. Le statut se pose en consignant un appel, ou en modifiant la
         fiche.
       </p>
     );

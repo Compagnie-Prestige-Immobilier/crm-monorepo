@@ -48,7 +48,7 @@ import { AndroidPreview } from './android-preview';
 import { mergedVariables, renderNotification } from './template';
 import { CATEGORY_LABELS, type NotificationCategory, type NotificationTemplate } from './types';
 
-const CATEGORIES: NotificationCategory[] = ['ANNONCE', 'RAPPEL', 'CAMPAGNE', 'DOSSIER', 'SYSTEME'];
+const CATEGORIES: NotificationCategory[] = ['ANNONCE', 'RAPPEL', 'DOSSIER', 'SYSTEME'];
 
 const CATEGORY_ITEMS = CATEGORIES.map((item) => ({ value: item, label: CATEGORY_LABELS[item] }));
 
@@ -342,7 +342,7 @@ function TemplateFormDialog({
                 <Textarea
                   {...props}
                   value={bodyTemplate}
-                  placeholder="{{nombre}} fiches à appeler."
+                  placeholder="{{nombre}} nouvelles fiches sur votre projet."
                   onChange={(event) => {
                     setBodyTemplate(event.target.value);
                   }}

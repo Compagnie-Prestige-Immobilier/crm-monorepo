@@ -7,9 +7,8 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/router/route_paths.dart';
 import '../../core/theme/cpi_tokens.dart';
-import '../../data/local/database.dart';
 import '../../ui/widgets/cpi_kit.dart';
-import '../campagnes/campagnes.dart';
+import '../rappels/presentation/rappels_en_retard_banner.dart';
 import 'app_shell.dart';
 import 'projects.dart';
 import 'workspace_switch.dart';
@@ -24,38 +23,15 @@ class GrandPublicScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final AsyncValue<List<CampaignsWithOpenWorkResult>> campaigns = ref.watch(
-      grandPublicCampagnesProvider,
-    );
     final AsyncValue<int> prospects = ref.watch(
       grandPublicProspectCountProvider,
     );
     final AsyncValue<List<Rappel>> rappels = ref.watch(
       grandPublicRappelsProvider,
     );
-    final List<CampaignsWithOpenWorkResult> campaignRows =
-        campaigns.value ?? const <CampaignsWithOpenWorkResult>[];
-    final int openCalls = campaignRows.fold<int>(
-      0,
-      (int total, CampaignsWithOpenWorkResult campaign) =>
-          total + campaign.ouvertes,
-    );
-
     void appeler() {
       HapticFeedback.selectionClick().ignore();
-      // Une seule file : on y va droit. Aucune : la console reste la porte
-      // d'entrée pour consigner un appel entrant.
-      if (campaignRows.length == 1) {
-        context
-            .push(CampagnesRoutes.grandPublicFileFor(campaignRows.single.id))
-            .ignore();
-        return;
-      }
-      if (campaignRows.isEmpty) {
-        context.push(CampagnesRoutes.grandPublicConsole).ignore();
-        return;
-      }
-      context.push(CampagnesRoutes.grandPublicListe).ignore();
+      context.push('/grand-public/phase2').ignore();
     }
 
     final List<Rappel>? prochains = rappels.value;
@@ -85,9 +61,10 @@ class GrandPublicScreen extends ConsumerWidget {
             CpiSpacing.xl,
           ),
           children: <Widget>[
+            const RappelsEnRetardBanner(grandPublic: true, padded: false),
             _GrandeCarte(
-              nombre: openCalls,
-              loading: campaigns.isLoading,
+              nombre: 0,
+              loading: false,
               titre: 'Appels du jour',
               icon: PhosphorIconsRegular.phoneCall,
               vide: 'Rien à appeler aujourd\'hui.',

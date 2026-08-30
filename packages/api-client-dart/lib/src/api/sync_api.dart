@@ -23,7 +23,7 @@ class SyncApi {
   /// Pagination keyset sur (updatedAt, id) et retard de sécurité de 2 secondes. Un COMMERCIAL ne reçoit que ses propres prospects ; l’annuaire des représentants et les référentiels sont communs.
   ///
   /// Parameters:
-  /// * [xCPIPayloadVersion] - Format de données que le client sait lire. En dessous de 4, le tirage est refusé au lieu d’être servi : les liens banque, syndicat et représentant d’un prospect peuvent être nuls, et un client plus ancien échoue à les décoder.
+  /// * [xCPIPayloadVersion] - Format de données que le client sait lire. En dessous de 5, le tirage est refusé au lieu d’être servi : les liens banque, syndicat et représentant d’un prospect peuvent être nuls, et un client plus ancien échoue à les décoder.
   /// * [since] - Curseur opaque renvoyé par l’appel précédent. Absent : synchronisation complète.
   /// * [limit]
   /// * [pendingOps] - Opérations en attente de remontée dans l’appareil. Le serveur ne peut pas la deviner. Facultatif sans limite de temps.

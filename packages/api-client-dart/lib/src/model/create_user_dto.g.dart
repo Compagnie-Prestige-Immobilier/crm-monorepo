@@ -17,8 +17,6 @@ abstract class _$CreateUserDtoCWProxy {
 
   CreateUserDto role(Role? role);
 
-  CreateUserDto departementId(String? departementId);
-
   CreateUserDto phone(String? phone);
 
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `CreateUserDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
@@ -33,7 +31,6 @@ abstract class _$CreateUserDtoCWProxy {
     String fullName,
     String password,
     Role? role,
-    String? departementId,
     String? phone,
   });
 }
@@ -60,10 +57,6 @@ class _$CreateUserDtoCWProxyImpl implements _$CreateUserDtoCWProxy {
   CreateUserDto role(Role? role) => this(role: role);
 
   @override
-  CreateUserDto departementId(String? departementId) =>
-      this(departementId: departementId);
-
-  @override
   CreateUserDto phone(String? phone) => this(phone: phone);
 
   @override
@@ -79,7 +72,6 @@ class _$CreateUserDtoCWProxyImpl implements _$CreateUserDtoCWProxy {
     Object? fullName = const $CopyWithPlaceholder(),
     Object? password = const $CopyWithPlaceholder(),
     Object? role = const $CopyWithPlaceholder(),
-    Object? departementId = const $CopyWithPlaceholder(),
     Object? phone = const $CopyWithPlaceholder(),
   }) {
     return CreateUserDto(
@@ -103,10 +95,6 @@ class _$CreateUserDtoCWProxyImpl implements _$CreateUserDtoCWProxy {
           ? _value.role
           // ignore: cast_nullable_to_non_nullable
           : role as Role?,
-      departementId: departementId == const $CopyWithPlaceholder()
-          ? _value.departementId
-          // ignore: cast_nullable_to_non_nullable
-          : departementId as String?,
       phone: phone == const $CopyWithPlaceholder()
           ? _value.phone
           // ignore: cast_nullable_to_non_nullable
@@ -146,7 +134,6 @@ CreateUserDto _$CreateUserDtoFromJson(Map<String, dynamic> json) =>
               ) ??
               Role.COMMERCIAL,
         ),
-        departementId: $checkedConvert('departementId', (v) => v as String?),
         phone: $checkedConvert('phone', (v) => v as String?),
       );
       return val;
@@ -159,7 +146,6 @@ Map<String, dynamic> _$CreateUserDtoToJson(CreateUserDto instance) =>
       'fullName': instance.fullName,
       'password': instance.password,
       if (_$RoleEnumMap[instance.role] case final value?) 'role': value,
-      if (instance.departementId case final value?) 'departementId': value,
       if (instance.phone case final value?) 'phone': value,
     };
 

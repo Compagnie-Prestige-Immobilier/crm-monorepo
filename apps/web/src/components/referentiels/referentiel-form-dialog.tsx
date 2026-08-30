@@ -132,7 +132,7 @@ export function BanqueFormDialog({
                 type="number"
                 min={0}
                 inputMode="numeric"
-                {...register('sortOrder')}
+                {...register('sortOrder', { valueAsNumber: true })}
               />
             )}
           </Field>
@@ -254,7 +254,7 @@ export function SyndicatFormDialog({
                 type="number"
                 min={0}
                 inputMode="numeric"
-                {...register('sortOrder')}
+                {...register('sortOrder', { valueAsNumber: true })}
               />
             )}
           </Field>

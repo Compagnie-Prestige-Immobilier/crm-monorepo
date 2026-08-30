@@ -25,8 +25,6 @@ class DemoWorkspaceCountsDto {
 
     required this.prospects,
 
-    required this.campaigns,
-
     required this.bankCases,
   });
 
@@ -39,9 +37,6 @@ class DemoWorkspaceCountsDto {
   @JsonKey(name: r'prospects', required: true, includeIfNull: false)
   final num prospects;
 
-  @JsonKey(name: r'campaigns', required: true, includeIfNull: false)
-  final num campaigns;
-
   @JsonKey(name: r'bankCases', required: true, includeIfNull: false)
   final num bankCases;
 
@@ -50,12 +45,11 @@ class DemoWorkspaceCountsDto {
         other is DemoWorkspaceCountsDto &&
             runtimeType == other.runtimeType &&
             equals(
-              [users, representants, prospects, campaigns, bankCases],
+              [users, representants, prospects, bankCases],
               [
                 other.users,
                 other.representants,
                 other.prospects,
-                other.campaigns,
                 other.bankCases,
               ],
             );
@@ -64,13 +58,7 @@ class DemoWorkspaceCountsDto {
   @override
   int get hashCode =>
       runtimeType.hashCode ^
-      mapPropsToHashCode([
-        users,
-        representants,
-        prospects,
-        campaigns,
-        bankCases,
-      ]);
+      mapPropsToHashCode([users, representants, prospects, bankCases]);
 
   factory DemoWorkspaceCountsDto.fromJson(Map<String, dynamic> json) =>
       _$DemoWorkspaceCountsDtoFromJson(json);

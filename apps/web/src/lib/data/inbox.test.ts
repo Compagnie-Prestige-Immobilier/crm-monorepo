@@ -45,7 +45,7 @@ describe('webRouteFor', () => {
   it('et chacune atterrit sur un écran servi', () => {
     expect(movedTarget('phase2')).toBe('/chues/campagnes');
     expect(movedTarget('phase2', ['callbacks'])).toBe('/chues/rappels');
-    expect(movedTarget('rep-campaigns')).toBe('/chues/campagnes/representants');
+    expect(movedTarget('rep-campaigns')).toBe('/chues/campagnes');
   });
 
   it('ne se laisse pas piéger par un préfixe partiel', () => {

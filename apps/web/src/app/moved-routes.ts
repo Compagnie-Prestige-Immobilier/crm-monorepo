@@ -24,18 +24,18 @@ export const MOVED_ROUTES: Readonly<Record<string, string>> = {
   parametres: '/admin/parametres',
   notifications: '/admin/notifications',
 
-  // Les trois adresses des rappels quotidiens : `reminders.service.ts` les émet
-  // encore, et elles n'ont jamais eu d'écran de ce nom dans le panel.
+  // Adresses des rappels quotidiens d'avant le retrait des campagnes : plus rien
+  // ne les émet, mais des notifications déjà envoyées les portent.
   phase2: '/chues/campagnes',
-  'rep-campaigns': '/chues/campagnes/representants',
+  'rep-campaigns': '/chues/campagnes',
 };
 
 /**
  * Adresses COMPLÈTES dont la racine seule mènerait ailleurs.
  *
- * `/phase2/callbacks` est la file des rappels, pas une sous-page des
- * campagnes : la règle de préfixe l'enverrait sur `/chues/campagnes/callbacks`,
- * qui n'existe pas.
+ * `/phase2/callbacks` est l'écran des rappels, pas une sous-page des lots : la
+ * règle de préfixe l'enverrait sur `/chues/campagnes/callbacks`, qui n'existe
+ * pas.
  */
 export const MOVED_PATHS: Readonly<Record<string, string>> = {
   '/phase2/callbacks': '/chues/rappels',

@@ -58,14 +58,27 @@ describe('contrat app-updates', () => {
 
   it('aucune propriété du module ne sort sans type ni $ref', () => {
     let vues = 0;
-    for (const [property, definition] of Object.entries(schema('AppUpdateDto').properties ?? {})) {
-      vues += 1;
-      expect(
-        definition.type !== undefined || definition.$ref !== undefined,
-        `AppUpdateDto.${property} : schéma sans type ni $ref`,
-      ).toBe(true);
+    for (const nom of ['AppUpdateDto', 'AndroidReleaseDto', 'AndroidReleaseListDto']) {
+      for (const [property, definition] of Object.entries(schema(nom).properties ?? {})) {
+        vues += 1;
+        expect(
+          definition.type !== undefined || definition.$ref !== undefined,
+          `${nom}.${property} : schéma sans type ni $ref`,
+        ).toBe(true);
+      }
     }
-    expect(vues).toBe(10);
+    expect(vues).toBe(12 + 13 + 2);
+  });
+
+  it('le plancher sort en nombre nullable, sur les deux surfaces qui le portent', () => {
+    for (const nom of ['AppUpdateDto', 'AndroidReleaseListDto']) {
+      expect({ nom, ...schema(nom).properties?.minVersionCode }).toMatchObject({
+        nom,
+        type: 'number',
+        nullable: true,
+      });
+      expect(schema(nom).required ?? []).toContain('minVersionCode');
+    }
   });
 
   it('les opérations gardent leurs operationId, sur lesquels les clients sont engendrés', () => {
@@ -75,5 +88,14 @@ describe('contrat app-updates', () => {
       'downloadAndroidUpdate',
     );
     expect(paths['/api/v1/app-updates/android']?.post?.operationId).toBe('uploadAndroidUpdate');
+    expect(paths['/api/v1/app-updates/android/releases']?.get?.operationId).toBe(
+      'listAndroidReleases',
+    );
+    expect(paths['/api/v1/app-updates/android/{versionCode}/mandatory']?.post?.operationId).toBe(
+      'markAndroidReleaseMandatory',
+    );
+    expect(paths['/api/v1/app-updates/android/{versionCode}/withdraw']?.post?.operationId).toBe(
+      'withdrawAndroidRelease',
+    );
   });
 });

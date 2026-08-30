@@ -69,6 +69,18 @@ Future<void> seedReferentials(AppDatabase db) async {
           localUpdatedAt: t0,
         ),
       );
+  await db
+      .into(db.incomeBands)
+      .insert(
+        IncomeBandsCompanion.insert(
+          id: 'rev-1',
+          code: 'B150_300',
+          label: 'Revenu Test',
+          minXof: const Value<int?>(150000),
+          maxXof: const Value<int?>(300000),
+          localUpdatedAt: t0,
+        ),
+      );
 }
 
 /// Donne un libellé de région au département du décor et en ajoute un second
@@ -165,53 +177,6 @@ Future<void> insertProspect(
           clientCreatedAt: t0,
           localUpdatedAt: t0,
           serverUpdatedAt: Value<DateTime?>(serverUpdatedAt),
-        ),
-      );
-}
-
-Future<void> insertCampagne(
-  AppDatabase db, {
-  required String id,
-  String name = 'Campagne',
-  String status = 'ACTIVE',
-  int spreadDays = 1,
-  DateTime? closedAt,
-  DateTime? updatedAt,
-}) {
-  return db
-      .into(db.callCampaigns)
-      .insert(
-        CallCampaignsCompanion.insert(
-          id: id,
-          name: name,
-          status: Value<String>(status),
-          spreadDays: Value<int>(spreadDays),
-          closedAt: Value<DateTime?>(closedAt),
-          updatedAt: updatedAt ?? t0,
-        ),
-      );
-}
-
-Future<void> insertTache(
-  AppDatabase db, {
-  required String id,
-  required String campaignId,
-  required String prospectId,
-  required int position,
-  int dayIndex = 0,
-  String status = 'OPEN',
-}) {
-  return db
-      .into(db.callTasks)
-      .insert(
-        CallTasksCompanion.insert(
-          id: id,
-          campaignId: campaignId,
-          prospectId: prospectId,
-          position: position,
-          dayIndex: Value<int>(dayIndex),
-          status: Value<String>(status),
-          updatedAt: t0,
         ),
       );
 }

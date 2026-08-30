@@ -15,6 +15,8 @@ abstract class _$SupervisionActivityDtoCWProxy {
 
   SupervisionActivityDto items(List<SupervisionActivityRowDto> items);
 
+  SupervisionActivityDto totals(SupervisionActivityCountsDto totals);
+
   SupervisionActivityDto teleconseillers(
     List<SupervisionTeleconseillerDto> teleconseillers,
   );
@@ -38,6 +40,7 @@ abstract class _$SupervisionActivityDtoCWProxy {
     DateTime? to,
     SupervisionGranularity granularity,
     List<SupervisionActivityRowDto> items,
+    SupervisionActivityCountsDto totals,
     List<SupervisionTeleconseillerDto> teleconseillers,
     List<SupervisionHistogramBarDto> prospectsByTeleconseiller,
     List<SupervisionHistogramBarDto> prospectsByRepresentant,
@@ -66,6 +69,10 @@ class _$SupervisionActivityDtoCWProxyImpl
       this(items: items);
 
   @override
+  SupervisionActivityDto totals(SupervisionActivityCountsDto totals) =>
+      this(totals: totals);
+
+  @override
   SupervisionActivityDto teleconseillers(
     List<SupervisionTeleconseillerDto> teleconseillers,
   ) => this(teleconseillers: teleconseillers);
@@ -92,6 +99,7 @@ class _$SupervisionActivityDtoCWProxyImpl
     Object? to = const $CopyWithPlaceholder(),
     Object? granularity = const $CopyWithPlaceholder(),
     Object? items = const $CopyWithPlaceholder(),
+    Object? totals = const $CopyWithPlaceholder(),
     Object? teleconseillers = const $CopyWithPlaceholder(),
     Object? prospectsByTeleconseiller = const $CopyWithPlaceholder(),
     Object? prospectsByRepresentant = const $CopyWithPlaceholder(),
@@ -113,6 +121,10 @@ class _$SupervisionActivityDtoCWProxyImpl
           ? _value.items
           // ignore: cast_nullable_to_non_nullable
           : items as List<SupervisionActivityRowDto>,
+      totals: totals == const $CopyWithPlaceholder()
+          ? _value.totals
+          // ignore: cast_nullable_to_non_nullable
+          : totals as SupervisionActivityCountsDto,
       teleconseillers: teleconseillers == const $CopyWithPlaceholder()
           ? _value.teleconseillers
           // ignore: cast_nullable_to_non_nullable
@@ -152,6 +164,7 @@ SupervisionActivityDto _$SupervisionActivityDtoFromJson(
       'to',
       'granularity',
       'items',
+      'totals',
       'teleconseillers',
       'prospectsByTeleconseiller',
       'prospectsByRepresentant',
@@ -182,6 +195,10 @@ SupervisionActivityDto _$SupervisionActivityDtoFromJson(
                 SupervisionActivityRowDto.fromJson(e as Map<String, dynamic>),
           )
           .toList(),
+    ),
+    totals: $checkedConvert(
+      'totals',
+      (v) => SupervisionActivityCountsDto.fromJson(v as Map<String, dynamic>),
     ),
     teleconseillers: $checkedConvert(
       'teleconseillers',
@@ -222,6 +239,7 @@ Map<String, dynamic> _$SupervisionActivityDtoToJson(
   'to': instance.to?.toIso8601String(),
   'granularity': _$SupervisionGranularityEnumMap[instance.granularity]!,
   'items': instance.items.map((e) => e.toJson()).toList(),
+  'totals': instance.totals.toJson(),
   'teleconseillers': instance.teleconseillers.map((e) => e.toJson()).toList(),
   'prospectsByTeleconseiller': instance.prospectsByTeleconseiller
       .map((e) => e.toJson())

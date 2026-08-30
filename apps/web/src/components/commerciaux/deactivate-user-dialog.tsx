@@ -38,8 +38,7 @@ export function DeactivateUserDialog({
   }, [user?.id]);
 
   // Le portefeuille GÈLE sans repreneur : `createdById` reste sur le compte
-  // parti, plus aucun commercial actif ne peut lire ni corriger ces fiches, et
-  // les tâches encore ouvertes les bloquent hors de tout tirage futur.
+  // parti, et plus aucun téléconseiller actif ne peut lire ni corriger ces fiches.
   const reprisRequise = user !== null && user.prospectCount > 0;
 
   const candidats = repreneurs.filter((row) => row.id !== user?.id && row.isActive);

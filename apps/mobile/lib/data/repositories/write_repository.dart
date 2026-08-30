@@ -735,9 +735,10 @@ class WriteRepository {
   /// premier reste le point d'entrée des six codes système, dont le référentiel
   /// garantit qu'ils portent le code de leur issue.
   ///
-  /// [nom], [prenom], [profession], [banqueId] et [syndicatId] ne sont PAS
-  /// écrits en local : c'est le serveur qui les pose sur le prospect lié, et
-  /// les recopier ici donnerait deux vérités à tenir d'accord jusqu'au pull.
+  /// [nom], [prenom], [profession], [banqueId], [syndicatId], [incomeBandId] et
+  /// [dureeSystemeMois] ne sont PAS écrits en local : c'est le serveur qui les
+  /// pose sur le prospect lié, et les recopier ici donnerait deux vérités à
+  /// tenir d'accord jusqu'au pull.
   Future<String> recordCallAttempt({
     required String prospectId,
     required String outcome,
@@ -753,6 +754,8 @@ class WriteRepository {
     String? profession,
     String? banqueId,
     String? syndicatId,
+    String? incomeBandId,
+    int? dureeSystemeMois,
     String? email,
     bool? fonctionnaire,
     bool? engagementEnCours,
@@ -826,6 +829,8 @@ class WriteRepository {
           'profession': ?normalizeComment(profession),
           'banqueId': ?banqueId,
           'syndicatId': ?syndicatId,
+          'incomeBandId': ?incomeBandId,
+          'dureeSystemeMois': ?dureeSystemeMois,
           'email': ?normalizedEmail,
           // Le `?` n'omet que le NUL : `false` est une réponse et part, là où
           // son absence se lirait « question non posée ».
@@ -888,13 +893,6 @@ class WriteRepository {
     if (whatsappStatus == WhatsappStatus.autreNumero.code && whatsapp == null) {
       throw ArgumentError.value(whatsappE164, 'whatsappE164');
     }
-    const Set<String> terminal = <String>{
-      'REACHED',
-      'PROSPECTS_PROMISED',
-      'REFUSED',
-      'WRONG_NUMBER',
-    };
-
     await _db.transaction(() async {
       final Representant? representant =
           await (_db.select(_db.representants)
@@ -916,19 +914,6 @@ class WriteRepository {
           localUpdatedAt: Value<DateTime>(now),
         ),
       );
-      if (terminal.contains(outcome)) {
-        await (_db.update(_db.repCallTasks)..where(
-              (RepCallTasks row) =>
-                  row.representantId.equals(representantId) &
-                  row.status.equals('OPEN'),
-            ))
-            .write(
-              RepCallTasksCompanion(
-                status: const Value<String>('DONE'),
-                updatedAt: Value<DateTime>(now),
-              ),
-            );
-      }
       if (callbackAt != null) {
         await _db
             .into(_db.repCallbackReminders)
@@ -993,6 +978,29 @@ class WriteRepository {
       _db.repCallbackReminders,
     )..where((RepCallbackReminders row) => row.id.isIn(honores))).go();
     return honores;
+  }
+
+  /// Repousse un rappel promis. Rend la ligne à jour, ou `null` si elle a
+  /// disparu entre-temps : un appel consigné pendant que l'alarme sonnait
+  /// l'a déjà honorée, et il n'y a plus rien à reprogrammer.
+  ///
+  /// `notifiedAt` repart à `null` : le popup in-app doit retomber à la
+  /// nouvelle heure.
+  Future<RepCallbackReminder?> snoozeRepCallback({
+    required String id,
+    required Duration by,
+  }) async {
+    await (_db.update(
+      _db.repCallbackReminders,
+    )..where((RepCallbackReminders row) => row.id.equals(id))).write(
+      RepCallbackRemindersCompanion(
+        scheduledAt: Value<DateTime>(_clock.now().add(by)),
+        notifiedAt: const Value<DateTime?>(null),
+      ),
+    );
+    return (_db.select(_db.repCallbackReminders)
+          ..where((RepCallbackReminders row) => row.id.equals(id)))
+        .getSingleOrNull();
   }
 
   static String? normalizeComment(String? raw) {

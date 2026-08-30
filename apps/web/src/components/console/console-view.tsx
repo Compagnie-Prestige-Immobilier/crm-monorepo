@@ -1,214 +1,319 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CopyIcon } from 'lucide-react';
+import { ArrowLeftIcon, CopyIcon } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
-import { ConversionFields } from '@/components/console/conversion-fields';
 import { copyPhone, Kbd } from '@/components/console/console-ui';
+import { ConversionFields } from '@/components/console/conversion-fields';
 import { useShortcuts } from '@/components/console/use-shortcuts';
-import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button, buttonVariants } from '@/components/ui/button';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
-import { useLive } from '@/components/live/use-live';
 import {
-  AttemptRefused,
   ALREADY_COMPLETED,
-  buildQueue,
+  AttemptRefused,
   callbackKeys,
   callbackSlots,
-  consoleKeys,
   conversionErrorFor,
   conversionFrom,
-  fetchCallbacks,
-  fetchConsoleCampaigns,
-  fetchConsoleQueue,
   formatCallbackAt,
-  nextAfter,
   newAttemptInput,
   pushCallAttempt,
-  queueLabel,
-  QUEUE_BUCKET_LABELS,
-  schedulesOf,
-  undatedCallbacks,
   validateAttempt,
   validateConversion,
   type AttemptDraft,
   type CallbackSlot,
-  type CallbackSchedules,
   type ConversionDraft,
   type ConversionErrors,
 } from '@/lib/data/console';
-import { dakarLocalToIso, formatDateTime, formatNumber, formatPhone } from '@/lib/format';
+import { fetchProspect, fetchProspects } from '@/lib/data/prospects';
+import { EMPTY_FILTERS } from '@/lib/filters';
+import { dakarLocalToIso, formatDateTime, formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
-import { matchesSearch } from '@/lib/search';
+import { queryKeys } from '@/lib/query-keys';
 import {
   CALL_OUTCOME_LABELS,
-  ENROLLMENT_METHOD_LABELS,
   PHASE2_STATUS_LABELS,
   type CallOutcome,
   type EnrollmentMethod,
+  type ProspectFilters,
   type ProspectRow,
 } from '@/lib/types';
+import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { cn } from '@/lib/utils';
 
-const METHOD_KEYS: readonly { key: string; method: EnrollmentMethod }[] = [
-  { key: '1', method: 'PLATFORM' },
-  { key: '2', method: 'PHYSICAL' },
-  { key: '3', method: 'VOICE_OR_ELECTRONIC_MESSAGING' },
-  { key: '9', method: 'APPOINTMENT' },
-];
+type Projet = 'CHUES' | 'GRAND_PUBLIC';
 
-const OUTCOME_KEYS: readonly { key: string; outcome: CallOutcome }[] = [
-  { key: '4', outcome: 'UNREACHABLE' },
-  { key: '6', outcome: 'REFUSED' },
-  { key: '7', outcome: 'WRONG_NUMBER' },
+/** Ce que l'appel a donné, avant tout : la personne était-elle joignable. */
+const ISSUES: readonly { key: string; label: string; outcome: CallOutcome | 'JOIGNABLE' }[] = [
+  { key: '1', label: 'Joignable', outcome: 'JOIGNABLE' },
+  { key: '2', label: CALL_OUTCOME_LABELS.CALLBACK, outcome: 'CALLBACK' },
+  { key: '3', label: CALL_OUTCOME_LABELS.UNREACHABLE, outcome: 'UNREACHABLE' },
+  { key: '4', label: CALL_OUTCOME_LABELS.WRONG_NUMBER, outcome: 'WRONG_NUMBER' },
+  { key: '5', label: 'Autre', outcome: 'OTHER' },
 ];
 
 const KEYBOARD_MAP: readonly (readonly [string, string])[] = [
-  ['1 2 3 9', 'Méthode obtenue, ouvre la conversion'],
-  ['4', 'Injoignable'],
-  ['5', 'À rappeler, puis échéance'],
-  ['6', 'Refus'],
-  ['7', 'Mauvais numéro'],
-  ['8', 'Autre, puis commentaire'],
-  ['1 … 6', 'Échéance proposée, après 5'],
-  ['0', 'Saisir une autre échéance, après 5'],
-  ['Entrée', 'Valider, ou passer à la suivante'],
-  ['Échap', 'Annuler la saisie en cours'],
-  ['↑ ↓', 'Parcourir la file'],
-  ['Espace', 'Ouvrir la fiche sélectionnée'],
+  ['1', 'Joignable : ouvre le dossier et l’adhésion'],
+  ['2', 'À rappeler, puis échéance'],
+  ['3', 'Injoignable'],
+  ['4', 'Mauvais numéro'],
+  ['5', 'Autre, puis commentaire'],
+  ['1 … 6', 'Échéance proposée, après 2'],
+  ['0', 'Saisir une autre échéance, après 2'],
+  ['Entrée', 'Valider'],
+  ['Échap', 'Annuler la saisie, ou revenir à la liste'],
   ['C', 'Copier le numéro'],
   ['N', 'Ajouter un prospect sur ce représentant'],
   ['R', 'Fiche du représentant'],
-  ['Ctrl/Cmd K', 'Palette'],
   ['?', 'Afficher cette carte'],
 ];
 
+const REVELE = 'animate-in fade-in-0 slide-in-from-top-1 duration-200 motion-reduce:animate-none';
+
+/** Sans recherche : les vingt dernières fiches ajoutées au projet. */
+const annuaireFilters = (projet: Projet, search: string): ProspectFilters => ({
+  ...EMPTY_FILTERS,
+  projet,
+  search,
+  pageSize: 20,
+  sortBy: 'clientCreatedAt',
+  sortDir: 'desc',
+});
+
+const nouveauHref = (projet: Projet): string =>
+  projet === 'GRAND_PUBLIC' ? '/grand-public/nouveau' : '/chues/prospects/nouveau';
+
 /**
- * UNE file, UN écran : les prospects. Les représentants ont désormais le leur
- * (`/chues/appels-representants`), qui est l'étape 1 du projet ; les empiler
- * derrière un onglet et une touche cachée faisait de deux étapes du parcours
- * un seul écran, que personne ne savait nommer.
+ * Étape 3 : convertir un prospect. L'écran ouvre sur la recherche, la fiche
+ * choisie reçoit l'appel, puis on revient à la liste. `?fiche=<id>` (depuis
+ * les rappels) ouvre directement la fiche visée.
  */
-export function ConsoleView() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const projet = pathname.startsWith('/grand-public') ? 'GRAND_PUBLIC' : 'CHUES';
+export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
   const queryClient = useQueryClient();
-  const live = useLive();
-  const commentRef = useRef<HTMLTextAreaElement>(null);
-  const callbackRef = useRef<HTMLInputElement>(null);
   const searchParams = useSearchParams();
 
-  const [campaignId, setCampaignId] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const requestedId = searchParams.get('fiche');
-  const [openedId, setOpenedId] = useState<string | null>(requestedId);
+  const [choisi, setChoisi] = useState<ProspectRow | null>(null);
+  const [demandee, setDemandee] = useState<string | null>(searchParams.get('fiche'));
+  const [search, setSearch] = useState('');
+  const [confirme, setConfirme] = useState<string | null>(null);
+  const cherche = useDebouncedValue(search).trim();
+
+  const parLien = useQuery({
+    queryKey: queryKeys.prospect(demandee ?? ''),
+    queryFn: () => fetchProspect(demandee ?? ''),
+    enabled: demandee !== null,
+    retry: false,
+  });
+
+  const courante = choisi ?? (demandee === null ? null : (parLien.data ?? null));
+
+  const annuaire = useQuery({
+    queryKey: queryKeys.prospects(annuaireFilters(projet, cherche)),
+    queryFn: () => fetchProspects(annuaireFilters(projet, cherche)),
+    enabled: courante === null,
+    placeholderData: (previous) => previous,
+  });
+
+  const revenir = useCallback(() => {
+    setChoisi(null);
+    setDemandee(null);
+  }, []);
+
+  if (courante !== null) {
+    return (
+      <Consignation
+        key={courante.id}
+        prospect={courante}
+        projet={projet}
+        onAbandon={revenir}
+        onEnregistre={(nom) => {
+          setConfirme(nom);
+          revenir();
+          void queryClient.invalidateQueries({ queryKey: ['prospects'] });
+          void queryClient.invalidateQueries({ queryKey: callbackKeys.root });
+        }}
+      />
+    );
+  }
+
+  if (demandee !== null && parLien.isPending) return <ListeSkeleton />;
+
+  return (
+    <div className="flex w-full flex-col gap-5">
+      {demandee !== null && parLien.isError ? (
+        <p
+          role="alert"
+          className="rounded-md border border-border bg-warning-surface px-3 py-2 text-[0.875rem] text-warning"
+        >
+          La fiche ouverte depuis les rappels n’a pas pu être chargée. Cherchez-la ci-dessous.
+        </p>
+      ) : null}
+
+      {confirme === null ? null : (
+        <p role="status" className={cn('text-[0.875rem] font-[600] text-accent-text', REVELE)}>
+          Appel enregistré pour {confirme}.
+        </p>
+      )}
+
+      <ChampAnnuaire value={search} onChange={setSearch} />
+
+      <p className="text-[0.8125rem] text-muted-foreground">
+        {cherche === ''
+          ? 'Les vingt dernières fiches ajoutées. Cherchez un nom ou un numéro pour en voir d’autres.'
+          : 'Choisissez qui vous venez d’appeler.'}
+      </p>
+
+      {annuaire.isError ? (
+        <QueryErrorState
+          error={annuaire.error}
+          fallback="L’annuaire n’a pas pu être lu."
+          onRetry={() => {
+            void annuaire.refetch();
+          }}
+        />
+      ) : annuaire.isPending ? (
+        <ListeSkeleton />
+      ) : annuaire.data.items.length === 0 ? (
+        <div className="flex flex-col gap-3">
+          <p className="text-[0.9375rem]">
+            {cherche === ''
+              ? 'Aucun prospect pour l’instant.'
+              : 'Aucun résultat. Vérifiez le nom ou le numéro.'}
+          </p>
+          <Link href={nouveauHref(projet)} className={cn(buttonVariants(), 'self-start')}>
+            Ajouter un prospect
+          </Link>
+        </div>
+      ) : (
+        <ol className="flex flex-col gap-2">
+          {annuaire.data.items.map((row) => (
+            <li key={row.id}>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirme(null);
+                  setChoisi(row);
+                }}
+                className={cn(
+                  'flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-md border border-border px-3 py-3 text-left',
+                  'hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                )}
+              >
+                <span className="flex min-w-0 flex-col">
+                  <span className="truncate text-[0.9375rem] font-[600]">
+                    {row.nom} {row.prenom}
+                  </span>
+                  <span className="text-[0.8125rem] text-muted-foreground">
+                    <span className="tabular-nums">{formatPhone(row.phoneE164)}</span>
+                    {row.banqueName === null ? '' : ` · ${row.banqueName}`}
+                    {row.lastAttemptAt === null
+                      ? ' · jamais appelé'
+                      : ` · dernier appel ${formatDateTime(row.lastAttemptAt)}`}
+                  </span>
+                </span>
+                {row.phase2Status === 'PENDING' ? null : (
+                  <span className="rounded-full border border-border px-2 py-0.5 text-[0.75rem] text-muted-foreground">
+                    {PHASE2_STATUS_LABELS[row.phase2Status]}
+                  </span>
+                )}
+              </button>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
+function ChampAnnuaire({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const champ = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    champ.current?.focus();
+  }, []);
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor="console-annuaire" className="text-[0.875rem] font-[600]">
+        Quel prospect avez-vous appelé ?
+      </label>
+      <Input
+        id="console-annuaire"
+        ref={champ}
+        type="search"
+        autoComplete="off"
+        placeholder="Chercher un prospect : nom ou numéro"
+        className="h-12 text-[1rem]"
+        value={value}
+        onChange={(event) => {
+          onChange(event.target.value);
+        }}
+      />
+    </div>
+  );
+}
+
+function ListeSkeleton() {
+  return (
+    <div className="flex flex-col gap-2">
+      <Skeleton className="h-14" />
+      <Skeleton className="h-14" />
+      <Skeleton className="h-14" />
+    </div>
+  );
+}
+
+/**
+ * La consignation d'un appel, en deux temps : d'abord si la personne était
+ * joignable, puis, si oui, son dossier et la manière dont elle adhère.
+ */
+function Consignation({
+  prospect,
+  projet,
+  onAbandon,
+  onEnregistre,
+}: {
+  prospect: ProspectRow;
+  projet: Projet;
+  onAbandon: () => void;
+  onEnregistre: (nom: string) => void;
+}) {
+  const router = useRouter();
+  const commentRef = useRef<HTMLTextAreaElement>(null);
+  const callbackRef = useRef<HTMLInputElement>(null);
+
   const [comment, setComment] = useState('');
   const [draftOutcome, setDraftOutcome] = useState<CallOutcome | null>(null);
   const [conversion, setConversion] = useState<ConversionDraft | null>(null);
   const [conversionErrors, setConversionErrors] = useState<ConversionErrors>({});
   const [slots, setSlots] = useState<readonly CallbackSlot[] | null>(null);
   const [freeCallback, setFreeCallback] = useState('');
-  const [done, setDone] = useState<readonly string[]>([]);
-  // L'écran passe seul à la fiche suivante ; cette ligne est la seule trace de
-  // ce qui vient d'être enregistré.
-  const [enchaine, setEnchaine] = useState(false);
-  const [refusedIds, setRefusedIds] = useState<readonly string[]>([]);
-  const [rawOrder, setRawOrder] = useState(false);
-  const [palette, setPalette] = useState(false);
-  const [paletteSearch, setPaletteSearch] = useState('');
+  const [refusee, setRefusee] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
 
-  const campaigns = useQuery({
-    queryKey: [...consoleKeys.campaigns, projet],
-    queryFn: () => fetchConsoleCampaigns(undefined, projet),
-    retry: false,
-    staleTime: 300_000,
-  });
-
-  const queue = useQuery({
-    queryKey: [...consoleKeys.queue(campaignId), projet],
-    queryFn: () => fetchConsoleQueue(campaignId, undefined, projet),
-    refetchInterval: live.refetchInterval,
-  });
-
-  const callbacks = useQuery({
-    queryKey: [...callbackKeys.list('week', null), projet],
-    queryFn: () => fetchCallbacks('week', null, undefined, projet),
-    refetchInterval: live.refetchInterval,
-    retry: false,
-  });
-
-  const now = queue.dataUpdatedAt === 0 ? Date.now() : queue.dataUpdatedAt;
-  const schedules: CallbackSchedules = useMemo(
-    () => schedulesOf(callbacks.data?.items ?? []),
-    [callbacks.data],
-  );
-
-  const loaded = useMemo(() => queue.data?.items ?? [], [queue.data]);
-  const sorted = useMemo(() => buildQueue(loaded, schedules, now), [loaded, schedules, now]);
-  const items = useMemo(
-    () => (rawOrder ? loaded : sorted.items).filter((row) => !done.includes(row.id)),
-    [rawOrder, loaded, sorted.items, done],
-  );
-
-  const current = useMemo(
-    () => items.find((row) => row.id === openedId) ?? items[0],
-    [items, openedId],
-  );
-  const selected = useMemo(
-    () => items.find((row) => row.id === selectedId) ?? current,
-    [items, selectedId, current],
-  );
-
-  const closed =
-    current !== undefined &&
-    (current.phase2Status !== 'PENDING' || refusedIds.includes(current.id));
+  const nomComplet = `${prospect.nom} ${prospect.prenom}`;
+  const closed = prospect.phase2Status !== 'PENDING' || refusee;
+  const now = Date.now();
 
   const send = useMutation({
-    mutationFn: (input: { prospect: ProspectRow; draft: AttemptDraft }) =>
-      pushCallAttempt(newAttemptInput(input.prospect.id, input.draft)),
-    onSuccess: (_result, input) => {
-      setEnchaine(true);
-      setDone((ids) => [...ids, input.prospect.id]);
-      const next = nextAfter(items, input.prospect.id);
-      setOpenedId(next);
-      setSelectedId(next);
-      setComment('');
-      setDraftOutcome(null);
-      setSlots(null);
-      setConversion(null);
-      setConversionErrors({});
-      void queryClient.invalidateQueries({ queryKey: consoleKeys.root });
-      void queryClient.invalidateQueries({ queryKey: callbackKeys.root });
+    mutationFn: (draft: AttemptDraft) => pushCallAttempt(newAttemptInput(prospect.id, draft)),
+    onSuccess: () => {
+      onEnregistre(nomComplet);
     },
-    onError: (error, input) => {
+    onError: (error) => {
       if (error instanceof AttemptRefused && error.code === ALREADY_COMPLETED) {
-        setRefusedIds((ids) => [...ids, input.prospect.id]);
+        setRefusee(true);
         toast.error(error.message);
         return;
       }
       if (error instanceof AttemptRefused) {
-        // Le verdict du serveur revient SOUS le champ qu'il refuse ; un simple
-        // bandeau ferait relire onze champs pour en corriger un.
         const refused = conversionErrorFor(error.code);
         if (refused !== null) setConversionErrors({ [refused.field]: refused.message });
         toast.error(error.message);
@@ -225,8 +330,7 @@ export function ConsoleView() {
       callbackAt: string | null = null,
       renseignements?: ConversionDraft,
     ) => {
-      if (current === undefined || closed || send.isPending) return;
-
+      if (closed || send.isPending) return;
       const draft: AttemptDraft = {
         outcome,
         method,
@@ -239,75 +343,49 @@ export function ConsoleView() {
         toast.error(problem);
         return;
       }
-      send.mutate({ prospect: current, draft });
+      send.mutate(draft);
     },
-    [current, closed, send, comment],
+    [closed, send, comment],
   );
 
-  /**
-   * La méthode n'envoie plus rien à elle seule : elle ouvre les renseignements
-   * de conversion, que l'adhésion exige désormais.
-   */
-  const startConversion = useCallback(
-    (method: EnrollmentMethod) => {
-      if (current === undefined || closed || send.isPending) return;
-      setDraftOutcome(null);
-      setSlots(null);
-      setConversionErrors({});
-      setConversion(conversionFrom(current, method));
-    },
-    [current, closed, send.isPending],
-  );
+  const ouvrirDossier = useCallback(() => {
+    if (closed || send.isPending) return;
+    setDraftOutcome(null);
+    setSlots(null);
+    setConversionErrors({});
+    setConversion(conversionFrom(prospect));
+  }, [closed, send.isPending, prospect]);
 
   const submitConversion = useCallback(() => {
     if (conversion === null) return;
-
     const problems = validateConversion(conversion);
     setConversionErrors(problems);
-    if (Object.keys(problems).length > 0) return;
-
+    if (Object.keys(problems).length > 0 || conversion.method === null) return;
     record('METHOD_OBTAINED', conversion.method, null, conversion);
   }, [conversion, record]);
 
-  const move = useCallback(
-    (step: number) => {
-      if (items.length === 0) return;
-      const at = items.findIndex((row) => row.id === selected?.id);
-      const next = items[Math.min(items.length - 1, Math.max(0, at + step))];
-      if (next !== undefined) setSelectedId(next.id);
-    },
-    [items, selected],
-  );
-
-  const skip = useCallback(() => {
-    if (current === undefined) return;
-    const next = nextAfter(items, current.id);
-    if (next === null || next === current.id) return;
-    setOpenedId(next);
-    setSelectedId(next);
-    setComment('');
-    setDraftOutcome(null);
-    setSlots(null);
-    setConversion(null);
-    setConversionErrors({});
-  }, [current, items]);
-
-  const copyCurrentPhone = useCallback(() => {
-    if (current !== undefined) copyPhone(current.phoneE164);
-  }, [current]);
-
   const startOther = useCallback(() => {
-    if (current === undefined || closed) return;
+    if (closed) return;
     setDraftOutcome('OTHER');
     commentRef.current?.focus();
-  }, [current, closed]);
+  }, [closed]);
 
   const startCallback = useCallback(() => {
-    if (current === undefined || closed) return;
+    if (closed) return;
     setDraftOutcome(null);
     setFreeCallback('');
     setSlots(callbackSlots(Date.now()));
-  }, [current, closed]);
+  }, [closed]);
+
+  const choisir = useCallback(
+    (outcome: CallOutcome | 'JOIGNABLE') => {
+      if (outcome === 'JOIGNABLE') ouvrirDossier();
+      else if (outcome === 'CALLBACK') startCallback();
+      else if (outcome === 'OTHER') startOther();
+      else record(outcome, null);
+    },
+    [ouvrirDossier, startCallback, startOther, record],
+  );
 
   const validate = useCallback(() => {
     if (conversion !== null) {
@@ -323,38 +401,33 @@ export function ConsoleView() {
       record('CALLBACK', null, iso);
       return;
     }
-    if (draftOutcome !== null) {
-      record(draftOutcome, null);
+    if (draftOutcome !== null) record(draftOutcome, null);
+  }, [conversion, submitConversion, slots, freeCallback, draftOutcome, record]);
+
+  const saisieEnCours =
+    conversion !== null || slots !== null || draftOutcome !== null || comment !== '';
+
+  const annuler = useCallback(() => {
+    if (!saisieEnCours) {
+      onAbandon();
       return;
     }
-    skip();
-  }, [conversion, submitConversion, slots, freeCallback, draftOutcome, record, skip]);
+    setDraftOutcome(null);
+    setComment('');
+    setSlots(null);
+    setConversion(null);
+    setConversionErrors({});
+    commentRef.current?.blur();
+  }, [saisieEnCours, onAbandon]);
 
-  const outcomeShortcuts: Record<string, () => void> = {
-    '1': () => {
-      startConversion('PLATFORM');
-    },
-    '2': () => {
-      startConversion('PHYSICAL');
-    },
-    '3': () => {
-      startConversion('VOICE_OR_ELECTRONIC_MESSAGING');
-    },
-    '9': () => {
-      startConversion('APPOINTMENT');
-    },
-    '4': () => {
-      record('UNREACHABLE', null);
-    },
-    '5': startCallback,
-    '6': () => {
-      record('REFUSED', null);
-    },
-    '7': () => {
-      record('WRONG_NUMBER', null);
-    },
-    '8': startOther,
-  };
+  const issueShortcuts: Record<string, () => void> = Object.fromEntries(
+    ISSUES.map((issue) => [
+      issue.key,
+      () => {
+        choisir(issue.outcome);
+      },
+    ]),
+  );
 
   const slotShortcuts: Record<string, () => void> = Object.fromEntries(
     (slots ?? []).map((slot) => [
@@ -368,184 +441,72 @@ export function ConsoleView() {
     callbackRef.current?.focus();
   };
 
-  // Le formulaire de conversion rend les chiffres inertes : ils y sont de la
-  // saisie, pas des issues.
-  let digitShortcuts = outcomeShortcuts;
+  let digitShortcuts = issueShortcuts;
   if (slots !== null) digitShortcuts = slotShortcuts;
   if (conversion !== null) digitShortcuts = {};
 
-  useShortcuts(
-    {
-      ...digitShortcuts,
-      Enter: validate,
-      Escape: () => {
-        setDraftOutcome(null);
-        setComment('');
-        setSlots(null);
-        setConversion(null);
-        setConversionErrors({});
-        commentRef.current?.blur();
-      },
-      ArrowDown: () => {
-        move(1);
-      },
-      ArrowUp: () => {
-        move(-1);
-      },
-      Space: () => {
-        if (selected !== undefined) setOpenedId(selected.id);
-      },
-      c: copyCurrentPhone,
-      // Une fiche Grand Public n'a pas de representant : le raccourci ne mene
-      // nulle part plutot que vers une adresse construite sur du vide.
-      n: () => {
-        const rep = current?.representantId;
-        if (rep) router.push(`/chues/prospects/nouveau?rep=${encodeURIComponent(rep)}`);
-      },
-      r: () => {
-        const rep = current?.representantId;
-        if (rep) router.push(`/chues/representants/${encodeURIComponent(rep)}`);
-      },
-      'mod+k': () => {
-        setPalette(true);
-      },
-      '?': () => {
-        setHelpOpen((open) => !open);
-      },
+  useShortcuts({
+    ...digitShortcuts,
+    Enter: validate,
+    Escape: annuler,
+    c: () => {
+      copyPhone(prospect.phoneE164);
     },
-    !palette,
-  );
-
-  useEffect(() => {
-    setComment('');
-    setDraftOutcome(null);
-    setSlots(null);
-    setConversion(null);
-    setConversionErrors({});
-  }, [current?.id]);
-
-  if (queue.isPending) return <ConsoleSkeleton />;
-
-  if (queue.isError) {
-    return (
-      <QueryErrorState
-        error={queue.error}
-        fallback="La file d’appel n’a pas pu être chargée."
-        onRetry={() => {
-          void queue.refetch();
-        }}
-      />
-    );
-  }
-
-  /*
-    File vide : une seule colonne. Le compteur, le rail de droite et
-    l'explication du tri décrivent une fiche et une file qui n'existent pas ;
-    les rendre étalait trois colonnes de vide autour de deux boutons.
-  */
-  if (current === undefined) {
-    return (
-      <div className="flex w-full max-w-3xl flex-col gap-5">
-        {requestedId !== null && !loaded.some((row) => row.id === requestedId) ? (
-          <p
-            role="alert"
-            className="rounded-md border border-border bg-warning-surface px-3 py-2 text-[0.875rem] text-warning"
-          >
-            La fiche ouverte depuis les rappels n’est pas dans cette file. Retirez le filtre de
-            campagne, ou ouvrez-la depuis les prospects.
-          </p>
-        ) : null}
-
-        <p className="text-[0.9375rem]">
-          {campaignId === null
-            ? 'Aucun prospect à appeler pour l’instant.'
-            : 'Aucun prospect à appeler dans cette campagne.'}
-        </p>
-
-        <div className="flex flex-wrap gap-2">
-          {campaignId === null ? null : (
-            <Button
-              variant="outline"
-              onClick={() => {
-                setCampaignId(null);
-                setOpenedId(null);
-                setSelectedId(null);
-              }}
-            >
-              Voir toutes mes fiches
-            </Button>
-          )}
-          <Link
-            href={projet === 'CHUES' ? '/chues/prospects/nouveau' : '/grand-public/nouveau'}
-            className={buttonVariants()}
-          >
-            Ajouter un prospect
-          </Link>
-          {/* L'étape 1 est propre à CHUES : le Grand Public n'a pas de
-              représentant à qualifier avant d'ajouter un prospect. */}
-          {projet === 'CHUES' ? (
-            <Link
-              href="/chues/appels-representants"
-              className={buttonVariants({ variant: 'outline' })}
-            >
-              Qualifier un représentant
-            </Link>
-          ) : null}
-        </div>
-      </div>
-    );
-  }
-
-  const total = queue.data.total;
-  const suivants = items.filter((row) => row.id !== current.id);
+    n: () => {
+      const rep = prospect.representantId;
+      if (rep) router.push(`/chues/prospects/nouveau?rep=${encodeURIComponent(rep)}`);
+    },
+    r: () => {
+      const rep = prospect.representantId;
+      if (rep) router.push(`/chues/representants/${encodeURIComponent(rep)}`);
+    },
+    '?': () => {
+      setHelpOpen((open) => !open);
+    },
+  });
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
+      <Button variant="ghost" className="self-start px-0" onClick={onAbandon}>
+        <ArrowLeftIcon aria-hidden="true" />
+        Revenir à la liste
+      </Button>
+
       <section aria-label="Fiche courante" className="flex flex-col gap-4">
-        {requestedId !== null && !loaded.some((row) => row.id === requestedId) ? (
-          <p
-            role="alert"
-            className="rounded-md border border-border bg-warning-surface px-3 py-2 text-[0.875rem] text-warning"
-          >
-            La fiche ouverte depuis les rappels n’est pas dans cette file. Retirez le filtre de
-            campagne, ou ouvrez-la depuis les prospects.
-          </p>
-        ) : null}
-
-        {enchaine ? (
-          <p role="status" className="text-[0.875rem] font-[600] text-accent-text">
-            Enregistré. Personne suivante.
-          </p>
-        ) : null}
-
-        <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">
-          {current.nom} {current.prenom}
-        </h2>
+        <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">{nomComplet}</h2>
 
         <div className="flex items-center gap-3">
           <span className="select-all font-display text-[2rem] font-[700] tracking-[-0.02em] tabular-nums">
-            {formatPhone(current.phoneE164)}
+            {formatPhone(prospect.phoneE164)}
           </span>
-          <Button variant="outline" size="sm" onClick={copyCurrentPhone}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              copyPhone(prospect.phoneE164);
+            }}
+          >
             <CopyIcon aria-hidden="true" />
             Copier
             <Kbd>C</Kbd>
           </Button>
         </div>
 
-        {/* Le contexte de l'appel tient sous le numéro, en deux lignes grises :
-            un rail d'expert n'a pas sa place pendant deux heures d'appels. */}
         <p className="text-[0.8125rem] text-muted-foreground">
-          {current.banqueName} · {current.syndicatSigle} · {current.departementName} · Représentant{' '}
-          {current.representantName ?? 'aucun'}
+          {[prospect.banqueName, prospect.syndicatSigle, prospect.departementName]
+            .filter((part) => part !== null && part !== '')
+            .join(' · ')}
+          {projet === 'CHUES' ? ` · Représentant ${prospect.representantName ?? 'aucun'}` : ''}
         </p>
         <p className="text-[0.8125rem] text-muted-foreground">
-          {current.lastAttemptAt === null
+          {prospect.lastAttemptAt === null
             ? 'Jamais appelée.'
-            : `Dernier appel : ${formatDateTime(current.lastAttemptAt)}${
-                current.lastOutcome === null ? '' : ` · ${CALL_OUTCOME_LABELS[current.lastOutcome]}`
+            : `Dernier appel : ${formatDateTime(prospect.lastAttemptAt)}${
+                prospect.lastOutcome === null
+                  ? ''
+                  : ` · ${CALL_OUTCOME_LABELS[prospect.lastOutcome]}`
               }`}
-          {current.lastComment === null ? '' : ` · « ${current.lastComment} »`}
+          {prospect.lastComment === null ? '' : ` · « ${prospect.lastComment} »`}
         </p>
 
         {closed ? (
@@ -553,76 +514,86 @@ export function ConsoleView() {
             role="status"
             className="rounded-md border border-border bg-warning-surface px-3 py-2 text-[0.875rem] text-warning"
           >
-            Fiche déjà close ({PHASE2_STATUS_LABELS[current.phase2Status].toLowerCase()}). Rien à
-            consigner ici. Entrée passe à la suivante.
+            Fiche déjà close ({PHASE2_STATUS_LABELS[prospect.phase2Status].toLowerCase()}). Rien à
+            consigner ici.
           </div>
+        ) : conversion !== null ? (
+          <>
+            <p className="text-[0.8125rem] font-[600] text-muted-foreground">
+              Joignable · son dossier, et la manière dont il adhère
+            </p>
+
+            <ConversionFields
+              draft={conversion}
+              errors={conversionErrors}
+              phoneE164={prospect.phoneE164}
+              disabled={send.isPending}
+              onChange={(patch) => {
+                setConversion((draft) => (draft === null ? null : { ...draft, ...patch }));
+              }}
+            />
+
+            <Commentaire
+              value={comment}
+              obligatoire={false}
+              inputRef={commentRef}
+              onChange={setComment}
+              onValidate={validate}
+            />
+
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={submitConversion} disabled={send.isPending}>
+                Enregistrer l’adhésion
+                <Kbd>Entrée</Kbd>
+              </Button>
+              <Button
+                variant="outline"
+                disabled={send.isPending}
+                onClick={() => {
+                  record('REFUSED', null);
+                }}
+              >
+                Il refuse
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={send.isPending}
+                onClick={() => {
+                  setConversion(null);
+                  setConversionErrors({});
+                }}
+              >
+                Annuler
+                <Kbd>Échap</Kbd>
+              </Button>
+            </div>
+          </>
         ) : (
           <>
-            {conversion === null || slots !== null ? null : (
-              <ConversionFields
-                draft={conversion}
-                errors={conversionErrors}
-                phoneE164={current.phoneE164}
-                disabled={send.isPending}
-                onChange={(patch) => {
-                  setConversion((draft) => (draft === null ? null : { ...draft, ...patch }));
-                }}
-              />
-            )}
-
-            {conversion !== null || slots !== null ? null : (
-              <>
-                <fieldset className="flex flex-col gap-2" disabled={send.isPending}>
-                  <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
-                    Il accepte — de quelle manière ?
-                  </legend>
-                  <div className="flex flex-wrap gap-2">
-                    {METHOD_KEYS.map(({ key, method }) => (
-                      <Button
-                        key={key}
-                        variant="outline"
-                        onClick={() => {
-                          startConversion(method);
-                        }}
-                      >
-                        <Kbd>{key}</Kbd>
-                        {ENROLLMENT_METHOD_LABELS[method]}
-                      </Button>
-                    ))}
-                  </div>
-                </fieldset>
-
-                <fieldset className="flex flex-col gap-2" disabled={send.isPending}>
-                  <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
-                    Il n’accepte pas (pas encore)
-                  </legend>
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" onClick={startCallback}>
-                      <Kbd>5</Kbd>
-                      {CALL_OUTCOME_LABELS.CALLBACK}
-                    </Button>
-                    {OUTCOME_KEYS.map(({ key, outcome }) => (
-                      <Button
-                        key={key}
-                        variant="outline"
-                        onClick={() => {
-                          record(outcome, null);
-                        }}
-                      >
-                        <Kbd>{key}</Kbd>
-                        {CALL_OUTCOME_LABELS[outcome]}
-                      </Button>
-                    ))}
+            {slots !== null ? null : (
+              <fieldset className="flex flex-col gap-2" disabled={send.isPending}>
+                <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
+                  Comment s’est passé l’appel ?
+                </legend>
+                <div className="flex flex-wrap gap-2">
+                  {ISSUES.map((issue) => (
                     <Button
-                      variant={draftOutcome === 'OTHER' ? 'default' : 'outline'}
-                      onClick={startOther}
+                      key={issue.key}
+                      variant={
+                        issue.outcome === 'OTHER' && draftOutcome === 'OTHER'
+                          ? 'default'
+                          : 'outline'
+                      }
+                      onClick={() => {
+                        choisir(issue.outcome);
+                      }}
                     >
-                      <Kbd>8</Kbd>
-                      Autre
+                      <Kbd>{issue.key}</Kbd>
+                      {issue.label}
                     </Button>
-                  </div>
-                </fieldset>
-              </>
+                  ))}
+                </div>
+              </fieldset>
             )}
 
             {slots === null ? null : (
@@ -682,121 +653,16 @@ export function ConsoleView() {
               </fieldset>
             )}
 
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="console-comment" className="text-[0.875rem] font-[600]">
-                Commentaire
-                {draftOutcome === 'OTHER' ? ' (obligatoire pour Autre)' : ''}
-              </label>
-              <Textarea
-                id="console-comment"
-                ref={commentRef}
-                value={comment}
-                onChange={(event) => {
-                  setComment(event.target.value);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key !== 'Enter' || event.shiftKey) return;
-                  event.preventDefault();
-                  validate();
-                }}
-                placeholder="Entrée valide, Maj+Entrée passe à la ligne."
-              />
-            </div>
-
-            {conversion === null ? null : (
-              <div className="flex flex-wrap gap-2">
-                <Button onClick={submitConversion} disabled={send.isPending}>
-                  Enregistrer l’adhésion
-                  <Kbd>Entrée</Kbd>
-                </Button>
-                <Button
-                  variant="ghost"
-                  disabled={send.isPending}
-                  onClick={() => {
-                    setConversion(null);
-                    setConversionErrors({});
-                  }}
-                >
-                  Annuler
-                  <Kbd>Échap</Kbd>
-                </Button>
-              </div>
-            )}
+            <Commentaire
+              value={comment}
+              obligatoire={draftOutcome === 'OTHER'}
+              inputRef={commentRef}
+              onChange={setComment}
+              onValidate={validate}
+            />
           </>
         )}
       </section>
-
-      {/* La file ne s'impose plus en colonne : une ligne qu'on déroule si on
-          veut choisir soi-même, filtrer par campagne ou comprendre l'ordre. */}
-      {suivants.length === 0 ? null : (
-        <details className="rounded-lg border border-border bg-card px-3 py-2">
-          <summary className="cursor-pointer list-none text-[0.875rem] font-[600] text-muted-foreground">
-            Suivants à appeler · {formatNumber(suivants.length)}
-          </summary>
-
-          <div className="mt-2 flex flex-col gap-3">
-            {campaigns.data !== undefined && campaigns.data.length > 1 ? (
-              <FilterCombobox
-                label="Campagne"
-                placeholder="Toutes mes fiches"
-                options={campaigns.data}
-                value={campaignId}
-                onChange={(value) => {
-                  setCampaignId(value);
-                  setOpenedId(null);
-                  setSelectedId(null);
-                }}
-              />
-            ) : null}
-
-            <SortExplainer
-              counts={sorted.counts}
-              head={items[0]}
-              now={now}
-              schedules={schedules}
-              undated={undatedCallbacks(loaded, schedules)}
-              rawOrder={rawOrder}
-              onToggleOrder={() => {
-                setRawOrder((raw) => !raw);
-              }}
-            />
-
-            <ol className="flex max-h-72 flex-col gap-1 overflow-y-auto scrollbar-thin">
-              {suivants.map((row) => (
-                <li key={row.id}>
-                  <button
-                    type="button"
-                    data-highlighted={row.id === selected?.id ? '' : undefined}
-                    onClick={() => {
-                      setSelectedId(row.id);
-                      setOpenedId(row.id);
-                    }}
-                    className={cn(
-                      'flex w-full flex-col items-start gap-0.5 rounded-md px-2 py-2 text-left',
-                      'hover:bg-secondary',
-                      'data-highlighted:outline-2 data-highlighted:-outline-offset-2 data-highlighted:outline-ring',
-                    )}
-                  >
-                    <span className="min-w-0 truncate text-[0.875rem] font-[600]">
-                      {row.nom} {row.prenom}
-                    </span>
-                    <span className="text-[0.75rem] text-muted-foreground">
-                      {queueLabel(row, now, schedules)}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ol>
-
-            {total > loaded.length ? (
-              <p className="text-[0.75rem] text-muted-foreground">
-                {formatNumber(loaded.length)} fiches affichées sur {formatNumber(total)}. Choisissez
-                une campagne pour en voir moins.
-              </p>
-            ) : null}
-          </div>
-        </details>
-      )}
 
       <details
         open={helpOpen}
@@ -808,7 +674,9 @@ export function ConsoleView() {
           Carte clavier <Kbd>?</Kbd>
         </summary>
         <dl className="mt-2 flex flex-col gap-1 text-[0.8125rem]">
-          {KEYBOARD_MAP.map(([keys, what]) => (
+          {KEYBOARD_MAP.filter(
+            ([keys]) => projet === 'CHUES' || (keys !== 'N' && keys !== 'R'),
+          ).map(([keys, what]) => (
             <div key={keys} className="flex items-baseline gap-2">
               <dt className="w-24 shrink-0">
                 <Kbd>{keys}</Kbd>
@@ -818,126 +686,43 @@ export function ConsoleView() {
           ))}
         </dl>
       </details>
-
-      <Dialog open={palette} onOpenChange={setPalette}>
-        <DialogContent className="overflow-hidden p-0">
-          <DialogTitle className="sr-only">Aller à une fiche</DialogTitle>
-          <Command shouldFilter={false}>
-            <CommandInput
-              placeholder="Nom ou numéro…"
-              value={paletteSearch}
-              onValueChange={setPaletteSearch}
-            />
-            <CommandList>
-              <CommandEmpty>Aucune fiche.</CommandEmpty>
-              <CommandGroup>
-                {items
-                  .filter((row) =>
-                    matchesSearch(`${row.nom} ${row.prenom} ${row.phoneE164}`, paletteSearch),
-                  )
-                  .slice(0, 30)
-                  .map((row) => (
-                    <CommandItem
-                      key={row.id}
-                      value={row.id}
-                      onSelect={() => {
-                        setSelectedId(row.id);
-                        setOpenedId(row.id);
-                        setPalette(false);
-                      }}
-                    >
-                      <span className="min-w-0 flex-1 truncate">
-                        {row.nom} {row.prenom}
-                      </span>
-                      <span className="shrink-0 text-[0.75rem] text-muted-foreground">
-                        {queueLabel(row, now, schedules)}
-                      </span>
-                    </CommandItem>
-                  ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
 
-/**
- * Le témoin n'annonce aucun calcul : il montre le tri appliqué, la raison de la
- * fiche de tête, et se défait.
- */
-function SortExplainer({
-  counts,
-  head,
-  now,
-  schedules,
-  undated,
-  rawOrder,
-  onToggleOrder,
+function Commentaire({
+  value,
+  obligatoire,
+  inputRef,
+  onChange,
+  onValidate,
 }: {
-  counts: Record<string, number>;
-  head: ProspectRow | undefined;
-  now: number;
-  schedules: CallbackSchedules;
-  undated: number;
-  rawOrder: boolean;
-  onToggleOrder: () => void;
+  value: string;
+  obligatoire: boolean;
+  inputRef: React.RefObject<HTMLTextAreaElement | null>;
+  onChange: (value: string) => void;
+  onValidate: () => void;
 }) {
-  const rules = (['due', 'never', 'callback', 'unreachable', 'other'] as const).filter(
-    (bucket) => (counts[bucket] ?? 0) > 0,
-  );
-
   return (
-    <Popover>
-      {/* Un LIEN, pas un bouton d'action : la question qu'on se pose devant la
-          file (« pourquoi celle-là en tête ? ») n'est pas un geste de travail,
-          et « 4 règles de tri » n'était pas une réponse. */}
-      <PopoverTrigger render={<Button variant="link" size="sm" />}>
-        {rawOrder ? 'Tri désactivé — pourquoi ?' : 'Pourquoi cet ordre ?'}
-      </PopoverTrigger>
-      <PopoverContent className="w-80 text-[0.8125rem]">
-        <ul className="flex flex-col gap-1">
-          {rules.map((bucket) => (
-            <li key={bucket} className="flex justify-between gap-2">
-              <span>{QUEUE_BUCKET_LABELS[bucket]}</span>
-              <span className="text-muted-foreground">{formatNumber(counts[bucket] ?? 0)}</span>
-            </li>
-          ))}
-        </ul>
-
-        {head === undefined ? null : (
-          <p className="pt-2 text-muted-foreground">
-            En tête : {head.nom} {head.prenom}, {queueLabel(head, now, schedules)}.
-          </p>
-        )}
-
-        <p className="pt-2 text-muted-foreground">
-          Un rappel daté remonte à l’heure promise, retards en tête. Une échéance à venir attend son
-          heure.
-        </p>
-
-        {undated > 0 ? (
-          <p className="pt-2 text-muted-foreground">
-            {formatNumber(undated)} fiche{undated > 1 ? 's' : ''} « à rappeler » sans échéance :
-            l’ordre y suit l’ancienneté du dernier appel, ce n’est pas une date promise.
-          </p>
-        ) : null}
-
-        <Button variant="outline" size="sm" className="mt-3 w-full" onClick={onToggleOrder}>
-          {rawOrder ? 'Rétablir le tri' : 'Voir dans l’ordre du fichier'}
-        </Button>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-function ConsoleSkeleton() {
-  return (
-    <div className="grid gap-4 lg:grid-cols-[20rem_minmax(0,1fr)_22.5rem]">
-      <Skeleton className="h-96" />
-      <Skeleton className="h-96" />
-      <Skeleton className="h-96" />
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor="console-comment" className="text-[0.875rem] font-[600]">
+        Commentaire
+        {obligatoire ? ' (obligatoire pour Autre)' : ''}
+      </label>
+      <Textarea
+        id="console-comment"
+        ref={inputRef}
+        value={value}
+        onChange={(event) => {
+          onChange(event.target.value);
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter' || event.shiftKey) return;
+          event.preventDefault();
+          onValidate();
+        }}
+        placeholder="Entrée valide, Maj+Entrée passe à la ligne."
+      />
     </div>
   );
 }

@@ -4,6 +4,8 @@ import 'package:crm_api_client/src/model/analytics_finance_dto.dart';
 import 'package:crm_api_client/src/model/analytics_funnel_dto.dart';
 import 'package:crm_api_client/src/model/analytics_series_dto.dart';
 import 'package:crm_api_client/src/model/analytics_totals_dto.dart';
+import 'package:crm_api_client/src/model/android_release_dto.dart';
+import 'package:crm_api_client/src/model/android_release_list_dto.dart';
 import 'package:crm_api_client/src/model/api_error_dto.dart';
 import 'package:crm_api_client/src/model/app_update_dto.dart';
 import 'package:crm_api_client/src/model/approve_client_request_dto.dart';
@@ -34,14 +36,6 @@ import 'package:crm_api_client/src/model/call_outcome_reason_list_dto.dart';
 import 'package:crm_api_client/src/model/call_recording_dto.dart';
 import 'package:crm_api_client/src/model/callback_dto.dart';
 import 'package:crm_api_client/src/model/callback_list_dto.dart';
-import 'package:crm_api_client/src/model/campaign_attempt_dto.dart';
-import 'package:crm_api_client/src/model/campaign_closed_day_dto.dart';
-import 'package:crm_api_client/src/model/campaign_commercial_dto.dart';
-import 'package:crm_api_client/src/model/campaign_detail_dto.dart';
-import 'package:crm_api_client/src/model/campaign_list_dto.dart';
-import 'package:crm_api_client/src/model/campaign_pilotage_dto.dart';
-import 'package:crm_api_client/src/model/campaign_progress_dto.dart';
-import 'package:crm_api_client/src/model/campaign_summary_dto.dart';
 import 'package:crm_api_client/src/model/canal_provenance_dto.dart';
 import 'package:crm_api_client/src/model/change_prospect_segment_dto.dart';
 import 'package:crm_api_client/src/model/client_request_dto.dart';
@@ -53,18 +47,17 @@ import 'package:crm_api_client/src/model/create_bank_case_stage_dto.dart';
 import 'package:crm_api_client/src/model/create_bank_case_transition_dto.dart';
 import 'package:crm_api_client/src/model/create_banque_dto.dart';
 import 'package:crm_api_client/src/model/create_call_outcome_reason_dto.dart';
-import 'package:crm_api_client/src/model/create_campaign_dto.dart';
 import 'package:crm_api_client/src/model/create_canal_provenance_dto.dart';
 import 'package:crm_api_client/src/model/create_client_request_dto.dart';
 import 'package:crm_api_client/src/model/create_departement_dto.dart';
 import 'package:crm_api_client/src/model/create_income_band_dto.dart';
+import 'package:crm_api_client/src/model/create_lot_export_dto.dart';
 import 'package:crm_api_client/src/model/create_notification_dto.dart';
 import 'package:crm_api_client/src/model/create_notification_template_dto.dart';
 import 'package:crm_api_client/src/model/create_offer_dto.dart';
 import 'package:crm_api_client/src/model/create_profession_dto.dart';
 import 'package:crm_api_client/src/model/create_prospect_dto.dart';
 import 'package:crm_api_client/src/model/create_rep_call_attempt_dto.dart';
-import 'package:crm_api_client/src/model/create_rep_campaign_dto.dart';
 import 'package:crm_api_client/src/model/create_representant_comment_dto.dart';
 import 'package:crm_api_client/src/model/create_representant_dto.dart';
 import 'package:crm_api_client/src/model/create_syndicat_dto.dart';
@@ -101,6 +94,15 @@ import 'package:crm_api_client/src/model/inbox_item_dto.dart';
 import 'package:crm_api_client/src/model/income_band_dto.dart';
 import 'package:crm_api_client/src/model/login_dto.dart';
 import 'package:crm_api_client/src/model/logout_response_dto.dart';
+import 'package:crm_api_client/src/model/lot_export_attempt_dto.dart';
+import 'package:crm_api_client/src/model/lot_export_detail_dto.dart';
+import 'package:crm_api_client/src/model/lot_export_distribution_dto.dart';
+import 'package:crm_api_client/src/model/lot_export_distribution_input_dto.dart';
+import 'package:crm_api_client/src/model/lot_export_list_dto.dart';
+import 'package:crm_api_client/src/model/lot_export_preview_dto.dart';
+import 'package:crm_api_client/src/model/lot_export_repartition_dto.dart';
+import 'package:crm_api_client/src/model/lot_export_repartition_jour_dto.dart';
+import 'package:crm_api_client/src/model/lot_export_summary_dto.dart';
 import 'package:crm_api_client/src/model/merge_prospects_dto.dart';
 import 'package:crm_api_client/src/model/named_count_dto.dart';
 import 'package:crm_api_client/src/model/named_count_list_dto.dart';
@@ -124,6 +126,7 @@ import 'package:crm_api_client/src/model/profession_dto.dart';
 import 'package:crm_api_client/src/model/prospect_conflict_dto.dart';
 import 'package:crm_api_client/src/model/prospect_conflict_existing_dto.dart';
 import 'package:crm_api_client/src/model/prospect_dto.dart';
+import 'package:crm_api_client/src/model/prospect_filter_dto.dart';
 import 'package:crm_api_client/src/model/prospect_journey_dto.dart';
 import 'package:crm_api_client/src/model/prospect_list_dto.dart';
 import 'package:crm_api_client/src/model/prospect_search_item_dto.dart';
@@ -145,16 +148,10 @@ import 'package:crm_api_client/src/model/rendered_template_dto.dart';
 import 'package:crm_api_client/src/model/reorder_bank_case_stages_dto.dart';
 import 'package:crm_api_client/src/model/reorder_visite_referentiel_dto.dart';
 import 'package:crm_api_client/src/model/rep_call_attempt_result_dto.dart';
-import 'package:crm_api_client/src/model/rep_campaign_attempt_dto.dart';
-import 'package:crm_api_client/src/model/rep_campaign_commercial_dto.dart';
-import 'package:crm_api_client/src/model/rep_campaign_detail_dto.dart';
-import 'package:crm_api_client/src/model/rep_campaign_list_dto.dart';
-import 'package:crm_api_client/src/model/rep_campaign_preview_dto.dart';
-import 'package:crm_api_client/src/model/rep_campaign_progress_dto.dart';
-import 'package:crm_api_client/src/model/rep_campaign_summary_dto.dart';
 import 'package:crm_api_client/src/model/representant_comment_dto.dart';
 import 'package:crm_api_client/src/model/representant_comment_list_dto.dart';
 import 'package:crm_api_client/src/model/representant_dto.dart';
+import 'package:crm_api_client/src/model/representant_export_query_dto.dart';
 import 'package:crm_api_client/src/model/representant_list_dto.dart';
 import 'package:crm_api_client/src/model/representant_lookup_dto.dart';
 import 'package:crm_api_client/src/model/representant_productivity_dto.dart';
@@ -175,19 +172,16 @@ import 'package:crm_api_client/src/model/set_bank_case_stage_active_dto.dart';
 import 'package:crm_api_client/src/model/set_call_outcome_reason_active_dto.dart';
 import 'package:crm_api_client/src/model/set_visite_import_change_selection_dto.dart';
 import 'package:crm_api_client/src/model/set_visite_referentiel_active_dto.dart';
-import 'package:crm_api_client/src/model/stats_layout_dto.dart';
-import 'package:crm_api_client/src/model/stats_layout_widget_dto.dart';
 import 'package:crm_api_client/src/model/suggestion_dto.dart';
 import 'package:crm_api_client/src/model/suggestion_list_dto.dart';
 import 'package:crm_api_client/src/model/supervised_user_dto.dart';
+import 'package:crm_api_client/src/model/supervision_activity_counts_dto.dart';
 import 'package:crm_api_client/src/model/supervision_activity_dto.dart';
 import 'package:crm_api_client/src/model/supervision_activity_row_dto.dart';
 import 'package:crm_api_client/src/model/supervision_dto.dart';
 import 'package:crm_api_client/src/model/supervision_histogram_bar_dto.dart';
 import 'package:crm_api_client/src/model/supervision_teleconseiller_dto.dart';
 import 'package:crm_api_client/src/model/switch_workspace_dto.dart';
-import 'package:crm_api_client/src/model/sync_call_campaign_dto.dart';
-import 'package:crm_api_client/src/model/sync_call_task_dto.dart';
 import 'package:crm_api_client/src/model/sync_changes_dto.dart';
 import 'package:crm_api_client/src/model/sync_deletion_dto.dart';
 import 'package:crm_api_client/src/model/sync_entity_data_dto.dart';
@@ -196,8 +190,6 @@ import 'package:crm_api_client/src/model/sync_operation_result_dto.dart';
 import 'package:crm_api_client/src/model/sync_pull_response_dto.dart';
 import 'package:crm_api_client/src/model/sync_push_dto.dart';
 import 'package:crm_api_client/src/model/sync_push_response_dto.dart';
-import 'package:crm_api_client/src/model/sync_rep_call_campaign_dto.dart';
-import 'package:crm_api_client/src/model/sync_rep_call_task_dto.dart';
 import 'package:crm_api_client/src/model/sync_visite_dto.dart';
 import 'package:crm_api_client/src/model/sync_visite_referentiel_dto.dart';
 import 'package:crm_api_client/src/model/syndicat_dto.dart';
@@ -220,7 +212,6 @@ import 'package:crm_api_client/src/model/update_offer_dto.dart';
 import 'package:crm_api_client/src/model/update_profession_dto.dart';
 import 'package:crm_api_client/src/model/update_prospect_dto.dart';
 import 'package:crm_api_client/src/model/update_representant_dto.dart';
-import 'package:crm_api_client/src/model/update_stats_layout_dto.dart';
 import 'package:crm_api_client/src/model/update_suggestion_status_dto.dart';
 import 'package:crm_api_client/src/model/update_syndicat_dto.dart';
 import 'package:crm_api_client/src/model/update_user_dto.dart';
@@ -292,6 +283,12 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'AnalyticsTotalsDto':
       return AnalyticsTotalsDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'AndroidReleaseDto':
+      return AndroidReleaseDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'AndroidReleaseListDto':
+      return AndroidReleaseListDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'ApiErrorDto':
       return ApiErrorDto.fromJson(value as Map<String, dynamic>) as ReturnType;
@@ -377,39 +374,12 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'CallRecordingDto':
       return CallRecordingDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
-    case 'CallTaskStatus':
     case 'CallbackDto':
       return CallbackDto.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'CallbackListDto':
       return CallbackListDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'CallbackScope':
-    case 'CampaignAttemptDto':
-      return CampaignAttemptDto.fromJson(value as Map<String, dynamic>)
-          as ReturnType;
-    case 'CampaignClosedDayDto':
-      return CampaignClosedDayDto.fromJson(value as Map<String, dynamic>)
-          as ReturnType;
-    case 'CampaignCommercialDto':
-      return CampaignCommercialDto.fromJson(value as Map<String, dynamic>)
-          as ReturnType;
-    case 'CampaignDetailDto':
-      return CampaignDetailDto.fromJson(value as Map<String, dynamic>)
-          as ReturnType;
-    case 'CampaignListDto':
-      return CampaignListDto.fromJson(value as Map<String, dynamic>)
-          as ReturnType;
-    case 'CampaignPilotageDto':
-      return CampaignPilotageDto.fromJson(value as Map<String, dynamic>)
-          as ReturnType;
-    case 'CampaignProgressDto':
-      return CampaignProgressDto.fromJson(value as Map<String, dynamic>)
-          as ReturnType;
-    case 'CampaignScope':
-    case 'CampaignStatus':
-    case 'CampaignSummaryDto':
-      return CampaignSummaryDto.fromJson(value as Map<String, dynamic>)
-          as ReturnType;
     case 'CanalProvenanceDto':
       return CanalProvenanceDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -447,9 +417,6 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'CreateCallOutcomeReasonDto':
       return CreateCallOutcomeReasonDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
-    case 'CreateCampaignDto':
-      return CreateCampaignDto.fromJson(value as Map<String, dynamic>)
-          as ReturnType;
     case 'CreateCanalProvenanceDto':
       return CreateCanalProvenanceDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -461,6 +428,9 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'CreateIncomeBandDto':
       return CreateIncomeBandDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'CreateLotExportDto':
+      return CreateLotExportDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'CreateNotificationDto':
       return CreateNotificationDto.fromJson(value as Map<String, dynamic>)
@@ -482,9 +452,6 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'CreateRepCallAttemptDto':
       return CreateRepCallAttemptDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
-    case 'CreateRepCampaignDto':
-      return CreateRepCampaignDto.fromJson(value as Map<String, dynamic>)
-          as ReturnType;
     case 'CreateRepresentantCommentDto':
       return CreateRepresentantCommentDto.fromJson(
             value as Map<String, dynamic>,
@@ -505,6 +472,7 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'CreateVisiteReferentielDto':
       return CreateVisiteReferentielDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'DashboardEcran':
     case 'DashboardMarque':
     case 'DashboardPreset':
     case 'DashboardSource':
@@ -600,6 +568,36 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'LogoutResponseDto':
       return LogoutResponseDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'LotExportAttemptDto':
+      return LotExportAttemptDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'LotExportCible':
+    case 'LotExportDetailDto':
+      return LotExportDetailDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'LotExportDistributionDto':
+      return LotExportDistributionDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'LotExportDistributionInputDto':
+      return LotExportDistributionInputDto.fromJson(
+            value as Map<String, dynamic>,
+          )
+          as ReturnType;
+    case 'LotExportListDto':
+      return LotExportListDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'LotExportPreviewDto':
+      return LotExportPreviewDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'LotExportRepartitionDto':
+      return LotExportRepartitionDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'LotExportRepartitionJourDto':
+      return LotExportRepartitionJourDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'LotExportSummaryDto':
+      return LotExportSummaryDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'MergeProspectsDto':
       return MergeProspectsDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -675,6 +673,9 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'ProspectDto':
       return ProspectDto.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'ProspectFilterDto':
+      return ProspectFilterDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'ProspectJourneyDto':
       return ProspectJourneyDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -742,27 +743,6 @@ ReturnType deserialize<ReturnType, BaseType>(
       return RepCallAttemptResultDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'RepCallOutcome':
-    case 'RepCampaignAttemptDto':
-      return RepCampaignAttemptDto.fromJson(value as Map<String, dynamic>)
-          as ReturnType;
-    case 'RepCampaignCommercialDto':
-      return RepCampaignCommercialDto.fromJson(value as Map<String, dynamic>)
-          as ReturnType;
-    case 'RepCampaignDetailDto':
-      return RepCampaignDetailDto.fromJson(value as Map<String, dynamic>)
-          as ReturnType;
-    case 'RepCampaignListDto':
-      return RepCampaignListDto.fromJson(value as Map<String, dynamic>)
-          as ReturnType;
-    case 'RepCampaignPreviewDto':
-      return RepCampaignPreviewDto.fromJson(value as Map<String, dynamic>)
-          as ReturnType;
-    case 'RepCampaignProgressDto':
-      return RepCampaignProgressDto.fromJson(value as Map<String, dynamic>)
-          as ReturnType;
-    case 'RepCampaignSummaryDto':
-      return RepCampaignSummaryDto.fromJson(value as Map<String, dynamic>)
-          as ReturnType;
     case 'RepresentantCommentDto':
       return RepresentantCommentDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -771,6 +751,9 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'RepresentantDto':
       return RepresentantDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'RepresentantExportQueryDto':
+      return RepresentantExportQueryDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'RepresentantListDto':
       return RepresentantListDto.fromJson(value as Map<String, dynamic>)
@@ -847,13 +830,6 @@ ReturnType deserialize<ReturnType, BaseType>(
           )
           as ReturnType;
     case 'SortOrder':
-    case 'StatsLayoutDto':
-      return StatsLayoutDto.fromJson(value as Map<String, dynamic>)
-          as ReturnType;
-    case 'StatsLayoutScreen':
-    case 'StatsLayoutWidgetDto':
-      return StatsLayoutWidgetDto.fromJson(value as Map<String, dynamic>)
-          as ReturnType;
     case 'SuggestionDto':
       return SuggestionDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -863,6 +839,11 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'SuggestionStatus':
     case 'SupervisedUserDto':
       return SupervisedUserDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'SupervisionActivityCountsDto':
+      return SupervisionActivityCountsDto.fromJson(
+            value as Map<String, dynamic>,
+          )
           as ReturnType;
     case 'SupervisionActivityDto':
       return SupervisionActivityDto.fromJson(value as Map<String, dynamic>)
@@ -884,12 +865,6 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'SwitchWorkspaceDto':
       return SwitchWorkspaceDto.fromJson(value as Map<String, dynamic>)
-          as ReturnType;
-    case 'SyncCallCampaignDto':
-      return SyncCallCampaignDto.fromJson(value as Map<String, dynamic>)
-          as ReturnType;
-    case 'SyncCallTaskDto':
-      return SyncCallTaskDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'SyncChangesDto':
       return SyncChangesDto.fromJson(value as Map<String, dynamic>)
@@ -916,12 +891,6 @@ ReturnType deserialize<ReturnType, BaseType>(
       return SyncPushDto.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'SyncPushResponseDto':
       return SyncPushResponseDto.fromJson(value as Map<String, dynamic>)
-          as ReturnType;
-    case 'SyncRepCallCampaignDto':
-      return SyncRepCallCampaignDto.fromJson(value as Map<String, dynamic>)
-          as ReturnType;
-    case 'SyncRepCallTaskDto':
-      return SyncRepCallTaskDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'SyncVisiteDto':
       return SyncVisiteDto.fromJson(value as Map<String, dynamic>)
@@ -990,9 +959,6 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'UpdateRepresentantDto':
       return UpdateRepresentantDto.fromJson(value as Map<String, dynamic>)
-          as ReturnType;
-    case 'UpdateStatsLayoutDto':
-      return UpdateStatsLayoutDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'UpdateSuggestionStatusDto':
       return UpdateSuggestionStatusDto.fromJson(value as Map<String, dynamic>)

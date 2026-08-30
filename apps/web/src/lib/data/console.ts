@@ -10,21 +10,14 @@ import {
   type WhatsappStatus,
 } from '@/lib/data/representants';
 import { EMPTY_REPRESENTANT_FILTERS, type RepresentantRelation } from '@/lib/representant-filters';
-import {
-  CALL_OUTCOME_LABELS,
-  PHASE2_STATUS_LABELS,
-  type CallOutcome,
-  type EnrollmentMethod,
-  type FilterOption,
-  type ProspectRow,
+import type {
+  CallOutcome,
+  EnrollmentMethod,
+  PaymentMode,
+  Projet,
+  ProspectRow,
+  ProspectType,
 } from '@/lib/types';
-
-/** `queryKeys` sert tout le panel ; la console garde ses clés chez elle. */
-export const consoleKeys = {
-  root: ['console'] as const,
-  queue: (campaignId: string | null) => ['console', 'queue', campaignId] as const,
-  campaigns: ['console', 'campaigns'] as const,
-};
 
 export const callbackKeys = {
   root: ['callbacks'] as const,
@@ -32,56 +25,6 @@ export const callbackKeys = {
     ['callbacks', scope, assignedToId] as const,
   teleconseillers: ['callbacks', 'teleconseillers'] as const,
 };
-
-export const CONSOLE_QUEUE_SIZE = 200;
-
-export interface ConsolePage {
-  readonly items: ProspectRow[];
-  readonly total: number;
-}
-
-export async function fetchConsoleQueue(
-  campaignId: string | null,
-  client: ApiClient = getApiClient(),
-  projet?: 'CHUES' | 'GRAND_PUBLIC',
-): Promise<ConsolePage> {
-  const page = unwrap(
-    await client.GET('/api/v1/prospects', {
-      params: {
-        query: {
-          ...(campaignId === null ? {} : { campaignId }),
-          ...(projet ? { projet } : {}),
-          // Une file d'appel ne porte QUE des fiches a appeler. Une fiche close
-          // y ferait perdre un tour a l'operatrice: les touches d'issue y sont
-          // inertes, et rien ne se consigne. Le bandeau lecture seule reste
-          // utile pour une fiche ouverte par lien direct.
-          phase2Status: 'PENDING',
-          pageSize: CONSOLE_QUEUE_SIZE,
-          sortBy: 'clientCreatedAt',
-          sortOrder: 'asc',
-        },
-      },
-    }),
-  );
-  return { items: page.items, total: page.meta.total };
-}
-
-/** Un téléconseiller ne reçoit que ses campagnes, et `progress` compte SES tâches. */
-export async function fetchConsoleCampaigns(
-  client: ApiClient = getApiClient(),
-  projet?: 'CHUES' | 'GRAND_PUBLIC',
-): Promise<FilterOption[]> {
-  const page = unwrap(
-    await client.GET('/api/v1/phase2/campaigns', {
-      params: { query: { status: 'ACTIVE', pageSize: 100, ...(projet ? { projet } : {}) } },
-    }),
-  );
-  return page.items.map((campaign) => ({
-    value: campaign.id,
-    label: campaign.name,
-    hint: `${String(campaign.progress.open)} ouvertes`,
-  }));
-}
 
 export type Callback = components['schemas']['CallbackDto'];
 export type CallbackScope = components['schemas']['CallbackScope'];
@@ -98,19 +41,6 @@ export function sortCallbacks(items: readonly Callback[]): Callback[] {
       return left.scheduledAt < right.scheduledAt ? -1 : 1;
     return left.id < right.id ? -1 : 1;
   });
-}
-
-export type CallbackSchedules = ReadonlyMap<string, string>;
-
-const NO_SCHEDULES: CallbackSchedules = new Map();
-
-export function schedulesOf(items: readonly Callback[]): CallbackSchedules {
-  const byProspect = new Map<string, string>();
-  for (const callback of sortCallbacks(items)) {
-    if (!byProspect.has(callback.prospectId))
-      byProspect.set(callback.prospectId, callback.scheduledAt);
-  }
-  return byProspect;
 }
 
 export async function fetchCallbacks(
@@ -229,162 +159,11 @@ export function callbackHalfHours(now: number, day: string): CallbackSlot[] {
   return slots;
 }
 
-export type QueueBucket = 'due' | 'never' | 'callback' | 'unreachable' | 'other' | 'closed';
-
-export const QUEUE_BUCKET_LABELS: Record<QueueBucket, string> = {
-  due: 'Rappels dus',
-  never: 'Jamais appelées',
-  callback: 'À rappeler',
-  unreachable: 'Injoignables',
-  other: 'Déjà tentées',
-  closed: 'Closes',
-};
-
-const BUCKET_RANK: Record<QueueBucket, number> = {
-  due: 0,
-  never: 1,
-  callback: 2,
-  unreachable: 3,
-  other: 4,
-  closed: 5,
-};
-
-/** Un rappel promis dans moins d'une heure se prépare déjà : il remonte avec les retards. */
-export const DUE_SOON_MS = 3_600_000;
-
-export function bucketOf(
-  prospect: ProspectRow,
-  schedules: CallbackSchedules = NO_SCHEDULES,
-  now: number = Date.now(),
-): QueueBucket {
-  if (prospect.phase2Status !== 'PENDING') return 'closed';
-
-  const scheduledAt = schedules.get(prospect.id);
-  if (scheduledAt !== undefined && Date.parse(scheduledAt) <= now + DUE_SOON_MS) return 'due';
-
-  if (prospect.lastAttemptAt === null) return 'never';
-  if (prospect.lastOutcome === 'CALLBACK') return 'callback';
-  if (prospect.lastOutcome === 'UNREACHABLE') return 'unreachable';
-  return 'other';
-}
-
-/**
- * Une échéance à venir passe DERRIÈRE les fiches de son groupe : rappeler avant
- * l'heure promise, c'est rappeler trop tôt.
- */
-function orderKey(
-  prospect: ProspectRow,
-  schedules: CallbackSchedules,
-  now: number,
-): { rank: number; when: string } {
-  const bucket = bucketOf(prospect, schedules, now);
-  const scheduledAt = schedules.get(prospect.id);
-  const later = bucket !== 'due' && bucket !== 'closed' && scheduledAt !== undefined;
-
-  if (bucket === 'due' || later) {
-    return { rank: BUCKET_RANK[bucket] * 2 + (later ? 1 : 0), when: scheduledAt ?? '' };
-  }
-  return { rank: BUCKET_RANK[bucket] * 2, when: prospect.lastAttemptAt ?? '' };
-}
-
-export function sortQueue(
-  prospects: readonly ProspectRow[],
-  schedules: CallbackSchedules = NO_SCHEDULES,
-  now: number = Date.now(),
-): ProspectRow[] {
-  return [...prospects].sort((left, right) => {
-    const leftKey = orderKey(left, schedules, now);
-    const rightKey = orderKey(right, schedules, now);
-
-    if (leftKey.rank !== rightKey.rank) return leftKey.rank - rightKey.rank;
-    if (leftKey.when !== rightKey.when) return leftKey.when < rightKey.when ? -1 : 1;
-
-    return left.id < right.id ? -1 : 1;
-  });
-}
-
-export interface ConsoleQueue {
-  readonly items: ProspectRow[];
-  readonly pendingCount: number;
-  readonly counts: Record<QueueBucket, number>;
-}
-
-export function buildQueue(
-  prospects: readonly ProspectRow[],
-  schedules: CallbackSchedules = NO_SCHEDULES,
-  now: number = Date.now(),
-): ConsoleQueue {
-  const items = sortQueue(prospects, schedules, now);
-  const counts: Record<QueueBucket, number> = {
-    due: 0,
-    never: 0,
-    callback: 0,
-    unreachable: 0,
-    other: 0,
-    closed: 0,
-  };
-  for (const prospect of items) counts[bucketOf(prospect, schedules, now)] += 1;
-
-  return { items, pendingCount: items.length - counts.closed, counts };
-}
-
-/** Fiches « À rappeler » saisies avant que l'échéance existe : elles n'en ont aucune. */
-export function undatedCallbacks(
-  prospects: readonly ProspectRow[],
-  schedules: CallbackSchedules,
-): number {
-  return prospects.filter(
-    (prospect) =>
-      prospect.phase2Status === 'PENDING' &&
-      prospect.lastOutcome === 'CALLBACK' &&
-      !schedules.has(prospect.id),
-  ).length;
-}
-
-export function nextAfter(items: readonly { id: string }[], id: string): string | null {
-  const at = items.findIndex((prospect) => prospect.id === id);
-  if (at === -1) return items[0]?.id ?? null;
-  return items[at + 1]?.id ?? items[at - 1]?.id ?? null;
-}
-
-export function daysSince(iso: string | null, now: number): number | null {
-  if (iso === null) return null;
-  const at = Date.parse(iso);
-  if (Number.isNaN(at)) return null;
-  return Math.max(0, Math.floor((now - at) / 86_400_000));
-}
-
-export function queueLabel(
-  prospect: ProspectRow,
-  now: number,
-  schedules: CallbackSchedules = NO_SCHEDULES,
-): string {
-  const bucket = bucketOf(prospect, schedules, now);
-  if (bucket === 'closed') return PHASE2_STATUS_LABELS[prospect.phase2Status].toLowerCase();
-
-  const scheduledAt = schedules.get(prospect.id);
-  if (scheduledAt !== undefined) {
-    const at = Date.parse(scheduledAt);
-    return at < now
-      ? `rappel en retard de ${formatDelay(now - at)}`
-      : `rappel ${formatCallbackAt(scheduledAt, now)}`;
-  }
-
-  if (bucket === 'never') return 'jamais appelé';
-
-  const days = daysSince(prospect.lastAttemptAt, now);
-  const age = days === null ? '' : ` · ${String(days)} j`;
-  if (bucket === 'callback') return `rappel sans échéance${age}`;
-  if (bucket === 'unreachable') return `injoignable${age}`;
-
-  const outcome = prospect.lastOutcome;
-  return `${outcome === null ? 'appelé' : CALL_OUTCOME_LABELS[outcome].toLowerCase()}${age}`;
-}
-
 export const COMMENT_MAX_LENGTH = 2_000;
 export const EMAIL_MAX_LENGTH = 160;
 export const NAME_MAX_LENGTH = 120;
 export const DUREE_ETABLISSEMENT_MAX_MOIS = 600;
+export const DUREE_SYSTEME_MAX_MOIS = 300;
 
 /** Même tolérance que le serveur : le rendez-vous se juge sur l'horodatage terrain. */
 const RENDEZ_VOUS_SKEW_MS = 5 * 60_000;
@@ -393,39 +172,56 @@ const RENDEZ_VOUS_SKEW_MS = 5 * 60_000;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/u;
 
 /**
- * Les renseignements recueillis pendant l'appel de conversion (phase 3). Tout
- * est saisi en texte : la durée et le rendez-vous ne prennent leur type qu'au
+ * Les renseignements recueillis pendant l'appel de conversion (phase 3) : le
+ * dossier entier du prospect, corrigeable, plus ce que l'appel apprend. Tout
+ * est saisi en texte : les durées et le rendez-vous ne prennent leur type qu'au
  * moment de l'envoi, sinon un champ vidé n'aurait plus de représentation.
+ *
+ * Sur CHUES le prospect est enseignant : ni situation ni mode de paiement, et
+ * l'adhésion exige le dossier complet. Le Grand Public garde ces deux champs.
  */
 export interface ConversionDraft {
+  readonly projet: Projet;
   readonly nom: string;
   readonly prenom: string;
   readonly email: string;
   readonly profession: string;
+  readonly type: ProspectType | null;
   readonly dureeEtablissementMois: string;
   readonly fonctionnaire: boolean | null;
   readonly syndicatId: string;
   readonly banqueId: string;
   readonly engagementEnCours: boolean | null;
-  readonly method: EnrollmentMethod;
+  readonly incomeBandId: string;
+  readonly paymentMode: PaymentMode | null;
+  readonly dureeSystemeMois: string;
+  readonly method: EnrollmentMethod | null;
   readonly rendezVousAt: string;
 }
 
-export type ConversionField = keyof ConversionDraft;
+export type ConversionField = Exclude<keyof ConversionDraft, 'projet'>;
 export type ConversionErrors = Partial<Record<ConversionField, string>>;
 
 /** Le formulaire s'ouvre déjà rempli de ce que la fiche sait : on ne redemande rien. */
-export function conversionFrom(prospect: ProspectRow, method: EnrollmentMethod): ConversionDraft {
+export function conversionFrom(
+  prospect: ProspectRow,
+  method: EnrollmentMethod | null = null,
+): ConversionDraft {
   return {
+    projet: prospect.projet,
     nom: prospect.nom,
     prenom: prospect.prenom,
     email: '',
     profession: prospect.profession ?? '',
+    type: prospect.type,
     dureeEtablissementMois: '',
     fonctionnaire: null,
     syndicatId: prospect.syndicatId ?? '',
     banqueId: prospect.banqueId ?? '',
     engagementEnCours: null,
+    incomeBandId: prospect.incomeBandId ?? '',
+    paymentMode: prospect.paymentMode,
+    dureeSystemeMois: prospect.dureeSystemeMois === null ? '' : String(prospect.dureeSystemeMois),
     method,
     rendezVousAt: '',
   };
@@ -437,15 +233,21 @@ export function validateConversion(
   now: number = Date.now(),
 ): ConversionErrors {
   const errors: ConversionErrors = {};
+  const complet = draft.projet === 'CHUES';
 
   const nom = draft.nom.trim();
   if (nom === '') errors.nom = 'Le nom est obligatoire.';
   else if (nom.length > NAME_MAX_LENGTH) errors.nom = 'Nom trop long (120 caractères maximum).';
 
-  if (draft.prenom.trim().length > NAME_MAX_LENGTH) {
+  const prenom = draft.prenom.trim();
+  if (complet && prenom === '') errors.prenom = 'Le prénom est obligatoire.';
+  else if (prenom.length > NAME_MAX_LENGTH) {
     errors.prenom = 'Prénom trop long (120 caractères maximum).';
   }
-  if (draft.profession.trim().length > NAME_MAX_LENGTH) {
+
+  const profession = draft.profession.trim();
+  if (complet && profession === '') errors.profession = 'La profession est obligatoire.';
+  else if (profession.length > NAME_MAX_LENGTH) {
     errors.profession = 'Profession trop longue (120 caractères maximum).';
   }
 
@@ -455,9 +257,33 @@ export function validateConversion(
   }
 
   const mois = draft.dureeEtablissementMois.trim();
-  if (mois !== '' && (!/^\d+$/u.test(mois) || Number(mois) > DUREE_ETABLISSEMENT_MAX_MOIS)) {
+  if (complet && mois === '') {
+    errors.dureeEtablissementMois = 'La durée dans l’établissement est obligatoire.';
+  } else if (mois !== '' && (!/^\d+$/u.test(mois) || Number(mois) > DUREE_ETABLISSEMENT_MAX_MOIS)) {
     errors.dureeEtablissementMois = `La durée s’exprime en mois entiers, de 0 à ${String(DUREE_ETABLISSEMENT_MAX_MOIS)}.`;
   }
+
+  if (complet && draft.fonctionnaire === null)
+    errors.fonctionnaire = 'Dites s’il est fonctionnaire.';
+  if (complet && draft.syndicatId === '') errors.syndicatId = 'Choisissez le syndicat.';
+  if (complet && draft.banqueId === '') errors.banqueId = 'Choisissez la banque.';
+  if (complet && draft.engagementEnCours === null) {
+    errors.engagementEnCours = 'Dites s’il a un engagement en cours à la banque.';
+  }
+  if (complet && draft.incomeBandId === '')
+    errors.incomeBandId = 'Choisissez la tranche de revenu.';
+
+  const systeme = draft.dureeSystemeMois.trim();
+  if (complet && systeme === '') {
+    errors.dureeSystemeMois = 'Choisissez la durée du système de paiement.';
+  } else if (
+    systeme !== '' &&
+    (!/^\d+$/u.test(systeme) || Number(systeme) < 1 || Number(systeme) > DUREE_SYSTEME_MAX_MOIS)
+  ) {
+    errors.dureeSystemeMois = `La durée du système s’exprime en mois entiers, de 1 à ${String(DUREE_SYSTEME_MAX_MOIS)}.`;
+  }
+
+  if (draft.method === null) errors.method = 'Choisissez la méthode d’enrôlement.';
 
   const rendezVous = draft.rendezVousAt.trim();
   if (draft.method === 'APPOINTMENT') {
@@ -581,6 +407,7 @@ function conversionData(draft: ConversionDraft): SyncEntityData {
   const email = draft.email.trim();
   const profession = draft.profession.trim();
   const mois = draft.dureeEtablissementMois.trim();
+  const systeme = draft.dureeSystemeMois.trim();
   const rendezVousAt =
     draft.method === 'APPOINTMENT' ? dakarLocalToIso(draft.rendezVousAt.trim()) : null;
 
@@ -589,8 +416,12 @@ function conversionData(draft: ConversionDraft): SyncEntityData {
     ...(prenom === '' ? {} : { prenom }),
     ...(email === '' ? {} : { email }),
     ...(profession === '' ? {} : { profession }),
+    ...(draft.type === null ? {} : { type: draft.type }),
     ...(draft.syndicatId === '' ? {} : { syndicatId: draft.syndicatId }),
     ...(draft.banqueId === '' ? {} : { banqueId: draft.banqueId }),
+    ...(draft.incomeBandId === '' ? {} : { incomeBandId: draft.incomeBandId }),
+    ...(draft.paymentMode === null ? {} : { paymentMode: draft.paymentMode }),
+    ...(systeme === '' ? {} : { dureeSystemeMois: Number(systeme) }),
     ...(mois === '' ? {} : { dureeEtablissementMois: Number(mois) }),
     ...(draft.fonctionnaire === null ? {} : { fonctionnaire: draft.fonctionnaire }),
     ...(draft.engagementEnCours === null ? {} : { engagementEnCours: draft.engagementEnCours }),

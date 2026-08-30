@@ -44,7 +44,7 @@ export class NotificationsController {
     status: 422,
     type: ApiErrorDto,
     description:
-      'NOTIFICATION_AUDIENCE_EMPTY, NOTIFICATION_AUDIENCE_ROLE_REQUIRED, NOTIFICATION_AUDIENCE_DEPARTEMENT_REQUIRED, NOTIFICATION_AUDIENCE_USERS_REQUIRED, NOTIFICATION_SCHEDULE_IN_PAST, NOTIFICATION_ROUTE_INVALID.',
+      'NOTIFICATION_AUDIENCE_EMPTY, NOTIFICATION_AUDIENCE_ROLE_REQUIRED, NOTIFICATION_AUDIENCE_DEPARTEMENT_RETIRED, NOTIFICATION_AUDIENCE_USERS_REQUIRED, NOTIFICATION_SCHEDULE_IN_PAST, NOTIFICATION_ROUTE_INVALID.',
   })
   create(
     @CurrentUser() user: AuthenticatedUser,
@@ -88,7 +88,6 @@ export class NotificationsController {
     return this.notifications.previewAudience({
       audience: query.audience,
       audienceRole: query.audienceRole ?? null,
-      audienceDepartementId: query.audienceDepartementId ?? null,
       audienceUserIds: parseUserIdList(query.audienceUserIds),
     });
   }

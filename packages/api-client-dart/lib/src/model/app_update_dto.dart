@@ -33,9 +33,13 @@ class AppUpdateDto {
 
     required this.sha256,
 
+    required this.signerSha256,
+
     required this.downloadUrl,
 
     required this.publishedAt,
+
+    required this.minVersionCode,
 
     required this.notes,
   });
@@ -43,6 +47,7 @@ class AppUpdateDto {
   @JsonKey(name: r'available', required: true, includeIfNull: false)
   final bool available;
 
+  /// Le poste est sous le plancher obligatoire.
   @JsonKey(name: r'forceUpdate', required: true, includeIfNull: false)
   final bool forceUpdate;
 
@@ -61,11 +66,19 @@ class AppUpdateDto {
   @JsonKey(name: r'sha256', required: true, includeIfNull: false)
   final String sha256;
 
+  /// Empreinte SHA-256 du certificat signataire de l’APK servi.
+  @JsonKey(name: r'signerSha256', required: true, includeIfNull: false)
+  final String signerSha256;
+
   @JsonKey(name: r'downloadUrl', required: true, includeIfNull: false)
   final String downloadUrl;
 
   @JsonKey(name: r'publishedAt', required: true, includeIfNull: false)
   final String publishedAt;
+
+  /// Plus haut versionCode obligatoire encore en ligne, ou null.
+  @JsonKey(name: r'minVersionCode', required: true, includeIfNull: true)
+  final num? minVersionCode;
 
   @JsonKey(name: r'notes', required: true, includeIfNull: true)
   final String? notes;
@@ -83,8 +96,10 @@ class AppUpdateDto {
                 fileName,
                 fileSize,
                 sha256,
+                signerSha256,
                 downloadUrl,
                 publishedAt,
+                minVersionCode,
                 notes,
               ],
               [
@@ -95,8 +110,10 @@ class AppUpdateDto {
                 other.fileName,
                 other.fileSize,
                 other.sha256,
+                other.signerSha256,
                 other.downloadUrl,
                 other.publishedAt,
+                other.minVersionCode,
                 other.notes,
               ],
             );
@@ -113,8 +130,10 @@ class AppUpdateDto {
         fileName,
         fileSize,
         sha256,
+        signerSha256,
         downloadUrl,
         publishedAt,
+        minVersionCode,
         notes,
       ]);
 

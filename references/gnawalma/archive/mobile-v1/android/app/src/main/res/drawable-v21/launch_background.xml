@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Native splash screen with app logo (API 21+) -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="?android:colorBackground" />
+
+    <!-- App logo centered -->
+    <item>
+        <bitmap
+            android:gravity="center"
+            android:src="@mipmap/launcher_icon" />
+    </item>
+</layer-list>

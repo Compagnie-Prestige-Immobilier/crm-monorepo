@@ -686,47 +686,6 @@ describe('une campagne ouvre l’écriture sur la fiche d’un autre', () => {
     expect(result.body.results[0]?.errorCode).toBe('ENTITY_ID_OWNED_BY_ANOTHER_USER');
   });
 
-  it('la file de la campagne l’ouvre à qui elle l’a confiée', async () => {
-    ficheDeBob();
-    db.callTasks.set('task-1', {
-      id: 'task-1',
-      prospectId: PROSPECT_DE_BOB,
-      assignedToId: alice.id,
-      isActive: true,
-    });
-
-    const result = await sync.push(alice, batch([qualifier()]));
-
-    expect(statuses(result.body.results)).toEqual([SyncOpStatus.APPLIED]);
-  });
-
-  it('une file confiée à un TIERS ne l’ouvre pas', async () => {
-    ficheDeBob();
-    db.callTasks.set('task-1', {
-      id: 'task-1',
-      prospectId: PROSPECT_DE_BOB,
-      assignedToId: 'com-carine',
-      isActive: true,
-    });
-
-    const result = await sync.push(alice, batch([qualifier()]));
-
-    expect(statuses(result.body.results)).toEqual([SyncOpStatus.CONFLICT]);
-  });
-
-  it('une file RETIRÉE ne l’ouvre plus', async () => {
-    ficheDeBob();
-    db.callTasks.set('task-1', {
-      id: 'task-1',
-      prospectId: PROSPECT_DE_BOB,
-      assignedToId: alice.id,
-      isActive: false,
-    });
-
-    const result = await sync.push(alice, batch([qualifier()]));
-
-    expect(statuses(result.body.results)).toEqual([SyncOpStatus.CONFLICT]);
-  });
 });
 
 describe('écriture conditionnelle sur la révision', () => {

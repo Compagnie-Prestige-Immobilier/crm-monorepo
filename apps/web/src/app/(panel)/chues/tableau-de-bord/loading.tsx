@@ -1,11 +1,5 @@
-import { DashboardChartsSkeleton } from '@/components/dashboard/dashboard-view';
-import { FiltersBarSkeleton } from '@/components/filters/filters-bar';
+import { ChiffresSkeleton } from '@/components/chiffres/vue';
 
 export default function Loading() {
-  return (
-    <div className="flex flex-col gap-6">
-      <FiltersBarSkeleton />
-      <DashboardChartsSkeleton />
-    </div>
-  );
+  return <ChiffresSkeleton />;
 }

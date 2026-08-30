@@ -146,7 +146,7 @@ describe('listes du registre des visites', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Désactiver SANTARGILE' }));
 
     expect(await screen.findByRole('dialog')).toBeTruthy();
-    expect(screen.getByRole('dialog').textContent).toContain('0 visites référencent');
+    expect(screen.getByRole('dialog').textContent).toContain('0 visite référence');
 
     await userEvent.click(screen.getByRole('button', { name: 'Désactiver' }));
     expect(setVisiteReferentielActive).toHaveBeenCalledWith('entreprises', 'e-2', false);

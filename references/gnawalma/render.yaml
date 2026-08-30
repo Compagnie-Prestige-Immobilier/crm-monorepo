@@ -1,0 +1,53 @@
+services:
+  - type: web
+    name: gnawalma-api
+    runtime: docker
+    rootDir: apps/api
+    plan: free
+    region: frankfurt
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_LOCALE
+        value: fr
+      - key: APP_KEY
+        generateValue: true
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_TTL
+        value: "15"
+      - key: JWT_REFRESH_TTL
+        value: "43200"
+      - key: HASH_DRIVER
+        value: argon2id
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: FILESYSTEM_DISK
+        value: public
+      - key: FRONTEND_RESET_URL
+        value: gnawalma://reinitialiser
+      - key: MIN_APP_VERSION
+        value: 2.0.0
+      - key: OCTANE_SERVER
+        value: frankenphp
+      - key: SENTRY_LARAVEL_DSN
+        value: ""
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_URL
+        fromDatabase:
+          name: gnawalma-db
+          property: connectionString
+      - key: APP_URL
+        fromService:
+          type: web
+          name: gnawalma-api
+          envVarKey: RENDER_EXTERNAL_URL
+
+databases:
+  - name: gnawalma-db
+    plan: free
+    region: frankfurt

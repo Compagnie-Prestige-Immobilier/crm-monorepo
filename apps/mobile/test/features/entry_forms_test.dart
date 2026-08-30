@@ -10,8 +10,6 @@ import 'package:cpi_go/core/theme/app_theme.dart';
 import 'package:cpi_go/core/utils/whatsapp.dart';
 import 'package:cpi_go/data/local/database.dart';
 import 'package:cpi_go/data/repositories/write_repository.dart';
-import 'package:cpi_go/features/auth/auth_controller.dart';
-import 'package:cpi_go/features/auth/auth_state.dart';
 import 'package:cpi_go/features/prospect/presentation/prospect_entry_screen.dart';
 import 'package:cpi_go/features/representant/presentation/representant_form_screen.dart';
 import 'package:cpi_go/ui/widgets/cpi_kit.dart';
@@ -147,11 +145,9 @@ void main() {
     });
   }
 
-  Widget host(Widget screen, {AuthState? session, WriteRepository? writes}) {
+  Widget host(Widget screen, {WriteRepository? writes}) {
     return ProviderScope(
       overrides: [
-        if (session != null)
-          authControllerProvider.overrideWith(() => _FixedSession(session)),
         if (writes != null) writeRepositoryProvider.overrideWithValue(writes),
         appDatabaseProvider.overrideWithValue(db),
         apiPortProvider.overrideWithValue(api),
@@ -853,29 +849,6 @@ void main() {
 
   // ───────────────────────────────────────────────────────────────────────────
   group('ce que le système sait déjà, le téléconseiller ne le tape pas', () {
-    formTestWidgets('le département de la session est déjà posé', (
-      WidgetTester tester,
-    ) async {
-      await tester.pumpWidget(
-        host(
-          const RepresentantFormScreen(),
-          session: const AuthState(
-            status: AuthStatus.authenticated,
-            userId: 'me',
-            fullName: 'Awa Sy',
-            departementId: 'dep-1',
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await etapeIdentite(tester);
-
-      expect(
-        find.descendant(of: champ('Département'), matching: find.text('Dakar')),
-        findsOneWidget,
-      );
-    });
-
     formTestWidgets('les notes saisies suivent le représentant', (
       WidgetTester tester,
     ) async {
@@ -1604,17 +1577,6 @@ void main() {
   });
 }
 
-/// Coordinateur à l'arrêt : le vrai branche un minuteur de 60 s et un écouteur
-/// de connectivité, et ne se stabilise jamais dans un test de widget.
-class _FixedSession extends AuthController {
-  _FixedSession(this._state);
-
-  final AuthState _state;
-
-  @override
-  AuthState build() => _state;
-}
-
 /// Une écriture lente : le temps que le minuteur du brouillon se déclenche.
 class _SlowWrites extends WriteRepository {
   _SlowWrites(super.db);
@@ -1654,6 +1616,8 @@ class _SlowWrites extends WriteRepository {
   }
 }
 
+/// Coordinateur à l'arrêt : le vrai branche un minuteur de 60 s et un écouteur
+/// de connectivité, et ne se stabilise jamais dans un test de widget.
 class _IdleSyncCoordinator extends SyncCoordinator {
   @override
   SyncUiState build() => const SyncUiState();

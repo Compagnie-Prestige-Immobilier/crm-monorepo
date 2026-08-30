@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Put, Query } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Role } from '@crm/database';
 import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
@@ -10,6 +10,7 @@ import {
 } from '../../common/decorators/current-user.decorator.js';
 import { AnalyticsService } from './analytics.service.js';
 import { FunnelService } from './funnel.service.js';
+import { PilotageService } from './pilotage.service.js';
 import { AnalyticsFunnelDto } from './funnel.dto.js';
 import {
   AnalyticsQueryDto,
@@ -19,18 +20,14 @@ import {
   NamedCountListDto,
   Phase2StatusListDto,
   SegmentListDto,
-  StatsLayoutDto,
-  StatsLayoutQueryDto,
   TimeSeriesQueryDto,
   TopCommercialListDto,
   TopQueryDto,
   TopRepresentantListDto,
-  UpdateStatsLayoutDto,
 } from './dto.js';
-import { PilotageService } from './pilotage.service.js';
 import { PortfolioService } from './portfolio.service.js';
 import { QualityService } from './quality.service.js';
-import { AnalyticsDelaysDto, CampaignPilotageDto } from './pilotage.dto.js';
+import { AnalyticsDelaysDto } from './pilotage.dto.js';
 import { BankAgingDto, DepartementYieldListDto, WeeklyCohortListDto } from './portfolio.dto.js';
 import {
   AmbassadorConversionDto,
@@ -41,7 +38,6 @@ import {
 } from './quality.dto.js';
 import { SegmentConversionsService } from './segment-conversions.service.js';
 import { SegmentConversionListDto, SegmentConversionsQueryDto } from './segment-conversions.dto.js';
-import { StatsLayoutService } from './stats-layout.service.js';
 
 @ApiTags('analytics')
 @ApiBearerAuth()
@@ -56,50 +52,7 @@ export class AnalyticsController {
     private readonly portfolio: PortfolioService,
     private readonly quality: QualityService,
     private readonly segments: SegmentConversionsService,
-    private readonly layouts: StatsLayoutService,
   ) {}
-
-  @Get('layout')
-  @ApiOperation({
-    operationId: 'getStatsLayout',
-    summary: 'Organisation des graphiques de statistiques pour l’utilisateur courant.',
-  })
-  @ApiResponse({ status: 200, type: StatsLayoutDto })
-  layout(
-    @CurrentUser() user: AuthenticatedUser,
-    @Query() query: StatsLayoutQueryDto,
-  ): Promise<StatsLayoutDto> {
-    return this.layouts.get(user.id, query.screen);
-  }
-
-  @Put('layout')
-  @ApiOperation({
-    operationId: 'putStatsLayout',
-    summary: 'Enregistre l’organisation des graphiques de statistiques.',
-  })
-  @ApiResponse({ status: 200, type: StatsLayoutDto })
-  putLayout(
-    @CurrentUser() user: AuthenticatedUser,
-    @Query() query: StatsLayoutQueryDto,
-    @Body() body: UpdateStatsLayoutDto,
-  ): Promise<StatsLayoutDto> {
-    return this.layouts.put(user.id, query.screen, body);
-  }
-
-  @Delete('layout')
-  @ApiOperation({
-    operationId: 'deleteStatsLayout',
-    summary:
-      'Efface l’organisation personnelle des statistiques pour revenir à l’ordre par défaut.',
-  })
-  @ApiResponse({ status: 200, type: StatsLayoutDto })
-  async deleteLayout(
-    @CurrentUser() user: AuthenticatedUser,
-    @Query() query: StatsLayoutQueryDto,
-  ): Promise<StatsLayoutDto> {
-    await this.layouts.remove(user.id, query.screen);
-    return this.layouts.get(user.id, query.screen);
-  }
 
   @Get('funnel')
   @ApiOperation({
@@ -240,24 +193,6 @@ export class AnalyticsController {
     @Query() query: TopQueryDto,
   ): Promise<TopRepresentantListDto> {
     return this.analytics.topRepresentants(user, query);
-  }
-
-  @Get('campaign-pilotage')
-  @ApiOperation({
-    operationId: 'getCampaignPilotage',
-    summary: 'Pilotage d’une campagne d’appels : joignabilité, cadence, fin projetée.',
-    description:
-      'Sans `campaignId`, la mesure porte sur l’ensemble des campagnes ACTIVES. ' +
-      'La progression était jusqu’ici calculée à la volée et ne remontait dans ' +
-      'aucun tableau de bord : « 42 % faits » ne dit ni si les numéros répondent, ' +
-      'ni quand la campagne se termine.',
-  })
-  @ApiResponse({ status: 200, type: CampaignPilotageDto })
-  campaignPilotage(
-    @CurrentUser() user: AuthenticatedUser,
-    @Query() query: AnalyticsQueryDto,
-  ): Promise<CampaignPilotageDto> {
-    return this.pilotage.campaignPilotage(user, query);
   }
 
   @Get('delays')

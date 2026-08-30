@@ -34,8 +34,6 @@ class AuthUserDto {
 
     required this.workspace,
 
-    this.departementId,
-
     this.phoneE164,
 
     this.lastLoginAt,
@@ -72,9 +70,6 @@ class AuthUserDto {
   )
   final AuthUserDtoWorkspaceEnum workspace;
 
-  @JsonKey(name: r'departementId', required: false, includeIfNull: false)
-  final String? departementId;
-
   @JsonKey(name: r'phoneE164', required: false, includeIfNull: false)
   final String? phoneE164;
 
@@ -94,7 +89,6 @@ class AuthUserDto {
                 role,
                 isActive,
                 workspace,
-                departementId,
                 phoneE164,
                 lastLoginAt,
               ],
@@ -106,7 +100,6 @@ class AuthUserDto {
                 other.role,
                 other.isActive,
                 other.workspace,
-                other.departementId,
                 other.phoneE164,
                 other.lastLoginAt,
               ],
@@ -124,7 +117,6 @@ class AuthUserDto {
         role,
         isActive,
         workspace,
-        departementId,
         phoneE164,
         lastLoginAt,
       ]);

@@ -16,6 +16,7 @@ import '../../../ui/widgets/cpi_kit.dart';
 import '../../../ui/widgets/cpi_pressable.dart';
 import '../../../ui/widgets/cpi_steps.dart';
 import '../../../ui/widgets/phone_field.dart';
+import '../../permissions/alarme_permission.dart';
 import '../../phase2/presentation/callback_picker.dart';
 
 enum _Resultat { joignable, rappel, injoignable }
@@ -236,6 +237,14 @@ class _RepresentantQualificationScreenState
     final bool chuesOui =
         choix == _Resultat.joignable && representantCpi == true;
 
+    // Avant l'écriture, et seulement quand un rappel est promis : c'est le
+    // seul moment où la demande d'autorisation s'explique d'elle-même. Un
+    // refus n'empêche jamais de consigner l'appel.
+    if (rappelAt != null) {
+      await demanderLAlarme(context, ref);
+      if (!context.mounted) return;
+    }
+
     setState(() {
       saving = true;
       echec = null;
@@ -292,6 +301,7 @@ class _RepresentantQualificationScreenState
                 id: attemptId,
                 representantId: widget.representantId,
                 fullName: representant?.fullName ?? 'Représentant',
+                phoneE164: representant?.phoneE164 ?? '',
                 at: rappel,
               ),
         );

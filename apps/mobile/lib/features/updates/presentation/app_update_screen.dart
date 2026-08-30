@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
+import '../../../core/providers/app_providers.dart';
 import '../../../core/updates/app_update_controller.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../ui/widgets/cpi_action_bar.dart';
@@ -16,16 +17,20 @@ class AppUpdateScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final AndroidRelease release = state.release!;
-    final bool force = release.forceUpdate;
+    final bool force = state.belowFloor;
     final AppUpdateController controller = ref.read(
       appUpdateControllerProvider.notifier,
     );
     final ThemeData theme = Theme.of(context);
     final bool downloading = state.status == AppUpdateStatus.downloading;
+    // L'écran bloquant prend la main APRÈS le montage de la synchronisation :
+    // ce qui reste dans l'outbox part pendant qu'il s'affiche, et l'installation
+    // n'est proposée qu'une fois la file vide.
+    final int pending = ref.watch(pendingSyncCountProvider).value ?? 0;
 
     return CpiScaffold(
       title: force
-          ? 'Mise à jour nécessaire'
+          ? 'Mise à jour obligatoire'
           : 'Une nouvelle version est disponible',
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(
@@ -72,6 +77,14 @@ class AppUpdateScreen extends ConsumerWidget {
                 ),
               ),
             ],
+            if (pending > 0) ...<Widget>[
+              const SizedBox(height: CpiSpacing.md),
+              CpiStatusBand(
+                text: '$pending ${_saisies(pending)} encore à envoyer',
+                tone: CpiTone.warning,
+                padded: false,
+              ),
+            ],
             if (downloading) ...<Widget>[
               const SizedBox(height: CpiSpacing.xl),
               if (state.progress == 0)
@@ -104,7 +117,7 @@ class AppUpdateScreen extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  _primary(state, controller),
+                  _primary(state, controller, pending: pending),
                   if (!force) ...<Widget>[
                     const SizedBox(height: CpiSpacing.xs),
                     CpiButton(
@@ -120,12 +133,27 @@ class AppUpdateScreen extends ConsumerWidget {
   }
 }
 
-Widget _primary(AppUpdateState state, AppUpdateController controller) {
+String _saisies(int count) => count > 1 ? 'saisies' : 'saisie';
+
+Widget _primary(
+  AppUpdateState state,
+  AppUpdateController controller, {
+  required int pending,
+}) {
+  if (state.isReady && !state.canInstall) {
+    return CpiButton(
+      'Autoriser l\'installation',
+      icon: PhosphorIconsRegular.lockKeyOpen,
+      onPressed: controller.openInstallSettings,
+    );
+  }
   if (state.isReady) {
     return CpiButton(
-      'Installer la mise à jour',
+      'Installer',
       icon: PhosphorIconsRegular.deviceMobile,
-      onPressed: controller.install,
+      // Installer, c'est remplacer le processus : ce qui n'est pas parti serait
+      // gardé, mais l'utilisateur ne saurait pas pourquoi la file n'est pas vide.
+      onPressed: pending > 0 ? null : controller.install,
     );
   }
   if (state.blocker == AppUpdateBlocker.meteredLink) {
@@ -147,6 +175,14 @@ String _paragraph(AppUpdateState state, AndroidRelease release) {
   if (state.status == AppUpdateStatus.downloading) {
     return 'Le téléchargement est en cours. Gardez l\'application ouverte.';
   }
+  if (state.blocker == AppUpdateBlocker.diskSpace) {
+    return 'Il manque ${_megabytes(state.missingBytes)} sur le téléphone. '
+        'Libérez de la place, puis réessayez.';
+  }
+  if (state.isReady && !state.canInstall) {
+    return 'Android demande votre accord pour que CPI GO installe cette '
+        'mise à jour. Ouvrez les réglages, autorisez CPI GO, puis revenez.';
+  }
   if (!state.isReady) {
     if (state.blocker == AppUpdateBlocker.meteredLink) {
       return 'Vous êtes sur des données mobiles. '
@@ -155,6 +191,8 @@ String _paragraph(AppUpdateState state, AndroidRelease release) {
     }
     return state.error ?? 'Le téléchargement n\'a pas pu démarrer.';
   }
+  final String? erreur = state.error;
+  if (erreur != null) return erreur;
   final String notes = release.notes?.trim() ?? '';
   if (notes.isNotEmpty) return notes;
   return 'La mise à jour est prête à être installée.';

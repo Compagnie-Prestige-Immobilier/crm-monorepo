@@ -4,11 +4,9 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   ArrayUnique,
-  IsArray,
   IsBoolean,
   IsDateString,
   IsEnum,
-  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -18,10 +16,6 @@ import {
   MaxLength,
   Min,
   MinLength,
-  Validate,
-  ValidateNested,
-  ValidatorConstraint,
-  type ValidatorConstraintInterface,
 } from 'class-validator';
 
 import { PageMetaDto, SortOrder } from '../../common/dto/prospect-filter.dto.js';
@@ -148,7 +142,7 @@ export class ReorderVisiteReferentielDto {
     format: 'uuid',
     description: 'Les entrées dans leur nouvel ordre. Celles omises gardent leur rang.',
   })
-  @IsUUID('4', { each: true })
+  @IsUUID(undefined, { each: true })
   @ArrayMinSize(2)
   @ArrayMaxSize(200)
   @ArrayUnique()
@@ -553,160 +547,4 @@ export class VisiteStatsDto {
     description: 'Délai entre la visite et sa saisie.',
   })
   saisieDifferee!: VisiteStatSaisieDto;
-}
-
-export const DASHBOARD_SOURCES = [
-  'total-visites',
-  'moyenne-journaliere',
-  'jour-le-plus-charge',
-  'par-entreprise',
-  'par-objet',
-  'par-direction',
-  'par-destinataire',
-  'par-jour',
-  'par-mois',
-  'par-heure',
-  'par-jour-semaine',
-  'par-heure-jour-semaine',
-  'par-agent',
-  'par-entreprise-objet',
-  'par-destinataire-direction',
-  'par-objet-mois',
-  'visiteurs-recurrents',
-  'avec-telephone',
-  'qualite-de-saisie',
-] as const;
-
-export type DashboardSource = (typeof DASHBOARD_SOURCES)[number];
-
-export const DASHBOARD_MARQUES = [
-  'barres-verticales',
-  'barres-horizontales',
-  'barres-empilees',
-  'barres-100',
-  'barres-groupees',
-  'courbe',
-  'aire',
-  'escalier',
-  'anneau',
-  'camembert',
-  'aire-polaire',
-  'radar',
-  'nuage',
-  'bulles',
-  'mixte',
-  'jauge',
-  'carte-de-chaleur',
-  'tableau',
-  'tuile',
-  'tuile-courbe',
-] as const;
-
-export type DashboardMarque = (typeof DASHBOARD_MARQUES)[number];
-
-export const DASHBOARD_TAILLES = ['demi', 'pleine'] as const;
-export type DashboardTaille = (typeof DASHBOARD_TAILLES)[number];
-
-export const DASHBOARD_PRESETS = ['essentiel', 'affluence', 'organisation', 'complet'] as const;
-export type DashboardPreset = (typeof DASHBOARD_PRESETS)[number];
-
-@ValidatorConstraint({ name: 'uniqueDispositionSources', async: false })
-export class UniqueDispositionSourcesConstraint implements ValidatorConstraintInterface {
-  validate(widgets: unknown): boolean {
-    if (!Array.isArray(widgets)) return true;
-    const sources = new Set<string>();
-    for (const widget of widgets as { source?: unknown }[]) {
-      if (typeof widget.source === 'string') sources.add(widget.source);
-    }
-    return sources.size === widgets.length;
-  }
-
-  defaultMessage(): string {
-    return 'Chaque source ne peut apparaître qu’une seule fois dans la disposition.';
-  }
-}
-
-export class DispositionPresentationDto {
-  @ApiPropertyOptional({ enum: ['neutre', 'serie', 'categorielle'] })
-  @IsOptional()
-  @IsIn(['neutre', 'serie', 'categorielle'])
-  palette?: string;
-
-  @ApiPropertyOptional({ type: Boolean })
-  @IsOptional()
-  @IsBoolean()
-  valeurs?: boolean;
-
-  @ApiPropertyOptional({ type: Boolean })
-  @IsOptional()
-  @IsBoolean()
-  legende?: boolean;
-
-  @ApiPropertyOptional({ enum: ['valeur-desc', 'valeur-asc', 'alphabetique'] })
-  @IsOptional()
-  @IsIn(['valeur-desc', 'valeur-asc', 'alphabetique'])
-  tri?: string;
-
-  @ApiPropertyOptional({ type: Number, minimum: 1, maximum: 50 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(50)
-  autresApres?: number;
-}
-
-export class DispositionWidgetDto {
-  @ApiProperty({ enum: DASHBOARD_SOURCES, enumName: 'DashboardSource' })
-  @IsIn(DASHBOARD_SOURCES)
-  source!: DashboardSource;
-
-  @ApiPropertyOptional({ enum: DASHBOARD_MARQUES, enumName: 'DashboardMarque' })
-  @IsOptional()
-  @IsIn(DASHBOARD_MARQUES)
-  marque?: DashboardMarque;
-
-  @ApiPropertyOptional({ enum: DASHBOARD_TAILLES, enumName: 'DashboardTaille' })
-  @IsOptional()
-  @IsIn(DASHBOARD_TAILLES)
-  taille?: DashboardTaille;
-
-  @ApiPropertyOptional({ type: () => DispositionPresentationDto })
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => DispositionPresentationDto)
-  presentation?: DispositionPresentationDto;
-}
-
-export class UpdateDispositionDto {
-  @ApiPropertyOptional({ enum: DASHBOARD_PRESETS, enumName: 'DashboardPreset' })
-  @IsOptional()
-  @IsIn(DASHBOARD_PRESETS)
-  preset?: DashboardPreset;
-
-  @ApiProperty({
-    type: () => [DispositionWidgetDto],
-    description:
-      'Les éléments du tableau de bord. `version` est fixé par le serveur et refusé s’il est transmis.',
-  })
-  @IsArray()
-  @ArrayMaxSize(40)
-  @ValidateNested({ each: true })
-  @Type(() => DispositionWidgetDto)
-  @Validate(UniqueDispositionSourcesConstraint)
-  widgets!: DispositionWidgetDto[];
-}
-
-export class DispositionResponseDto {
-  @ApiProperty({ type: () => [DispositionWidgetDto] }) widgets!: DispositionWidgetDto[];
-  @ApiProperty({ enum: DASHBOARD_PRESETS, enumName: 'DashboardPreset' }) preset!: DashboardPreset;
-
-  @ApiProperty({
-    enum: ['utilisateur', 'defaut', 'usine'],
-    description:
-      'D’où vient la disposition rendue : la sienne, celle fixée par l’administrateur, ou celle d’usine.',
-  })
-  source!: 'utilisateur' | 'defaut' | 'usine';
-
-  @ApiProperty({ type: String, format: 'date-time', nullable: true }) updatedAt!: string | null;
 }

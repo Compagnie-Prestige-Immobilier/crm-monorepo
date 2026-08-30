@@ -295,8 +295,6 @@ class FakeApi implements ApiPort {
     return RepCallAttemptResultDto(
       status: RepCallAttemptApplyStatus.applied,
       attemptId: attempt.id,
-      taskId: null,
-      taskClosed: false,
       suggestion: null,
     );
   }
@@ -480,13 +478,10 @@ PullPage emptyPullPage({String? cursor}) => PullPage(
     banques: const <BanqueDto>[],
     syndicats: const <SyndicatDto>[],
     canauxProvenance: const <CanalProvenanceDto>[],
+    incomeBands: const <IncomeBandDto>[],
     visiteReferentiels: const <SyncVisiteReferentielDto>[],
     representants: const <RepresentantDto>[],
     prospects: const <ProspectDto>[],
-    callCampaigns: const <SyncCallCampaignDto>[],
-    callTasks: const <SyncCallTaskDto>[],
-    repCallCampaigns: const <SyncRepCallCampaignDto>[],
-    repCallTasks: const <SyncRepCallTaskDto>[],
     visites: const <SyncVisiteDto>[],
   ),
   deletions: const <SyncDeletionDto>[],
