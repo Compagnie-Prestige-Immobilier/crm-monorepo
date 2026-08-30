@@ -1465,6 +1465,12 @@ class SyncEngine {
         (CanalProvenanceDto c) => c.id,
         _upsertCanalProvenance,
       );
+      retired += await _mirrorKind<IncomeBandDto>(
+        _db.incomeBands,
+        snapshot.incomeBands,
+        (IncomeBandDto b) => b.id,
+        _upsertIncomeBand,
+      );
       // Le marqueur est posé DANS la transaction : une écriture interrompue ne
       // doit pas laisser croire que le miroir est fait.
       await _db
@@ -1486,7 +1492,8 @@ class SyncEngine {
       page.changes.iefs.isNotEmpty ||
       page.changes.banques.isNotEmpty ||
       page.changes.syndicats.isNotEmpty ||
-      page.changes.canauxProvenance.isNotEmpty;
+      page.changes.canauxProvenance.isNotEmpty ||
+      page.changes.incomeBands.isNotEmpty;
 
   static const String referentielsMirrorKey = 'referentiels_mirror';
 
@@ -1765,6 +1772,40 @@ class SyncEngine {
         );
   }
 
+  Future<void> _upsertIncomeBand(IncomeBandDto b) async {
+    await _db
+        .into(_db.incomeBands)
+        .insert(
+          IncomeBandsCompanion.insert(
+            id: b.id,
+            code: b.code,
+            label: b.label,
+            minXof: Value<int?>(b.minXof?.toInt()),
+            maxXof: Value<int?>(b.maxXof?.toInt()),
+            isActive: Value<bool>(b.isActive),
+            sortOrder: Value<int>(b.position.toInt()),
+            localUpdatedAt: _clock.now(),
+            serverUpdatedAt: Value<DateTime?>(b.updatedAt),
+          ),
+          onConflict: DoUpdate<IncomeBands, IncomeBand>(
+            (IncomeBands old) => IncomeBandsCompanion.custom(
+              code: const CustomExpression<String>('excluded.code'),
+              label: const CustomExpression<String>('excluded.label'),
+              minXof: const CustomExpression<int>('excluded.min_xof'),
+              maxXof: const CustomExpression<int>('excluded.max_xof'),
+              isActive: const CustomExpression<bool>('excluded.is_active'),
+              sortOrder: const CustomExpression<int>('excluded.sort_order'),
+              serverUpdatedAt: const CustomExpression<DateTime>(
+                'excluded.server_updated_at',
+              ),
+              localUpdatedAt: const CustomExpression<DateTime>(
+                'excluded.local_updated_at',
+              ),
+            ),
+          ),
+        );
+  }
+
   Future<int> _applyPage(PullPage page) async {
     int count = 0;
     await _db.transaction(() async {
@@ -1788,6 +1829,10 @@ class SyncEngine {
       }
       for (final CanalProvenanceDto c in page.changes.canauxProvenance) {
         await _upsertCanalProvenance(c);
+        count++;
+      }
+      for (final IncomeBandDto b in page.changes.incomeBands) {
+        await _upsertIncomeBand(b);
         count++;
       }
       for (final SyndicatDto s in page.changes.syndicats) {

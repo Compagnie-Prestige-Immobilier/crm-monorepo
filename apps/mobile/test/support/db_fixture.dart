@@ -69,6 +69,18 @@ Future<void> seedReferentials(AppDatabase db) async {
           localUpdatedAt: t0,
         ),
       );
+  await db
+      .into(db.incomeBands)
+      .insert(
+        IncomeBandsCompanion.insert(
+          id: 'rev-1',
+          code: 'B150_300',
+          label: 'Revenu Test',
+          minXof: const Value<int?>(150000),
+          maxXof: const Value<int?>(300000),
+          localUpdatedAt: t0,
+        ),
+      );
 }
 
 /// Donne un libellé de région au département du décor et en ajoute un second

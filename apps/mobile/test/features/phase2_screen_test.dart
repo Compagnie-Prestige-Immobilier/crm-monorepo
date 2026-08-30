@@ -140,24 +140,8 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  /// L'écran est en CINQ étapes : le numéro, puis les renseignements en trois
-  /// blocs — qui est-ce, son travail, sa banque —, puis la méthode. Elle ne
-  /// s'ouvre qu'une fois le numéro trouvé et les quatre « Continuer » touchés.
-  Future<void> resultat(WidgetTester tester, String digits) async {
-    await type(tester, digits);
-    for (int i = 0; i < 4; i++) {
-      await continuer(tester);
-    }
-  }
-
-  /// S'arrête à l'étape 2, la première des renseignements.
-  Future<void> renseignements(WidgetTester tester, String digits) async {
-    await type(tester, digits);
-    await continuer(tester);
-  }
-
-  /// Répond à une question à trois réponses de l'étape 2. Le libellé « Oui » se
-  /// répète d'une question à l'autre : la recherche part donc du groupe.
+  /// Répond à une question à deux réponses. Le libellé « Oui » se répète d'une
+  /// question à l'autre : la recherche part donc du groupe.
   Future<void> repondre(WidgetTester tester, String question, Tri choix) async {
     final Finder groupe = find.byWidgetPredicate(
       (Widget w) => w is CpiChoiceGroup<Tri> && w.label == question,
@@ -165,6 +149,18 @@ void main() {
     final Finder option = find.descendant(
       of: groupe,
       matching: find.text(choix.label),
+    );
+    await tester.ensureVisible(option);
+    await tester.pumpAndSettle();
+    await tester.tap(option);
+    await tester.pumpAndSettle();
+  }
+
+  /// Choisit une durée du système de paiement, à l'étape de la banque.
+  Future<void> choisirDuree(WidgetTester tester, int mois) async {
+    final Finder option = find.descendant(
+      of: find.byWidgetPredicate((Widget w) => w is CpiChoiceGroup<int>),
+      matching: find.text(formatDureeMois(mois)),
     );
     await tester.ensureVisible(option);
     await tester.pumpAndSettle();
@@ -210,6 +206,40 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(field, value);
     await tester.pumpAndSettle();
+  }
+
+  /// S'arrête à l'étape 2, la première des renseignements.
+  Future<void> renseignements(WidgetTester tester, String digits) async {
+    await type(tester, digits);
+    await continuer(tester);
+  }
+
+  /// Remplit les trois blocs de renseignements, depuis l'étape 2, et s'arrête à
+  /// la méthode. Depuis que l'adhésion exige le dossier entier, chaque bloc se
+  /// remplit avant que « Continuer » ne s'allume.
+  Future<void> dossier(WidgetTester tester) async {
+    await remplir(tester, 'Nom', 'Sow');
+    await remplir(tester, 'Prénom', 'Awa');
+    await continuer(tester);
+
+    await remplir(tester, 'Profession', 'Institutrice');
+    await remplir(tester, 'Ancienneté', '36');
+    await repondre(tester, 'Fonctionnaire', Tri.oui);
+    await continuer(tester);
+
+    await choisirDansListe(tester, 'Syndicat', 'Syndicat Test');
+    await choisirDansListe(tester, 'Banque', 'Banque Test');
+    await repondre(tester, 'Engagement en cours à la banque', Tri.non);
+    await choisirDansListe(tester, 'Revenu mensuel', 'Revenu Test');
+    await choisirDuree(tester, 24);
+    await continuer(tester);
+  }
+
+  /// L'écran est en CINQ étapes : le numéro, puis les renseignements en trois
+  /// blocs — qui est-ce, son travail, sa banque —, puis la méthode.
+  Future<void> resultat(WidgetTester tester, String digits) async {
+    await renseignements(tester, digits);
+    await dossier(tester);
   }
 
   /// La note vocale est repliée derrière son bouton : elle n'existe dans l'arbre
@@ -292,11 +322,8 @@ void main() {
 
       expect(find.text('Ce numéro n\'est pas dans la liste.'), findsNothing);
 
-      // Autant d'étapes qu'il en reste : le nombre de blocs de renseignements
-      // se rediscute, la propriété testée ici non.
-      while (find.text('Continuer').evaluate().isNotEmpty) {
-        await continuer(tester);
-      }
+      await continuer(tester);
+      await dossier(tester);
       await tester.ensureVisible(find.text('Plateforme'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Plateforme'));
@@ -340,22 +367,8 @@ void main() {
       isTrue,
     );
 
-    await remplir(tester, 'Nom', 'Sow');
-    await remplir(tester, 'Prénom', 'Awa');
     await remplir(tester, 'E-mail', 'awa.sow@exemple.sn');
-    await continuer(tester);
-
-    // Étape 3 : son travail.
-    await remplir(tester, 'Ancienneté', '36');
-    await repondre(tester, 'Fonctionnaire', Tri.oui);
-    await continuer(tester);
-
-    // Étape 4 : sa banque, son syndicat.
-    await choisirDansListe(tester, 'Syndicat', 'Syndicat Test');
-    await choisirDansListe(tester, 'Banque', 'Banque Test');
-    await repondre(tester, 'Engagement en cours à la banque', Tri.non);
-
-    await continuer(tester);
+    await dossier(tester);
     await remplir(tester, 'Commentaire', 'Rappeler après la rentrée.');
     await tester.ensureVisible(find.text('Plateforme'));
     await tester.pumpAndSettle();
@@ -381,30 +394,68 @@ void main() {
     expect(op['dureeEtablissementMois'], 36);
     expect(op['banqueId'], 'bq-1');
     expect(op['syndicatId'], 'sy-1');
+    expect(op['incomeBandId'], 'rev-1');
+    expect(op['dureeSystemeMois'], 24);
     expect(op['comment'], 'Rappeler après la rentrée.');
     expect(op.containsKey('rendezVousAt'), isFalse);
   });
 
-  // « Non demandé » est l'état de départ, et il ne se confond pas avec « Non » :
-  // le serveur distingue les deux, et une question non posée ne doit pas partir
-  // en refus.
-  phase2TestWidgets('une question non posée ne part pas en « non »', (
+  // « Non demandé » ne se propose plus : sur CHUES le dossier d'adhésion est
+  // complet ou il n'y a pas d'adhésion. La valeur reste possible en interne,
+  // pour les appels qui n'ont pas abouti.
+  phase2TestWidgets('« Non demandé » n\'est plus proposé aux deux questions', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(host());
-    await resultat(tester, '771234567');
-    await tester.ensureVisible(find.text('Plateforme'));
+    await renseignements(tester, '771234567');
+    await remplir(tester, 'Nom', 'Sow');
+    await remplir(tester, 'Prénom', 'Awa');
+    await continuer(tester);
+
+    expect(find.text('Non demandé', skipOffstage: false), findsNothing);
+    expect(
+      tester
+          .widget<CpiChoiceGroup<Tri>>(
+            find.byWidgetPredicate(
+              (Widget w) =>
+                  w is CpiChoiceGroup<Tri> && w.label == 'Fonctionnaire',
+            ),
+          )
+          .options
+          .map((CpiChoice<Tri> o) => o.label),
+      <String>['Oui', 'Non'],
+    );
+  });
+
+  // Une adhésion exige le dossier entier ; un appel qui n'a pas abouti, non.
+  phase2TestWidgets('l\'appel qui n\'a pas abouti se consigne sans dossier', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(host());
+    await renseignements(tester, '771234567');
+
+    await tester.ensureVisible(find.text('L\'appel n\'a pas abouti'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Plateforme'));
+    await tester.tap(find.text('L\'appel n\'a pas abouti'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Injoignable'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Injoignable'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Enregistrer'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Enregistrer'));
     await tester.pumpAndSettle();
 
     final CallAttempt attempt = (await db.select(db.callAttempts).get()).single;
+    expect(attempt.outcome, CallOutcomes.unreachable);
     expect(attempt.fonctionnaire, isNull);
     expect(attempt.engagementEnCours, isNull);
+    expect(find.text('Enregistré'), findsOneWidget);
 
     final Map<String, Object?> op = await payload(db);
-    expect(op.containsKey('fonctionnaire'), isFalse);
-    expect(op.containsKey('engagementEnCours'), isFalse);
+    expect(op.containsKey('incomeBandId'), isFalse);
+    expect(op.containsKey('dureeSystemeMois'), isFalse);
   });
 
   phase2TestWidgets('un e-mail mal formé retient l\'étape et le dit', (
@@ -412,6 +463,8 @@ void main() {
   ) async {
     await tester.pumpWidget(host());
     await renseignements(tester, '771234567');
+    await remplir(tester, 'Nom', 'Sow');
+    await remplir(tester, 'Prénom', 'Awa');
     await remplir(tester, 'E-mail', 'awa.sow');
 
     // `skipOffstage: false` : ForUI rend le reproche du champ hors scène tant
@@ -440,8 +493,11 @@ void main() {
   ) async {
     await tester.pumpWidget(host());
     await renseignements(tester, '771234567');
+    await remplir(tester, 'Nom', 'Sow');
+    await remplir(tester, 'Prénom', 'Awa');
     // La durée est à l'étape du travail, celle qui suit l'identité.
     await continuer(tester);
+    await remplir(tester, 'Profession', 'Institutrice');
     await remplir(tester, 'Ancienneté', '900');
 
     expect(
@@ -454,6 +510,59 @@ void main() {
           .subtitle,
       'Vérifiez la durée en mois',
     );
+  });
+
+  phase2TestWidgets('le revenu puis la durée du système retiennent l\'étape', (
+    WidgetTester tester,
+  ) async {
+    String? reproche() => tester
+        .widget<CpiButton>(find.widgetWithText(CpiButton, 'Continuer'))
+        .subtitle;
+
+    await tester.pumpWidget(host());
+    await renseignements(tester, '771234567');
+    await remplir(tester, 'Nom', 'Sow');
+    await remplir(tester, 'Prénom', 'Awa');
+    await continuer(tester);
+    await remplir(tester, 'Profession', 'Institutrice');
+    await remplir(tester, 'Ancienneté', '36');
+    await repondre(tester, 'Fonctionnaire', Tri.oui);
+    await continuer(tester);
+
+    await choisirDansListe(tester, 'Syndicat', 'Syndicat Test');
+    await choisirDansListe(tester, 'Banque', 'Banque Test');
+    await repondre(tester, 'Engagement en cours à la banque', Tri.non);
+    expect(reproche(), 'Choisissez le revenu mensuel');
+
+    await choisirDansListe(tester, 'Revenu mensuel', 'Revenu Test');
+    expect(reproche(), 'Choisissez la durée du système');
+    expect(
+      tester
+          .widget<CpiButton>(find.widgetWithText(CpiButton, 'Continuer'))
+          .onPressed,
+      isNull,
+    );
+
+    await choisirDuree(tester, 24);
+    expect(reproche(), isNull);
+    expect(
+      tester
+          .widget<CpiButton>(find.widgetWithText(CpiButton, 'Continuer'))
+          .onPressed,
+      isNotNull,
+    );
+  });
+
+  phase2TestWidgets('le récapitulatif rappelle le revenu et la durée', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(host());
+    await resultat(tester, '771234567');
+
+    expect(find.text('Revenu mensuel'), findsOneWidget);
+    expect(find.text('Revenu Test'), findsOneWidget);
+    expect(find.text('Durée du système'), findsOneWidget);
+    expect(find.text('2 ans (24 mois)'), findsOneWidget);
   });
 
   // ═══ LA PRISE DE RENDEZ-VOUS ═══
@@ -946,14 +1055,19 @@ void main() {
     await type(tester, '771234567');
     expect(haptics, isEmpty);
 
-    // Les quatre « Continuer » du parcours : un retour LÉGER par appui, celui
-    // que `CpiButton` donne à toute action primaire, et rien de plus.
-    for (int i = 0; i < 4; i++) {
-      await continuer(tester);
-    }
+    // Les « Continuer » du parcours : un retour LÉGER par appui, celui que
+    // `CpiButton` donne à toute action primaire. Les choix du dossier, eux,
+    // rendent un retour de SÉLECTION : le parcours en compte donc les deux.
+    await continuer(tester);
+    await dossier(tester);
     expect(
       haptics,
-      everyElement('HapticFeedbackType.lightImpact'),
+      everyElement(
+        anyOf(
+          'HapticFeedbackType.lightImpact',
+          'HapticFeedbackType.selectionClick',
+        ),
+      ),
       reason: 'un appui rend un retour léger ; la frappe, aucun',
     );
 
@@ -985,17 +1099,25 @@ void main() {
     await continuer(tester);
     expect(find.bySemanticsLabel(RegExp('Étape 2 sur 5')), findsOneWidget);
 
+    await remplir(tester, 'Nom', 'Sow');
+    await remplir(tester, 'Prénom', 'Awa');
     await continuer(tester);
 
-    // Étape 3 : les questions à trois réponses portent la question dans le nom
+    // Étape 3 : les questions à deux réponses portent la question dans le nom
     // de chaque option, sans quoi « Oui » ne se rattache à rien.
     expect(find.bySemanticsLabel(RegExp('Étape 3 sur 5')), findsOneWidget);
-    expect(
-      find.bySemanticsLabel(RegExp('Fonctionnaire : Non demandé')),
-      findsOneWidget,
-    );
+    expect(find.bySemanticsLabel(RegExp('Fonctionnaire : Oui')), findsWidgets);
 
+    await remplir(tester, 'Profession', 'Institutrice');
+    await remplir(tester, 'Ancienneté', '36');
+    await repondre(tester, 'Fonctionnaire', Tri.oui);
     await continuer(tester);
+
+    await choisirDansListe(tester, 'Syndicat', 'Syndicat Test');
+    await choisirDansListe(tester, 'Banque', 'Banque Test');
+    await repondre(tester, 'Engagement en cours à la banque', Tri.non);
+    await choisirDansListe(tester, 'Revenu mensuel', 'Revenu Test');
+    await choisirDuree(tester, 24);
     await continuer(tester);
 
     expect(
@@ -1006,6 +1128,10 @@ void main() {
       find.bySemanticsLabel(RegExp('Méthode obtenue : Prise de rendez-vous')),
       findsOneWidget,
     );
+    // Le dossier a fait défiler l'étape : l'en-tête est hors du cache
+    // sémantique tant qu'on n'est pas remonté.
+    await tester.drag(find.byType(ListView).first, const Offset(0, 1200));
+    await tester.pumpAndSettle();
     expect(find.bySemanticsLabel(RegExp('Étape 5 sur 5')), findsOneWidget);
     handle.dispose();
   });
