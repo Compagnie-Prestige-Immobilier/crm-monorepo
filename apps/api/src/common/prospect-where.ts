@@ -2,7 +2,7 @@ import { segmentWhere } from '@crm/database';
 import type { Prisma } from '@crm/database';
 
 import type { AuthenticatedUser } from './decorators/current-user.decorator.js';
-import { isAdmin, prospectReadScope } from './scope.js';
+import { prospectReadScope } from './scope.js';
 import { tryNormalizePhone } from './phone.js';
 import type { ProspectFilterDto } from './dto/prospect-filter.dto.js';
 import { inclusiveDateFrom, inclusiveDateTo } from './date-bounds.js';
@@ -35,11 +35,9 @@ function applyDirectFilters(
   user: Pick<AuthenticatedUser, 'id' | 'role'>,
   filter: ProspectFilterDto,
 ): void {
-  // Filtrer sur un collègue ne donne PAS ses fiches : le cloisonnement posé
-  // dans `AND` s'applique par-dessus, et ne laisse que ce que l'appelant a déjà
-  // en main.
+  // Filtrer sur un collègue ne change pas la portée de l'appelant.
   if (filter.commercialId) where.createdById = filter.commercialId;
-  if (!(filter.includeDeleted && isAdmin(user))) where.deletedAt = null;
+  where.deletedAt = null;
   Object.assign(
     where,
     Object.fromEntries(
@@ -75,13 +73,10 @@ function relationFilters(filter: ProspectFilterDto): Prisma.ProspectWhereInput[]
     });
   }
   if (filter.segment) and.push(segmentWhere(filter.segment));
-  if (filter.campaignId ?? filter.assignedToId) {
-    const callTask: Prisma.CallTaskWhereInput = {};
-    if (filter.campaignId) callTask.campaignId = filter.campaignId;
-    if (filter.assignedToId) callTask.assignedToId = filter.assignedToId;
+  if (filter.appelePar) {
     and.push({
-      callTasks: {
-        some: callTask,
+      callAttempts: {
+        some: { performedById: filter.appelePar },
       },
     });
   }

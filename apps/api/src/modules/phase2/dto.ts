@@ -1,12 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
-  ArrayMaxSize,
-  ArrayMinSize,
-  ArrayUnique,
-  IsBoolean,
-  IsEmail,
   IsEnum,
+  IsEmail,
+  IsBoolean,
   IsISO8601,
   IsInt,
   IsOptional,
@@ -19,12 +16,11 @@ import {
 } from 'class-validator';
 import {
   CallOutcome,
-  CallTaskStatus,
-  CampaignScope,
-  CampaignStatus,
   EnrollmentMethod,
+  PaymentMode,
   Phase2Status,
   Projet,
+  ProspectType,
 } from '@crm/database';
 
 import {
@@ -32,307 +28,9 @@ import {
   DUREE_ETABLISSEMENT_MAX_MOIS,
   EMAIL_MAX_LENGTH,
 } from './attempt-rules.js';
-import { MAX_SPREAD_DAYS, MIN_SPREAD_DAYS } from './distribution.js';
-import { PageMetaDto } from '../../common/dto/prospect-filter.dto.js';
-
-export class CreateCampaignDto {
-  @ApiProperty({ maxLength: 120, example: 'Campagne CHUES, avril' })
-  @IsString()
-  @MinLength(3)
-  @MaxLength(120)
-  name!: string;
-
-  @ApiPropertyOptional({ enum: Projet, enumName: 'Projet', default: Projet.CHUES })
-  @IsOptional()
-  @IsEnum(Projet)
-  projet?: Projet;
-
-  @ApiProperty({
-    enum: CampaignScope,
-    enumName: 'CampaignScope',
-    description:
-      'Périmètre du tirage. BDD1..BDD4 sont les segments partagés ; ALL réunit les quatre sans recouvrement.',
-  })
-  @IsEnum(CampaignScope)
-  scope!: CampaignScope;
-
-  @ApiPropertyOptional({ format: 'uuid', description: 'Offre ciblée, pour Grand Public.' })
-  @IsOptional()
-  @IsUUID()
-  offerId?: string;
-
-  @ApiPropertyOptional({ format: 'uuid' })
-  @IsOptional()
-  @IsUUID()
-  canalProvenanceId?: string;
-
-  @ApiPropertyOptional({ format: 'uuid' })
-  @IsOptional()
-  @IsUUID()
-  professionId?: string;
-
-  @ApiPropertyOptional({ format: 'uuid' })
-  @IsOptional()
-  @IsUUID()
-  incomeBandId?: string;
-
-  @ApiProperty({
-    type: 'array',
-    items: { type: 'string', format: 'uuid' },
-    minItems: 1,
-    maxItems: 200,
-    description:
-      'Commerciaux destinataires, DANS L’ORDRE du tourniquet. Cet ordre est persisté en `position` et fige le contenu de chaque programme.',
-  })
-  @IsUUID('all', { each: true })
-  @ArrayMinSize(1)
-  @ArrayMaxSize(200)
-  @ArrayUnique()
-  commercialIds!: string[];
-
-  @ApiPropertyOptional({
-    type: Number,
-    minimum: MIN_SPREAD_DAYS,
-    maximum: MAX_SPREAD_DAYS,
-    default: MIN_SPREAD_DAYS,
-    description:
-      'Étale la file de chaque commercial sur N journées. À 1 (défaut), comportement inchangé : un seul programme. Au-delà, chaque commercial reçoit un programme par jour, ce qui rend une base de 120 000 fiches distribuable.',
-  })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(MIN_SPREAD_DAYS)
-  @Max(MAX_SPREAD_DAYS)
-  spreadDays?: number;
-}
-
-export class CampaignProgressDto {
-  @ApiProperty({ type: Number, description: 'Nombre total de tâches affectées.' })
-  total!: number;
-
-  @ApiProperty({ type: Number, description: 'Tâches encore ouvertes.' })
-  open!: number;
-
-  @ApiProperty({ type: Number, description: 'Tâches abouties : une issue terminale a été saisie.' })
-  done!: number;
-
-  @ApiProperty({ type: Number, description: 'Tâches annulées par la clôture de la campagne.' })
-  cancelled!: number;
-}
-
-export class CampaignCommercialDto {
-  @ApiProperty({ format: 'uuid' }) userId!: string;
-  @ApiProperty() fullName!: string;
-  @ApiProperty() username!: string;
-
-  @ApiProperty({ type: Number, description: 'Rang dans le tourniquet, à partir de 1.' })
-  position!: number;
-
-  @ApiProperty({ type: () => CampaignProgressDto }) progress!: CampaignProgressDto;
-
-  @ApiProperty({ type: () => [Number], description: 'Lignes par journée, jour 1 en tête.' })
-  perDay!: number[];
-}
-
-export class CampaignAttemptDto {
-  @ApiProperty({ format: 'uuid' }) id!: string;
-  @ApiProperty({ format: 'uuid' }) prospectId!: string;
-  @ApiProperty({ description: 'Code court à six caractères du prospect.' }) shortCode!: string;
-  @ApiProperty() phoneE164!: string;
-
-  @ApiProperty({ enum: CallOutcome, enumName: 'CallOutcome' }) outcome!: CallOutcome;
-
-  @ApiProperty({
-    enum: EnrollmentMethod,
-    enumName: 'EnrollmentMethod',
-    nullable: true,
-    description: 'Renseignée si et seulement si l’issue vaut METHOD_OBTAINED.',
-  })
-  method!: EnrollmentMethod | null;
-
-  @ApiProperty({ type: String, nullable: true }) comment!: string | null;
-
-  @ApiProperty({ type: String, nullable: true }) email!: string | null;
-  @ApiProperty({ type: Boolean, nullable: true }) fonctionnaire!: boolean | null;
-  @ApiProperty({ type: Boolean, nullable: true }) engagementEnCours!: boolean | null;
-  @ApiProperty({ type: Number, nullable: true }) dureeEtablissementMois!: number | null;
-
-  @ApiProperty({
-    type: String,
-    format: 'date-time',
-    nullable: true,
-    description: 'Non nulle si et seulement si method vaut APPOINTMENT.',
-  })
-  rendezVousAt!: string | null;
-
-  @ApiProperty({ format: 'uuid', description: 'Commercial qui a RÉELLEMENT passé l’appel.' })
-  performedById!: string;
-
-  @ApiProperty() performedByName!: string;
-
-  @ApiProperty({
-    type: String,
-    format: 'uuid',
-    nullable: true,
-    description: 'Commercial à qui la tâche était affectée. Peut différer de performedById.',
-  })
-  assignedToId!: string | null;
-
-  @ApiProperty({ type: String, format: 'date-time' }) createdAt!: string;
-}
-
 export class CallRecordingDto {
   @ApiProperty({ format: 'uuid' }) attemptId!: string;
   @ApiProperty({ type: Number }) bytes!: number;
-}
-
-export class CampaignSummaryDto {
-  @ApiProperty({ format: 'uuid' }) id!: string;
-  @ApiProperty() name!: string;
-  @ApiProperty({ enum: Projet, enumName: 'Projet' }) projet!: Projet;
-  @ApiProperty({ enum: CampaignScope, enumName: 'CampaignScope' }) scope!: CampaignScope;
-  @ApiProperty({ description: 'Libellé lisible du périmètre, issu de la définition partagée.' })
-  scopeLabel!: string;
-  @ApiProperty({ enum: CampaignStatus, enumName: 'CampaignStatus' }) status!: CampaignStatus;
-  @ApiProperty({ type: String, nullable: true }) offerLabel!: string | null;
-
-  @ApiProperty({
-    description:
-      'Graine du tirage, persistée pour pouvoir rejouer et auditer la répartition. Les affectations, elles, sont matérialisées.',
-  })
-  seed!: string;
-
-  @ApiProperty({ format: 'uuid' }) createdById!: string;
-  @ApiProperty() createdByName!: string;
-  @ApiProperty({ type: Number }) commercialCount!: number;
-
-  @ApiProperty({ type: Number, description: 'Journées d’étalement. 1 : programme unique.' })
-  spreadDays!: number;
-
-  @ApiProperty({ type: () => CampaignProgressDto }) progress!: CampaignProgressDto;
-  @ApiProperty({ type: String, format: 'date-time' }) createdAt!: string;
-  @ApiProperty({ type: String, format: 'date-time', nullable: true }) closedAt!: string | null;
-}
-
-export class CampaignDetailDto {
-  @ApiProperty({ format: 'uuid' }) id!: string;
-  @ApiProperty() name!: string;
-  @ApiProperty({ enum: Projet, enumName: 'Projet' }) projet!: Projet;
-  @ApiProperty({ enum: CampaignScope, enumName: 'CampaignScope' }) scope!: CampaignScope;
-  @ApiProperty() scopeLabel!: string;
-  @ApiProperty({ enum: CampaignStatus, enumName: 'CampaignStatus' }) status!: CampaignStatus;
-  @ApiProperty({ type: String, nullable: true }) offerLabel!: string | null;
-  @ApiProperty() seed!: string;
-  @ApiProperty({ format: 'uuid' }) createdById!: string;
-  @ApiProperty() createdByName!: string;
-  @ApiProperty({ type: Number }) commercialCount!: number;
-
-  @ApiProperty({ type: Number, description: 'Journées d’étalement. 1 : programme unique.' })
-  spreadDays!: number;
-
-  @ApiProperty({ type: () => CampaignProgressDto }) progress!: CampaignProgressDto;
-  @ApiProperty({ type: String, format: 'date-time' }) createdAt!: string;
-  @ApiProperty({ type: String, format: 'date-time', nullable: true }) closedAt!: string | null;
-
-  @ApiProperty({
-    type: () => [Number],
-    description: 'Lignes par journée, toutes affectations confondues. Jour 1 en tête.',
-  })
-  perDay!: number[];
-
-  @ApiProperty({ type: () => [CampaignCommercialDto], description: 'Ordonnés par position.' })
-  commerciaux!: CampaignCommercialDto[];
-
-  @ApiProperty({
-    type: () => [CampaignAttemptDto],
-    description: 'Les vingt dernières tentatives, de la plus récente à la plus ancienne.',
-  })
-  recentAttempts!: CampaignAttemptDto[];
-}
-
-export class CampaignListDto {
-  @ApiProperty({ type: () => [CampaignSummaryDto] }) items!: CampaignSummaryDto[];
-  @ApiProperty({ type: () => PageMetaDto }) meta!: PageMetaDto;
-}
-
-export class CampaignQueryDto {
-  @ApiPropertyOptional({ enum: Projet, enumName: 'Projet' })
-  @IsOptional()
-  @IsEnum(Projet)
-  projet?: Projet;
-  @ApiPropertyOptional({ enum: CampaignStatus, enumName: 'CampaignStatus' })
-  @IsOptional()
-  @IsEnum(CampaignStatus)
-  status?: CampaignStatus;
-
-  @ApiPropertyOptional({
-    description: 'Recherche libre sur le nom de la campagne.',
-    maxLength: 120,
-  })
-  @IsOptional()
-  @IsString()
-  @MaxLength(120)
-  search?: string;
-
-  @ApiPropertyOptional({
-    enum: CampaignScope,
-    enumName: 'CampaignScope',
-    description: 'Périmètre du tirage.',
-  })
-  @IsOptional()
-  @IsEnum(CampaignScope)
-  scope?: CampaignScope;
-
-  @ApiPropertyOptional({ format: 'uuid', description: 'Administrateur qui a créé la campagne.' })
-  @IsOptional()
-  @IsUUID()
-  createdById?: string;
-
-  @ApiPropertyOptional({
-    format: 'date-time',
-    description: 'Borne basse sur la date de création, incluse.',
-  })
-  @IsOptional()
-  @IsISO8601()
-  dateFrom?: string;
-
-  @ApiPropertyOptional({
-    format: 'date-time',
-    description: 'Borne haute sur la date de création, incluse.',
-  })
-  @IsOptional()
-  @IsISO8601()
-  dateTo?: string;
-
-  @ApiPropertyOptional({ type: Number, minimum: 1, default: 1 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  page?: number;
-
-  @ApiPropertyOptional({ type: Number, minimum: 1, maximum: 100, default: 25 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  pageSize?: number;
-}
-
-export class ProgrammeQueryDto {
-  @ApiPropertyOptional({
-    type: Number,
-    minimum: 1,
-    maximum: MAX_SPREAD_DAYS,
-    description: 'Journée d’étalement, à partir de 1. Absent : tout le programme du commercial.',
-  })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(MAX_SPREAD_DAYS)
-  jour?: number;
 }
 
 export class DirectoryEntryDto {
@@ -400,6 +98,11 @@ export class CallAttemptOpDto {
   @ApiProperty({ format: 'uuid' })
   @IsUUID()
   prospectId!: string;
+
+  @ApiPropertyOptional({ enum: Projet, enumName: 'Projet' })
+  @IsOptional()
+  @IsEnum(Projet)
+  projet?: Projet;
 
   @ApiProperty({ enum: CallOutcome, enumName: 'CallOutcome' })
   @IsEnum(CallOutcome)
@@ -553,6 +256,42 @@ export class CallAttemptOpDto {
   @IsOptional()
   @IsUUID()
   syndicatId?: string;
+
+  @ApiPropertyOptional({
+    enum: ProspectType,
+    enumName: 'ProspectType',
+    description: 'Corrige la situation DU PROSPECT.',
+  })
+  @IsOptional()
+  @IsEnum(ProspectType)
+  type?: ProspectType;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Corrige la tranche de revenu DU PROSPECT.' })
+  @IsOptional()
+  @IsUUID()
+  incomeBandId?: string;
+
+  @ApiPropertyOptional({
+    enum: PaymentMode,
+    enumName: 'PaymentMode',
+    description: 'Corrige le mode de paiement DU PROSPECT.',
+  })
+  @IsOptional()
+  @IsEnum(PaymentMode)
+  paymentMode?: PaymentMode;
+
+  @ApiPropertyOptional({
+    type: Number,
+    minimum: 1,
+    maximum: 300,
+    description: 'Corrige la durée du système de paiement DU PROSPECT, en MOIS.',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(300)
+  dureeSystemeMois?: number;
 }
 
 export class ProspectPhase2StateDto {
@@ -586,22 +325,6 @@ export class CallAttemptResultDto {
   status!: CallAttemptApplyStatus;
 
   @ApiProperty({ format: 'uuid' }) attemptId!: string;
-
-  @ApiProperty({
-    type: String,
-    format: 'uuid',
-    nullable: true,
-    description: 'Tâche close par cette tentative, si le prospect en avait une active.',
-  })
-  taskId!: string | null;
-
-  @ApiProperty({
-    enum: CallTaskStatus,
-    enumName: 'CallTaskStatus',
-    nullable: true,
-    description: 'Statut de cette tâche après application.',
-  })
-  taskStatus!: CallTaskStatus | null;
 
   @ApiProperty({ type: () => ProspectPhase2StateDto }) state!: ProspectPhase2StateDto;
 }

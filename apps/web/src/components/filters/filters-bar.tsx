@@ -252,7 +252,7 @@ export function FiltersBar({ startCollapsed = false }: { startCollapsed?: boolea
           {/* ─── Ce que l'appel a donné ───────────────────────────────────
                 Ces cinq critères vivent dans le MÊME objet de filtre que les
                 précédents. C'est ce qui garantit qu'un lien « BDD2, méthode
-                obtenue, campagne d'avril » rouvre le tableau, les graphiques ET
+                obtenue, IEF de Thiès » rouvre le tableau, les graphiques ET
                 l'export sur exactement la même population. Un second état de
                 filtre, même bien synchronisé, finirait par produire un classeur
                 qui ne correspond pas à l'écran d'où il a été demandé. */}
@@ -281,15 +281,6 @@ export function FiltersBar({ startCollapsed = false }: { startCollapsed?: boolea
             value={filters.enrollmentMethod}
             onChange={(value) => {
               setFilters({ enrollmentMethod: value as EnrollmentMethod | null });
-            }}
-          />
-          <FilterCombobox
-            label="Campagne d’appels"
-            placeholder="Toutes les campagnes"
-            options={reference.campagnes}
-            value={filters.campaignId}
-            onChange={(value) => {
-              setFilters({ campaignId: value });
             }}
           />
           <FilterCombobox

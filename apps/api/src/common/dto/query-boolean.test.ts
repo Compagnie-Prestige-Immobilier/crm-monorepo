@@ -10,7 +10,6 @@ import {
 import { ReferentielQueryDto } from '../../modules/referentiels/dto.js';
 import { UserListQueryDto } from '../../modules/users/dto.js';
 import { InboxQueryDto } from '../../modules/notifications/dto.js';
-import { RepCampaignPreviewQueryDto } from '../../modules/rep-campaigns/dto.js';
 import { IncludeInactiveQueryDto } from '../../modules/bank-cases/dto.js';
 
 const pipe = new ValidationPipe({
@@ -43,11 +42,6 @@ describe('booléens de requête, coercition', () => {
     ['InboxQueryDto.unreadOnly', InboxQueryDto, 'unreadOnly'],
     ['IncludeInactiveQueryDto.includeInactive', IncludeInactiveQueryDto, 'includeInactive'],
     ['ProspectFilterDto.includeDeleted', ProspectFilterDto, 'includeDeleted'],
-    [
-      'RepCampaignPreviewQueryDto.onlyWithoutProspects',
-      RepCampaignPreviewQueryDto,
-      'onlyWithoutProspects',
-    ],
   ] as const)('%s', (_name, metatype, field) => {
     it.each(CASES)('« %s » vaut %s', async (raw, expected) => {
       const dto = await through(metatype as new () => Record<string, unknown>, { [field]: raw });

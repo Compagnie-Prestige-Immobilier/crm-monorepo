@@ -115,9 +115,8 @@ const WEB_ROUTES: readonly string[] = [
   '/espaces',
 
   /*
-   * Les trois adresses des rappels quotidiens (`reminders.service.ts`), qui
-   * n'ont jamais porté le nom d'un écran du panel. `moved-routes.ts` les
-   * renvoie sur les campagnes, les campagnes représentants et les rappels.
+   * Adresses portées par des notifications d'avant le retrait des campagnes.
+   * `moved-routes.ts` les renvoie sur les lots d'export et sur les rappels.
    */
   '/phase2',
   '/rep-campaigns',

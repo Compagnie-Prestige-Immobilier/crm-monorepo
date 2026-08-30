@@ -388,7 +388,7 @@ function ProspectsTable({
                 setFilters({ pageSize: Number(value), page: 1 });
               }}
             >
-              <SelectTrigger size="sm" className="w-20">
+              <SelectTrigger size="sm" className="w-20" aria-label="Lignes par page">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

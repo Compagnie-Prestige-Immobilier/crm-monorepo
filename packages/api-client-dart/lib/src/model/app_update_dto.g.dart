@@ -21,9 +21,13 @@ abstract class _$AppUpdateDtoCWProxy {
 
   AppUpdateDto sha256(String sha256);
 
+  AppUpdateDto signerSha256(String signerSha256);
+
   AppUpdateDto downloadUrl(String downloadUrl);
 
   AppUpdateDto publishedAt(String publishedAt);
+
+  AppUpdateDto minVersionCode(num? minVersionCode);
 
   AppUpdateDto notes(String? notes);
 
@@ -41,8 +45,10 @@ abstract class _$AppUpdateDtoCWProxy {
     String fileName,
     num fileSize,
     String sha256,
+    String signerSha256,
     String downloadUrl,
     String publishedAt,
+    num? minVersionCode,
     String? notes,
   });
 }
@@ -76,12 +82,20 @@ class _$AppUpdateDtoCWProxyImpl implements _$AppUpdateDtoCWProxy {
   AppUpdateDto sha256(String sha256) => this(sha256: sha256);
 
   @override
+  AppUpdateDto signerSha256(String signerSha256) =>
+      this(signerSha256: signerSha256);
+
+  @override
   AppUpdateDto downloadUrl(String downloadUrl) =>
       this(downloadUrl: downloadUrl);
 
   @override
   AppUpdateDto publishedAt(String publishedAt) =>
       this(publishedAt: publishedAt);
+
+  @override
+  AppUpdateDto minVersionCode(num? minVersionCode) =>
+      this(minVersionCode: minVersionCode);
 
   @override
   AppUpdateDto notes(String? notes) => this(notes: notes);
@@ -101,8 +115,10 @@ class _$AppUpdateDtoCWProxyImpl implements _$AppUpdateDtoCWProxy {
     Object? fileName = const $CopyWithPlaceholder(),
     Object? fileSize = const $CopyWithPlaceholder(),
     Object? sha256 = const $CopyWithPlaceholder(),
+    Object? signerSha256 = const $CopyWithPlaceholder(),
     Object? downloadUrl = const $CopyWithPlaceholder(),
     Object? publishedAt = const $CopyWithPlaceholder(),
+    Object? minVersionCode = const $CopyWithPlaceholder(),
     Object? notes = const $CopyWithPlaceholder(),
   }) {
     return AppUpdateDto(
@@ -134,6 +150,10 @@ class _$AppUpdateDtoCWProxyImpl implements _$AppUpdateDtoCWProxy {
           ? _value.sha256
           // ignore: cast_nullable_to_non_nullable
           : sha256 as String,
+      signerSha256: signerSha256 == const $CopyWithPlaceholder()
+          ? _value.signerSha256
+          // ignore: cast_nullable_to_non_nullable
+          : signerSha256 as String,
       downloadUrl: downloadUrl == const $CopyWithPlaceholder()
           ? _value.downloadUrl
           // ignore: cast_nullable_to_non_nullable
@@ -142,6 +162,10 @@ class _$AppUpdateDtoCWProxyImpl implements _$AppUpdateDtoCWProxy {
           ? _value.publishedAt
           // ignore: cast_nullable_to_non_nullable
           : publishedAt as String,
+      minVersionCode: minVersionCode == const $CopyWithPlaceholder()
+          ? _value.minVersionCode
+          // ignore: cast_nullable_to_non_nullable
+          : minVersionCode as num?,
       notes: notes == const $CopyWithPlaceholder()
           ? _value.notes
           // ignore: cast_nullable_to_non_nullable
@@ -172,8 +196,10 @@ AppUpdateDto _$AppUpdateDtoFromJson(Map<String, dynamic> json) =>
           'fileName',
           'fileSize',
           'sha256',
+          'signerSha256',
           'downloadUrl',
           'publishedAt',
+          'minVersionCode',
           'notes',
         ],
       );
@@ -185,8 +211,10 @@ AppUpdateDto _$AppUpdateDtoFromJson(Map<String, dynamic> json) =>
         fileName: $checkedConvert('fileName', (v) => v as String),
         fileSize: $checkedConvert('fileSize', (v) => v as num),
         sha256: $checkedConvert('sha256', (v) => v as String),
+        signerSha256: $checkedConvert('signerSha256', (v) => v as String),
         downloadUrl: $checkedConvert('downloadUrl', (v) => v as String),
         publishedAt: $checkedConvert('publishedAt', (v) => v as String),
+        minVersionCode: $checkedConvert('minVersionCode', (v) => v as num?),
         notes: $checkedConvert('notes', (v) => v as String?),
       );
       return val;
@@ -201,7 +229,9 @@ Map<String, dynamic> _$AppUpdateDtoToJson(AppUpdateDto instance) =>
       'fileName': instance.fileName,
       'fileSize': instance.fileSize,
       'sha256': instance.sha256,
+      'signerSha256': instance.signerSha256,
       'downloadUrl': instance.downloadUrl,
       'publishedAt': instance.publishedAt,
+      'minVersionCode': instance.minVersionCode,
       'notes': instance.notes,
     };

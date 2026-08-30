@@ -11,9 +11,8 @@ import { callbackKeys, fetchCallbacks } from '@/lib/data/console';
 import { countPendingProspects } from '@/lib/data/phase2';
 import { fetchRepresentants } from '@/lib/data/representants';
 import { formatNumber } from '@/lib/format';
-import { cn } from '@/lib/utils';
 import { queryKeys } from '@/lib/query-keys';
-import { A_APPELER, SANS_PROSPECT, hubKeys } from '@/components/chues/hub-filters';
+import { NON_QUALIFIES, SANS_PROSPECT, hubKeys } from '@/components/chues/hub-filters';
 
 /**
  * L'écran d'ouverture du projet CHUES : trois étapes, dans l'ordre, chacune
@@ -24,9 +23,9 @@ import { A_APPELER, SANS_PROSPECT, hubKeys } from '@/components/chues/hub-filter
  * passent eux-mêmes les appels. Les chiffres sont ceux que l'API sert à chacun.
  */
 export function HubView({ prenom }: { prenom: string }) {
-  const aAppeler = useQuery({
-    queryKey: queryKeys.representants(A_APPELER),
-    queryFn: () => fetchRepresentants(A_APPELER),
+  const nonQualifies = useQuery({
+    queryKey: queryKeys.representants(NON_QUALIFIES),
+    queryFn: () => fetchRepresentants(NON_QUALIFIES),
   });
 
   const sansProspect = useQuery({
@@ -44,17 +43,6 @@ export function HubView({ prenom }: { prenom: string }) {
     queryFn: () => fetchCallbacks('today', null, undefined, 'CHUES'),
     retry: false,
   });
-
-  // Là où le travail attend. Trois boutons de même poids ne disent pas par où
-  // commencer : la première étape qui a de quoi faire porte seule le geste plein.
-  const prioritaire =
-    (aAppeler.data?.total ?? 0) > 0
-      ? 1
-      : (sansProspect.data?.total ?? 0) > 0
-        ? 2
-        : (enAttente.data ?? 0) > 0
-          ? 3
-          : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -79,30 +67,20 @@ export function HubView({ prenom }: { prenom: string }) {
 
       <ol className="grid gap-4 md:grid-cols-3">
         <Etape
-          n={1}
-          prioritaire={prioritaire === 1}
           titre="Qualifier un représentant"
           explication="Un enseignant relais accepte de transmettre les contacts de ses collègues."
           chiffre={
             <Chiffre
-              pending={aAppeler.isPending}
-              failed={aAppeler.isError}
-              valeur={aAppeler.data?.total}
-              legende="pas encore appelés"
+              pending={nonQualifies.isPending}
+              failed={nonQualifies.isError}
+              valeur={nonQualifies.data?.total}
+              legende="pas encore qualifiés"
             />
           }
-          action={
-            <Geste
-              href="/chues/appels-representants"
-              label="Qualifier un représentant"
-              prioritaire={prioritaire === 1}
-            />
-          }
+          action={<Geste href="/chues/appels-representants" label="Qualifier un représentant" />}
         />
 
         <Etape
-          n={2}
-          prioritaire={prioritaire === 2}
           titre="Ajouter un prospect"
           explication="Le représentant a donné des noms : on les note un par un."
           chiffre={
@@ -113,18 +91,10 @@ export function HubView({ prenom }: { prenom: string }) {
               legende="ont dit oui, sans contacts notés"
             />
           }
-          action={
-            <Geste
-              href="/chues/prospects/nouveau"
-              label="Ajouter un prospect"
-              prioritaire={prioritaire === 2}
-            />
-          }
+          action={<Geste href="/chues/prospects/nouveau" label="Ajouter un prospect" />}
         />
 
         <Etape
-          n={3}
-          prioritaire={prioritaire === 3}
           titre="Convertir un prospect"
           explication="Chaque prospect est rappelé jusqu’à son adhésion."
           chiffre={
@@ -132,7 +102,7 @@ export function HubView({ prenom }: { prenom: string }) {
               pending={enAttente.isPending}
               failed={enAttente.isError}
               valeur={enAttente.data}
-              legende="en attente d’appel"
+              legende="pas encore convertis"
               suite={
                 // Le nombre de rappels dus n'a pas de sens sans le nombre en
                 // attente : il ne s'affiche donc pas avant lui.
@@ -144,13 +114,7 @@ export function HubView({ prenom }: { prenom: string }) {
               }
             />
           }
-          action={
-            <Geste
-              href="/chues/console"
-              label="Convertir un prospect"
-              prioritaire={prioritaire === 3}
-            />
-          }
+          action={<Geste href="/chues/console" label="Convertir un prospect" />}
         />
       </ol>
     </div>
@@ -158,44 +122,19 @@ export function HubView({ prenom }: { prenom: string }) {
 }
 
 function Etape({
-  n,
   titre,
   explication,
   chiffre,
   action,
-  prioritaire = false,
 }: {
-  n: number;
   titre: string;
   explication: string;
   chiffre: ReactNode;
   action: ReactNode;
-  prioritaire?: boolean;
 }) {
   return (
-    <li
-      className={cn(
-        'flex flex-col gap-3 rounded-lg border border-border bg-card p-5 shadow-elev-sm',
-        prioritaire && 'border-accent-text/40 ring-1 ring-accent-text/25',
-      )}
-    >
-      <span className="flex items-center gap-2">
-        <span
-          aria-hidden="true"
-          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent-surface font-display text-[1.125rem] font-[800] text-accent-text"
-        >
-          {n}
-        </span>
-        {prioritaire ? (
-          <span className="rounded-full bg-accent-surface px-2 py-0.5 text-[0.75rem] font-[600] text-accent-text">
-            À faire maintenant
-          </span>
-        ) : null}
-      </span>
-      <h2 className="font-display text-h4 font-[700] tracking-[-0.02em]">
-        <span className="sr-only">Étape {n} sur 3 : </span>
-        {titre}
-      </h2>
+    <li className="flex flex-col gap-3 rounded-lg border border-border bg-card p-5 shadow-elev-sm">
+      <h2 className="font-display text-h4 font-[700] tracking-[-0.02em]">{titre}</h2>
       <p className="text-[0.875rem] text-muted-foreground">{explication}</p>
       {chiffre}
       <div className="mt-auto pt-1">{action}</div>
@@ -205,8 +144,8 @@ function Etape({
 
 /**
  * Un compteur ne montre JAMAIS un zéro provisoire : tant que le serveur n'a
- * pas répondu, la place du chiffre reste une plaque grise, et « 0 à appeler »
- * ne fait pas fermer l'écran à celui qui en a trois cents.
+ * pas répondu, la place du chiffre reste une plaque grise, et « 0 » ne fait pas
+ * fermer l'écran à celui qui en a trois cents.
  */
 function Chiffre({
   pending,
@@ -239,17 +178,9 @@ function Chiffre({
  * `role="button"` sur le `<a>`, et l'ouverture dans un nouvel onglet, la
  * prélecture et le menu contextuel disparaîtraient avec.
  */
-function Geste({
-  href,
-  label,
-  prioritaire = false,
-}: {
-  href: string;
-  label: string;
-  prioritaire?: boolean;
-}) {
+function Geste({ href, label }: { href: string; label: string }) {
   return (
-    <Link href={href} className={buttonVariants(prioritaire ? {} : { variant: 'outline' })}>
+    <Link href={href} className={buttonVariants({ variant: 'outline' })}>
       {label}
     </Link>
   );

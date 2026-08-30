@@ -12,7 +12,6 @@ export class SupervisedUserDto {
   @ApiProperty() email!: string;
   @ApiProperty({ enum: Role, enumName: 'Role' }) role!: Role;
   @ApiProperty({ type: Boolean }) isActive!: boolean;
-  @ApiProperty({ type: String, nullable: true }) departementName!: string | null;
 
   @ApiProperty({ enum: PRESENCE_STATES, enumName: 'PresenceState' })
   presence!: PresenceState;

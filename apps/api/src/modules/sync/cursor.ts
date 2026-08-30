@@ -12,6 +12,7 @@ export const SYNC_STREAMS = [
   'iefs',
   'banques',
   'syndicats',
+  'incomeBands',
   'canauxProvenance',
   'visiteEntreprises',
   'visiteObjets',
@@ -19,10 +20,6 @@ export const SYNC_STREAMS = [
   'visiteDestinataires',
   'representants',
   'prospects',
-  'callCampaigns',
-  'callTasks',
-  'repCallCampaigns',
-  'repCallTasks',
   'visites',
 ] as const;
 

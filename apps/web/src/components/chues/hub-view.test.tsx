@@ -59,11 +59,36 @@ describe('HubView : les trois étapes, dans l’ordre', () => {
     });
     const [une, deux, trois] = etapes();
     expect(une?.textContent).toContain('Qualifier un représentant');
-    expect(une?.textContent).toContain('pas encore appelés');
+    expect(une?.textContent).toContain('pas encore qualifiés');
     expect(deux?.textContent).toContain('7');
     expect(deux?.textContent).toContain('ont dit oui, sans contacts notés');
     expect(trois?.textContent).toContain('310');
+    expect(trois?.textContent).toContain('pas encore convertis');
     expect(trois?.textContent).toContain('2 rappels dus');
+  });
+
+  // Les trois étapes se lisent dans l'ordre ; rien n'y désigne une file à vider.
+  it('ne met aucune étape « à faire maintenant » en avant', async () => {
+    renderWithQuery(<HubView prenom="Fatou" />);
+    await waitFor(() => {
+      expect(screen.getByText('42')).toBeTruthy();
+    });
+
+    expect(screen.queryByText('À faire maintenant')).toBeNull();
+  });
+
+  // L'ordre des cartes porte déjà le rang ; la pastille chiffrée et le « Étape
+  // n sur 3 » lu à voix haute ne faisaient que le répéter.
+  it('ne numérote plus les étapes', async () => {
+    renderWithQuery(<HubView prenom="Fatou" />);
+    await waitFor(() => {
+      expect(screen.getByText('42')).toBeTruthy();
+    });
+
+    expect(screen.queryByText(/Étape \d sur 3/u)).toBeNull();
+    for (const etape of etapes()) {
+      expect(within(etape).getByRole('heading').textContent).not.toMatch(/\d/u);
+    }
   });
 
   it('n’affiche AUCUN zéro provisoire pendant le chargement', () => {

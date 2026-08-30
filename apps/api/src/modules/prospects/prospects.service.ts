@@ -6,7 +6,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
-  CallTaskStatus,
   GrandPublicConsent,
   Prisma,
   Projet,
@@ -87,23 +86,10 @@ function defined<T extends Record<string, unknown>>(
 const isoOrNull = (value: Date | null | undefined): string | null =>
   value === null || value === undefined ? null : value.toISOString();
 
-/**
- * Ce qu'une fiche qui sort du jeu laisse derrière elle.
- *
- * `deletedAt` seul ne suffisait pas : la tâche d'appel restait ACTIVE et le
- * rappel restait DÛ, pour toujours. Le téléconseiller voyait un numéro dans sa
- * journée que toute tentative renvoyait en « prospect introuvable », donc en
- * échec définitif côté téléphone ; et l'index d'unicité de tâche active
- * interdisait qu'une campagne ultérieure reprenne ce numéro, même ressaisi.
- */
 export async function closeProspectWork(
   tx: Prisma.TransactionClient,
   prospectId: string,
 ): Promise<void> {
-  await tx.callTask.updateMany({
-    where: { prospectId, isActive: true },
-    data: { status: CallTaskStatus.CANCELLED, isActive: false, completedAt: new Date() },
-  });
   await tx.scheduledCallback.updateMany({
     where: { prospectId, status: ScheduledCallbackStatus.PENDING },
     data: { status: ScheduledCallbackStatus.CANCELLED },
@@ -660,7 +646,6 @@ export class ProspectsService {
       const versLaCible = { where: { prospectId: source.id }, data: { prospectId: target.id } };
       await tx.bankCase.updateMany(versLaCible);
       await tx.callAttempt.updateMany(versLaCible);
-      await tx.callTask.updateMany(versLaCible);
       await tx.scheduledCallback.updateMany(versLaCible);
       // La demande bancaire nomme sa fiche `createdProspectId`, et un CHECK
       // exige qu'une demande approuvée en porte une : la laisser sur la fiche

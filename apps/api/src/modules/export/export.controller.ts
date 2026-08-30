@@ -191,11 +191,9 @@ export class ExportController {
     }
   }
 
-  // Plus étroit que `GET /representants`, jamais plus large : un export plus large
-  // que son écran serait un contournement. Le SUPERVISEUR consulte, il n'emporte pas
-  // l'annuaire national dans un classeur.
+  // Le SUPERVISEUR peut exporter l'annuaire qu'il consulte pour travailler hors ligne.
   @Get('representants.xlsx')
-  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.DIRECTION)
+  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiProduces(XLSX_MIME)
   @ApiOperation({
     operationId: 'exportRepresentantsXlsx',

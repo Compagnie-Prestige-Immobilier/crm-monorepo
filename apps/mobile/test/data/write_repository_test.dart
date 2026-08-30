@@ -706,29 +706,9 @@ void main() {
 
   group('payload', () {
     test(
-      'qualifier un représentant met à jour la fiche et ferme sa tâche',
+      'qualifier un représentant met à jour la fiche',
       () async {
         await insertRepresentant(db, id: 'repA', phone: '+221770000001');
-        await db
-            .into(db.repCallCampaigns)
-            .insert(
-              RepCallCampaignsCompanion.insert(
-                id: 'camp-1',
-                name: 'Relance CHUES',
-                updatedAt: t0,
-              ),
-            );
-        await db
-            .into(db.repCallTasks)
-            .insert(
-              RepCallTasksCompanion.insert(
-                id: 'task-1',
-                campaignId: 'camp-1',
-                representantId: 'repA',
-                position: 1,
-                updatedAt: t0,
-              ),
-            );
 
         await repo.recordRepCallAttempt(
           representantId: 'repA',
@@ -743,7 +723,6 @@ void main() {
         )..where((Representants row) => row.id.equals('repA'))).getSingle();
         expect(rep.relationStatus, 'AMBASSADEUR');
         expect(rep.whatsappStatus, 'MEME_NUMERO');
-        expect((await db.select(db.repCallTasks).getSingle()).status, 'DONE');
         final OutboxData op = (await allOutbox(db)).single;
         expect(op.entityType, repCallAttemptEntity);
         expect(jsonDecode(op.payload), containsPair('comment', 'Disponible.'));
@@ -1079,6 +1058,8 @@ void main() {
           profession: 'Institutrice',
           banqueId: 'bq-1',
           syndicatId: 'sy-1',
+          incomeBandId: 'rev-1',
+          dureeSystemeMois: 24,
           email: 'awa.sow@exemple.sn',
           fonctionnaire: false,
           engagementEnCours: true,
@@ -1093,6 +1074,8 @@ void main() {
         expect(payload['profession'], 'Institutrice');
         expect(payload['banqueId'], 'bq-1');
         expect(payload['syndicatId'], 'sy-1');
+        expect(payload['incomeBandId'], 'rev-1');
+        expect(payload['dureeSystemeMois'], 24);
         // `false` et `0` sont des réponses : les omettre les lirait comme
         // « question non posée ».
         expect(payload['fonctionnaire'], isFalse);

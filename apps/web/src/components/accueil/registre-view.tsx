@@ -149,8 +149,13 @@ export function RegistreView() {
   const pageCount = registre.data?.pageCount ?? 1;
   const premiere = total === 0 ? 0 : (page - 1) * filters.pageSize + 1;
   const derniere = Math.min(page * filters.pageSize, total);
-  const jourSeul = !filters.toutePeriode && filters.dateFrom === null && filters.dateTo === null;
   const chips = buildVisiteAdvancedChips(filters, referentiels.data);
+  const jourSeul =
+    !filters.toutePeriode &&
+    filters.dateFrom === null &&
+    filters.dateTo === null &&
+    filters.search === '' &&
+    chips.length === 0;
 
   function rafraichir(): void {
     void queryClient.invalidateQueries({ queryKey: ['visites'] });
@@ -174,65 +179,69 @@ export function RegistreView() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       <style media="print">{`@page { size: ${orientation}; margin: 10mm; }`}</style>
-
-      {/* Le geste du comptoir passe AVANT l'outillage de recherche, et prend
-          toute la largeur là où le pouce le cherche. */}
-      <div className="print:hidden">
-        <Button
-          type="button"
-          className="w-full sm:w-auto"
-          onClick={() => {
-            setAjoutOuvert(true);
-          }}
-        >
-          <PlusIcon aria-hidden="true" />
-          Ajouter une visite
-        </Button>
-      </div>
 
       <section
         aria-label="Rechercher dans le registre"
-        className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4 shadow-elev-sm print:hidden"
+        className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3 shadow-elev-sm print:hidden"
       >
-        {/* Les deux bascules restent VISIBLES : c'est le réglage qu'on change
-            plusieurs fois par jour, pas un critère de recherche. */}
-        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Période">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
-            variant={jourSeul ? 'default' : 'outline'}
-            aria-pressed={jourSeul}
+            size="sm"
             onClick={() => {
-              setFilters({ toutePeriode: false, dateFrom: null, dateTo: null });
+              setAjoutOuvert(true);
             }}
           >
-            Aujourd’hui
+            <PlusIcon aria-hidden="true" />
+            Ajouter une visite
           </Button>
+
+          <fieldset className="flex items-center gap-2">
+            <legend className="sr-only">Période</legend>
+            <Button
+              type="button"
+              size="sm"
+              variant={jourSeul ? 'secondary' : 'outline'}
+              aria-pressed={jourSeul}
+              onClick={() => {
+                setFilters({ toutePeriode: false, dateFrom: null, dateTo: null });
+              }}
+            >
+              Aujourd’hui
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={filters.toutePeriode ? 'secondary' : 'outline'}
+              aria-pressed={filters.toutePeriode}
+              onClick={() => {
+                setFilters({ toutePeriode: true, dateFrom: null, dateTo: null });
+              }}
+            >
+              Tout le registre
+            </Button>
+          </fieldset>
+
           <Button
             type="button"
-            variant={filters.toutePeriode ? 'default' : 'outline'}
-            aria-pressed={filters.toutePeriode}
+            size="sm"
+            variant="outline"
+            className="sm:ml-auto"
+            aria-expanded={rechercheOuverte}
+            aria-controls="filtres-registre"
             onClick={() => {
-              setFilters({ toutePeriode: true, dateFrom: null, dateTo: null });
+              setRechercheOuverte((current) => !current);
             }}
           >
-            Tout le registre
+            <SearchIcon aria-hidden="true" />
+            Rechercher et filtrer
           </Button>
         </div>
 
-        <details
-          open={rechercheOuverte}
-          onToggle={(event) => {
-            setRechercheOuverte(event.currentTarget.open);
-          }}
-        >
-          <summary className="flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-md text-[0.875rem] font-[600] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-            <SearchIcon className="size-4 shrink-0" aria-hidden="true" />
-            Rechercher
-          </summary>
-
-          <div className="flex flex-col gap-4 pt-3">
+        {rechercheOuverte ? (
+          <div id="filtres-registre" className="flex flex-col gap-3 border-t border-border pt-3">
             <div className="flex flex-wrap items-end gap-3">
               <SearchField
                 value={searchDraft}
@@ -314,7 +323,7 @@ export function RegistreView() {
               </div>
             </AdvancedPanel>
           </div>
-        </details>
+        ) : null}
       </section>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -341,7 +350,7 @@ export function RegistreView() {
           les visites au-delà de la page en cours. */}
       {pageCount > 1 ? (
         <p className="hidden text-[0.75rem] print:block">
-          Page {page} sur {pageCount} — visites {formatNumber(premiere)} à {formatNumber(derniere)}{' '}
+          Page {page} sur {pageCount}, visites {formatNumber(premiere)} à {formatNumber(derniere)}{' '}
           sur {formatNumber(total)}. Les autres pages s’impriment séparément.
         </p>
       ) : null}
@@ -390,10 +399,16 @@ export function RegistreView() {
                 />
               );
             return (
-              <div className="rounded-lg border border-border bg-card shadow-elev-sm print:text-[10px]">
+              <div
+                className={cn(
+                  'rounded-lg border border-border bg-card shadow-elev-sm transition-opacity print:text-[10px]',
+                  '[&_[data-slot=table-container]]:max-h-[calc(100dvh-17rem)] [&_[data-slot=table-container]]:overflow-auto',
+                  registre.isFetching && 'opacity-80',
+                )}
+              >
                 <Table>
-                  <TableHeader>
-                    <TableRow>
+                  <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_var(--border)]">
+                    <TableRow className="hover:bg-transparent">
                       <TableHead
                         className={
                           impressionColonneVisible('N° REGISTRE', colonnesImprimees)

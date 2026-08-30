@@ -40,8 +40,6 @@ export interface RepresentantRow {
 export interface CallAttemptRow {
   id: string;
   prospectId: string;
-  taskId: string | null;
-  campaignId: string | null;
   performedById: string;
   outcome: string;
   reasonId: string | null;
@@ -123,19 +121,10 @@ export interface ProspectRow {
 
 type Row = Record<string, unknown>;
 
-/**
- * `relations` traduit un filtre de relation (`callTasks: { some: … }`) que la
- * doublure ne peut pas lire dans la ligne elle-même. Sans lui, la clé serait
- * silencieusement ignorée et un test d'autorisation passerait toujours.
- */
-function matches(
-  row: Row,
-  where: Row | undefined,
-  relations: Record<string, (clause: Row) => boolean> = {},
-): boolean {
+function matches(row: Row, where: Row | undefined): boolean {
   if (!where) return true;
   for (const [key, expected] of Object.entries(where)) {
-    if (!matchesFilter(row, key, expected, relations)) return false;
+    if (!matchesFilter(row, key, expected)) return false;
   }
   return true;
 }
@@ -144,12 +133,9 @@ function matchesFilter(
   row: Row,
   key: string,
   expected: unknown,
-  relations: Record<string, (clause: Row) => boolean>,
 ): boolean {
-  if (key === 'AND') return (expected as Row[]).every((clause) => matches(row, clause, relations));
-  if (key === 'OR') return (expected as Row[]).some((clause) => matches(row, clause, relations));
-  const relation = relations[key];
-  if (relation !== undefined) return relation(expected as Row);
+  if (key === 'AND') return (expected as Row[]).every((clause) => matches(row, clause));
+  if (key === 'OR') return (expected as Row[]).some((clause) => matches(row, clause));
 
   const actual = row[key];
   if (expected === null) return actual === null || actual === undefined;
@@ -436,24 +422,6 @@ export class FakePrisma {
     },
   };
 
-  // Vide par defaut : une tentative arrive alors hors file, comme avant. Un test
-  // qui veut une campagne remplit `callTasks` lui-meme.
-  callTasks = new Map<string, Row>();
-
-  callTask = {
-    findFirst: (args: { where?: Row }) => {
-      const row = [...this.callTasks.values()].find((item) => matches(item, args.where));
-      if (!row) return Promise.resolve(null);
-      // La campagne porte le PROJET, qui décide de quel parcours relève la
-      // tentative : sans elle, la doublure rendrait une tâche muette.
-      return Promise.resolve({
-        ...row,
-        campaign: { projet: (row.projet as string | undefined) ?? 'CHUES' },
-      });
-    },
-    updateMany: () => Promise.resolve({ count: 0 }),
-  };
-
   scheduledCallback = {
     updateMany: () => Promise.resolve({ count: 0 }),
     createMany: () => Promise.resolve({ count: 1 }),
@@ -464,15 +432,7 @@ export class FakePrisma {
       Promise.resolve(this.prospects.get(args.where.id) ?? null),
     findFirst: (args: { where?: Row; include?: unknown }) => {
       const row = [...this.prospects.values()].find((item) =>
-        matches(item as unknown as Row, args.where, {
-          callTasks: (clause) => {
-            const some = (clause as { some?: Row }).some;
-            if (!some) return true;
-            return [...this.callTasks.values()].some(
-              (task) => task.prospectId === item.id && matches(task, some),
-            );
-          },
-        }),
+        matches(item as unknown as Row, args.where),
       );
       if (!row) return Promise.resolve(null);
       return Promise.resolve({

@@ -6,6 +6,7 @@ import { RappelsView } from '@/components/rappels/rappels-view';
 import type * as ConsoleData from '@/lib/data/console';
 import type { Callback, CallbackScope } from '@/lib/data/console';
 import { renderWithQuery } from '@/test/render-query';
+import { setUrl } from '@/test/router-mock';
 
 const fetchCallbacks = vi.fn();
 const cancelCallback = vi.fn();
@@ -45,8 +46,6 @@ function callback(over: Partial<Callback> & { id: string }): Callback {
     comment: null,
     assignedToId: 'u-1',
     assignedToName: 'Fatou Sow',
-    campaignId: null,
-    taskId: null,
     overdue: false,
     ...over,
   };
@@ -100,11 +99,20 @@ describe('RappelsView', () => {
     expect(within(ligne as HTMLElement).getByText('3 h')).toBeTruthy();
   });
 
-  it('ouvre la fiche dans la console d’appel', async () => {
+  it('ouvre la fiche du rappel', async () => {
     await renderView();
 
-    const lien = await screen.findByRole('link', { name: /console/ });
+    const lien = await screen.findByRole('link', { name: 'Consigner l’appel' });
     expect(lien.getAttribute('href')).toBe('/chues/console?fiche=p-9');
+  });
+
+  it('reste dans le projet Grand Public quand l’écran y est servi', async () => {
+    setUrl('/grand-public/rappels');
+    await renderView();
+
+    const lien = await screen.findByRole('link', { name: 'Consigner l’appel' });
+    expect(lien.getAttribute('href')).toBe('/grand-public/console?fiche=p-9');
+    expect(fetchCallbacks).toHaveBeenCalledWith('overdue', null, undefined, 'GRAND_PUBLIC');
   });
 
   it('annule le rappel choisi', async () => {
@@ -117,7 +125,7 @@ describe('RappelsView', () => {
     });
   });
 
-  it('change de volet sans mélanger les files', async () => {
+  it('change de volet sans mélanger les échéances', async () => {
     serve({ overdue: [RETARD], today: [RETARD, callback({ id: 'r-2' })] });
     await renderView();
 
@@ -129,7 +137,7 @@ describe('RappelsView', () => {
     expect(fetchCallbacks).toHaveBeenCalledWith('today', null, undefined, 'CHUES');
   });
 
-  it('cache le filtre à un téléconseiller, qui ne voit que sa file', async () => {
+  it('cache le filtre à un téléconseiller, qui ne voit que ses rappels', async () => {
     await renderView();
 
     expect(screen.queryByLabelText('Téléconseiller')).toBeNull();

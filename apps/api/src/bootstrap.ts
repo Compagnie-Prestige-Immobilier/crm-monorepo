@@ -17,6 +17,7 @@ import { DEMO_MODE_HEADER } from './modules/export/demo-marking.js';
 import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter.js';
 import { normalizeErrorBody } from './common/errors/normalize.js';
 import { readEnv, type ApiEnv } from './env.js';
+import { WorkspaceContext } from './workspaces/workspace.js';
 
 interface FastifyErrorReply {
   code: (status: number) => { send: (payload: unknown) => unknown };
@@ -32,6 +33,7 @@ function flattenValidationErrors(errors: ValidationError[], path = ''): string[]
 }
 
 export const REQUEST_BODY_LIMIT_BYTES = 4_194_304;
+const requestStartedAt = new WeakMap<object, number>();
 
 export const buildOpenApiDocument = (app: NestFastifyApplication): OpenAPIObject =>
   SwaggerModule.createDocument(
@@ -64,6 +66,30 @@ export async function createApiApp(): Promise<NestFastifyApplication> {
   });
 
   app.useLogger(app.get(Logger));
+
+  const workspace = app.get(WorkspaceContext);
+  const httpLogger = app.get(Logger);
+  const http = app.getHttpAdapter().getInstance();
+  http.addHook('onRequest', (request, _reply, done) => {
+    requestStartedAt.set(request, Date.now());
+    workspace.run(done);
+  });
+  http.addHook('onResponse', (request, reply, done) => {
+    const status = reply.statusCode;
+    const details = {
+      requestId: request.id,
+      method: request.method,
+      url: request.url,
+      status,
+      durationMs: Date.now() - (requestStartedAt.get(request) ?? Date.now()),
+    };
+    const message = `HTTP ${request.method} ${request.url} -> ${status}`;
+
+    if (status >= 500) httpLogger.error(details, message);
+    else if (status >= 400) httpLogger.warn(details, message);
+    else httpLogger.log(details, message);
+    done();
+  });
 
   await app.register(helmet, env.API_DOCS_ENABLED ? { contentSecurityPolicy: false } : {});
   await app.register(rateLimit, { max: 600, timeWindow: '1 minute' });

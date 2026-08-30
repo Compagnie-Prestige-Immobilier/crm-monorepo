@@ -61,7 +61,7 @@ export default async function ConnexionPage({
             CPI GO
           </p>
           <p className="mt-5 text-body-xl text-sidebar-foreground">
-            Prospects, campagnes d’appels et dossiers bancaires.
+            Prospects, appels consignés et dossiers bancaires.
           </p>
         </div>
 

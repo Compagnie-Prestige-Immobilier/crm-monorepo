@@ -233,37 +233,25 @@ export class RepresentantExportQueryDto {
   @Transform(queryBoolean)
   @IsBoolean()
   hasProspects?: boolean;
-}
 
-export class RepresentantQueryDto extends RepresentantExportQueryDto {
-  @ApiPropertyOptional({
-    enum: RepresentantRelation,
-    enumName: 'RepresentantRelation',
-    description: 'Ne retient que les représentants dans cet état de relation.',
-  })
+  @ApiPropertyOptional({ enum: RepresentantRelation, enumName: 'RepresentantRelation' })
   @IsOptional()
   @IsEnum(RepresentantRelation)
   relationStatus?: RepresentantRelation;
 
-  @ApiPropertyOptional({
-    enum: WhatsappStatus,
-    enumName: 'WhatsappStatus',
-    description: 'Ne retient que les représentants dans cet état WhatsApp.',
-  })
+  @ApiPropertyOptional({ enum: WhatsappStatus, enumName: 'WhatsappStatus' })
   @IsOptional()
   @IsEnum(WhatsappStatus)
   whatsappStatus?: WhatsappStatus;
 
-  @ApiPropertyOptional({
-    type: Boolean,
-    description:
-      'true : un numéro WhatsApp joignable (MEME_NUMERO ou AUTRE_NUMERO). false : les autres, question non posée comprise. Se compose avec `whatsappStatus` par intersection.',
-  })
+  @ApiPropertyOptional({ type: Boolean })
   @IsOptional()
   @Transform(queryBoolean)
   @IsBoolean()
   hasWhatsapp?: boolean;
+}
 
+export class RepresentantQueryDto extends RepresentantExportQueryDto {
   @ApiPropertyOptional({ enum: RepresentantSortField, enumName: 'RepresentantSortField' })
   @IsOptional()
   @IsEnum(RepresentantSortField)

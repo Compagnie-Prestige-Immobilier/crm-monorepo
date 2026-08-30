@@ -46,13 +46,6 @@ const admitted = (method: string): Role[] =>
 
 const MATRICE: { method: string; roles: Role[] }[] = [
   { method: 'pullDirectory', roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR] },
-  { method: 'listCampaigns', roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR] },
-  { method: 'createCampaign', roles: [Role.ADMIN] },
-  { method: 'getCampaign', roles: [Role.ADMIN, Role.SUPERVISEUR] },
-  { method: 'closeCampaign', roles: [Role.ADMIN] },
-  { method: 'pauseCampaign', roles: [Role.ADMIN] },
-  { method: 'resumeCampaign', roles: [Role.ADMIN] },
-  { method: 'downloadProgramme', roles: [Role.ADMIN, Role.SUPERVISEUR] },
   {
     method: 'downloadRecording',
     roles: [Role.ADMIN, Role.SUPERVISEUR, Role.COMMERCIAL],
@@ -62,7 +55,7 @@ const MATRICE: { method: string; roles: Role[] }[] = [
   { method: 'uploadRecording', roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR] },
 ];
 
-describe('matrice d’autorisation des campagnes d’appels', () => {
+describe('matrice d’autorisation des appels', () => {
   it.each(MATRICE)('$method', ({ method, roles }) => {
     expect(admitted(method).sort()).toEqual([...roles].sort());
   });
@@ -74,18 +67,7 @@ describe('matrice d’autorisation des campagnes d’appels', () => {
     expect(routes.sort()).toEqual(MATRICE.map((row) => row.method).sort());
   });
 
-  it('ouvrir la LECTURE des campagnes n’ouvre ni l’écriture ni le programme', () => {
-    expect(allows('listCampaigns', Role.COMMERCIAL)).toBe(true);
-
-    for (const method of ['createCampaign', 'getCampaign', 'closeCampaign', 'downloadProgramme']) {
-      expect(allows(method, Role.COMMERCIAL)).toBe(false);
-    }
-  });
-
-  it('le SUPERVISEUR lit, imprime et appelle, mais ne crée ni ne clôt de campagne', () => {
-    for (const method of ['createCampaign', 'closeCampaign', 'pauseCampaign', 'resumeCampaign']) {
-      expect(allows(method, Role.SUPERVISEUR), method).toBe(false);
-    }
+  it('le SUPERVISEUR lit l’annuaire et les notes, sans accès bancaire', () => {
     expect(allows('pullDirectory', Role.SUPERVISEUR)).toBe(true);
   });
 });

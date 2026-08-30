@@ -193,8 +193,8 @@ export function NotificationsView({ isAdmin }: { isAdmin: boolean }) {
         {isAdmin ? (
           <TabsContent value="historique" className="mt-4 flex flex-col gap-4">
             {/* Les critères que l'API expose depuis le début, et que l'écran
-                n'offrait pas : sans eux, retrouver « le rappel de campagne de
-                mardi » se faisait à l'œil sur une seule page de vingt. */}
+                n'offrait pas : sans eux, retrouver « l'annonce de mardi » se
+                faisait à l'œil sur une seule page de vingt. */}
             <section
               aria-label="Filtres des envois"
               className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4 shadow-elev-sm"

@@ -76,7 +76,6 @@ export class NotificationTemplatesService {
           ...(body.name !== undefined ? { name: body.name.trim() } : {}),
           ...(body.category !== undefined ? { category: body.category } : {}),
           ...(body.isActive !== undefined ? { isActive: body.isActive } : {}),
-          // Meme regle que le departement d'un compte : le vide efface.
           ...(body.route !== undefined ? { route: body.route === '' ? null : body.route } : {}),
           titleTemplate,
           bodyTemplate,

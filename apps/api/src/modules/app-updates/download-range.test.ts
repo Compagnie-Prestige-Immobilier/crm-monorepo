@@ -29,12 +29,9 @@ beforeAll(async () => {
   store.seed({
     versionName: '1.4.0',
     versionCode: 42,
-    forceUpdate: false,
     fileName: 'cpi-go-42-test.apk',
     fileSize: CONTENT.length,
     sha256: createHash('sha256').update(CONTENT).digest('hex'),
-    publishedAt: '2026-01-01T00:00:00.000Z',
-    notes: null,
   });
 
   app = await createAppUpdatesApp(store);
@@ -142,16 +139,7 @@ describe('GET android/download', () => {
 
   it('une release référencée mais absente du disque reste une 404 explicite', async () => {
     const orphan = new FakeReleaseStore();
-    orphan.seed({
-      versionName: '9.9.9',
-      versionCode: 99,
-      forceUpdate: false,
-      fileName: 'introuvable.apk',
-      fileSize: 1,
-      sha256: 'peu-importe',
-      publishedAt: '2026-01-01T00:00:00.000Z',
-      notes: null,
-    });
+    orphan.seed({ versionCode: 99, fileName: 'introuvable.apk' });
     const other = await createAppUpdatesApp(orphan);
     try {
       const response = await other.inject({ method: 'GET', url: DOWNLOAD_URL });
@@ -159,5 +147,56 @@ describe('GET android/download', () => {
     } finally {
       await other.close();
     }
+  });
+});
+
+describe('GET android/download?v=', () => {
+  it('sert la version demandée, et la déclare immuable', async () => {
+    const response = await app.inject({ method: 'GET', url: `${DOWNLOAD_URL}?v=42` });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['cache-control']).toBe('public, max-age=31536000, immutable');
+    expect(response.rawPayload.equals(CONTENT)).toBe(true);
+  });
+
+  it('ne déclare PAS immuable la forme sans version, qui change à chaque publication', async () => {
+    const response = await app.inject({ method: 'GET', url: DOWNLOAD_URL });
+
+    expect(response.headers['cache-control']).not.toContain('immutable');
+  });
+
+  it('honore les plages sur la forme versionnée', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: `${DOWNLOAD_URL}?v=42`,
+      headers: { range: 'bytes=-500' },
+    });
+
+    expect(response.statusCode).toBe(206);
+    expect(response.rawPayload.equals(CONTENT.subarray(1_500))).toBe(true);
+  });
+
+  it('refuse une version RETIRÉE, sans servir la courante à sa place', async () => {
+    const retiree = new FakeReleaseStore();
+    retiree.seed(
+      { versionCode: 42, fileName: 'cpi-go-42-test.apk' },
+      { versionCode: 41, fileName: 'cpi-go-42-test.apk', withdrawnAt: new Date() },
+    );
+    const other = await createAppUpdatesApp(retiree);
+    try {
+      const response = await other.inject({ method: 'GET', url: `${DOWNLOAD_URL}?v=41` });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json<{ code: string }>().code).toBe('APK_VERSION_WITHDRAWN');
+    } finally {
+      await other.close();
+    }
+  });
+
+  it('refuse une version inconnue', async () => {
+    const response = await app.inject({ method: 'GET', url: `${DOWNLOAD_URL}?v=9999` });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json<{ code: string }>().code).toBe('APK_VERSION_WITHDRAWN');
   });
 });

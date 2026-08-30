@@ -19,6 +19,8 @@ import 'package:crm_api_client/src/model/phase2_status.dart';
 import 'package:crm_api_client/src/model/projet.dart';
 import 'package:crm_api_client/src/model/prospect_statut.dart';
 import 'package:crm_api_client/src/model/prospect_type.dart';
+import 'package:crm_api_client/src/model/representant_relation.dart';
+import 'package:crm_api_client/src/model/whatsapp_status.dart';
 
 class ExportApi {
   final Dio _dio;
@@ -356,8 +358,7 @@ class ExportApi {
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
-  /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
-  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
+  /// * [appelePar] - Téléconseiller ayant consigné au moins une tentative sur la fiche.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -387,8 +388,7 @@ class ExportApi {
     BddSegment? segment,
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
-    String? campaignId,
-    String? assignedToId,
+    String? appelePar,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -430,8 +430,7 @@ class ExportApi {
       if (segment != null) r'segment': segment,
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
-      if (campaignId != null) r'campaignId': campaignId,
-      if (assignedToId != null) r'assignedToId': assignedToId,
+      if (appelePar != null) r'appelePar': appelePar,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -488,6 +487,9 @@ class ExportApi {
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [hasProspects] - true : au moins un prospect vivant. false : aucun (représentant dormant).
+  /// * [relationStatus]
+  /// * [whatsappStatus]
+  /// * [hasWhatsapp]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -505,6 +507,9 @@ class ExportApi {
     DateTime? dateFrom,
     DateTime? dateTo,
     bool? hasProspects,
+    RepresentantRelation? relationStatus,
+    WhatsappStatus? whatsappStatus,
+    bool? hasWhatsapp,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -534,6 +539,9 @@ class ExportApi {
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
       if (hasProspects != null) r'hasProspects': hasProspects,
+      if (relationStatus != null) r'relationStatus': relationStatus,
+      if (whatsappStatus != null) r'whatsappStatus': whatsappStatus,
+      if (hasWhatsapp != null) r'hasWhatsapp': hasWhatsapp,
     };
 
     final _response = await _dio.request<Object>(

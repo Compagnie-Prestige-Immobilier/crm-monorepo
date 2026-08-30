@@ -1,14 +1,12 @@
 import { bankFiltersQueryKey, type BankCaseFilters } from '@/lib/bank-filters';
-import { campaignFiltersQueryKey, type CampaignFilters } from '@/lib/campaign-filters';
 import {
   clientRequestFiltersQueryKey,
   type ClientRequestFilters,
 } from '@/lib/client-request-filters';
 import { filtersQueryKey } from '@/lib/filters';
-import { repCampaignFiltersQueryKey, type RepCampaignFilters } from '@/lib/rep-campaign-filters';
 import { representantFiltersQueryKey, type RepresentantFilters } from '@/lib/representant-filters';
 import { userFiltersQueryKey, type UserFilters } from '@/lib/user-filters';
-import type { CampaignScope, ProspectFilters } from '@/lib/types';
+import type { ProspectFilters } from '@/lib/types';
 
 /** Clés de cache des listes, détails et tableaux de bord associés. */
 export const queryKeys = {
@@ -37,7 +35,9 @@ export const queryKeys = {
   referentielsRoot: ['referentiels'] as const,
   banques: ['referentiels', 'banques'] as const,
   syndicats: ['referentiels', 'syndicats'] as const,
+  incomeBands: ['referentiels', 'incomeBands'] as const,
   departements: ['referentiels', 'departements'] as const,
+  iefs: ['referentiels', 'iefs'] as const,
   regions: ['referentiels', 'regions'] as const,
   referentielUsage: ['referentiels', 'usage'] as const,
 
@@ -48,44 +48,18 @@ export const queryKeys = {
   visiteReferentiel: (kind: string) => ['visites', 'referentiels', kind] as const,
   visiteReferentielUsage: ['visites', 'referentiels', 'usage'] as const,
   visitesStats: (du: string, au: string) => ['visites', 'stats', du, au] as const,
-  visitesDisposition: ['visites', 'disposition'] as const,
+  disposition: (ecran: string) => ['tableau-de-bord', 'disposition', ecran] as const,
   visitesImport: (id: string) => ['visites', 'import', id] as const,
   visitesImportRevue: (id: string, page: number) =>
     ['visites', 'import', id, 'revue', page] as const,
 
   // ─── Phase 2 ──────────────────────────────────────────────────────────────
-  campaignsRoot: ['campaigns'] as const,
-  campaigns: (filters: CampaignFilters) => ['campaigns', campaignFiltersQueryKey(filters)] as const,
-  campaign: (id: string) => ['campaigns', 'detail', id] as const,
-  /** Contient chaque entrée qui modifie le résultat de l'aperçu. */
-  campaignPreview: (scope: CampaignScope, commercialCount: number, spreadDays: number) =>
-    ['campaigns', 'preview', scope, commercialCount, spreadDays] as const,
-
-  /** Racine distincte : les campagnes représentants sont une ressource API séparée. */
-  repCampaignsRoot: ['rep-campaigns'] as const,
-  repCampaigns: (filters: RepCampaignFilters) =>
-    ['rep-campaigns', repCampaignFiltersQueryKey(filters)] as const,
-  repCampaign: (id: string) => ['rep-campaigns', 'detail', id] as const,
-  repCampaignPreview: (
-    scope: {
-      departementId: string | null;
-      iefId: string | null;
-      onlyWithoutProspects: boolean;
-      relationStatuses: readonly string[];
-    },
-    commercialCount: number,
-    spreadDays: number,
-  ) =>
-    [
-      'rep-campaigns',
-      'preview',
-      scope.departementId,
-      scope.iefId,
-      scope.onlyWithoutProspects,
-      scope.relationStatuses.join('+'),
-      commercialCount,
-      spreadDays,
-    ] as const,
+  lotsExportRoot: ['lots-export'] as const,
+  lotsExport: (filters: Record<string, unknown> = {}) => ['lots-export', filters] as const,
+  lotsExportDetail: (id: string) => ['lots-export', 'detail', id] as const,
+  lotsExportApercu: (critere: Record<string, unknown>) =>
+    ['lots-export', 'apercu', critere] as const,
+  lotsExportTeleconseillers: ['lots-export', 'teleconseillers'] as const,
 
   // ─── Banque & Finance ─────────────────────────────────────────────────────
   bankCasesRoot: ['bank-cases'] as const,
@@ -123,13 +97,15 @@ export const queryKeys = {
   importJobs: (page: number) => ['imports', 'page', page] as const,
   importJob: (id: string) => ['imports', 'detail', id] as const,
 
-  androidUpdate: ['android-update'] as const,
+  /** L'envoi survit à la navigation : sa mutation et sa progression vivent dans le cache, pas dans la carte. */
+  androidReleases: ['androidRelease', 'releases'] as const,
+  androidReleaseUpload: ['androidRelease', 'upload'] as const,
+  androidReleaseProgress: ['androidRelease', 'progress'] as const,
   /** Export intégral de la base : sondé pendant que `pg_dump` tourne. */
   databaseDump: ['database-dump'] as const,
 
   // ─── Statistiques ─────────────────────────────────────────────────────────
   statsRoot: ['stats'] as const,
-  statsLayout: (screen: 'dashboard' | 'teleconseil') => ['stats', 'layout', screen] as const,
   statsTeleconseil: (filters: ProspectFilters) =>
     ['stats', 'teleconseil', filtersQueryKey(filters)] as const,
   /** Des clés séparées évitent de coupler les volets lourds au rafraîchissement live. */

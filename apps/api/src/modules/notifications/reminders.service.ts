@@ -2,8 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import {
   BankStageType,
-  CallTaskStatus,
-  CampaignStatus,
   NotificationAudience,
   NotificationCategory,
   NotificationDeliveryStatus,
@@ -38,8 +36,6 @@ export const DAILY_REPORT_CRON = remindersCron(env.NOTIFICATIONS_DAILY_REPORT_AT
 export { SENDING_LEASE_MS };
 
 export const ReminderKey = {
-  OPEN_CALL_TASKS: 'open-call-tasks',
-  OPEN_REP_CALL_TASKS: 'open-rep-call-tasks',
   BANK_CASES_PENDING: 'bank-cases-pending',
   BANK_CASES_STALE: 'bank-cases-stale',
   DUE_CALLBACKS: 'due-callbacks',
@@ -55,14 +51,6 @@ export const periodFor = (date: Date, timeZone: string): string =>
     month: '2-digit',
     day: '2-digit',
   }).format(date);
-
-interface OpenTaskDelegate {
-  groupBy(args: {
-    by: ['assignedToId'];
-    where: Record<string, unknown>;
-    _count: { _all: true };
-  }): Promise<{ assignedToId: string; _count: { _all: number } }[]>;
-}
 
 interface ReminderCandidate {
   readonly userId: string;
@@ -125,76 +113,15 @@ export class RemindersService {
       return { created: 0, skipped: 0 };
     }
 
-    const tasks = await this.remindOpenCallTasks(now);
-    const repTasks = await this.remindOpenRepCallTasks(now);
     const callbacks = await this.remindDueCallbacks(now);
     const bankPending = await this.remindBankCasesPending(now);
     const bankStale = await this.remindBankCasesStale(now);
 
-    const runs = [tasks, repTasks, callbacks, bankPending, bankStale];
+    const runs = [callbacks, bankPending, bankStale];
     return {
       created: runs.reduce((total, run) => total + run.created, 0),
       skipped: runs.reduce((total, run) => total + run.skipped, 0),
     };
-  }
-
-  async remindOpenCallTasks(now: Date = new Date()): Promise<ReminderRunDto> {
-    return this.remindOpenTasks({
-      now,
-      delegate: this.prisma.callTask,
-      key: ReminderKey.OPEN_CALL_TASKS,
-      title: 'Appels en attente',
-      body: 'Il vous reste {{nombre}} fiche(s) à appeler dans la campagne en cours.',
-      route: '/phase2',
-    });
-  }
-
-  async remindOpenRepCallTasks(now: Date = new Date()): Promise<ReminderRunDto> {
-    return this.remindOpenTasks({
-      now,
-      delegate: this.prisma.repCallTask,
-      key: ReminderKey.OPEN_REP_CALL_TASKS,
-      title: 'Représentants à rappeler',
-      body: 'Il vous reste {{nombre}} représentant(s) à appeler dans la campagne en cours.',
-      route: '/rep-campaigns',
-    });
-  }
-
-  private async remindOpenTasks(options: {
-    now: Date;
-    delegate: OpenTaskDelegate;
-    key: ReminderKeyValue;
-    title: string;
-    body: string;
-    route: string;
-  }): Promise<ReminderRunDto> {
-    const { now, delegate, key, title, body, route } = options;
-    if (!this.config.NOTIFICATIONS_OPEN_TASKS_ENABLED) return { created: 0, skipped: 0 };
-
-    const grouped = await delegate.groupBy({
-      by: ['assignedToId'],
-      where: {
-        status: CallTaskStatus.OPEN,
-        isActive: true,
-        campaign: { status: CampaignStatus.ACTIVE },
-      },
-      _count: { _all: true },
-    });
-
-    const eligible = grouped.filter(
-      (group) => group._count._all >= this.config.NOTIFICATIONS_OPEN_TASKS_MIN,
-    );
-    if (!eligible.length) return { created: 0, skipped: 0 };
-
-    return this.emit({
-      key,
-      now,
-      candidates: await this.assignedCandidates(eligible),
-      titleTemplate: title,
-      bodyTemplate: body,
-      route,
-      category: NotificationCategory.CAMPAGNE,
-    });
   }
 
   /**

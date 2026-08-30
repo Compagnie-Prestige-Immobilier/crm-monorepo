@@ -21,8 +21,6 @@ abstract class _$AuthUserDtoCWProxy {
 
   AuthUserDto workspace(AuthUserDtoWorkspaceEnum workspace);
 
-  AuthUserDto departementId(String? departementId);
-
   AuthUserDto phoneE164(String? phoneE164);
 
   AuthUserDto lastLoginAt(DateTime? lastLoginAt);
@@ -41,7 +39,6 @@ abstract class _$AuthUserDtoCWProxy {
     Role role,
     bool isActive,
     AuthUserDtoWorkspaceEnum workspace,
-    String? departementId,
     String? phoneE164,
     DateTime? lastLoginAt,
   });
@@ -76,10 +73,6 @@ class _$AuthUserDtoCWProxyImpl implements _$AuthUserDtoCWProxy {
       this(workspace: workspace);
 
   @override
-  AuthUserDto departementId(String? departementId) =>
-      this(departementId: departementId);
-
-  @override
   AuthUserDto phoneE164(String? phoneE164) => this(phoneE164: phoneE164);
 
   @override
@@ -101,7 +94,6 @@ class _$AuthUserDtoCWProxyImpl implements _$AuthUserDtoCWProxy {
     Object? role = const $CopyWithPlaceholder(),
     Object? isActive = const $CopyWithPlaceholder(),
     Object? workspace = const $CopyWithPlaceholder(),
-    Object? departementId = const $CopyWithPlaceholder(),
     Object? phoneE164 = const $CopyWithPlaceholder(),
     Object? lastLoginAt = const $CopyWithPlaceholder(),
   }) {
@@ -134,10 +126,6 @@ class _$AuthUserDtoCWProxyImpl implements _$AuthUserDtoCWProxy {
           ? _value.workspace
           // ignore: cast_nullable_to_non_nullable
           : workspace as AuthUserDtoWorkspaceEnum,
-      departementId: departementId == const $CopyWithPlaceholder()
-          ? _value.departementId
-          // ignore: cast_nullable_to_non_nullable
-          : departementId as String?,
       phoneE164: phoneE164 == const $CopyWithPlaceholder()
           ? _value.phoneE164
           // ignore: cast_nullable_to_non_nullable
@@ -196,7 +184,6 @@ AuthUserDto _$AuthUserDtoFromJson(Map<String, dynamic> json) =>
             unknownValue: AuthUserDtoWorkspaceEnum.unknownDefaultOpenApi,
           ),
         ),
-        departementId: $checkedConvert('departementId', (v) => v as String?),
         phoneE164: $checkedConvert('phoneE164', (v) => v as String?),
         lastLoginAt: $checkedConvert(
           'lastLoginAt',
@@ -215,7 +202,6 @@ Map<String, dynamic> _$AuthUserDtoToJson(AuthUserDto instance) =>
       'role': _$RoleEnumMap[instance.role]!,
       'isActive': instance.isActive,
       'workspace': _$AuthUserDtoWorkspaceEnumEnumMap[instance.workspace]!,
-      if (instance.departementId case final value?) 'departementId': value,
       if (instance.phoneE164 case final value?) 'phoneE164': value,
       if (instance.lastLoginAt?.toIso8601String() case final value?)
         'lastLoginAt': value,

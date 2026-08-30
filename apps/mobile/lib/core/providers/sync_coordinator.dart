@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../background/background_sync.dart';
 import '../sync/api_port.dart';
 import '../sync/sync_engine.dart';
+import '../updates/app_update_controller.dart';
 import 'app_providers.dart';
 import 'connectivity.dart';
 
@@ -200,6 +201,11 @@ class SyncCoordinator extends Notifier<SyncUiState> {
         ref.read(authControllerProvider.notifier).onSessionExpired();
       }
       _recordReachability(outcome);
+      // Le serveur vient de répondre : c'est le moment le moins coûteux pour
+      // lui redemander le plancher de version.
+      if (outcome.isOk) {
+        ref.read(appUpdateControllerProvider.notifier).recheckAfterSync();
+      }
       if (pull && outcome.isOk) await _pullDirectory();
       return outcome;
     } on Object catch (e) {

@@ -192,7 +192,6 @@ function PresenceTable({
                   <span className="block font-[600]">{user.fullName}</span>
                   <span className="block text-[0.75rem] text-muted-foreground">
                     {user.username}
-                    {user.departementName !== null ? ` · ${user.departementName}` : ''}
                   </span>
                 </th>
                 <td className="px-5 py-2">

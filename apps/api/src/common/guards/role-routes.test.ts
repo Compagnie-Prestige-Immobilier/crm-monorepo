@@ -32,7 +32,9 @@ import { SyncController } from '../../modules/sync/sync.controller.js';
 import { CallOutcomeReasonsController } from '../../modules/referentiels/call-outcome-reasons.controller.js';
 import { VisitesController } from '../../modules/visites/visites.controller.js';
 import { VisitesImportController } from '../../modules/visites/visites-import.controller.js';
+import { DashboardsController } from '../../modules/dashboards/dashboards.controller.js';
 import { UsersController } from '../../modules/users/users.controller.js';
+import { LotsExportController } from '../../modules/lots-export/lots-export.controller.js';
 
 type Controller = new (...args: never[]) => object;
 
@@ -47,6 +49,7 @@ const CONTROLLERS: readonly Controller[] = [
   CallbacksController,
   CallOutcomeReasonsController,
   ClientRequestsController,
+  DashboardsController,
   DbDumpController,
   DemoController,
   ExportController,
@@ -65,6 +68,7 @@ const CONTROLLERS: readonly Controller[] = [
   UsersController,
   VisitesController,
   VisitesImportController,
+  LotsExportController,
 ];
 
 /**
@@ -96,6 +100,16 @@ const TROIS_ETAPES: readonly string[] = [
 ];
 
 /**
+ * Ranger son propre écran de chiffres. Aucune donnée métier n'y passe : la
+ * disposition ne dit que l'ordre des cartes de qui la sauvegarde.
+ */
+const DISPOSITION: readonly string[] = [
+  'DashboardsController.get',
+  'DashboardsController.put',
+  'DashboardsController.remove',
+];
+
+/**
  * TOUT ce qu'un SUPERVISEUR atteint, nommément.
  *
  * Hors des trois étapes, le rôle reste un rôle de LECTURE : la liste est donc
@@ -116,16 +130,12 @@ const ADMISES: readonly string[] = [
   'AnalyticsController.byPhase2Status',
   'AnalyticsController.bySegment',
   'AnalyticsController.bySyndicat',
-  'AnalyticsController.campaignPilotage',
   'AnalyticsController.dataQuality',
-  'AnalyticsController.deleteLayout',
   'AnalyticsController.delays',
   'AnalyticsController.departementYield',
   'AnalyticsController.funnel',
-  'AnalyticsController.layout',
   'AnalyticsController.originBreakdown',
   'AnalyticsController.overTime',
-  'AnalyticsController.putLayout',
   'AnalyticsController.representantProductivity',
   'AnalyticsController.segmentConversions',
   'AnalyticsController.topCommercials',
@@ -149,9 +159,6 @@ const ADMISES: readonly string[] = [
   'NotificationsController.mine',
   'NotificationsController.markRead',
 
-  'Phase2Controller.getCampaign',
-  'Phase2Controller.listCampaigns',
-  'Phase2Controller.downloadProgramme',
   // Lecture seule: un superviseur ecoute une note audio, il n'en televerse pas.
   'Phase2Controller.downloadRecording',
 
@@ -170,10 +177,12 @@ const ADMISES: readonly string[] = [
   'ReferentielsController.listRegionsWithDepartements',
   'ReferentielsController.listSyndicats',
 
-  'RepCampaignsController.get',
-  'RepCampaignsController.list',
-  'RepCampaignsController.downloadProgramme',
-  'RepCampaignsController.downloadProgrammes',
+  'LotsExportController.list',
+  'LotsExportController.get',
+  'LotsExportController.xlsx',
+  'LotsExportController.programme',
+  'LotsExportController.programmesZip',
+  'ExportController.representantsExport',
 
   'RepresentantsController.get',
   'RepresentantsController.list',
@@ -185,6 +194,7 @@ const ADMISES: readonly string[] = [
   'SupervisionController.activite',
   'UsersController.list',
   'VisitesController.bundle',
+  ...DISPOSITION,
 ];
 
 /**
@@ -223,11 +233,8 @@ const SOCLE: readonly string[] = [
 const REGISTRE: readonly string[] = [
   'ExportController.visitesExportRoute',
   'VisitesController.create',
-  'VisitesController.deleteDashboardLayout',
   'VisitesController.get',
-  'VisitesController.getDashboardLayout',
   'VisitesController.list',
-  'VisitesController.putDashboardLayout',
   'VisitesController.statistiques',
   'VisitesController.update',
 ];
@@ -243,6 +250,7 @@ const REGISTRE: readonly string[] = [
 const ADMISES_ACCUEIL: readonly string[] = [
   ...SOCLE,
   ...REGISTRE,
+  ...DISPOSITION,
   'SyncController.pull',
   'SyncController.push',
 ];
@@ -257,7 +265,6 @@ const ADMISES_DIRECTION: readonly string[] = [
   ...ADMISES.filter((route) => route !== 'AnalyticsController.bankAging'),
   ...REGISTRE,
   'ExportController.prospects',
-  'ExportController.representantsExport',
   'VisitesController.createReferentiel',
   'VisitesController.listReferentiel',
   'VisitesController.reorderReferentiel',
@@ -474,7 +481,8 @@ describe('ce qu’une DIRECTION atteint, route par route', () => {
     }
   });
 
-  it('ne fixe pas la disposition par défaut du tableau de bord, réservée à l’ADMIN', () => {
-    expect(allowsAs(Role.DIRECTION, VisitesController, 'putDefaultDashboardLayout')).toBe(false);
+  it('ne fixe pas la disposition par défaut des écrans de chiffres, réservée à l’ADMIN', () => {
+    expect(allowsAs(Role.DIRECTION, DashboardsController, 'putDefault')).toBe(false);
+    expect(allowsAs(Role.ADMIN, DashboardsController, 'putDefault')).toBe(true);
   });
 });

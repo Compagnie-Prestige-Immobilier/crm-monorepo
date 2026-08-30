@@ -110,11 +110,11 @@ export function RepScript() {
     placeholderData: (previous) => previous,
   });
 
-  const file = useMemo(() => buildRepQueue(queue.data?.items ?? []), [queue.data]);
-  // Sans recherche, la liste confiée passe devant l'annuaire : c'est le travail
-  // du jour. Elle ne choisit personne pour autant.
-  const liste = cherche === '' && file.length > 0 ? file : (annuaire.data?.items ?? []);
-  const listeEstFile = cherche === '' && file.length > 0;
+  const aQualifier = useMemo(() => buildRepQueue(queue.data?.items ?? []), [queue.data]);
+  // Sans recherche, l'écran ouvre sur les représentants dont la relation n'est
+  // pas tranchée. Il ne choisit personne pour autant.
+  const liste = cherche === '' && aQualifier.length > 0 ? aQualifier : (annuaire.data?.items ?? []);
+  const listeParDefaut = cherche === '' && aQualifier.length > 0;
 
   const ouvrir = useCallback((row: ScriptedRepresentant) => {
     setConfirme(null);
@@ -131,7 +131,7 @@ export function RepScript() {
     return (
       <QueryErrorState
         error={queue.error}
-        fallback="La file des représentants n’a pas pu être chargée."
+        fallback="L’annuaire n’a pas pu être lu."
         onRetry={() => {
           void queue.refetch();
         }}
@@ -155,7 +155,7 @@ export function RepScript() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
+    <div className="flex w-full flex-col gap-5">
       {confirme === null ? null : (
         <p role="status" className={cn('text-[0.875rem] font-[600] text-accent-text', REVELE)}>
           Appel enregistré pour {confirme}.
@@ -164,13 +164,9 @@ export function RepScript() {
 
       <ChampAnnuaire value={search} onChange={setSearch} />
 
-      <p className="text-[0.8125rem] text-muted-foreground">
-        {listeEstFile
-          ? 'Votre liste d’appel. Choisissez qui vous venez d’appeler.'
-          : 'Choisissez qui vous venez d’appeler.'}
-      </p>
+      <p className="text-[0.8125rem] text-muted-foreground">Choisissez qui vous venez d’appeler.</p>
 
-      {annuaire.isError && !listeEstFile ? (
+      {annuaire.isError && !listeParDefaut ? (
         <QueryErrorState
           error={annuaire.error}
           fallback="L’annuaire n’a pas pu être lu."
@@ -178,7 +174,7 @@ export function RepScript() {
             void annuaire.refetch();
           }}
         />
-      ) : annuaire.isPending && !listeEstFile ? (
+      ) : annuaire.isPending && !listeParDefaut ? (
         <div className="flex flex-col gap-2">
           <Skeleton className="h-14" />
           <Skeleton className="h-14" />
@@ -415,7 +411,7 @@ function Qualification({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
+    <div className="flex w-full flex-col gap-5">
       <Button variant="ghost" className="self-start px-0" onClick={reculer}>
         <ArrowLeftIcon aria-hidden="true" />
         {etape === 1 ? 'Revenir à la liste' : 'Étape précédente'}

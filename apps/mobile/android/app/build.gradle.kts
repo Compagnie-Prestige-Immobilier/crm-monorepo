@@ -1,8 +1,21 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+// Clés de signature hors dépôt (`android/key.properties`). Absentes, tout se
+// signe en debug et un clone sans keystore construit quand même.
+//
+// CPI GO s'auto-mets à jour : Android refuse de remplacer un paquet signé par
+// une autre clé. Debug ET release doivent donc lire la MÊME clé quand elle est
+// là, sans quoi une release ne peut pas succéder à un build de développement.
+val keyProperties = Properties().apply {
+    val file = rootProject.file("key.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
 }
 
 android {
@@ -37,10 +50,23 @@ android {
         resourceConfigurations += listOf("fr", "en")
     }
 
+    signingConfigs {
+        if (keyProperties.containsKey("storeFile")) {
+            create("cpi") {
+                storeFile = file(keyProperties.getProperty("storeFile"))
+                storePassword = keyProperties.getProperty("storePassword")
+                keyAlias = keyProperties.getProperty("keyAlias")
+                keyPassword = keyProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.findByName("cpi") ?: signingConfigs.getByName("debug")
+        }
         release {
-            // TODO: real signing config before the first store upload.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("cpi") ?: signingConfigs.getByName("debug")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

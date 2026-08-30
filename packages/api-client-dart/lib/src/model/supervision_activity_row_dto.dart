@@ -19,12 +19,6 @@ part 'supervision_activity_row_dto.g.dart';
 class SupervisionActivityRowDto {
   /// Returns a new [SupervisionActivityRowDto] instance.
   SupervisionActivityRowDto({
-    required this.bucket,
-
-    required this.teleconseillerId,
-
-    required this.teleconseillerName,
-
     required this.calls,
 
     required this.unreachable,
@@ -45,18 +39,32 @@ class SupervisionActivityRowDto {
 
     required this.representantsContacted,
 
-    required this.tasksClosed,
+    required this.repCalls,
+
+    required this.repReached,
+
+    required this.repCallback,
+
+    required this.repUnreachable,
+
+    required this.repOther,
+
+    required this.repContactRate,
+
+    required this.repCallbackRate,
+
+    required this.repQuestioned,
+
+    required this.repQualified,
+
+    required this.repQualificationRate,
+
+    required this.bucket,
+
+    required this.teleconseillerId,
+
+    required this.teleconseillerName,
   });
-
-  /// Début de la journée ou de la semaine, en AAAA-MM-JJ.
-  @JsonKey(name: r'bucket', required: true, includeIfNull: false)
-  final String bucket;
-
-  @JsonKey(name: r'teleconseillerId', required: true, includeIfNull: false)
-  final String teleconseillerId;
-
-  @JsonKey(name: r'teleconseillerName', required: true, includeIfNull: false)
-  final String teleconseillerName;
 
   /// Appels passés à des prospects.
   @JsonKey(name: r'calls', required: true, includeIfNull: false)
@@ -102,9 +110,55 @@ class SupervisionActivityRowDto {
   )
   final num representantsContacted;
 
-  /// Tâches d’appel clôturées sur la période.
-  @JsonKey(name: r'tasksClosed', required: true, includeIfNull: false)
-  final num tasksClosed;
+  /// Appels à des représentants, issues encore saisissables seulement : REACHED, REFUSED, CALLBACK, UNREACHABLE. Dénominateur de `repContactRate` et de `repCallbackRate`.
+  @JsonKey(name: r'repCalls', required: true, includeIfNull: false)
+  final num repCalls;
+
+  /// Représentants qui ont DÉCROCHÉ et répondu : REACHED ou REFUSED. Un refus est un contact ; un rappel promis n’en est pas encore un.
+  @JsonKey(name: r'repReached', required: true, includeIfNull: false)
+  final num repReached;
+
+  /// Issue CALLBACK : rappel promis, date posée.
+  @JsonKey(name: r'repCallback', required: true, includeIfNull: false)
+  final num repCallback;
+
+  /// Issue UNREACHABLE : n’a pas décroché.
+  @JsonKey(name: r'repUnreachable', required: true, includeIfNull: false)
+  final num repUnreachable;
+
+  /// Issues d’héritage que le terrain ne saisit plus : PROSPECTS_PROMISED, WRONG_NUMBER, OTHER. Hors de tous les taux.
+  @JsonKey(name: r'repOther', required: true, includeIfNull: false)
+  final num repOther;
+
+  /// Part des appels représentants où quelqu’un a répondu, en pourcentage. `null` sans aucun appel.
+  @JsonKey(name: r'repContactRate', required: true, includeIfNull: true)
+  final num? repContactRate;
+
+  /// Part des appels représentants finissant en rappel, en pourcentage.
+  @JsonKey(name: r'repCallbackRate', required: true, includeIfNull: true)
+  final num? repCallbackRate;
+
+  /// Représentants DISTINCTS dont la dernière réponse de la fenêtre a été obtenue par ce téléconseiller. Attribué à qui a obtenu la réponse, pas à qui a appelé le premier. NON SOMMABLE entre périodes ni entre téléconseillers.
+  @JsonKey(name: r'repQuestioned', required: true, includeIfNull: false)
+  final num repQuestioned;
+
+  /// Parmi `repQuestioned`, ceux dont cette dernière réponse est REACHED. NON SOMMABLE.
+  @JsonKey(name: r'repQualified', required: true, includeIfNull: false)
+  final num repQualified;
+
+  /// Part des représentants interrogés qui ont dit oui, en pourcentage. `null` sans aucun représentant interrogé.
+  @JsonKey(name: r'repQualificationRate', required: true, includeIfNull: true)
+  final num? repQualificationRate;
+
+  /// Début de la journée ou de la semaine, en AAAA-MM-JJ.
+  @JsonKey(name: r'bucket', required: true, includeIfNull: false)
+  final String bucket;
+
+  @JsonKey(name: r'teleconseillerId', required: true, includeIfNull: false)
+  final String teleconseillerId;
+
+  @JsonKey(name: r'teleconseillerName', required: true, includeIfNull: false)
+  final String teleconseillerName;
 
   bool operator ==(Object other) {
     return identical(this, other) ||
@@ -112,9 +166,6 @@ class SupervisionActivityRowDto {
             runtimeType == other.runtimeType &&
             equals(
               [
-                bucket,
-                teleconseillerId,
-                teleconseillerName,
                 calls,
                 unreachable,
                 wrongNumber,
@@ -125,12 +176,21 @@ class SupervisionActivityRowDto {
                 reachRate,
                 prospectsCreated,
                 representantsContacted,
-                tasksClosed,
+                repCalls,
+                repReached,
+                repCallback,
+                repUnreachable,
+                repOther,
+                repContactRate,
+                repCallbackRate,
+                repQuestioned,
+                repQualified,
+                repQualificationRate,
+                bucket,
+                teleconseillerId,
+                teleconseillerName,
               ],
               [
-                other.bucket,
-                other.teleconseillerId,
-                other.teleconseillerName,
                 other.calls,
                 other.unreachable,
                 other.wrongNumber,
@@ -141,7 +201,19 @@ class SupervisionActivityRowDto {
                 other.reachRate,
                 other.prospectsCreated,
                 other.representantsContacted,
-                other.tasksClosed,
+                other.repCalls,
+                other.repReached,
+                other.repCallback,
+                other.repUnreachable,
+                other.repOther,
+                other.repContactRate,
+                other.repCallbackRate,
+                other.repQuestioned,
+                other.repQualified,
+                other.repQualificationRate,
+                other.bucket,
+                other.teleconseillerId,
+                other.teleconseillerName,
               ],
             );
   }
@@ -150,9 +222,6 @@ class SupervisionActivityRowDto {
   int get hashCode =>
       runtimeType.hashCode ^
       mapPropsToHashCode([
-        bucket,
-        teleconseillerId,
-        teleconseillerName,
         calls,
         unreachable,
         wrongNumber,
@@ -163,7 +232,19 @@ class SupervisionActivityRowDto {
         reachRate,
         prospectsCreated,
         representantsContacted,
-        tasksClosed,
+        repCalls,
+        repReached,
+        repCallback,
+        repUnreachable,
+        repOther,
+        repContactRate,
+        repCallbackRate,
+        repQuestioned,
+        repQualified,
+        repQualificationRate,
+        bucket,
+        teleconseillerId,
+        teleconseillerName,
       ]);
 
   factory SupervisionActivityRowDto.fromJson(Map<String, dynamic> json) =>

@@ -194,7 +194,6 @@ export type ActivityLine = {
   id: string;
   name: string;
   isActive: boolean;
-  openTasks: number;
   calls: number;
   methodObtained: number;
   unreachable: number;
@@ -204,7 +203,6 @@ export type ActivityLine = {
   reachRate: number | null;
   prospectsCreated: number;
   representantsContacted: number;
-  tasksClosed: number;
   hasActivity: boolean;
 };
 
@@ -230,7 +228,6 @@ export function activityLines(data: SupervisionActivity): ActivityLine[] {
       id: person.id,
       name: person.fullName,
       isActive: person.isActive,
-      openTasks: person.openTasks,
       calls: 0,
       methodObtained: 0,
       unreachable: 0,
@@ -240,7 +237,6 @@ export function activityLines(data: SupervisionActivity): ActivityLine[] {
       reachRate: null,
       prospectsCreated: 0,
       representantsContacted: 0,
-      tasksClosed: 0,
       hasActivity: false,
     });
   }
@@ -252,7 +248,6 @@ export function activityLines(data: SupervisionActivity): ActivityLine[] {
         id: row.teleconseillerId,
         name: row.teleconseillerName,
         isActive: true,
-        openTasks: 0,
         calls: 0,
         methodObtained: 0,
         unreachable: 0,
@@ -262,7 +257,6 @@ export function activityLines(data: SupervisionActivity): ActivityLine[] {
         reachRate: null,
         prospectsCreated: 0,
         representantsContacted: 0,
-        tasksClosed: 0,
         hasActivity: false,
       };
       lines.set(line.id, line);
@@ -276,7 +270,6 @@ export function activityLines(data: SupervisionActivity): ActivityLine[] {
     line.prospectsCreated += row.prospectsCreated;
     // Distinct DANS une période: le cumul recompte un représentant rappelé une autre période.
     line.representantsContacted += row.representantsContacted;
-    line.tasksClosed += row.tasksClosed;
     line.hasActivity = true;
   }
 
@@ -296,8 +289,6 @@ export type ActivityTotals = {
   reachRate: number | null;
   prospectsCreated: number;
   representantsContacted: number;
-  tasksClosed: number;
-  openTasks: number;
 };
 
 export function activityTotals(lines: readonly ActivityLine[]): ActivityTotals {
@@ -312,8 +303,6 @@ export function activityTotals(lines: readonly ActivityLine[]): ActivityTotals {
     reachRate: null,
     prospectsCreated: 0,
     representantsContacted: 0,
-    tasksClosed: 0,
-    openTasks: 0,
   };
 
   for (const line of lines) {
@@ -325,8 +314,6 @@ export function activityTotals(lines: readonly ActivityLine[]): ActivityTotals {
     totals.callback += line.callback;
     totals.prospectsCreated += line.prospectsCreated;
     totals.representantsContacted += line.representantsContacted;
-    totals.tasksClosed += line.tasksClosed;
-    totals.openTasks += line.openTasks;
   }
 
   totals.reachRate = reachRateOf(totals);
@@ -346,8 +333,6 @@ export function activityAverages(totals: ActivityTotals): Omit<ActivityTotals, '
     reachRate: totals.reachRate,
     prospectsCreated: mean(totals.prospectsCreated),
     representantsContacted: mean(totals.representantsContacted),
-    tasksClosed: mean(totals.tasksClosed),
-    openTasks: mean(totals.openTasks),
   };
 }
 
@@ -423,8 +408,6 @@ const CSV_HEADERS = [
   'Taux de joignabilité (%)',
   'Prospects saisis',
   'Représentants contactés',
-  'Tâches closes',
-  'Reste à faire',
 ];
 
 export function activityCsv(input: {
@@ -454,8 +437,6 @@ export function activityCsv(input: {
       line.reachRate,
       line.prospectsCreated,
       line.representantsContacted,
-      line.tasksClosed,
-      line.openTasks,
     ]);
   }
 
@@ -472,8 +453,6 @@ export function activityCsv(input: {
     totals.reachRate,
     totals.prospectsCreated,
     totals.representantsContacted,
-    totals.tasksClosed,
-    totals.openTasks,
   ]);
   rows.push([
     'Moyenne par téléconseiller',
@@ -486,12 +465,7 @@ export function activityCsv(input: {
     averages.reachRate,
     averages.prospectsCreated,
     averages.representantsContacted,
-    averages.tasksClosed,
-    averages.openTasks,
   ]);
-  rows.push([]);
-  rows.push(['Reste à faire : tâches d’appel ouvertes à l’instant, hors période.']);
-
   return csvRows(rows);
 }
 

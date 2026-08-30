@@ -14,7 +14,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 19;
+  int get schemaVersion => 21;
 
   /// Les colonnes ajoutées à `call_attempts` par la v19. Déclarées ici parce
   /// que TROIS paliers recopient cette table : chacun engendre sa forme
@@ -167,14 +167,6 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(representants, representants.whatsappE164);
         await m.addColumn(representants, representants.profession);
       }
-      if (from < 12 && to >= 12) {
-        // Deux tables neuves, aucune recopie : rien ici ne peut lire une colonne
-        // qui n'existait pas encore au palier d'origine.
-        await m.createTable(callCampaigns);
-        await m.createTable(callTasks);
-        await m.createIndex(callTasksCampaignIdx);
-        await m.createIndex(callTasksProspectIdx);
-      }
       if (from < 13 && to >= 13) {
         // Trois liens relaches et trois colonnes ajoutees : SQLite recree la table.
         await m.alterTable(_prospectsCopy(prospects));
@@ -212,12 +204,6 @@ class AppDatabase extends _$AppDatabase {
         // l'historique de l'accueil. Additif : rien à recopier.
         await m.createIndex(visitesEntrepriseDateIdx);
       }
-      if (from < 17 && to >= 17) {
-        await m.createTable(repCallCampaigns);
-        await m.createTable(repCallTasks);
-        await m.createIndex(repCallTasksCampaignIdx);
-        await m.createIndex(repCallTasksRepresentantIdx);
-      }
       if (from < 18 && to >= 18) {
         await m.createTable(repCallbackReminders);
         await m.createIndex(repCallbackRemindersPendingIdx);
@@ -234,6 +220,23 @@ class AppDatabase extends _$AppDatabase {
             ),
           );
         }
+      }
+      if (from < 20 && to >= 20) {
+        await customStatement('DROP TABLE IF EXISTS call_tasks');
+        await customStatement('DROP TABLE IF EXISTS call_campaigns');
+        await customStatement('DROP TABLE IF EXISTS rep_call_tasks');
+        await customStatement('DROP TABLE IF EXISTS rep_call_campaigns');
+      }
+      if (from < 21 && to >= 21) {
+        await m.createTable(incomeBands);
+        await m.createIndex(incomeBandsActiveIdx);
+        // Comme à la v8 : le pull est un curseur keyset, et un appareil déjà
+        // mis au miroir ne redemande plus la liste entière. Sans ce marqueur
+        // effacé, la table neuve resterait vide à vie et le revenu mensuel,
+        // désormais obligatoire, serait impossible à choisir.
+        await customStatement(
+          'DELETE FROM sync_state WHERE collection = \'referentiels_mirror\'',
+        );
       }
     },
     beforeOpen: (OpeningDetails details) async {

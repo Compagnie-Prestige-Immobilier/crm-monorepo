@@ -4,7 +4,6 @@ export class DemoWorkspaceCountsDto {
   @ApiProperty() users!: number;
   @ApiProperty() representants!: number;
   @ApiProperty() prospects!: number;
-  @ApiProperty() campaigns!: number;
   @ApiProperty() bankCases!: number;
 }
 

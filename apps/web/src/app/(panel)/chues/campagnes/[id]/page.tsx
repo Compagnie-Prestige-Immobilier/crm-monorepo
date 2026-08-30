@@ -1,41 +1,33 @@
 import { HydrationBoundary, dehydrate } from '@tanstack/react-query';
 import type { Metadata } from 'next';
-import { redirect, unstable_rethrow } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 
-import { PermissionDenied } from '@/components/permission-denied';
-import { CampaignDetailView } from '@/components/phase2/campaign-detail-view';
+import { LotExportDetailView } from '@/components/lots-export/lot-export-detail-view';
 import { getServerApiClient } from '@/lib/api/server';
-import { fetchCampaign } from '@/lib/data/phase2';
+import { fetchLotExport } from '@/lib/data/lots-export';
 import { getQueryClient } from '@/lib/query-client';
 import { queryKeys } from '@/lib/query-keys';
 import { guardRoles } from '@/lib/session';
 
-export const metadata: Metadata = { title: 'Campagne d’appels prospects' };
+export const metadata: Metadata = { title: 'Lot d’export' };
 
-export default async function CampagnePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function LotExportDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const guard = await guardRoles(['ADMIN', 'SUPERVISEUR', 'DIRECTION']);
   if (guard.status === 'anonymous') redirect('/connexion');
-  if (guard.status === 'denied') {
-    return (
-      <PermissionDenied role={guard.user.role} what="Le détail d’une campagne d’appels prospects" />
-    );
-  }
-
+  if (guard.status === 'denied') redirect('/chues');
   const { id } = await params;
-
   const queryClient = getQueryClient();
   try {
     await queryClient.prefetchQuery({
-      queryKey: queryKeys.campaign(id),
-      queryFn: () => fetchCampaign(id, getServerApiClient()),
+      queryKey: queryKeys.lotsExportDetail(id),
+      queryFn: () => fetchLotExport(id, getServerApiClient()),
     });
-  } catch (error) {
-    unstable_rethrow(error);
+  } catch {
+    notFound();
   }
-
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <CampaignDetailView campaignId={id} canManage={guard.user.role === 'ADMIN'} />
+      <LotExportDetailView id={id} />
     </HydrationBoundary>
   );
 }

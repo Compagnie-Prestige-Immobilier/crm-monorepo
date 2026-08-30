@@ -3,8 +3,8 @@ import { expect, request, type APIRequestContext } from '@playwright/test';
 const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:3000';
 const ADMIN_STORAGE_STATE = 'e2e/.auth/admin.json';
 
-/** Assez long pour la règle de l'API (12 caractères minimum). */
-export const FIXTURE_PASSWORD = 'Fixture1-CPI-Sunugal';
+/** Le mot de passe posé par `pnpm db:seed` sur tous les comptes `fixture.*`. */
+export const FIXTURE_PASSWORD = process.env.SEED_FIXTURE_PASSWORD ?? 'ChangeMoi123456';
 
 /**
  * BDD1 = syndicat CHUES × banque CBAO (`packages/database/src/segment.ts`).

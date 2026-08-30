@@ -50,8 +50,12 @@ const PURGE_EXEMPT = new Map<string, string>([
     'sous-système push retiré : aucun code n’écrit plus cette table, conservée une version pour que la mise à jour reste réversible (docs/migrations-en-attente.md), et emportée en cascade avec son compte',
   ],
   [
-    'visite_dashboard_layouts',
-    'préférence d’affichage, UNE ligne par compte, en `onDelete: Cascade` : elle décrit la façon dont quelqu’un range son écran, pas une donnée métier. La purger effacerait la composition du tableau de bord d’une directrice qui n’a rien demandé, et le compte, lui, l’emporte déjà en partant',
+    'dashboard_layouts',
+    'préférence d’affichage, UNE ligne par compte et par écran, en `onDelete: Cascade` : elle décrit la façon dont quelqu’un range son écran, pas une donnée métier. La purger effacerait la composition des chiffres d’une directrice qui n’a rien demandé, et le compte, lui, l’emporte déjà en partant',
+  ],
+  [
+    'android_releases',
+    'catalogue de distribution de l’application : il décrit les APK publiés et le plancher de version du parc, pas une donnée métier. La purger couperait la mise à jour des téléphones ; `publishedById` part en SetNull avec le compte qui a publié',
   ],
   [
     'visite_import_changes',
@@ -170,7 +174,6 @@ describe('fermeture de la sélection', () => {
     expect(expandPurgeSelection(['representants'])).toEqual([
       'representants',
       'prospects',
-      'campagnesRepresentants',
       'demandesClients',
       'fileAppels',
       'tentatives',
@@ -193,7 +196,6 @@ describe('fermeture de la sélection', () => {
     const expanded = expandPurgeSelection(['teleconseillers']);
     expect(expanded).toContain('prospects');
     expect(expanded).toContain('representants');
-    expect(expanded).toContain('campagnes');
     expect(expanded).toContain('dossiers');
     expect(expanded).not.toContain('referentiels');
   });
@@ -222,13 +224,11 @@ describe('séquence d’étapes', () => {
     const steps = purgeSteps(['teleconseillers']);
     expect(steps.indexOf('prospects')).toBeLessThan(steps.indexOf('commercialAccounts'));
     expect(steps.indexOf('representants')).toBeLessThan(steps.indexOf('commercialAccounts'));
-    expect(steps.indexOf('campaignMembers')).toBeLessThan(steps.indexOf('commercialAccounts'));
+    expect(steps.indexOf('scheduledCallbacks')).toBeLessThan(steps.indexOf('commercialAccounts'));
   });
 
-  it('supprime les rappels planifiés avant leur file, leurs campagnes et les comptes', () => {
+  it('supprime les rappels planifiés avant les prospects et les comptes', () => {
     const steps = purgeSteps([...PURGE_DOMAIN_KEYS]);
-    expect(steps.indexOf('scheduledCallbacks')).toBeLessThan(steps.indexOf('callTasks'));
-    expect(steps.indexOf('scheduledCallbacks')).toBeLessThan(steps.indexOf('campaigns'));
     expect(steps.indexOf('scheduledCallbacks')).toBeLessThan(steps.indexOf('prospects'));
     expect(steps.indexOf('scheduledCallbacks')).toBeLessThan(steps.indexOf('commercialAccounts'));
   });

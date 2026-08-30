@@ -44,25 +44,20 @@ export const PURGE_STEPS: Readonly<Record<PurgeStepKey, PurgeStep>> = {
     count: (db) => db.callAttempt.count(),
     remove: async (db) => (await db.callAttempt.deleteMany({})).count,
   },
+  lotExportItems: {
+    table: 'lot_export_items',
+    count: (db) => db.lotExportItem.count(),
+    remove: async (db) => (await db.lotExportItem.deleteMany({})).count,
+  },
+  lotsExport: {
+    table: 'lots_export',
+    count: (db) => db.lotExport.count(),
+    remove: async (db) => (await db.lotExport.deleteMany({})).count,
+  },
   scheduledCallbacks: {
     table: 'scheduled_callbacks',
     count: (db) => db.scheduledCallback.count(),
     remove: async (db) => (await db.scheduledCallback.deleteMany({})).count,
-  },
-  callTasks: {
-    table: 'call_tasks',
-    count: (db) => db.callTask.count(),
-    remove: async (db) => (await db.callTask.deleteMany({})).count,
-  },
-  campaignMembers: {
-    table: 'call_campaign_commerciaux',
-    count: (db) => db.callCampaignCommercial.count(),
-    remove: async (db) => (await db.callCampaignCommercial.deleteMany({})).count,
-  },
-  campaigns: {
-    table: 'call_campaigns',
-    count: (db) => db.callCampaign.count(),
-    remove: async (db) => (await db.callCampaign.deleteMany({})).count,
   },
   repSuggestions: {
     table: 'representant_suggestions',
@@ -73,21 +68,6 @@ export const PURGE_STEPS: Readonly<Record<PurgeStepKey, PurgeStep>> = {
     table: 'rep_call_attempts',
     count: (db) => db.repCallAttempt.count(),
     remove: async (db) => (await db.repCallAttempt.deleteMany({})).count,
-  },
-  repCallTasks: {
-    table: 'rep_call_tasks',
-    count: (db) => db.repCallTask.count(),
-    remove: async (db) => (await db.repCallTask.deleteMany({})).count,
-  },
-  repCampaignMembers: {
-    table: 'rep_call_campaign_commerciaux',
-    count: (db) => db.repCallCampaignCommercial.count(),
-    remove: async (db) => (await db.repCallCampaignCommercial.deleteMany({})).count,
-  },
-  repCampaigns: {
-    table: 'rep_call_campaigns',
-    count: (db) => db.repCallCampaign.count(),
-    remove: async (db) => (await db.repCallCampaign.deleteMany({})).count,
   },
   clientRequests: {
     table: 'client_creation_requests',

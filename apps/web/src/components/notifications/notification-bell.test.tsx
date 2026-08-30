@@ -50,7 +50,7 @@ describe('NotificationBell', () => {
           item({
             id: 'liv-2',
             notificationId: 'notif-2',
-            title: 'Campagne clôturée',
+            title: 'Dossier accepté',
             isRead: true,
           }),
         ],

@@ -19,10 +19,6 @@ abstract class _$UserDtoCWProxy {
 
   UserDto isActive(bool isActive);
 
-  UserDto departementId(String? departementId);
-
-  UserDto departementName(String? departementName);
-
   UserDto phoneE164(String? phoneE164);
 
   UserDto lastLoginAt(DateTime? lastLoginAt);
@@ -44,8 +40,6 @@ abstract class _$UserDtoCWProxy {
     String fullName,
     Role role,
     bool isActive,
-    String? departementId,
-    String? departementName,
     String? phoneE164,
     DateTime? lastLoginAt,
     DateTime createdAt,
@@ -78,14 +72,6 @@ class _$UserDtoCWProxyImpl implements _$UserDtoCWProxy {
   UserDto isActive(bool isActive) => this(isActive: isActive);
 
   @override
-  UserDto departementId(String? departementId) =>
-      this(departementId: departementId);
-
-  @override
-  UserDto departementName(String? departementName) =>
-      this(departementName: departementName);
-
-  @override
   UserDto phoneE164(String? phoneE164) => this(phoneE164: phoneE164);
 
   @override
@@ -112,8 +98,6 @@ class _$UserDtoCWProxyImpl implements _$UserDtoCWProxy {
     Object? fullName = const $CopyWithPlaceholder(),
     Object? role = const $CopyWithPlaceholder(),
     Object? isActive = const $CopyWithPlaceholder(),
-    Object? departementId = const $CopyWithPlaceholder(),
-    Object? departementName = const $CopyWithPlaceholder(),
     Object? phoneE164 = const $CopyWithPlaceholder(),
     Object? lastLoginAt = const $CopyWithPlaceholder(),
     Object? createdAt = const $CopyWithPlaceholder(),
@@ -144,14 +128,6 @@ class _$UserDtoCWProxyImpl implements _$UserDtoCWProxy {
           ? _value.isActive
           // ignore: cast_nullable_to_non_nullable
           : isActive as bool,
-      departementId: departementId == const $CopyWithPlaceholder()
-          ? _value.departementId
-          // ignore: cast_nullable_to_non_nullable
-          : departementId as String?,
-      departementName: departementName == const $CopyWithPlaceholder()
-          ? _value.departementName
-          // ignore: cast_nullable_to_non_nullable
-          : departementName as String?,
       phoneE164: phoneE164 == const $CopyWithPlaceholder()
           ? _value.phoneE164
           // ignore: cast_nullable_to_non_nullable
@@ -182,52 +158,50 @@ extension $UserDtoCopyWith on UserDto {
 // JsonSerializableGenerator
 // **************************************************************************
 
-UserDto _$UserDtoFromJson(
-  Map<String, dynamic> json,
-) => $checkedCreate('UserDto', json, ($checkedConvert) {
-  $checkKeys(
-    json,
-    requiredKeys: const [
-      'id',
-      'email',
-      'username',
-      'fullName',
-      'role',
-      'isActive',
-      'departementId',
-      'departementName',
-      'phoneE164',
-      'lastLoginAt',
-      'createdAt',
-      'prospectCount',
-    ],
-  );
-  final val = UserDto(
-    id: $checkedConvert('id', (v) => v as String),
-    email: $checkedConvert('email', (v) => v as String),
-    username: $checkedConvert('username', (v) => v as String),
-    fullName: $checkedConvert('fullName', (v) => v as String),
-    role: $checkedConvert(
-      'role',
-      (v) => $enumDecode(
-        _$RoleEnumMap,
-        v,
-        unknownValue: Role.unknownDefaultOpenApi,
-      ),
-    ),
-    isActive: $checkedConvert('isActive', (v) => v as bool),
-    departementId: $checkedConvert('departementId', (v) => v as String?),
-    departementName: $checkedConvert('departementName', (v) => v as String?),
-    phoneE164: $checkedConvert('phoneE164', (v) => v as String?),
-    lastLoginAt: $checkedConvert(
-      'lastLoginAt',
-      (v) => v == null ? null : DateTime.parse(v as String),
-    ),
-    createdAt: $checkedConvert('createdAt', (v) => DateTime.parse(v as String)),
-    prospectCount: $checkedConvert('prospectCount', (v) => v as num),
-  );
-  return val;
-});
+UserDto _$UserDtoFromJson(Map<String, dynamic> json) =>
+    $checkedCreate('UserDto', json, ($checkedConvert) {
+      $checkKeys(
+        json,
+        requiredKeys: const [
+          'id',
+          'email',
+          'username',
+          'fullName',
+          'role',
+          'isActive',
+          'phoneE164',
+          'lastLoginAt',
+          'createdAt',
+          'prospectCount',
+        ],
+      );
+      final val = UserDto(
+        id: $checkedConvert('id', (v) => v as String),
+        email: $checkedConvert('email', (v) => v as String),
+        username: $checkedConvert('username', (v) => v as String),
+        fullName: $checkedConvert('fullName', (v) => v as String),
+        role: $checkedConvert(
+          'role',
+          (v) => $enumDecode(
+            _$RoleEnumMap,
+            v,
+            unknownValue: Role.unknownDefaultOpenApi,
+          ),
+        ),
+        isActive: $checkedConvert('isActive', (v) => v as bool),
+        phoneE164: $checkedConvert('phoneE164', (v) => v as String?),
+        lastLoginAt: $checkedConvert(
+          'lastLoginAt',
+          (v) => v == null ? null : DateTime.parse(v as String),
+        ),
+        createdAt: $checkedConvert(
+          'createdAt',
+          (v) => DateTime.parse(v as String),
+        ),
+        prospectCount: $checkedConvert('prospectCount', (v) => v as num),
+      );
+      return val;
+    });
 
 Map<String, dynamic> _$UserDtoToJson(UserDto instance) => <String, dynamic>{
   'id': instance.id,
@@ -236,8 +210,6 @@ Map<String, dynamic> _$UserDtoToJson(UserDto instance) => <String, dynamic>{
   'fullName': instance.fullName,
   'role': _$RoleEnumMap[instance.role]!,
   'isActive': instance.isActive,
-  'departementId': instance.departementId,
-  'departementName': instance.departementName,
   'phoneE164': instance.phoneE164,
   'lastLoginAt': instance.lastLoginAt?.toIso8601String(),
   'createdAt': instance.createdAt.toIso8601String(),

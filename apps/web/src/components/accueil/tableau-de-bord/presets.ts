@@ -2,11 +2,11 @@ import {
   SOURCES,
   type DashboardMarque,
   type DashboardPreset,
-  type DashboardSource,
+  type VisiteSource,
 } from '@/components/accueil/tableau-de-bord/sources';
 
 export interface PresetWidget {
-  source: DashboardSource;
+  source: VisiteSource;
   marque: DashboardMarque;
   taille: 'demi' | 'pleine';
 }
@@ -26,7 +26,7 @@ const AFFLUENCE: PresetWidget[] = [
   { source: 'jour-le-plus-charge', marque: 'tuile', taille: 'demi' },
   { source: 'par-heure-jour-semaine', marque: 'carte-de-chaleur', taille: 'pleine' },
   { source: 'par-heure', marque: 'aire-polaire', taille: 'demi' },
-  { source: 'par-jour-semaine', marque: 'radar', taille: 'demi' },
+  { source: 'par-jour-semaine', marque: 'barres-verticales', taille: 'demi' },
 ];
 
 const ORGANISATION: PresetWidget[] = [
@@ -37,7 +37,7 @@ const ORGANISATION: PresetWidget[] = [
   { source: 'par-entreprise-objet', marque: 'carte-de-chaleur', taille: 'pleine' },
 ];
 
-const COMPLET: PresetWidget[] = (Object.keys(SOURCES) as DashboardSource[]).map((source) => {
+const COMPLET: PresetWidget[] = (Object.keys(SOURCES) as VisiteSource[]).map((source) => {
   const forme = SOURCES[source].forme;
   const marque: DashboardMarque = (() => {
     if (forme === 'scalaire') return 'tuile';

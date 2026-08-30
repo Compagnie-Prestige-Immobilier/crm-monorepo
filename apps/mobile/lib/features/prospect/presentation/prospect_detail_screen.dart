@@ -23,7 +23,6 @@ import '../../../ui/widgets/cpi_kit.dart';
 import '../../../ui/widgets/empty_state.dart';
 import '../../../ui/widgets/error_state.dart';
 import '../../../ui/widgets/sync_status_icon.dart';
-import '../../campagnes/campagnes.dart';
 import '../../phase2/phase2_controller.dart';
 import '../../shell/projects.dart';
 
@@ -127,7 +126,7 @@ class _Pied extends StatelessWidget {
           icon: PhosphorIconsRegular.notePencil,
           onPressed: () => context.pushOnce(
             Uri(
-              path: chues ? Routes.phase2 : CampagnesRoutes.grandPublicConsole,
+              path: chues ? Routes.phase2 : '/grand-public/phase2',
               queryParameters: <String, String>{
                 Routes.prefillPhoneParam: data.phoneE164,
               },

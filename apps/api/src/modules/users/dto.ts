@@ -8,7 +8,6 @@ import {
   IsOptional,
   IsString,
   IsUUID,
-  ValidateIf,
   Matches,
   Max,
   MaxLength,
@@ -55,19 +54,6 @@ export class CreateUserDto {
   @IsOptional()
   @IsEnum(Role)
   role?: Role;
-
-  /**
-   * La chaine VIDE efface le rattachement, un identifiant le pose.
-   *
-   * Sans ce vide, « Aucun » cote panneau ne pouvait qu'omettre le champ, et sur
-   * un PATCH l'omission veut dire « ne change rien » : un departement pose par
-   * erreur ne se retirait jamais.
-   */
-  @ApiPropertyOptional({ format: 'uuid', description: 'Chaîne vide pour retirer le rattachement.' })
-  @IsOptional()
-  @ValidateIf((_object: object, value: unknown) => value !== '')
-  @IsUUID()
-  departementId?: string;
 
   @ApiPropertyOptional({ description: 'Téléphone, normalisé en E.164 par le serveur.' })
   @IsOptional()
@@ -121,8 +107,6 @@ export class UserDto {
   @ApiProperty() fullName!: string;
   @ApiProperty({ enum: Role, enumName: 'Role' }) role!: Role;
   @ApiProperty({ type: Boolean }) isActive!: boolean;
-  @ApiProperty({ type: String, format: 'uuid', nullable: true }) departementId!: string | null;
-  @ApiProperty({ type: String, nullable: true }) departementName!: string | null;
   @ApiProperty({ type: String, nullable: true }) phoneE164!: string | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) lastLoginAt!: string | null;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt!: string;

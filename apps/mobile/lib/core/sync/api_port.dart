@@ -11,7 +11,6 @@ class AuthTokens {
     required this.fullName,
     this.role,
     this.email,
-    this.departementId,
   });
 
   final String accessToken;
@@ -23,8 +22,6 @@ class AuthTokens {
   final String? role;
 
   final String? email;
-
-  final String? departementId;
 }
 
 class PushResult {
@@ -94,7 +91,7 @@ class Phase2DirectoryPage {
   final DateTime serverTime;
 }
 
-/// Les cinq référentiels de saisie, ENTIERS, actifs ou non.
+/// Les six référentiels de saisie, ENTIERS, actifs ou non.
 ///
 /// Le flux keyset ne sait dire que ce qui a CHANGÉ. Une ligne SUPPRIMÉE du
 /// serveur — base remontée, référentiel réimporté — n'y apparaît jamais : le
@@ -108,6 +105,7 @@ class ReferentielsSnapshot {
     required this.banques,
     required this.syndicats,
     required this.canauxProvenance,
+    required this.incomeBands,
   });
 
   final List<DepartementDto> departements;
@@ -115,6 +113,7 @@ class ReferentielsSnapshot {
   final List<BanqueDto> banques;
   final List<SyndicatDto> syndicats;
   final List<CanalProvenanceDto> canauxProvenance;
+  final List<IncomeBandDto> incomeBands;
 }
 
 class RepresentantLookup {

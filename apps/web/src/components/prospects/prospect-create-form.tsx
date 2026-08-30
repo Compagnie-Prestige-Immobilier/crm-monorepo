@@ -176,7 +176,7 @@ export function ProspectCreateForm({
 
   return (
     <form
-      className="mx-auto flex w-full max-w-2xl flex-col gap-5"
+      className="flex w-full flex-col gap-5"
       onSubmit={(event) => {
         event.preventDefault();
         submit(true);

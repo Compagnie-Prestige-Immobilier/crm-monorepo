@@ -150,29 +150,9 @@ enum PaymentMode {
   ECHELONNE
 }
 
-enum CampaignScope {
-  BDD1
-  BDD2
-  BDD3
-  BDD4
-  GP1
-  GP2
-  GP3
-  GP4
-  ALL
-}
-
-enum CampaignStatus {
-  DRAFT
-  ACTIVE
-  PAUSED
-  CLOSED
-}
-
-enum CallTaskStatus {
-  OPEN
-  DONE
-  CANCELLED
+enum LotExportCible {
+  REPRESENTANTS
+  PROSPECTS
 }
 
 enum CallOutcome {
@@ -237,6 +217,9 @@ model User {
   isActive     Boolean   @default(true)
   lastLoginAt  DateTime?
 
+  /// Colonne MORTE : un compte n'a pas de département, plus aucun code ne la
+  /// lit ni ne l'écrit. Conservée pour garder la version réversible, voir
+  /// `docs/migrations-en-attente.md` §2.
   departementId String?
   departement   Departement? @relation(fields: [departementId], references: [id], onDelete: SetNull)
 
@@ -252,9 +235,6 @@ model User {
 
   // Phase 2
   enrollmentsCaptured  Prospect[]               @relation("ProspectEnrollmentCapturedBy")
-  campaignsCreated     CallCampaign[]           @relation("CallCampaignCreatedBy")
-  campaignMemberships  CallCampaignCommercial[] @relation("CallCampaignCommercial")
-  callTasksAssigned    CallTask[]               @relation("CallTaskAssignedTo")
   callAttempts         CallAttempt[]            @relation("CallAttemptPerformedBy")
   journeysConsented    ProspectJourney[]        @relation("ProspectJourneyConsentBy")
   journeysConverted    ProspectJourney[]        @relation("ProspectJourneyConvertedBy")
@@ -262,10 +242,6 @@ model User {
   journeysClosed       ProspectJourney[]        @relation("ProspectJourneyClosedBy")
   conversionsConfirmed ProspectConversion[]     @relation("ProspectConversionConfirmedBy")
 
-  // Campagnes d'appels aux représentants : module séparé, voir plus bas
-  repCampaignsCreated    RepCallCampaign[]           @relation("RepCallCampaignCreatedBy")
-  repCampaignMemberships RepCallCampaignCommercial[] @relation("RepCallCampaignCommercial")
-  repCallTasksAssigned   RepCallTask[]               @relation("RepCallTaskAssignedTo")
   repCallAttempts        RepCallAttempt[]            @relation("RepCallAttemptPerformedBy")
   repSuggestions         RepresentantSuggestion[]    @relation("RepresentantSuggestionSuggestedBy")
 
@@ -280,6 +256,8 @@ model User {
 
   // Démonstration
   appSettingsUpdated AppSetting[] @relation("AppSettingUpdatedBy")
+
+  androidReleasesPublished AndroidRelease[] @relation("AndroidReleasePublishedBy")
 
   // Notifications
   deviceTokens           DeviceToken[]          @relation("DeviceTokenUser")
@@ -296,8 +274,10 @@ model User {
 
   heartbeat AgentHeartbeat?
 
-  visitesEnregistrees Visite[]               @relation("VisiteCreatedBy")
-  visiteDashboard     VisiteDashboardLayout? @relation("VisiteDashboardLayoutUser")
+  visitesEnregistrees Visite[]          @relation("VisiteCreatedBy")
+  dashboardLayouts    DashboardLayout[] @relation("DashboardLayoutUser")
+  lotsExport          LotExport[]       @relation("LotExportCreatedBy")
+  lotExportItems      LotExportItem[]   @relation("LotExportItemAssignee")
 
   @@index([role, isActive])
   @@index([deletedAt])
@@ -358,7 +338,6 @@ model Departement {
   representants    Representant[]
   iefs             Ief[]
   notifications    Notification[]    @relation("NotificationAudienceDepartement")
-  repCallCampaigns RepCallCampaign[] @relation("RepCallCampaignDepartement")
 
   @@unique([regionId, name])
   @@index([updatedAt])
@@ -387,7 +366,6 @@ model Ief {
   updatedAt DateTime @updatedAt
 
   representants    Representant[]
-  repCallCampaigns RepCallCampaign[] @relation("RepCallCampaignIef")
 
   @@unique([departementId, name])
   @@index([updatedAt])
@@ -489,12 +467,12 @@ model Representant {
   deletedAt DateTime?
 
   prospects           Prospect[]
-  repCallTasks        RepCallTask[]
   repCallAttempts     RepCallAttempt[]
   relationChanges     RepresentantRelationChange[]
   comments            RepresentantComment[]
   suggestionsGiven    RepresentantSuggestion[]     @relation("RepresentantSuggestionSource")
   suggestionsResolved RepresentantSuggestion[]     @relation("RepresentantSuggestionResolved")
+  lotItems            LotExportItem[]
 
   @@index([phoneE164])
   @@index([createdById])
@@ -583,7 +561,6 @@ model Offer {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  campaigns   CallCampaign[]
   conversions ProspectConversion[]
 
   @@index([isActive, position])
@@ -690,9 +667,9 @@ model Prospect {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  callTasks          CallTask[]
   callAttempts       CallAttempt[]
   scheduledCallbacks ScheduledCallback[]
+  lotItems           LotExportItem[]
   bankCases          BankCase[]
   clientRequests     ClientCreationRequest[]
 
@@ -917,133 +894,14 @@ model AuditLog {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Phase 2 : campagnes d'appels et collecte des méthodes
-// ═════════════════════════════════════════════════════════════════════════════
-
-// Une campagne fige une répartition. La graine de mélange est PERSISTÉE parce
-// que la répartition doit être reproductible et surtout stable : consulter la
-// campagne ou retélécharger un PDF ne doit jamais retirer au sort. Les
-// affectations sont matérialisées dans CallTask ; la graine ne sert qu'à
-// pouvoir rejouer et auditer le tirage.
-model CallCampaign {
-  id     String         @id @default(uuid(7))
-  name   String
-  projet Projet         @default(CHUES)
-  scope  CampaignScope
-  seed   String
-  status CampaignStatus @default(ACTIVE)
-
-  offerId         String?
-  offer           Offer?  @relation(fields: [offerId], references: [id], onDelete: Restrict)
-  audienceFilters Json?
-
-  /// Nombre de journées sur lesquelles la file de chaque commercial est étalée.
-  ///
-  /// Vaut 1 par défaut, ce qui reproduit exactement le comportement antérieur.
-  /// Au-delà, la file de chaque commercial est découpée en tranches contiguës :
-  /// sur 120 000 fiches et 7 jours, un commercial reçoit sept programmes tenables
-  /// au lieu d'un seul illisible. La répartition reste reproductible à graine
-  /// égale, puisqu'elle se fait APRÈS le tirage et non pendant.
-  spreadDays Int @default(1)
-
-  createdById String
-  createdBy   User   @relation("CallCampaignCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  closedAt  DateTime?
-
-  commerciaux CallCampaignCommercial[]
-  tasks       CallTask[]
-  attempts    CallAttempt[]
-  callbacks   ScheduledCallback[]
-
-  @@index([status, createdAt])
-  @@index([projet, status, createdAt])
-  @@map("call_campaigns")
-}
-
-model CallCampaignCommercial {
-  id         String       @id @default(uuid(7))
-  campaignId String
-  campaign   CallCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  userId     String
-  user       User         @relation("CallCampaignCommercial", fields: [userId], references: [id], onDelete: Restrict)
-  // Rang dans le round-robin. Fige l'ordre de distribution, donc le contenu de
-  // chaque PDF, indépendamment de l'ordre de lecture en base.
-  position   Int
-
-  @@unique([campaignId, userId])
-  @@unique([campaignId, position])
-  @@map("call_campaign_commerciaux")
-}
-
-// Une tâche est une ligne du programme papier d'un commercial.
-//
-// `isActive` est une colonne dédiée plutôt qu'un simple `status = OPEN` : elle
-// porte l'index unique partiel qui interdit deux tâches actives sur le même
-// prospect. Sans lui, deux campagnes simultanées pourraient distribuer le même
-// numéro à deux commerciaux.
-model CallTask {
-  id         String       @id @default(uuid(7))
-  campaignId String
-  campaign   CallCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  prospectId String
-  prospect   Prospect     @relation(fields: [prospectId], references: [id], onDelete: Cascade)
-
-  assignedToId String
-  assignedTo   User   @relation("CallTaskAssignedTo", fields: [assignedToId], references: [id], onDelete: Restrict)
-
-  // Rang dans le PDF du commercial, à partir de 1. L'ordre du PDF doit être
-  // exactement celui-ci : c'est ce qui rend le papier et l'écran cohérents.
-  position Int
-
-  /// Journée d'étalement, à partir de 0 (donc « jour 1 » à l'affichage).
-  ///
-  /// Écrit à la création, jamais recalculé : le programme du jour 3 doit rendre
-  /// le même document une semaine plus tard. Vaut 0 partout quand la campagne
-  /// n'est pas étalée, ce qui laisse les campagnes existantes intactes.
-  dayIndex Int @default(0)
-
-  status   CallTaskStatus @default(OPEN)
-  isActive Boolean        @default(true)
-
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  completedAt DateTime?
-
-  attempts  CallAttempt[]
-  callbacks ScheduledCallback[]
-
-  @@unique([campaignId, prospectId])
-  @@unique([campaignId, assignedToId, position])
-  @@index([assignedToId, status])
-  @@index([assignedToId, completedAt])
-  @@index([prospectId])
-  // Le PDF « jour N » d'un commercial lit exactement cette clé.
-  @@index([campaignId, assignedToId, dayIndex])
-  // Index du curseur de synchronisation : le pull lit ce flux en
-  // `orderBy: [updatedAt, id]`. Sans lui, chaque page balaie la table.
-  @@index([updatedAt, id])
-  @@map("call_tasks")
-}
-
 // Historique append-only des tentatives. Une tentative n'est jamais modifiée.
 //
-// `performedById` est le commercial qui a RÉELLEMENT passé l'appel, distinct de
-// `CallTask.assignedToId`. N'importe quel commercial authentifié peut compléter
-// un numéro trouvé dans l'annuaire, y compris un numéro attribué à un collègue :
-// il faut donc conserver les deux pour que l'attribution reste juste.
+// `performedById` est le téléconseiller qui a réellement passé l'appel.
 model CallAttempt {
   // UUID v7 généré par le mobile : sert aussi de clé d'idempotence.
   id         String        @id
   prospectId String
   prospect   Prospect      @relation(fields: [prospectId], references: [id], onDelete: Cascade)
-  taskId     String?
-  task       CallTask?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
-  campaignId String?
-  campaign   CallCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-
   performedById String
   performedBy   User   @relation("CallAttemptPerformedBy", fields: [performedById], references: [id], onDelete: Restrict)
 
@@ -1082,7 +940,6 @@ model CallAttempt {
   @@index([performedById, createdAt])
   // La journee de travail se lit sur `clientCreatedAt`, l'heure de l'appel.
   @@index([performedById, clientCreatedAt])
-  @@index([campaignId])
   @@index([reasonId, clientCreatedAt])
   @@map("call_attempts")
 }
@@ -1091,11 +948,8 @@ model CallAttempt {
 // date ne soit stockée nulle part : personne ne pouvait savoir quand, donc
 // personne ne saurait jamais si le rappel a eu lieu.
 //
-// Table dédiée, et non une colonne. Sur `CallTask`, la date serait perdue dès
-// qu'un appel se fait hors campagne depuis l'annuaire, et effacée à la clôture
-// de campagne qui passe les tâches à CANCELLED. Sur `Prospect`, deux campagnes
-// et deux téléconseillers se partageraient une seule date, ce que l'index
-// `call_tasks_one_active_per_prospect` existe précisément pour empêcher.
+// Table dédiée, et non une colonne : plusieurs rappels peuvent être historiques
+// et seul le rappel en attente appartient à la file de son auteur.
 //
 // Le retard est DÉRIVÉ (`status = 'PENDING' AND scheduledAt < now()`), jamais
 // stocké : un `missedAt` obligerait un cron à réécrire des millions de lignes
@@ -1104,11 +958,6 @@ model ScheduledCallback {
   id         String        @id @default(uuid(7))
   prospectId String
   prospect   Prospect      @relation(fields: [prospectId], references: [id], onDelete: Cascade)
-  taskId     String?
-  task       CallTask?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
-  campaignId String?
-  campaign   CallCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-
   // Le `performedById` de la tentative source, pas l'assigné de la tâche : c'est
   // celui qui a promis le rappel qui le doit.
   assignedToId String
@@ -1143,109 +992,6 @@ enum ScheduledCallbackStatus {
   SUPERSEDED
 }
 
-// ═════════════════════════════════════════════════════════════════════════════
-// Campagnes d'appels aux REPRÉSENTANTS
-//
-// Module SÉPARÉ, et non un `kind` ajouté sur CallCampaign. Les deux familles
-// partagent la mécanique (graine persistée, tourniquet, tâche par cible,
-// journal d'appels en ajout seul) mais rien de leur métier : la cible n'est pas
-// la même table, les issues d'appel ne sont pas les mêmes, et surtout la
-// campagne prospects porte l'invariant « une seule tâche active par prospect »
-// qui décide de l'éligibilité de la phase 2. Greffer les représentants dessus
-// mettrait cet invariant en jeu à chaque évolution du nouveau besoin, sur la
-// fonctionnalité qui porte aujourd'hui toute la collecte des méthodes.
-// ═════════════════════════════════════════════════════════════════════════════
-
-model RepCallCampaign {
-  id     String         @id @default(uuid(7))
-  name   String
-  seed   String
-  status CampaignStatus @default(ACTIVE)
-
-  /// Voir `CallCampaign.spreadDays` : même sémantique, même valeur par défaut.
-  spreadDays Int @default(1)
-
-  /// Périmètre du tirage. Les deux bornes sont FACULTATIVES et se cumulent ;
-  /// aucune des deux ne vaut « tous les représentants du pays ».
-  departementId String?
-  departement   Departement? @relation("RepCallCampaignDepartement", fields: [departementId], references: [id], onDelete: SetNull)
-  iefId         String?
-  ief           Ief?         @relation("RepCallCampaignIef", fields: [iefId], references: [id], onDelete: SetNull)
-
-  /// Ne retenir que les représentants n'ayant apporté AUCUN prospect vivant.
-  /// C'est la campagne de relance des dormants, celle qui a motivé le module.
-  onlyWithoutProspects Boolean @default(false)
-
-  /// Statuts de relation retenus par le tirage. Liste VIDE : aucun filtre, la
-  /// campagne prend qualifiés et non qualifiés.
-  relationStatuses RepresentantRelation[] @default([])
-
-  createdById String
-  createdBy   User   @relation("RepCallCampaignCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  closedAt  DateTime?
-
-  commerciaux RepCallCampaignCommercial[]
-  tasks       RepCallTask[]
-  attempts    RepCallAttempt[]
-
-  @@index([status, createdAt])
-  @@map("rep_call_campaigns")
-}
-
-model RepCallCampaignCommercial {
-  id         String          @id @default(uuid(7))
-  campaignId String
-  campaign   RepCallCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  userId     String
-  user       User            @relation("RepCallCampaignCommercial", fields: [userId], references: [id], onDelete: Restrict)
-  // Rang dans le tourniquet. Fige la distribution, donc le contenu de chaque PDF.
-  position   Int
-
-  @@unique([campaignId, userId])
-  @@unique([campaignId, position])
-  @@map("rep_call_campaign_commerciaux")
-}
-
-// Une tâche est une ligne du programme papier d'un commercial.
-//
-// `isActive` porte l'index unique partiel qui interdit deux tâches actives sur
-// le même représentant : sans lui, deux campagnes simultanées distribueraient le
-// même numéro à deux commerciaux, qui appelleraient la même personne le même
-// matin.
-model RepCallTask {
-  id             String          @id @default(uuid(7))
-  campaignId     String
-  campaign       RepCallCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  representantId String
-  representant   Representant    @relation(fields: [representantId], references: [id], onDelete: Cascade)
-
-  assignedToId String
-  assignedTo   User   @relation("RepCallTaskAssignedTo", fields: [assignedToId], references: [id], onDelete: Restrict)
-
-  position Int
-  /// Voir `CallTask.dayIndex`.
-  dayIndex Int @default(0)
-
-  status   CallTaskStatus @default(OPEN)
-  isActive Boolean        @default(true)
-
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  completedAt DateTime?
-
-  attempts RepCallAttempt[]
-
-  @@unique([campaignId, representantId])
-  @@unique([campaignId, assignedToId, position])
-  @@index([assignedToId, status])
-  @@index([representantId])
-  @@index([campaignId, assignedToId, dayIndex])
-  @@map("rep_call_tasks")
-}
-
 /// Historique en AJOUT SEUL des appels passés aux représentants. Une tentative
 /// n'est jamais modifiée : elle décrit un fait daté.
 model RepCallAttempt {
@@ -1253,11 +999,6 @@ model RepCallAttempt {
   id             String           @id
   representantId String
   representant   Representant     @relation(fields: [representantId], references: [id], onDelete: Cascade)
-  taskId         String?
-  task           RepCallTask?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
-  campaignId     String?
-  campaign       RepCallCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-
   performedById String
   performedBy   User   @relation("RepCallAttemptPerformedBy", fields: [performedById], references: [id], onDelete: Restrict)
 
@@ -1277,7 +1018,6 @@ model RepCallAttempt {
   @@index([representantId, createdAt])
   @@index([performedById, createdAt])
   @@index([performedById, clientCreatedAt])
-  @@index([campaignId])
   @@map("rep_call_attempts")
 }
 
@@ -1507,6 +1247,27 @@ model AppSetting {
   @@map("app_settings")
 }
 
+/// Historique des APK publiés depuis le panel. Le plancher de version n'est PAS
+/// une colonne : c'est `max(versionCode)` des lignes `mandatory` non retirées.
+model AndroidRelease {
+  versionCode   Int       @id
+  versionName   String
+  fileName      String
+  fileSize      Int
+  sha256        String
+  signerSha256  String
+  mandatory     Boolean   @default(false)
+  publishedAt   DateTime  @default(now())
+  publishedById String?
+  publishedBy   User?     @relation("AndroidReleasePublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
+  notes         String?
+  withdrawnAt   DateTime?
+  withdrawnById String?
+
+  @@index([publishedAt])
+  @@map("android_releases")
+}
+
 // ═════════════════════════════════════════════════════════════════════════════
 // Notifications
 // ═════════════════════════════════════════════════════════════════════════════
@@ -1527,6 +1288,9 @@ enum NotificationCategory {
 enum NotificationAudience {
   ALL
   ROLE
+  /// Valeur MORTE : refusée à l'envoi depuis que les comptes n'ont plus de
+  /// département. Ne survit que dans les envois passés, voir
+  /// `docs/migrations-en-attente.md` §2.
   DEPARTEMENT
   USERS
 }
@@ -1665,6 +1429,7 @@ model Notification {
 
   audience              NotificationAudience @default(ALL)
   audienceRole          Role?
+  /// Colonne MORTE, même sort que `users.departementId` : `docs/migrations-en-attente.md` §2.
   audienceDepartementId String?
   audienceDepartement   Departement?         @relation("NotificationAudienceDepartement", fields: [audienceDepartementId], references: [id], onDelete: SetNull)
   audienceUserIds       String[]             @default([])
@@ -2247,20 +2012,68 @@ model Visite {
   @@map("visites")
 }
 
-/// La disposition du tableau de bord des visites, telle que l'utilisateur l'a
-/// composée. L'absence de ligne veut dire « suivre la disposition par défaut »,
-/// posée par l'administrateur dans `AppSetting`.
+/// La disposition d'un écran de chiffres, telle que l'utilisateur l'a composée.
+/// L'absence de ligne veut dire « suivre la disposition par défaut », posée par
+/// l'administrateur dans `AppSetting`.
 ///
-/// `userId` est la clé primaire : une ligne par utilisateur par construction.
-model VisiteDashboardLayout {
-  userId String @id
-  user   User   @relation("VisiteDashboardLayoutUser", fields: [userId], references: [id], onDelete: Cascade)
+/// `ecran` distingue les écrans qui partagent le même moteur de composition :
+/// le registre des visites, les chiffres CHUES, les chiffres Grand Public.
+model DashboardLayout {
+  userId String
+  user   User   @relation("DashboardLayoutUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  ecran String
 
   layout Json
 
   updatedAt DateTime @updatedAt
 
-  @@map("visite_dashboard_layouts")
+  @@id([userId, ecran])
+  @@map("dashboard_layouts")
+}
+
+model LotExport {
+  id        String         @id @default(uuid(7))
+  name      String
+  cible     LotExportCible
+  projet    Projet?
+  filters   Json
+  itemCount Int
+
+  createdById String
+  createdBy   User     @relation("LotExportCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime @default(now())
+
+  items LotExportItem[]
+
+  @@index([cible, createdAt])
+  @@index([createdById, createdAt])
+  @@map("lots_export")
+}
+
+model LotExportItem {
+  lotId String
+  lot   LotExport @relation(fields: [lotId], references: [id], onDelete: Cascade)
+
+  representantId String?
+  representant   Representant? @relation(fields: [representantId], references: [id], onDelete: Cascade)
+  prospectId     String?
+  prospect       Prospect?     @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+
+  position Int
+
+  /// Le téléconseiller à qui la fiche est confiée, et la journée de son
+  /// programme. Le lot n'est pas une simple sélection : c'est la répartition
+  /// imprimée que le terrain emporte.
+  assigneeId String?
+  assignee   User?   @relation("LotExportItemAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  day        Int     @default(1)
+
+  @@id([lotId, position])
+  @@index([representantId])
+  @@index([prospectId])
+  @@index([lotId, assigneeId, day])
+  @@map("lot_export_items")
 }
 
 enum VisiteImportChangeKind {

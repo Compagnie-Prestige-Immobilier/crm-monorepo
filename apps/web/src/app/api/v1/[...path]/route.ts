@@ -84,20 +84,19 @@ async function handle(
   }
 
   const accessToken = await getAccessToken();
-  if (accessToken === null || accessToken === '') {
-    return NextResponse.json({ error: 'Session expirée.' }, { status: 401 });
-  }
-
   const body = method === 'GET' || method === 'DELETE' ? null : await request.arrayBuffer();
 
-  let upstream: Response;
-  try {
-    upstream = await forward(request, method, path, accessToken, body);
-  } catch {
-    return NextResponse.json({ error: 'Le serveur CPI est injoignable.' }, { status: 502 });
+  // Le cookie d'accès expire avant celui de rafraîchissement : son absence
+  // vaut un 401 amont et passe par la même rotation.
+  if (accessToken !== null && accessToken !== '') {
+    let upstream: Response;
+    try {
+      upstream = await forward(request, method, path, accessToken, body);
+    } catch {
+      return NextResponse.json({ error: 'Le serveur CPI est injoignable.' }, { status: 502 });
+    }
+    if (upstream.status !== 401) return toClientResponse(upstream);
   }
-
-  if (upstream.status !== 401) return toClientResponse(upstream);
 
   const refreshToken = await getRefreshToken();
   const rotation =

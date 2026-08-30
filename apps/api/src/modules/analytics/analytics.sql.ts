@@ -14,13 +14,12 @@ export function prospectConditions(
   const conditions: Prisma.Sql[] = [];
 
   if (!readsEveryone(user)) {
-    conditions.push(porteeProspect(user.id));
+    conditions.push(Prisma.sql`p."createdById" = ${user.id}`);
   }
-
-  // Le filtre passe tel quel : la portée ci-dessus reste en AND et ne laisse
-  // remonter que ce que l'appelant a déjà en main.
   if (filter.commercialId) {
-    conditions.push(Prisma.sql`p."createdById" = ${filter.commercialId}`);
+    conditions.push(
+      Prisma.sql`p."createdById" = ${readableOwnerId(user, filter.commercialId)}`,
+    );
   }
 
   if (!(filter.includeDeleted && isAdmin(user))) {
@@ -37,17 +36,9 @@ export function prospectConditions(
 }
 
 /**
- * `prospectReadScope` en SQL : ses propres fiches, ou celles qu'une campagne lui
- * a confiées. Les agrégats sont écrits en SQL brut, une clause Prisma ne s'y
- * réemploie pas ; c'est la même règle, elle doit bouger en même temps.
+ * Portée des prospects en SQL. Les agrégats sont écrits en SQL brut, une clause
+ * Prisma ne s'y réemploie pas ; c'est la même règle, elle doit bouger en même temps.
  */
-function porteeProspect(userId: string): Prisma.Sql {
-  return Prisma.sql`(p."createdById" = ${userId} OR EXISTS (
-    SELECT 1 FROM "call_tasks" ct
-    WHERE ct."prospectId" = p."id" AND ct."assignedToId" = ${userId} AND ct."isActive"
-  ))`;
-}
-
 function prospectFilterConditions(filter: ProspectFilterDto): Prisma.Sql[] {
   const conditions: Prisma.Sql[] = [];
   const directConditions: Array<[unknown, Prisma.Sql]> = [
@@ -90,8 +81,12 @@ function prospectFilterConditions(filter: ProspectFilterDto): Prisma.Sql[] {
     conditions.push(Prisma.sql`p."statut" = ${filter.statut}::"ProspectStatut"`);
   }
   if (filter.segment) conditions.push(segmentCondition(filter.segment));
-  const campaign = campaignCondition(filter);
-  if (campaign) conditions.push(campaign);
+  if (filter.appelePar) {
+    conditions.push(Prisma.sql`EXISTS (
+      SELECT 1 FROM "call_attempts" ca
+      WHERE ca."prospectId" = p."id" AND ca."performedById" = ${filter.appelePar}
+    )`);
+  }
   if (filter.dateFrom) {
     conditions.push(Prisma.sql`p."clientCreatedAt" >= ${inclusiveDateFrom(filter.dateFrom)}`);
   }
@@ -102,21 +97,6 @@ function prospectFilterConditions(filter: ProspectFilterDto): Prisma.Sql[] {
   const search = searchCondition(filter.search);
   if (search) conditions.push(search);
   return conditions;
-}
-
-function campaignCondition(filter: ProspectFilterDto): Prisma.Sql | undefined {
-  if (!(filter.campaignId ?? filter.assignedToId)) return undefined;
-  let campagne = Prisma.empty;
-  let attribuee = Prisma.empty;
-  if (filter.campaignId) campagne = Prisma.sql`AND ct."campaignId" = ${filter.campaignId}`;
-  if (filter.assignedToId) attribuee = Prisma.sql`AND ct."assignedToId" = ${filter.assignedToId}`;
-  return Prisma.sql`EXISTS (
-    SELECT 1 FROM "call_tasks" ct
-    WHERE ct."prospectId" = p."id"
-      ${campagne}
-      ${attribuee}
-      AND TRUE
-  )`;
 }
 
 function searchCondition(rawSearch: string | undefined): Prisma.Sql | undefined {

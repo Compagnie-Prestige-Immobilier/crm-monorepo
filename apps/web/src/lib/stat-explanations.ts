@@ -24,12 +24,6 @@ export const STAT_KEYS = [
   'bankByStage',
   'bankByRejectionReason',
 
-  'campaignContactRate',
-  'campaignReachRate',
-  'campaignAttemptsPerMethod',
-  'campaignRemaining',
-  'campaignClosedPerDay',
-  'campaignClosedPerCommercial',
   'dataQuality',
 
   'delayLegs',
@@ -92,18 +86,6 @@ export const STAT_EXPLANATIONS: Record<StatKey, string> = {
   bankByRejectionReason:
     'Répartition des motifs de rejet. Elle nomme la cause la plus fréquente de perte d’un dossier.',
 
-  campaignContactRate:
-    'Part des fiches de la campagne ayant reçu au moins un appel. Elle mesure l’avancement du travail, pas son résultat.',
-  campaignReachRate:
-    'Part des appels qui ont abouti à quelqu’un. Les numéros injoignables et les faux numéros en sont exclus : ils disent la qualité de la base, pas celle du téléconseil.',
-  campaignAttemptsPerMethod:
-    'Nombre moyen d’appels nécessaires pour obtenir une méthode d’enrôlement. Plus il monte, plus la base résiste.',
-  campaignRemaining:
-    'Fiches encore à appeler, et date de fin projetée à la cadence des sept derniers jours. Sans cadence observée, aucune date n’est annoncée.',
-  campaignClosedPerDay:
-    'Fiches clôturées chaque jour, tous téléconseillers confondus. La pente donne la cadence réelle de la campagne.',
-  campaignClosedPerCommercial:
-    'Fiches clôturées par chaque téléconseiller. Le classement porte sur les fiches abouties, pas sur le nombre d’appels passés.',
   dataQuality:
     'Part de numéros injoignables ou erronés, par représentant ayant apporté les fiches. Elle désigne l’origine d’une base inexploitable.',
 

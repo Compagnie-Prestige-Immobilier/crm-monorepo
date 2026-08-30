@@ -1,7 +1,9 @@
 import {
   CallOutcome,
   EnrollmentMethod,
+  PaymentMode,
   Phase2Status,
+  ProspectType,
   ScheduledCallbackStatus,
 } from '@crm/database';
 import { BadRequestException } from '@nestjs/common';
@@ -15,7 +17,6 @@ type MockFn = ReturnType<typeof vi.fn>;
 
 interface MockTx {
   callAttempt: Record<'findUnique' | 'createMany', MockFn>;
-  callTask: Record<'findFirst' | 'updateMany', MockFn>;
   callOutcomeReason: Record<'findUnique', MockFn>;
   prospect: Record<'findFirst' | 'updateMany' | 'update', MockFn>;
   prospectJourney: Record<'upsert' | 'updateMany', MockFn>;
@@ -60,10 +61,6 @@ const prepare = (): void => {
     callAttempt: {
       findUnique: vi.fn().mockResolvedValue(null),
       createMany: vi.fn().mockResolvedValue({ count: 1 }),
-    },
-    callTask: {
-      findFirst: vi.fn().mockResolvedValue(null),
-      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
     callOutcomeReason: {
       findUnique: vi.fn((args: { where: { code: string } }) =>
@@ -174,6 +171,26 @@ describe('renseignements de conversion', () => {
     expect(row.banqueId).toBeUndefined();
   });
 
+  it('écrit aussi sur le PROSPECT sa situation, son revenu et son paiement', async () => {
+    await apply({
+      ...priseDeRendezVous,
+      type: ProspectType.FONCTIONNAIRE,
+      incomeBandId: 'i-1',
+      paymentMode: PaymentMode.ECHELONNE,
+      dureeSystemeMois: 24,
+    });
+
+    const [args] = tx.prospect.update.mock.calls[0] as [{ data: Record<string, unknown> }];
+    expect(args.data).toEqual({
+      type: 'FONCTIONNAIRE',
+      incomeBandId: 'i-1',
+      paymentMode: 'ECHELONNE',
+      dureeSystemeMois: 24,
+      rev: { increment: 1 },
+    });
+    expect(writtenRow().incomeBandId).toBeUndefined();
+  });
+
   it('un champ absent laisse la valeur en place : le silence n’efface rien', async () => {
     await apply({ ...priseDeRendezVous, prenom: 'Awa' });
 
@@ -199,7 +216,7 @@ describe('renseignements de conversion', () => {
   });
 
   it('le rejeu d’une tentative déjà reçue ne recorrige pas la fiche', async () => {
-    tx.callAttempt.findUnique.mockResolvedValue({ id: 'att-1', taskId: null, task: null });
+    tx.callAttempt.findUnique.mockResolvedValue({ id: 'att-1' });
     await apply({ ...priseDeRendezVous, nom: 'Diop' });
 
     expect(tx.prospect.update).not.toHaveBeenCalled();
@@ -256,24 +273,10 @@ describe('rappel planifié', () => {
     expect((row.scheduledAt as Date).toISOString()).toBe(RAPPEL);
   });
 
-  it('rattache le rappel à la campagne quand l’appel en vient', async () => {
-    // La campagne porte le PROJET, qui décide de quel parcours relève la tentative.
-    tx.callTask.findFirst.mockResolvedValue({
-      id: 'task-1',
-      campaignId: 'camp-1',
-      campaign: { projet: 'CHUES' },
-    });
+  it('un rappel existe sans tâche', async () => {
     await apply({ outcome: CallOutcome.CALLBACK, callbackAt: RAPPEL });
 
-    expect(callbackWritten().taskId).toBe('task-1');
-    expect(callbackWritten().campaignId).toBe('camp-1');
-  });
-
-  it('hors campagne, le rappel existe quand même, sans tâche', async () => {
-    await apply({ outcome: CallOutcome.CALLBACK, callbackAt: RAPPEL });
-
-    expect(callbackWritten().taskId).toBeNull();
-    expect(callbackWritten().campaignId).toBeNull();
+    expect(callbackWritten()).toMatchObject({ prospectId: 'p-1', assignedToId: 'com-1' });
   });
 
   it('dépose le rappel précédent en SUPERSEDED avant d’insérer', async () => {
@@ -297,7 +300,7 @@ describe('rappel planifié', () => {
   });
 
   it('le rejeu de la MÊME tentative ne recrée pas de rappel', async () => {
-    tx.callAttempt.findUnique.mockResolvedValue({ id: 'att-1', taskId: null, task: null });
+    tx.callAttempt.findUnique.mockResolvedValue({ id: 'att-1' });
     await apply({ outcome: CallOutcome.CALLBACK, callbackAt: RAPPEL });
 
     expect(tx.scheduledCallback.createMany).not.toHaveBeenCalled();
@@ -452,35 +455,6 @@ describe('résolution du motif d’issue', () => {
 });
 
 describe('la phase 2 est un état du PARCOURS, pas de la fiche', () => {
-  /// Portée par la fiche, elle rendait un prospect refusé en CHUES
-  /// définitivement inappelable en Grand Public : la campagne le tirait quand
-  /// même et chaque tentative revenait en 409, bloquant sur le téléphone toute
-  /// la partition de file de ce prospect.
-  it('un refus CHUES ne ferme pas le parcours Grand Public', async () => {
-    prepare();
-    tx.callTask.findFirst.mockResolvedValue({
-      id: 'task-gp',
-      campaignId: 'camp-gp',
-      campaign: { projet: 'GRAND_PUBLIC' },
-    });
-    // Le parcours Grand Public est neuf, même si la fiche a été soldée par CHUES.
-    tx.prospectJourney.upsert.mockResolvedValue({
-      id: 'j-gp',
-      phase2Status: Phase2Status.PENDING,
-      enrollmentMethod: null,
-      enrollmentCapturedById: null,
-      enrollmentCapturedAt: null,
-    });
-
-    const result = (await apply({ outcome: CallOutcome.REFUSED })) as { status: string };
-
-    expect(result.status).toBe('applied');
-    const upsert = tx.prospectJourney.upsert.mock.calls[0]?.[0] as {
-      where: { prospectId_projet: { projet: string } };
-    };
-    expect(upsert.where.prospectId_projet.projet).toBe('GRAND_PUBLIC');
-  });
-
   it('c’est le PARCOURS qui arbitre « la première transition terminale gagne »', async () => {
     prepare();
     tx.prospectJourney.updateMany.mockResolvedValue({ count: 0 });

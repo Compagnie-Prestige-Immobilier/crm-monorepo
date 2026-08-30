@@ -21,9 +21,6 @@ export const notificationsEnvSchema = z.object({
     .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'NOTIFICATIONS_DAILY_REPORT_AT must be HH:MM')
     .default('17:00'),
 
-  NOTIFICATIONS_OPEN_TASKS_ENABLED: booleanFlag(true),
-  NOTIFICATIONS_OPEN_TASKS_MIN: z.coerce.number().int().positive().max(10_000).default(1),
-
   NOTIFICATIONS_BANK_PENDING_ENABLED: booleanFlag(true),
   NOTIFICATIONS_BANK_PENDING_DAYS: z.coerce.number().int().positive().max(365).default(5),
 

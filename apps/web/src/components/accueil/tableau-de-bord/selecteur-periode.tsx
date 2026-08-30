@@ -33,6 +33,12 @@ export interface DashboardFilters {
   comparaison: Comparaison;
 }
 
+const LIBELLES_COMPARAISON: Record<Comparaison, string> = {
+  aucune: 'Comparer à : rien',
+  precedente: 'Comparer à : période précédente',
+  'annee-precedente': 'Comparer à : même période l’an dernier',
+};
+
 function defaultRange(): Plage {
   return plageDuPreset('ce-mois', new Date());
 }
@@ -93,9 +99,12 @@ export function periodeAffichee(filters: DashboardFilters): string {
 export function SelecteurPeriode({
   filters,
   onChange,
+  comparaison = true,
 }: {
   filters: DashboardFilters;
   onChange: (patch: Partial<DashboardFilters>) => void;
+  /** Un écran qui ne compare rien ne montre pas « Comparer à ». */
+  comparaison?: boolean;
 }) {
   const plage = plageDeFiltres(filters);
   const tropLarge = plageTropLarge(plage);
@@ -157,21 +166,27 @@ export function SelecteurPeriode({
           </PopoverContent>
         </Popover>
 
-        <Select
-          value={filters.comparaison}
-          onValueChange={(value) => {
-            if (value !== null) onChange({ comparaison: value });
-          }}
-        >
-          <SelectTrigger aria-label="Comparer à" size="sm" className="w-48">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="aucune">Comparer à : rien</SelectItem>
-            <SelectItem value="precedente">Comparer à : période précédente</SelectItem>
-            <SelectItem value="annee-precedente">Comparer à : même période l’an dernier</SelectItem>
-          </SelectContent>
-        </Select>
+        {comparaison ? (
+          <Select
+            value={filters.comparaison}
+            onValueChange={(value) => {
+              if (value !== null) onChange({ comparaison: value });
+            }}
+          >
+            <SelectTrigger aria-label="Comparer à" size="sm" className="w-48">
+              <SelectValue>
+                {(valeur: Comparaison) => LIBELLES_COMPARAISON[valeur]}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(LIBELLES_COMPARAISON).map(([valeur, libelle]) => (
+                <SelectItem key={valeur} value={valeur}>
+                  {libelle}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
       </div>
 
       {tropLarge ? (

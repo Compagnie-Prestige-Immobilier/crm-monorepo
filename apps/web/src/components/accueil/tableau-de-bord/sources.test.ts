@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { REGLAGES_HONORES, reglagesHonores } from '@/components/accueil/tableau-de-bord/sources';
+import {
+  REGLAGES_HONORES,
+  catalogueVisitesDe,
+  reglagesHonores,
+} from '@/components/accueil/tableau-de-bord/sources';
 
 describe('reglagesHonores', () => {
   it('ne rend aucun réglage inerte : tableau, carte de chaleur et tuile n’honorent rien', () => {
@@ -45,5 +49,14 @@ describe('reglagesHonores', () => {
 
   it('couvre les vingt marques du catalogue', () => {
     expect(Object.keys(REGLAGES_HONORES)).toHaveLength(20);
+  });
+});
+
+describe('catalogueVisitesDe', () => {
+  it('réserve les indicateurs internes au registre à sa direction', () => {
+    const accueil = catalogueVisitesDe('ACCUEIL');
+    expect(accueil['par-direction']).toBeUndefined();
+    expect(accueil['par-agent']).toBeUndefined();
+    expect(accueil['par-objet']).toBeDefined();
   });
 });

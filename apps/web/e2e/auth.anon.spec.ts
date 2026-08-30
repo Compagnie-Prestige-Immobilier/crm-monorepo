@@ -48,9 +48,17 @@ test('la connexion pose une session utilisable et mène au hub des espaces', asy
     await expect(tuiles.getByRole('link', { name: new RegExp(`^${espace}`) })).toBeVisible();
   }
 
+  /**
+   * La tuile mène à `coqueHomePath(role, coque)`, pas à la racine de la coque.
+   * Pour un ADMIN, la première entrée non repliée de la coque CHUES est
+   * « Tableau de bord » (`nav-items.ts`), soit `/chues/statistiques` : attendre
+   * `**\/chues` échouait sur une redirection qui n'a jamais existé.
+   */
   await tuiles.getByRole('link', { name: /^Projet CHUES/ }).click();
-  await page.waitForURL('**/chues');
-  await expect(page).toHaveTitle(/Projet CHUES/);
+  await page.waitForURL('**/chues/statistiques');
+  // Le titre du DOCUMENT, posé par la page (`statistiques/page.tsx`), pas par
+  // la barre supérieure qui le dérive de la route.
+  await expect(page).toHaveTitle(/Tableau de bord/);
 });
 
 test('la déconnexion efface la session et reverrouille le panel', async ({ page }) => {
@@ -66,7 +74,10 @@ test('la déconnexion efface la session et reverrouille le panel', async ({ page
   expect(names).not.toContain('cpi_rt');
 
   // ...et le panel n'est plus atteignable en tapant l'URL directement.
-  await page.goto('/prospects');
+  // `/chues/prospects` : l'adresse réelle depuis le découpage en coques.
+  // `/prospects` passait d'abord par le renvoi de `moved-routes.ts` et
+  // n'éprouvait donc pas la garde de la coque elle-même.
+  await page.goto('/chues/prospects');
   await page.waitForURL('**/connexion**');
 });
 

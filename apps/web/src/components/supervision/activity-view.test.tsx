@@ -36,12 +36,11 @@ function payload(overrides: Partial<AdminModule.SupervisionActivity> = {}) {
         reachRate: 50,
         prospectsCreated: 2,
         representantsContacted: 2,
-        tasksClosed: 1,
       },
     ],
     teleconseillers: [
-      { id: ALICE, fullName: 'Alice Diop', isActive: true, openTasks: 1 },
-      { id: BINETA, fullName: 'Bineta Fall', isActive: true, openTasks: 4 },
+      { id: ALICE, fullName: 'Alice Diop', isActive: true },
+      { id: BINETA, fullName: 'Bineta Fall', isActive: true },
     ],
     ...overrides,
   };

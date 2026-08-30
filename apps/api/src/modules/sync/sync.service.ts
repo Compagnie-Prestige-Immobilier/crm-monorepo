@@ -183,10 +183,6 @@ function errorMessageOf(error: { getResponse: () => unknown; message: string }):
  * tirer, mais une tâche déjà traitée reste visible, sinon la fiche disparaît de
  * l'appareil au moment même où le téléconseiller vient de la qualifier.
  */
-const assignedTo = (userId: string): Prisma.CallTaskListRelationFilter => ({
-  some: { assignedToId: userId, isActive: true },
-});
-
 /**
  * Les représentants sont l'ANNUAIRE de l'entreprise : un téléconseiller les
  * reçoit tous, sans qu'une campagne les lui confie. Les prospects, eux, restent
@@ -201,16 +197,7 @@ const ANNUAIRE_ROLES: readonly Role[] = [
 
 const mineOrAssignedRepresentant = (
   user: Pick<AuthenticatedUser, 'id' | 'role'>,
-): Prisma.RepresentantWhereInput =>
-  ANNUAIRE_ROLES.includes(user.role)
-    ? {}
-    : {
-        OR: [
-          { createdById: user.id },
-          { prospects: { some: { callTasks: assignedTo(user.id) } } },
-          { repCallTasks: { some: { assignedToId: user.id } } },
-        ],
-      };
+): Prisma.RepresentantWhereInput => (ANNUAIRE_ROLES.includes(user.role) ? {} : {});
 
 @Injectable()
 export class SyncService {
@@ -723,15 +710,6 @@ export class SyncService {
     existing: { id: string; createdById: string } | null,
   ): Promise<void> {
     if (existing === null || isAdmin(user) || existing.createdById === user.id) return;
-    const assigned = await tx.callTask.findFirst({
-      where: {
-        assignedToId: user.id,
-        isActive: true,
-        prospect: { representantId: existing.id },
-      },
-      select: { id: true },
-    });
-    if (assigned !== null) return;
     throw new OperationError(
       SyncOpStatus.CONFLICT,
       'ENTITY_ID_OWNED_BY_ANOTHER_USER',
@@ -794,29 +772,6 @@ export class SyncService {
       );
     }
 
-    // La tentative n'hérite d'aucune garde : `phase2-sync` LIT le prospect, il
-    // ne l'autorise pas. Sans ce contrôle, poster le `prospectId` d'un collègue
-    // suffisait à s'attribuer son adhésion et à éteindre sa file.
-    //
-    // La tâche est cherchée sans `isActive` : une tentative saisie hors ligne
-    // arrive souvent après que la file a été soldée, et elle reste légitime.
-    if (!isAdmin(user)) {
-      const permis = await tx.prospect.findFirst({
-        where: {
-          id: data.prospectId,
-          OR: [{ createdById: user.id }, { callTasks: { some: { assignedToId: user.id } } }],
-        },
-        select: { id: true },
-      });
-      if (!permis) {
-        throw new OperationError(
-          SyncOpStatus.CONFLICT,
-          'ENTITY_ID_OWNED_BY_ANOTHER_USER',
-          'Cette fiche appartient à un autre téléconseiller.',
-        );
-      }
-    }
-
     try {
       const result = await this.phase2Sync.applyCallAttempt(tx, user.id, {
         id: operation.entityId,
@@ -839,6 +794,10 @@ export class SyncService {
           profession: data.profession,
           banqueId: data.banqueId,
           syndicatId: data.syndicatId,
+          type: data.type,
+          incomeBandId: data.incomeBandId,
+          paymentMode: data.paymentMode,
+          dureeSystemeMois: data.dureeSystemeMois,
         }),
         clientCreatedAt: data.clientCreatedAt,
       });
@@ -1009,11 +968,6 @@ export class SyncService {
     existing: { id: string; createdById: string } | null,
   ): Promise<void> {
     if (existing === null || isAdmin(user) || existing.createdById === user.id) return;
-    const assigned = await tx.callTask.findFirst({
-      where: { prospectId: existing.id, assignedToId: user.id, isActive: true },
-      select: { id: true },
-    });
-    if (assigned !== null) return;
     throw new OperationError(
       SyncOpStatus.CONFLICT,
       'ENTITY_ID_OWNED_BY_ANOTHER_USER',
@@ -1114,6 +1068,14 @@ export class SyncService {
     cursor = advance(cursor, 'syndicats', lastPosition(syndicats));
     pageLengths.push(syndicats.length);
 
+    const incomeBands = await this.prisma.incomeBand.findMany({
+      where: keyset(cursor.streams.incomeBands, safeNow),
+      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+    });
+    cursor = advance(cursor, 'incomeBands', lastPosition(incomeBands));
+    pageLengths.push(incomeBands.length);
+
     const representants = await this.prisma.representant.findMany({
       where: {
         ...keyset(cursor.streams.representants, safeNow),
@@ -1134,56 +1096,6 @@ export class SyncService {
     });
     cursor = advance(cursor, 'prospects', lastPosition(prospects));
     pageLengths.push(prospects.length);
-
-    // Les campagnes AVANT les files : une file qui arrive sans sa campagne
-    // n'aurait pas de nom à afficher, et le terrain verrait une liste anonyme.
-    const callCampaigns = await this.prisma.callCampaign.findMany({
-      where: {
-        ...keyset(cursor.streams.callCampaigns, safeNow),
-        ...(isAdmin(user) ? {} : { tasks: { some: { assignedToId: user.id, isActive: true } } }),
-      },
-      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
-      take: limit,
-    });
-    cursor = advance(cursor, 'callCampaigns', lastPosition(callCampaigns));
-    pageLengths.push(callCampaigns.length);
-
-    // `isActive` n'est PAS filtré ici : une file retirée au commercial doit
-    // descendre une dernière fois, sinon le téléphone la garde pour toujours et
-    // continue de proposer des fiches qui ne lui sont plus confiées. C'est le
-    // client qui l'efface, sur la foi du drapeau.
-    const callTasks = await this.prisma.callTask.findMany({
-      where: {
-        ...keyset(cursor.streams.callTasks, safeNow),
-        ...(isAdmin(user) ? {} : { assignedToId: user.id }),
-      },
-      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
-      take: limit,
-    });
-    cursor = advance(cursor, 'callTasks', lastPosition(callTasks));
-    pageLengths.push(callTasks.length);
-
-    const repCallCampaigns = await this.prisma.repCallCampaign.findMany({
-      where: {
-        ...keyset(cursor.streams.repCallCampaigns, safeNow),
-        ...(isAdmin(user) ? {} : { commerciaux: { some: { userId: user.id } } }),
-      },
-      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
-      take: limit,
-    });
-    cursor = advance(cursor, 'repCallCampaigns', lastPosition(repCallCampaigns));
-    pageLengths.push(repCallCampaigns.length);
-
-    const repCallTasks = await this.prisma.repCallTask.findMany({
-      where: {
-        ...keyset(cursor.streams.repCallTasks, safeNow),
-        ...(isAdmin(user) ? {} : { assignedToId: user.id }),
-      },
-      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
-      take: limit,
-    });
-    cursor = advance(cursor, 'repCallTasks', lastPosition(repCallTasks));
-    pageLengths.push(repCallTasks.length);
 
     // Le registre n'est pas un référentiel : il porte des noms et des numéros de
     // visiteurs, hors du périmètre des rôles qui ne le tiennent pas. Un compte
@@ -1275,46 +1187,20 @@ export class SyncService {
           sortOrder: row.sortOrder,
           updatedAt: row.updatedAt.toISOString(),
         })),
+        incomeBands: incomeBands.map((row) => ({
+          id: row.id,
+          code: row.code,
+          label: row.label,
+          minXof: row.minXof,
+          maxXof: row.maxXof,
+          position: row.position,
+          isActive: row.isActive,
+          updatedAt: row.updatedAt.toISOString(),
+        })),
         representants: representants
           .filter((row) => !row.deletedAt)
           .map((row) => toRepresentantDto(row)),
         prospects: prospects.filter((row) => !row.deletedAt).map((row) => toProspectDto(row)),
-        callCampaigns: callCampaigns.map((row) => ({
-          id: row.id,
-          name: row.name,
-          status: row.status,
-          spreadDays: row.spreadDays,
-          updatedAt: row.updatedAt.toISOString(),
-          closedAt: row.closedAt?.toISOString() ?? null,
-        })),
-        callTasks: callTasks.map((row) => ({
-          id: row.id,
-          campaignId: row.campaignId,
-          prospectId: row.prospectId,
-          position: row.position,
-          dayIndex: row.dayIndex,
-          status: row.status,
-          isActive: row.isActive,
-          updatedAt: row.updatedAt.toISOString(),
-        })),
-        repCallCampaigns: repCallCampaigns.map((row) => ({
-          id: row.id,
-          name: row.name,
-          status: row.status,
-          spreadDays: row.spreadDays,
-          updatedAt: row.updatedAt.toISOString(),
-          closedAt: row.closedAt?.toISOString() ?? null,
-        })),
-        repCallTasks: repCallTasks.map((row) => ({
-          id: row.id,
-          campaignId: row.campaignId,
-          representantId: row.representantId,
-          position: row.position,
-          dayIndex: row.dayIndex,
-          status: row.status,
-          isActive: row.isActive,
-          updatedAt: row.updatedAt.toISOString(),
-        })),
         visites: visites.map((row): SyncVisiteDto => ({
           id: row.id,
           reference: row.reference,

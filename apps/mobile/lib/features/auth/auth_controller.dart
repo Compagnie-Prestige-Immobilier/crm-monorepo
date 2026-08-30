@@ -32,21 +32,13 @@ class AuthController extends Notifier<AuthState> {
       String? name;
       String? role;
       String? email;
-      String? departementId;
       if (store is SecureTokenStore) {
-        final ({
-          String fullName,
-          String id,
-          String? role,
-          String? email,
-          String? departementId,
-        })?
+        final ({String fullName, String id, String? role, String? email})?
         identity = await store.readIdentity();
         id = identity?.id;
         name = identity?.fullName;
         role = identity?.role;
         email = identity?.email;
-        departementId = identity?.departementId;
       }
       state = AuthState(
         status: AuthStatus.authenticated,
@@ -54,7 +46,6 @@ class AuthController extends Notifier<AuthState> {
         fullName: name,
         role: role,
         email: email,
-        departementId: departementId,
       );
     } on Object {
       // Coffre chiffré illisible : sans ce repli l'état reste `unknown` et
@@ -91,7 +82,6 @@ class AuthController extends Notifier<AuthState> {
           fullName: tokens.fullName,
           role: tokens.role,
           email: tokens.email,
-          departementId: tokens.departementId,
         );
       }
       state = AuthState(
@@ -100,7 +90,6 @@ class AuthController extends Notifier<AuthState> {
         fullName: tokens.fullName,
         role: tokens.role,
         email: tokens.email,
-        departementId: tokens.departementId,
       );
       unawaited(ref.read(notificationInboxProvider).refresh(force: true));
       return true;

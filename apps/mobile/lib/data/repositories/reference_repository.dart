@@ -100,6 +100,18 @@ class ReferenceRepository {
         .watch();
   }
 
+  Stream<List<IncomeBand>> watchIncomeBands() {
+    return (_db.select(_db.incomeBands)
+          ..where(
+            (IncomeBands t) => t.isActive.equals(true) & t.deletedAt.isNull(),
+          )
+          ..orderBy(<OrderClauseGenerator<IncomeBands>>[
+            (IncomeBands t) => OrderingTerm.asc(t.sortOrder),
+            (IncomeBands t) => OrderingTerm.asc(t.label),
+          ]))
+        .watch();
+  }
+
   /// Les motifs d'issue proposés à la saisie, avec repli sur les six motifs
   /// système tant que la table est vide : au premier lancement, avant la
   /// première synchronisation, le téléconseiller doit pouvoir enregistrer un

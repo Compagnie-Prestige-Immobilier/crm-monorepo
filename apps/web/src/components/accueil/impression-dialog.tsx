@@ -330,7 +330,7 @@ export function ImpressionDialog({
           tableau avec lui. Masqué à l'écran, visible seulement à l'impression. */}
       {toutesLesVisites === null ? null : (
         <div className="hidden print:block">
-          <p className="mb-1 font-[700]">Registre des visites — {periodeTexte(filters, today)}</p>
+          <p className="mb-1 font-[700]">Registre des visites : {periodeTexte(filters, today)}</p>
           <p className="mb-3 text-[0.75rem]">
             {formatNumber(toutesLesVisites.length)} visites · imprimé le{' '}
             {formatDate(dakarNow().date)}

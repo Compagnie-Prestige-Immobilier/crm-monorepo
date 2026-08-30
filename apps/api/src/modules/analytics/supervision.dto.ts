@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsISO8601, IsOptional } from 'class-validator';
+import { Projet } from '@crm/database';
+import { IsEnum, IsISO8601, IsOptional, IsUUID } from 'class-validator';
 
 export enum SupervisionGranularity {
   DAY = 'day',
@@ -34,15 +35,32 @@ export class SupervisionQueryDto {
   @IsOptional()
   @IsEnum(SupervisionGranularity)
   granularity?: SupervisionGranularity;
+
+  @ApiPropertyOptional({
+    enum: Projet,
+    enumName: 'Projet',
+    description:
+      'Le projet. ABSENT veut dire les deux. Un représentant n’existe que dans ' +
+      'CHUES : sous `GRAND_PUBLIC`, toutes les colonnes `rep*` valent 0 ou `null`.',
+  })
+  @IsOptional()
+  @IsEnum(Projet)
+  projet?: Projet;
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Un seul téléconseiller : borne les lignes, la liste et les histogrammes.',
+  })
+  @IsOptional()
+  @IsUUID()
+  commercialId?: string;
 }
 
-export class SupervisionActivityRowDto {
-  @ApiProperty({ description: 'Début de la journée ou de la semaine, en AAAA-MM-JJ.' })
-  bucket!: string;
-
-  @ApiProperty({ format: 'uuid' }) teleconseillerId!: string;
-  @ApiProperty() teleconseillerName!: string;
-
+/**
+ * Les mêmes colonnes pour une ligne d'agent et pour la ligne d'équipe. Les taux
+ * de l'équipe se recalculent sur les sommes, jamais en moyennant les lignes.
+ */
+export class SupervisionActivityCountsDto {
   @ApiProperty({ type: Number, description: 'Appels passés à des prospects.' }) calls!: number;
   @ApiProperty({ type: Number, description: 'Issue UNREACHABLE : NRP ou injoignable.' })
   unreachable!: number;
@@ -70,20 +88,91 @@ export class SupervisionActivityRowDto {
   @ApiProperty({ type: Number, description: 'Représentants distincts appelés sur la période.' })
   representantsContacted!: number;
 
-  @ApiProperty({ type: Number, description: 'Tâches d’appel clôturées sur la période.' })
-  tasksClosed!: number;
+  @ApiProperty({
+    type: Number,
+    description:
+      'Appels à des représentants, issues encore saisissables seulement : REACHED, ' +
+      'REFUSED, CALLBACK, UNREACHABLE. Dénominateur de `repContactRate` et de ' +
+      '`repCallbackRate`.',
+  })
+  repCalls!: number;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      'Représentants qui ont DÉCROCHÉ et répondu : REACHED ou REFUSED. Un refus est ' +
+      'un contact ; un rappel promis n’en est pas encore un.',
+  })
+  repReached!: number;
+
+  @ApiProperty({ type: Number, description: 'Issue CALLBACK : rappel promis, date posée.' })
+  repCallback!: number;
+
+  @ApiProperty({ type: Number, description: 'Issue UNREACHABLE : n’a pas décroché.' })
+  repUnreachable!: number;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      'Issues d’héritage que le terrain ne saisit plus : PROSPECTS_PROMISED, ' +
+      'WRONG_NUMBER, OTHER. Hors de tous les taux.',
+  })
+  repOther!: number;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description:
+      'Part des appels représentants où quelqu’un a répondu, en pourcentage. ' +
+      '`null` sans aucun appel.',
+  })
+  repContactRate!: number | null;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: 'Part des appels représentants finissant en rappel, en pourcentage.',
+  })
+  repCallbackRate!: number | null;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      'Représentants DISTINCTS dont la dernière réponse de la fenêtre a été obtenue ' +
+      'par ce téléconseiller. Attribué à qui a obtenu la réponse, pas à qui a appelé ' +
+      'le premier. NON SOMMABLE entre périodes ni entre téléconseillers.',
+  })
+  repQuestioned!: number;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      'Parmi `repQuestioned`, ceux dont cette dernière réponse est REACHED. NON SOMMABLE.',
+  })
+  repQualified!: number;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description:
+      'Part des représentants interrogés qui ont dit oui, en pourcentage. `null` sans ' +
+      'aucun représentant interrogé.',
+  })
+  repQualificationRate!: number | null;
+}
+
+export class SupervisionActivityRowDto extends SupervisionActivityCountsDto {
+  @ApiProperty({ description: 'Début de la journée ou de la semaine, en AAAA-MM-JJ.' })
+  bucket!: string;
+
+  @ApiProperty({ format: 'uuid' }) teleconseillerId!: string;
+  @ApiProperty() teleconseillerName!: string;
 }
 
 export class SupervisionTeleconseillerDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
   @ApiProperty() fullName!: string;
   @ApiProperty({ type: Boolean }) isActive!: boolean;
-
-  @ApiProperty({
-    type: Number,
-    description: 'Tâches d’appel encore OUVERTES. Instantané : la fenêtre ne le borne pas.',
-  })
-  openTasks!: number;
 }
 
 export class SupervisionHistogramBarDto {
@@ -105,6 +194,15 @@ export class SupervisionActivityDto {
       'Une ligne par téléconseiller et par période, seulement là où il s’est passé quelque chose.',
   })
   items!: SupervisionActivityRowDto[];
+
+  @ApiProperty({
+    type: () => SupervisionActivityCountsDto,
+    description:
+      'L’équipe entière sur TOUTE la fenêtre, filtres compris. Calculé côté serveur : ' +
+      '`representantsContacted`, `repQuestioned` et `repQualified` comptent des ' +
+      'personnes distinctes, et la somme des lignes en compterait certaines deux fois.',
+  })
+  totals!: SupervisionActivityCountsDto;
 
   @ApiProperty({
     type: () => [SupervisionTeleconseillerDto],

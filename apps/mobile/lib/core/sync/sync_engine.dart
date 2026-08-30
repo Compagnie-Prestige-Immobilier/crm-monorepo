@@ -56,7 +56,7 @@ class SyncEngine {
   /// v3 : les commentaires d'une fiche remontent depuis la file hors ligne.
   /// v4 : les liens banque, syndicat et représentant d'un prospect peuvent
   /// être nuls ; le tirage exige ce numéro en en-tête et refuse en dessous.
-  static const int payloadVersion = 4;
+  static const int payloadVersion = 5;
 
   /// Poids qu'un lot peut atteindre sur le fil ; c'est lui que le `sendTimeout`
   /// du profil `push` doit pouvoir émettre sur un lien montant EDGE.
@@ -1465,6 +1465,12 @@ class SyncEngine {
         (CanalProvenanceDto c) => c.id,
         _upsertCanalProvenance,
       );
+      retired += await _mirrorKind<IncomeBandDto>(
+        _db.incomeBands,
+        snapshot.incomeBands,
+        (IncomeBandDto b) => b.id,
+        _upsertIncomeBand,
+      );
       // Le marqueur est posé DANS la transaction : une écriture interrompue ne
       // doit pas laisser croire que le miroir est fait.
       await _db
@@ -1486,7 +1492,8 @@ class SyncEngine {
       page.changes.iefs.isNotEmpty ||
       page.changes.banques.isNotEmpty ||
       page.changes.syndicats.isNotEmpty ||
-      page.changes.canauxProvenance.isNotEmpty;
+      page.changes.canauxProvenance.isNotEmpty ||
+      page.changes.incomeBands.isNotEmpty;
 
   static const String referentielsMirrorKey = 'referentiels_mirror';
 
@@ -1765,6 +1772,40 @@ class SyncEngine {
         );
   }
 
+  Future<void> _upsertIncomeBand(IncomeBandDto b) async {
+    await _db
+        .into(_db.incomeBands)
+        .insert(
+          IncomeBandsCompanion.insert(
+            id: b.id,
+            code: b.code,
+            label: b.label,
+            minXof: Value<int?>(b.minXof?.toInt()),
+            maxXof: Value<int?>(b.maxXof?.toInt()),
+            isActive: Value<bool>(b.isActive),
+            sortOrder: Value<int>(b.position.toInt()),
+            localUpdatedAt: _clock.now(),
+            serverUpdatedAt: Value<DateTime?>(b.updatedAt),
+          ),
+          onConflict: DoUpdate<IncomeBands, IncomeBand>(
+            (IncomeBands old) => IncomeBandsCompanion.custom(
+              code: const CustomExpression<String>('excluded.code'),
+              label: const CustomExpression<String>('excluded.label'),
+              minXof: const CustomExpression<int>('excluded.min_xof'),
+              maxXof: const CustomExpression<int>('excluded.max_xof'),
+              isActive: const CustomExpression<bool>('excluded.is_active'),
+              sortOrder: const CustomExpression<int>('excluded.sort_order'),
+              serverUpdatedAt: const CustomExpression<DateTime>(
+                'excluded.server_updated_at',
+              ),
+              localUpdatedAt: const CustomExpression<DateTime>(
+                'excluded.local_updated_at',
+              ),
+            ),
+          ),
+        );
+  }
+
   Future<int> _applyPage(PullPage page) async {
     int count = 0;
     await _db.transaction(() async {
@@ -1788,6 +1829,10 @@ class SyncEngine {
       }
       for (final CanalProvenanceDto c in page.changes.canauxProvenance) {
         await _upsertCanalProvenance(c);
+        count++;
+      }
+      for (final IncomeBandDto b in page.changes.incomeBands) {
+        await _upsertIncomeBand(b);
         count++;
       }
       for (final SyndicatDto s in page.changes.syndicats) {
@@ -1969,90 +2014,6 @@ class SyncEngine {
                 ),
               );
         }
-        count++;
-      }
-
-      // Les campagnes puis les files. Elles ne portent AUCUNE revision : le
-      // serveur est seul a les ecrire, un rejeu de pull reecrit donc la meme
-      // ligne sans qu'il y ait rien a arbitrer.
-      for (final SyncCallCampaignDto c in page.changes.callCampaigns) {
-        await _db
-            .into(_db.callCampaigns)
-            .insertOnConflictUpdate(
-              CallCampaignsCompanion.insert(
-                id: c.id,
-                name: c.name,
-                status: Value<String>(c.status.value),
-                spreadDays: Value<int>(c.spreadDays.toInt()),
-                closedAt: Value<DateTime?>(c.closedAt),
-                updatedAt: c.updatedAt,
-              ),
-            );
-        count++;
-      }
-      // Une file retirée au commercial descend une DERNIÈRE fois, avec
-      // `isActive` à faux : c'est le seul moment où le téléphone apprend qu'il
-      // doit cesser d'appeler ces fiches. Sans cette suppression, elle restait
-      // au programme pour toujours.
-      for (final SyncCallTaskDto t in page.changes.callTasks) {
-        if (!t.isActive) {
-          await (_db.delete(
-            _db.callTasks,
-          )..where((CallTasks c) => c.id.equals(t.id))).go();
-          count++;
-          continue;
-        }
-        await _db
-            .into(_db.callTasks)
-            .insertOnConflictUpdate(
-              CallTasksCompanion.insert(
-                id: t.id,
-                campaignId: t.campaignId,
-                prospectId: t.prospectId,
-                position: t.position.toInt(),
-                dayIndex: Value<int>(t.dayIndex.toInt()),
-                status: Value<String>(t.status.value),
-                updatedAt: t.updatedAt,
-              ),
-            );
-        count++;
-      }
-      for (final SyncRepCallCampaignDto c in page.changes.repCallCampaigns) {
-        await _db
-            .into(_db.repCallCampaigns)
-            .insertOnConflictUpdate(
-              RepCallCampaignsCompanion.insert(
-                id: c.id,
-                name: c.name,
-                status: Value<String>(c.status.value),
-                spreadDays: Value<int>(c.spreadDays.toInt()),
-                closedAt: Value<DateTime?>(c.closedAt),
-                updatedAt: c.updatedAt,
-              ),
-            );
-        count++;
-      }
-      for (final SyncRepCallTaskDto t in page.changes.repCallTasks) {
-        if (!t.isActive) {
-          await (_db.delete(
-            _db.repCallTasks,
-          )..where((RepCallTasks c) => c.id.equals(t.id))).go();
-          count++;
-          continue;
-        }
-        await _db
-            .into(_db.repCallTasks)
-            .insertOnConflictUpdate(
-              RepCallTasksCompanion.insert(
-                id: t.id,
-                campaignId: t.campaignId,
-                representantId: t.representantId,
-                position: t.position.toInt(),
-                dayIndex: Value<int>(t.dayIndex.toInt()),
-                status: Value<String>(t.status.value),
-                updatedAt: t.updatedAt,
-              ),
-            );
         count++;
       }
 

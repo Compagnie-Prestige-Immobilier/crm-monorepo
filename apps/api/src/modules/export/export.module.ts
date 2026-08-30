@@ -11,5 +11,6 @@ import { VisitesExportService } from './visites-export.service.js';
   imports: [AnalyticsModule, VisitesModule],
   controllers: [ExportController],
   providers: [ExportService, RepresentantsExportService, VisitesExportService],
+  exports: [ExportService, RepresentantsExportService],
 })
 export class ExportModule {}

@@ -106,7 +106,9 @@ export class AnalyticsService {
       [TimeGranularity.WEEK]: Prisma.sql`'week'`,
       [TimeGranularity.MONTH]: Prisma.sql`'month'`,
     };
-    const unit = units[query.granularity ?? TimeGranularity.DAY];
+    // Une valeur hors énumération passe la lecture d'index et rendrait
+    // `date_trunc(undefined, ...)` : le repli se fait sur la valeur, pas sur la clé.
+    const unit = units[query.granularity as TimeGranularity] ?? units[TimeGranularity.DAY];
 
     const rows = await this.prisma.$queryRaw<
       { bucket: Date; prospects: number; representants: number }[]

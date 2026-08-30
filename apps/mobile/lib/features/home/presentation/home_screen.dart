@@ -9,7 +9,6 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/providers/sync_coordinator.dart';
 import '../../../data/local/database.dart';
-import '../../campagnes/campagnes.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/router/single_push.dart';
 import '../../../core/theme/cpi_tokens.dart';
@@ -19,6 +18,7 @@ import '../../../ui/widgets/cpi_kit.dart';
 import '../../../ui/widgets/cpi_pressable.dart';
 import '../../auth/auth_state.dart';
 import '../../notifications/notifications_controller.dart';
+import '../../rappels/presentation/rappels_en_retard_banner.dart';
 import '../../shell/app_shell.dart';
 import '../../shell/projects.dart';
 import '../../shell/workspace_switch.dart';
@@ -52,58 +52,30 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ThemeData theme = Theme.of(context);
     final AuthState auth = ref.watch(authControllerProvider);
-    final AsyncValue<List<RepCampaignsWithOpenWorkResult>> filesRep = ref.watch(
-      repCampagnesProvider,
-    );
-    final AsyncValue<List<CampaignsWithOpenWorkResult>> files = ref.watch(
-      chuesCampagnesProvider,
-    );
+    final AsyncValue<int> representants = ref.watch(representantCountProvider);
+    final AsyncValue<int> prospects = ref.watch(prospectCountProvider);
     final AsyncValue<int> sansProspect = ref.watch(
       representantsSansProspectProvider,
     );
     final List<ActivityDay> activity =
         ref.watch(activityLast7DaysProvider).value ?? const <ActivityDay>[];
-    final bool chiffresIllisibles =
-        filesRep.hasError || files.hasError || sansProspect.hasError;
-
-    final List<RepCampaignsWithOpenWorkResult> campagnesRep =
-        filesRep.value ?? const <RepCampaignsWithOpenWorkResult>[];
-    final List<CampaignsWithOpenWorkResult> campagnes =
-        files.value ?? const <CampaignsWithOpenWorkResult>[];
-
-    final AsyncValue<int> aQualifier = filesRep.whenData(
-      (List<RepCampaignsWithOpenWorkResult> rows) => rows.fold<int>(
-        0,
-        (int total, RepCampaignsWithOpenWorkResult c) => total + c.ouvertes,
-      ),
-    );
-    final AsyncValue<int> aConvertir = files.whenData(
-      (List<CampaignsWithOpenWorkResult> rows) => rows.fold<int>(
-        0,
-        (int total, CampaignsWithOpenWorkResult c) => total + c.ouvertes,
-      ),
-    );
+    final bool chiffresIllisibles = representants.hasError || prospects.hasError || sansProspect.hasError;
+    final AsyncValue<int> aQualifier = representants;
+    final AsyncValue<int> aConvertir = prospects;
 
     // Sans liste confiée, la qualification passe par l'annuaire : le
     // téléconseiller a souvent le fichier des représentants de son côté et
     // cherche la personne au nom ou au numéro.
     void ouvrirQualification() => context.pushOnce(
-      filesRep.hasValue && campagnesRep.isEmpty
-          ? Routes.representantsPourQualifier()
-          : campagnesRep.length == 1
-          ? CampagnesRoutes.repFileFor(campagnesRep.single.id)
-          : CampagnesRoutes.listeRepresentants,
+      Routes.representantsPourQualifier(),
     );
 
     void ouvrirConversion() => context.pushOnce(
-      campagnes.isEmpty
-          ? Routes.phase2
-          : campagnes.length == 1
-          ? CampagnesRoutes.fileFor(campagnes.single.id)
-          : CampagnesRoutes.liste,
+      Routes.phase2,
     );
 
     final List<Widget> corps = <Widget>[
+      const RappelsEnRetardBanner(padded: false),
       if (chiffresIllisibles)
         Padding(
           padding: const EdgeInsets.only(bottom: CpiSpacing.sm),
@@ -112,8 +84,8 @@ class HomeScreen extends ConsumerWidget {
             tone: CpiTone.danger,
             actionLabel: 'Réessayer',
             onAction: () {
-              ref.invalidate(repCampagnesProvider);
-              ref.invalidate(chuesCampagnesProvider);
+              ref.invalidate(representantCountProvider);
+              ref.invalidate(prospectCountProvider);
               ref.invalidate(representantsSansProspectProvider);
             },
           ),

@@ -4,19 +4,14 @@ export const PURGE_STEP_ORDER = [
   'bankCaseTransitions',
   'bankCases',
   'callAttempts',
-  // Avant `callTasks`, `campaigns` et surtout `commercialAccounts` : un rappel
-  // planifié pointe son téléconseiller en Restrict, et son prospect en cascade.
+  'lotExportItems',
+  'lotsExport',
+  // Avant `commercialAccounts` : un rappel planifié pointe son téléconseiller
+  // en Restrict, et son prospect en cascade.
   'scheduledCallbacks',
-  'callTasks',
-  'campaignMembers',
-  'campaigns',
-  // Avant `repCallAttempts` : la suggestion pend de la tentative en CASCADE, et
-  // partirait sans figurer au rapport rendu a l'administrateur.
+  // Avant `repCallAttempts` : la suggestion pend de la tentative en CASCADE.
   'repSuggestions',
   'repCallAttempts',
-  'repCallTasks',
-  'repCampaignMembers',
-  'repCampaigns',
   'clientRequests',
   'visites',
   'prospectConversions',
@@ -61,8 +56,7 @@ export const PURGE_DOMAIN_KEYS = [
   'directionAccueil',
   'representants',
   'prospects',
-  'campagnes',
-  'campagnesRepresentants',
+  'lotsExport',
   'demandesClients',
   'visites',
   'fileAppels',
@@ -98,34 +92,21 @@ export const PURGE_DOMAINS: readonly PurgeDomain[] = [
     key: 'tentatives',
     label: 'Tentatives d’appel',
     hint: 'Historique des appels passés.',
-    steps: ['callAttempts'],
+    steps: ['repSuggestions', 'repCallAttempts', 'callAttempts'],
     requires: [],
   },
   {
     key: 'fileAppels',
     label: 'File d’appels',
     hint: 'Numéros attribués, appelés ou non, et les rappels planifiés.',
-    steps: ['scheduledCallbacks', 'callTasks'],
+    steps: ['scheduledCallbacks'],
     requires: [],
   },
   {
-    key: 'campagnes',
-    label: 'Campagnes d’appels',
-    hint: 'Campagnes et leur répartition entre téléconseillers.',
-    steps: ['campaignMembers', 'campaigns'],
-    requires: ['fileAppels'],
-  },
-  {
-    key: 'campagnesRepresentants',
-    label: 'Campagnes d’appels aux représentants',
-    hint: 'Campagnes de relance, leur file d’appels, les tentatives enregistrées et les numéros suggérés.',
-    steps: [
-      'repSuggestions',
-      'repCallAttempts',
-      'repCallTasks',
-      'repCampaignMembers',
-      'repCampaigns',
-    ],
+    key: 'lotsExport',
+    label: 'Lots d’export',
+    hint: 'Lots de fiches figés pour Excel et le terrain.',
+    steps: ['lotExportItems', 'lotsExport'],
     requires: [],
   },
   {
@@ -154,9 +135,7 @@ export const PURGE_DOMAINS: readonly PurgeDomain[] = [
     label: 'Représentants',
     hint: 'Fiches représentants.',
     steps: ['representants'],
-    // `campagnesRepresentants` : tâches et tentatives pendent du représentant en CASCADE,
-    // et partiraient sans être comptées dans le rapport rendu à l'administrateur.
-    requires: ['prospects', 'campagnesRepresentants'],
+    requires: ['prospects'],
   },
   {
     key: 'notifications',
@@ -188,8 +167,7 @@ export const PURGE_DOMAINS: readonly PurgeDomain[] = [
       'dossiers',
       'tentatives',
       'fileAppels',
-      'campagnes',
-      'campagnesRepresentants',
+      'lotsExport',
       'prospects',
       'representants',
     ],

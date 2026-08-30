@@ -18,8 +18,10 @@ import { axisScales, baseOptions, radialScale } from '@/components/dashboard/cha
 import type {
   CompositionLigne,
   DispositionPresentation,
+  EquipeDatum,
   MatriceDatum,
 } from '@/components/accueil/tableau-de-bord/sources';
+import { EmptyChart } from '@/components/dashboard/empty-chart';
 import { seriesBorderColor, seriesColor, useChartTheme, type ChartTheme } from '@/lib/chart-theme';
 import { formatNumber } from '@/lib/format';
 import type { NamedCount } from '@/lib/types';
@@ -787,7 +789,7 @@ export function CarteDeChaleurTable({
       ?.value ?? 0;
 
   return (
-    <div className="h-full overflow-auto">
+    <div className="h-full overflow-auto" tabIndex={0}>
       <table className="w-full border-collapse text-[0.75rem]">
         <caption className="sr-only">{caption}</caption>
         <thead>
@@ -844,7 +846,7 @@ export function TableauWidget({
 }) {
   const total = items.reduce((somme, item) => somme + item.value, 0);
   return (
-    <div className="h-full overflow-auto">
+    <div className="h-full overflow-auto" tabIndex={0}>
       <table className="w-full text-[0.8125rem]">
         <caption className="sr-only">{caption}</caption>
         <thead className="border-b border-border">
@@ -868,7 +870,7 @@ export function TableauWidget({
               </th>
               <td className="px-2 py-1.5 text-right tabular-nums">{formatNumber(item.value)}</td>
               <td className="px-2 py-1.5 text-right tabular-nums">
-                {total === 0 ? '—' : `${String(Math.round((item.value / total) * 100))} %`}
+                {total === 0 ? '0 %' : `${String(Math.round((item.value / total) * 100))} %`}
               </td>
             </tr>
           ))}
@@ -885,19 +887,80 @@ export function TableauWidget({
   );
 }
 
+/**
+ * Le tableau d'équipe : une ligne par personne, des colonnes d'unités
+ * différentes. Les cellules arrivent déjà mises en forme, la source seule
+ * sachant ce qui est un compte et ce qui est un pourcentage.
+ */
+export function TableauEquipe({ donnee, caption }: { donnee: EquipeDatum; caption: string }) {
+  if (donnee.lignes.length === 0) {
+    return <EmptyChart message="Personne n’a travaillé sur la période." />;
+  }
+
+  return (
+    <div className="h-full overflow-auto" tabIndex={0}>
+      <table className="min-w-[42rem] w-full text-[0.875rem]">
+        <caption className="sr-only">{caption}</caption>
+        <thead className="sticky top-0 border-b border-border bg-card">
+          <tr>
+            <th scope="col" className="px-3 py-2 text-left font-[600]">
+              Téléconseiller
+            </th>
+            {donnee.colonnes.map((colonne) => (
+              <th key={colonne} scope="col" className="px-3 py-2 text-right font-[600]">
+                {colonne}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {donnee.lignes.map((ligne) => (
+            <tr key={ligne.id}>
+              <th scope="row" className="px-3 py-2 text-left font-[400]">
+                {ligne.nom}
+              </th>
+              {ligne.cellules.map((cellule) => (
+                <td key={cellule.cle} className="px-3 py-2 text-right tabular-nums">
+                  {cellule.texte}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+        {donnee.pied === undefined ? null : (
+          <tfoot className="sticky bottom-0 border-t border-border bg-card font-[600]">
+            <tr>
+              <th scope="row" className="px-3 py-2 text-left">
+                {donnee.pied.nom}
+              </th>
+              {donnee.pied.cellules.map((cellule) => (
+                <td key={cellule.cle} className="px-3 py-2 text-right tabular-nums">
+                  {cellule.texte}
+                </td>
+              ))}
+            </tr>
+          </tfoot>
+        )}
+      </table>
+    </div>
+  );
+}
+
 export function TuileWidget({
   valeur,
+  affichage,
   libelle,
   detail,
 }: {
   valeur: number;
+  affichage?: string | undefined;
   libelle: string;
   detail?: string | undefined;
 }) {
   return (
     <div className="flex h-full flex-col justify-center">
       <p className="font-display text-[2.25rem] font-[800] leading-none tracking-[-0.02em] tabular-nums">
-        {formatNumber(valeur)}
+        {affichage ?? formatNumber(valeur)}
       </p>
       {detail === undefined ? null : (
         <p className="mt-2 text-[0.8125rem] text-muted-foreground">{detail}</p>

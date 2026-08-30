@@ -10,6 +10,7 @@ import 'package:crm_api_client/src/deserialize.dart';
 import 'package:dio/dio.dart';
 
 import 'package:crm_api_client/src/model/api_error_dto.dart';
+import 'package:crm_api_client/src/model/projet.dart';
 import 'package:crm_api_client/src/model/supervision_activity_dto.dart';
 import 'package:crm_api_client/src/model/supervision_granularity.dart';
 
@@ -25,6 +26,8 @@ class SupervisionApi {
   /// * [actFrom] - Borne basse sur la date de l’ACTE, incluse : heure d’appel, de saisie ou de clôture relevée chez le client, et non date d’arrivée en base. Une date seule (AAAA-MM-JJ) démarre à minuit, fuseau Africa/Dakar.
   /// * [actTo] - Borne haute sur la date de l’acte, incluse. Une date seule finit à 23:59:59.999.
   /// * [granularity]
+  /// * [projet] - Le projet. ABSENT veut dire les deux. Un représentant n’existe que dans CHUES : sous `GRAND_PUBLIC`, toutes les colonnes `rep*` valent 0 ou `null`.
+  /// * [commercialId] - Un seul téléconseiller : borne les lignes, la liste et les histogrammes.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -38,6 +41,8 @@ class SupervisionApi {
     DateTime? actFrom,
     DateTime? actTo,
     SupervisionGranularity? granularity,
+    Projet? projet,
+    String? commercialId,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -62,6 +67,8 @@ class SupervisionApi {
       if (actFrom != null) r'actFrom': actFrom,
       if (actTo != null) r'actTo': actTo,
       if (granularity != null) r'granularity': granularity,
+      if (projet != null) r'projet': projet,
+      if (commercialId != null) r'commercialId': commercialId,
     };
 
     final _response = await _dio.request<Object>(

@@ -111,6 +111,25 @@ CREATE TABLE canaux_provenance (
 CREATE INDEX canaux_provenance_active_idx
     ON canaux_provenance (is_active, sort_order, label);
 
+-- Les tranches de revenu mensuel, administrées depuis le web. Les bornes
+-- descendent avec la ligne mais ne servent qu'à relire le libellé : c'est le
+-- serveur qui juge la cohérence d'une tranche citée par une saisie.
+CREATE TABLE income_bands (
+    id TEXT NOT NULL PRIMARY KEY,
+    code TEXT NOT NULL,
+    label TEXT NOT NULL,
+    min_xof INTEGER NULL,
+    max_xof INTEGER NULL,
+    is_active BOOLEAN NOT NULL DEFAULT 1,
+    sort_order INTEGER NOT NULL DEFAULT 100,
+    local_updated_at DATETIME NOT NULL,
+    server_updated_at DATETIME NULL,
+    deleted_at DATETIME NULL
+);
+
+CREATE INDEX income_bands_active_idx
+    ON income_bands (is_active, sort_order, label);
+
 -- Les quatre listes du registre des visites, dans UNE table : elles ont la même
 -- forme, et `kind` suffit à les séparer. Quatre tables jumelles auraient quatre
 -- fois le même code de pull et de lecture.
@@ -800,104 +819,6 @@ attemptsForProspect:
 countUnreadNotifications:
     SELECT COUNT(*) AS c FROM notifications WHERE read_at IS NULL;
 
--- ── Campagnes d'appels ───────────────────────────────────────────────────────
---
--- Le tirage se fait sur le serveur. L'appareil n'en reçoit que le RÉSULTAT : le
--- nom de la campagne, et la liste des fiches qu'elle lui a confiées. Sans ces
--- deux tables, toutes les campagnes se confondaient dans une seule file et le
--- téléconseiller ne savait pas au titre de quoi il appelait.
-
-CREATE TABLE call_campaigns (
-    id TEXT NOT NULL PRIMARY KEY,
-    name TEXT NOT NULL,
-    -- Pas de CHECK d'énumération : la valeur vient du SERVEUR. Voir `prospects`.
-    status TEXT NOT NULL DEFAULT 'ACTIVE',
-    spread_days INTEGER NOT NULL DEFAULT 1,
-    closed_at DATETIME,
-    updated_at DATETIME NOT NULL
-);
-
--- AUCUNE clé étrangère, volontairement. Les flux du pull paginent séparément :
--- une file peut arriver avant sa campagne ou avant sa fiche, et une contrainte
--- avorterait la transaction de pull entière au lieu d'attendre la page
--- suivante. La jointure se fait à la lecture, et une ligne orpheline reste
--- simplement invisible.
-CREATE TABLE call_tasks (
-    id TEXT NOT NULL PRIMARY KEY,
-    campaign_id TEXT NOT NULL,
-    prospect_id TEXT NOT NULL,
-    -- Rang dans le programme papier : l'écran doit rendre le MÊME ordre.
-    position INTEGER NOT NULL,
-    day_index INTEGER NOT NULL DEFAULT 0,
-    status TEXT NOT NULL DEFAULT 'OPEN',
-    updated_at DATETIME NOT NULL
-);
-
-CREATE INDEX call_tasks_campaign_idx ON call_tasks (campaign_id, day_index, position);
--- Index SIMPLE et non unique. Le couple (campagne, fiche) est unique côté
--- serveur, et c'est à lui de le tenir : un index unique local avorterait la
--- transaction de pull entière le jour où le serveur renvoie la même paire sous
--- un autre identifiant, et la synchronisation s'arrêterait là.
-CREATE INDEX call_tasks_prospect_idx ON call_tasks (prospect_id);
-
--- La file du jour, dans l'ordre du programme, fiches déjà closes exclues.
-campaignQueue:
-    SELECT t.*, p.nom AS nom, p.prenom AS prenom, p.phone_e164 AS phone_e164
-    FROM call_tasks t
-    JOIN prospects p ON p.id = t.prospect_id
-    WHERE t.campaign_id = :campaignId
-      AND t.status = 'OPEN'
-      AND p.deleted_at IS NULL
-    ORDER BY t.day_index ASC, t.position ASC;
-
--- Les campagnes qui ont encore quelque chose à appeler, la plus recente d'abord.
-campaignsWithOpenWork:
-    SELECT c.*, COUNT(t.id) AS ouvertes
-    FROM call_campaigns c
-    JOIN call_tasks t ON t.campaign_id = c.id AND t.status = 'OPEN'
-    JOIN prospects p ON p.id = t.prospect_id AND p.deleted_at IS NULL
-    GROUP BY c.id
-    ORDER BY c.updated_at DESC;
-
-CREATE TABLE rep_call_campaigns (
-    id TEXT NOT NULL PRIMARY KEY,
-    name TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'ACTIVE',
-    spread_days INTEGER NOT NULL DEFAULT 1,
-    closed_at DATETIME,
-    updated_at DATETIME NOT NULL
-);
-
-CREATE TABLE rep_call_tasks (
-    id TEXT NOT NULL PRIMARY KEY,
-    campaign_id TEXT NOT NULL,
-    representant_id TEXT NOT NULL,
-    position INTEGER NOT NULL,
-    day_index INTEGER NOT NULL DEFAULT 0,
-    status TEXT NOT NULL DEFAULT 'OPEN',
-    updated_at DATETIME NOT NULL
-);
-
-CREATE INDEX rep_call_tasks_campaign_idx ON rep_call_tasks (campaign_id, day_index, position);
-CREATE INDEX rep_call_tasks_representant_idx ON rep_call_tasks (representant_id);
-
-repCampaignQueue:
-    SELECT t.*, r.full_name AS full_name, r.phone_e164 AS phone_e164
-    FROM rep_call_tasks t
-    JOIN representants r ON r.id = t.representant_id
-    WHERE t.campaign_id = :campaignId
-      AND t.status = 'OPEN'
-      AND r.deleted_at IS NULL
-    ORDER BY t.day_index ASC, t.position ASC;
-
-repCampaignsWithOpenWork:
-    SELECT c.*, COUNT(t.id) AS ouvertes
-    FROM rep_call_campaigns c
-    JOIN rep_call_tasks t ON t.campaign_id = c.id AND t.status = 'OPEN'
-    JOIN representants r ON r.id = t.representant_id AND r.deleted_at IS NULL
-    GROUP BY c.id
-    ORDER BY c.updated_at DESC;
-
 -- Rappels promis pendant un appel représentant (issue CALLBACK), pour armer la
 -- notification locale et le popup in-app. `full_name`/`phone_e164` sont
 -- DUPLIQUÉS depuis `representants` : la fiche peut être modifiée ou purgée
@@ -923,16 +844,15 @@ pendingRepCallbackReminders:
 
 -- ── Registre des visites ─────────────────────────────────────────────────────
 --
--- Le tirage descend le registre comme call_campaigns/call_tasks : le serveur
--- est seul à l'écrire, un pull rejoué recopie la même ligne, `updated_at` seul
+-- Le serveur est seul à l'écrire, un pull rejoué recopie la même ligne, `updated_at` seul
 -- arbitre. Les entreprise/objet/direction/destinataire voyagent DÉNORMALISÉS
 -- (id + libellé), même patron que `departements.region_name` : cette table
 -- n'a pas de miroir local des référentiels de visite, le tirage étant la seule
 -- source. `reference` est NULL tant que l'inscription reste en file : le
 -- serveur seul l'attribue, et le tirage qui suit la poussée la complète.
 --
--- AUCUNE clé étrangère, AUCUN CHECK d'énumération : voir le commentaire de
--- call_tasks, la même raison vaut ici à l'identique.
+-- AUCUNE clé étrangère, AUCUN CHECK d'énumération : le serveur reste la source
+-- de vérité pour les références du registre.
 CREATE TABLE visites (
     id TEXT NOT NULL PRIMARY KEY,
     reference TEXT NULL,
