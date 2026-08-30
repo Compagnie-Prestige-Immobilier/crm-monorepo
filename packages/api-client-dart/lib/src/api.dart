@@ -18,6 +18,7 @@ import 'package:crm_api_client/src/api/client_requests_api.dart';
 import 'package:crm_api_client/src/api/demo_api.dart';
 import 'package:crm_api_client/src/api/export_api.dart';
 import 'package:crm_api_client/src/api/imports_api.dart';
+import 'package:crm_api_client/src/api/lots_export_api.dart';
 import 'package:crm_api_client/src/api/notification_templates_api.dart';
 import 'package:crm_api_client/src/api/notifications_api.dart';
 import 'package:crm_api_client/src/api/phase2_api.dart';
@@ -219,6 +220,12 @@ class CrmApiClient {
   /// by doing that all interceptors will not be executed
   ImportsApi getImportsApi() {
     return ImportsApi(dio);
+  }
+
+  /// Get LotsExportApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  LotsExportApi getLotsExportApi() {
+    return LotsExportApi(dio);
   }
 
   /// Get NotificationTemplatesApi instance, base route and serializer can be overridden by a given but be careful,

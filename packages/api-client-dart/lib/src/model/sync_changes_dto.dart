@@ -3,18 +3,14 @@
 //
 
 // ignore_for_file: unused_element
-import 'package:crm_api_client/src/model/representant_dto.dart';
-import 'package:crm_api_client/src/model/sync_visite_dto.dart';
-import 'package:crm_api_client/src/model/sync_call_campaign_dto.dart';
 import 'package:crm_api_client/src/model/departement_dto.dart';
+import 'package:crm_api_client/src/model/representant_dto.dart';
 import 'package:crm_api_client/src/model/prospect_dto.dart';
 import 'package:crm_api_client/src/model/ief_dto.dart';
 import 'package:crm_api_client/src/model/sync_visite_referentiel_dto.dart';
-import 'package:crm_api_client/src/model/sync_call_task_dto.dart';
 import 'package:crm_api_client/src/model/canal_provenance_dto.dart';
+import 'package:crm_api_client/src/model/sync_visite_dto.dart';
 import 'package:crm_api_client/src/model/syndicat_dto.dart';
-import 'package:crm_api_client/src/model/sync_rep_call_campaign_dto.dart';
-import 'package:crm_api_client/src/model/sync_rep_call_task_dto.dart';
 import 'package:crm_api_client/src/model/banque_dto.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
@@ -48,14 +44,6 @@ class SyncChangesDto {
 
     required this.prospects,
 
-    required this.callCampaigns,
-
-    required this.callTasks,
-
-    required this.repCallCampaigns,
-
-    required this.repCallTasks,
-
     required this.visites,
   });
 
@@ -84,18 +72,6 @@ class SyncChangesDto {
   @JsonKey(name: r'prospects', required: true, includeIfNull: false)
   final List<ProspectDto> prospects;
 
-  @JsonKey(name: r'callCampaigns', required: true, includeIfNull: false)
-  final List<SyncCallCampaignDto> callCampaigns;
-
-  @JsonKey(name: r'callTasks', required: true, includeIfNull: false)
-  final List<SyncCallTaskDto> callTasks;
-
-  @JsonKey(name: r'repCallCampaigns', required: true, includeIfNull: false)
-  final List<SyncRepCallCampaignDto> repCallCampaigns;
-
-  @JsonKey(name: r'repCallTasks', required: true, includeIfNull: false)
-  final List<SyncRepCallTaskDto> repCallTasks;
-
   @JsonKey(name: r'visites', required: true, includeIfNull: false)
   final List<SyncVisiteDto> visites;
 
@@ -113,10 +89,6 @@ class SyncChangesDto {
                 visiteReferentiels,
                 representants,
                 prospects,
-                callCampaigns,
-                callTasks,
-                repCallCampaigns,
-                repCallTasks,
                 visites,
               ],
               [
@@ -128,10 +100,6 @@ class SyncChangesDto {
                 other.visiteReferentiels,
                 other.representants,
                 other.prospects,
-                other.callCampaigns,
-                other.callTasks,
-                other.repCallCampaigns,
-                other.repCallTasks,
                 other.visites,
               ],
             );
@@ -149,10 +117,6 @@ class SyncChangesDto {
         visiteReferentiels,
         representants,
         prospects,
-        callCampaigns,
-        callTasks,
-        repCallCampaigns,
-        repCallTasks,
         visites,
       ]);
 

@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "turbo dev",
     "dx": "node tools/dev/dx.mjs",
+    "dxs": "pnpm build && pnpm --filter @crm/api start",
     "build": "turbo build",
     "lint": "turbo lint",
     "dead-code": "knip --include files,dependencies,unlisted",

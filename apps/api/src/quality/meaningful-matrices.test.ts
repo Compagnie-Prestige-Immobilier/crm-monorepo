@@ -15,7 +15,6 @@ import {
   decodeDirectoryCursor,
   encodeDirectoryCursor,
 } from '../modules/phase2/directory-cursor.js';
-import { distributeRoundRobin } from '../modules/phase2/distribution.js';
 import { normalizeAttempt } from '../modules/phase2/attempt-rules.js';
 import {
   assertReachable,
@@ -205,31 +204,6 @@ describe('workflow bancaire, transitions successives sur des workflows variables
       expect(() => {
         assertReachable(stages, current, expected);
       }).not.toThrow();
-    },
-  );
-});
-
-const distributionCases = Array.from({ length: 1000 }, (_, index) => {
-  const itemCount = index + 1;
-  const bucketCount = (index % 17) + 1;
-  return { itemCount, bucketCount };
-});
-
-describe('distribution phase 2, conservation et équilibrage', () => {
-  it.each(distributionCases)(
-    '$itemCount fiches / $bucketCount commerciaux',
-    ({ itemCount, bucketCount }) => {
-      const assignments = distributeRoundRobin(
-        Array.from({ length: itemCount }, (_, item) => item),
-        bucketCount,
-      );
-      const counts = Array.from(
-        { length: bucketCount },
-        (_, bucket) => assignments.filter((assignment) => assignment.bucket === bucket).length,
-      );
-      expect(assignments).toHaveLength(itemCount);
-      expect(new Set(assignments.map((assignment) => assignment.item)).size).toBe(itemCount);
-      expect(Math.max(...counts) - Math.min(...counts)).toBeLessThanOrEqual(1);
     },
   );
 });

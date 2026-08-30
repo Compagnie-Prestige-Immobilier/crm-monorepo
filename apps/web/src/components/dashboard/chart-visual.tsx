@@ -611,6 +611,29 @@ export function ChartPreview({
   );
 }
 
+export function ChartDemo({ marque }: { marque: DashboardMarque }) {
+  const texte = marqueTexte(marque);
+
+  return (
+    <div className="flex items-center gap-3 rounded-md bg-secondary/60 p-3">
+      <span
+        role="img"
+        aria-label={`Exemple visuel : ${texte.nom}`}
+        className="flex min-w-0 flex-1 items-center justify-center"
+      >
+        <ChartPreview marque={marque} className="size-36 border-border bg-card [&>svg]:size-32" />
+      </span>
+      <div className="w-36 shrink-0">
+        <p className="text-[0.75rem] font-[700] uppercase tracking-[0.08em] text-muted-foreground">
+          Exemple visuel
+        </p>
+        <p className="mt-1 font-display text-[1rem] font-[700]">{texte.nom}</p>
+        <p className="mt-1 text-[0.8125rem] text-muted-foreground">{texte.usage}</p>
+      </div>
+    </div>
+  );
+}
+
 export function ChoixGraphique({
   marque,
   titre,

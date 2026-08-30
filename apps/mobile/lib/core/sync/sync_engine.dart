@@ -56,7 +56,7 @@ class SyncEngine {
   /// v3 : les commentaires d'une fiche remontent depuis la file hors ligne.
   /// v4 : les liens banque, syndicat et représentant d'un prospect peuvent
   /// être nuls ; le tirage exige ce numéro en en-tête et refuse en dessous.
-  static const int payloadVersion = 4;
+  static const int payloadVersion = 5;
 
   /// Poids qu'un lot peut atteindre sur le fil ; c'est lui que le `sendTimeout`
   /// du profil `push` doit pouvoir émettre sur un lien montant EDGE.
@@ -1969,90 +1969,6 @@ class SyncEngine {
                 ),
               );
         }
-        count++;
-      }
-
-      // Les campagnes puis les files. Elles ne portent AUCUNE revision : le
-      // serveur est seul a les ecrire, un rejeu de pull reecrit donc la meme
-      // ligne sans qu'il y ait rien a arbitrer.
-      for (final SyncCallCampaignDto c in page.changes.callCampaigns) {
-        await _db
-            .into(_db.callCampaigns)
-            .insertOnConflictUpdate(
-              CallCampaignsCompanion.insert(
-                id: c.id,
-                name: c.name,
-                status: Value<String>(c.status.value),
-                spreadDays: Value<int>(c.spreadDays.toInt()),
-                closedAt: Value<DateTime?>(c.closedAt),
-                updatedAt: c.updatedAt,
-              ),
-            );
-        count++;
-      }
-      // Une file retirée au commercial descend une DERNIÈRE fois, avec
-      // `isActive` à faux : c'est le seul moment où le téléphone apprend qu'il
-      // doit cesser d'appeler ces fiches. Sans cette suppression, elle restait
-      // au programme pour toujours.
-      for (final SyncCallTaskDto t in page.changes.callTasks) {
-        if (!t.isActive) {
-          await (_db.delete(
-            _db.callTasks,
-          )..where((CallTasks c) => c.id.equals(t.id))).go();
-          count++;
-          continue;
-        }
-        await _db
-            .into(_db.callTasks)
-            .insertOnConflictUpdate(
-              CallTasksCompanion.insert(
-                id: t.id,
-                campaignId: t.campaignId,
-                prospectId: t.prospectId,
-                position: t.position.toInt(),
-                dayIndex: Value<int>(t.dayIndex.toInt()),
-                status: Value<String>(t.status.value),
-                updatedAt: t.updatedAt,
-              ),
-            );
-        count++;
-      }
-      for (final SyncRepCallCampaignDto c in page.changes.repCallCampaigns) {
-        await _db
-            .into(_db.repCallCampaigns)
-            .insertOnConflictUpdate(
-              RepCallCampaignsCompanion.insert(
-                id: c.id,
-                name: c.name,
-                status: Value<String>(c.status.value),
-                spreadDays: Value<int>(c.spreadDays.toInt()),
-                closedAt: Value<DateTime?>(c.closedAt),
-                updatedAt: c.updatedAt,
-              ),
-            );
-        count++;
-      }
-      for (final SyncRepCallTaskDto t in page.changes.repCallTasks) {
-        if (!t.isActive) {
-          await (_db.delete(
-            _db.repCallTasks,
-          )..where((RepCallTasks c) => c.id.equals(t.id))).go();
-          count++;
-          continue;
-        }
-        await _db
-            .into(_db.repCallTasks)
-            .insertOnConflictUpdate(
-              RepCallTasksCompanion.insert(
-                id: t.id,
-                campaignId: t.campaignId,
-                representantId: t.representantId,
-                position: t.position.toInt(),
-                dayIndex: Value<int>(t.dayIndex.toInt()),
-                status: Value<String>(t.status.value),
-                updatedAt: t.updatedAt,
-              ),
-            );
         count++;
       }
 

@@ -80,12 +80,7 @@ const TENTATIVES = [
   },
 ] as const;
 
-const TITRES_DE_TAUX = [
-  'Appels aux représentants',
-  'Représentants joints',
-  'Rappels promis',
-  'Représentants qui acceptent',
-] as const;
+const TITRES_DE_TAUX = ['Taux de contact', 'Taux de rendez-vous', 'Taux de qualification'] as const;
 
 let superviseurId = '';
 let awaId = '';
@@ -213,14 +208,9 @@ test('CHU-CHF-13 le taux de contact vaut exactement 50 % sur 2 joints pour 4 app
 }) => {
   await page.goto(urlDuJeu(JOURNEE, JOURNEE, superviseurId));
 
-  await expect(chiffreDe(page, 'Appels aux représentants')).toHaveText('4');
+  await expect(chiffreDe(page, 'Taux de contact')).toHaveText('50,0 %');
   await expect(
-    carte(page, 'Appels aux représentants').getByText('dont 2 ont répondu', { exact: true }),
-  ).toHaveCount(1);
-
-  await expect(chiffreDe(page, 'Représentants joints')).toHaveText('50,0 %');
-  await expect(
-    carte(page, 'Représentants joints').getByText('50,0 % des appels aboutissent', { exact: true }),
+    carte(page, 'Taux de contact').getByText('2 joints sur 4 appels', { exact: true }),
   ).toHaveCount(1);
 });
 
@@ -229,9 +219,9 @@ test('CHU-CHF-14 le taux de rappel vaut exactement 25 % sur 1 rappel pour 4 appe
 }) => {
   await page.goto(urlDuJeu(JOURNEE, JOURNEE, superviseurId));
 
-  await expect(chiffreDe(page, 'Rappels promis')).toHaveText('25,0 %');
+  await expect(chiffreDe(page, 'Taux de rendez-vous')).toHaveText('25,0 %');
   await expect(
-    carte(page, 'Rappels promis').getByText('1 appel à rappeler', { exact: true }),
+    carte(page, 'Taux de rendez-vous').getByText('1 rendez-vous sur 4 appels', { exact: true }),
   ).toHaveCount(1);
 });
 
@@ -240,41 +230,50 @@ test('CHU-CHF-15 le taux de qualification vaut exactement 50 % sur 1 accepté po
 }) => {
   await page.goto(urlDuJeu(JOURNEE, JOURNEE, superviseurId));
 
-  await expect(chiffreDe(page, 'Représentants qui acceptent')).toHaveText('50,0 %');
+  await expect(chiffreDe(page, 'Taux de qualification')).toHaveText('50,0 %');
   await expect(
-    carte(page, 'Représentants qui acceptent').getByText('1 sur 2 interrogés', { exact: true }),
+    carte(page, 'Taux de qualification').getByText('1 acceptent sur 2 interrogés', {
+      exact: true,
+    }),
   ).toHaveCount(1);
 });
 
-test('CHU-CHF-16 la ligne d’équipe du tableau porte 4, 2, 0, 0', async ({ page }) => {
+test('CHU-CHF-16 la ligne du superviseur porte ses trois taux, et le pied « Équipe » les mêmes', async ({
+  page,
+}) => {
   await page.goto(urlDuJeu(JOURNEE, JOURNEE, superviseurId));
 
+  const attendu = ['4', '50,0 %', '25,0 %', '50,0 %', '0', '0'];
   const ligne = tableauEquipe(page)
     .getByRole('row')
-    .filter({ hasText: 'Superviseur Fixture' });
-  await expect(ligne.getByRole('cell')).toHaveText(['4', '2', '0', '0']);
+    .filter({ has: page.getByRole('rowheader', { name: 'Superviseur Fixture', exact: true }) });
+  await expect(ligne.getByRole('cell')).toHaveText(attendu);
+
+  const equipe = tableauEquipe(page)
+    .getByRole('row')
+    .filter({ has: page.getByRole('rowheader', { name: 'Équipe', exact: true }) });
+  await expect(equipe.getByRole('cell')).toHaveText(attendu);
 });
 
 test('CHU-CHF-17 une journée sans aucun appel ne se lit pas « 0 % »', async ({ page }) => {
   await page.goto(urlDuJeu(JOURNEE_VIDE, JOURNEE_VIDE, superviseurId));
 
-  await expect(chiffreDe(page, 'Représentants joints')).toHaveText('Sans objet');
+  await expect(chiffreDe(page, 'Taux de contact')).toHaveText('Sans objet');
   await expect(
-    carte(page, 'Représentants joints').getByText('Sans objet des appels aboutissent', {
-      exact: true,
-    }),
+    carte(page, 'Taux de contact').getByText('Aucun appel sur la période', { exact: true }),
   ).toHaveCount(1);
-  await expect(carte(page, 'Représentants joints').getByText('0,0 %')).toHaveCount(0);
+  await expect(carte(page, 'Taux de contact').getByText('0,0 %')).toHaveCount(0);
 });
 
 test('CHU-CHF-18 le filtre par téléconseiller borne réellement les chiffres', async ({ page }) => {
   await page.goto(urlDuJeu(JOURNEE, JOURNEE, superviseurId));
-  await expect(chiffreDe(page, 'Appels aux représentants')).toHaveText('4');
+  await expect(chiffreDe(page, 'Taux de contact')).toHaveText('50,0 %');
 
   await page.goto(urlDuJeu(JOURNEE, JOURNEE, awaId));
-  await expect(chiffreDe(page, 'Appels aux représentants')).toHaveText('0');
-  await expect(tableauEquipe(page).getByRole('rowheader')).toHaveText('Awa Fixture');
-  await expect(tableauEquipe(page).getByRole('row')).toHaveCount(2);
+  await expect(chiffreDe(page, 'Taux de contact')).toHaveText('Sans objet');
+  // Une ligne pour Awa, et le pied « Équipe » qui ne dit plus qu'elle.
+  await expect(tableauEquipe(page).getByRole('rowheader')).toHaveText(['Awa Fixture', 'Équipe']);
+  await expect(tableauEquipe(page).getByRole('row')).toHaveCount(3);
 });
 
 test('CHU-CHF-19 un rechargement complet rend exactement le même écran', async ({ page }) => {

@@ -72,7 +72,7 @@ export function renderMark(
   }
 
   if (donnees.forme === 'scalaire') {
-    const { valeur, libelle, serie } = donnees.donnee;
+    const { valeur, libelle, serie, affichage } = donnees.donnee;
     if (marque === 'jauge')
       return <JaugeChart valeur={valeur} max={valeur * 1.2 || 1} libelle={titre} />;
     if (marque === 'tuile-courbe' && serie !== undefined) {
@@ -81,8 +81,9 @@ export function renderMark(
     return (
       <TuileWidget
         valeur={valeur}
+        affichage={affichage}
         libelle={titre}
-        detail={marque === 'tuile' ? undefined : libelle}
+        detail={libelle === titre ? undefined : libelle}
       />
     );
   }

@@ -21,10 +21,15 @@ export type CreateNotificationInput = Schemas['CreateNotificationDto'];
 export type CreateTemplateInput = Schemas['CreateNotificationTemplateDto'];
 export type UpdateTemplateInput = Schemas['UpdateNotificationTemplateDto'];
 
+/**
+ * `CAMPAGNE` n'est plus proposé nulle part : plus rien n'en produit depuis le
+ * retrait des campagnes. L'entrée reste parce que l'enum du contrat la garde et
+ * que des envois archivés la portent encore.
+ */
 export const CATEGORY_LABELS: Record<NotificationCategory, string> = {
   ANNONCE: 'Annonce',
   RAPPEL: 'Rappel',
-  CAMPAGNE: 'Campagne',
+  CAMPAGNE: 'Lot d’export',
   DOSSIER: 'Dossier',
   SYSTEME: 'Système',
 };

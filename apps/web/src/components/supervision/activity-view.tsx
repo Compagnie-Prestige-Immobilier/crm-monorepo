@@ -65,8 +65,6 @@ const COLUMNS: { key: ActivitySortKey; label: string }[] = [
   { key: 'reachRate', label: 'Joignabilité' },
   { key: 'prospectsCreated', label: 'Prospects saisis' },
   { key: 'representantsContacted', label: 'Représentants contactés' },
-  { key: 'tasksClosed', label: 'Tâches closes' },
-  { key: 'openTasks', label: 'Reste à faire' },
 ];
 
 const PRESETS: Exclude<PeriodPreset, 'custom'>[] = ['today', 'week', 'last7'];
@@ -307,8 +305,7 @@ export function ActivityView() {
       </Card>
 
       <p className="text-[0.8125rem] text-muted-foreground">
-        « Reste à faire » compte les tâches d’appel encore ouvertes à l’instant : la période ne le
-        borne pas. Les autres colonnes portent sur la date de l’acte.
+        Chaque colonne porte sur la date de l’acte, dans la période choisie.
       </p>
 
       {buckets.length > 0 ? (
@@ -382,8 +379,6 @@ function ActivityRow({ line }: { line: ActivityLine }) {
       </TableCell>
       <TableCell className="text-right">{formatNumber(line.prospectsCreated)}</TableCell>
       <TableCell className="text-right">{formatNumber(line.representantsContacted)}</TableCell>
-      <TableCell className="text-right">{formatNumber(line.tasksClosed)}</TableCell>
-      <TableCell className="text-right">{formatNumber(line.openTasks)}</TableCell>
     </TableRow>
   );
 }
@@ -412,8 +407,6 @@ function TotalsRow({
       <TableCell className="text-right">{formatRateOrNone(values.reachRate)}</TableCell>
       <TableCell className="text-right">{show(values.prospectsCreated)}</TableCell>
       <TableCell className="text-right">{show(values.representantsContacted)}</TableCell>
-      <TableCell className="text-right">{show(values.tasksClosed)}</TableCell>
-      <TableCell className="text-right">{show(values.openTasks)}</TableCell>
     </TableRow>
   );
 }

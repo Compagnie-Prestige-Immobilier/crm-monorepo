@@ -32,13 +32,7 @@ interface Decor {
 
 async function tableRase(tx: Prisma.TransactionClient): Promise<void> {
   await tx.repCallAttempt.deleteMany({});
-  await tx.repCallTask.deleteMany({});
-  await tx.repCallCampaignCommercial.deleteMany({});
-  await tx.repCallCampaign.deleteMany({});
   await tx.callAttempt.deleteMany({});
-  await tx.callTask.deleteMany({});
-  await tx.callCampaignCommercial.deleteMany({});
-  await tx.callCampaign.deleteMany({});
   await tx.clientCreationRequest.deleteMany({});
   await tx.bankCaseTransition.deleteMany({});
   await tx.bankCase.deleteMany({});

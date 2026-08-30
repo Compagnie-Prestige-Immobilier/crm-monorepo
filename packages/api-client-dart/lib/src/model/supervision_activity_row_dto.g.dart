@@ -27,8 +27,6 @@ abstract class _$SupervisionActivityRowDtoCWProxy {
 
   SupervisionActivityRowDto representantsContacted(num representantsContacted);
 
-  SupervisionActivityRowDto tasksClosed(num tasksClosed);
-
   SupervisionActivityRowDto repCalls(num repCalls);
 
   SupervisionActivityRowDto repReached(num repReached);
@@ -72,7 +70,6 @@ abstract class _$SupervisionActivityRowDtoCWProxy {
     num? reachRate,
     num prospectsCreated,
     num representantsContacted,
-    num tasksClosed,
     num repCalls,
     num repReached,
     num repCallback,
@@ -132,10 +129,6 @@ class _$SupervisionActivityRowDtoCWProxyImpl
   SupervisionActivityRowDto representantsContacted(
     num representantsContacted,
   ) => this(representantsContacted: representantsContacted);
-
-  @override
-  SupervisionActivityRowDto tasksClosed(num tasksClosed) =>
-      this(tasksClosed: tasksClosed);
 
   @override
   SupervisionActivityRowDto repCalls(num repCalls) => this(repCalls: repCalls);
@@ -204,7 +197,6 @@ class _$SupervisionActivityRowDtoCWProxyImpl
     Object? reachRate = const $CopyWithPlaceholder(),
     Object? prospectsCreated = const $CopyWithPlaceholder(),
     Object? representantsContacted = const $CopyWithPlaceholder(),
-    Object? tasksClosed = const $CopyWithPlaceholder(),
     Object? repCalls = const $CopyWithPlaceholder(),
     Object? repReached = const $CopyWithPlaceholder(),
     Object? repCallback = const $CopyWithPlaceholder(),
@@ -261,10 +253,6 @@ class _$SupervisionActivityRowDtoCWProxyImpl
           ? _value.representantsContacted
           // ignore: cast_nullable_to_non_nullable
           : representantsContacted as num,
-      tasksClosed: tasksClosed == const $CopyWithPlaceholder()
-          ? _value.tasksClosed
-          // ignore: cast_nullable_to_non_nullable
-          : tasksClosed as num,
       repCalls: repCalls == const $CopyWithPlaceholder()
           ? _value.repCalls
           // ignore: cast_nullable_to_non_nullable
@@ -348,7 +336,6 @@ SupervisionActivityRowDto _$SupervisionActivityRowDtoFromJson(
       'reachRate',
       'prospectsCreated',
       'representantsContacted',
-      'tasksClosed',
       'repCalls',
       'repReached',
       'repCallback',
@@ -378,7 +365,6 @@ SupervisionActivityRowDto _$SupervisionActivityRowDtoFromJson(
       'representantsContacted',
       (v) => v as num,
     ),
-    tasksClosed: $checkedConvert('tasksClosed', (v) => v as num),
     repCalls: $checkedConvert('repCalls', (v) => v as num),
     repReached: $checkedConvert('repReached', (v) => v as num),
     repCallback: $checkedConvert('repCallback', (v) => v as num),
@@ -415,7 +401,6 @@ Map<String, dynamic> _$SupervisionActivityRowDtoToJson(
   'reachRate': instance.reachRate,
   'prospectsCreated': instance.prospectsCreated,
   'representantsContacted': instance.representantsContacted,
-  'tasksClosed': instance.tasksClosed,
   'repCalls': instance.repCalls,
   'repReached': instance.repReached,
   'repCallback': instance.repCallback,

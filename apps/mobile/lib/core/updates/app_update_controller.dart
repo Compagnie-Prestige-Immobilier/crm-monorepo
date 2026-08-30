@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:crypto/crypto.dart';
@@ -556,6 +557,14 @@ class AppUpdateController extends Notifier<AppUpdateState> {
   String _apkName(AndroidRelease release) =>
       'cpi-go-${release.versionCode}.apk';
 
+  /// Hacher l'APK dans un isolate séparé. Un APK CPI GO fait des dizaines de
+  /// mégaoctets : le hacher sur l'isolate principal fige l'interface assez
+  /// longtemps pour qu'Android affiche « CPI GO ne répond pas ».
+  static Future<String> _digest(String path) => Isolate.run(() async {
+    final Digest digest = await sha256.bind(File(path).openRead()).first;
+    return digest.toString().toLowerCase();
+  });
+
   /// L'APK de cette release, déjà sur le disque et dont l'empreinte correspond.
   Future<String?> _verifiedApk(AndroidRelease release) async {
     try {
@@ -565,10 +574,7 @@ class AppUpdateController extends Notifier<AppUpdateState> {
       if (release.fileSize > 0 && file.lengthSync() != release.fileSize) {
         return null;
       }
-      final Digest digest = await sha256.bind(file.openRead()).first;
-      if (digest.toString().toLowerCase() != release.sha256.toLowerCase()) {
-        return null;
-      }
+      if (await _digest(file.path) != release.sha256.toLowerCase()) return null;
       return file.path;
     } on Object {
       return null;
@@ -629,20 +635,27 @@ class AppUpdateController extends Notifier<AppUpdateState> {
       mode: append ? FileMode.append : FileMode.write,
     );
     int downloaded = append ? existing : 0;
+    // Un APK de plusieurs dizaines de mégaoctets arrive en dizaines de milliers
+    // de morceaux. Publier l'avancement à chaque morceau reconstruit l'écran
+    // autant de fois et fige l'application : Android affiche « CPI GO ne
+    // répond pas ». Le pour-cent affiché n'a besoin que de cent pas.
+    int publie = -1;
     try {
       await for (final List<int> chunk in response.data!.stream) {
         await output.writeFrom(chunk);
         downloaded += chunk.length;
         if (!ref.mounted) return;
-        state = state.copyWith(
-          progress: release.fileSize == 0 ? 0 : downloaded / release.fileSize,
-        );
+        final int pourCent = release.fileSize <= 0
+            ? 0
+            : downloaded * 100 ~/ release.fileSize;
+        if (pourCent == publie) continue;
+        publie = pourCent;
+        state = state.copyWith(progress: pourCent / 100);
       }
     } finally {
       await output.close();
     }
-    final Digest digest = await sha256.bind(target.openRead()).first;
-    if (digest.toString().toLowerCase() != release.sha256.toLowerCase()) {
+    if (await _digest(target.path) != release.sha256.toLowerCase()) {
       await target.delete();
       throw StateError('La signature de la release ne correspond pas.');
     }

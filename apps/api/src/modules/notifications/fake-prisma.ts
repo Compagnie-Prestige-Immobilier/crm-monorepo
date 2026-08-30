@@ -753,7 +753,6 @@ const LIGNE_VIDE = {
   reachRate: null,
   prospectsCreated: 0,
   representantsContacted: 0,
-  tasksClosed: 0,
   repCalls: 0,
   repReached: 0,
   repCallback: 0,
@@ -785,7 +784,6 @@ export class FakeActivity {
     this.teleconseillers.push({
       fullName: row.fullName ?? `Compte ${row.id}`,
       isActive: row.isActive ?? true,
-      openTasks: row.openTasks ?? 0,
       id: row.id,
     });
   }

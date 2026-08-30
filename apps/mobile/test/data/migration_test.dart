@@ -19,8 +19,8 @@ import 'generated_migrations/schema_v11.dart' as v11;
 import 'generated_migrations/schema_v13.dart' as v13;
 import 'generated_migrations/schema_v14.dart' as v14;
 import 'generated_migrations/schema_v15.dart' as v15;
-import 'generated_migrations/schema_v16.dart' as v16;
 import 'generated_migrations/schema_v18.dart' as v18;
+import 'generated_migrations/schema_v19.dart' as v19;
 
 /// Test doré de migration.
 ///
@@ -1395,90 +1395,6 @@ void main() {
       await db.close();
     },
   );
-  // ── v11 → v12 : les campagnes descendent sur l'appareil ────────────────────
-  //
-  // Deux tables NEUVES, aucune recopie. Ce qui doit être prouvé : la saisie déjà
-  // sur le téléphone survit, et les deux tables s'ouvrent vides plutôt que de
-  // faire échouer l'ouverture.
-
-  test(
-    'v11 -> v12 ajoute les campagnes sans toucher à la saisie du terrain',
-    () async {
-      final schema = await verifier.schemaAt(11);
-
-      final v11.DatabaseAtV11 old = v11.DatabaseAtV11(schema.newConnection());
-      await old.customStatement('PRAGMA foreign_keys = ON;');
-      await old.customStatement(
-        'INSERT INTO departements '
-        '(id, code, name, region_id, region_name, local_updated_at) '
-        'VALUES (?, ?, ?, ?, ?, ?)',
-        <Object?>['dep-1', 'DK', 'Dakar', 'reg-1', 'Dakar', _iso],
-      );
-      await old.customStatement(
-        'INSERT INTO outbox '
-        '(id, entity_type, entity_id, op, payload, next_attempt_at, created_at) '
-        'VALUES (?, ?, ?, ?, ?, ?, ?)',
-        <Object?>[
-          'op-1',
-          'representant',
-          'rep-1',
-          'create',
-          '{"x":1}',
-          _iso,
-          _iso,
-        ],
-      );
-      await old.close();
-
-      final AppDatabase db = AppDatabase(schema.newConnection());
-      await verifier.migrateAndValidate(db, 12);
-
-      // La file d'attente d'un téléphone hors ligne depuis des semaines ne doit
-      // pas être emportée par un palier qui ne la concerne pas.
-      final List<QueryRow> enFile = await db
-          .customSelect('SELECT id FROM outbox')
-          .get();
-      expect(enFile.single.read<String>('id'), 'op-1');
-
-      expect(
-        await db.customSelect('SELECT * FROM call_campaigns').get(),
-        isEmpty,
-      );
-      expect(await db.customSelect('SELECT * FROM call_tasks').get(), isEmpty);
-
-      await db.close();
-    },
-  );
-
-  // Aucune contrainte locale ne doit pouvoir avorter un pull : le couple
-  // (campagne, fiche) est unique cote SERVEUR, et la meme paire renvoyee sous un
-  // autre identifiant doit s'ecrire plutot que d'arreter la synchronisation.
-  test('v12 accepte une meme fiche deux fois sans arreter le pull', () async {
-    final schema = await verifier.schemaAt(11);
-    final AppDatabase db = AppDatabase(schema.newConnection());
-    await verifier.migrateAndValidate(db, 12);
-
-    Future<void> poser(String id) => db.customStatement(
-      'INSERT INTO call_tasks '
-      '(id, campaign_id, prospect_id, position, day_index, status, updated_at) '
-      'VALUES (?, ?, ?, ?, ?, ?, ?) '
-      'ON CONFLICT(id) DO UPDATE SET status = excluded.status',
-      <Object?>[id, 'camp-1', 'pro-1', 1, 0, 'OPEN', _iso],
-    );
-
-    await poser('task-1');
-    await poser('task-2');
-    // Le rejeu de la MEME ligne ne la double pas.
-    await poser('task-1');
-
-    final List<QueryRow> lignes = await db
-        .customSelect('SELECT id FROM call_tasks')
-        .get();
-    expect(lignes, hasLength(2));
-
-    await db.close();
-  });
-
   // ── v13 → v14 : le registre des visites descend sur l'appareil ─────────────
   //
   // Table NEUVE, aucune recopie. Ce qui doit être prouvé : la saisie déjà en
@@ -1773,47 +1689,6 @@ void main() {
     },
   );
 
-  test(
-    'v16 -> v17 ajoute les campagnes représentants sans toucher à la file',
-    () async {
-      final schema = await verifier.schemaAt(16);
-      final v16.DatabaseAtV16 old = v16.DatabaseAtV16(schema.newConnection());
-      await old.customStatement(
-        'INSERT INTO outbox '
-        '(id, entity_type, entity_id, op, payload, next_attempt_at, created_at) '
-        'VALUES (?, ?, ?, ?, ?, ?, ?)',
-        <Object?>['op-17', 'representant', 'rep-1', 'update', '{}', _iso, _iso],
-      );
-      await old.close();
-
-      final AppDatabase db = AppDatabase(schema.newConnection());
-      await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
-
-      expect(
-        await db
-            .customSelect('SELECT id FROM outbox')
-            .getSingle()
-            .then((QueryRow row) => row.read<String>('id')),
-        'op-17',
-      );
-      final List<String> indexes = await db
-          .customSelect(
-            'SELECT name FROM sqlite_master '
-            'WHERE type = \'index\' AND tbl_name = \'rep_call_tasks\'',
-          )
-          .map((QueryRow row) => row.read<String>('name'))
-          .get();
-      expect(
-        indexes,
-        containsAll(<String>[
-          'rep_call_tasks_campaign_idx',
-          'rep_call_tasks_representant_idx',
-        ]),
-      );
-      await db.close();
-    },
-  );
-
   // ── v18 → v19 : les renseignements de la conversion ───────────────────────
   //
   // Le palier RECOPIE `call_attempts` : il ajoute cinq colonnes ET trois CHECK,
@@ -1909,6 +1784,102 @@ void main() {
     await insert('APPOINTMENT', _iso);
 
     expect(await db.countMyAttempts().getSingle(), 1);
+    await db.close();
+  });
+
+  test('v19 -> v20 supprime les tables de campagne et garde les saisies', () async {
+    final schema = await verifier.schemaAt(19);
+    final v19.DatabaseAtV19 old = v19.DatabaseAtV19(schema.newConnection());
+    await old.customStatement(
+      'INSERT INTO call_campaigns (id, name, updated_at) VALUES (?, ?, ?)',
+      <Object?>['camp-20', 'Ancienne campagne', _iso],
+    );
+    await old.customStatement(
+      'INSERT INTO call_tasks '
+      '(id, campaign_id, prospect_id, position, updated_at) VALUES (?, ?, ?, ?, ?)',
+      <Object?>['task-20', 'camp-20', 'prospect-20', 1, _iso],
+    );
+    await old.customStatement(
+      'INSERT INTO rep_call_campaigns (id, name, updated_at) VALUES (?, ?, ?)',
+      <Object?>['rep-camp-20', 'Ancienne campagne représentants', _iso],
+    );
+    await old.customStatement(
+      'INSERT INTO rep_call_tasks '
+      '(id, campaign_id, representant_id, position, updated_at) VALUES (?, ?, ?, ?, ?)',
+      <Object?>['rep-task-20', 'rep-camp-20', 'rep-20', 1, _iso],
+    );
+    await old.customStatement(
+      'INSERT INTO call_attempts '
+      '(id, prospect_id, outcome, effect, method, client_created_at, created_by_id) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?)',
+      <Object?>[
+        'attempt-20',
+        'prospect-20',
+        'METHOD_OBTAINED',
+        'CLOSE_METHOD',
+        'PLATFORM',
+        _iso,
+        'me',
+      ],
+    );
+    await old.customStatement(
+      'INSERT INTO rep_callback_reminders '
+      '(id, representant_id, full_name, phone_e164, scheduled_at, created_at) '
+      'VALUES (?, ?, ?, ?, ?, ?)',
+      <Object?>['reminder-20', 'rep-20', 'Représentant 20', '+221770000020', _iso, _iso],
+    );
+    await old.customStatement(
+      'INSERT INTO outbox '
+      '(id, entity_type, entity_id, op, payload, next_attempt_at, created_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?)',
+      <Object?>['op-20', 'call_attempt', 'attempt-20', 'create', '{}', _iso, _iso],
+    );
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
+    final List<QueryRow> obsolete = await db.customSelect(
+      'SELECT name FROM sqlite_master '
+      'WHERE type = \'table\' AND name IN '
+      '(\'call_campaigns\', \'call_tasks\', \'rep_call_campaigns\', \'rep_call_tasks\')',
+    ).get();
+    expect(obsolete, isEmpty);
+    expect(await db.countMyAttempts().getSingle(), 1);
+    expect(await db.pendingRepCallbackReminders().get(), hasLength(1));
+    expect(
+      await db.customSelect('SELECT id FROM outbox').getSingle().then(
+        (QueryRow row) => row.read<String>('id'),
+      ),
+      'op-20',
+    );
+    await db.close();
+  });
+
+  test('v11 -> courant traverse sans créer les tables de campagne', () async {
+    final schema = await verifier.schemaAt(11);
+    final v11.DatabaseAtV11 old = v11.DatabaseAtV11(schema.newConnection());
+    await old.customStatement(
+      'INSERT INTO outbox '
+      '(id, entity_type, entity_id, op, payload, next_attempt_at, created_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?)',
+      <Object?>['op-v11', 'representant', 'rep-11', 'update', '{}', _iso, _iso],
+    );
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
+    final List<QueryRow> obsolete = await db.customSelect(
+      'SELECT name FROM sqlite_master '
+      'WHERE type = \'table\' AND name IN '
+      '(\'call_campaigns\', \'call_tasks\', \'rep_call_campaigns\', \'rep_call_tasks\')',
+    ).get();
+    expect(obsolete, isEmpty);
+    expect(
+      await db.customSelect('SELECT id FROM outbox').getSingle().then(
+        (QueryRow row) => row.read<String>('id'),
+      ),
+      'op-v11',
+    );
     await db.close();
   });
 }

@@ -42,7 +42,7 @@ describe('garde de l’étape 1, « Qualifier un représentant »', () => {
     await expect(AppelsRepresentantsPage()).rejects.toThrow('REDIRECT /connexion');
   });
 
-  it('refuse l’agent bancaire au lieu de lui servir la file d’appel', async () => {
+  it('refuse l’agent bancaire au lieu de lui servir l’écran d’appel', async () => {
     guardRoles.mockResolvedValue({
       status: 'denied',
       user: { id: 'u-1', role: 'BANQUE_FINANCE' },

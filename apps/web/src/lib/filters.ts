@@ -37,7 +37,6 @@ export const EMPTY_FILTERS: ProspectFilters = {
   segment: null,
   phase2Status: null,
   enrollmentMethod: null,
-  campaignId: null,
   enrollmentCapturedById: null,
   dateFrom: null,
   dateTo: null,
@@ -77,7 +76,6 @@ export function parseProspectFilters(params: RawSearchParams | URLSearchParams):
     segment: readEnum<BddSegment>(params, 'segment', BDD_SEGMENTS),
     phase2Status: readEnum<Phase2Status>(params, 'phase2Status', PHASE2_STATUSES),
     enrollmentMethod: readEnum<EnrollmentMethod>(params, 'enrollmentMethod', ENROLLMENT_METHODS),
-    campaignId: readString(params, 'campaignId'),
     enrollmentCapturedById: readString(params, 'enrollmentCapturedById'),
     dateFrom: readIsoDate(params, 'dateFrom'),
     dateTo: readIsoDate(params, 'dateTo'),
@@ -107,7 +105,6 @@ export function serializeProspectFilters(filters: ProspectFilters): URLSearchPar
   put('segment', filters.segment);
   put('phase2Status', filters.phase2Status);
   put('enrollmentMethod', filters.enrollmentMethod);
-  put('campaignId', filters.campaignId);
   put('enrollmentCapturedById', filters.enrollmentCapturedById);
   put('dateFrom', filters.dateFrom);
   put('dateTo', filters.dateTo);
@@ -132,7 +129,6 @@ export const ADVANCED_FILTER_KEYS = [
   'segment',
   'phase2Status',
   'enrollmentMethod',
-  'campaignId',
   'enrollmentCapturedById',
 ] as const;
 
@@ -160,7 +156,6 @@ export function clearAdvancedFilters(): Partial<ProspectFilters> {
     segment: null,
     phase2Status: null,
     enrollmentMethod: null,
-    campaignId: null,
     enrollmentCapturedById: null,
   } satisfies Record<AdvancedFilterKey, null>;
 }
@@ -186,7 +181,6 @@ export function countActiveFilters(filters: ProspectFilters): number {
   if (filters.segment !== null) count += 1;
   if (filters.phase2Status !== null) count += 1;
   if (filters.enrollmentMethod !== null) count += 1;
-  if (filters.campaignId !== null) count += 1;
   if (filters.enrollmentCapturedById !== null) count += 1;
   if (filters.dateFrom !== null || filters.dateTo !== null) count += 1;
   return count;

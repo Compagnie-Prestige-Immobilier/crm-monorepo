@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+.git
+.gitignore
+vendor
+node_modules
+tests
+storage/logs/*.log
+.phpunit.cache
+.phpunit.result.cache
+phpstan-baseline.neon
+.dockerignore
+Dockerfile
+frankenphp
+caddy

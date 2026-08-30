@@ -37,8 +37,6 @@ const row = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
   scheduledAt: new Date('2026-08-18T15:00:00.000Z'),
   comment: 'rappeler après la prière',
   assignedToId: AWA.id,
-  campaignId: 'camp-1',
-  taskId: 'task-1',
   prospect: { phoneE164: '+221771234567' },
   assignedTo: { fullName: 'Awa Ndiaye' },
   ...over,

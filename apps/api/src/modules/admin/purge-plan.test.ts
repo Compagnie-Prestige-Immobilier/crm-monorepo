@@ -174,7 +174,6 @@ describe('fermeture de la sélection', () => {
     expect(expandPurgeSelection(['representants'])).toEqual([
       'representants',
       'prospects',
-      'campagnesRepresentants',
       'demandesClients',
       'fileAppels',
       'tentatives',
@@ -197,7 +196,6 @@ describe('fermeture de la sélection', () => {
     const expanded = expandPurgeSelection(['teleconseillers']);
     expect(expanded).toContain('prospects');
     expect(expanded).toContain('representants');
-    expect(expanded).toContain('campagnes');
     expect(expanded).toContain('dossiers');
     expect(expanded).not.toContain('referentiels');
   });
@@ -226,13 +224,11 @@ describe('séquence d’étapes', () => {
     const steps = purgeSteps(['teleconseillers']);
     expect(steps.indexOf('prospects')).toBeLessThan(steps.indexOf('commercialAccounts'));
     expect(steps.indexOf('representants')).toBeLessThan(steps.indexOf('commercialAccounts'));
-    expect(steps.indexOf('campaignMembers')).toBeLessThan(steps.indexOf('commercialAccounts'));
+    expect(steps.indexOf('scheduledCallbacks')).toBeLessThan(steps.indexOf('commercialAccounts'));
   });
 
-  it('supprime les rappels planifiés avant leur file, leurs campagnes et les comptes', () => {
+  it('supprime les rappels planifiés avant les prospects et les comptes', () => {
     const steps = purgeSteps([...PURGE_DOMAIN_KEYS]);
-    expect(steps.indexOf('scheduledCallbacks')).toBeLessThan(steps.indexOf('callTasks'));
-    expect(steps.indexOf('scheduledCallbacks')).toBeLessThan(steps.indexOf('campaigns'));
     expect(steps.indexOf('scheduledCallbacks')).toBeLessThan(steps.indexOf('prospects'));
     expect(steps.indexOf('scheduledCallbacks')).toBeLessThan(steps.indexOf('commercialAccounts'));
   });

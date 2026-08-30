@@ -21,8 +21,6 @@ abstract class _$NotificationDtoCWProxy {
 
   NotificationDto audienceRole(Role? audienceRole);
 
-  NotificationDto audienceDepartementId(String? audienceDepartementId);
-
   NotificationDto audienceUserIds(List<String> audienceUserIds);
 
   NotificationDto status(NotificationStatus status);
@@ -55,7 +53,6 @@ abstract class _$NotificationDtoCWProxy {
     String? route,
     NotificationAudience audience,
     Role? audienceRole,
-    String? audienceDepartementId,
     List<String> audienceUserIds,
     NotificationStatus status,
     DateTime? scheduledFor,
@@ -97,10 +94,6 @@ class _$NotificationDtoCWProxyImpl implements _$NotificationDtoCWProxy {
   @override
   NotificationDto audienceRole(Role? audienceRole) =>
       this(audienceRole: audienceRole);
-
-  @override
-  NotificationDto audienceDepartementId(String? audienceDepartementId) =>
-      this(audienceDepartementId: audienceDepartementId);
 
   @override
   NotificationDto audienceUserIds(List<String> audienceUserIds) =>
@@ -150,7 +143,6 @@ class _$NotificationDtoCWProxyImpl implements _$NotificationDtoCWProxy {
     Object? route = const $CopyWithPlaceholder(),
     Object? audience = const $CopyWithPlaceholder(),
     Object? audienceRole = const $CopyWithPlaceholder(),
-    Object? audienceDepartementId = const $CopyWithPlaceholder(),
     Object? audienceUserIds = const $CopyWithPlaceholder(),
     Object? status = const $CopyWithPlaceholder(),
     Object? scheduledFor = const $CopyWithPlaceholder(),
@@ -190,11 +182,6 @@ class _$NotificationDtoCWProxyImpl implements _$NotificationDtoCWProxy {
           ? _value.audienceRole
           // ignore: cast_nullable_to_non_nullable
           : audienceRole as Role?,
-      audienceDepartementId:
-          audienceDepartementId == const $CopyWithPlaceholder()
-          ? _value.audienceDepartementId
-          // ignore: cast_nullable_to_non_nullable
-          : audienceDepartementId as String?,
       audienceUserIds: audienceUserIds == const $CopyWithPlaceholder()
           ? _value.audienceUserIds
           // ignore: cast_nullable_to_non_nullable
@@ -258,7 +245,6 @@ NotificationDto _$NotificationDtoFromJson(
       'route',
       'audience',
       'audienceRole',
-      'audienceDepartementId',
       'audienceUserIds',
       'status',
       'scheduledFor',
@@ -298,10 +284,6 @@ NotificationDto _$NotificationDtoFromJson(
         v,
         unknownValue: Role.unknownDefaultOpenApi,
       ),
-    ),
-    audienceDepartementId: $checkedConvert(
-      'audienceDepartementId',
-      (v) => v as String?,
     ),
     audienceUserIds: $checkedConvert(
       'audienceUserIds',
@@ -347,7 +329,6 @@ Map<String, dynamic> _$NotificationDtoToJson(NotificationDto instance) =>
       'route': instance.route,
       'audience': _$NotificationAudienceEnumMap[instance.audience]!,
       'audienceRole': _$RoleEnumMap[instance.audienceRole],
-      'audienceDepartementId': instance.audienceDepartementId,
       'audienceUserIds': instance.audienceUserIds,
       'status': _$NotificationStatusEnumMap[instance.status]!,
       'scheduledFor': instance.scheduledFor?.toIso8601String(),

@@ -39,8 +39,6 @@ class SupervisionActivityCountsDto {
 
     required this.representantsContacted,
 
-    required this.tasksClosed,
-
     required this.repCalls,
 
     required this.repReached,
@@ -106,10 +104,6 @@ class SupervisionActivityCountsDto {
   )
   final num representantsContacted;
 
-  /// Tâches d’appel clôturées sur la période.
-  @JsonKey(name: r'tasksClosed', required: true, includeIfNull: false)
-  final num tasksClosed;
-
   /// Appels à des représentants, issues encore saisissables seulement : REACHED, REFUSED, CALLBACK, UNREACHABLE. Dénominateur de `repContactRate` et de `repCallbackRate`.
   @JsonKey(name: r'repCalls', required: true, includeIfNull: false)
   final num repCalls;
@@ -166,7 +160,6 @@ class SupervisionActivityCountsDto {
                 reachRate,
                 prospectsCreated,
                 representantsContacted,
-                tasksClosed,
                 repCalls,
                 repReached,
                 repCallback,
@@ -189,7 +182,6 @@ class SupervisionActivityCountsDto {
                 other.reachRate,
                 other.prospectsCreated,
                 other.representantsContacted,
-                other.tasksClosed,
                 other.repCalls,
                 other.repReached,
                 other.repCallback,
@@ -218,7 +210,6 @@ class SupervisionActivityCountsDto {
         reachRate,
         prospectsCreated,
         representantsContacted,
-        tasksClosed,
         repCalls,
         repReached,
         repCallback,

@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils';
 
 const REFERENCE_STALE_TIME = 300_000;
 
-/** La prise de rendez-vous en tête : c'est l'issue que la campagne cherche. */
+/** La prise de rendez-vous en tête : c'est l'issue que l'appel cherche. */
 const METHOD_ORDER: readonly EnrollmentMethod[] = [
   'APPOINTMENT',
   'VOICE_OR_ELECTRONIC_MESSAGING',

@@ -155,7 +155,7 @@ export function ChiffresView({ ecran, role }: { ecran: DashboardEcran; role: Rol
 
   const projet: Projet = ecran === 'chues' ? 'CHUES' : 'GRAND_PUBLIC';
   const voitLesMontants = role === 'ADMIN' || role === 'DIRECTION';
-  const catalogue = catalogueDe({ chues: ecran === 'chues', voitLesMontants });
+  const catalogue = catalogueDe({ chues: ecran === 'chues', voitLesMontants, role });
 
   const plage = plageDeFiltres(filters);
   const perimetre: PerimetreChiffres = {
@@ -254,27 +254,56 @@ export function ChiffresView({ ecran, role }: { ecran: DashboardEcran; role: Rol
   const equipe = jeux.activite?.teleconseillers ?? [];
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <LiveIndicator
-          state={live.stateOf(enErreur)}
-          label={live.labelOf(enErreur)}
-          updatedAt={dataUpdatedAt === 0 ? null : dataUpdatedAt}
-          onTogglePause={live.togglePause}
-        />
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-[0.9375rem] font-[600] text-foreground" aria-live="polite">
+            {periodeAffichee(filters)}
+          </p>
+          {equipe.length > 0 ? (
+            <Select
+              value={filters.teleconseiller ?? 'tous'}
+              onValueChange={(value) => {
+                if (value === null) return;
+                setFilters({ teleconseiller: value === 'tous' ? null : value });
+              }}
+            >
+              <SelectTrigger size="sm" aria-label="Téléconseiller regardé" className="w-56">
+                {/* Sans cette fonction, Base UI rend la VALEUR de l'item : le
+                    déclencheur affichait l'identifiant du téléconseiller. */}
+                <SelectValue>{(valeur: string) => nomDeLEquipe(equipe, valeur)}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="tous">{TOUTE_L_EQUIPE}</SelectItem>
+                {equipe.map((personne) => (
+                  <SelectItem key={personne.id} value={personne.id}>
+                    {personne.fullName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <LiveIndicator
+            state={live.stateOf(enErreur)}
+            label={live.labelOf(enErreur)}
+            updatedAt={dataUpdatedAt === 0 ? null : dataUpdatedAt}
+            onTogglePause={live.togglePause}
+          />
           {editing ? (
             <TiroirWidgets
               placees={placees}
               donnees={donneesParSource}
               catalogue={catalogue}
-              onAdd={(source) => {
+              onAdd={(source, marqueChoisie) => {
                 const donneesSource = donneesParSource.get(source);
                 const forme = catalogue[source]?.forme;
                 const marque =
-                  donneesSource === undefined || forme === undefined
+                  marqueChoisie ??
+                  (donneesSource === undefined || forme === undefined
                     ? undefined
-                    : marqueRecommandee(forme, mesurerDonnees(donneesSource));
+                    : marqueRecommandee(forme, mesurerDonnees(donneesSource)));
                 setBrouillon((current) => [
                   ...(current ?? []),
                   { id: `${source}-${String(Date.now())}`, source, marque, taille: 'demi' },
@@ -313,36 +342,8 @@ export function ChiffresView({ ecran, role }: { ecran: DashboardEcran; role: Rol
         </div>
       </div>
 
-      <SelecteurPeriode filters={filters} onChange={setFilters} />
-
-      <div className="flex flex-wrap items-center gap-3">
-        <p className="text-[0.9375rem] font-[600] text-foreground" aria-live="polite">
-          {periodeAffichee(filters)}
-        </p>
-        {equipe.length > 0 ? (
-          <Select
-            value={filters.teleconseiller ?? 'tous'}
-            onValueChange={(value) => {
-              if (value === null) return;
-              setFilters({ teleconseiller: value === 'tous' ? null : value });
-            }}
-          >
-            <SelectTrigger size="sm" aria-label="Téléconseiller regardé" className="w-56">
-              {/* Sans cette fonction, Base UI rend la VALEUR de l'item : le
-                  déclencheur affichait l'identifiant du téléconseiller. */}
-              <SelectValue>{(valeur: string) => nomDeLEquipe(equipe, valeur)}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="tous">{TOUTE_L_EQUIPE}</SelectItem>
-              {equipe.map((personne) => (
-                <SelectItem key={personne.id} value={personne.id}>
-                  {personne.fullName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : null}
-      </div>
+      {/* « Comparer à » n'agit que sur le registre des visites : ici il serait inerte. */}
+      <SelecteurPeriode filters={filters} onChange={setFilters} comparaison={false} />
 
       {(() => {
         if (shouldShowError({ isError: enErreur || dispositionQuery.isError, hasData }))

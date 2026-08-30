@@ -30,8 +30,6 @@ class CreateUserDto {
 
     this.role = Role.COMMERCIAL,
 
-    this.departementId,
-
     this.phone,
   });
 
@@ -57,10 +55,6 @@ class CreateUserDto {
   )
   final Role? role;
 
-  /// Chaîne vide pour retirer le rattachement.
-  @JsonKey(name: r'departementId', required: false, includeIfNull: false)
-  final String? departementId;
-
   /// Téléphone, normalisé en E.164 par le serveur.
   @JsonKey(name: r'phone', required: false, includeIfNull: false)
   final String? phone;
@@ -70,14 +64,13 @@ class CreateUserDto {
         other is CreateUserDto &&
             runtimeType == other.runtimeType &&
             equals(
-              [email, username, fullName, password, role, departementId, phone],
+              [email, username, fullName, password, role, phone],
               [
                 other.email,
                 other.username,
                 other.fullName,
                 other.password,
                 other.role,
-                other.departementId,
                 other.phone,
               ],
             );
@@ -86,15 +79,7 @@ class CreateUserDto {
   @override
   int get hashCode =>
       runtimeType.hashCode ^
-      mapPropsToHashCode([
-        email,
-        username,
-        fullName,
-        password,
-        role,
-        departementId,
-        phone,
-      ]);
+      mapPropsToHashCode([email, username, fullName, password, role, phone]);
 
   factory CreateUserDto.fromJson(Map<String, dynamic> json) =>
       _$CreateUserDtoFromJson(json);

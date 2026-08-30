@@ -114,8 +114,6 @@ beforeEach(() => {
   pushRepCallAttempt.mockResolvedValue({
     status: 'applied',
     attemptId: 'a-1',
-    taskId: null,
-    taskClosed: true,
     suggestion: null,
   });
   fetchRepresentants.mockReset();

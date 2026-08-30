@@ -105,14 +105,7 @@ const MODULES: Record<string, string[]> = {
     'rejectClientRequest',
   ],
   'rep-campaigns': [
-    'previewRepCampaign',
     'recordRepCallAttempt',
-    'listRepCampaigns',
-    'createRepCampaign',
-    'getRepCampaign',
-    'closeRepCampaign',
-    'downloadRepProgrammePdf',
-    'downloadRepProgrammesZip',
   ],
   representants: [
     'listRepresentants',
@@ -186,7 +179,6 @@ describe('operationId sur tout le document publié', () => {
     for (const attendu of [
       'getAnalyticsFunnel',
       'getAnalyticsTotals',
-      'getCampaignPilotage',
       'getAnalyticsDelays',
       'getBankAging',
       'getWeeklyCohorts',

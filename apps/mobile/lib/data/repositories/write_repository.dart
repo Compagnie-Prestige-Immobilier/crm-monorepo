@@ -888,13 +888,6 @@ class WriteRepository {
     if (whatsappStatus == WhatsappStatus.autreNumero.code && whatsapp == null) {
       throw ArgumentError.value(whatsappE164, 'whatsappE164');
     }
-    const Set<String> terminal = <String>{
-      'REACHED',
-      'PROSPECTS_PROMISED',
-      'REFUSED',
-      'WRONG_NUMBER',
-    };
-
     await _db.transaction(() async {
       final Representant? representant =
           await (_db.select(_db.representants)
@@ -916,19 +909,6 @@ class WriteRepository {
           localUpdatedAt: Value<DateTime>(now),
         ),
       );
-      if (terminal.contains(outcome)) {
-        await (_db.update(_db.repCallTasks)..where(
-              (RepCallTasks row) =>
-                  row.representantId.equals(representantId) &
-                  row.status.equals('OPEN'),
-            ))
-            .write(
-              RepCallTasksCompanion(
-                status: const Value<String>('DONE'),
-                updatedAt: Value<DateTime>(now),
-              ),
-            );
-      }
       if (callbackAt != null) {
         await _db
             .into(_db.repCallbackReminders)

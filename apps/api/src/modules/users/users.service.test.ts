@@ -11,8 +11,6 @@ interface MockDb {
   refreshToken: Record<'updateMany', MockFn>;
   prospect: Record<'count' | 'updateMany', MockFn>;
   representant: Record<'count' | 'updateMany', MockFn>;
-  callTask: Record<'updateMany', MockFn>;
-  repCallTask: Record<'updateMany', MockFn>;
   auditLog: Record<'create', MockFn>;
   $transaction: MockFn;
 }
@@ -54,8 +52,6 @@ beforeEach(() => {
     refreshToken: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     prospect: { count: vi.fn().mockResolvedValue(0), updateMany: vi.fn() },
     representant: { count: vi.fn().mockResolvedValue(0), updateMany: vi.fn() },
-    callTask: { updateMany: vi.fn() },
-    repCallTask: { updateMany: vi.fn() },
     auditLog: { create: vi.fn().mockResolvedValue({}) },
     // Un autre administrateur existe : les gardes « dernier admin » ne sont pas
     // le sujet de ces tests-ci.
@@ -225,11 +221,6 @@ describe('le portefeuille d’un compte désactivé est repris', () => {
     for (const delegate of [db.prospect, db.representant]) {
       expect(delegate.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({ data: { createdById: 'usr-2' } }),
-      );
-    }
-    for (const delegate of [db.callTask, db.repCallTask]) {
-      expect(delegate.updateMany).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { assignedToId: 'usr-2' } }),
       );
     }
   });

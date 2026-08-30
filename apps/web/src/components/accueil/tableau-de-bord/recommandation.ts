@@ -13,19 +13,10 @@ export interface MarqueEvaluee {
 }
 
 const COMPATIBLES: Record<Forme, DashboardMarque[]> = {
-  scalaire: ['tuile', 'tuile-courbe', 'jauge', 'tableau'],
-  classement: [
-    'barres-horizontales',
-    'barres-verticales',
-    'barres-groupees',
-    'anneau',
-    'camembert',
-    'nuage',
-    'bulles',
-    'tableau',
-  ],
+  scalaire: ['tuile'],
+  classement: ['barres-horizontales', 'barres-verticales', 'anneau', 'camembert', 'tableau'],
   'serie-temporelle': ['courbe', 'aire', 'escalier', 'barres-verticales', 'mixte', 'tableau'],
-  cyclique: ['aire-polaire', 'radar', 'barres-verticales', 'tableau'],
+  cyclique: ['barres-verticales', 'aire-polaire', 'tableau'],
   matrice: ['carte-de-chaleur', 'tableau'],
   composition: ['barres-empilees', 'barres-100', 'anneau', 'camembert', 'tableau'],
   // Des colonnes d'unités différentes sur une même personne : aucun graphique

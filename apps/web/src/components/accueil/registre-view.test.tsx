@@ -186,17 +186,10 @@ describe('registre du jour', () => {
   });
 });
 
-/**
- * La recherche est repliée derrière « Rechercher ». jsdom n'applique pas la
- * feuille de style qui masque le contenu d'un `<details>` fermé : sans ce clic,
- * le test atteindrait des champs qu'un vrai navigateur cache.
- */
 async function openRecherche(): Promise<void> {
-  const resume = await screen.findByText('Rechercher');
-  const bloc = resume.closest('details');
-  if (bloc === null) throw new Error('Le bloc de recherche n’est pas repliable.');
-  if (bloc.open) return;
-  await userEvent.setup().click(resume);
+  const bouton = await screen.findByRole('button', { name: 'Rechercher et filtrer' });
+  if (bouton.getAttribute('aria-expanded') === 'true') return;
+  await userEvent.setup().click(bouton);
 }
 
 async function openAdvanced(): Promise<void> {
@@ -301,7 +294,9 @@ describe('filtres avancés du registre', () => {
     // Ce qui reste sous les yeux : le geste du comptoir et la période.
     expect(screen.getByRole('button', { name: 'Ajouter une visite' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Aujourd’hui' })).toBeTruthy();
-    expect(screen.getByText('Rechercher').closest('details')?.open).toBe(false);
+    expect(
+      screen.getByRole('button', { name: 'Rechercher et filtrer' }).getAttribute('aria-expanded'),
+    ).toBe('false');
     expect(screen.queryByRole('combobox', { name: /ENTREPRISE/u })).toBeNull();
 
     await openRecherche();

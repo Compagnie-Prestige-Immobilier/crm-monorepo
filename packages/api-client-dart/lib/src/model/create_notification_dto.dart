@@ -34,8 +34,6 @@ class CreateNotificationDto {
 
     this.audienceRole,
 
-    this.audienceDepartementId,
-
     this.audienceUserIds,
 
     this.scheduledFor,
@@ -78,13 +76,6 @@ class CreateNotificationDto {
   )
   final Role? audienceRole;
 
-  @JsonKey(
-    name: r'audienceDepartementId',
-    required: false,
-    includeIfNull: false,
-  )
-  final String? audienceDepartementId;
-
   @JsonKey(name: r'audienceUserIds', required: false, includeIfNull: false)
   final List<String>? audienceUserIds;
 
@@ -108,7 +99,6 @@ class CreateNotificationDto {
                 route,
                 audience,
                 audienceRole,
-                audienceDepartementId,
                 audienceUserIds,
                 scheduledFor,
                 templateId,
@@ -120,7 +110,6 @@ class CreateNotificationDto {
                 other.route,
                 other.audience,
                 other.audienceRole,
-                other.audienceDepartementId,
                 other.audienceUserIds,
                 other.scheduledFor,
                 other.templateId,
@@ -138,7 +127,6 @@ class CreateNotificationDto {
         route,
         audience,
         audienceRole,
-        audienceDepartementId,
         audienceUserIds,
         scheduledFor,
         templateId,

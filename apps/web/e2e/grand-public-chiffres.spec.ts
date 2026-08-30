@@ -34,9 +34,9 @@ const DISPOSITION = '/api/v1/tableaux-de-bord/grand-public/disposition';
  * ne voit pas les montants : les deux cartes de recette n'y sont pas.
  */
 const CARTES_USINE = [
+  'Taux de joignabilité',
   'Prospects notés',
-  'Adhésions obtenues',
-  'Reste à appeler',
+  'Adhésions',
   'Par téléconseiller',
 ] as const;
 
@@ -229,7 +229,13 @@ test('GP-39 · « Revenir à l’écran par défaut » efface la disposition du 
   const api = await superviseurApi();
   try {
     const pose = await api.put(DISPOSITION, {
-      data: { widgets: [{ source: 'prospects-notes' }, { source: SOURCE_AJOUTEE }] },
+      data: {
+        widgets: [
+          { source: 'taux-de-joignabilite' },
+          { source: 'prospects-notes' },
+          { source: SOURCE_AJOUTEE },
+        ],
+      },
     });
     expect(pose.ok(), `${DISPOSITION} a répondu ${String(pose.status())}`).toBe(true);
   } finally {

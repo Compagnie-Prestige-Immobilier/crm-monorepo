@@ -46,12 +46,7 @@ const SOURCES_VISITES = [
  * La qualification des représentants : elle n'existe QUE dans CHUES, où un
  * enseignant relais donne les contacts de ses collègues.
  */
-const SOURCES_QUALIFICATION = [
-  'appels-de-qualification',
-  'taux-de-contact',
-  'a-rappeler',
-  'taux-de-qualification',
-] as const;
+const SOURCES_QUALIFICATION = ['taux-de-contact', 'a-rappeler', 'taux-de-qualification'] as const;
 
 /**
  * Le travail d'appel et la vente, communs à CHUES et au Grand Public.
@@ -59,8 +54,10 @@ const SOURCES_QUALIFICATION = [
  * Volontairement COURTE : un écran de pilotage se lit d'un coup d'œil, et un
  * mur de tuiles ne se lit pas. Ajouter une source, c'est une entrée ici, une
  * règle de marque dans `dashboard-layout.ts` et un extracteur côté web.
+ * `reste-a-appeler` n'a plus d'extracteur web (Plan.md D3 la redéfinira).
  */
 const SOURCES_PROSPECTS = [
+  'taux-de-joignabilite',
   'prospects-notes',
   'adhesions',
   'reste-a-appeler',

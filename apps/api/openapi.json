@@ -2967,7 +2967,6 @@
             "name": "relationStatus",
             "required": false,
             "in": "query",
-            "description": "Ne retient que les représentants dans cet état de relation.",
             "schema": {
               "$ref": "#/components/schemas/RepresentantRelation"
             }
@@ -2976,7 +2975,6 @@
             "name": "whatsappStatus",
             "required": false,
             "in": "query",
-            "description": "Ne retient que les représentants dans cet état WhatsApp.",
             "schema": {
               "$ref": "#/components/schemas/WhatsappStatus"
             }
@@ -2985,7 +2983,6 @@
             "name": "hasWhatsapp",
             "required": false,
             "in": "query",
-            "description": "true : un numéro WhatsApp joignable (MEME_NUMERO ou AUTRE_NUMERO). false : les autres, question non posée comprise. Se compose avec `whatsappStatus` par intersection.",
             "schema": {
               "type": "boolean"
             }
@@ -4008,20 +4005,10 @@
             }
           },
           {
-            "name": "campaignId",
+            "name": "appelePar",
             "required": false,
             "in": "query",
-            "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "assignedToId",
-            "required": false,
-            "in": "query",
-            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -5070,11 +5057,11 @@
           {
             "name": "X-CPI-Payload-Version",
             "in": "header",
-            "description": "Format de données que le client sait lire. En dessous de 4, le tirage est refusé au lieu d’être servi : les liens banque, syndicat et représentant d’un prospect peuvent être nuls, et un client plus ancien échoue à les décoder.",
+            "description": "Format de données que le client sait lire. En dessous de 5, le tirage est refusé au lieu d’être servi : les liens banque, syndicat et représentant d’un prospect peuvent être nuls, et un client plus ancien échoue à les décoder.",
             "required": true,
             "schema": {
               "type": "integer",
-              "minimum": 4
+              "minimum": 5
             }
           }
         ],
@@ -5359,608 +5346,6 @@
           }
         ],
         "summary": "Annuaire hors ligne : téléphone et état de phase 2, rien d’autre.",
-        "tags": ["phase2"]
-      }
-    },
-    "/api/v1/phase2/campaigns": {
-      "get": {
-        "operationId": "listCallCampaigns",
-        "parameters": [
-          {
-            "name": "projet",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "$ref": "#/components/schemas/Projet"
-            }
-          },
-          {
-            "name": "status",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "$ref": "#/components/schemas/CampaignStatus"
-            }
-          },
-          {
-            "name": "search",
-            "required": false,
-            "in": "query",
-            "description": "Recherche libre sur le nom de la campagne.",
-            "schema": {
-              "maxLength": 120,
-              "type": "string"
-            }
-          },
-          {
-            "name": "scope",
-            "required": false,
-            "in": "query",
-            "description": "Périmètre du tirage.",
-            "schema": {
-              "$ref": "#/components/schemas/CampaignScope"
-            }
-          },
-          {
-            "name": "createdById",
-            "required": false,
-            "in": "query",
-            "description": "Administrateur qui a créé la campagne.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "dateFrom",
-            "required": false,
-            "in": "query",
-            "description": "Borne basse sur la date de création, incluse.",
-            "schema": {
-              "format": "date-time",
-              "type": "string"
-            }
-          },
-          {
-            "name": "dateTo",
-            "required": false,
-            "in": "query",
-            "description": "Borne haute sur la date de création, incluse.",
-            "schema": {
-              "format": "date-time",
-              "type": "string"
-            }
-          },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "maximum": 100,
-              "default": 25,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CampaignListDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Liste des campagnes, avec l’avancement de chacune.",
-        "tags": ["phase2"]
-      },
-      "post": {
-        "description": "Le tirage est mélangé par PostgreSQL à partir d’une graine persistée, puis réparti en tourniquet dans l’ordre des commerciaux fournis. Les affectations sont matérialisées : consulter la campagne ou retélécharger un PDF ne retire jamais au sort.",
-        "operationId": "createCallCampaign",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateCampaignDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CampaignDetailDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "PHASE2_PROSPECT_ALREADY_ASSIGNED, une campagne concurrente a pris les mêmes prospects.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "PHASE2_NO_ELIGIBLE_PROSPECT · PHASE2_COMMERCIAL_NOT_FOUND · PHASE2_NOT_A_COMMERCIAL · PHASE2_COMMERCIAL_INACTIVE. Requête bien formée, refusée par une règle métier.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Crée une campagne, tire l’ensemble éligible et fige la répartition.",
-        "tags": ["phase2"]
-      }
-    },
-    "/api/v1/phase2/campaigns/{id}": {
-      "get": {
-        "operationId": "getCallCampaign",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CampaignDetailDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "PHASE2_CAMPAIGN_NOT_FOUND.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Détail d’une campagne, ventilé par commercial.",
-        "tags": ["phase2"]
-      }
-    },
-    "/api/v1/phase2/campaigns/{id}/close": {
-      "post": {
-        "description": "Idempotent. Les tâches annulées redeviennent inactives : sans quoi leurs prospects resteraient inéligibles à toute campagne future.",
-        "operationId": "closeCallCampaign",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CampaignDetailDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "PHASE2_CAMPAIGN_NOT_FOUND.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Clôt la campagne et annule toutes les tâches encore ouvertes.",
-        "tags": ["phase2"]
-      }
-    },
-    "/api/v1/phase2/campaigns/{id}/pause": {
-      "post": {
-        "operationId": "pauseCallCampaign",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CampaignDetailDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Suspend temporairement les appels.",
-        "tags": ["phase2"]
-      }
-    },
-    "/api/v1/phase2/campaigns/{id}/resume": {
-      "post": {
-        "operationId": "resumeCallCampaign",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CampaignDetailDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Reprend une campagne suspendue.",
-        "tags": ["phase2"]
-      }
-    },
-    "/api/v1/phase2/campaigns/{id}/commerciaux/{userId}/programme.pdf": {
-      "get": {
-        "description": "Ordre identique aux positions persistées. AUCUN nom de prospect n’y figure : chaque ligne se rapproche de sa fiche par son code court à six caractères. Le paramètre `jour` restreint la liasse à une journée d’étalement ; sans lui, tout le programme est rendu.",
-        "operationId": "downloadCallProgrammePdf",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "userId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "jour",
-            "required": false,
-            "in": "query",
-            "description": "Journée d’étalement, à partir de 1. Absent : tout le programme du commercial.",
-            "schema": {
-              "minimum": 1,
-              "maximum": 31,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Document PDF, en flux.",
-            "content": {
-              "application/pdf": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "PHASE2_CAMPAIGN_COMMERCIAL_NOT_FOUND · PHASE2_CAMPAIGN_DAY_NOT_FOUND.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Programme d’appels imprimable d’un commercial.",
         "tags": ["phase2"]
       }
     },
@@ -8171,127 +7556,8 @@
         "tags": ["phase2"]
       }
     },
-    "/api/v1/rep-campaigns/preview": {
-      "get": {
-        "description": "Créer une campagne fige des dizaines de milliers d’affectations et rend les représentants inéligibles à toute autre campagne. L’aperçu est ce qui permet de constater qu’un périmètre trop large donne une liasse intenable, avant de le découvrir sur le PDF.",
-        "operationId": "previewRepCampaign",
-        "parameters": [
-          {
-            "name": "departementId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "iefId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "onlyWithoutProspects",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": false,
-              "type": "boolean"
-            }
-          },
-          {
-            "name": "relationStatuses",
-            "required": false,
-            "in": "query",
-            "description": "Mêmes états de relation que `createRepCampaign`, pour compter avant de créer.",
-            "schema": {
-              "type": "array",
-              "items": {
-                "$ref": "#/components/schemas/RepresentantRelation"
-              }
-            }
-          },
-          {
-            "name": "commercialCount",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "maximum": 200,
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "spreadDays",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "maximum": 31,
-              "default": 1,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RepCampaignPreviewDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Aperçu du tirage AVANT création : éligibles, charge par commercial et par jour.",
-        "tags": ["rep-campaigns"]
-      }
-    },
     "/api/v1/rep-campaigns/attempts": {
       "post": {
-        "description": "L’identifiant est engendré par le client et sert de clé d’idempotence : un envoi rejoué après une coupure réseau renvoie `duplicate` sans rien réécrire. Une tentative hors campagne est acceptée et conservée, parce qu’elle nourrit les statistiques de qualité de la base. `suggestedPhone` recueille, dans le même geste, le numéro qu’un représentant qui refuse propose d’appeler à sa place : la réponse dit si ce numéro est déjà une fiche connue.",
         "operationId": "recordRepCallAttempt",
         "parameters": [],
         "requestBody": {
@@ -8316,142 +7582,10 @@
             }
           },
           "400": {
-            "description": "REP_CAMPAIGN_COMMENT_REQUIRED · REP_CAMPAIGN_PROMISED_NOT_ALLOWED · REP_CAMPAIGN_CALLBACK_AT_REQUIRED · REP_CAMPAIGN_CALLBACK_AT_NOT_ALLOWED · PHONE_INVALID.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "REP_CAMPAIGN_REPRESENTANT_NOT_FOUND.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Enregistre un appel passé à un représentant et clôt la tâche si l’issue aboutit.",
-        "tags": ["rep-campaigns"]
-      }
-    },
-    "/api/v1/rep-campaigns": {
-      "get": {
-        "operationId": "listRepCampaigns",
-        "parameters": [
-          {
-            "name": "status",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "$ref": "#/components/schemas/CampaignStatus"
-            }
-          },
-          {
-            "name": "search",
-            "required": false,
-            "in": "query",
-            "description": "Recherche libre sur le nom de la campagne.",
-            "schema": {
-              "maxLength": 120,
-              "type": "string"
-            }
-          },
-          {
-            "name": "createdById",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "dateFrom",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "format": "date-time",
-              "type": "string"
-            }
-          },
-          {
-            "name": "dateTo",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "format": "date-time",
-              "type": "string"
-            }
-          },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "maximum": 100,
-              "default": 25,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RepCampaignListDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
                   "$ref": "#/components/schemas/ApiErrorDto"
                 }
               }
@@ -8483,415 +7617,7 @@
             "bearer": []
           }
         ],
-        "summary": "Liste des campagnes représentants, avec l’avancement de chacune.",
-        "tags": ["rep-campaigns"]
-      },
-      "post": {
-        "description": "Le tirage est mélangé par PostgreSQL à partir d’une graine persistée, puis réparti en tourniquet dans l’ordre des commerciaux fournis. `spreadDays` découpe ensuite la file de chaque commercial en tranches contiguës, une par journée.",
-        "operationId": "createRepCampaign",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateRepCampaignDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RepCampaignDetailDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "REP_CAMPAIGN_REPRESENTANT_ALREADY_ASSIGNED.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "REP_CAMPAIGN_NO_ELIGIBLE_REPRESENTANT · REP_CAMPAIGN_COMMERCIAL_NOT_FOUND · REP_CAMPAIGN_NOT_A_COMMERCIAL · REP_CAMPAIGN_COMMERCIAL_INACTIVE. Requête bien formée, refusée par une règle métier.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Crée une campagne, tire les représentants éligibles et fige la répartition.",
-        "tags": ["rep-campaigns"]
-      }
-    },
-    "/api/v1/rep-campaigns/{id}": {
-      "get": {
-        "operationId": "getRepCampaign",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RepCampaignDetailDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "REP_CAMPAIGN_NOT_FOUND.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Détail d’une campagne, ventilé par commercial et par journée.",
-        "tags": ["rep-campaigns"]
-      }
-    },
-    "/api/v1/rep-campaigns/{id}/close": {
-      "post": {
-        "description": "Idempotent. Les tâches annulées redeviennent inactives : sans quoi leurs représentants resteraient inéligibles à toute campagne future.",
-        "operationId": "closeRepCampaign",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RepCampaignDetailDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "REP_CAMPAIGN_NOT_FOUND.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Clôt la campagne et annule toutes les tâches encore ouvertes.",
-        "tags": ["rep-campaigns"]
-      }
-    },
-    "/api/v1/rep-campaigns/{id}/commerciaux/{userId}/programme.pdf": {
-      "get": {
-        "description": "A4 portrait, 25 représentants par page. Chaque ligne ne contient que le nom complet et le téléphone.",
-        "operationId": "downloadRepProgrammePdf",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "userId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "jour",
-            "required": false,
-            "in": "query",
-            "description": "Journée d’étalement, à partir de 1. Absent : tout le programme du commercial.",
-            "schema": {
-              "minimum": 1,
-              "maximum": 31,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Document PDF, en flux.",
-            "content": {
-              "application/pdf": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "REP_CAMPAIGN_PROGRAMME_NOT_FOUND · REP_CAMPAIGN_DAY_NOT_FOUND.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Programme d’appels représentants, imprimable.",
-        "tags": ["rep-campaigns"]
-      }
-    },
-    "/api/v1/rep-campaigns/{id}/programmes.zip": {
-      "get": {
-        "operationId": "downloadRepProgrammesZip",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Un PDF non vide par téléconseiller et par journée.",
-            "content": {
-              "application/zip": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "REP_CAMPAIGN_NOT_FOUND.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Télécharge tous les programmes représentants dans une archive ZIP.",
+        "summary": "Enregistre un appel passé à un représentant.",
         "tags": ["rep-campaigns"]
       }
     },
@@ -11044,7 +9770,7 @@
             }
           },
           "422": {
-            "description": "NOTIFICATION_AUDIENCE_EMPTY, NOTIFICATION_AUDIENCE_ROLE_REQUIRED, NOTIFICATION_AUDIENCE_DEPARTEMENT_REQUIRED, NOTIFICATION_AUDIENCE_USERS_REQUIRED, NOTIFICATION_SCHEDULE_IN_PAST, NOTIFICATION_ROUTE_INVALID.",
+            "description": "NOTIFICATION_AUDIENCE_EMPTY, NOTIFICATION_AUDIENCE_ROLE_REQUIRED, NOTIFICATION_AUDIENCE_DEPARTEMENT_RETIRED, NOTIFICATION_AUDIENCE_USERS_REQUIRED, NOTIFICATION_SCHEDULE_IN_PAST, NOTIFICATION_ROUTE_INVALID.",
             "content": {
               "application/json": {
                 "schema": {
@@ -11260,15 +9986,6 @@
             "in": "query",
             "schema": {
               "$ref": "#/components/schemas/Role"
-            }
-          },
-          {
-            "name": "audienceDepartementId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
             }
           },
           {
@@ -12037,20 +10754,10 @@
             }
           },
           {
-            "name": "campaignId",
+            "name": "appelePar",
             "required": false,
             "in": "query",
-            "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "assignedToId",
-            "required": false,
-            "in": "query",
-            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -12282,20 +10989,10 @@
             }
           },
           {
-            "name": "campaignId",
+            "name": "appelePar",
             "required": false,
             "in": "query",
-            "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "assignedToId",
-            "required": false,
-            "in": "query",
-            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -12527,20 +11224,10 @@
             }
           },
           {
-            "name": "campaignId",
+            "name": "appelePar",
             "required": false,
             "in": "query",
-            "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "assignedToId",
-            "required": false,
-            "in": "query",
-            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -12780,20 +11467,10 @@
             }
           },
           {
-            "name": "campaignId",
+            "name": "appelePar",
             "required": false,
             "in": "query",
-            "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "assignedToId",
-            "required": false,
-            "in": "query",
-            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -13036,20 +11713,10 @@
             }
           },
           {
-            "name": "campaignId",
+            "name": "appelePar",
             "required": false,
             "in": "query",
-            "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "assignedToId",
-            "required": false,
-            "in": "query",
-            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -13281,20 +11948,10 @@
             }
           },
           {
-            "name": "campaignId",
+            "name": "appelePar",
             "required": false,
             "in": "query",
-            "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "assignedToId",
-            "required": false,
-            "in": "query",
-            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -13526,20 +12183,10 @@
             }
           },
           {
-            "name": "campaignId",
+            "name": "appelePar",
             "required": false,
             "in": "query",
-            "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "assignedToId",
-            "required": false,
-            "in": "query",
-            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -13772,20 +12419,10 @@
             }
           },
           {
-            "name": "campaignId",
+            "name": "appelePar",
             "required": false,
             "in": "query",
-            "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "assignedToId",
-            "required": false,
-            "in": "query",
-            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -14018,20 +12655,10 @@
             }
           },
           {
-            "name": "campaignId",
+            "name": "appelePar",
             "required": false,
             "in": "query",
-            "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "assignedToId",
-            "required": false,
-            "in": "query",
-            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -14264,20 +12891,10 @@
             }
           },
           {
-            "name": "campaignId",
+            "name": "appelePar",
             "required": false,
             "in": "query",
-            "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "assignedToId",
-            "required": false,
-            "in": "query",
-            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -14509,20 +13126,10 @@
             }
           },
           {
-            "name": "campaignId",
+            "name": "appelePar",
             "required": false,
             "in": "query",
-            "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "assignedToId",
-            "required": false,
-            "in": "query",
-            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -14638,252 +13245,6 @@
           }
         ],
         "summary": "Représentants ayant apporté le plus de prospects.",
-        "tags": ["analytics"]
-      }
-    },
-    "/api/v1/analytics/campaign-pilotage": {
-      "get": {
-        "description": "Sans `campaignId`, la mesure porte sur l’ensemble des campagnes ACTIVES. La progression était jusqu’ici calculée à la volée et ne remontait dans aucun tableau de bord : « 42 % faits » ne dit ni si les numéros répondent, ni quand la campagne se termine.",
-        "operationId": "getCampaignPilotage",
-        "parameters": [
-          {
-            "name": "search",
-            "required": false,
-            "in": "query",
-            "description": "Recherche libre sur le nom, le prénom ou le téléphone.",
-            "schema": {
-              "maxLength": 120,
-              "type": "string"
-            }
-          },
-          {
-            "name": "representantId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "banqueId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "syndicatId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "departementId",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "commercialId",
-            "required": false,
-            "in": "query",
-            "description": "Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "projet",
-            "required": false,
-            "in": "query",
-            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
-            "schema": {
-              "$ref": "#/components/schemas/Projet"
-            }
-          },
-          {
-            "name": "type",
-            "required": false,
-            "in": "query",
-            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
-            "schema": {
-              "$ref": "#/components/schemas/ProspectType"
-            }
-          },
-          {
-            "name": "canalProvenanceId",
-            "required": false,
-            "in": "query",
-            "description": "Grand Public : canal de provenance.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "statut",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "$ref": "#/components/schemas/ProspectStatut"
-            }
-          },
-          {
-            "name": "segment",
-            "required": false,
-            "in": "query",
-            "description": "Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.",
-            "schema": {
-              "$ref": "#/components/schemas/BddSegment"
-            }
-          },
-          {
-            "name": "phase2Status",
-            "required": false,
-            "in": "query",
-            "description": "Avancement de la phase 2. Dimension indépendante de `statut`.",
-            "schema": {
-              "$ref": "#/components/schemas/Phase2Status"
-            }
-          },
-          {
-            "name": "enrollmentMethod",
-            "required": false,
-            "in": "query",
-            "description": "Méthode d’enrôlement obtenue en phase 2.",
-            "schema": {
-              "$ref": "#/components/schemas/EnrollmentMethod"
-            }
-          },
-          {
-            "name": "campaignId",
-            "required": false,
-            "in": "query",
-            "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "assignedToId",
-            "required": false,
-            "in": "query",
-            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "enrollmentCapturedById",
-            "required": false,
-            "in": "query",
-            "description": "Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "origin",
-            "required": false,
-            "in": "query",
-            "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
-            "schema": {
-              "type": "string",
-              "enum": ["BANQUE"]
-            }
-          },
-          {
-            "name": "dateFrom",
-            "required": false,
-            "in": "query",
-            "description": "Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.",
-            "schema": {
-              "format": "date-time",
-              "type": "string"
-            }
-          },
-          {
-            "name": "dateTo",
-            "required": false,
-            "in": "query",
-            "description": "Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.",
-            "schema": {
-              "format": "date-time",
-              "type": "string"
-            }
-          },
-          {
-            "name": "includeDeleted",
-            "required": false,
-            "in": "query",
-            "description": "Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.",
-            "schema": {
-              "default": false,
-              "type": "boolean"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CampaignPilotageDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Pilotage d’une campagne d’appels : joignabilité, cadence, fin projetée.",
         "tags": ["analytics"]
       }
     },
@@ -15012,20 +13373,10 @@
             }
           },
           {
-            "name": "campaignId",
+            "name": "appelePar",
             "required": false,
             "in": "query",
-            "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "assignedToId",
-            "required": false,
-            "in": "query",
-            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -15258,20 +13609,10 @@
             }
           },
           {
-            "name": "campaignId",
+            "name": "appelePar",
             "required": false,
             "in": "query",
-            "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "assignedToId",
-            "required": false,
-            "in": "query",
-            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -15504,20 +13845,10 @@
             }
           },
           {
-            "name": "campaignId",
+            "name": "appelePar",
             "required": false,
             "in": "query",
-            "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "assignedToId",
-            "required": false,
-            "in": "query",
-            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -15749,20 +14080,10 @@
             }
           },
           {
-            "name": "campaignId",
+            "name": "appelePar",
             "required": false,
             "in": "query",
-            "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "assignedToId",
-            "required": false,
-            "in": "query",
-            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -15995,20 +14316,10 @@
             }
           },
           {
-            "name": "campaignId",
+            "name": "appelePar",
             "required": false,
             "in": "query",
-            "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "assignedToId",
-            "required": false,
-            "in": "query",
-            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -16264,20 +14575,10 @@
             }
           },
           {
-            "name": "campaignId",
+            "name": "appelePar",
             "required": false,
             "in": "query",
-            "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "assignedToId",
-            "required": false,
-            "in": "query",
-            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -16510,20 +14811,10 @@
             }
           },
           {
-            "name": "campaignId",
+            "name": "appelePar",
             "required": false,
             "in": "query",
-            "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "assignedToId",
-            "required": false,
-            "in": "query",
-            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -16882,20 +15173,10 @@
             }
           },
           {
-            "name": "campaignId",
+            "name": "appelePar",
             "required": false,
             "in": "query",
-            "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "assignedToId",
-            "required": false,
-            "in": "query",
-            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -17050,16 +15331,6 @@
             "required": false,
             "in": "query",
             "description": "Un seul téléconseiller : borne les lignes, la liste et les histogrammes.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "campaignId",
-            "required": false,
-            "in": "query",
-            "description": "Campagne d’appels. L’identifiant vaut pour une campagne prospects OU une campagne représentants : l’autre famille tombe alors à zéro.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -17418,20 +15689,10 @@
             }
           },
           {
-            "name": "campaignId",
+            "name": "appelePar",
             "required": false,
             "in": "query",
-            "description": "Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "assignedToId",
-            "required": false,
-            "in": "query",
-            "description": "Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.",
+            "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -17797,6 +16058,30 @@
             "required": false,
             "in": "query",
             "description": "true : au moins un prospect vivant. false : aucun (représentant dormant).",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "relationStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/RepresentantRelation"
+            }
+          },
+          {
+            "name": "whatsappStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/WhatsappStatus"
+            }
+          },
+          {
+            "name": "hasWhatsapp",
+            "required": false,
+            "in": "query",
             "schema": {
               "type": "boolean"
             }
@@ -18829,6 +17114,538 @@
         "summary": "Fixe la disposition proposée par défaut à tous les comptes de cet écran.",
         "tags": ["tableaux-de-bord"]
       }
+    },
+    "/api/v1/lots-export": {
+      "post": {
+        "operationId": "createLotExport",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLotExportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LotExportSummaryDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crée un lot de fiches exportées.",
+        "tags": ["lots-export"]
+      },
+      "get": {
+        "operationId": "listLotsExport",
+        "parameters": [
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
+            "name": "cible",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/LotExportCible"
+            }
+          },
+          {
+            "name": "createdById",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 25,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LotExportListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Liste les lots d’export.",
+        "tags": ["lots-export"]
+      }
+    },
+    "/api/v1/lots-export/apercu": {
+      "post": {
+        "operationId": "previewLotExport",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLotExportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LotExportPreviewDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Compte les fiches d’une cible.",
+        "tags": ["lots-export"]
+      }
+    },
+    "/api/v1/lots-export/{id}/export.xlsx": {
+      "get": {
+        "operationId": "downloadLotExportXlsx",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Télécharge le classeur figé du lot.",
+        "tags": ["lots-export"]
+      }
+    },
+    "/api/v1/lots-export/{id}/programme.pdf": {
+      "get": {
+        "operationId": "downloadLotExportProgramme",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "teleconseillerId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "jour",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 10,
+              "default": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Télécharge le programme d’un téléconseiller pour une journée.",
+        "tags": ["lots-export"]
+      }
+    },
+    "/api/v1/lots-export/{id}/programmes.zip": {
+      "get": {
+        "operationId": "downloadLotExportProgrammesZip",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Télécharge tous les programmes du lot.",
+        "tags": ["lots-export"]
+      }
+    },
+    "/api/v1/lots-export/{id}": {
+      "get": {
+        "operationId": "getLotExport",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LotExportDetailDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Consulte un lot et les appels qui ont suivi.",
+        "tags": ["lots-export"]
+      }
     }
   },
   "info": {
@@ -18899,11 +17716,6 @@
           "workspace": {
             "type": "string",
             "enum": ["public", "demo"]
-          },
-          "departementId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
           },
           "phoneE164": {
             "type": "string",
@@ -19012,14 +17824,11 @@
           "prospects": {
             "type": "number"
           },
-          "campaigns": {
-            "type": "number"
-          },
           "bankCases": {
             "type": "number"
           }
         },
-        "required": ["users", "representants", "prospects", "campaigns", "bankCases"]
+        "required": ["users", "representants", "prospects", "bankCases"]
       },
       "DemoWorkspaceStatusDto": {
         "type": "object",
@@ -19060,15 +17869,6 @@
           "isActive": {
             "type": "boolean"
           },
-          "departementId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
-          },
-          "departementName": {
-            "type": "string",
-            "nullable": true
-          },
           "phoneE164": {
             "type": "string",
             "nullable": true
@@ -19094,8 +17894,6 @@
           "fullName",
           "role",
           "isActive",
-          "departementId",
-          "departementName",
           "phoneE164",
           "lastLoginAt",
           "createdAt",
@@ -19167,11 +17965,6 @@
               }
             ]
           },
-          "departementId": {
-            "type": "string",
-            "format": "uuid",
-            "description": "Chaîne vide pour retirer le rattachement."
-          },
           "phone": {
             "type": "string",
             "description": "Téléphone, normalisé en E.164 par le serveur."
@@ -19204,11 +17997,6 @@
                 "$ref": "#/components/schemas/Role"
               }
             ]
-          },
-          "departementId": {
-            "type": "string",
-            "format": "uuid",
-            "description": "Chaîne vide pour retirer le rattachement."
           },
           "phone": {
             "type": "string",
@@ -21952,180 +20740,6 @@
         },
         "required": ["id", "kind", "code", "label", "isActive", "sortOrder", "updatedAt"]
       },
-      "CampaignStatus": {
-        "type": "string",
-        "enum": ["DRAFT", "ACTIVE", "PAUSED", "CLOSED"]
-      },
-      "SyncCallCampaignDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string"
-          },
-          "status": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/CampaignStatus"
-              }
-            ]
-          },
-          "spreadDays": {
-            "type": "number",
-            "description": "Journees d’etalement de la file."
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "closedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          }
-        },
-        "required": ["id", "name", "status", "spreadDays", "updatedAt"]
-      },
-      "CallTaskStatus": {
-        "type": "string",
-        "enum": ["OPEN", "DONE", "CANCELLED"]
-      },
-      "SyncCallTaskDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "campaignId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "prospectId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "position": {
-            "type": "number",
-            "description": "Rang dans le programme, a partir de 1."
-          },
-          "dayIndex": {
-            "type": "number",
-            "description": "Journee d’etalement, a partir de 0."
-          },
-          "status": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/CallTaskStatus"
-              }
-            ]
-          },
-          "isActive": {
-            "type": "boolean",
-            "description": "Faux quand la file a été retirée au commercial. La ligne descend alors une dernière fois pour que le téléphone la retire de son programme : sans elle, il continuerait d’appeler des fiches qui ne lui sont plus confiées."
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "id",
-          "campaignId",
-          "prospectId",
-          "position",
-          "dayIndex",
-          "status",
-          "isActive",
-          "updatedAt"
-        ]
-      },
-      "SyncRepCallCampaignDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string"
-          },
-          "status": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/CampaignStatus"
-              }
-            ]
-          },
-          "spreadDays": {
-            "type": "number",
-            "description": "Journees d’etalement de la file."
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "closedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          }
-        },
-        "required": ["id", "name", "status", "spreadDays", "updatedAt"]
-      },
-      "SyncRepCallTaskDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "campaignId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "representantId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "position": {
-            "type": "number",
-            "description": "Rang dans le programme, à partir de 1."
-          },
-          "dayIndex": {
-            "type": "number",
-            "description": "Journée d’étalement, à partir de 0."
-          },
-          "status": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/CallTaskStatus"
-              }
-            ]
-          },
-          "isActive": {
-            "type": "boolean",
-            "description": "Voir `SyncCallTaskDto.isActive`."
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "id",
-          "campaignId",
-          "representantId",
-          "position",
-          "dayIndex",
-          "status",
-          "isActive",
-          "updatedAt"
-        ]
-      },
       "VisiteReferentielRefDto": {
         "type": "object",
         "properties": {
@@ -22284,30 +20898,6 @@
               "$ref": "#/components/schemas/ProspectDto"
             }
           },
-          "callCampaigns": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/SyncCallCampaignDto"
-            }
-          },
-          "callTasks": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/SyncCallTaskDto"
-            }
-          },
-          "repCallCampaigns": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/SyncRepCallCampaignDto"
-            }
-          },
-          "repCallTasks": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/SyncRepCallTaskDto"
-            }
-          },
           "visites": {
             "type": "array",
             "items": {
@@ -22324,10 +20914,6 @@
           "visiteReferentiels",
           "representants",
           "prospects",
-          "callCampaigns",
-          "callTasks",
-          "repCallCampaigns",
-          "repCallTasks",
           "visites"
         ]
       },
@@ -22460,434 +21046,6 @@
           }
         },
         "required": ["entries", "nextCursor", "hasMore", "serverTime"]
-      },
-      "CampaignScope": {
-        "type": "string",
-        "enum": ["BDD1", "BDD2", "BDD3", "BDD4", "GP1", "GP2", "GP3", "GP4", "ALL"]
-      },
-      "CampaignProgressDto": {
-        "type": "object",
-        "properties": {
-          "total": {
-            "type": "number",
-            "description": "Nombre total de tâches affectées."
-          },
-          "open": {
-            "type": "number",
-            "description": "Tâches encore ouvertes."
-          },
-          "done": {
-            "type": "number",
-            "description": "Tâches abouties : une issue terminale a été saisie."
-          },
-          "cancelled": {
-            "type": "number",
-            "description": "Tâches annulées par la clôture de la campagne."
-          }
-        },
-        "required": ["total", "open", "done", "cancelled"]
-      },
-      "CampaignSummaryDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string"
-          },
-          "projet": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/Projet"
-              }
-            ]
-          },
-          "scope": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/CampaignScope"
-              }
-            ]
-          },
-          "scopeLabel": {
-            "type": "string",
-            "description": "Libellé lisible du périmètre, issu de la définition partagée."
-          },
-          "status": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/CampaignStatus"
-              }
-            ]
-          },
-          "offerLabel": {
-            "type": "string",
-            "nullable": true
-          },
-          "seed": {
-            "type": "string",
-            "description": "Graine du tirage, persistée pour pouvoir rejouer et auditer la répartition. Les affectations, elles, sont matérialisées."
-          },
-          "createdById": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "createdByName": {
-            "type": "string"
-          },
-          "commercialCount": {
-            "type": "number"
-          },
-          "spreadDays": {
-            "type": "number",
-            "description": "Journées d’étalement. 1 : programme unique."
-          },
-          "progress": {
-            "$ref": "#/components/schemas/CampaignProgressDto"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "closedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "projet",
-          "scope",
-          "scopeLabel",
-          "status",
-          "offerLabel",
-          "seed",
-          "createdById",
-          "createdByName",
-          "commercialCount",
-          "spreadDays",
-          "progress",
-          "createdAt",
-          "closedAt"
-        ]
-      },
-      "CampaignListDto": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/CampaignSummaryDto"
-            }
-          },
-          "meta": {
-            "$ref": "#/components/schemas/PageMetaDto"
-          }
-        },
-        "required": ["items", "meta"]
-      },
-      "CreateCampaignDto": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "maxLength": 120,
-            "example": "Campagne CHUES, avril"
-          },
-          "projet": {
-            "default": "CHUES",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/Projet"
-              }
-            ]
-          },
-          "scope": {
-            "description": "Périmètre du tirage. BDD1..BDD4 sont les segments partagés ; ALL réunit les quatre sans recouvrement.",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/CampaignScope"
-              }
-            ]
-          },
-          "offerId": {
-            "type": "string",
-            "format": "uuid",
-            "description": "Offre ciblée, pour Grand Public."
-          },
-          "canalProvenanceId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "professionId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "incomeBandId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "commercialIds": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "minItems": 1,
-            "maxItems": 200,
-            "description": "Commerciaux destinataires, DANS L’ORDRE du tourniquet. Cet ordre est persisté en `position` et fige le contenu de chaque programme."
-          },
-          "spreadDays": {
-            "type": "number",
-            "minimum": 1,
-            "maximum": 31,
-            "default": 1,
-            "description": "Étale la file de chaque commercial sur N journées. À 1 (défaut), comportement inchangé : un seul programme. Au-delà, chaque commercial reçoit un programme par jour, ce qui rend une base de 120 000 fiches distribuable."
-          }
-        },
-        "required": ["name", "scope", "commercialIds"]
-      },
-      "CampaignCommercialDto": {
-        "type": "object",
-        "properties": {
-          "userId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "fullName": {
-            "type": "string"
-          },
-          "username": {
-            "type": "string"
-          },
-          "position": {
-            "type": "number",
-            "description": "Rang dans le tourniquet, à partir de 1."
-          },
-          "progress": {
-            "$ref": "#/components/schemas/CampaignProgressDto"
-          },
-          "perDay": {
-            "description": "Lignes par journée, jour 1 en tête.",
-            "type": "array",
-            "items": {
-              "type": "number"
-            }
-          }
-        },
-        "required": ["userId", "fullName", "username", "position", "progress", "perDay"]
-      },
-      "CampaignAttemptDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "prospectId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "shortCode": {
-            "type": "string",
-            "description": "Code court à six caractères du prospect."
-          },
-          "phoneE164": {
-            "type": "string"
-          },
-          "outcome": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/CallOutcome"
-              }
-            ]
-          },
-          "method": {
-            "nullable": true,
-            "description": "Renseignée si et seulement si l’issue vaut METHOD_OBTAINED.",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/EnrollmentMethod"
-              }
-            ]
-          },
-          "comment": {
-            "type": "string",
-            "nullable": true
-          },
-          "email": {
-            "type": "string",
-            "nullable": true
-          },
-          "fonctionnaire": {
-            "type": "boolean",
-            "nullable": true
-          },
-          "engagementEnCours": {
-            "type": "boolean",
-            "nullable": true
-          },
-          "dureeEtablissementMois": {
-            "type": "number",
-            "nullable": true
-          },
-          "rendezVousAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true,
-            "description": "Non nulle si et seulement si method vaut APPOINTMENT."
-          },
-          "performedById": {
-            "type": "string",
-            "format": "uuid",
-            "description": "Commercial qui a RÉELLEMENT passé l’appel."
-          },
-          "performedByName": {
-            "type": "string"
-          },
-          "assignedToId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true,
-            "description": "Commercial à qui la tâche était affectée. Peut différer de performedById."
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "id",
-          "prospectId",
-          "shortCode",
-          "phoneE164",
-          "outcome",
-          "method",
-          "comment",
-          "email",
-          "fonctionnaire",
-          "engagementEnCours",
-          "dureeEtablissementMois",
-          "rendezVousAt",
-          "performedById",
-          "performedByName",
-          "assignedToId",
-          "createdAt"
-        ]
-      },
-      "CampaignDetailDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string"
-          },
-          "projet": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/Projet"
-              }
-            ]
-          },
-          "scope": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/CampaignScope"
-              }
-            ]
-          },
-          "scopeLabel": {
-            "type": "string"
-          },
-          "status": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/CampaignStatus"
-              }
-            ]
-          },
-          "offerLabel": {
-            "type": "string",
-            "nullable": true
-          },
-          "seed": {
-            "type": "string"
-          },
-          "createdById": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "createdByName": {
-            "type": "string"
-          },
-          "commercialCount": {
-            "type": "number"
-          },
-          "spreadDays": {
-            "type": "number",
-            "description": "Journées d’étalement. 1 : programme unique."
-          },
-          "progress": {
-            "$ref": "#/components/schemas/CampaignProgressDto"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "closedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "perDay": {
-            "description": "Lignes par journée, toutes affectations confondues. Jour 1 en tête.",
-            "type": "array",
-            "items": {
-              "type": "number"
-            }
-          },
-          "commerciaux": {
-            "description": "Ordonnés par position.",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/CampaignCommercialDto"
-            }
-          },
-          "recentAttempts": {
-            "description": "Les vingt dernières tentatives, de la plus récente à la plus ancienne.",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/CampaignAttemptDto"
-            }
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "projet",
-          "scope",
-          "scopeLabel",
-          "status",
-          "offerLabel",
-          "seed",
-          "createdById",
-          "createdByName",
-          "commercialCount",
-          "spreadDays",
-          "progress",
-          "createdAt",
-          "closedAt",
-          "perDay",
-          "commerciaux",
-          "recentAttempts"
-        ]
       },
       "VisiteReferentielDto": {
         "type": "object",
@@ -23983,16 +22141,6 @@
           "assignedToName": {
             "type": "string"
           },
-          "campaignId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
-          },
-          "taskId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
-          },
           "overdue": {
             "type": "boolean",
             "description": "Le rappel est passé. État DÉRIVÉ de scheduledAt et de l’heure du serveur, jamais stocké."
@@ -24007,8 +22155,6 @@
           "comment",
           "assignedToId",
           "assignedToName",
-          "campaignId",
-          "taskId",
           "overdue"
         ]
       },
@@ -24029,31 +22175,6 @@
           }
         },
         "required": ["items", "serverTime"]
-      },
-      "RepCampaignPreviewDto": {
-        "type": "object",
-        "properties": {
-          "eligible": {
-            "type": "number",
-            "description": "Représentants éligibles sur ce périmètre."
-          },
-          "perCommercial": {
-            "type": "number",
-            "description": "Lignes par commercial, au plus."
-          },
-          "perDay": {
-            "description": "Lignes par journée POUR UN commercial, jour 1 en tête. C’est le chiffre qui dit si la journée est tenable.",
-            "type": "array",
-            "items": {
-              "type": "number"
-            }
-          },
-          "scopeLabel": {
-            "type": "string",
-            "description": "Libellé lisible du périmètre."
-          }
-        },
-        "required": ["eligible", "perCommercial", "perDay", "scopeLabel"]
       },
       "RepCallOutcome": {
         "type": "string",
@@ -24171,16 +22292,6 @@
             "type": "string",
             "format": "uuid"
           },
-          "taskId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true,
-            "description": "Tâche close par cette tentative, si le représentant en avait une active."
-          },
-          "taskClosed": {
-            "type": "boolean",
-            "description": "Vrai si l’issue a clos la tâche. Les issues « à rappeler » la laissent ouverte."
-          },
           "suggestion": {
             "nullable": true,
             "description": "Ce que le numéro suggéré donne dans l’annuaire, dans la forme que la bannière de doublon du mobile sait déjà afficher. Nul si la tentative n’en portait pas.",
@@ -24192,398 +22303,7 @@
             ]
           }
         },
-        "required": ["status", "attemptId", "taskId", "taskClosed", "suggestion"]
-      },
-      "RepCampaignProgressDto": {
-        "type": "object",
-        "properties": {
-          "total": {
-            "type": "number",
-            "description": "Nombre total de tâches affectées."
-          },
-          "open": {
-            "type": "number",
-            "description": "Tâches encore ouvertes."
-          },
-          "done": {
-            "type": "number",
-            "description": "Tâches abouties : une issue terminale a été saisie."
-          },
-          "cancelled": {
-            "type": "number",
-            "description": "Tâches annulées par la clôture de la campagne."
-          }
-        },
-        "required": ["total", "open", "done", "cancelled"]
-      },
-      "RepCampaignSummaryDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string"
-          },
-          "status": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/CampaignStatus"
-              }
-            ]
-          },
-          "seed": {
-            "type": "string",
-            "description": "Graine du tirage, persistée pour pouvoir rejouer et auditer la répartition. Les affectations, elles, sont matérialisées."
-          },
-          "scopeLabel": {
-            "type": "string",
-            "description": "Libellé lisible du périmètre, composé côté serveur."
-          },
-          "departementId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
-          },
-          "iefId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
-          },
-          "onlyWithoutProspects": {
-            "type": "boolean"
-          },
-          "relationStatuses": {
-            "type": "array",
-            "description": "États de relation retenus par le tirage. Vide : aucun filtre.",
-            "items": {
-              "$ref": "#/components/schemas/RepresentantRelation"
-            }
-          },
-          "createdById": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "createdByName": {
-            "type": "string"
-          },
-          "commercialCount": {
-            "type": "number"
-          },
-          "spreadDays": {
-            "type": "number",
-            "description": "Journées d’étalement. 1 : programme unique."
-          },
-          "progress": {
-            "$ref": "#/components/schemas/RepCampaignProgressDto"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "closedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "status",
-          "seed",
-          "scopeLabel",
-          "departementId",
-          "iefId",
-          "onlyWithoutProspects",
-          "relationStatuses",
-          "createdById",
-          "createdByName",
-          "commercialCount",
-          "spreadDays",
-          "progress",
-          "createdAt",
-          "closedAt"
-        ]
-      },
-      "RepCampaignListDto": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/RepCampaignSummaryDto"
-            }
-          },
-          "meta": {
-            "$ref": "#/components/schemas/PageMetaDto"
-          }
-        },
-        "required": ["items", "meta"]
-      },
-      "CreateRepCampaignDto": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "maxLength": 120,
-            "example": "Relance représentants dormants"
-          },
-          "commercialIds": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "minItems": 1,
-            "maxItems": 200,
-            "description": "Commerciaux destinataires, DANS L’ORDRE du tourniquet. Cet ordre est persisté en `position` et fige le contenu de chaque programme."
-          },
-          "departementId": {
-            "type": "string",
-            "format": "uuid",
-            "description": "Restreint le tirage à un département. Cumulable avec `iefId`."
-          },
-          "iefId": {
-            "type": "string",
-            "format": "uuid",
-            "description": "Restreint le tirage à une IEF."
-          },
-          "onlyWithoutProspects": {
-            "type": "boolean",
-            "default": false,
-            "description": "Ne retenir que les représentants n’ayant apporté aucun prospect vivant. C’est la campagne de relance des dormants."
-          },
-          "relationStatuses": {
-            "type": "array",
-            "maxItems": 4,
-            "description": "Ne retenir que les représentants dans ces états de relation. Absente ou vide : aucun filtre. `AMBASSADEUR` seul donne les qualifiés ; une liste qui l’exclut donne les non qualifiés.",
-            "items": {
-              "$ref": "#/components/schemas/RepresentantRelation"
-            }
-          },
-          "spreadDays": {
-            "type": "number",
-            "minimum": 1,
-            "maximum": 31,
-            "default": 1,
-            "description": "Étale la file de chaque commercial sur N journées. À 1 (défaut), un seul programme par commercial."
-          }
-        },
-        "required": ["name", "commercialIds"]
-      },
-      "RepCampaignCommercialDto": {
-        "type": "object",
-        "properties": {
-          "userId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "fullName": {
-            "type": "string"
-          },
-          "username": {
-            "type": "string"
-          },
-          "position": {
-            "type": "number",
-            "description": "Rang dans le tourniquet, à partir de 1."
-          },
-          "progress": {
-            "$ref": "#/components/schemas/RepCampaignProgressDto"
-          },
-          "perDay": {
-            "description": "Lignes par journée, jour 1 en tête.",
-            "type": "array",
-            "items": {
-              "type": "number"
-            }
-          }
-        },
-        "required": ["userId", "fullName", "username", "position", "progress", "perDay"]
-      },
-      "RepCampaignAttemptDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "representantId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "shortCode": {
-            "type": "string",
-            "description": "Code court à six caractères du représentant."
-          },
-          "phoneE164": {
-            "type": "string"
-          },
-          "outcome": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/RepCallOutcome"
-              }
-            ]
-          },
-          "promisedProspects": {
-            "type": "number",
-            "nullable": true,
-            "description": "Renseigné si et seulement si l’issue vaut PROSPECTS_PROMISED."
-          },
-          "comment": {
-            "type": "string",
-            "nullable": true
-          },
-          "performedById": {
-            "type": "string",
-            "format": "uuid",
-            "description": "Commercial qui a RÉELLEMENT passé l’appel."
-          },
-          "performedByName": {
-            "type": "string"
-          },
-          "assignedToId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true,
-            "description": "Commercial à qui la tâche était affectée. Peut différer de performedById."
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "id",
-          "representantId",
-          "shortCode",
-          "phoneE164",
-          "outcome",
-          "promisedProspects",
-          "comment",
-          "performedById",
-          "performedByName",
-          "assignedToId",
-          "createdAt"
-        ]
-      },
-      "RepCampaignDetailDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string"
-          },
-          "status": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/CampaignStatus"
-              }
-            ]
-          },
-          "seed": {
-            "type": "string",
-            "description": "Graine du tirage, persistée pour pouvoir rejouer et auditer la répartition. Les affectations, elles, sont matérialisées."
-          },
-          "scopeLabel": {
-            "type": "string",
-            "description": "Libellé lisible du périmètre, composé côté serveur."
-          },
-          "departementId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
-          },
-          "iefId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
-          },
-          "onlyWithoutProspects": {
-            "type": "boolean"
-          },
-          "relationStatuses": {
-            "type": "array",
-            "description": "États de relation retenus par le tirage. Vide : aucun filtre.",
-            "items": {
-              "$ref": "#/components/schemas/RepresentantRelation"
-            }
-          },
-          "createdById": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "createdByName": {
-            "type": "string"
-          },
-          "commercialCount": {
-            "type": "number"
-          },
-          "spreadDays": {
-            "type": "number",
-            "description": "Journées d’étalement. 1 : programme unique."
-          },
-          "progress": {
-            "$ref": "#/components/schemas/RepCampaignProgressDto"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "closedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "perDay": {
-            "description": "Lignes par journée, toutes affectations confondues. Jour 1 en tête.",
-            "type": "array",
-            "items": {
-              "type": "number"
-            }
-          },
-          "commerciaux": {
-            "description": "Ordonnés par position.",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/RepCampaignCommercialDto"
-            }
-          },
-          "recentAttempts": {
-            "description": "Les vingt dernières tentatives, de la plus récente à la plus ancienne.",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/RepCampaignAttemptDto"
-            }
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "status",
-          "seed",
-          "scopeLabel",
-          "departementId",
-          "iefId",
-          "onlyWithoutProspects",
-          "relationStatuses",
-          "createdById",
-          "createdByName",
-          "commercialCount",
-          "spreadDays",
-          "progress",
-          "createdAt",
-          "closedAt",
-          "perDay",
-          "commerciaux",
-          "recentAttempts"
-        ]
+        "required": ["status", "attemptId", "suggestion"]
       },
       "SuggestionStatus": {
         "type": "string",
@@ -25712,10 +23432,6 @@
               }
             ]
           },
-          "audienceDepartementId": {
-            "type": "string",
-            "format": "uuid"
-          },
           "audienceUserIds": {
             "maxItems": 1000,
             "type": "array",
@@ -25806,11 +23522,6 @@
               }
             ]
           },
-          "audienceDepartementId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true
-          },
           "audienceUserIds": {
             "type": "array",
             "items": {
@@ -25864,7 +23575,6 @@
           "route",
           "audience",
           "audienceRole",
-          "audienceDepartementId",
           "audienceUserIds",
           "status",
           "scheduledFor",
@@ -26629,109 +24339,6 @@
         },
         "required": ["items", "total"]
       },
-      "CampaignClosedDayDto": {
-        "type": "object",
-        "properties": {
-          "day": {
-            "type": "string",
-            "format": "date",
-            "description": "Journée, au format AAAA-MM-JJ."
-          },
-          "commercialId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "commercialName": {
-            "type": "string"
-          },
-          "done": {
-            "type": "number",
-            "description": "Tâches clôturées ce jour-là par ce commercial."
-          }
-        },
-        "required": ["day", "commercialId", "commercialName", "done"]
-      },
-      "CampaignPilotageDto": {
-        "type": "object",
-        "properties": {
-          "campaignId": {
-            "type": "string",
-            "format": "uuid",
-            "nullable": true,
-            "description": "Campagne observée. Nul quand aucune n’est précisée : le calcul porte alors sur l’ensemble des campagnes ACTIVES."
-          },
-          "tasks": {
-            "type": "number",
-            "description": "Tâches de la campagne, toutes issues confondues."
-          },
-          "tasksContacted": {
-            "type": "number",
-            "description": "Tâches ayant reçu au moins une tentative."
-          },
-          "contactRate": {
-            "type": "number",
-            "nullable": true,
-            "description": "Part des tâches touchées au moins une fois, en pourcentage. Nul quand le dénominateur est vide : un taux calculé sur zéro observation n’existe pas, et le publier comme 0 le rendrait indistinguable d’un vrai 0 %."
-          },
-          "attempts": {
-            "type": "number",
-            "description": "Tentatives d’appel rattachées à la campagne."
-          },
-          "reachableAttempts": {
-            "type": "number",
-            "description": "Tentatives dont l’issue n’est ni « injoignable » ni « faux numéro »."
-          },
-          "reachRate": {
-            "type": "number",
-            "nullable": true,
-            "description": "Part des tentatives joignables, en pourcentage. Nul quand le dénominateur est vide : un taux calculé sur zéro observation n’existe pas, et le publier comme 0 le rendrait indistinguable d’un vrai 0 %."
-          },
-          "methodsObtained": {
-            "type": "number",
-            "description": "Tentatives ayant abouti à une méthode obtenue."
-          },
-          "attemptsPerMethodObtained": {
-            "type": "number",
-            "description": "Nombre moyen de tentatives pour une méthode obtenue. Vaut 0 tant qu’aucune méthode n’a été obtenue, faute de dénominateur."
-          },
-          "closedPerDay": {
-            "description": "Tâches clôturées, par jour et par commercial.",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/CampaignClosedDayDto"
-            }
-          },
-          "remaining": {
-            "type": "number",
-            "description": "Tâches encore ouvertes."
-          },
-          "observedPace": {
-            "type": "number",
-            "description": "Cadence observée : tâches clôturées par jour sur les 7 derniers jours."
-          },
-          "estimatedEndDate": {
-            "type": "string",
-            "format": "date",
-            "nullable": true,
-            "description": "Date de fin projetée à la cadence observée. Nulle quand la cadence est nulle : une campagne à l’arrêt n’a pas de date de fin, et en annoncer une serait une division par zéro déguisée en prévision."
-          }
-        },
-        "required": [
-          "campaignId",
-          "tasks",
-          "tasksContacted",
-          "contactRate",
-          "attempts",
-          "reachableAttempts",
-          "reachRate",
-          "methodsObtained",
-          "attemptsPerMethodObtained",
-          "closedPerDay",
-          "remaining",
-          "observedPace",
-          "estimatedEndDate"
-        ]
-      },
       "DelayLeg": {
         "type": "string",
         "enum": ["CREATION_TO_METHOD", "METHOD_TO_CASE", "CASE_TO_CASHED"]
@@ -27391,10 +24998,6 @@
             "type": "number",
             "description": "Représentants distincts appelés sur la période."
           },
-          "tasksClosed": {
-            "type": "number",
-            "description": "Tâches d’appel clôturées sur la période."
-          },
           "repCalls": {
             "type": "number",
             "description": "Appels à des représentants, issues encore saisissables seulement : REACHED, REFUSED, CALLBACK, UNREACHABLE. Dénominateur de `repContactRate` et de `repCallbackRate`."
@@ -27461,7 +25064,6 @@
           "reachRate",
           "prospectsCreated",
           "representantsContacted",
-          "tasksClosed",
           "repCalls",
           "repReached",
           "repCallback",
@@ -27521,10 +25123,6 @@
             "type": "number",
             "description": "Représentants distincts appelés sur la période."
           },
-          "tasksClosed": {
-            "type": "number",
-            "description": "Tâches d’appel clôturées sur la période."
-          },
           "repCalls": {
             "type": "number",
             "description": "Appels à des représentants, issues encore saisissables seulement : REACHED, REFUSED, CALLBACK, UNREACHABLE. Dénominateur de `repContactRate` et de `repCallbackRate`."
@@ -27580,7 +25178,6 @@
           "reachRate",
           "prospectsCreated",
           "representantsContacted",
-          "tasksClosed",
           "repCalls",
           "repReached",
           "repCallback",
@@ -27605,13 +25202,9 @@
           },
           "isActive": {
             "type": "boolean"
-          },
-          "openTasks": {
-            "type": "number",
-            "description": "Tâches d’appel encore OUVERTES. Instantané : la fenêtre ne le borne pas."
           }
         },
-        "required": ["id", "fullName", "isActive", "openTasks"]
+        "required": ["id", "fullName", "isActive"]
       },
       "SupervisionHistogramBarDto": {
         "type": "object",
@@ -27707,8 +25300,7 @@
           "directionAccueil",
           "representants",
           "prospects",
-          "campagnes",
-          "campagnesRepresentants",
+          "lotsExport",
           "demandesClients",
           "visites",
           "fileAppels",
@@ -27857,10 +25449,6 @@
           "isActive": {
             "type": "boolean"
           },
-          "departementName": {
-            "type": "string",
-            "nullable": true
-          },
           "presence": {
             "allOf": [
               {
@@ -27923,7 +25511,6 @@
           "email",
           "role",
           "isActive",
-          "departementName",
           "presence",
           "hasLiveSession",
           "sessionCount",
@@ -28229,10 +25816,10 @@
           "visiteurs-recurrents",
           "avec-telephone",
           "qualite-de-saisie",
-          "appels-de-qualification",
           "taux-de-contact",
           "a-rappeler",
           "taux-de-qualification",
+          "taux-de-joignabilite",
           "prospects-notes",
           "adhesions",
           "reste-a-appeler",
@@ -28380,6 +25967,538 @@
           }
         },
         "required": ["widgets"]
+      },
+      "LotExportCible": {
+        "type": "string",
+        "enum": ["REPRESENTANTS", "PROSPECTS"]
+      },
+      "RepresentantExportQueryDto": {
+        "type": "object",
+        "properties": {
+          "search": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "departementId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "iefId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Filtre par IEF."
+          },
+          "commercialId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Réservé à l’ADMIN."
+          },
+          "dateFrom": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Borne basse sur la date de saisie terrain (clientCreatedAt), incluse."
+          },
+          "dateTo": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Borne haute sur la date de saisie terrain (clientCreatedAt), incluse."
+          },
+          "hasProspects": {
+            "type": "boolean",
+            "description": "true : au moins un prospect vivant. false : aucun (représentant dormant)."
+          },
+          "relationStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RepresentantRelation"
+              }
+            ]
+          },
+          "whatsappStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WhatsappStatus"
+              }
+            ]
+          },
+          "hasWhatsapp": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ProspectFilterDto": {
+        "type": "object",
+        "properties": {
+          "search": {
+            "type": "string",
+            "description": "Recherche libre sur le nom, le prénom ou le téléphone.",
+            "maxLength": 120
+          },
+          "representantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "banqueId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "syndicatId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "departementId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "commercialId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes."
+          },
+          "projet": {
+            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Projet"
+              }
+            ]
+          },
+          "type": {
+            "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProspectType"
+              }
+            ]
+          },
+          "canalProvenanceId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Grand Public : canal de provenance."
+          },
+          "statut": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProspectStatut"
+              }
+            ]
+          },
+          "segment": {
+            "description": "Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BddSegment"
+              }
+            ]
+          },
+          "phase2Status": {
+            "description": "Avancement de la phase 2. Dimension indépendante de `statut`.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Phase2Status"
+              }
+            ]
+          },
+          "enrollmentMethod": {
+            "description": "Méthode d’enrôlement obtenue en phase 2.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EnrollmentMethod"
+              }
+            ]
+          },
+          "appelePar": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche."
+          },
+          "enrollmentCapturedById": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1."
+          },
+          "origin": {
+            "type": "string",
+            "enum": ["BANQUE"],
+            "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses."
+          },
+          "dateFrom": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Borne basse sur la date de saisie terrain (clientCreatedAt), incluse."
+          },
+          "dateTo": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Borne haute sur la date de saisie terrain (clientCreatedAt), incluse."
+          },
+          "includeDeleted": {
+            "type": "boolean",
+            "description": "Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.",
+            "default": false
+          }
+        }
+      },
+      "LotExportDistributionInputDto": {
+        "type": "object",
+        "properties": {
+          "teleconseillerIds": {
+            "minItems": 1,
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "fichesParJour": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 500,
+            "default": 50
+          },
+          "jours": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10,
+            "default": 1
+          }
+        },
+        "required": ["teleconseillerIds"]
+      },
+      "CreateLotExportDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "cible": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LotExportCible"
+              }
+            ]
+          },
+          "representants": {
+            "$ref": "#/components/schemas/RepresentantExportQueryDto"
+          },
+          "prospects": {
+            "$ref": "#/components/schemas/ProspectFilterDto"
+          },
+          "distribution": {
+            "$ref": "#/components/schemas/LotExportDistributionInputDto"
+          }
+        },
+        "required": ["name", "cible", "distribution"]
+      },
+      "LotExportSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "cible": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LotExportCible"
+              }
+            ]
+          },
+          "projet": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Projet"
+              }
+            ]
+          },
+          "scopeLabel": {
+            "type": "string"
+          },
+          "itemCount": {
+            "type": "number"
+          },
+          "createdById": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdByName": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "callsSince": {
+            "type": "number"
+          },
+          "fichesAppelees": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "cible",
+          "projet",
+          "scopeLabel",
+          "itemCount",
+          "createdById",
+          "createdByName",
+          "createdAt",
+          "callsSince",
+          "fichesAppelees"
+        ]
+      },
+      "LotExportPreviewDto": {
+        "type": "object",
+        "properties": {
+          "eligible": {
+            "type": "number"
+          },
+          "scopeLabel": {
+            "type": "string"
+          },
+          "places": {
+            "type": "number"
+          },
+          "retenues": {
+            "type": "number"
+          },
+          "parTeleconseiller": {
+            "type": "number"
+          }
+        },
+        "required": ["eligible", "scopeLabel", "places", "retenues", "parTeleconseiller"]
+      },
+      "LotExportListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LotExportSummaryDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMetaDto"
+          }
+        },
+        "required": ["items", "meta"]
+      },
+      "LotExportAttemptDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "phoneE164": {
+            "type": "string"
+          },
+          "shortCode": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "METHOD_OBTAINED",
+              "UNREACHABLE",
+              "CALLBACK",
+              "REFUSED",
+              "WRONG_NUMBER",
+              "OTHER",
+              "REACHED",
+              "PROSPECTS_PROMISED",
+              "UNREACHABLE",
+              "CALLBACK",
+              "REFUSED",
+              "WRONG_NUMBER",
+              "OTHER"
+            ]
+          },
+          "method": {
+            "type": "string",
+            "enum": ["PLATFORM", "PHYSICAL", "VOICE_OR_ELECTRONIC_MESSAGING", "APPOINTMENT"],
+            "nullable": true
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "performedByName": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "email": {
+            "type": "object",
+            "nullable": true
+          },
+          "fonctionnaire": {
+            "type": "object",
+            "nullable": true
+          },
+          "engagementEnCours": {
+            "type": "object",
+            "nullable": true
+          },
+          "dureeEtablissementMois": {
+            "type": "object",
+            "nullable": true
+          },
+          "rendezVousAt": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "phoneE164",
+          "shortCode",
+          "outcome",
+          "method",
+          "comment",
+          "performedByName",
+          "createdAt",
+          "email",
+          "fonctionnaire",
+          "engagementEnCours",
+          "dureeEtablissementMois",
+          "rendezVousAt"
+        ]
+      },
+      "LotExportDistributionDto": {
+        "type": "object",
+        "properties": {
+          "fichesParJour": {
+            "type": "number"
+          },
+          "jours": {
+            "type": "number"
+          }
+        },
+        "required": ["fichesParJour", "jours"]
+      },
+      "LotExportRepartitionJourDto": {
+        "type": "object",
+        "properties": {
+          "jour": {
+            "type": "number"
+          },
+          "fiches": {
+            "type": "number"
+          }
+        },
+        "required": ["jour", "fiches"]
+      },
+      "LotExportRepartitionDto": {
+        "type": "object",
+        "properties": {
+          "teleconseillerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "teleconseillerName": {
+            "type": "string"
+          },
+          "jours": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LotExportRepartitionJourDto"
+            }
+          }
+        },
+        "required": ["teleconseillerId", "teleconseillerName", "jours"]
+      },
+      "LotExportDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "cible": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LotExportCible"
+              }
+            ]
+          },
+          "projet": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Projet"
+              }
+            ]
+          },
+          "scopeLabel": {
+            "type": "string"
+          },
+          "itemCount": {
+            "type": "number"
+          },
+          "createdById": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdByName": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "callsSince": {
+            "type": "number"
+          },
+          "fichesAppelees": {
+            "type": "number"
+          },
+          "recentAttempts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LotExportAttemptDto"
+            }
+          },
+          "callsByTeleconseiller": {
+            "type": "object"
+          },
+          "distribution": {
+            "$ref": "#/components/schemas/LotExportDistributionDto"
+          },
+          "repartition": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LotExportRepartitionDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "cible",
+          "projet",
+          "scopeLabel",
+          "itemCount",
+          "createdById",
+          "createdByName",
+          "createdAt",
+          "callsSince",
+          "fichesAppelees",
+          "recentAttempts",
+          "callsByTeleconseiller",
+          "distribution",
+          "repartition"
+        ]
       }
     }
   }

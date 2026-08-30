@@ -3,6 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule, seconds } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
+import { resolve } from 'node:path';
 
 import { envSchema, readEnv } from './env.js';
 import { PrismaModule } from './prisma/prisma.module.js';
@@ -35,6 +36,7 @@ import { DashboardsModule } from './modules/dashboards/dashboards.module.js';
 import { LotsExportModule } from './modules/lots-export/lots-export.module.js';
 
 const env = readEnv();
+const apiLogPath = resolve(import.meta.dirname, '../../../logs/api.log');
 
 @Module({
   imports: [
@@ -45,7 +47,24 @@ const env = readEnv();
     LoggerModule.forRoot({
       pinoHttp: {
         level: env.LOG_LEVEL,
-        ...(env.NODE_ENV === 'development' ? { transport: { target: 'pino-pretty' } } : {}),
+        ...(env.NODE_ENV === 'development'
+          ? {
+              transport: {
+                targets: [
+                  {
+                    target: 'pino-pretty',
+                    level: env.LOG_LEVEL,
+                    options: { colorize: true, translateTime: 'SYS:standard' },
+                  },
+                  {
+                    target: 'pino/file',
+                    level: env.LOG_LEVEL,
+                    options: { destination: apiLogPath, mkdir: true },
+                  },
+                ],
+              },
+            }
+          : {}),
         redact: {
           paths: [
             'req.headers.authorization',

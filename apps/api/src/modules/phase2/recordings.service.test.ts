@@ -14,9 +14,6 @@ import type { AuthenticatedUser } from '../../common/decorators/current-user.dec
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import { CallRecordingsService } from './recordings.service.js';
 import { Phase2Controller } from './phase2.controller.js';
-import type { Phase2CampaignsService } from './campaigns.service.js';
-import type { Phase2DirectoryService } from './directory.service.js';
-import type { CallOutcomeReasonsService } from '../referentiels/call-outcome-reasons.service.js';
 
 const identity = (id: string, role: Role): AuthenticatedUser => ({
   id,
@@ -328,9 +325,7 @@ describe('note vocale, le fichier', () => {
 describe('note vocale, entêtes de lecture', () => {
   function controller(service: CallRecordingsService): Phase2Controller {
     return new Phase2Controller(
-      undefined as unknown as Phase2CampaignsService,
-      undefined as unknown as Phase2DirectoryService,
-      undefined as unknown as CallOutcomeReasonsService,
+      undefined as never,
       service,
     );
   }

@@ -23,22 +23,19 @@ test.describe.configure({ mode: 'serial' });
 const DISPOSITION = '/api/v1/tableaux-de-bord/chues/disposition';
 
 const CARTES_USINE = [
-  'Appels aux représentants',
-  'Représentants joints',
-  'Rappels promis',
-  'Représentants qui acceptent',
-  'Prospects notés',
-  'Adhésions obtenues',
-  'Reste à appeler',
+  'Taux de contact',
+  'Taux de rendez-vous',
+  'Taux de qualification',
+  'Adhésions',
   'Par téléconseiller',
 ] as const;
 
-/** Les quatre sources du catalogue CHUES qui ne sont pas d'usine. */
+/** Les sources du catalogue CHUES d'un superviseur qui ne sont pas d'usine. */
 const SOURCES_EN_RESERVE = [
+  'Taux de joignabilité',
+  'Prospects notés',
   'Méthodes d’adhésion',
-  'Par banque',
   'Délais médians',
-  'Rendement par département',
 ] as const;
 
 async function effacerLaDisposition(): Promise<void> {
@@ -72,6 +69,14 @@ async function avecDisposition(page: Page, geste: () => Promise<unknown>): Promi
   );
   await geste();
   await attendue;
+  // La réponse reçue n'est pas encore rendue : c'est la première carte qui
+  // prouve que le brouillon a de quoi se recopier.
+  await expect(
+    page
+      .getByRole('group', { name: / graphique$/u })
+      .or(page.getByText('Cet écran est vide'))
+      .first(),
+  ).toBeVisible();
 }
 
 async function ouvrirComposition(page: Page): Promise<void> {
@@ -89,6 +94,7 @@ async function enregistrer(page: Page): Promise<void> {
 
 /** L'ordre des cartes, lu sur les boutons « Retirer … » du mode composition. */
 async function ordreDesCartes(page: Page): Promise<string[]> {
+  await expect(page.getByRole('button', { name: /^Retirer / }).first()).toBeVisible();
   const boutons = await page.getByRole('button', { name: /^Retirer / }).all();
   const titres: string[] = [];
   for (const bouton of boutons) {
@@ -127,14 +133,14 @@ test('CHU-DSP-03 · retirer une carte, enregistrer, recharger : elle reste absen
   await avecDisposition(page, () => page.goto('/chues/statistiques'));
   await ouvrirComposition(page);
 
-  await page.getByRole('button', { name: 'Retirer Reste à appeler' }).click();
+  await page.getByRole('button', { name: 'Retirer Adhésions' }).click();
   await enregistrer(page);
 
   await expect(page.getByRole('button', { name: 'Composer l’écran' })).toBeVisible();
-  await expect(carte(page, 'Reste à appeler')).toHaveCount(0);
+  await expect(carte(page, 'Adhésions')).toHaveCount(0);
 
   await avecDisposition(page, () => page.reload());
-  await expect(carte(page, 'Reste à appeler')).toHaveCount(0);
+  await expect(carte(page, 'Adhésions')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Revenir à l’écran par défaut' })).toBeVisible();
 });
 
@@ -149,14 +155,14 @@ test('CHU-DSP-04 · ajouter une carte depuis le tiroir', async ({ page }) => {
   await expect(tiroir).toContainText(
     'Choisissez ce que vous voulez suivre. L’image montre la forme conseillée.',
   );
-  await expect(tiroir.getByRole('button', { name: /^Reste à appeler/ })).toBeVisible();
+  await expect(tiroir.getByRole('button', { name: /^Adhésions/ })).toBeVisible();
   // Une source déjà posée n'est pas proposée : sinon l'enregistrement crée un
   // doublon que le serveur déduplique en silence.
-  await expect(tiroir.getByRole('button', { name: /^Prospects notés/ })).toHaveCount(0);
+  await expect(tiroir.getByRole('button', { name: /^Taux de contact/ })).toHaveCount(0);
 
-  await tiroir.getByRole('button', { name: /^Reste à appeler/ }).click();
+  await tiroir.getByRole('button', { name: /^Adhésions/ }).click();
   await expect(tiroir).toHaveCount(0);
-  await expect(carte(page, 'Reste à appeler')).toBeVisible();
+  await expect(carte(page, 'Adhésions')).toBeVisible();
 
   await enregistrer(page);
 });
@@ -189,14 +195,12 @@ test('CHU-DSP-06 · l’ordre se change au clavier, sans glisser-déposer, et il
   await ouvrirComposition(page);
 
   const avant = await ordreDesCartes(page);
-  expect(avant[0], 'la grille d’usine commence par les appels de qualification').toBe(
-    'Appels aux représentants',
-  );
+  expect(avant[0], 'la grille d’usine commence par le taux de contact').toBe('Taux de contact');
 
-  await page.getByRole('button', { name: 'Descendre Appels aux représentants' }).click();
+  await page.getByRole('button', { name: 'Descendre Taux de contact' }).click();
 
   const apres = await ordreDesCartes(page);
-  expect(apres[0]).not.toBe('Appels aux représentants');
+  expect(apres[0]).not.toBe('Taux de contact');
 
   await expect(page.getByRole('button', { name: `Monter ${apres[0] ?? ''}` })).toBeDisabled();
   await expect(
@@ -215,7 +219,7 @@ test('CHU-DSP-07 · la marque d’une carte se change et survit au rechargement'
   await avecDisposition(page, () => page.goto('/chues/statistiques'));
   await ouvrirComposition(page);
 
-  await page.getByRole('button', { name: 'Changer la présentation de Représentants joints' }).click();
+  await page.getByRole('button', { name: 'Changer la présentation de Taux de contact' }).click();
   await page.getByRole('button', { name: /^Jauge/ }).click();
   await enregistrer(page);
 
@@ -224,10 +228,10 @@ test('CHU-DSP-07 · la marque d’une carte se change et survit au rechargement'
    * carte. La tuile d'usine n'en pose aucun. C'est la seule différence
    * observable entre les deux marques.
    */
-  await expect(carte(page, 'Représentants joints').locator('canvas')).toHaveCount(1);
+  await expect(carte(page, 'Taux de contact').locator('canvas')).toHaveCount(1);
 
   await avecDisposition(page, () => page.reload());
-  await expect(carte(page, 'Représentants joints').locator('canvas')).toHaveCount(1);
+  await expect(carte(page, 'Taux de contact').locator('canvas')).toHaveCount(1);
 });
 
 test('CHU-DSP-09 · « Quitter » avec des changements demande confirmation', async ({ page }) => {
@@ -262,9 +266,9 @@ test('CHU-DSP-11 · la disposition est propre à chaque compte', async ({
 }) => {
   await avecDisposition(page, () => page.goto('/chues/statistiques'));
   await ouvrirComposition(page);
-  await page.getByRole('button', { name: 'Retirer Adhésions obtenues' }).click();
+  await page.getByRole('button', { name: 'Retirer Adhésions' }).click();
   await enregistrer(page);
-  await expect(carte(page, 'Adhésions obtenues')).toHaveCount(0);
+  await expect(carte(page, 'Adhésions')).toHaveCount(0);
 
   const contexteDirection = await browser.newContext({
     ...(baseURL === undefined ? {} : { baseURL }),
@@ -274,7 +278,7 @@ test('CHU-DSP-11 · la disposition est propre à chaque compte', async ({
     const pageDirection = await contexteDirection.newPage();
     await pageDirection.goto('/chues/statistiques');
     await expect(
-      carte(pageDirection, 'Adhésions obtenues'),
+      carte(pageDirection, 'Adhésions'),
       'la disposition d’un superviseur ne touche pas l’écran de la direction',
     ).toBeVisible();
   } finally {
@@ -292,15 +296,15 @@ test('CHU-DSP-11 · la disposition est propre à chaque compte', async ({
 test('CHU-DSP-12 · la disposition est propre à chaque écran', async ({ page }) => {
   await avecDisposition(page, () => page.goto('/chues/statistiques'));
   await ouvrirComposition(page);
-  await page.getByRole('button', { name: 'Retirer Appels aux représentants' }).click();
+  await page.getByRole('button', { name: 'Retirer Taux de qualification' }).click();
   await enregistrer(page);
-  await expect(carte(page, 'Appels aux représentants')).toHaveCount(0);
+  await expect(carte(page, 'Taux de qualification')).toHaveCount(0);
 
   await page.goto('/grand-public/statistiques');
-  for (const titre of ['Prospects notés', 'Adhésions obtenues', 'Reste à appeler', 'Par téléconseiller']) {
+  for (const titre of ['Taux de joignabilité', 'Prospects notés', 'Adhésions', 'Par téléconseiller']) {
     await expect(carte(page, titre), `« ${titre} » d’usine sur l’écran Grand Public`).toBeVisible();
   }
-  await expect(carte(page, 'Appels aux représentants')).toHaveCount(0);
+  await expect(carte(page, 'Taux de qualification')).toHaveCount(0);
 });
 
 test('CHU-DSP-08 · « Revenir à l’écran par défaut » efface la disposition personnelle', async ({

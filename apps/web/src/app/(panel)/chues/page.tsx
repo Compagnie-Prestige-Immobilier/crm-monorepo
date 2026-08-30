@@ -2,7 +2,7 @@ import { HydrationBoundary, dehydrate } from '@tanstack/react-query';
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 
-import { A_APPELER, SANS_PROSPECT, hubKeys } from '@/components/chues/hub-filters';
+import { NON_QUALIFIES, SANS_PROSPECT, hubKeys } from '@/components/chues/hub-filters';
 import { HubView } from '@/components/chues/hub-view';
 import { PermissionDenied } from '@/components/permission-denied';
 import { getServerApiClient } from '@/lib/api/server';
@@ -40,8 +40,8 @@ export default async function ProjetChuesPage() {
   // liste au périmètre de qui la demande.
   await Promise.all([
     queryClient.prefetchQuery({
-      queryKey: queryKeys.representants(A_APPELER),
-      queryFn: () => fetchRepresentants(A_APPELER, client),
+      queryKey: queryKeys.representants(NON_QUALIFIES),
+      queryFn: () => fetchRepresentants(NON_QUALIFIES, client),
     }),
     queryClient.prefetchQuery({
       queryKey: queryKeys.representants(SANS_PROSPECT),

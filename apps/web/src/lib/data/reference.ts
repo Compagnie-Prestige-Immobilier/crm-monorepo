@@ -40,12 +40,11 @@ function listeFacultative<TItem>(
 export async function fetchReferenceData(
   client: ApiClient = getApiClient(),
 ): Promise<ReferenceData> {
-  const [bundle, iefs, users, representants, campaigns] = await Promise.all([
+  const [bundle, iefs, users, representants] = await Promise.all([
     client.GET('/api/v1/referentiels', { params: { query: { activeOnly: false } } }),
     client.GET('/api/v1/referentiels/iefs', { params: { query: { activeOnly: false } } }),
     client.GET('/api/v1/users', { params: { query: { role: 'COMMERCIAL', pageSize: 200 } } }),
     client.GET('/api/v1/representants', { params: { query: { pageSize: 200 } } }),
-    client.GET('/api/v1/phase2/campaigns', { params: { query: { pageSize: 100 } } }),
   ]);
 
   const referentiels = unwrap(bundle);
@@ -62,17 +61,12 @@ export async function fetchReferenceData(
     commerciaux: listeFacultative(users, (user) => ({
       value: user.id,
       label: user.fullName,
-      hint: user.isActive ? (user.departementName ?? undefined) : 'Compte désactivé',
+      hint: user.isActive ? undefined : 'Compte désactivé',
     })),
     representants: listeFacultative(representants, (representant) => ({
       value: representant.id,
       label: `${representant.fullName} - ${formatPhone(representant.phoneE164)}`,
       hint: representant.departementName,
-    })),
-    campagnes: listeFacultative(campaigns, (campaign) => ({
-      value: campaign.id,
-      label: campaign.name,
-      hint: `${campaign.scope} · ${campaign.status === 'ACTIVE' ? 'en cours' : 'clôturée'}`,
     })),
   };
 }

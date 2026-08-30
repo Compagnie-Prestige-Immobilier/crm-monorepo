@@ -587,8 +587,7 @@ class ProspectsApi {
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
-  /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
-  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
+  /// * [appelePar] - Téléconseiller ayant consigné au moins une tentative sur la fiche.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -621,8 +620,7 @@ class ProspectsApi {
     BddSegment? segment,
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
-    String? campaignId,
-    String? assignedToId,
+    String? appelePar,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -666,8 +664,7 @@ class ProspectsApi {
       if (segment != null) r'segment': segment,
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
-      if (campaignId != null) r'campaignId': campaignId,
-      if (assignedToId != null) r'assignedToId': assignedToId,
+      if (appelePar != null) r'appelePar': appelePar,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,

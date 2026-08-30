@@ -1,0 +1,42 @@
+{
+  "welcome": {
+    "title": "Welcome Aboard",
+    "slug": "welcome-aboard_y4e9",
+    "source": "https://cdn.undraw.co/illustration/welcome-aboard_y4e9.svg"
+  },
+  "garment": {
+    "title": "Trying on Clothes",
+    "slug": "trying-on-clothes_ht5p",
+    "source": "https://cdn.undraw.co/illustration/trying-on-clothes_ht5p.svg"
+  },
+  "cloth": {
+    "title": "Order Status",
+    "slug": "order-status_swsl",
+    "source": "https://cdn.undraw.co/illustration/order-status_swsl.svg"
+  },
+  "client": {
+    "title": "Personal Information",
+    "slug": "personal-information_h7kf",
+    "source": "https://cdn.undraw.co/illustration/personal-information_h7kf.svg"
+  },
+  "search": {
+    "title": "Searching Everywhere",
+    "slug": "searching-everywhere_tffi",
+    "source": "https://cdn.undraw.co/illustration/searching-everywhere_tffi.svg"
+  },
+  "payment": {
+    "title": "Receipt",
+    "slug": "receipt_oemh",
+    "source": "https://cdn.undraw.co/illustration/receipt_oemh.svg"
+  },
+  "schedule": {
+    "title": "Digital Calendar",
+    "slug": "digital-calendar_180l",
+    "source": "https://cdn.undraw.co/illustration/digital-calendar_180l.svg"
+  },
+  "nodata": {
+    "title": "No data",
+    "slug": "no-data_ig65",
+    "source": "https://cdn.undraw.co/illustrations/no-data_ig65.svg"
+  }
+}

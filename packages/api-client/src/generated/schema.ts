@@ -946,118 +946,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/phase2/campaigns': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Liste des campagnes, avec l’avancement de chacune. */
-    get: operations['listCallCampaigns'];
-    put?: never;
-    /**
-     * Crée une campagne, tire l’ensemble éligible et fige la répartition.
-     * @description Le tirage est mélangé par PostgreSQL à partir d’une graine persistée, puis réparti en tourniquet dans l’ordre des commerciaux fournis. Les affectations sont matérialisées : consulter la campagne ou retélécharger un PDF ne retire jamais au sort.
-     */
-    post: operations['createCallCampaign'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/phase2/campaigns/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Détail d’une campagne, ventilé par commercial. */
-    get: operations['getCallCampaign'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/phase2/campaigns/{id}/close': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Clôt la campagne et annule toutes les tâches encore ouvertes.
-     * @description Idempotent. Les tâches annulées redeviennent inactives : sans quoi leurs prospects resteraient inéligibles à toute campagne future.
-     */
-    post: operations['closeCallCampaign'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/phase2/campaigns/{id}/pause': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Suspend temporairement les appels. */
-    post: operations['pauseCallCampaign'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/phase2/campaigns/{id}/resume': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Reprend une campagne suspendue. */
-    post: operations['resumeCallCampaign'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/phase2/campaigns/{id}/commerciaux/{userId}/programme.pdf': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Programme d’appels imprimable d’un commercial.
-     * @description Ordre identique aux positions persistées. AUCUN nom de prospect n’y figure : chaque ligne se rapproche de sa fiche par son code court à six caractères. Le paramètre `jour` restreint la liasse à une journée d’étalement ; sans lui, tout le programme est rendu.
-     */
-    get: operations['downloadCallProgrammePdf'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/v1/visites/referentiels': {
     parameters: {
       query?: never;
@@ -1490,26 +1378,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/rep-campaigns/preview': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Aperçu du tirage AVANT création : éligibles, charge par commercial et par jour.
-     * @description Créer une campagne fige des dizaines de milliers d’affectations et rend les représentants inéligibles à toute autre campagne. L’aperçu est ce qui permet de constater qu’un périmètre trop large donne une liasse intenable, avant de le découvrir sur le PDF.
-     */
-    get: operations['previewRepCampaign'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/v1/rep-campaigns/attempts': {
     parameters: {
       query?: never;
@@ -1519,106 +1387,8 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /**
-     * Enregistre un appel passé à un représentant et clôt la tâche si l’issue aboutit.
-     * @description L’identifiant est engendré par le client et sert de clé d’idempotence : un envoi rejoué après une coupure réseau renvoie `duplicate` sans rien réécrire. Une tentative hors campagne est acceptée et conservée, parce qu’elle nourrit les statistiques de qualité de la base. `suggestedPhone` recueille, dans le même geste, le numéro qu’un représentant qui refuse propose d’appeler à sa place : la réponse dit si ce numéro est déjà une fiche connue.
-     */
+    /** Enregistre un appel passé à un représentant. */
     post: operations['recordRepCallAttempt'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/rep-campaigns': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Liste des campagnes représentants, avec l’avancement de chacune. */
-    get: operations['listRepCampaigns'];
-    put?: never;
-    /**
-     * Crée une campagne, tire les représentants éligibles et fige la répartition.
-     * @description Le tirage est mélangé par PostgreSQL à partir d’une graine persistée, puis réparti en tourniquet dans l’ordre des commerciaux fournis. `spreadDays` découpe ensuite la file de chaque commercial en tranches contiguës, une par journée.
-     */
-    post: operations['createRepCampaign'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/rep-campaigns/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Détail d’une campagne, ventilé par commercial et par journée. */
-    get: operations['getRepCampaign'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/rep-campaigns/{id}/close': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Clôt la campagne et annule toutes les tâches encore ouvertes.
-     * @description Idempotent. Les tâches annulées redeviennent inactives : sans quoi leurs représentants resteraient inéligibles à toute campagne future.
-     */
-    post: operations['closeRepCampaign'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/rep-campaigns/{id}/commerciaux/{userId}/programme.pdf': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Programme d’appels représentants, imprimable.
-     * @description A4 portrait, 25 représentants par page. Chaque ligne ne contient que le nom complet et le téléphone.
-     */
-    get: operations['downloadRepProgrammePdf'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/rep-campaigns/{id}/programmes.zip': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Télécharge tous les programmes représentants dans une archive ZIP. */
-    get: operations['downloadRepProgrammesZip'];
-    put?: never;
-    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -2362,26 +2132,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/analytics/campaign-pilotage': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Pilotage d’une campagne d’appels : joignabilité, cadence, fin projetée.
-     * @description Sans `campaignId`, la mesure porte sur l’ensemble des campagnes ACTIVES. La progression était jusqu’ici calculée à la volée et ne remontait dans aucun tableau de bord : « 42 % faits » ne dit ni si les numéros répondent, ni quand la campagne se termine.
-     */
-    get: operations['getCampaignPilotage'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/v1/analytics/delays': {
     parameters: {
       query?: never;
@@ -2946,6 +2696,109 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/lots-export': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Liste les lots d’export. */
+    get: operations['listLotsExport'];
+    put?: never;
+    /** Crée un lot de fiches exportées. */
+    post: operations['createLotExport'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/lots-export/apercu': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Compte les fiches d’une cible. */
+    post: operations['previewLotExport'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/lots-export/{id}/export.xlsx': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Télécharge le classeur figé du lot. */
+    get: operations['downloadLotExportXlsx'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/lots-export/{id}/programme.pdf': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Télécharge le programme d’un téléconseiller pour une journée. */
+    get: operations['downloadLotExportProgramme'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/lots-export/{id}/programmes.zip': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Télécharge tous les programmes du lot. */
+    get: operations['downloadLotExportProgrammesZip'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/lots-export/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Consulte un lot et les appels qui ont suivi. */
+    get: operations['getLotExport'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2971,8 +2824,6 @@ export interface components {
       isActive: boolean;
       /** @enum {string} */
       workspace: 'public' | 'demo';
-      /** Format: uuid */
-      departementId?: string | null;
       phoneE164?: string | null;
       /** Format: date-time */
       lastLoginAt?: string | null;
@@ -3027,7 +2878,6 @@ export interface components {
       users: number;
       representants: number;
       prospects: number;
-      campaigns: number;
       bankCases: number;
     };
     DemoWorkspaceStatusDto: {
@@ -3043,9 +2893,6 @@ export interface components {
       fullName: string;
       role: components['schemas']['Role'];
       isActive: boolean;
-      /** Format: uuid */
-      departementId: string | null;
-      departementName: string | null;
       phoneE164: string | null;
       /** Format: date-time */
       lastLoginAt: string | null;
@@ -3074,11 +2921,6 @@ export interface components {
       password: string;
       /** @default COMMERCIAL */
       role: components['schemas']['Role'];
-      /**
-       * Format: uuid
-       * @description Chaîne vide pour retirer le rattachement.
-       */
-      departementId?: string;
       /** @description Téléphone, normalisé en E.164 par le serveur. */
       phone?: string;
     };
@@ -3090,11 +2932,6 @@ export interface components {
       fullName?: string;
       /** @default COMMERCIAL */
       role: components['schemas']['Role'];
-      /**
-       * Format: uuid
-       * @description Chaîne vide pour retirer le rattachement.
-       */
-      departementId?: string;
       /** @description Téléphone, normalisé en E.164 par le serveur. */
       phone?: string;
     };
@@ -4162,68 +3999,6 @@ export interface components {
       /** Format: date-time */
       updatedAt: string;
     };
-    /** @enum {string} */
-    CampaignStatus: 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'CLOSED';
-    SyncCallCampaignDto: {
-      /** Format: uuid */
-      id: string;
-      name: string;
-      status: components['schemas']['CampaignStatus'];
-      /** @description Journees d’etalement de la file. */
-      spreadDays: number;
-      /** Format: date-time */
-      updatedAt: string;
-      /** Format: date-time */
-      closedAt?: string | null;
-    };
-    /** @enum {string} */
-    CallTaskStatus: 'OPEN' | 'DONE' | 'CANCELLED';
-    SyncCallTaskDto: {
-      /** Format: uuid */
-      id: string;
-      /** Format: uuid */
-      campaignId: string;
-      /** Format: uuid */
-      prospectId: string;
-      /** @description Rang dans le programme, a partir de 1. */
-      position: number;
-      /** @description Journee d’etalement, a partir de 0. */
-      dayIndex: number;
-      status: components['schemas']['CallTaskStatus'];
-      /** @description Faux quand la file a été retirée au commercial. La ligne descend alors une dernière fois pour que le téléphone la retire de son programme : sans elle, il continuerait d’appeler des fiches qui ne lui sont plus confiées. */
-      isActive: boolean;
-      /** Format: date-time */
-      updatedAt: string;
-    };
-    SyncRepCallCampaignDto: {
-      /** Format: uuid */
-      id: string;
-      name: string;
-      status: components['schemas']['CampaignStatus'];
-      /** @description Journees d’etalement de la file. */
-      spreadDays: number;
-      /** Format: date-time */
-      updatedAt: string;
-      /** Format: date-time */
-      closedAt?: string | null;
-    };
-    SyncRepCallTaskDto: {
-      /** Format: uuid */
-      id: string;
-      /** Format: uuid */
-      campaignId: string;
-      /** Format: uuid */
-      representantId: string;
-      /** @description Rang dans le programme, à partir de 1. */
-      position: number;
-      /** @description Journée d’étalement, à partir de 0. */
-      dayIndex: number;
-      status: components['schemas']['CallTaskStatus'];
-      /** @description Voir `SyncCallTaskDto.isActive`. */
-      isActive: boolean;
-      /** Format: date-time */
-      updatedAt: string;
-    };
     VisiteReferentielRefDto: {
       /** Format: uuid */
       id: string;
@@ -4264,10 +4039,6 @@ export interface components {
       visiteReferentiels: components['schemas']['SyncVisiteReferentielDto'][];
       representants: components['schemas']['RepresentantDto'][];
       prospects: components['schemas']['ProspectDto'][];
-      callCampaigns: components['schemas']['SyncCallCampaignDto'][];
-      callTasks: components['schemas']['SyncCallTaskDto'][];
-      repCallCampaigns: components['schemas']['SyncRepCallCampaignDto'][];
-      repCallTasks: components['schemas']['SyncRepCallTaskDto'][];
       visites: components['schemas']['SyncVisiteDto'][];
     };
     SyncDeletionDto: {
@@ -4313,146 +4084,6 @@ export interface components {
       hasMore: boolean;
       /** Format: date-time */
       serverTime: string;
-    };
-    /** @enum {string} */
-    CampaignScope: 'BDD1' | 'BDD2' | 'BDD3' | 'BDD4' | 'GP1' | 'GP2' | 'GP3' | 'GP4' | 'ALL';
-    CampaignProgressDto: {
-      /** @description Nombre total de tâches affectées. */
-      total: number;
-      /** @description Tâches encore ouvertes. */
-      open: number;
-      /** @description Tâches abouties : une issue terminale a été saisie. */
-      done: number;
-      /** @description Tâches annulées par la clôture de la campagne. */
-      cancelled: number;
-    };
-    CampaignSummaryDto: {
-      /** Format: uuid */
-      id: string;
-      name: string;
-      projet: components['schemas']['Projet'];
-      scope: components['schemas']['CampaignScope'];
-      /** @description Libellé lisible du périmètre, issu de la définition partagée. */
-      scopeLabel: string;
-      status: components['schemas']['CampaignStatus'];
-      offerLabel: string | null;
-      /** @description Graine du tirage, persistée pour pouvoir rejouer et auditer la répartition. Les affectations, elles, sont matérialisées. */
-      seed: string;
-      /** Format: uuid */
-      createdById: string;
-      createdByName: string;
-      commercialCount: number;
-      /** @description Journées d’étalement. 1 : programme unique. */
-      spreadDays: number;
-      progress: components['schemas']['CampaignProgressDto'];
-      /** Format: date-time */
-      createdAt: string;
-      /** Format: date-time */
-      closedAt: string | null;
-    };
-    CampaignListDto: {
-      items: components['schemas']['CampaignSummaryDto'][];
-      meta: components['schemas']['PageMetaDto'];
-    };
-    CreateCampaignDto: {
-      /** @example Campagne CHUES, avril */
-      name: string;
-      /** @default CHUES */
-      projet: components['schemas']['Projet'];
-      /** @description Périmètre du tirage. BDD1..BDD4 sont les segments partagés ; ALL réunit les quatre sans recouvrement. */
-      scope: components['schemas']['CampaignScope'];
-      /**
-       * Format: uuid
-       * @description Offre ciblée, pour Grand Public.
-       */
-      offerId?: string;
-      /** Format: uuid */
-      canalProvenanceId?: string;
-      /** Format: uuid */
-      professionId?: string;
-      /** Format: uuid */
-      incomeBandId?: string;
-      /** @description Commerciaux destinataires, DANS L’ORDRE du tourniquet. Cet ordre est persisté en `position` et fige le contenu de chaque programme. */
-      commercialIds: string[];
-      /**
-       * @description Étale la file de chaque commercial sur N journées. À 1 (défaut), comportement inchangé : un seul programme. Au-delà, chaque commercial reçoit un programme par jour, ce qui rend une base de 120 000 fiches distribuable.
-       * @default 1
-       */
-      spreadDays: number;
-    };
-    CampaignCommercialDto: {
-      /** Format: uuid */
-      userId: string;
-      fullName: string;
-      username: string;
-      /** @description Rang dans le tourniquet, à partir de 1. */
-      position: number;
-      progress: components['schemas']['CampaignProgressDto'];
-      /** @description Lignes par journée, jour 1 en tête. */
-      perDay: number[];
-    };
-    CampaignAttemptDto: {
-      /** Format: uuid */
-      id: string;
-      /** Format: uuid */
-      prospectId: string;
-      /** @description Code court à six caractères du prospect. */
-      shortCode: string;
-      phoneE164: string;
-      outcome: components['schemas']['CallOutcome'];
-      /** @description Renseignée si et seulement si l’issue vaut METHOD_OBTAINED. */
-      method: components['schemas']['EnrollmentMethod'] | null;
-      comment: string | null;
-      email: string | null;
-      fonctionnaire: boolean | null;
-      engagementEnCours: boolean | null;
-      dureeEtablissementMois: number | null;
-      /**
-       * Format: date-time
-       * @description Non nulle si et seulement si method vaut APPOINTMENT.
-       */
-      rendezVousAt: string | null;
-      /**
-       * Format: uuid
-       * @description Commercial qui a RÉELLEMENT passé l’appel.
-       */
-      performedById: string;
-      performedByName: string;
-      /**
-       * Format: uuid
-       * @description Commercial à qui la tâche était affectée. Peut différer de performedById.
-       */
-      assignedToId: string | null;
-      /** Format: date-time */
-      createdAt: string;
-    };
-    CampaignDetailDto: {
-      /** Format: uuid */
-      id: string;
-      name: string;
-      projet: components['schemas']['Projet'];
-      scope: components['schemas']['CampaignScope'];
-      scopeLabel: string;
-      status: components['schemas']['CampaignStatus'];
-      offerLabel: string | null;
-      seed: string;
-      /** Format: uuid */
-      createdById: string;
-      createdByName: string;
-      commercialCount: number;
-      /** @description Journées d’étalement. 1 : programme unique. */
-      spreadDays: number;
-      progress: components['schemas']['CampaignProgressDto'];
-      /** Format: date-time */
-      createdAt: string;
-      /** Format: date-time */
-      closedAt: string | null;
-      /** @description Lignes par journée, toutes affectations confondues. Jour 1 en tête. */
-      perDay: number[];
-      /** @description Ordonnés par position. */
-      commerciaux: components['schemas']['CampaignCommercialDto'][];
-      /** @description Les vingt dernières tentatives, de la plus récente à la plus ancienne. */
-      recentAttempts: components['schemas']['CampaignAttemptDto'][];
     };
     VisiteReferentielDto: {
       /** Format: uuid */
@@ -4817,10 +4448,6 @@ export interface components {
       /** Format: uuid */
       assignedToId: string;
       assignedToName: string;
-      /** Format: uuid */
-      campaignId: string | null;
-      /** Format: uuid */
-      taskId: string | null;
       /** @description Le rappel est passé. État DÉRIVÉ de scheduledAt et de l’heure du serveur, jamais stocké. */
       overdue: boolean;
     };
@@ -4832,16 +4459,6 @@ export interface components {
        * @description Heure du serveur ayant servi à décider du retard.
        */
       serverTime: string;
-    };
-    RepCampaignPreviewDto: {
-      /** @description Représentants éligibles sur ce périmètre. */
-      eligible: number;
-      /** @description Lignes par commercial, au plus. */
-      perCommercial: number;
-      /** @description Lignes par journée POUR UN commercial, jour 1 en tête. C’est le chiffre qui dit si la journée est tenable. */
-      perDay: number[];
-      /** @description Libellé lisible du périmètre. */
-      scopeLabel: string;
     };
     /** @enum {string} */
     RepCallOutcome:
@@ -4896,156 +4513,8 @@ export interface components {
       status: components['schemas']['RepCallAttemptApplyStatus'];
       /** Format: uuid */
       attemptId: string;
-      /**
-       * Format: uuid
-       * @description Tâche close par cette tentative, si le représentant en avait une active.
-       */
-      taskId: string | null;
-      /** @description Vrai si l’issue a clos la tâche. Les issues « à rappeler » la laissent ouverte. */
-      taskClosed: boolean;
       /** @description Ce que le numéro suggéré donne dans l’annuaire, dans la forme que la bannière de doublon du mobile sait déjà afficher. Nul si la tentative n’en portait pas. */
       suggestion: components['schemas']['RepresentantLookupDto'] | null;
-    };
-    RepCampaignProgressDto: {
-      /** @description Nombre total de tâches affectées. */
-      total: number;
-      /** @description Tâches encore ouvertes. */
-      open: number;
-      /** @description Tâches abouties : une issue terminale a été saisie. */
-      done: number;
-      /** @description Tâches annulées par la clôture de la campagne. */
-      cancelled: number;
-    };
-    RepCampaignSummaryDto: {
-      /** Format: uuid */
-      id: string;
-      name: string;
-      status: components['schemas']['CampaignStatus'];
-      /** @description Graine du tirage, persistée pour pouvoir rejouer et auditer la répartition. Les affectations, elles, sont matérialisées. */
-      seed: string;
-      /** @description Libellé lisible du périmètre, composé côté serveur. */
-      scopeLabel: string;
-      /** Format: uuid */
-      departementId: string | null;
-      /** Format: uuid */
-      iefId: string | null;
-      onlyWithoutProspects: boolean;
-      /** @description États de relation retenus par le tirage. Vide : aucun filtre. */
-      relationStatuses: components['schemas']['RepresentantRelation'][];
-      /** Format: uuid */
-      createdById: string;
-      createdByName: string;
-      commercialCount: number;
-      /** @description Journées d’étalement. 1 : programme unique. */
-      spreadDays: number;
-      progress: components['schemas']['RepCampaignProgressDto'];
-      /** Format: date-time */
-      createdAt: string;
-      /** Format: date-time */
-      closedAt: string | null;
-    };
-    RepCampaignListDto: {
-      items: components['schemas']['RepCampaignSummaryDto'][];
-      meta: components['schemas']['PageMetaDto'];
-    };
-    CreateRepCampaignDto: {
-      /** @example Relance représentants dormants */
-      name: string;
-      /** @description Commerciaux destinataires, DANS L’ORDRE du tourniquet. Cet ordre est persisté en `position` et fige le contenu de chaque programme. */
-      commercialIds: string[];
-      /**
-       * Format: uuid
-       * @description Restreint le tirage à un département. Cumulable avec `iefId`.
-       */
-      departementId?: string;
-      /**
-       * Format: uuid
-       * @description Restreint le tirage à une IEF.
-       */
-      iefId?: string;
-      /**
-       * @description Ne retenir que les représentants n’ayant apporté aucun prospect vivant. C’est la campagne de relance des dormants.
-       * @default false
-       */
-      onlyWithoutProspects: boolean;
-      /** @description Ne retenir que les représentants dans ces états de relation. Absente ou vide : aucun filtre. `AMBASSADEUR` seul donne les qualifiés ; une liste qui l’exclut donne les non qualifiés. */
-      relationStatuses?: components['schemas']['RepresentantRelation'][];
-      /**
-       * @description Étale la file de chaque commercial sur N journées. À 1 (défaut), un seul programme par commercial.
-       * @default 1
-       */
-      spreadDays: number;
-    };
-    RepCampaignCommercialDto: {
-      /** Format: uuid */
-      userId: string;
-      fullName: string;
-      username: string;
-      /** @description Rang dans le tourniquet, à partir de 1. */
-      position: number;
-      progress: components['schemas']['RepCampaignProgressDto'];
-      /** @description Lignes par journée, jour 1 en tête. */
-      perDay: number[];
-    };
-    RepCampaignAttemptDto: {
-      /** Format: uuid */
-      id: string;
-      /** Format: uuid */
-      representantId: string;
-      /** @description Code court à six caractères du représentant. */
-      shortCode: string;
-      phoneE164: string;
-      outcome: components['schemas']['RepCallOutcome'];
-      /** @description Renseigné si et seulement si l’issue vaut PROSPECTS_PROMISED. */
-      promisedProspects: number | null;
-      comment: string | null;
-      /**
-       * Format: uuid
-       * @description Commercial qui a RÉELLEMENT passé l’appel.
-       */
-      performedById: string;
-      performedByName: string;
-      /**
-       * Format: uuid
-       * @description Commercial à qui la tâche était affectée. Peut différer de performedById.
-       */
-      assignedToId: string | null;
-      /** Format: date-time */
-      createdAt: string;
-    };
-    RepCampaignDetailDto: {
-      /** Format: uuid */
-      id: string;
-      name: string;
-      status: components['schemas']['CampaignStatus'];
-      /** @description Graine du tirage, persistée pour pouvoir rejouer et auditer la répartition. Les affectations, elles, sont matérialisées. */
-      seed: string;
-      /** @description Libellé lisible du périmètre, composé côté serveur. */
-      scopeLabel: string;
-      /** Format: uuid */
-      departementId: string | null;
-      /** Format: uuid */
-      iefId: string | null;
-      onlyWithoutProspects: boolean;
-      /** @description États de relation retenus par le tirage. Vide : aucun filtre. */
-      relationStatuses: components['schemas']['RepresentantRelation'][];
-      /** Format: uuid */
-      createdById: string;
-      createdByName: string;
-      commercialCount: number;
-      /** @description Journées d’étalement. 1 : programme unique. */
-      spreadDays: number;
-      progress: components['schemas']['RepCampaignProgressDto'];
-      /** Format: date-time */
-      createdAt: string;
-      /** Format: date-time */
-      closedAt: string | null;
-      /** @description Lignes par journée, toutes affectations confondues. Jour 1 en tête. */
-      perDay: number[];
-      /** @description Ordonnés par position. */
-      commerciaux: components['schemas']['RepCampaignCommercialDto'][];
-      /** @description Les vingt dernières tentatives, de la plus récente à la plus ancienne. */
-      recentAttempts: components['schemas']['RepCampaignAttemptDto'][];
     };
     /** @enum {string} */
     SuggestionStatus: 'A_APPELER' | 'APPELE' | 'ABANDONNE';
@@ -5444,8 +4913,6 @@ export interface components {
       route?: string;
       audience: components['schemas']['NotificationAudience'];
       audienceRole?: components['schemas']['Role'];
-      /** Format: uuid */
-      audienceDepartementId?: string;
       audienceUserIds?: string[];
       /**
        * Format: date-time
@@ -5480,8 +4947,6 @@ export interface components {
       route: string | null;
       audience: components['schemas']['NotificationAudience'];
       audienceRole: components['schemas']['Role'] | null;
-      /** Format: uuid */
-      audienceDepartementId: string | null;
       audienceUserIds: string[];
       status: components['schemas']['NotificationStatus'];
       /** Format: date-time */
@@ -5741,52 +5206,6 @@ export interface components {
       items: components['schemas']['TopRepresentantDto'][];
       total: number;
     };
-    CampaignClosedDayDto: {
-      /**
-       * Format: date
-       * @description Journée, au format AAAA-MM-JJ.
-       */
-      day: string;
-      /** Format: uuid */
-      commercialId: string;
-      commercialName: string;
-      /** @description Tâches clôturées ce jour-là par ce commercial. */
-      done: number;
-    };
-    CampaignPilotageDto: {
-      /**
-       * Format: uuid
-       * @description Campagne observée. Nul quand aucune n’est précisée : le calcul porte alors sur l’ensemble des campagnes ACTIVES.
-       */
-      campaignId: string | null;
-      /** @description Tâches de la campagne, toutes issues confondues. */
-      tasks: number;
-      /** @description Tâches ayant reçu au moins une tentative. */
-      tasksContacted: number;
-      /** @description Part des tâches touchées au moins une fois, en pourcentage. Nul quand le dénominateur est vide : un taux calculé sur zéro observation n’existe pas, et le publier comme 0 le rendrait indistinguable d’un vrai 0 %. */
-      contactRate: number | null;
-      /** @description Tentatives d’appel rattachées à la campagne. */
-      attempts: number;
-      /** @description Tentatives dont l’issue n’est ni « injoignable » ni « faux numéro ». */
-      reachableAttempts: number;
-      /** @description Part des tentatives joignables, en pourcentage. Nul quand le dénominateur est vide : un taux calculé sur zéro observation n’existe pas, et le publier comme 0 le rendrait indistinguable d’un vrai 0 %. */
-      reachRate: number | null;
-      /** @description Tentatives ayant abouti à une méthode obtenue. */
-      methodsObtained: number;
-      /** @description Nombre moyen de tentatives pour une méthode obtenue. Vaut 0 tant qu’aucune méthode n’a été obtenue, faute de dénominateur. */
-      attemptsPerMethodObtained: number;
-      /** @description Tâches clôturées, par jour et par commercial. */
-      closedPerDay: components['schemas']['CampaignClosedDayDto'][];
-      /** @description Tâches encore ouvertes. */
-      remaining: number;
-      /** @description Cadence observée : tâches clôturées par jour sur les 7 derniers jours. */
-      observedPace: number;
-      /**
-       * Format: date
-       * @description Date de fin projetée à la cadence observée. Nulle quand la cadence est nulle : une campagne à l’arrêt n’a pas de date de fin, et en annoncer une serait une division par zéro déguisée en prévision.
-       */
-      estimatedEndDate: string | null;
-    };
     /** @enum {string} */
     DelayLeg: 'CREATION_TO_METHOD' | 'METHOD_TO_CASE' | 'CASE_TO_CASHED';
     DelayLegDto: {
@@ -6024,8 +5443,6 @@ export interface components {
       prospectsCreated: number;
       /** @description Représentants distincts appelés sur la période. */
       representantsContacted: number;
-      /** @description Tâches d’appel clôturées sur la période. */
-      tasksClosed: number;
       /** @description Appels à des représentants, issues encore saisissables seulement : REACHED, REFUSED, CALLBACK, UNREACHABLE. Dénominateur de `repContactRate` et de `repCallbackRate`. */
       repCalls: number;
       /** @description Représentants qui ont DÉCROCHÉ et répondu : REACHED ou REFUSED. Un refus est un contact ; un rappel promis n’en est pas encore un. */
@@ -6073,8 +5490,6 @@ export interface components {
       prospectsCreated: number;
       /** @description Représentants distincts appelés sur la période. */
       representantsContacted: number;
-      /** @description Tâches d’appel clôturées sur la période. */
-      tasksClosed: number;
       /** @description Appels à des représentants, issues encore saisissables seulement : REACHED, REFUSED, CALLBACK, UNREACHABLE. Dénominateur de `repContactRate` et de `repCallbackRate`. */
       repCalls: number;
       /** @description Représentants qui ont DÉCROCHÉ et répondu : REACHED ou REFUSED. Un refus est un contact ; un rappel promis n’en est pas encore un. */
@@ -6101,8 +5516,6 @@ export interface components {
       id: string;
       fullName: string;
       isActive: boolean;
-      /** @description Tâches d’appel encore OUVERTES. Instantané : la fenêtre ne le borne pas. */
-      openTasks: number;
     };
     SupervisionHistogramBarDto: {
       /** Format: uuid */
@@ -6135,8 +5548,7 @@ export interface components {
       | 'directionAccueil'
       | 'representants'
       | 'prospects'
-      | 'campagnes'
-      | 'campagnesRepresentants'
+      | 'lotsExport'
       | 'demandesClients'
       | 'visites'
       | 'fileAppels'
@@ -6192,7 +5604,6 @@ export interface components {
       email: string;
       role: components['schemas']['Role'];
       isActive: boolean;
-      departementName: string | null;
       presence: components['schemas']['PresenceState'];
       /** @description Une famille de jetons est encore vivante : ni révoquée, ni expirée. */
       hasLiveSession: boolean;
@@ -6338,10 +5749,10 @@ export interface components {
       | 'visiteurs-recurrents'
       | 'avec-telephone'
       | 'qualite-de-saisie'
-      | 'appels-de-qualification'
       | 'taux-de-contact'
       | 'a-rappeler'
       | 'taux-de-qualification'
+      | 'taux-de-joignabilite'
       | 'prospects-notes'
       | 'adhesions'
       | 'reste-a-appeler'
@@ -6408,6 +5819,205 @@ export interface components {
       preset?: components['schemas']['DashboardPreset'];
       /** @description Les éléments du tableau de bord. `version` est fixé par le serveur et refusé s’il est transmis. */
       widgets: components['schemas']['DispositionWidgetDto'][];
+    };
+    /** @enum {string} */
+    LotExportCible: 'REPRESENTANTS' | 'PROSPECTS';
+    RepresentantExportQueryDto: {
+      search?: string;
+      /** Format: uuid */
+      departementId?: string;
+      /**
+       * Format: uuid
+       * @description Filtre par IEF.
+       */
+      iefId?: string;
+      /**
+       * Format: uuid
+       * @description Réservé à l’ADMIN.
+       */
+      commercialId?: string;
+      /**
+       * Format: date-time
+       * @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
+       */
+      dateFrom?: string;
+      /**
+       * Format: date-time
+       * @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+       */
+      dateTo?: string;
+      /** @description true : au moins un prospect vivant. false : aucun (représentant dormant). */
+      hasProspects?: boolean;
+      relationStatus?: components['schemas']['RepresentantRelation'];
+      whatsappStatus?: components['schemas']['WhatsappStatus'];
+      hasWhatsapp?: boolean;
+    };
+    ProspectFilterDto: {
+      /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
+      search?: string;
+      /** Format: uuid */
+      representantId?: string;
+      /** Format: uuid */
+      banqueId?: string;
+      /** Format: uuid */
+      syndicatId?: string;
+      /** Format: uuid */
+      departementId?: string;
+      /**
+       * Format: uuid
+       * @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
+       */
+      commercialId?: string;
+      /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
+      projet?: components['schemas']['Projet'];
+      /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
+      type?: components['schemas']['ProspectType'];
+      /**
+       * Format: uuid
+       * @description Grand Public : canal de provenance.
+       */
+      canalProvenanceId?: string;
+      statut?: components['schemas']['ProspectStatut'];
+      /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
+      segment?: components['schemas']['BddSegment'];
+      /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
+      phase2Status?: components['schemas']['Phase2Status'];
+      /** @description Méthode d’enrôlement obtenue en phase 2. */
+      enrollmentMethod?: components['schemas']['EnrollmentMethod'];
+      /**
+       * Format: uuid
+       * @description Téléconseiller ayant consigné au moins une tentative sur la fiche.
+       */
+      appelePar?: string;
+      /**
+       * Format: uuid
+       * @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
+       */
+      enrollmentCapturedById?: string;
+      /**
+       * @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
+       * @enum {string}
+       */
+      origin?: 'BANQUE';
+      /**
+       * Format: date-time
+       * @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
+       */
+      dateFrom?: string;
+      /**
+       * Format: date-time
+       * @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+       */
+      dateTo?: string;
+      /**
+       * @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
+       * @default false
+       */
+      includeDeleted: boolean;
+    };
+    LotExportDistributionInputDto: {
+      teleconseillerIds: string[];
+      /** @default 50 */
+      fichesParJour: number;
+      /** @default 1 */
+      jours: number;
+    };
+    CreateLotExportDto: {
+      name: string;
+      cible: components['schemas']['LotExportCible'];
+      representants?: components['schemas']['RepresentantExportQueryDto'];
+      prospects?: components['schemas']['ProspectFilterDto'];
+      distribution: components['schemas']['LotExportDistributionInputDto'];
+    };
+    LotExportSummaryDto: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      cible: components['schemas']['LotExportCible'];
+      projet: components['schemas']['Projet'] | null;
+      scopeLabel: string;
+      itemCount: number;
+      /** Format: uuid */
+      createdById: string;
+      createdByName: string;
+      createdAt: string;
+      callsSince: number;
+      fichesAppelees: number;
+    };
+    LotExportPreviewDto: {
+      eligible: number;
+      scopeLabel: string;
+      places: number;
+      retenues: number;
+      parTeleconseiller: number;
+    };
+    LotExportListDto: {
+      items: components['schemas']['LotExportSummaryDto'][];
+      meta: components['schemas']['PageMetaDto'];
+    };
+    LotExportAttemptDto: {
+      /** Format: uuid */
+      id: string;
+      phoneE164: string;
+      shortCode: string;
+      /** @enum {string} */
+      outcome:
+        | 'METHOD_OBTAINED'
+        | 'UNREACHABLE'
+        | 'CALLBACK'
+        | 'REFUSED'
+        | 'WRONG_NUMBER'
+        | 'OTHER'
+        | 'REACHED'
+        | 'PROSPECTS_PROMISED'
+        | 'UNREACHABLE'
+        | 'CALLBACK'
+        | 'REFUSED'
+        | 'WRONG_NUMBER'
+        | 'OTHER';
+      /** @enum {string|null} */
+      method: 'PLATFORM' | 'PHYSICAL' | 'VOICE_OR_ELECTRONIC_MESSAGING' | 'APPOINTMENT' | null;
+      comment: string | null;
+      performedByName: string;
+      createdAt: string;
+      email: Record<string, never> | null;
+      fonctionnaire: Record<string, never> | null;
+      engagementEnCours: Record<string, never> | null;
+      dureeEtablissementMois: Record<string, never> | null;
+      rendezVousAt: string | null;
+    };
+    LotExportDistributionDto: {
+      fichesParJour: number;
+      jours: number;
+    };
+    LotExportRepartitionJourDto: {
+      jour: number;
+      fiches: number;
+    };
+    LotExportRepartitionDto: {
+      /** Format: uuid */
+      teleconseillerId: string;
+      teleconseillerName: string;
+      jours: components['schemas']['LotExportRepartitionJourDto'][];
+    };
+    LotExportDetailDto: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      cible: components['schemas']['LotExportCible'];
+      projet: components['schemas']['Projet'] | null;
+      scopeLabel: string;
+      itemCount: number;
+      /** Format: uuid */
+      createdById: string;
+      createdByName: string;
+      createdAt: string;
+      callsSince: number;
+      fichesAppelees: number;
+      recentAttempts: components['schemas']['LotExportAttemptDto'][];
+      callsByTeleconseiller: Record<string, never>;
+      distribution: components['schemas']['LotExportDistributionDto'];
+      repartition: components['schemas']['LotExportRepartitionDto'][];
     };
   };
   responses: never;
@@ -8517,11 +8127,8 @@ export interface operations {
         dateTo?: string;
         /** @description true : au moins un prospect vivant. false : aucun (représentant dormant). */
         hasProspects?: boolean;
-        /** @description Ne retient que les représentants dans cet état de relation. */
         relationStatus?: components['schemas']['RepresentantRelation'];
-        /** @description Ne retient que les représentants dans cet état WhatsApp. */
         whatsappStatus?: components['schemas']['WhatsappStatus'];
-        /** @description true : un numéro WhatsApp joignable (MEME_NUMERO ou AUTRE_NUMERO). false : les autres, question non posée comprise. Se compose avec `whatsappStatus` par intersection. */
         hasWhatsapp?: boolean;
         sortBy?: components['schemas']['RepresentantSortField'];
         sortOrder?: components['schemas']['SortOrder'];
@@ -9173,10 +8780,8 @@ export interface operations {
         phase2Status?: components['schemas']['Phase2Status'];
         /** @description Méthode d’enrôlement obtenue en phase 2. */
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
-        assignedToId?: string;
+        /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
+        appelePar?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -9877,7 +9482,7 @@ export interface operations {
         appVersion?: string;
       };
       header: {
-        /** @description Format de données que le client sait lire. En dessous de 4, le tirage est refusé au lieu d’être servi : les liens banque, syndicat et représentant d’un prospect peuvent être nuls, et un client plus ancien échoue à les décoder. */
+        /** @description Format de données que le client sait lire. En dessous de 5, le tirage est refusé au lieu d’être servi : les liens banque, syndicat et représentant d’un prospect peuvent être nuls, et un client plus ancien échoue à les décoder. */
         'X-CPI-Payload-Version': number;
       };
       path?: never;
@@ -10075,407 +9680,6 @@ export interface operations {
       };
       /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
       403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  listCallCampaigns: {
-    parameters: {
-      query?: {
-        projet?: components['schemas']['Projet'];
-        status?: components['schemas']['CampaignStatus'];
-        /** @description Recherche libre sur le nom de la campagne. */
-        search?: string;
-        /** @description Périmètre du tirage. */
-        scope?: components['schemas']['CampaignScope'];
-        /** @description Administrateur qui a créé la campagne. */
-        createdById?: string;
-        /** @description Borne basse sur la date de création, incluse. */
-        dateFrom?: string;
-        /** @description Borne haute sur la date de création, incluse. */
-        dateTo?: string;
-        page?: number;
-        pageSize?: number;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['CampaignListDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  createCallCampaign: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateCampaignDto'];
-      };
-    };
-    responses: {
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['CampaignDetailDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description PHASE2_PROSPECT_ALREADY_ASSIGNED, une campagne concurrente a pris les mêmes prospects. */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description PHASE2_NO_ELIGIBLE_PROSPECT · PHASE2_COMMERCIAL_NOT_FOUND · PHASE2_NOT_A_COMMERCIAL · PHASE2_COMMERCIAL_INACTIVE. Requête bien formée, refusée par une règle métier. */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  getCallCampaign: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['CampaignDetailDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description PHASE2_CAMPAIGN_NOT_FOUND. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  closeCallCampaign: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['CampaignDetailDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description PHASE2_CAMPAIGN_NOT_FOUND. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  pauseCallCampaign: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['CampaignDetailDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  resumeCallCampaign: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['CampaignDetailDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  downloadCallProgrammePdf: {
-    parameters: {
-      query?: {
-        /** @description Journée d’étalement, à partir de 1. Absent : tout le programme du commercial. */
-        jour?: number;
-      };
-      header?: never;
-      path: {
-        id: string;
-        userId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Document PDF, en flux. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/pdf': string;
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description PHASE2_CAMPAIGN_COMMERCIAL_NOT_FOUND · PHASE2_CAMPAIGN_DAY_NOT_FOUND. */
-      404: {
         headers: {
           [name: string]: unknown;
         };
@@ -12016,60 +11220,6 @@ export interface operations {
       };
     };
   };
-  previewRepCampaign: {
-    parameters: {
-      query?: {
-        departementId?: string;
-        iefId?: string;
-        onlyWithoutProspects?: boolean;
-        /** @description Mêmes états de relation que `createRepCampaign`, pour compter avant de créer. */
-        relationStatuses?: components['schemas']['RepresentantRelation'][];
-        commercialCount?: number;
-        spreadDays?: number;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['RepCampaignPreviewDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
   recordRepCallAttempt: {
     parameters: {
       query?: never;
@@ -12091,7 +11241,6 @@ export interface operations {
           'application/json': components['schemas']['RepCallAttemptResultDto'];
         };
       };
-      /** @description REP_CAMPAIGN_COMMENT_REQUIRED · REP_CAMPAIGN_PROMISED_NOT_ALLOWED · REP_CAMPAIGN_CALLBACK_AT_REQUIRED · REP_CAMPAIGN_CALLBACK_AT_NOT_ALLOWED · PHONE_INVALID. */
       400: {
         headers: {
           [name: string]: unknown;
@@ -12111,372 +11260,6 @@ export interface operations {
       };
       /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
       403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description REP_CAMPAIGN_REPRESENTANT_NOT_FOUND. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  listRepCampaigns: {
-    parameters: {
-      query?: {
-        status?: components['schemas']['CampaignStatus'];
-        /** @description Recherche libre sur le nom de la campagne. */
-        search?: string;
-        createdById?: string;
-        dateFrom?: string;
-        dateTo?: string;
-        page?: number;
-        pageSize?: number;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['RepCampaignListDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  createRepCampaign: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateRepCampaignDto'];
-      };
-    };
-    responses: {
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['RepCampaignDetailDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description REP_CAMPAIGN_REPRESENTANT_ALREADY_ASSIGNED. */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description REP_CAMPAIGN_NO_ELIGIBLE_REPRESENTANT · REP_CAMPAIGN_COMMERCIAL_NOT_FOUND · REP_CAMPAIGN_NOT_A_COMMERCIAL · REP_CAMPAIGN_COMMERCIAL_INACTIVE. Requête bien formée, refusée par une règle métier. */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  getRepCampaign: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['RepCampaignDetailDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description REP_CAMPAIGN_NOT_FOUND. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  closeRepCampaign: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['RepCampaignDetailDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description REP_CAMPAIGN_NOT_FOUND. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  downloadRepProgrammePdf: {
-    parameters: {
-      query?: {
-        /** @description Journée d’étalement, à partir de 1. Absent : tout le programme du commercial. */
-        jour?: number;
-      };
-      header?: never;
-      path: {
-        id: string;
-        userId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Document PDF, en flux. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/pdf': string;
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description REP_CAMPAIGN_PROGRAMME_NOT_FOUND · REP_CAMPAIGN_DAY_NOT_FOUND. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  downloadRepProgrammesZip: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Un PDF non vide par téléconseiller et par journée. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/zip': string;
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description REP_CAMPAIGN_NOT_FOUND. */
-      404: {
         headers: {
           [name: string]: unknown;
         };
@@ -13911,7 +12694,7 @@ export interface operations {
           'application/json': components['schemas']['ApiErrorDto'];
         };
       };
-      /** @description NOTIFICATION_AUDIENCE_EMPTY, NOTIFICATION_AUDIENCE_ROLE_REQUIRED, NOTIFICATION_AUDIENCE_DEPARTEMENT_REQUIRED, NOTIFICATION_AUDIENCE_USERS_REQUIRED, NOTIFICATION_SCHEDULE_IN_PAST, NOTIFICATION_ROUTE_INVALID. */
+      /** @description NOTIFICATION_AUDIENCE_EMPTY, NOTIFICATION_AUDIENCE_ROLE_REQUIRED, NOTIFICATION_AUDIENCE_DEPARTEMENT_RETIRED, NOTIFICATION_AUDIENCE_USERS_REQUIRED, NOTIFICATION_SCHEDULE_IN_PAST, NOTIFICATION_ROUTE_INVALID. */
       422: {
         headers: {
           [name: string]: unknown;
@@ -13978,7 +12761,6 @@ export interface operations {
       query: {
         audience: components['schemas']['NotificationAudience'];
         audienceRole?: components['schemas']['Role'];
-        audienceDepartementId?: string;
         /** @description Identifiants séparés par des virgules (contrainte de la chaîne de requête). */
         audienceUserIds?: string;
       };
@@ -14479,10 +13261,8 @@ export interface operations {
         phase2Status?: components['schemas']['Phase2Status'];
         /** @description Méthode d’enrôlement obtenue en phase 2. */
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
-        assignedToId?: string;
+        /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
+        appelePar?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -14561,10 +13341,8 @@ export interface operations {
         phase2Status?: components['schemas']['Phase2Status'];
         /** @description Méthode d’enrôlement obtenue en phase 2. */
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
-        assignedToId?: string;
+        /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
+        appelePar?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -14643,10 +13421,8 @@ export interface operations {
         phase2Status?: components['schemas']['Phase2Status'];
         /** @description Méthode d’enrôlement obtenue en phase 2. */
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
-        assignedToId?: string;
+        /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
+        appelePar?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -14726,10 +13502,8 @@ export interface operations {
         phase2Status?: components['schemas']['Phase2Status'];
         /** @description Méthode d’enrôlement obtenue en phase 2. */
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
-        assignedToId?: string;
+        /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
+        appelePar?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -14809,10 +13583,8 @@ export interface operations {
         phase2Status?: components['schemas']['Phase2Status'];
         /** @description Méthode d’enrôlement obtenue en phase 2. */
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
-        assignedToId?: string;
+        /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
+        appelePar?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -14891,10 +13663,8 @@ export interface operations {
         phase2Status?: components['schemas']['Phase2Status'];
         /** @description Méthode d’enrôlement obtenue en phase 2. */
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
-        assignedToId?: string;
+        /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
+        appelePar?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -14973,10 +13743,8 @@ export interface operations {
         phase2Status?: components['schemas']['Phase2Status'];
         /** @description Méthode d’enrôlement obtenue en phase 2. */
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
-        assignedToId?: string;
+        /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
+        appelePar?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -15055,10 +13823,8 @@ export interface operations {
         phase2Status?: components['schemas']['Phase2Status'];
         /** @description Méthode d’enrôlement obtenue en phase 2. */
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
-        assignedToId?: string;
+        /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
+        appelePar?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -15137,10 +13903,8 @@ export interface operations {
         phase2Status?: components['schemas']['Phase2Status'];
         /** @description Méthode d’enrôlement obtenue en phase 2. */
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
-        assignedToId?: string;
+        /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
+        appelePar?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -15219,10 +13983,8 @@ export interface operations {
         phase2Status?: components['schemas']['Phase2Status'];
         /** @description Méthode d’enrôlement obtenue en phase 2. */
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
-        assignedToId?: string;
+        /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
+        appelePar?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -15301,10 +14063,8 @@ export interface operations {
         phase2Status?: components['schemas']['Phase2Status'];
         /** @description Méthode d’enrôlement obtenue en phase 2. */
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
-        assignedToId?: string;
+        /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
+        appelePar?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -15360,88 +14120,6 @@ export interface operations {
       };
     };
   };
-  getCampaignPilotage: {
-    parameters: {
-      query?: {
-        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
-        search?: string;
-        representantId?: string;
-        banqueId?: string;
-        syndicatId?: string;
-        departementId?: string;
-        /** @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes. */
-        commercialId?: string;
-        /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
-        projet?: components['schemas']['Projet'];
-        /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
-        type?: components['schemas']['ProspectType'];
-        /** @description Grand Public : canal de provenance. */
-        canalProvenanceId?: string;
-        statut?: components['schemas']['ProspectStatut'];
-        /** @description Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque. */
-        segment?: components['schemas']['BddSegment'];
-        /** @description Avancement de la phase 2. Dimension indépendante de `statut`. */
-        phase2Status?: components['schemas']['Phase2Status'];
-        /** @description Méthode d’enrôlement obtenue en phase 2. */
-        enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
-        assignedToId?: string;
-        /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
-        enrollmentCapturedById?: string;
-        /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
-        /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateFrom?: string;
-        /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
-        dateTo?: string;
-        /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
-        includeDeleted?: boolean;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['CampaignPilotageDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
   getAnalyticsDelays: {
     parameters: {
       query?: {
@@ -15466,10 +14144,8 @@ export interface operations {
         phase2Status?: components['schemas']['Phase2Status'];
         /** @description Méthode d’enrôlement obtenue en phase 2. */
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
-        assignedToId?: string;
+        /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
+        appelePar?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -15548,10 +14224,8 @@ export interface operations {
         phase2Status?: components['schemas']['Phase2Status'];
         /** @description Méthode d’enrôlement obtenue en phase 2. */
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
-        assignedToId?: string;
+        /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
+        appelePar?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -15630,10 +14304,8 @@ export interface operations {
         phase2Status?: components['schemas']['Phase2Status'];
         /** @description Méthode d’enrôlement obtenue en phase 2. */
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
-        assignedToId?: string;
+        /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
+        appelePar?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -15712,10 +14384,8 @@ export interface operations {
         phase2Status?: components['schemas']['Phase2Status'];
         /** @description Méthode d’enrôlement obtenue en phase 2. */
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
-        assignedToId?: string;
+        /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
+        appelePar?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -15794,10 +14464,8 @@ export interface operations {
         phase2Status?: components['schemas']['Phase2Status'];
         /** @description Méthode d’enrôlement obtenue en phase 2. */
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
-        assignedToId?: string;
+        /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
+        appelePar?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -15879,10 +14547,8 @@ export interface operations {
         phase2Status?: components['schemas']['Phase2Status'];
         /** @description Méthode d’enrôlement obtenue en phase 2. */
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
-        assignedToId?: string;
+        /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
+        appelePar?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -15961,10 +14627,8 @@ export interface operations {
         phase2Status?: components['schemas']['Phase2Status'];
         /** @description Méthode d’enrôlement obtenue en phase 2. */
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
-        assignedToId?: string;
+        /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
+        appelePar?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -16102,10 +14766,8 @@ export interface operations {
         phase2Status?: components['schemas']['Phase2Status'];
         /** @description Méthode d’enrôlement obtenue en phase 2. */
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
-        assignedToId?: string;
+        /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
+        appelePar?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -16172,8 +14834,6 @@ export interface operations {
         projet?: components['schemas']['Projet'];
         /** @description Un seul téléconseiller : borne les lignes, la liste et les histogrammes. */
         commercialId?: string;
-        /** @description Campagne d’appels. L’identifiant vaut pour une campagne prospects OU une campagne représentants : l’autre famille tombe alors à zéro. */
-        campaignId?: string;
       };
       header?: never;
       path?: never;
@@ -16384,10 +15044,8 @@ export interface operations {
         phase2Status?: components['schemas']['Phase2Status'];
         /** @description Méthode d’enrôlement obtenue en phase 2. */
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
-        /** @description Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne. */
-        campaignId?: string;
-        /** @description Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent. */
-        assignedToId?: string;
+        /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
+        appelePar?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -16603,6 +15261,9 @@ export interface operations {
         dateTo?: string;
         /** @description true : au moins un prospect vivant. false : aucun (représentant dormant). */
         hasProspects?: boolean;
+        relationStatus?: components['schemas']['RepresentantRelation'];
+        whatsappStatus?: components['schemas']['WhatsappStatus'];
+        hasWhatsapp?: boolean;
       };
       header?: never;
       path?: never;
@@ -17323,6 +15984,355 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['DispositionResponseDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listLotsExport: {
+    parameters: {
+      query?: {
+        search?: string;
+        cible?: components['schemas']['LotExportCible'];
+        createdById?: string;
+        dateFrom?: string;
+        dateTo?: string;
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LotExportListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  createLotExport: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateLotExportDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LotExportSummaryDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  previewLotExport: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateLotExportDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LotExportPreviewDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  downloadLotExportXlsx: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': string;
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  downloadLotExportProgramme: {
+    parameters: {
+      query: {
+        teleconseillerId: string;
+        jour?: number;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/pdf': string;
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  downloadLotExportProgrammesZip: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/zip': string;
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getLotExport: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LotExportDetailDto'];
         };
       };
       /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */

@@ -86,7 +86,7 @@ export class DashboardsService {
       where: { userId_ecran: { userId, ecran } },
     });
     if (own !== null) {
-      const userLayout = resolveLayout(ecran, own.layout);
+      const userLayout = resolveLayout(ecran, own.layout, { videAutorise: true });
       if (userLayout !== null)
         return toResponse(userLayout, 'utilisateur', own.updatedAt.toISOString());
     }

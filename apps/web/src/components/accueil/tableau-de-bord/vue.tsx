@@ -15,7 +15,7 @@ import {
 } from '@/components/accueil/tableau-de-bord/selecteur-periode';
 import { plageComparaison, plageTropLarge } from '@/components/accueil/tableau-de-bord/periode';
 import {
-  SOURCES,
+  catalogueVisitesDe,
   mesurerDonnees,
   type VisiteSource,
   type DonneesSource,
@@ -81,6 +81,7 @@ export function DashboardVisitesView({ role }: { role: Role }) {
   const plage = plageDeFiltres(filters);
   const tropLarge = plageTropLarge(plage);
   const comparaisonPlage = plageComparaison(plage, filters.comparaison);
+  const catalogue = catalogueVisitesDe(role);
 
   const live = useLive({ intervalMs: LIVE_SLOW_INTERVAL_MS });
   const queryClient = useQueryClient();
@@ -147,12 +148,15 @@ export function DashboardVisitesView({ role }: { role: Role }) {
     },
   });
 
-  const widgets = editing ? brouillon : (dispositionQuery.data?.widgets ?? []);
+  const widgets = (editing ? brouillon : (dispositionQuery.data?.widgets ?? [])).filter(
+    (widget) => catalogue[widget.source] !== undefined,
+  );
 
   const donneesParSource = new Map<string, DonneesSource>();
   if (statsQuery.data !== undefined) {
-    for (const source of Object.keys(SOURCES) as VisiteSource[]) {
-      donneesParSource.set(source, SOURCES[source].extraire(statsQuery.data));
+    for (const source of Object.keys(catalogue) as VisiteSource[]) {
+      const definition = catalogue[source];
+      if (definition !== undefined) donneesParSource.set(source, definition.extraire(statsQuery.data));
     }
   }
   const donneesParWidget = new Map<string, DonneesSource>();
@@ -203,13 +207,14 @@ export function DashboardVisitesView({ role }: { role: Role }) {
             <TiroirWidgets
               placees={placees}
               donnees={donneesParSource}
-              onAdd={(source) => {
+              onAdd={(source, marqueChoisie) => {
                 const donneesSource = donneesParSource.get(source);
-                const forme = SOURCES[source as VisiteSource]?.forme;
+                const forme = catalogue[source]?.forme;
                 const marque =
-                  donneesSource === undefined || forme === undefined
+                  marqueChoisie ??
+                  (donneesSource === undefined || forme === undefined
                     ? undefined
-                    : marqueRecommandee(forme, mesurerDonnees(donneesSource));
+                    : marqueRecommandee(forme, mesurerDonnees(donneesSource)));
                 const id = `${source}-${String(Date.now())}`;
                 setBrouillon((current) => [
                   ...(current ?? []),
@@ -298,6 +303,7 @@ export function DashboardVisitesView({ role }: { role: Role }) {
                 widgets={widgets}
                 donnees={donneesParWidget}
                 editing={editing}
+                catalogue={catalogue}
                 onReorder={(fromId, toId) => {
                   setBrouillon((current) => {
                     if (current === null) return current;

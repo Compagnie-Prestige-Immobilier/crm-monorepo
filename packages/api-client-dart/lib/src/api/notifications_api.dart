@@ -546,7 +546,6 @@ class NotificationsApi {
   /// Parameters:
   /// * [audience]
   /// * [audienceRole]
-  /// * [audienceDepartementId]
   /// * [audienceUserIds] - Identifiants séparés par des virgules (contrainte de la chaîne de requête).
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
@@ -560,7 +559,6 @@ class NotificationsApi {
   Future<Response<AudiencePreviewDto>> previewNotificationAudience({
     required NotificationAudience audience,
     Role? audienceRole,
-    String? audienceDepartementId,
     String? audienceUserIds,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -585,8 +583,6 @@ class NotificationsApi {
     final _queryParameters = <String, dynamic>{
       r'audience': audience,
       if (audienceRole != null) r'audienceRole': audienceRole,
-      if (audienceDepartementId != null)
-        r'audienceDepartementId': audienceDepartementId,
       if (audienceUserIds != null) r'audienceUserIds': audienceUserIds,
     };
 

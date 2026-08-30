@@ -54,7 +54,6 @@ export class SupervisionQueryDto {
   @IsOptional()
   @IsUUID()
   commercialId?: string;
-
 }
 
 /**
@@ -88,7 +87,6 @@ export class SupervisionActivityCountsDto {
 
   @ApiProperty({ type: Number, description: 'Représentants distincts appelés sur la période.' })
   representantsContacted!: number;
-
 
   @ApiProperty({
     type: Number,
@@ -175,7 +173,6 @@ export class SupervisionTeleconseillerDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
   @ApiProperty() fullName!: string;
   @ApiProperty({ type: Boolean }) isActive!: boolean;
-
 }
 
 export class SupervisionHistogramBarDto {

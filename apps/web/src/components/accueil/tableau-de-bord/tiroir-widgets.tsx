@@ -1,13 +1,15 @@
 'use client';
 
 import { PlusIcon } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
-import { ChoixGraphique, marquePhrase } from '@/components/dashboard/chart-visual';
+import { ChartDemo, ChartPreview, marqueTexte } from '@/components/dashboard/chart-visual';
 import { evaluerMarques } from '@/components/accueil/tableau-de-bord/recommandation';
 import {
   SOURCES,
   mesurerDonnees,
   type Catalogue,
+  type DashboardMarque,
   type DashboardSource,
   type DonneesSource,
 } from '@/components/accueil/tableau-de-bord/sources';
@@ -20,6 +22,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 export function TiroirWidgets({
   placees,
@@ -30,9 +33,25 @@ export function TiroirWidgets({
   placees: ReadonlySet<string>;
   donnees: Map<string, DonneesSource>;
   catalogue?: Catalogue;
-  onAdd: (source: DashboardSource) => void;
+  onAdd: (source: DashboardSource, marque?: DashboardMarque) => void;
 }) {
-  const disponibles = Object.keys(catalogue).filter((source) => !placees.has(source));
+  const [recherche, setRecherche] = useState('');
+  const [apercu, setApercu] = useState<{
+    source: DashboardSource;
+    marque: DashboardMarque;
+    rejeu: number;
+  } | null>(null);
+  const disponibles = useMemo(
+    () =>
+      Object.keys(catalogue).filter((source) => {
+        if (placees.has(source)) return false;
+        if (recherche.trim() === '') return true;
+        const entree = catalogue[source];
+        const texte = `${source} ${entree?.label ?? ''} ${entree?.question ?? ''} ${entree?.description ?? ''}`;
+        return texte.toLocaleLowerCase('fr').includes(recherche.trim().toLocaleLowerCase('fr'));
+      }),
+    [catalogue, placees, recherche],
+  );
 
   return (
     <Sheet>
@@ -48,13 +67,21 @@ export function TiroirWidgets({
         <SheetHeader>
           <SheetTitle>Ajouter un graphique</SheetTitle>
           <SheetDescription>
-            Choisissez ce que vous voulez suivre. L’image montre la forme conseillée.
+            Choisissez une question simple. Nous vous proposons l’affichage le plus facile à lire.
           </SheetDescription>
         </SheetHeader>
-        <div className="flex flex-col gap-1 overflow-y-auto px-4 pb-4">
+        <div className="flex flex-col gap-3 overflow-y-auto px-4 pb-4">
+          <Input
+            value={recherche}
+            onChange={(event) => setRecherche(event.target.value)}
+            placeholder="Chercher une question ou un indicateur"
+            aria-label="Chercher une question ou un indicateur"
+          />
           {disponibles.length === 0 ? (
             <p className="py-6 text-center text-[0.875rem] text-muted-foreground">
-              Toutes les sources sont déjà placées.
+              {recherche === ''
+                ? 'Toutes les questions sont déjà affichées.'
+                : 'Aucun indicateur ne correspond à votre recherche.'}
             </p>
           ) : (
             disponibles.map((source) => {
@@ -63,25 +90,118 @@ export function TiroirWidgets({
               const donneesSource = donnees.get(source);
               // Sans données chargées, la mesure vaut zéro : le classement des
               // marques reste celui de la FORME, jamais un repli muet.
-              const tete = evaluerMarques(
+              const evaluees = evaluerMarques(
                 entree.forme,
                 donneesSource === undefined
                   ? { nombreCategories: 0, nombrePoints: 0, partZero: 0 }
                   : mesurerDonnees(donneesSource),
-              )[0];
+              );
+              const tete = evaluees[0];
               const marque = tete?.marque ?? 'tableau';
               return (
-                <ChoixGraphique
+                <article
                   key={source}
-                  marque={marque}
-                  titre={entree.label}
-                  phrase={marquePhrase(marque)}
-                  conseille={tete?.recommandee === true}
-                  raison={tete?.recommandee === true ? tete.raison : null}
-                  onSelect={() => {
-                    onAdd(source as DashboardSource);
-                  }}
-                />
+                  className="flex shrink-0 flex-col gap-3 rounded-lg border border-border/70 bg-card p-3"
+                >
+                  <div className="flex items-start gap-3">
+                    <ChartPreview marque={marque} />
+                    <div className="min-w-0">
+                      <p className="text-[0.6875rem] font-[700] uppercase tracking-[0.08em] text-muted-foreground">
+                        {entree.groupe ?? 'Indicateur'}
+                      </p>
+                      <h3 className="font-display text-[1rem] font-[700] text-foreground">
+                        {entree.label}
+                      </h3>
+                      <p className="mt-1 text-[0.875rem] font-[600] text-foreground">
+                        {entree.question ??
+                          `Que se passe-t-il avec ${entree.label.toLowerCase()} ?`}
+                      </p>
+                      <p className="mt-1 text-[0.8125rem] text-muted-foreground">
+                        {entree.description ?? 'Ce chiffre vous aide à comprendre la situation.'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setApercu({
+                          source: source as DashboardSource,
+                          marque,
+                          rejeu: (apercu?.rejeu ?? 0) + 1,
+                        });
+                      }}
+                    >
+                      Voir cet exemple
+                    </Button>
+                    {evaluees.length > 1 ? (
+                      <details className="text-[0.8125rem]">
+                        <summary className="cursor-pointer rounded-md px-2 py-1.5 font-[600] text-primary hover:bg-secondary">
+                          Voir les autres façons
+                        </summary>
+                        <div className="mt-2 flex flex-col gap-1 border-l-2 border-border pl-3">
+                          {evaluees.slice(1).map((evaluee) => (
+                            <button
+                              key={evaluee.marque}
+                              type="button"
+                              className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-secondary"
+                              onClick={() => {
+                                setApercu({
+                                  source: source as DashboardSource,
+                                  marque: evaluee.marque,
+                                  rejeu: (apercu?.rejeu ?? 0) + 1,
+                                });
+                              }}
+                            >
+                              <ChartPreview
+                                marque={evaluee.marque}
+                                className="size-10 [&>svg]:size-8"
+                              />
+                              <span>
+                                <span className="block font-[600]">
+                                  Voir {marqueTexte(evaluee.marque).nom.toLowerCase()}
+                                </span>
+                                <span className="block text-muted-foreground">
+                                  {marqueTexte(evaluee.marque).usage}
+                                </span>
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </details>
+                    ) : null}
+                  </div>
+                  {apercu?.source === source ? (
+                    <div className="flex flex-col gap-3 border-t border-border/70 pt-3">
+                      <ChartDemo
+                        key={`${source}-${apercu.marque}-${String(apercu.rejeu)}`}
+                        marque={apercu.marque}
+                      />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => {
+                            onAdd(source as DashboardSource, apercu.marque);
+                            setApercu(null);
+                          }}
+                        >
+                          Ajouter cette forme
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setApercu(null)}
+                        >
+                          Fermer l’exemple
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+                </article>
               );
             })
           )}

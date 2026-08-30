@@ -163,8 +163,8 @@ describe('PurgeService, exécution', () => {
     const models = trace.deletes.map((call) => call.model);
     expect(models).toContain('prospect');
     expect(models).toContain('bankCase');
-    expect(models).toContain('callTask');
     expect(models).toContain('callAttempt');
+    expect(models).toContain('repCallAttempt');
   });
 
   it('n’exécute que les étapes des domaines demandés', async () => {

@@ -28,7 +28,6 @@ class SupervisionApi {
   /// * [granularity]
   /// * [projet] - Le projet. ABSENT veut dire les deux. Un représentant n’existe que dans CHUES : sous `GRAND_PUBLIC`, toutes les colonnes `rep*` valent 0 ou `null`.
   /// * [commercialId] - Un seul téléconseiller : borne les lignes, la liste et les histogrammes.
-  /// * [campaignId] - Campagne d’appels. L’identifiant vaut pour une campagne prospects OU une campagne représentants : l’autre famille tombe alors à zéro.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -44,7 +43,6 @@ class SupervisionApi {
     SupervisionGranularity? granularity,
     Projet? projet,
     String? commercialId,
-    String? campaignId,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -71,7 +69,6 @@ class SupervisionApi {
       if (granularity != null) r'granularity': granularity,
       if (projet != null) r'projet': projet,
       if (commercialId != null) r'commercialId': commercialId,
-      if (campaignId != null) r'campaignId': campaignId,
     };
 
     final _response = await _dio.request<Object>(

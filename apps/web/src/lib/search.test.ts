@@ -16,7 +16,7 @@ describe('foldForSearch', () => {
   });
 
   it('unifie les apostrophes', () => {
-    expect(foldForSearch('Campagne d’appels')).toBe(foldForSearch("Campagne d'appels"));
+    expect(foldForSearch('Lot d’export')).toBe(foldForSearch("Lot d'export"));
     expect(foldForSearch('Méthode d’enrôlement')).toBe("methode d'enrolement");
   });
 });

@@ -57,7 +57,6 @@ function mount(representantId: string | null = 'rep-1') {
     iefs: [],
     regions: [],
     commerciaux: [],
-    campagnes: [],
     banques: [
       { id: 'bnq-cbao', name: 'CBAO Sénégal', shortName: 'CBAO', isActive: true, sortOrder: 1 },
       { id: 'bnq-old', name: 'Banque fermée', shortName: 'BF', isActive: false, sortOrder: 2 },

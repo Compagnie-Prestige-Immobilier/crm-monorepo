@@ -11,7 +11,7 @@ export default async function RappelsPage() {
   const guard = await guardRoles(['ADMIN', 'COMMERCIAL', 'SUPERVISEUR', 'DIRECTION']);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
-    return <PermissionDenied role={guard.user.role} what="La file des rappels" />;
+    return <PermissionDenied role={guard.user.role} what="Les rappels promis" />;
   }
 
   return <RappelsView canFilter={guard.user.role !== 'COMMERCIAL'} />;

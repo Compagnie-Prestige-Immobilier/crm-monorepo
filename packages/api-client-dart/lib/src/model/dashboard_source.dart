@@ -44,14 +44,14 @@ enum DashboardSource {
   avecTelephone(r'avec-telephone'),
   @JsonValue(r'qualite-de-saisie')
   qualiteDeSaisie(r'qualite-de-saisie'),
-  @JsonValue(r'appels-de-qualification')
-  appelsDeQualification(r'appels-de-qualification'),
   @JsonValue(r'taux-de-contact')
   tauxDeContact(r'taux-de-contact'),
   @JsonValue(r'a-rappeler')
   aRappeler(r'a-rappeler'),
   @JsonValue(r'taux-de-qualification')
   tauxDeQualification(r'taux-de-qualification'),
+  @JsonValue(r'taux-de-joignabilite')
+  tauxDeJoignabilite(r'taux-de-joignabilite'),
   @JsonValue(r'prospects-notes')
   prospectsNotes(r'prospects-notes'),
   @JsonValue(r'adhesions')

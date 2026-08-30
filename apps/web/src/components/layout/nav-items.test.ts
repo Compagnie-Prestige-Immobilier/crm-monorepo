@@ -104,7 +104,6 @@ const ATTEINT_AUTREMENT: Readonly<Record<string, string>> = {
   '/chues/appels-representants': 'premier geste · chues/hub-view.tsx',
   '/chues/prospects/nouveau': 'deuxième geste · chues/hub-view.tsx',
   '/chues/console': 'troisième geste · chues/hub-view.tsx',
-  '/chues/campagnes/representants': 'onglet · phase2/campaigns-tabs.tsx',
   '/chues/tableau-de-bord': 'redirige vers « Chiffres », qui l’a absorbé',
   '/grand-public/tableau-de-bord': 'redirige vers « Chiffres », qui l’a absorbé',
   '/chues/dossiers/nouveau': 'bouton · bank/bank-cases-view.tsx',
@@ -121,7 +120,6 @@ const MASQUEES: Readonly<Record<Role, readonly string[]>> = {
     '/admin',
     '/admin/referentiels/issues-appel',
     '/chues/appels-representants',
-    '/chues/campagnes/representants',
     '/chues/console',
     '/chues/dossiers/nouveau',
     '/chues/prospects/nouveau',
@@ -135,14 +133,12 @@ const MASQUEES: Readonly<Record<Role, readonly string[]>> = {
     '/accueil/listes',
     '/accueil/tableau-de-bord',
     '/chues',
-    '/chues/campagnes/representants',
     '/chues/tableau-de-bord',
     '/grand-public/tableau-de-bord',
     '/notifications',
   ],
   SUPERVISEUR: [
     '/chues',
-    '/chues/campagnes/representants',
     '/chues/tableau-de-bord',
     '/grand-public/tableau-de-bord',
     '/notifications',
@@ -736,11 +732,11 @@ describe('navigation d’un SUPERVISEUR', () => {
       'Contacts recommandés',
       'Représentants',
       'Prospects',
-      'Campagnes',
+      'Lots d’export',
     ]);
   });
 
-  it('garde le tableau de bord et le suivi de l’équipe en pleine barre, replie les campagnes', () => {
+  it('garde le tableau de bord et le suivi de l’équipe en pleine barre, replie les lots', () => {
     const replies = navItems('SUPERVISEUR', 'chues')
       .filter((item) => item.secondary === true)
       .map((item) => item.href);
@@ -891,7 +887,6 @@ describe('navigation de la DIRECTION', () => {
     expect(hrefs('DIRECTION', 'grand-public')).toEqual([
       '/grand-public/statistiques',
       '/grand-public',
-      '/grand-public/campagnes',
       // Sous « Plus ».
       '/grand-public/rappels',
     ]);
@@ -955,7 +950,6 @@ describe('navigation du pilotage sur le Grand Public et le registre', () => {
     expect(hrefs('SUPERVISEUR', 'grand-public')).toEqual([
       '/grand-public/statistiques',
       '/grand-public',
-      '/grand-public/campagnes',
       // Sous « Plus ».
       '/grand-public/rappels',
     ]);
@@ -970,7 +964,6 @@ describe('navigation du pilotage sur le Grand Public et le registre', () => {
     expect(hrefs('ADMIN', 'grand-public')).toEqual([
       '/grand-public/statistiques',
       '/grand-public',
-      '/grand-public/campagnes',
       // Sous « Plus ».
       '/grand-public/rappels',
       '/grand-public/console',
@@ -1000,9 +993,18 @@ describe('charge de la barre latérale', () => {
 });
 
 describe('mots interdits dans la barre', () => {
-  // « Phase n » est proscrit dans l'interface ; les trois autres sont du
+  // « Phase n » est proscrit dans l'interface ; « campagne », « tâche » et
+  // « file d'appel » nomment une fonctionnalité retirée ; les autres sont du
   // vocabulaire d'équipe que personne n'emploie au téléphone.
-  const PROSCRITS = ['phase', 'pilotage', 'console', 'commercial'];
+  const PROSCRITS = [
+    'phase',
+    'pilotage',
+    'console',
+    'commercial',
+    'campagne',
+    'tâche',
+    'file d’appel',
+  ];
 
   it('ne laisse passer aucun jargon, pour aucun rôle', () => {
     const fautes = ENTREES.flatMap(({ role, item }) => {

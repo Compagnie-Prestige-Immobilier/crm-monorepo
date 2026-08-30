@@ -7,6 +7,7 @@ import {
   type DashboardMarque,
 } from '@/components/accueil/tableau-de-bord/sources';
 import {
+  ChartDemo,
   ChartPreview,
   ChoixGraphique,
   MARQUE_TEXTES,
@@ -50,6 +51,12 @@ describe('ChartPreview', () => {
       .join('');
     expect(css).toContain('@media (prefers-reduced-motion: reduce)');
     expect(css).toContain('.cpi-piece { animation: none; }');
+  });
+
+  it('affiche un exemple agrandi pour comprendre la forme choisie', () => {
+    render(<ChartDemo marque="barres-horizontales" />);
+    expect(screen.getByRole('img', { name: 'Exemple visuel : Barres couchées' })).toBeTruthy();
+    expect(screen.getByText('Comparer qui fait le plus, noms longs lisibles')).toBeTruthy();
   });
 });
 

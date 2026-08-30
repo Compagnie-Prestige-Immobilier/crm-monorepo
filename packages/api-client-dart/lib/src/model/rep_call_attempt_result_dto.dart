@@ -25,10 +25,6 @@ class RepCallAttemptResultDto {
 
     required this.attemptId,
 
-    required this.taskId,
-
-    required this.taskClosed,
-
     required this.suggestion,
   });
 
@@ -43,14 +39,6 @@ class RepCallAttemptResultDto {
   @JsonKey(name: r'attemptId', required: true, includeIfNull: false)
   final String attemptId;
 
-  /// Tâche close par cette tentative, si le représentant en avait une active.
-  @JsonKey(name: r'taskId', required: true, includeIfNull: true)
-  final String? taskId;
-
-  /// Vrai si l’issue a clos la tâche. Les issues « à rappeler » la laissent ouverte.
-  @JsonKey(name: r'taskClosed', required: true, includeIfNull: false)
-  final bool taskClosed;
-
   /// Ce que le numéro suggéré donne dans l’annuaire, dans la forme que la bannière de doublon du mobile sait déjà afficher. Nul si la tentative n’en portait pas.
   @JsonKey(name: r'suggestion', required: true, includeIfNull: true)
   final RepresentantLookupDto? suggestion;
@@ -60,21 +48,15 @@ class RepCallAttemptResultDto {
         other is RepCallAttemptResultDto &&
             runtimeType == other.runtimeType &&
             equals(
-              [status, attemptId, taskId, taskClosed, suggestion],
-              [
-                other.status,
-                other.attemptId,
-                other.taskId,
-                other.taskClosed,
-                other.suggestion,
-              ],
+              [status, attemptId, suggestion],
+              [other.status, other.attemptId, other.suggestion],
             );
   }
 
   @override
   int get hashCode =>
       runtimeType.hashCode ^
-      mapPropsToHashCode([status, attemptId, taskId, taskClosed, suggestion]);
+      mapPropsToHashCode([status, attemptId, suggestion]);
 
   factory RepCallAttemptResultDto.fromJson(Map<String, dynamic> json) =>
       _$RepCallAttemptResultDtoFromJson(json);

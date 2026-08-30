@@ -170,29 +170,6 @@ const MATRICE_NOUVEAUX: {
   { controller: ClientRequestsController, method: 'approve', roles: [Role.ADMIN] },
   { controller: ClientRequestsController, method: 'reject', roles: [Role.ADMIN] },
 
-  { controller: RepCampaignsController, method: 'preview', roles: [Role.ADMIN] },
-  {
-    controller: RepCampaignsController,
-    method: 'list',
-    roles: [Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION],
-  },
-  { controller: RepCampaignsController, method: 'create', roles: [Role.ADMIN] },
-  {
-    controller: RepCampaignsController,
-    method: 'get',
-    roles: [Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION],
-  },
-  { controller: RepCampaignsController, method: 'close', roles: [Role.ADMIN] },
-  {
-    controller: RepCampaignsController,
-    method: 'downloadProgramme',
-    roles: [Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION],
-  },
-  {
-    controller: RepCampaignsController,
-    method: 'downloadProgrammes',
-    roles: [Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION],
-  },
   {
     controller: RepCampaignsController,
     method: 'recordAttempt',
@@ -301,11 +278,6 @@ describe('matrice d’autorisation des modules récents', () => {
       for (const method of ['import', 'removeComment']) {
         expect(allows(RepresentantsController, method, role), `${role}.${method}`).toBe(false);
       }
-      for (const method of ['preview', 'create', 'close']) {
-        expect(allows(RepCampaignsController, method, role), `${role}.campagnes.${method}`).toBe(
-          false,
-        );
-      }
     }
   });
 
@@ -329,7 +301,7 @@ describe('matrice d’autorisation des modules récents', () => {
     const routes = Object.getOwnPropertyNames(AnalyticsController.prototype).filter(
       (name) => name !== 'constructor',
     );
-    expect(routes.length).toBeGreaterThanOrEqual(21);
+    expect(routes.length).toBeGreaterThanOrEqual(20);
 
     for (const method of routes) {
       // Le vieillissement des dossiers est la seule route resserree: il tient du
@@ -359,12 +331,6 @@ describe('cloisonnement hors module', () => {
     )) {
       expect(allows(UsersController, method, Role.BANQUE_FINANCE)).toBe(false);
       expect(allows(UsersController, method, Role.ADMIN)).toBe(true);
-    }
-  });
-
-  it('les campagnes d’appels lui sont fermées', () => {
-    for (const method of ['listCampaigns', 'createCampaign', 'getCampaign', 'closeCampaign']) {
-      expect(allows(Phase2Controller, method, Role.BANQUE_FINANCE)).toBe(false);
     }
   });
 

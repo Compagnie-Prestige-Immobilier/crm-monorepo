@@ -17,7 +17,6 @@ export const NOTIFICATION_STATUSES = [
 export const NOTIFICATION_CATEGORIES = [
   'ANNONCE',
   'RAPPEL',
-  'CAMPAGNE',
   'DOSSIER',
   'SYSTEME',
 ] as const satisfies readonly NotificationCategory[];
