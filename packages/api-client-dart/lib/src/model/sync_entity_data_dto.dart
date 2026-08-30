@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:crm_api_client/src/model/payment_mode.dart';
 import 'package:crm_api_client/src/model/projet.dart';
 import 'package:crm_api_client/src/model/prospect_type.dart';
 import 'package:crm_api_client/src/model/call_outcome.dart';
@@ -69,6 +70,10 @@ class SyncEntityDataDto {
     this.dureeSystemeMois,
 
     this.canalProvenanceId,
+
+    this.incomeBandId,
+
+    this.paymentMode,
 
     this.clientCreatedAt,
 
@@ -223,6 +228,19 @@ class SyncEntityDataDto {
   @JsonKey(name: r'canalProvenanceId', required: false, includeIfNull: false)
   final String? canalProvenanceId;
 
+  /// Prospect : tranche de revenu mensuel, choisie dans le référentiel.
+  @JsonKey(name: r'incomeBandId', required: false, includeIfNull: false)
+  final String? incomeBandId;
+
+  /// Prospect : mode de paiement.
+  @JsonKey(
+    name: r'paymentMode',
+    required: false,
+    includeIfNull: false,
+    unknownEnumValue: PaymentMode.unknownDefaultOpenApi,
+  )
+  final PaymentMode? paymentMode;
+
   /// Horodatage de la saisie terrain.
   @JsonKey(name: r'clientCreatedAt', required: false, includeIfNull: false)
   final DateTime? clientCreatedAt;
@@ -342,6 +360,8 @@ class SyncEntityDataDto {
                 type,
                 dureeSystemeMois,
                 canalProvenanceId,
+                incomeBandId,
+                paymentMode,
                 clientCreatedAt,
                 prospectId,
                 outcome,
@@ -385,6 +405,8 @@ class SyncEntityDataDto {
                 other.type,
                 other.dureeSystemeMois,
                 other.canalProvenanceId,
+                other.incomeBandId,
+                other.paymentMode,
                 other.clientCreatedAt,
                 other.prospectId,
                 other.outcome,
@@ -434,6 +456,8 @@ class SyncEntityDataDto {
         type,
         dureeSystemeMois,
         canalProvenanceId,
+        incomeBandId,
+        paymentMode,
         clientCreatedAt,
         prospectId,
         outcome,

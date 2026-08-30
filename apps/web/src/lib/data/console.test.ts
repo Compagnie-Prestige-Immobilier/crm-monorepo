@@ -183,6 +183,10 @@ describe('buildAttemptBatch', () => {
       profession: 'Instituteur',
       syndicatId: 's-1',
       banqueId: 'b-1',
+      type: 'FONCTIONNAIRE',
+      incomeBandId: 'i-1',
+      paymentMode: 'ECHELONNE',
+      dureeSystemeMois: 24,
       dureeEtablissementMois: 36,
       fonctionnaire: true,
       engagementEnCours: false,
@@ -208,6 +212,10 @@ describe('buildAttemptBatch', () => {
           engagementEnCours: null,
           syndicatId: '',
           banqueId: '',
+          type: null,
+          incomeBandId: '',
+          paymentMode: null,
+          dureeSystemeMois: '',
         },
       },
     });
@@ -222,6 +230,10 @@ describe('buildAttemptBatch', () => {
       'engagementEnCours',
       'syndicatId',
       'banqueId',
+      'type',
+      'incomeBandId',
+      'paymentMode',
+      'dureeSystemeMois',
       'rendezVousAt',
     ]) {
       expect(data).not.toHaveProperty(field);
@@ -246,15 +258,20 @@ describe('buildAttemptBatch', () => {
 
 function conversion(over: Partial<ConversionDraft> = {}): ConversionDraft {
   return {
+    projet: 'CHUES',
     nom: 'Diallo',
     prenom: 'Mamadou',
     email: 'mamadou@example.sn',
     profession: 'Instituteur',
+    type: 'FONCTIONNAIRE',
     dureeEtablissementMois: '36',
     fonctionnaire: true,
     syndicatId: 's-1',
     banqueId: 'b-1',
     engagementEnCours: false,
+    incomeBandId: 'i-1',
+    paymentMode: 'ECHELONNE',
+    dureeSystemeMois: '24',
     method: 'PLATFORM',
     rendezVousAt: '',
     ...over,
@@ -306,6 +323,67 @@ describe('validateConversion', () => {
     }
     expect(
       validateConversion(conversion({ dureeEtablissementMois: '600' }), NOW).dureeEtablissementMois,
+    ).toBeUndefined();
+  });
+
+  it('sur CHUES, l’adhésion exige le dossier complet', () => {
+    const vide = conversion({
+      prenom: '',
+      email: '',
+      profession: '',
+      dureeEtablissementMois: '',
+      fonctionnaire: null,
+      syndicatId: '',
+      banqueId: '',
+      engagementEnCours: null,
+      incomeBandId: '',
+      dureeSystemeMois: '',
+    });
+
+    expect(Object.keys(validateConversion(vide, NOW)).sort()).toEqual(
+      [
+        'banqueId',
+        'dureeEtablissementMois',
+        'dureeSystemeMois',
+        'email',
+        'engagementEnCours',
+        'fonctionnaire',
+        'incomeBandId',
+        'prenom',
+        'profession',
+        'syndicatId',
+      ].sort(),
+    );
+    expect(validateConversion(vide, NOW).fonctionnaire).toMatch(/fonctionnaire/);
+  });
+
+  it('sur le Grand Public, seul le nom est exigé', () => {
+    const vide = conversion({
+      projet: 'GRAND_PUBLIC',
+      prenom: '',
+      email: '',
+      profession: '',
+      dureeEtablissementMois: '',
+      fonctionnaire: null,
+      syndicatId: '',
+      banqueId: '',
+      engagementEnCours: null,
+      incomeBandId: '',
+      dureeSystemeMois: '',
+    });
+
+    expect(validateConversion(vide, NOW)).toEqual({});
+  });
+
+  it('borne la durée du système à des mois entiers de 1 à 300', () => {
+    for (const mois of ['0', '301', '12,5']) {
+      expect(
+        validateConversion(conversion({ dureeSystemeMois: mois }), NOW).dureeSystemeMois,
+      ).toMatch(/mois entiers/);
+    }
+    expect(
+      validateConversion(conversion({ projet: 'GRAND_PUBLIC', dureeSystemeMois: '' }), NOW)
+        .dureeSystemeMois,
     ).toBeUndefined();
   });
 

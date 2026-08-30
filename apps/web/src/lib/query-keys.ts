@@ -35,6 +35,7 @@ export const queryKeys = {
   referentielsRoot: ['referentiels'] as const,
   banques: ['referentiels', 'banques'] as const,
   syndicats: ['referentiels', 'syndicats'] as const,
+  incomeBands: ['referentiels', 'incomeBands'] as const,
   departements: ['referentiels', 'departements'] as const,
   iefs: ['referentiels', 'iefs'] as const,
   regions: ['referentiels', 'regions'] as const,

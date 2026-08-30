@@ -20447,6 +20447,19 @@
             "format": "uuid",
             "description": "Prospect : canal de provenance, choisi dans le référentiel."
           },
+          "incomeBandId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Prospect : tranche de revenu mensuel, choisie dans le référentiel."
+          },
+          "paymentMode": {
+            "description": "Prospect : mode de paiement.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaymentMode"
+              }
+            ]
+          },
           "clientCreatedAt": {
             "type": "string",
             "format": "date-time",

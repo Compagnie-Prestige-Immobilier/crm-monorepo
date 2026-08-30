@@ -26,6 +26,7 @@ import { ValidatorConstraint } from 'class-validator';
 import {
   CallOutcome,
   EnrollmentMethod,
+  PaymentMode,
   Projet,
   ProspectStatut,
   ProspectType,
@@ -271,6 +272,23 @@ export class SyncEntityDataDto {
   @IsOptional()
   @IsUUID()
   canalProvenanceId?: string;
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Prospect : tranche de revenu mensuel, choisie dans le référentiel.',
+  })
+  @IsOptional()
+  @IsUUID()
+  incomeBandId?: string;
+
+  @ApiPropertyOptional({
+    enum: PaymentMode,
+    enumName: 'PaymentMode',
+    description: 'Prospect : mode de paiement.',
+  })
+  @IsOptional()
+  @IsEnum(PaymentMode)
+  paymentMode?: PaymentMode;
 
   @ApiPropertyOptional({ format: 'date-time', description: 'Horodatage de la saisie terrain.' })
   @IsOptional()

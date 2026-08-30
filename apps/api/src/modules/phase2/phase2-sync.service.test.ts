@@ -1,7 +1,9 @@
 import {
   CallOutcome,
   EnrollmentMethod,
+  PaymentMode,
   Phase2Status,
+  ProspectType,
   ScheduledCallbackStatus,
 } from '@crm/database';
 import { BadRequestException } from '@nestjs/common';
@@ -167,6 +169,26 @@ describe('renseignements de conversion', () => {
     const row = writtenRow();
     expect(row.nom).toBeUndefined();
     expect(row.banqueId).toBeUndefined();
+  });
+
+  it('écrit aussi sur le PROSPECT sa situation, son revenu et son paiement', async () => {
+    await apply({
+      ...priseDeRendezVous,
+      type: ProspectType.FONCTIONNAIRE,
+      incomeBandId: 'i-1',
+      paymentMode: PaymentMode.ECHELONNE,
+      dureeSystemeMois: 24,
+    });
+
+    const [args] = tx.prospect.update.mock.calls[0] as [{ data: Record<string, unknown> }];
+    expect(args.data).toEqual({
+      type: 'FONCTIONNAIRE',
+      incomeBandId: 'i-1',
+      paymentMode: 'ECHELONNE',
+      dureeSystemeMois: 24,
+      rev: { increment: 1 },
+    });
+    expect(writtenRow().incomeBandId).toBeUndefined();
   });
 
   it('un champ absent laisse la valeur en place : le silence n’efface rien', async () => {

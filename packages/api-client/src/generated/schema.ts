@@ -3857,6 +3857,13 @@ export interface components {
        */
       canalProvenanceId?: string;
       /**
+       * Format: uuid
+       * @description Prospect : tranche de revenu mensuel, choisie dans le référentiel.
+       */
+      incomeBandId?: string;
+      /** @description Prospect : mode de paiement. */
+      paymentMode?: components['schemas']['PaymentMode'];
+      /**
        * Format: date-time
        * @description Horodatage de la saisie terrain.
        */
