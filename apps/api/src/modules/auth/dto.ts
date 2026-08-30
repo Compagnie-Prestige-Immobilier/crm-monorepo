@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { Role } from '@crm/database';
 import { WORKSPACES, type Workspace } from '../../workspaces/workspace.js';
+import { IsPasswordLength } from './password-policy.js';
 
 export class LoginDto {
   @ApiProperty({
@@ -43,6 +44,18 @@ export class AuthUserDto {
 
   @ApiPropertyOptional({ nullable: true, type: String, format: 'date-time' })
   lastLoginAt!: string | null;
+}
+
+export class ChangeMyPasswordDto {
+  @ApiProperty({ format: 'password' })
+  @IsString()
+  @MinLength(1)
+  currentPassword!: string;
+
+  @ApiProperty({ minLength: 8, maxLength: 24, format: 'password' })
+  @IsString()
+  @IsPasswordLength()
+  newPassword!: string;
 }
 
 export class SwitchWorkspaceDto {

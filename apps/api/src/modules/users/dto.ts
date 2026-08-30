@@ -18,6 +18,7 @@ import { Role } from '@crm/database';
 
 import { PageMetaDto } from '../../common/dto/prospect-filter.dto.js';
 import { queryBoolean } from '../../common/dto/query-boolean.js';
+import { IsPasswordLength } from '../auth/password-policy.js';
 
 export class CreateUserDto {
   @ApiProperty({ format: 'email', maxLength: 254 })
@@ -44,10 +45,9 @@ export class CreateUserDto {
   @MaxLength(160)
   fullName!: string;
 
-  @ApiProperty({ minLength: 12, maxLength: 200, format: 'password' })
+  @ApiProperty({ minLength: 8, maxLength: 24, format: 'password' })
   @IsString()
-  @MinLength(12, { message: 'Le mot de passe doit faire au moins 12 caractères' })
-  @MaxLength(200)
+  @IsPasswordLength()
   password!: string;
 
   @ApiPropertyOptional({ enum: Role, enumName: 'Role', default: Role.COMMERCIAL })
@@ -65,10 +65,9 @@ export class CreateUserDto {
 export class UpdateUserDto extends PartialType(OmitType(CreateUserDto, ['password'] as const)) {}
 
 export class ResetPasswordDto {
-  @ApiProperty({ minLength: 12, maxLength: 200, format: 'password' })
+  @ApiProperty({ minLength: 8, maxLength: 24, format: 'password' })
   @IsString()
-  @MinLength(12)
-  @MaxLength(200)
+  @IsPasswordLength()
   password!: string;
 }
 

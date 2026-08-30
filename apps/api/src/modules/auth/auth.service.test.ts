@@ -29,6 +29,8 @@ interface PrismaMock {
     update: ReturnType<typeof vi.fn>;
     updateMany: ReturnType<typeof vi.fn>;
   };
+  auditLog: { create: ReturnType<typeof vi.fn> };
+  $transaction: ReturnType<typeof vi.fn>;
 }
 
 const userRow = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
@@ -70,6 +72,8 @@ beforeEach(() => {
       update: vi.fn().mockResolvedValue({}),
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
+    auditLog: { create: vi.fn().mockResolvedValue({}) },
+    $transaction: vi.fn((cb: (tx: unknown) => unknown) => cb(prisma)),
   };
   demo.ensureSeeded.mockClear();
   auth = new AuthService(
@@ -260,6 +264,38 @@ describe('rotation et détection de rejeu', () => {
   it('la déconnexion est muette sur un jeton inconnu', async () => {
     prisma.refreshToken.findUnique.mockResolvedValue(null);
     await expect(auth.logout('jeton-inconnu')).resolves.toBe(false);
+  });
+});
+
+describe('changeMyPassword', () => {
+  it('refuse un mauvais mot de passe actuel sans réécrire le condensat', async () => {
+    prisma.user.findFirst.mockResolvedValue(
+      userRow({ passwordHash: await hashPassword('actuel-12') }),
+    );
+
+    const error = (await auth
+      .changeMyPassword('com-alice', 'le-mauvais', 'nouveau-1234')
+      .catch((e: unknown) => e)) as UnauthorizedException;
+
+    expect(error).toBeInstanceOf(UnauthorizedException);
+    expect(error.getResponse()).toMatchObject({ code: 'INVALID_CURRENT_PASSWORD' });
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('accepte le bon mot de passe actuel et écrit le nouveau condensat', async () => {
+    prisma.user.findFirst.mockResolvedValue(
+      userRow({ passwordHash: await hashPassword('actuel-12') }),
+    );
+
+    await expect(auth.changeMyPassword('com-alice', 'actuel-12', 'nouveau-1234')).resolves.toEqual({
+      ok: true,
+    });
+
+    const data = firstArg(prisma.user.update).data ?? {};
+    const written = data.passwordHash as string;
+    expect(written.startsWith('$argon2id$')).toBe(true);
+    await expect(verifyPassword(written, 'nouveau-1234')).resolves.toBe(true);
+    expect(prisma.refreshToken.updateMany).not.toHaveBeenCalled();
   });
 });
 
