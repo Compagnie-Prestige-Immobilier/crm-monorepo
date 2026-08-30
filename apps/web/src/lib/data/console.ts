@@ -10,7 +10,14 @@ import {
   type WhatsappStatus,
 } from '@/lib/data/representants';
 import { EMPTY_REPRESENTANT_FILTERS, type RepresentantRelation } from '@/lib/representant-filters';
-import type { CallOutcome, EnrollmentMethod, ProspectRow } from '@/lib/types';
+import type {
+  CallOutcome,
+  EnrollmentMethod,
+  PaymentMode,
+  Projet,
+  ProspectRow,
+  ProspectType,
+} from '@/lib/types';
 
 export const callbackKeys = {
   root: ['callbacks'] as const,
@@ -156,6 +163,7 @@ export const COMMENT_MAX_LENGTH = 2_000;
 export const EMAIL_MAX_LENGTH = 160;
 export const NAME_MAX_LENGTH = 120;
 export const DUREE_ETABLISSEMENT_MAX_MOIS = 600;
+export const DUREE_SYSTEME_MAX_MOIS = 300;
 
 /** Même tolérance que le serveur : le rendez-vous se juge sur l'horodatage terrain. */
 const RENDEZ_VOUS_SKEW_MS = 5 * 60_000;
@@ -164,39 +172,53 @@ const RENDEZ_VOUS_SKEW_MS = 5 * 60_000;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/u;
 
 /**
- * Les renseignements recueillis pendant l'appel de conversion (phase 3). Tout
- * est saisi en texte : la durée et le rendez-vous ne prennent leur type qu'au
+ * Les renseignements recueillis pendant l'appel de conversion (phase 3) : le
+ * dossier entier du prospect, corrigeable, plus ce que l'appel apprend. Tout
+ * est saisi en texte : les durées et le rendez-vous ne prennent leur type qu'au
  * moment de l'envoi, sinon un champ vidé n'aurait plus de représentation.
+ *
+ * Sur CHUES le prospect est enseignant : ni situation ni mode de paiement, et
+ * l'adhésion exige le dossier complet. Le Grand Public garde ces deux champs.
  */
 export interface ConversionDraft {
+  readonly projet: Projet;
   readonly nom: string;
   readonly prenom: string;
   readonly email: string;
   readonly profession: string;
+  readonly type: ProspectType | null;
   readonly dureeEtablissementMois: string;
   readonly fonctionnaire: boolean | null;
   readonly syndicatId: string;
   readonly banqueId: string;
   readonly engagementEnCours: boolean | null;
+  readonly incomeBandId: string;
+  readonly paymentMode: PaymentMode | null;
+  readonly dureeSystemeMois: string;
   readonly method: EnrollmentMethod;
   readonly rendezVousAt: string;
 }
 
-export type ConversionField = keyof ConversionDraft;
+export type ConversionField = Exclude<keyof ConversionDraft, 'projet'>;
 export type ConversionErrors = Partial<Record<ConversionField, string>>;
 
 /** Le formulaire s'ouvre déjà rempli de ce que la fiche sait : on ne redemande rien. */
 export function conversionFrom(prospect: ProspectRow, method: EnrollmentMethod): ConversionDraft {
   return {
+    projet: prospect.projet,
     nom: prospect.nom,
     prenom: prospect.prenom,
     email: '',
     profession: prospect.profession ?? '',
+    type: prospect.type,
     dureeEtablissementMois: '',
     fonctionnaire: null,
     syndicatId: prospect.syndicatId ?? '',
     banqueId: prospect.banqueId ?? '',
     engagementEnCours: null,
+    incomeBandId: prospect.incomeBandId ?? '',
+    paymentMode: prospect.paymentMode,
+    dureeSystemeMois: prospect.dureeSystemeMois === null ? '' : String(prospect.dureeSystemeMois),
     method,
     rendezVousAt: '',
   };
@@ -208,26 +230,55 @@ export function validateConversion(
   now: number = Date.now(),
 ): ConversionErrors {
   const errors: ConversionErrors = {};
+  const complet = draft.projet === 'CHUES';
 
   const nom = draft.nom.trim();
   if (nom === '') errors.nom = 'Le nom est obligatoire.';
   else if (nom.length > NAME_MAX_LENGTH) errors.nom = 'Nom trop long (120 caractères maximum).';
 
-  if (draft.prenom.trim().length > NAME_MAX_LENGTH) {
+  const prenom = draft.prenom.trim();
+  if (complet && prenom === '') errors.prenom = 'Le prénom est obligatoire.';
+  else if (prenom.length > NAME_MAX_LENGTH) {
     errors.prenom = 'Prénom trop long (120 caractères maximum).';
   }
-  if (draft.profession.trim().length > NAME_MAX_LENGTH) {
+
+  const profession = draft.profession.trim();
+  if (complet && profession === '') errors.profession = 'La profession est obligatoire.';
+  else if (profession.length > NAME_MAX_LENGTH) {
     errors.profession = 'Profession trop longue (120 caractères maximum).';
   }
 
   const email = draft.email.trim();
-  if (email !== '' && (email.length > EMAIL_MAX_LENGTH || !EMAIL_PATTERN.test(email))) {
+  if (complet && email === '') errors.email = 'L’adresse électronique est obligatoire.';
+  else if (email !== '' && (email.length > EMAIL_MAX_LENGTH || !EMAIL_PATTERN.test(email))) {
     errors.email = 'Cette adresse électronique n’en est pas une.';
   }
 
   const mois = draft.dureeEtablissementMois.trim();
-  if (mois !== '' && (!/^\d+$/u.test(mois) || Number(mois) > DUREE_ETABLISSEMENT_MAX_MOIS)) {
+  if (complet && mois === '') {
+    errors.dureeEtablissementMois = 'La durée dans l’établissement est obligatoire.';
+  } else if (mois !== '' && (!/^\d+$/u.test(mois) || Number(mois) > DUREE_ETABLISSEMENT_MAX_MOIS)) {
     errors.dureeEtablissementMois = `La durée s’exprime en mois entiers, de 0 à ${String(DUREE_ETABLISSEMENT_MAX_MOIS)}.`;
+  }
+
+  if (complet && draft.fonctionnaire === null)
+    errors.fonctionnaire = 'Dites s’il est fonctionnaire.';
+  if (complet && draft.syndicatId === '') errors.syndicatId = 'Choisissez le syndicat.';
+  if (complet && draft.banqueId === '') errors.banqueId = 'Choisissez la banque.';
+  if (complet && draft.engagementEnCours === null) {
+    errors.engagementEnCours = 'Dites s’il a un engagement en cours à la banque.';
+  }
+  if (complet && draft.incomeBandId === '')
+    errors.incomeBandId = 'Choisissez la tranche de revenu.';
+
+  const systeme = draft.dureeSystemeMois.trim();
+  if (complet && systeme === '') {
+    errors.dureeSystemeMois = 'Choisissez la durée du système de paiement.';
+  } else if (
+    systeme !== '' &&
+    (!/^\d+$/u.test(systeme) || Number(systeme) < 1 || Number(systeme) > DUREE_SYSTEME_MAX_MOIS)
+  ) {
+    errors.dureeSystemeMois = `La durée du système s’exprime en mois entiers, de 1 à ${String(DUREE_SYSTEME_MAX_MOIS)}.`;
   }
 
   const rendezVous = draft.rendezVousAt.trim();
@@ -352,6 +403,7 @@ function conversionData(draft: ConversionDraft): SyncEntityData {
   const email = draft.email.trim();
   const profession = draft.profession.trim();
   const mois = draft.dureeEtablissementMois.trim();
+  const systeme = draft.dureeSystemeMois.trim();
   const rendezVousAt =
     draft.method === 'APPOINTMENT' ? dakarLocalToIso(draft.rendezVousAt.trim()) : null;
 
@@ -360,8 +412,12 @@ function conversionData(draft: ConversionDraft): SyncEntityData {
     ...(prenom === '' ? {} : { prenom }),
     ...(email === '' ? {} : { email }),
     ...(profession === '' ? {} : { profession }),
+    ...(draft.type === null ? {} : { type: draft.type }),
     ...(draft.syndicatId === '' ? {} : { syndicatId: draft.syndicatId }),
     ...(draft.banqueId === '' ? {} : { banqueId: draft.banqueId }),
+    ...(draft.incomeBandId === '' ? {} : { incomeBandId: draft.incomeBandId }),
+    ...(draft.paymentMode === null ? {} : { paymentMode: draft.paymentMode }),
+    ...(systeme === '' ? {} : { dureeSystemeMois: Number(systeme) }),
     ...(mois === '' ? {} : { dureeEtablissementMois: Number(mois) }),
     ...(draft.fonctionnaire === null ? {} : { fonctionnaire: draft.fonctionnaire }),
     ...(draft.engagementEnCours === null ? {} : { engagementEnCours: draft.engagementEnCours }),

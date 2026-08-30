@@ -794,6 +794,10 @@ export class SyncService {
           profession: data.profession,
           banqueId: data.banqueId,
           syndicatId: data.syndicatId,
+          type: data.type,
+          incomeBandId: data.incomeBandId,
+          paymentMode: data.paymentMode,
+          dureeSystemeMois: data.dureeSystemeMois,
         }),
         clientCreatedAt: data.clientCreatedAt,
       });

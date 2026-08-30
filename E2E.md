@@ -163,16 +163,13 @@ reste comme trace de ce que ces scénarios doivent attraper.
 - Attrapé par : **ROL-28**, qui est **vert** et distingue le refus d'un état
   d'erreur de chargement (§6.5).
 
-### 1.5 Lien mort « Ouvrir l'annuaire » vers `/grand-public/prospects` : vérifié
+### 1.5 Lien mort « Ouvrir l'annuaire » vers `/grand-public/prospects` : corrigé
 
-- `apps/web/src/components/console/console-view.tsx` ligne 9 :
-  `const href = projet === 'GRAND_PUBLIC' ? '/grand-public/prospects' : '/chues/prospects';`
-  Aucune route `grand-public/prospects/page.tsx` n'existe : le chemin est capté
-  par le segment dynamique `/grand-public/[id]` avec `id = "prospects"`,
-  `fetchProspect('prospects')` échoue sur le `ParseUUIDPipe` de l'API et l'écran
-  rend « Cette fiche n'a pas pu être chargée. ». La liste vit à `/grand-public`.
-- Attrapé par : **ROL-29**.
-- Consigne : l'assertion vise `/grand-public` et **reste rouge**.
+- Le talon « Rechercher une fiche » a disparu le 30 août : `console-view.tsx`
+  est redevenu l'écran de conversion (recherche puis fiche), commun à CHUES et
+  au Grand Public. Sans résultat, « Ajouter un prospect » mène à
+  `/grand-public/nouveau` (GP-29b) ou `/chues/prospects/nouveau`.
+- **ROL-29** est à réaligner sur ce comportement.
 
 ### 1.6 Specs existants déjà rouges sur des libellés périmés : à confirmer en navigateur
 
@@ -186,7 +183,7 @@ prospect », « Représentants », « Tableau de bord », « Lots d'export ».
 | `e2e/roles.anon.spec.ts` | « 1 · Appeler les représentants », « 2 · Noter un prospect », « 3 · Appeler les prospects », « Mes représentants », « Chiffres », « Campagnes » | 195, 301 à 303, 312, 321, 322 |
 | `e2e/accessibility.spec.ts` | table de routes sur les **anciennes** racines ; `/console` → « Appeler les prospects » et « Carte clavier » ; `/campagnes` → « Campagnes » | 27, 28, 32 à 35 |
 | `e2e/prospects.spec.ts` | « Chiffres » niveau 1 ; `/console` → « Appeler les prospects » ; `/campagnes` → « Campagnes » | 30, 119, 122, 126, 127 |
-| `e2e/console.spec.ts` | parcours d'appel au clavier sur un `ConsoleView` qui a été vidé | tout le fichier |
+| `e2e/console.spec.ts` | ne porte plus que la rafale de saisie et la cascade géographique ; l'étape 3 vit dans `chues-etape3.commercial.spec.ts` | |
 
 - Consigne : **aucun agent ne corrige ces fichiers.** Ils sont signalés au
   mainteneur central (§3.6), qui seul décide de leur mise à jour. Un agent qui
@@ -307,9 +304,10 @@ L'arbre de travail est à mi-chemin.
 - `apps/web/src/app/(panel)/grand-public/campagnes/page.tsx` est **supprimé** ;
   `grand-public/campagnes/[id]/` subsiste et réexporte la page CHUES, devenue
   `LotExportDetailPage`.
-- `apps/web/src/components/console/console-view.tsx` a été vidé : `/chues/console`
-  ne rend plus qu'un titre « Rechercher une fiche » et un lien « Ouvrir
-  l'annuaire ». Le paramètre `?fiche=<id>` n'est plus lu.
+- `apps/web/src/components/console/console-view.tsx` est reconstruit (30 août) :
+  recherche serveur, fiche, issues au clavier, renseignements d'adhésion
+  (dossier complet obligatoire sur CHUES ; situation et paiement réservés au
+  Grand Public), `?fiche=<id>` lu par identifiant.
 - `apps/web/src/components/lots-export/` est **ajouté** et **livré** : liste,
   dialogue « Nouveau lot d'export » (cible en boutons radio, téléconseillers en
   cases à cocher, aperçu chiffré lu sur `POST /lots-export/apercu`) et détail
@@ -474,7 +472,8 @@ Le mainteneur, et lui seul, décide du sort de ces fichiers (§1.6) :
 - `e2e/prospects.spec.ts` : parcours « chaque écran du panel se charge sans état
   d'erreur » dont la table contient encore `/console` → « Appeler les prospects »
   et `/campagnes` → « Campagnes ». C'est le porteur de **CHU-TRV-02**.
-- `e2e/console.spec.ts` : parcours d'appel au clavier sur un écran vidé.
+- `e2e/console.spec.ts` : rafale de saisie et cascade géographique, sur les
+  anciennes racines `/prospects/nouveau` et `/representants`.
 
 ### 3.7 Ce que le mainteneur central se réserve, en une liste
 

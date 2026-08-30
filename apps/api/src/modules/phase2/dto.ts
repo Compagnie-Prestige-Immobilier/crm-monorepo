@@ -17,8 +17,10 @@ import {
 import {
   CallOutcome,
   EnrollmentMethod,
+  PaymentMode,
   Phase2Status,
   Projet,
+  ProspectType,
 } from '@crm/database';
 
 import {
@@ -254,6 +256,42 @@ export class CallAttemptOpDto {
   @IsOptional()
   @IsUUID()
   syndicatId?: string;
+
+  @ApiPropertyOptional({
+    enum: ProspectType,
+    enumName: 'ProspectType',
+    description: 'Corrige la situation DU PROSPECT.',
+  })
+  @IsOptional()
+  @IsEnum(ProspectType)
+  type?: ProspectType;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Corrige la tranche de revenu DU PROSPECT.' })
+  @IsOptional()
+  @IsUUID()
+  incomeBandId?: string;
+
+  @ApiPropertyOptional({
+    enum: PaymentMode,
+    enumName: 'PaymentMode',
+    description: 'Corrige le mode de paiement DU PROSPECT.',
+  })
+  @IsOptional()
+  @IsEnum(PaymentMode)
+  paymentMode?: PaymentMode;
+
+  @ApiPropertyOptional({
+    type: Number,
+    minimum: 1,
+    maximum: 300,
+    description: 'Corrige la durée du système de paiement DU PROSPECT, en MOIS.',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(300)
+  dureeSystemeMois?: number;
 }
 
 export class ProspectPhase2StateDto {

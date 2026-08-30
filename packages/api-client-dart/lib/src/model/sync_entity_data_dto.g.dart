@@ -51,6 +51,10 @@ abstract class _$SyncEntityDataDtoCWProxy {
 
   SyncEntityDataDto canalProvenanceId(String? canalProvenanceId);
 
+  SyncEntityDataDto incomeBandId(String? incomeBandId);
+
+  SyncEntityDataDto paymentMode(PaymentMode? paymentMode);
+
   SyncEntityDataDto clientCreatedAt(DateTime? clientCreatedAt);
 
   SyncEntityDataDto prospectId(String? prospectId);
@@ -118,6 +122,8 @@ abstract class _$SyncEntityDataDtoCWProxy {
     ProspectType? type,
     num? dureeSystemeMois,
     String? canalProvenanceId,
+    String? incomeBandId,
+    PaymentMode? paymentMode,
     DateTime? clientCreatedAt,
     String? prospectId,
     CallOutcome? outcome,
@@ -224,6 +230,14 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
       this(canalProvenanceId: canalProvenanceId);
 
   @override
+  SyncEntityDataDto incomeBandId(String? incomeBandId) =>
+      this(incomeBandId: incomeBandId);
+
+  @override
+  SyncEntityDataDto paymentMode(PaymentMode? paymentMode) =>
+      this(paymentMode: paymentMode);
+
+  @override
   SyncEntityDataDto clientCreatedAt(DateTime? clientCreatedAt) =>
       this(clientCreatedAt: clientCreatedAt);
 
@@ -322,6 +336,8 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
     Object? type = const $CopyWithPlaceholder(),
     Object? dureeSystemeMois = const $CopyWithPlaceholder(),
     Object? canalProvenanceId = const $CopyWithPlaceholder(),
+    Object? incomeBandId = const $CopyWithPlaceholder(),
+    Object? paymentMode = const $CopyWithPlaceholder(),
     Object? clientCreatedAt = const $CopyWithPlaceholder(),
     Object? prospectId = const $CopyWithPlaceholder(),
     Object? outcome = const $CopyWithPlaceholder(),
@@ -431,6 +447,14 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
           ? _value.canalProvenanceId
           // ignore: cast_nullable_to_non_nullable
           : canalProvenanceId as String?,
+      incomeBandId: incomeBandId == const $CopyWithPlaceholder()
+          ? _value.incomeBandId
+          // ignore: cast_nullable_to_non_nullable
+          : incomeBandId as String?,
+      paymentMode: paymentMode == const $CopyWithPlaceholder()
+          ? _value.paymentMode
+          // ignore: cast_nullable_to_non_nullable
+          : paymentMode as PaymentMode?,
       clientCreatedAt: clientCreatedAt == const $CopyWithPlaceholder()
           ? _value.clientCreatedAt
           // ignore: cast_nullable_to_non_nullable
@@ -586,6 +610,15 @@ SyncEntityDataDto _$SyncEntityDataDtoFromJson(Map<String, dynamic> json) =>
           'canalProvenanceId',
           (v) => v as String?,
         ),
+        incomeBandId: $checkedConvert('incomeBandId', (v) => v as String?),
+        paymentMode: $checkedConvert(
+          'paymentMode',
+          (v) => $enumDecodeNullable(
+            _$PaymentModeEnumMap,
+            v,
+            unknownValue: PaymentMode.unknownDefaultOpenApi,
+          ),
+        ),
         clientCreatedAt: $checkedConvert(
           'clientCreatedAt',
           (v) => v == null ? null : DateTime.parse(v as String),
@@ -666,6 +699,9 @@ Map<String, dynamic> _$SyncEntityDataDtoToJson(
   if (_$ProspectTypeEnumMap[instance.type] case final value?) 'type': value,
   if (instance.dureeSystemeMois case final value?) 'dureeSystemeMois': value,
   if (instance.canalProvenanceId case final value?) 'canalProvenanceId': value,
+  if (instance.incomeBandId case final value?) 'incomeBandId': value,
+  if (_$PaymentModeEnumMap[instance.paymentMode] case final value?)
+    'paymentMode': value,
   if (instance.clientCreatedAt?.toIso8601String() case final value?)
     'clientCreatedAt': value,
   if (instance.prospectId case final value?) 'prospectId': value,
@@ -729,6 +765,12 @@ const _$ProspectTypeEnumMap = {
   ProspectType.INFORMEL: 'INFORMEL',
   ProspectType.DIASPORA: 'DIASPORA',
   ProspectType.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$PaymentModeEnumMap = {
+  PaymentMode.COMPTANT: 'COMPTANT',
+  PaymentMode.ECHELONNE: 'ECHELONNE',
+  PaymentMode.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 
 const _$CallOutcomeEnumMap = {

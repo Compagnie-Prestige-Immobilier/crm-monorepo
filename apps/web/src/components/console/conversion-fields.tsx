@@ -11,11 +11,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { fetchBanques, fetchSyndicats } from '@/lib/data/reference';
 import type { ConversionDraft, ConversionErrors } from '@/lib/data/console';
+import {
+  DUREES_MOIS,
+  formatDureeMois,
+  PROSPECT_TYPE_LABELS,
+  PROSPECT_TYPES,
+} from '@/lib/data/grand-public';
+import { fetchBanques, fetchIncomeBands, fetchSyndicats } from '@/lib/data/reference';
 import { formatPhone, withRetired } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
-import { ENROLLMENT_METHOD_LABELS, type EnrollmentMethod } from '@/lib/types';
+import {
+  ENROLLMENT_METHOD_LABELS,
+  type EnrollmentMethod,
+  type PaymentMode,
+  type ProspectType,
+} from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 const REFERENCE_STALE_TIME = 300_000;
@@ -28,17 +39,18 @@ const METHOD_ORDER: readonly EnrollmentMethod[] = [
   'PHYSICAL',
 ];
 
-/**
- * Trois réponses, pas deux : « non demandé » est l'état d'une question que
- * l'appel n'a pas eu le temps d'atteindre, et le confondre avec « non »
- * inventerait une déclaration que le prospect n'a jamais faite.
- */
-const TRI_STATE: readonly { readonly label: string; readonly value: boolean | null }[] = [
-  { label: 'Oui', value: true },
-  { label: 'Non', value: false },
-  { label: 'Non demandé', value: null },
+const PAIEMENTS: readonly { value: PaymentMode; label: string }[] = [
+  { value: 'COMPTANT', label: 'Comptant' },
+  { value: 'ECHELONNE', label: 'Échelonné' },
 ];
 
+const DUREES = DUREES_MOIS.map((mois) => ({ value: String(mois), label: formatDureeMois(mois) }));
+
+/**
+ * Sur CHUES le prospect est enseignant : ni situation ni mode de paiement, et
+ * l'adhésion exige le dossier complet. Le Grand Public garde ces deux champs,
+ * facultatifs, et « non demandé » pour les questions qu'on n'a pas posées.
+ */
 export function ConversionFields({
   draft,
   errors,
@@ -52,6 +64,8 @@ export function ConversionFields({
   disabled: boolean;
   onChange: (patch: Partial<ConversionDraft>) => void;
 }) {
+  const complet = draft.projet === 'CHUES';
+
   const banques = useQuery({
     queryKey: queryKeys.banques,
     queryFn: () => fetchBanques(),
@@ -62,6 +76,11 @@ export function ConversionFields({
     queryFn: () => fetchSyndicats(),
     staleTime: REFERENCE_STALE_TIME,
   });
+  const tranches = useQuery({
+    queryKey: queryKeys.incomeBands,
+    queryFn: () => fetchIncomeBands(),
+    staleTime: REFERENCE_STALE_TIME,
+  });
 
   const banqueItems = (banques.data ?? []).map((banque) => ({
     value: banque.id,
@@ -70,6 +89,10 @@ export function ConversionFields({
   const syndicatItems = (syndicats.data ?? []).map((syndicat) => ({
     value: syndicat.id,
     label: withRetired(syndicat.sigle, syndicat.isActive),
+  }));
+  const trancheItems = (tranches.data ?? []).map((tranche) => ({
+    value: tranche.id,
+    label: withRetired(tranche.label, tranche.isActive),
   }));
 
   return (
@@ -90,7 +113,7 @@ export function ConversionFields({
         )}
       </Field>
 
-      <Field label="Prénom" error={errors.prenom}>
+      <Field label="Prénom" required={complet} error={errors.prenom}>
         {(props) => (
           <Input
             {...props}
@@ -106,7 +129,7 @@ export function ConversionFields({
         {(props) => <Input {...props} readOnly value={formatPhone(phoneE164)} />}
       </Field>
 
-      <Field label="E-mail" error={errors.email}>
+      <Field label="E-mail" required={complet} error={errors.email}>
         {(props) => (
           <Input
             {...props}
@@ -120,7 +143,7 @@ export function ConversionFields({
         )}
       </Field>
 
-      <Field label="Profession" error={errors.profession}>
+      <Field label="Profession" required={complet} error={errors.profession}>
         {(props) => (
           <Input
             {...props}
@@ -134,6 +157,7 @@ export function ConversionFields({
 
       <Field
         label="Durée dans l’établissement (mois)"
+        required={complet}
         error={errors.dureeEtablissementMois}
         description="Ancienneté au poste, pas la durée du système de paiement."
       >
@@ -153,71 +177,132 @@ export function ConversionFields({
         )}
       </Field>
 
-      <TriStateField
+      <ChoixOuiNon
         label="Fonctionnaire"
         name="console-fonctionnaire"
         value={draft.fonctionnaire}
+        nonDemande={!complet}
+        error={errors.fonctionnaire}
         onChange={(fonctionnaire) => {
           onChange({ fonctionnaire });
         }}
       />
 
-      <Field label="Syndicat" error={errors.syndicatId}>
+      {complet ? null : (
+        <fieldset className="flex min-w-0 flex-col gap-2">
+          <legend className="pb-1.5 text-[0.8125rem] font-[600] text-foreground">Situation</legend>
+          <div className="flex flex-wrap gap-2">
+            {PROSPECT_TYPES.map((option) => (
+              <ChoixSituation
+                key={option}
+                option={option}
+                checked={draft.type === option}
+                onSelect={() => {
+                  onChange({ type: draft.type === option ? null : option });
+                }}
+              />
+            ))}
+          </div>
+        </fieldset>
+      )}
+
+      <Field label="Syndicat" required={complet} error={errors.syndicatId}>
         {(props) => (
-          <Select
+          <Liste
+            id={props.id}
+            describedBy={props['aria-describedby']}
             items={syndicatItems}
             value={draft.syndicatId}
-            onValueChange={(value) => {
-              if (value === null) return;
-              onChange({ syndicatId: value });
+            placeholder="Choisir un syndicat"
+            onChange={(syndicatId) => {
+              onChange({ syndicatId });
             }}
-          >
-            <SelectTrigger id={props.id} aria-describedby={props['aria-describedby']}>
-              <SelectValue placeholder="Choisir un syndicat" />
-            </SelectTrigger>
-            <SelectContent>
-              {syndicatItems.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          />
         )}
       </Field>
 
-      <Field label="Banque" error={errors.banqueId}>
+      <Field label="Banque" required={complet} error={errors.banqueId}>
         {(props) => (
-          <Select
+          <Liste
+            id={props.id}
+            describedBy={props['aria-describedby']}
             items={banqueItems}
             value={draft.banqueId}
-            onValueChange={(value) => {
-              if (value === null) return;
-              onChange({ banqueId: value });
+            placeholder="Choisir une banque"
+            onChange={(banqueId) => {
+              onChange({ banqueId });
             }}
-          >
-            <SelectTrigger id={props.id} aria-describedby={props['aria-describedby']}>
-              <SelectValue placeholder="Choisir une banque" />
-            </SelectTrigger>
-            <SelectContent>
-              {banqueItems.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          />
         )}
       </Field>
 
-      <TriStateField
+      <ChoixOuiNon
         label="Engagement en cours à la banque"
         name="console-engagement"
         value={draft.engagementEnCours}
+        nonDemande={!complet}
+        error={errors.engagementEnCours}
         onChange={(engagementEnCours) => {
           onChange({ engagementEnCours });
         }}
       />
+
+      <Field label="Revenu mensuel" required={complet} error={errors.incomeBandId}>
+        {(props) => (
+          <Liste
+            id={props.id}
+            describedBy={props['aria-describedby']}
+            items={trancheItems}
+            value={draft.incomeBandId}
+            placeholder="Choisir une tranche"
+            onChange={(incomeBandId) => {
+              onChange({ incomeBandId });
+            }}
+          />
+        )}
+      </Field>
+
+      {complet ? null : (
+        <Field label="Paiement">
+          {(props) => (
+            <Liste
+              id={props.id}
+              describedBy={props['aria-describedby']}
+              items={PAIEMENTS}
+              value={draft.paymentMode ?? ''}
+              placeholder="Choisir un mode"
+              onChange={(value) => {
+                const paymentMode = value as PaymentMode;
+                onChange({
+                  paymentMode,
+                  ...(paymentMode === 'ECHELONNE' ? {} : { dureeSystemeMois: '' }),
+                });
+              }}
+            />
+          )}
+        </Field>
+      )}
+
+      {complet || draft.paymentMode === 'ECHELONNE' ? (
+        <Field
+          label="Durée du système de paiement"
+          required={complet}
+          error={errors.dureeSystemeMois}
+        >
+          {(props) => (
+            <Liste
+              id={props.id}
+              describedBy={props['aria-describedby']}
+              items={DUREES}
+              value={draft.dureeSystemeMois}
+              placeholder="Choisir une durée"
+              onChange={(dureeSystemeMois) => {
+                onChange({ dureeSystemeMois });
+              }}
+            />
+          )}
+        </Field>
+      ) : null}
 
       <fieldset className="flex min-w-0 flex-col gap-2 sm:col-span-2">
         <legend className="pb-1.5 text-[0.8125rem] font-[600] text-foreground">
@@ -266,6 +351,44 @@ export function ConversionFields({
   );
 }
 
+function Liste({
+  id,
+  describedBy,
+  items,
+  value,
+  placeholder,
+  onChange,
+}: {
+  id: string;
+  describedBy: string | undefined;
+  items: readonly { value: string; label: string }[];
+  value: string;
+  placeholder: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <Select
+      items={items}
+      value={value}
+      onValueChange={(next) => {
+        if (next === null || next === '') return;
+        onChange(next);
+      }}
+    >
+      <SelectTrigger id={id} aria-describedby={describedBy}>
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent>
+        {items.map((item) => (
+          <SelectItem key={item.value} value={item.value}>
+            {item.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 function MethodChoice({
   method,
   checked,
@@ -298,22 +421,68 @@ function MethodChoice({
   );
 }
 
-function TriStateField({
+function ChoixSituation({
+  option,
+  checked,
+  onSelect,
+}: {
+  option: ProspectType;
+  checked: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <label
+      className={cn(
+        'flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 text-[0.875rem]',
+        'transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring',
+        checked
+          ? 'border-primary bg-secondary text-secondary-foreground'
+          : 'border-border hover:bg-secondary/60',
+      )}
+    >
+      <input
+        type="checkbox"
+        name="console-situation"
+        value={option}
+        checked={checked}
+        className="size-4 accent-[var(--primary)]"
+        onChange={onSelect}
+      />
+      {PROSPECT_TYPE_LABELS[option]}
+    </label>
+  );
+}
+
+/**
+ * « Non demandé » n'existe que là où la question peut rester sans réponse :
+ * confondre ce silence avec « non » inventerait une déclaration jamais faite.
+ */
+function ChoixOuiNon({
   label,
   name,
   value,
+  nonDemande,
+  error,
   onChange,
 }: {
   label: string;
   name: string;
   value: boolean | null;
+  nonDemande: boolean;
+  error?: string | undefined;
   onChange: (value: boolean | null) => void;
 }) {
+  const choix: readonly { readonly label: string; readonly value: boolean | null }[] = [
+    { label: 'Oui', value: true },
+    { label: 'Non', value: false },
+    ...(nonDemande ? [{ label: 'Non demandé', value: null }] : []),
+  ];
+
   return (
     <fieldset className="flex min-w-0 flex-col gap-2">
       <legend className="pb-1.5 text-[0.8125rem] font-[600] text-foreground">{label}</legend>
       <div className="flex flex-wrap gap-2">
-        {TRI_STATE.map((choice) => (
+        {choix.map((choice) => (
           <label
             key={choice.label}
             className={cn(
@@ -337,6 +506,11 @@ function TriStateField({
           </label>
         ))}
       </div>
+      {error === undefined ? null : (
+        <p role="alert" className="text-[0.75rem] text-destructive">
+          {error}
+        </p>
+      )}
     </fieldset>
   );
 }

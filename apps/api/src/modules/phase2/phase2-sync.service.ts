@@ -187,6 +187,10 @@ export class Phase2SyncService {
       ...(op.profession === undefined ? {} : { profession: op.profession.trim() }),
       ...(op.banqueId === undefined ? {} : { banqueId: op.banqueId }),
       ...(op.syndicatId === undefined ? {} : { syndicatId: op.syndicatId }),
+      ...(op.type === undefined ? {} : { type: op.type }),
+      ...(op.incomeBandId === undefined ? {} : { incomeBandId: op.incomeBandId }),
+      ...(op.paymentMode === undefined ? {} : { paymentMode: op.paymentMode }),
+      ...(op.dureeSystemeMois === undefined ? {} : { dureeSystemeMois: op.dureeSystemeMois }),
     };
     if (Object.keys(data).length === 0) return current;
 

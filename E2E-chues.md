@@ -74,11 +74,10 @@ constats vérifiés qui conditionnent l'écriture :
    peut l'attraper : la requête est un gabarit de chaîne jamais analysé hors
    base. Tous les scénarios CHF-* et SUP-* seront **rouges pour cette raison**
    tant que la virgule est là. C'est le résultat attendu, à rapporter tel quel.
-2. **`console-view.tsx` a été vidé.** L'écran `/chues/console` ne rend plus
-   qu'un titre « Rechercher une fiche » et un lien « Ouvrir l'annuaire ». Le
-   paramètre `?fiche=<id>` n'est plus lu. Le lien « Ouvrir dans la console » des
-   rappels (`rappels-view.tsx:170`) mène donc à un écran qui n'ouvre pas la
-   fiche.
+2. **`console-view.tsx` a été reconstruit** (30 août) : recherche serveur puis
+   fiche, issues au clavier, renseignements d'adhésion, `?fiche=<id>` lu par
+   `GET /api/v1/prospects/{id}`. Parcours ET3-1 à ET3-7 dans
+   `e2e/chues-etape3.commercial.spec.ts`, verts.
 3. **`/chues/campagnes` est déjà devenu « Lots d'export »** côté web, avec des
    composants provisoires (`<select>` brut sans nom accessible, aucun état vide,
    aucun aperçu chiffré avant création), alors que `Plan.md` décrit un écran
@@ -768,55 +767,47 @@ Fichier : `e2e/chues-etape2.commercial.spec.ts`.
 
 ---
 
-### 5.4 `/chues/console` — Étape 3, conversion (**cible mouvante**)
+### 5.4 `/chues/console` — Étape 3, conversion
 
-L'écran a été vidé (§1.4 point 2). Les six scénarios ci-dessous décrivent la
-cible de `Plan.md` §4.2.3 et sont **à écrire une fois le lot web livré**. Seul
-ET3-1 est écrivable tout de suite, et il est **attendu rouge**.
+Composant : `components/console/console-view.tsx` (recherche puis fiche),
+`conversion-fields.tsx` (renseignements d'adhésion).
+Endpoints : `GET /api/v1/prospects` (recherche, 20 dernières fiches du projet),
+`GET /api/v1/prospects/{id}` (`?fiche=`), `POST /api/v1/sync/push`
+(`call_attempt`, renseignements de conversion écrits sur la tentative et sur le
+prospect). Fichier : `e2e/chues-etape3.commercial.spec.ts`, session COMMERCIAL,
+mode série, fiches `+221 78 100 91 01` à `91 04` recréées à chaque exécution.
 
-**ET3-1 | P1 | l'écran n'est plus un talon**
-Parcours : session COMMERCIAL, `/chues/console`.
-Assertions attendues à terme : champ « Quel prospect avez-vous appelé ? »
-autofocalisé ; sans saisie, jusqu'à vingt fiches récentes du projet CHUES.
-Assertions écrivables aujourd'hui : le `heading` niveau 1 vaut « Rechercher une
-fiche » et un lien « Ouvrir l'annuaire » pointe sur `/chues/prospects`.
-Échoue si : rien ne change, ce qui est le résultat attendu tant que le lot n'est
-pas livré, ou si un troisième état intermédiaire apparaît.
-Fichier : `e2e/chues-etape3.commercial.spec.ts` (nouveau).
-**Cible mouvante : à réécrire une fois le lot web livré.**
+**ET3-1 | P1 | l'écran ouvre sur la recherche, focalisée**
+Champ « Quel prospect avez-vous appelé ? » autofocalisé ; sans saisie, au plus
+vingt fiches récentes du projet CHUES ; aucune fiche ouverte d'office.
 
 **ET3-2 | P1 | `?fiche=<id>` ouvre directement la fiche visée**
-Cible : lecture par identifiant (`GET /api/v1/prospects/{id}`), plus de
-recherche dans une file chargée, disparition de l'avertissement « n'est pas dans
-cette file ».
-Échoue si : le paramètre est ignoré, ce qui casse le seul chemin depuis
-`/chues/rappels` (« Ouvrir dans la console »).
-Fichier : `e2e/chues-etape3.commercial.spec.ts`. **Cible mouvante.**
+Lecture par identifiant ; aucun avertissement ; « Revenir à la liste » rend la
+recherche. **ET3-2b** rejoue le chemin réel : un rappel promis depuis la fiche
+apparaît dans `/chues/rappels`, et « Ouvrir la fiche » rouvre la fiche.
 
-**ET3-3 | P1 | les issues au clavier consignent l'appel attendu**
-Cible : `1`, `2`, `3`, `9` méthode obtenue ; `5` à rappeler ; `4` injoignable ;
-`6` refus ; `7` mauvais numéro ; `8` autre.
-Échoue si : une touche est réaffectée et consigne une issue pour une autre.
-Fichier : `e2e/chues-etape3.commercial.spec.ts`. **Cible mouvante.**
+**ET3-3 | P1 | les touches ouvrent l'échéance, les renseignements, et consignent**
+`5` ouvre « Quand rappeler », Échap le referme ; `1` ouvre « Phase 3 ·
+Conversion », Échap le referme ; `4` consigne `UNREACHABLE` (relu par l'API,
+fiche toujours `PENDING`).
 
-**ET3-4 | P1 | après enregistrement, retour à la liste avec « Appel enregistré pour X »**
-Cible : plus de « Personne suivante », plus d'enchaînement automatique.
-Échoue si : l'enchaînement automatique subsiste et l'agent perd la fiche qu'il
-vient de traiter.
-Fichier : `e2e/chues-etape3.commercial.spec.ts`. **Cible mouvante.**
+**ET3-4 | P1 | après enregistrement, retour à la liste**
+`role=status` « Appel enregistré pour X. », aucune fiche ouverte à la place.
 
 **ET3-5 | P2 | la carte clavier ne mentionne plus « ↑ ↓ » ni « Espace »**
-Échoue si : la carte annonce des touches retirées.
-Fichier : `e2e/chues-etape3.commercial.spec.ts`. **Cible mouvante.**
 
 **ET3-6 | P2 | une fiche déjà close refuse un nouvel appel en le disant**
-Cible : garde `PHASE2_ALREADY_COMPLETED` rendue lisible à l'écran.
-Échoue si : le refus n'est pas montré et l'agent croit avoir consigné.
-Fichier : `e2e/chues-etape3.commercial.spec.ts`. **Cible mouvante.**
+Après un refus (`6`), la fiche rouverte affiche « Fiche déjà close (refus) »,
+sans bouton d'issue ; `4` ne consigne rien.
 
-Note pour le mainteneur : le parcours existant « la console traite un appel au
-clavier, et la fiche suivante s'ouvre seule » de `console.spec.ts` porte sur
-l'ancien écran et **sera rouge**. Il ne doit pas être supprimé par un agent.
+**ET3-7 | P1 | l'adhésion exige le dossier complet, et le serveur l'enregistre**
+Sur CHUES : ni « Situation » ni « Paiement » (le prospect est enseignant) ;
+« Enregistrer l'adhésion » sur un dossier incomplet nomme chaque manque sous son
+champ et n'envoie rien ; une fois e-mail, profession, durée dans
+l'établissement, fonctionnaire, syndicat, banque, engagement, revenu mensuel et
+durée du système renseignés, l'API relit `METHOD_OBTAINED`, la profession, le
+syndicat, la tranche de revenu et la durée du système, `type` et `paymentMode`
+restant nuls.
 
 ---
 
