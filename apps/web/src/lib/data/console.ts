@@ -10,21 +10,7 @@ import {
   type WhatsappStatus,
 } from '@/lib/data/representants';
 import { EMPTY_REPRESENTANT_FILTERS, type RepresentantRelation } from '@/lib/representant-filters';
-import {
-  CALL_OUTCOME_LABELS,
-  PHASE2_STATUS_LABELS,
-  type CallOutcome,
-  type EnrollmentMethod,
-  type FilterOption,
-  type ProspectRow,
-} from '@/lib/types';
-
-/** `queryKeys` sert tout le panel ; la console garde ses clés chez elle. */
-export const consoleKeys = {
-  root: ['console'] as const,
-  queue: (campaignId: string | null) => ['console', 'queue', campaignId] as const,
-  campaigns: ['console', 'campaigns'] as const,
-};
+import type { CallOutcome, EnrollmentMethod, ProspectRow } from '@/lib/types';
 
 export const callbackKeys = {
   root: ['callbacks'] as const,
@@ -32,56 +18,6 @@ export const callbackKeys = {
     ['callbacks', scope, assignedToId] as const,
   teleconseillers: ['callbacks', 'teleconseillers'] as const,
 };
-
-export const CONSOLE_QUEUE_SIZE = 200;
-
-export interface ConsolePage {
-  readonly items: ProspectRow[];
-  readonly total: number;
-}
-
-export async function fetchConsoleQueue(
-  campaignId: string | null,
-  client: ApiClient = getApiClient(),
-  projet?: 'CHUES' | 'GRAND_PUBLIC',
-): Promise<ConsolePage> {
-  const page = unwrap(
-    await client.GET('/api/v1/prospects', {
-      params: {
-        query: {
-          ...(campaignId === null ? {} : { campaignId }),
-          ...(projet ? { projet } : {}),
-          // Une file d'appel ne porte QUE des fiches a appeler. Une fiche close
-          // y ferait perdre un tour a l'operatrice: les touches d'issue y sont
-          // inertes, et rien ne se consigne. Le bandeau lecture seule reste
-          // utile pour une fiche ouverte par lien direct.
-          phase2Status: 'PENDING',
-          pageSize: CONSOLE_QUEUE_SIZE,
-          sortBy: 'clientCreatedAt',
-          sortOrder: 'asc',
-        },
-      },
-    }),
-  );
-  return { items: page.items, total: page.meta.total };
-}
-
-/** Un téléconseiller ne reçoit que ses campagnes, et `progress` compte SES tâches. */
-export async function fetchConsoleCampaigns(
-  client: ApiClient = getApiClient(),
-  projet?: 'CHUES' | 'GRAND_PUBLIC',
-): Promise<FilterOption[]> {
-  const page = unwrap(
-    await client.GET('/api/v1/phase2/campaigns', {
-      params: { query: { status: 'ACTIVE', pageSize: 100, ...(projet ? { projet } : {}) } },
-    }),
-  );
-  return page.items.map((campaign) => ({
-    value: campaign.id,
-    label: campaign.name,
-    hint: `${String(campaign.progress.open)} ouvertes`,
-  }));
-}
 
 export type Callback = components['schemas']['CallbackDto'];
 export type CallbackScope = components['schemas']['CallbackScope'];
@@ -98,19 +34,6 @@ export function sortCallbacks(items: readonly Callback[]): Callback[] {
       return left.scheduledAt < right.scheduledAt ? -1 : 1;
     return left.id < right.id ? -1 : 1;
   });
-}
-
-export type CallbackSchedules = ReadonlyMap<string, string>;
-
-const NO_SCHEDULES: CallbackSchedules = new Map();
-
-export function schedulesOf(items: readonly Callback[]): CallbackSchedules {
-  const byProspect = new Map<string, string>();
-  for (const callback of sortCallbacks(items)) {
-    if (!byProspect.has(callback.prospectId))
-      byProspect.set(callback.prospectId, callback.scheduledAt);
-  }
-  return byProspect;
 }
 
 export async function fetchCallbacks(
@@ -227,158 +150,6 @@ export function callbackHalfHours(now: number, day: string): CallbackSlot[] {
     });
   }
   return slots;
-}
-
-export type QueueBucket = 'due' | 'never' | 'callback' | 'unreachable' | 'other' | 'closed';
-
-export const QUEUE_BUCKET_LABELS: Record<QueueBucket, string> = {
-  due: 'Rappels dus',
-  never: 'Jamais appelées',
-  callback: 'À rappeler',
-  unreachable: 'Injoignables',
-  other: 'Déjà tentées',
-  closed: 'Closes',
-};
-
-const BUCKET_RANK: Record<QueueBucket, number> = {
-  due: 0,
-  never: 1,
-  callback: 2,
-  unreachable: 3,
-  other: 4,
-  closed: 5,
-};
-
-/** Un rappel promis dans moins d'une heure se prépare déjà : il remonte avec les retards. */
-export const DUE_SOON_MS = 3_600_000;
-
-export function bucketOf(
-  prospect: ProspectRow,
-  schedules: CallbackSchedules = NO_SCHEDULES,
-  now: number = Date.now(),
-): QueueBucket {
-  if (prospect.phase2Status !== 'PENDING') return 'closed';
-
-  const scheduledAt = schedules.get(prospect.id);
-  if (scheduledAt !== undefined && Date.parse(scheduledAt) <= now + DUE_SOON_MS) return 'due';
-
-  if (prospect.lastAttemptAt === null) return 'never';
-  if (prospect.lastOutcome === 'CALLBACK') return 'callback';
-  if (prospect.lastOutcome === 'UNREACHABLE') return 'unreachable';
-  return 'other';
-}
-
-/**
- * Une échéance à venir passe DERRIÈRE les fiches de son groupe : rappeler avant
- * l'heure promise, c'est rappeler trop tôt.
- */
-function orderKey(
-  prospect: ProspectRow,
-  schedules: CallbackSchedules,
-  now: number,
-): { rank: number; when: string } {
-  const bucket = bucketOf(prospect, schedules, now);
-  const scheduledAt = schedules.get(prospect.id);
-  const later = bucket !== 'due' && bucket !== 'closed' && scheduledAt !== undefined;
-
-  if (bucket === 'due' || later) {
-    return { rank: BUCKET_RANK[bucket] * 2 + (later ? 1 : 0), when: scheduledAt ?? '' };
-  }
-  return { rank: BUCKET_RANK[bucket] * 2, when: prospect.lastAttemptAt ?? '' };
-}
-
-export function sortQueue(
-  prospects: readonly ProspectRow[],
-  schedules: CallbackSchedules = NO_SCHEDULES,
-  now: number = Date.now(),
-): ProspectRow[] {
-  return [...prospects].sort((left, right) => {
-    const leftKey = orderKey(left, schedules, now);
-    const rightKey = orderKey(right, schedules, now);
-
-    if (leftKey.rank !== rightKey.rank) return leftKey.rank - rightKey.rank;
-    if (leftKey.when !== rightKey.when) return leftKey.when < rightKey.when ? -1 : 1;
-
-    return left.id < right.id ? -1 : 1;
-  });
-}
-
-export interface ConsoleQueue {
-  readonly items: ProspectRow[];
-  readonly pendingCount: number;
-  readonly counts: Record<QueueBucket, number>;
-}
-
-export function buildQueue(
-  prospects: readonly ProspectRow[],
-  schedules: CallbackSchedules = NO_SCHEDULES,
-  now: number = Date.now(),
-): ConsoleQueue {
-  const items = sortQueue(prospects, schedules, now);
-  const counts: Record<QueueBucket, number> = {
-    due: 0,
-    never: 0,
-    callback: 0,
-    unreachable: 0,
-    other: 0,
-    closed: 0,
-  };
-  for (const prospect of items) counts[bucketOf(prospect, schedules, now)] += 1;
-
-  return { items, pendingCount: items.length - counts.closed, counts };
-}
-
-/** Fiches « À rappeler » saisies avant que l'échéance existe : elles n'en ont aucune. */
-export function undatedCallbacks(
-  prospects: readonly ProspectRow[],
-  schedules: CallbackSchedules,
-): number {
-  return prospects.filter(
-    (prospect) =>
-      prospect.phase2Status === 'PENDING' &&
-      prospect.lastOutcome === 'CALLBACK' &&
-      !schedules.has(prospect.id),
-  ).length;
-}
-
-export function nextAfter(items: readonly { id: string }[], id: string): string | null {
-  const at = items.findIndex((prospect) => prospect.id === id);
-  if (at === -1) return items[0]?.id ?? null;
-  return items[at + 1]?.id ?? items[at - 1]?.id ?? null;
-}
-
-export function daysSince(iso: string | null, now: number): number | null {
-  if (iso === null) return null;
-  const at = Date.parse(iso);
-  if (Number.isNaN(at)) return null;
-  return Math.max(0, Math.floor((now - at) / 86_400_000));
-}
-
-export function queueLabel(
-  prospect: ProspectRow,
-  now: number,
-  schedules: CallbackSchedules = NO_SCHEDULES,
-): string {
-  const bucket = bucketOf(prospect, schedules, now);
-  if (bucket === 'closed') return PHASE2_STATUS_LABELS[prospect.phase2Status].toLowerCase();
-
-  const scheduledAt = schedules.get(prospect.id);
-  if (scheduledAt !== undefined) {
-    const at = Date.parse(scheduledAt);
-    return at < now
-      ? `rappel en retard de ${formatDelay(now - at)}`
-      : `rappel ${formatCallbackAt(scheduledAt, now)}`;
-  }
-
-  if (bucket === 'never') return 'jamais appelé';
-
-  const days = daysSince(prospect.lastAttemptAt, now);
-  const age = days === null ? '' : ` · ${String(days)} j`;
-  if (bucket === 'callback') return `rappel sans échéance${age}`;
-  if (bucket === 'unreachable') return `injoignable${age}`;
-
-  const outcome = prospect.lastOutcome;
-  return `${outcome === null ? 'appelé' : CALL_OUTCOME_LABELS[outcome].toLowerCase()}${age}`;
 }
 
 export const COMMENT_MAX_LENGTH = 2_000;

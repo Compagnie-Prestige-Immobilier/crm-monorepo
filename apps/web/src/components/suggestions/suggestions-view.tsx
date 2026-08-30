@@ -126,7 +126,7 @@ export function SuggestionsView({ readOnly = false }: { readOnly?: boolean }) {
                   </p>
                   <p className="max-w-md text-[0.8125rem] text-muted-foreground">
                     {status === null
-                      ? 'Un numéro arrive ici quand un représentant en décline un autre depuis la console d’appel ou le mobile.'
+                      ? 'Un numéro arrive ici quand un représentant en décline un autre pendant un appel consigné, sur le web ou sur le mobile.'
                       : 'Retirez le filtre pour voir les autres numéros.'}
                   </p>
                 </div>

@@ -73,7 +73,7 @@ describe('sérialisation canonique', () => {
       ...emptyNotificationFilters(true),
       tab: 'gabarits' as const,
       status: 'SENT' as const,
-      category: 'CAMPAGNE' as const,
+      category: 'DOSSIER' as const,
       page: 4,
       inboxPage: 2,
       unreadOnly: true,

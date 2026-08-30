@@ -764,9 +764,9 @@ class RepresentantsApi {
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [hasProspects] - true : au moins un prospect vivant. false : aucun (représentant dormant).
-  /// * [relationStatus] - Ne retient que les représentants dans cet état de relation.
-  /// * [whatsappStatus] - Ne retient que les représentants dans cet état WhatsApp.
-  /// * [hasWhatsapp] - true : un numéro WhatsApp joignable (MEME_NUMERO ou AUTRE_NUMERO). false : les autres, question non posée comprise. Se compose avec `whatsappStatus` par intersection.
+  /// * [relationStatus]
+  /// * [whatsappStatus]
+  /// * [hasWhatsapp]
   /// * [sortBy]
   /// * [sortOrder]
   /// * [page]

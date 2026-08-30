@@ -13,8 +13,6 @@ abstract class _$DemoWorkspaceCountsDtoCWProxy {
 
   DemoWorkspaceCountsDto prospects(num prospects);
 
-  DemoWorkspaceCountsDto campaigns(num campaigns);
-
   DemoWorkspaceCountsDto bankCases(num bankCases);
 
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `DemoWorkspaceCountsDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
@@ -27,7 +25,6 @@ abstract class _$DemoWorkspaceCountsDtoCWProxy {
     num users,
     num representants,
     num prospects,
-    num campaigns,
     num bankCases,
   });
 }
@@ -50,9 +47,6 @@ class _$DemoWorkspaceCountsDtoCWProxyImpl
   DemoWorkspaceCountsDto prospects(num prospects) => this(prospects: prospects);
 
   @override
-  DemoWorkspaceCountsDto campaigns(num campaigns) => this(campaigns: campaigns);
-
-  @override
   DemoWorkspaceCountsDto bankCases(num bankCases) => this(bankCases: bankCases);
 
   @override
@@ -66,7 +60,6 @@ class _$DemoWorkspaceCountsDtoCWProxyImpl
     Object? users = const $CopyWithPlaceholder(),
     Object? representants = const $CopyWithPlaceholder(),
     Object? prospects = const $CopyWithPlaceholder(),
-    Object? campaigns = const $CopyWithPlaceholder(),
     Object? bankCases = const $CopyWithPlaceholder(),
   }) {
     return DemoWorkspaceCountsDto(
@@ -82,10 +75,6 @@ class _$DemoWorkspaceCountsDtoCWProxyImpl
           ? _value.prospects
           // ignore: cast_nullable_to_non_nullable
           : prospects as num,
-      campaigns: campaigns == const $CopyWithPlaceholder()
-          ? _value.campaigns
-          // ignore: cast_nullable_to_non_nullable
-          : campaigns as num,
       bankCases: bankCases == const $CopyWithPlaceholder()
           ? _value.bankCases
           // ignore: cast_nullable_to_non_nullable
@@ -110,19 +99,12 @@ DemoWorkspaceCountsDto _$DemoWorkspaceCountsDtoFromJson(
 ) => $checkedCreate('DemoWorkspaceCountsDto', json, ($checkedConvert) {
   $checkKeys(
     json,
-    requiredKeys: const [
-      'users',
-      'representants',
-      'prospects',
-      'campaigns',
-      'bankCases',
-    ],
+    requiredKeys: const ['users', 'representants', 'prospects', 'bankCases'],
   );
   final val = DemoWorkspaceCountsDto(
     users: $checkedConvert('users', (v) => v as num),
     representants: $checkedConvert('representants', (v) => v as num),
     prospects: $checkedConvert('prospects', (v) => v as num),
-    campaigns: $checkedConvert('campaigns', (v) => v as num),
     bankCases: $checkedConvert('bankCases', (v) => v as num),
   );
   return val;
@@ -134,6 +116,5 @@ Map<String, dynamic> _$DemoWorkspaceCountsDtoToJson(
   'users': instance.users,
   'representants': instance.representants,
   'prospects': instance.prospects,
-  'campaigns': instance.campaigns,
   'bankCases': instance.bankCases,
 };

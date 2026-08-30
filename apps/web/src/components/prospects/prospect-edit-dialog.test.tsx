@@ -94,7 +94,6 @@ function mount(over: Partial<ProspectRow> = {}) {
     regions: [],
     commerciaux: [],
     representants: [{ value: 'rep-1', label: 'Cheikh Ba' }],
-    campagnes: [],
   });
   history.mockResolvedValue([]);
   return renderWithQuery(<ProspectEditDialog prospect={prospect(over)} onOpenChange={vi.fn()} />);

@@ -113,56 +113,6 @@ export class DemoWorkspaceFactory {
       })),
     });
 
-    const assignee =
-      (await this.demoDb.user.findFirst({
-        where: { role: 'COMMERCIAL', isActive: true, deletedAt: null },
-        orderBy: { createdAt: 'asc' },
-      })) ?? author;
-    const campaign = await this.demoDb.callCampaign.create({
-      data: {
-        id: demoId('campaign:prospects'),
-        name: 'Campagne de démonstration',
-        scope: 'ALL',
-        seed: 'cpi-demo',
-        createdById: author.id,
-        createdAt,
-      },
-    });
-    await this.demoDb.callCampaignCommercial.create({
-      data: { campaignId: campaign.id, userId: assignee.id, position: 0 },
-    });
-    await this.demoDb.callTask.createMany({
-      data: prospects.slice(0, 6).map((prospect, index) => ({
-        campaignId: campaign.id,
-        prospectId: prospect.id,
-        assignedToId: assignee.id,
-        position: index + 1,
-      })),
-    });
-
-    const grandPublicCampaign = await this.demoDb.callCampaign.create({
-      data: {
-        id: demoId('campaign:grand-public'),
-        name: 'Campagne Grand Public de démonstration',
-        projet: Projet.GRAND_PUBLIC,
-        scope: 'ALL',
-        seed: 'cpi-demo-grand-public',
-        createdById: author.id,
-        createdAt,
-      },
-    });
-    await this.demoDb.callCampaignCommercial.create({
-      data: { campaignId: grandPublicCampaign.id, userId: assignee.id, position: 0 },
-    });
-    await this.demoDb.callTask.createMany({
-      data: prospects.slice(8, 14).map((prospect, index) => ({
-        campaignId: grandPublicCampaign.id,
-        prospectId: prospect.id,
-        assignedToId: assignee.id,
-        position: index + 1,
-      })),
-    });
-
     if (banque && stage) {
       await this.demoDb.bankCase.createMany({
         data: prospects.slice(0, 3).map((prospect, index) => ({

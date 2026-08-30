@@ -18,17 +18,14 @@ function carte(page: Page, titre: string) {
 }
 
 const CARTES_USINE = [
-  'Appels aux représentants',
-  'Représentants joints',
-  'Rappels promis',
-  'Représentants qui acceptent',
-  'Prospects notés',
-  'Adhésions obtenues',
-  'Reste à appeler',
+  'Taux de contact',
+  'Taux de rendez-vous',
+  'Taux de qualification',
+  'Adhésions',
   'Par téléconseiller',
 ] as const;
 
-test('CHU-CHF-02 · la direction voit en plus les deux cartes de montants', async ({ page }) => {
+test('CHU-CHF-02 · la direction voit en plus les cartes de résultat', async ({ page }) => {
   // La disposition dit QUELLES cartes poser : tant qu'elle n'est pas arrivée,
   // l'écran n'a lancé aucune requête de chiffres. On attend la réponse, pas un
   // délai, et l'écran est alors soit posé, soit en erreur.
@@ -46,5 +43,6 @@ test('CHU-CHF-02 · la direction voit en plus les deux cartes de montants', asyn
 
   await expect(carte(page, 'Encaissé')).toBeVisible();
   await expect(carte(page, 'De l’appel à l’encaissement')).toBeVisible();
+  await expect(carte(page, 'Rendement par département')).toBeVisible();
   await expect(carte(page, 'Encaissé')).toContainText('FCFA');
 });

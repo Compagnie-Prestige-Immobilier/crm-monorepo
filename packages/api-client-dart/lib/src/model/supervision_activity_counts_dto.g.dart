@@ -29,8 +29,6 @@ abstract class _$SupervisionActivityCountsDtoCWProxy {
     num representantsContacted,
   );
 
-  SupervisionActivityCountsDto tasksClosed(num tasksClosed);
-
   SupervisionActivityCountsDto repCalls(num repCalls);
 
   SupervisionActivityCountsDto repReached(num repReached);
@@ -68,7 +66,6 @@ abstract class _$SupervisionActivityCountsDtoCWProxy {
     num? reachRate,
     num prospectsCreated,
     num representantsContacted,
-    num tasksClosed,
     num repCalls,
     num repReached,
     num repCallback,
@@ -126,10 +123,6 @@ class _$SupervisionActivityCountsDtoCWProxyImpl
   SupervisionActivityCountsDto representantsContacted(
     num representantsContacted,
   ) => this(representantsContacted: representantsContacted);
-
-  @override
-  SupervisionActivityCountsDto tasksClosed(num tasksClosed) =>
-      this(tasksClosed: tasksClosed);
 
   @override
   SupervisionActivityCountsDto repCalls(num repCalls) =>
@@ -190,7 +183,6 @@ class _$SupervisionActivityCountsDtoCWProxyImpl
     Object? reachRate = const $CopyWithPlaceholder(),
     Object? prospectsCreated = const $CopyWithPlaceholder(),
     Object? representantsContacted = const $CopyWithPlaceholder(),
-    Object? tasksClosed = const $CopyWithPlaceholder(),
     Object? repCalls = const $CopyWithPlaceholder(),
     Object? repReached = const $CopyWithPlaceholder(),
     Object? repCallback = const $CopyWithPlaceholder(),
@@ -244,10 +236,6 @@ class _$SupervisionActivityCountsDtoCWProxyImpl
           ? _value.representantsContacted
           // ignore: cast_nullable_to_non_nullable
           : representantsContacted as num,
-      tasksClosed: tasksClosed == const $CopyWithPlaceholder()
-          ? _value.tasksClosed
-          // ignore: cast_nullable_to_non_nullable
-          : tasksClosed as num,
       repCalls: repCalls == const $CopyWithPlaceholder()
           ? _value.repCalls
           // ignore: cast_nullable_to_non_nullable
@@ -320,7 +308,6 @@ SupervisionActivityCountsDto _$SupervisionActivityCountsDtoFromJson(
       'reachRate',
       'prospectsCreated',
       'representantsContacted',
-      'tasksClosed',
       'repCalls',
       'repReached',
       'repCallback',
@@ -347,7 +334,6 @@ SupervisionActivityCountsDto _$SupervisionActivityCountsDtoFromJson(
       'representantsContacted',
       (v) => v as num,
     ),
-    tasksClosed: $checkedConvert('tasksClosed', (v) => v as num),
     repCalls: $checkedConvert('repCalls', (v) => v as num),
     repReached: $checkedConvert('repReached', (v) => v as num),
     repCallback: $checkedConvert('repCallback', (v) => v as num),
@@ -378,7 +364,6 @@ Map<String, dynamic> _$SupervisionActivityCountsDtoToJson(
   'reachRate': instance.reachRate,
   'prospectsCreated': instance.prospectsCreated,
   'representantsContacted': instance.representantsContacted,
-  'tasksClosed': instance.tasksClosed,
   'repCalls': instance.repCalls,
   'repReached': instance.repReached,
   'repCallback': instance.repCallback,

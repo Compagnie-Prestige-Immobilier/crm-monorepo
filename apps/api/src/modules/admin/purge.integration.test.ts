@@ -5,8 +5,6 @@ process.env.JWT_REFRESH_SECRET ??= 'integration-refresh-secret-32-characters';
 process.env.PHONE_DEFAULT_REGION ??= 'SN';
 
 import {
-  CallTaskStatus,
-  CampaignStatus,
   ClientRequestStatus,
   PrismaClient,
   PrismaPg,
@@ -122,43 +120,9 @@ async function semer(tx: Prisma.TransactionClient): Promise<void> {
     select: { id: true },
   });
 
-  const campagne = await tx.repCallCampaign.create({
-    data: {
-      id: uuidv7(),
-      name: `${TAG} Relance`,
-      seed: 'a'.repeat(32),
-      spreadDays: 2,
-      status: CampaignStatus.ACTIVE,
-      createdById: firstAdmin.id,
-      departementId: departement.id,
-      iefId: ief.id,
-    },
-    select: { id: true },
-  });
-
-  await tx.repCallCampaignCommercial.create({
-    data: { campaignId: campagne.id, userId: commercial.id, position: 0 },
-  });
-
-  const tache = await tx.repCallTask.create({
-    data: {
-      id: uuidv7(),
-      campaignId: campagne.id,
-      representantId: representant.id,
-      assignedToId: commercial.id,
-      position: 1,
-      dayIndex: 0,
-      status: CallTaskStatus.OPEN,
-      isActive: true,
-    },
-    select: { id: true },
-  });
-
   await tx.repCallAttempt.create({
     data: {
       id: uuidv7(),
-      campaignId: campagne.id,
-      taskId: tache.id,
       representantId: representant.id,
       performedById: commercial.id,
       outcome: RepCallOutcome.CALLBACK,
@@ -216,7 +180,7 @@ afterAll(async () => {
 });
 
 describe('purge complète sur une base qui utilise TOUTES les tables', () => {
-  it('va jusqu’au bout, IEF et campagnes de représentants comprises', async () => {
+  it('va jusqu’au bout avec les tables métier conservées', async () => {
     const resultat = await dansUneTransactionAnnulee(async (service, tx) => {
       await semer(tx);
       return service.purge(actor, {

@@ -57,7 +57,7 @@ import {
 type Step = 'redaction' | 'confirmation';
 type When = 'now' | 'later';
 
-const CATEGORIES: NotificationCategory[] = ['ANNONCE', 'RAPPEL', 'CAMPAGNE', 'DOSSIER', 'SYSTEME'];
+const CATEGORIES: NotificationCategory[] = ['ANNONCE', 'RAPPEL', 'DOSSIER', 'SYSTEME'];
 const ROLES: Role[] = [
   'ADMIN',
   'COMMERCIAL',

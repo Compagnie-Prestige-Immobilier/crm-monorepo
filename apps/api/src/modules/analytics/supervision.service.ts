@@ -112,10 +112,7 @@ export class SupervisionActivityService {
     const teleconseiller = Prisma.sql`u."role" IN (${rolesDuPlateau}) AND u."deletedAt" IS NULL AND ${userScope}`;
 
     // Un représentant est CHUES par construction : filtrer Grand Public le sort.
-    const repScope =
-      query.projet === Projet.GRAND_PUBLIC
-        ? Prisma.sql`FALSE`
-        : ALL_ROWS;
+    const repScope = query.projet === Projet.GRAND_PUBLIC ? Prisma.sql`FALSE` : ALL_ROWS;
 
     const repWindow = withinWindow(Prisma.sql`rca."clientCreatedAt"`, query);
     const projetScope = (prospectId: Prisma.Sql): Prisma.Sql =>
@@ -259,7 +256,7 @@ export class SupervisionActivityService {
           COALESCE(SUM(f.rappel), 0)::int      AS rappels,
           COALESCE(SUM(f.joignable), 0)::int   AS joignables,
           COALESCE(SUM(f.prospect), 0)::int    AS prospects,
-          COUNT(DISTINCT f.representant)::int  AS representants,
+          COUNT(DISTINCT f.representant)::int  AS representants
         FROM faits f
         WHERE ${membreEquipe(Prisma.sql`f."userId"`)}
       `,

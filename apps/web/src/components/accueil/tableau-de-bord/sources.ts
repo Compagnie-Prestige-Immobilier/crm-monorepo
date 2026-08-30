@@ -2,6 +2,7 @@ import type { components } from '@crm/api-client';
 
 import { MOIS_LABELS } from '@/lib/data/visites-stats';
 import type { NamedCount } from '@/lib/types';
+import type { Role } from '@/lib/types';
 
 type Schemas = components['schemas'];
 
@@ -24,6 +25,8 @@ export type Forme =
 export interface ScalaireDatum {
   libelle: string;
   valeur: number;
+  /** Texte affiché à la place du nombre brut (un taux : « 50,0 % », « Sans objet »). */
+  affichage?: string;
   serie?: NamedCount[];
 }
 
@@ -54,6 +57,8 @@ export interface EquipeLigne {
 export interface EquipeDatum {
   colonnes: string[];
   lignes: EquipeLigne[];
+  /** La ligne d'équipe en pied, recalculée sur les sommes et non sur la moyenne des lignes. */
+  pied?: EquipeLigne;
 }
 
 export type DonneesSource =
@@ -68,6 +73,8 @@ export type DonneesSource =
 export interface SourceDefinition {
   label: string;
   forme: Forme;
+  question?: string;
+  description?: string;
   extraire: (stats: VisiteStats) => DonneesSource;
 }
 
@@ -79,6 +86,9 @@ export interface SourceDefinition {
 export interface CatalogueEntree {
   label: string;
   forme: Forme;
+  question?: string;
+  description?: string;
+  groupe?: string;
 }
 
 export type Catalogue = Readonly<Record<string, CatalogueEntree>>;
@@ -131,6 +141,8 @@ export const SOURCES = {
   'total-visites': {
     label: 'Total des visites',
     forme: 'scalaire',
+    question: 'Combien de visites ont été enregistrées ?',
+    description: 'Le volume total sur la période choisie.',
     extraire: (stats) => ({
       forme: 'scalaire',
       donnee: { libelle: 'Total des visites', valeur: stats.total },
@@ -139,6 +151,8 @@ export const SOURCES = {
   'moyenne-journaliere': {
     label: 'Moyenne journalière',
     forme: 'scalaire',
+    question: 'À quel rythme les visites arrivent-elles ?',
+    description: 'Le nombre moyen de visites par jour.',
     extraire: (stats) => {
       const jours = joursDePeriode(stats.from, stats.to);
       return {
@@ -153,6 +167,8 @@ export const SOURCES = {
   'jour-le-plus-charge': {
     label: 'Jour le plus chargé',
     forme: 'scalaire',
+    question: 'Quel jour reçoit le plus de visiteurs ?',
+    description: 'Le jour où l’accueil a été le plus sollicité.',
     extraire: (stats) => {
       const plusCharge = stats.parJour.reduce<{ date: string; count: number } | null>(
         (max, point) => (max === null || point.count > max.count ? point : max),
@@ -170,31 +186,43 @@ export const SOURCES = {
   'par-entreprise': {
     label: 'Par entreprise',
     forme: 'classement',
+    question: 'Quelles entreprises viennent le plus ?',
+    description: 'Comparer les volumes entre organismes.',
     extraire: (stats) => ({ forme: 'classement', donnee: bucketRank(stats.parEntreprise) }),
   },
   'par-objet': {
     label: 'Par objet',
     forme: 'classement',
+    question: 'Pourquoi les visiteurs viennent-ils ?',
+    description: 'Voir les demandes les plus fréquentes.',
     extraire: (stats) => ({ forme: 'classement', donnee: bucketRank(stats.parObjet) }),
   },
   'par-direction': {
     label: 'Par direction',
     forme: 'classement',
+    question: 'Quelles directions sont le plus demandées ?',
+    description: 'Comparer les volumes par direction.',
     extraire: (stats) => ({ forme: 'classement', donnee: bucketRank(stats.parDirection) }),
   },
   'par-destinataire': {
     label: 'Par destinataire',
     forme: 'classement',
+    question: 'Qui reçoit le plus de visiteurs ?',
+    description: 'Comparer les personnes ou services sollicités.',
     extraire: (stats) => ({ forme: 'classement', donnee: bucketRank(stats.parDestinataire) }),
   },
   'par-agent': {
     label: 'Par agent',
     forme: 'classement',
+    question: 'Qui a enregistré le plus de visites ?',
+    description: 'Comparer le nombre de saisies par agent d’accueil.',
     extraire: (stats) => ({ forme: 'classement', donnee: bucketRank(stats.parAgent) }),
   },
   'visiteurs-recurrents': {
     label: 'Visiteurs récurrents',
     forme: 'classement',
+    question: 'Qui revient le plus souvent ?',
+    description: 'Repérer les visiteurs qui reviennent régulièrement.',
     extraire: (stats) => ({
       forme: 'classement',
       donnee: stats.recurrents.map((r, index) => ({
@@ -207,6 +235,8 @@ export const SOURCES = {
   'par-jour': {
     label: 'Par jour',
     forme: 'serie-temporelle',
+    question: 'Les visites montent-elles ou baissent-elles ?',
+    description: 'Suivre l’évolution jour après jour.',
     extraire: (stats) => ({
       forme: 'serie-temporelle',
       donnee: [...stats.parJour]
@@ -217,6 +247,8 @@ export const SOURCES = {
   'par-mois': {
     label: 'Par mois',
     forme: 'serie-temporelle',
+    question: 'Quel est le rythme d’un mois à l’autre ?',
+    description: 'Comparer les mois de la période.',
     extraire: (stats) => ({
       forme: 'serie-temporelle',
       donnee: [...stats.parMois]
@@ -227,6 +259,8 @@ export const SOURCES = {
   'par-heure': {
     label: 'Par heure',
     forme: 'cyclique',
+    question: 'À quelles heures l’accueil est-il le plus chargé ?',
+    description: 'Repérer les heures qui demandent le plus de présence.',
     extraire: (stats) => {
       const parHeure = new Map(stats.parHeure.map((point) => [point.hour, point.count]));
       return {
@@ -242,6 +276,8 @@ export const SOURCES = {
   'par-jour-semaine': {
     label: 'Par jour de la semaine',
     forme: 'cyclique',
+    question: 'Quels jours de la semaine sont les plus chargés ?',
+    description: 'Comparer lundi, mardi et les autres jours.',
     extraire: (stats) => {
       const parJour = new Map(stats.parJourSemaine.map((point) => [point.weekday, point.count]));
       return {
@@ -257,6 +293,8 @@ export const SOURCES = {
   'par-heure-jour-semaine': {
     label: 'Heure × jour de la semaine',
     forme: 'matrice',
+    question: 'Quel créneau est le plus chargé ?',
+    description: 'Lire le jour et l’heure ensemble.',
     extraire: (stats) => {
       const cellules = new Map(
         stats.parHeureJourSemaine.map((point) => [
@@ -283,6 +321,8 @@ export const SOURCES = {
   'par-entreprise-objet': {
     label: 'Entreprise × objet',
     forme: 'matrice',
+    question: 'Que demandent les visiteurs de chaque entreprise ?',
+    description: 'Croiser l’entreprise et le motif de visite.',
     extraire: (stats) => ({
       forme: 'matrice',
       donnee: croisement(
@@ -295,6 +335,8 @@ export const SOURCES = {
   'par-destinataire-direction': {
     label: 'Destinataire × direction',
     forme: 'matrice',
+    question: 'Quelle direction reçoit chaque demande ?',
+    description: 'Croiser le destinataire et sa direction.',
     extraire: (stats) => ({
       forme: 'matrice',
       donnee: croisement(
@@ -307,6 +349,8 @@ export const SOURCES = {
   'par-objet-mois': {
     label: 'Objet × mois',
     forme: 'matrice',
+    question: 'Quels motifs augmentent selon les mois ?',
+    description: 'Croiser le motif de visite et le mois.',
     extraire: (stats) => {
       const colonnes = new Map(stats.parMois.map((point) => [point.month, moisLabel(point.month)]));
       return {
@@ -318,6 +362,8 @@ export const SOURCES = {
   'avec-telephone': {
     label: 'Avec téléphone',
     forme: 'composition',
+    question: 'Combien de fiches ont un numéro utilisable ?',
+    description: 'Comparer les fiches avec et sans téléphone.',
     extraire: (stats) => ({
       forme: 'composition',
       donnee: [
@@ -338,6 +384,8 @@ export const SOURCES = {
   'qualite-de-saisie': {
     label: 'Qualité de saisie',
     forme: 'composition',
+    question: 'Les visites sont-elles saisies à temps ?',
+    description: 'Voir si la saisie est faite le jour même ou plus tard.',
     extraire: (stats) => ({
       forme: 'composition',
       donnee: [
@@ -355,6 +403,21 @@ export const SOURCES = {
 } satisfies Record<string, SourceDefinition>;
 
 export type VisiteSource = keyof typeof SOURCES;
+
+const SOURCES_REGISTRE_ACCUEIL: readonly VisiteSource[] = [
+  'total-visites',
+  'moyenne-journaliere',
+  'jour-le-plus-charge',
+  'par-entreprise',
+  'par-objet',
+  'par-jour',
+  'avec-telephone',
+];
+
+export function catalogueVisitesDe(role: Role): Readonly<Record<string, SourceDefinition>> {
+  if (role !== 'ACCUEIL') return SOURCES;
+  return Object.fromEntries(SOURCES_REGISTRE_ACCUEIL.map((source) => [source, SOURCES[source]]));
+}
 
 /** Une clé qui n'existe pas dans le contrat de l'API rougit sur cette ligne. */
 export const SOURCES_DU_REGISTRE: readonly DashboardSource[] = Object.keys(
@@ -400,6 +463,7 @@ export function spanClass(
   taille: DashboardTaille | undefined,
 ): string {
   if (marque === 'tuile' || marque === 'tuile-courbe' || marque === 'jauge') return '';
+  if (marque === 'tableau') return 'sm:col-span-2 xl:col-span-4';
   if (taille === 'pleine') return 'sm:col-span-2 xl:col-span-4';
   return 'sm:col-span-2 xl:col-span-2';
 }

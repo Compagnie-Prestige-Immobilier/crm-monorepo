@@ -32,10 +32,6 @@ class UserDto {
 
     required this.isActive,
 
-    required this.departementId,
-
-    required this.departementName,
-
     required this.phoneE164,
 
     required this.lastLoginAt,
@@ -68,12 +64,6 @@ class UserDto {
   @JsonKey(name: r'isActive', required: true, includeIfNull: false)
   final bool isActive;
 
-  @JsonKey(name: r'departementId', required: true, includeIfNull: true)
-  final String? departementId;
-
-  @JsonKey(name: r'departementName', required: true, includeIfNull: true)
-  final String? departementName;
-
   @JsonKey(name: r'phoneE164', required: true, includeIfNull: true)
   final String? phoneE164;
 
@@ -99,8 +89,6 @@ class UserDto {
                 fullName,
                 role,
                 isActive,
-                departementId,
-                departementName,
                 phoneE164,
                 lastLoginAt,
                 createdAt,
@@ -113,8 +101,6 @@ class UserDto {
                 other.fullName,
                 other.role,
                 other.isActive,
-                other.departementId,
-                other.departementName,
                 other.phoneE164,
                 other.lastLoginAt,
                 other.createdAt,
@@ -133,8 +119,6 @@ class UserDto {
         fullName,
         role,
         isActive,
-        departementId,
-        departementName,
         phoneE164,
         lastLoginAt,
         createdAt,

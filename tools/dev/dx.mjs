@@ -5,6 +5,7 @@ import process from 'node:process';
 
 const root = resolve(import.meta.dirname, '../..');
 const mobile = resolve(root, 'apps/mobile');
+const mobileMode = process.argv.includes('--mobile');
 
 if (existsSync(resolve(root, '.env'))) {
   for (const line of readFileSync(resolve(root, '.env'), 'utf8').split('\n')) {
@@ -51,6 +52,15 @@ function startApps() {
   flutterProcess = run('flutter', ['run', '-d', 'emulator-5554'], mobile, { interactive: true });
 }
 
+function startApiDev() {
+  if (isListening(3001)) {
+    console.log('[dx] API déjà active : http://localhost:3001 · logs/api.log');
+    return;
+  }
+  console.log('[dx] démarrage de l’API : http://localhost:3001 · logs/api.log');
+  run('pnpm', ['--filter', '@crm/api', 'dev']);
+}
+
 function isListening(port) {
   const result = spawnSync('lsof', ['-nP', `-iTCP:${String(port)}`, '-sTCP:LISTEN'], {
     encoding: 'utf8',
@@ -79,32 +89,37 @@ function waitForAndroid() {
   });
 }
 
-console.log('[dx] démarrage de Postgres, migrations et seed…');
-for (const [command, args] of [
-  ['docker', ['compose', '-f', 'infra/docker/docker-compose.yml', 'up', '-d']],
-  ['pnpm', ['db:deploy']],
-  ['pnpm', ['db:seed']],
-]) {
-  const result = spawnSync(command, args, { cwd: root, env: process.env, stdio: 'inherit' });
-  if (result.status !== 0) process.exit(result.status ?? 1);
+function startMobile() {
+  console.log('[dx] démarrage de Postgres, migrations et seed…');
+  for (const [command, args] of [
+    ['docker', ['compose', '-f', 'infra/docker/docker-compose.yml', 'up', '-d']],
+    ['pnpm', ['db:deploy']],
+    ['pnpm', ['db:seed']],
+  ]) {
+    const result = spawnSync(command, args, { cwd: root, env: process.env, stdio: 'inherit' });
+    if (result.status !== 0) process.exit(result.status ?? 1);
+  }
+
+  const devices = spawnSync('adb', ['devices'], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+  });
+  if (/^emulator-\d+\s+device$/m.test(devices.stdout ?? '')) {
+    waitForAndroid();
+  } else {
+    const emulator = spawn('flutter', ['emulators', '--launch', 'Pixel_10_Pro_XL'], {
+      cwd: mobile,
+      env: process.env,
+      stdio: 'inherit',
+    });
+    children.add(emulator);
+    emulator.on('exit', () => children.delete(emulator));
+    emulator.on('exit', waitForAndroid);
+  }
 }
 
-const devices = spawnSync('adb', ['devices'], {
-  encoding: 'utf8',
-  stdio: ['ignore', 'pipe', 'ignore'],
-});
-if (/^emulator-\d+\s+device$/m.test(devices.stdout ?? '')) {
-  waitForAndroid();
-} else {
-  const emulator = spawn('flutter', ['emulators', '--launch', 'Pixel_10_Pro_XL'], {
-    cwd: mobile,
-    env: process.env,
-    stdio: 'inherit',
-  });
-  children.add(emulator);
-  emulator.on('exit', () => children.delete(emulator));
-  emulator.on('exit', waitForAndroid);
-}
+if (mobileMode) startMobile();
+else startApiDev();
 
 process.stdin.setRawMode?.(true);
 process.stdin.resume();

@@ -75,11 +75,6 @@ function firstArg(fn: ReturnType<typeof vi.fn>): PrismaCallArgs {
 const service = (prisma: PrismaMock): ProspectsService =>
   new ProspectsService(prisma as unknown as PrismaService);
 
-/** Ce qu'un téléconseiller a en main : ses fiches, ou celles qu'on lui a confiées. */
-const portee = (userId: string): Record<string, unknown> => ({
-  OR: [{ createdById: userId }, { callTasks: { some: { assignedToId: userId, isActive: true } } }],
-});
-
 describe('cloisonnement par commercial', () => {
   let prisma: PrismaMock;
 
@@ -91,7 +86,7 @@ describe('cloisonnement par commercial', () => {
     await service(prisma).list(alice, {});
 
     const where = firstArg(prisma.prospect.findMany).where ?? {};
-    expect(where.AND).toEqual([portee('com-alice')]);
+    expect(where.AND).toBeUndefined();
     expect(where.createdById).toBeUndefined();
     expect(firstArg(prisma.prospect.count).where).toEqual(where);
   });
@@ -101,7 +96,7 @@ describe('cloisonnement par commercial', () => {
 
     const where = firstArg(prisma.prospect.findMany).where ?? {};
     expect(where.createdById).toBe('com-bob');
-    expect(where.AND).toEqual([portee('com-alice')]);
+    expect(where.AND).toBeUndefined();
   });
 
   it('un ADMIN n’est pas borné', async () => {
@@ -128,15 +123,9 @@ describe('cloisonnement par commercial', () => {
     expect(where.deletedAt).toBeNull();
   });
 
-  it('un COMMERCIAL ne peut pas lire le prospect d’un autre commercial', async () => {
-    // Hors de sa portée à la première lecture, présent à la seconde : c'est ce
-    // qui distingue « pas à vous » de « n'existe pas ».
-    prisma.prospect.findFirst
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ id: 'p-1', createdById: bob.id });
-
-    await expect(service(prisma).get(alice, 'p-1')).rejects.toThrow(ForbiddenException);
-    expect(firstArg(prisma.prospect.findFirst).where).toMatchObject(portee('com-alice'));
+  it('un COMMERCIAL peut lire le prospect d’un autre commercial', async () => {
+    prisma.prospect.findFirst.mockResolvedValue(prospectRow({ createdById: bob.id }));
+    await expect(service(prisma).get(alice, 'p-1')).resolves.toMatchObject({ id: 'p-1' });
   });
 
   it('ouvre la fiche qu’une campagne lui a confiée, comme sur son téléphone', async () => {
@@ -502,7 +491,6 @@ describe('surface de phase 2 dans la liste', () => {
       phase2Status: 'METHOD_OBTAINED',
       enrollmentMethod: 'PLATFORM',
       enrollmentCapturedById: 'com-bob',
-      campaignId: 'camp-1',
     });
 
     const where = firstArg(prisma.prospect.findMany).where ?? {};
@@ -511,11 +499,7 @@ describe('surface de phase 2 dans la liste', () => {
       enrollmentMethod: 'PLATFORM',
       enrollmentCapturedById: 'com-bob',
     });
-    expect(where.AND).toEqual([
-      portee('com-alice'),
-      { syndicat: { sigle: 'CHUES' }, banque: { shortName: 'CBAO' } },
-      { callTasks: { some: { campaignId: 'camp-1' } } },
-    ]);
+    expect(where.AND).toEqual([{ syndicat: { sigle: 'CHUES' }, banque: { shortName: 'CBAO' } }]);
     expect(firstArg(prisma.prospect.count).where).toEqual(where);
   });
 });

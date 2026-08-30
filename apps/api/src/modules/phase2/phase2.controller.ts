@@ -10,7 +10,16 @@ import {
   Req,
   Res,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiParam, ApiProduces, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiParam,
+  ApiProduces,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
 import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
 import type { FastifyReply, FastifyRequest } from 'fastify';
@@ -103,5 +112,4 @@ export class Phase2Controller {
   pullDirectory(@Query() query: DirectoryQueryDto): Promise<DirectoryPageDto> {
     return this.directory.pull(query);
   }
-
 }

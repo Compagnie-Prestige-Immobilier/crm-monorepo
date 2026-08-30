@@ -44,17 +44,15 @@ const CATEGORIE_MARQUES: readonly DashboardMarque[] = [
   'camembert',
   'anneau',
   'tableau',
-  'tuile',
 ];
 
-const CHIFFRE_MARQUES: readonly DashboardMarque[] = ['tuile', 'jauge'];
+const CHIFFRE_MARQUES: readonly DashboardMarque[] = ['tuile'];
 
 const SERIE_TEMPORELLE_MARQUES: readonly DashboardMarque[] = [
   'courbe',
   'aire',
   'escalier',
   'barres-verticales',
-  'tuile-courbe',
 ];
 
 const COMPOSITION_MARQUES: readonly DashboardMarque[] = [
@@ -105,30 +103,21 @@ const SOURCE_MARQUES: Record<DashboardSource, ReglesDeMarque> = {
     compatibles: ['barres-verticales', 'radar', 'aire-polaire', 'camembert'],
   },
   'par-heure-jour-semaine': MATRICE,
-  'par-entreprise-objet': {
-    defaut: 'carte-de-chaleur',
-    compatibles: [...MATRICE_MARQUES, 'barres-empilees', 'barres-groupees', 'barres-100'],
-  },
-  'par-destinataire-direction': {
-    defaut: 'carte-de-chaleur',
-    compatibles: [...MATRICE_MARQUES, 'barres-empilees', 'barres-groupees', 'barres-100'],
-  },
-  'par-objet-mois': {
-    defaut: 'carte-de-chaleur',
-    compatibles: [...MATRICE_MARQUES, 'barres-empilees', 'barres-groupees', 'barres-100'],
-  },
+  'par-entreprise-objet': { defaut: 'carte-de-chaleur', compatibles: MATRICE_MARQUES },
+  'par-destinataire-direction': { defaut: 'carte-de-chaleur', compatibles: MATRICE_MARQUES },
+  'par-objet-mois': { defaut: 'carte-de-chaleur', compatibles: MATRICE_MARQUES },
   'visiteurs-recurrents': { defaut: 'tableau', compatibles: ['tableau', 'barres-horizontales'] },
-  'avec-telephone': { defaut: 'jauge', compatibles: ['jauge', 'anneau', 'tuile'] },
+  'avec-telephone': { defaut: 'anneau', compatibles: COMPOSITION_MARQUES },
   'qualite-de-saisie': {
     defaut: 'barres-100',
     compatibles: ['barres-100', 'camembert', 'anneau', 'tableau'],
   },
 
-  'appels-de-qualification': { defaut: 'tuile-courbe', compatibles: CHIFFRE_MARQUES },
   'taux-de-contact': TAUX,
   'a-rappeler': TAUX,
   'taux-de-qualification': TAUX,
-  'prospects-notes': { defaut: 'tuile-courbe', compatibles: CHIFFRE_MARQUES },
+  'taux-de-joignabilite': TAUX,
+  'prospects-notes': { defaut: 'tuile', compatibles: CHIFFRE_MARQUES },
   adhesions: CHIFFRE,
   'reste-a-appeler': { defaut: 'tuile', compatibles: ['tuile'] },
   'par-teleconseiller': { defaut: 'tableau', compatibles: ['tableau'] },
@@ -239,18 +228,23 @@ export function sanitize(
  * marques cohérentes. `null` si, une fois nettoyée, il ne reste plus rien à
  * montrer : le chaînon appelant passe alors au repli suivant.
  */
-export function resolveLayout(ecran: DashboardEcran, value: unknown): DispositionLayout | null {
+export function resolveLayout(
+  ecran: DashboardEcran,
+  value: unknown,
+  options: { videAutorise: boolean } = { videAutorise: false },
+): DispositionLayout | null {
   const parsed = parseLayout(value);
   if (parsed === null) return null;
   const widgets = sanitize(ecran, parsed.widgets);
-  if (widgets.length === 0) return null;
+  // Un compte peut vouloir un écran vide ; une disposition par défaut vide retombe sur l'usine.
+  if (widgets.length === 0 && !options.videAutorise) return null;
   return { version: 1, preset: parsed.preset, widgets };
 }
 
 /**
- * Ce qu'un compte voit à sa première ouverture : le travail d'appel d'abord, le
- * tableau par téléconseiller en pied. Courte à dessein, et tout y est
- * déplaçable et retirable comme le reste.
+ * Ce qu'un compte voit à sa première ouverture : une ligne de taux, le tableau
+ * par téléconseiller dessous. Courte à dessein, et tout y est déplaçable et
+ * retirable comme le reste.
  */
 const USINE: Record<DashboardEcran, readonly DashboardSource[]> = {
   visites: [
@@ -262,28 +256,22 @@ const USINE: Record<DashboardEcran, readonly DashboardSource[]> = {
     'par-objet',
     'qualite-de-saisie',
   ],
-  chues: [
-    'appels-de-qualification',
-    'taux-de-contact',
-    'a-rappeler',
-    'taux-de-qualification',
-    'prospects-notes',
-    'adhesions',
-    'reste-a-appeler',
-    'par-teleconseiller',
-  ],
-  'grand-public': ['prospects-notes', 'adhesions', 'reste-a-appeler', 'par-teleconseiller'],
+  chues: ['taux-de-contact', 'a-rappeler', 'taux-de-qualification', 'adhesions', 'par-teleconseiller'],
+  'grand-public': ['taux-de-joignabilite', 'prospects-notes', 'adhesions', 'par-teleconseiller'],
 };
 
-/** Ce que la direction voit EN PLUS, ajouté après le tableau d'équipe. */
-const USINE_DIRECTION: readonly DashboardSource[] = ['encaisse', 'de-l-appel-a-l-encaissement'];
+/** Ce que la direction voit EN PLUS, ajouté après le tableau d'équipe : le résultat. */
+const USINE_DIRECTION: Record<DashboardEcran, readonly DashboardSource[]> = {
+  visites: [],
+  chues: ['encaisse', 'de-l-appel-a-l-encaissement', 'rendement-par-departement'],
+  'grand-public': ['encaisse', 'de-l-appel-a-l-encaissement', 'methodes-d-adhesion'],
+};
 
 export function dispositionUsine(
   ecran: DashboardEcran,
   voitLesMontants = false,
 ): DispositionLayout {
-  const sources =
-    voitLesMontants && ecran !== 'visites' ? [...USINE[ecran], ...USINE_DIRECTION] : USINE[ecran];
+  const sources = voitLesMontants ? [...USINE[ecran], ...USINE_DIRECTION[ecran]] : USINE[ecran];
   return {
     version: 1,
     preset: 'essentiel',

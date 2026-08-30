@@ -310,16 +310,18 @@ L'arbre de travail est à mi-chemin.
 - `apps/web/src/components/console/console-view.tsx` a été vidé : `/chues/console`
   ne rend plus qu'un titre « Rechercher une fiche » et un lien « Ouvrir
   l'annuaire ». Le paramètre `?fiche=<id>` n'est plus lu.
-- `apps/web/src/components/lots-export/` est **ajouté** : composants provisoires,
-  `<select>` brut sans nom accessible, aucun état vide, aucun aperçu chiffré
-  avant création, là où `Plan.md` décrit un écran nettement plus complet.
+- `apps/web/src/components/lots-export/` est **ajouté** et **livré** : liste,
+  dialogue « Nouveau lot d'export » (cible en boutons radio, téléconseillers en
+  cases à cocher, aperçu chiffré lu sur `POST /lots-export/apercu`) et détail
+  portant le tableau « Programmes d'appel ». Les lots ne sont plus une cible
+  mouvante : les noms accessibles sont figés au §7.4.17.
 
 ### 2.2 Scénarios concernés, par identifiant
 
 | Lot | Scénarios | État |
 | --- | --- | --- |
 | Étape 3, `/chues/console` | **CHU-ET3-01** à **CHU-ET3-06** | CHU-ET3-01 écrivable aujourd'hui et **attendu rouge** ; les cinq autres décrivent la cible de `Plan.md` §4.2.3 |
-| Lots d'export | **CHU-LOT-01** à **CHU-LOT-09** | CHU-LOT-01 et CHU-LOT-02 écrivables aujourd'hui pour verrouiller l'existant ; les sept autres décrivent la cible de `Plan.md` §4.2.4 |
+| Lots d'export | **CHU-LOT-01** à **CHU-LOT-09** | **livrés** : les neuf sont écrits contre l'écran réparti du §7.4.17, plus aucun n'est en attente |
 | Campagne Grand Public | **ROL-30** | écrit sur la cible : détail de lot, aucune notion d'assignation |
 | Rappels vers la console | **CHU-RAP-04**, **CHU-RAP-08** | écrivables, **attendus rouges** tant que la console est un talon |
 | Pastille « À faire maintenant » | **CHU-HUB-06** | `Plan.md` prévoit de la supprimer ; si elle a disparu, rouge et rapport |
@@ -726,7 +728,7 @@ Alloué aux nouvelles specs, sans recouvrement :
 | `+221 78 100 45 01` à `45 09` | `chues-suggestions.commercial.spec.ts` |
 | `+221 78 100 46 01` à `46 09` | `chues-rappels.commercial.spec.ts` |
 | `+221 78 100 47 01` à `47 09` | `chues-import.spec.ts` |
-| `+221 78 100 48 01` à `48 09` | `chues-lots-export.spec.ts` |
+| `+221 78 100 48 01` à `48 21` | `chues-lots-export.spec.ts` (vingt représentants de réserve, plus le vingt-et-unième que CHU-LOT-09 crée après le lot) |
 | `+221 78 100 49 01` à `49 09` | `chues-demandes.banque.spec.ts` |
 | `+221 78 100 50 01` à `50 09` | specs de l'espace Accueil, si un numéro unique devient nécessaire |
 | `+221 78 100 51 01` à `51 09` | `chues-dossiers.banque.spec.ts` (fiches client des dossiers) |
@@ -806,8 +808,8 @@ Aucun de ces cinq fichiers ne s'appelle `.anon.spec.ts` : ils consomment des
 | `chues-banque.banque.spec.ts` | banque | CHU-BQ-01, 02, 03, 05 | libre | aucune | nouveau |
 | `chues-demandes.banque.spec.ts` | banque, arbitrage en admin | CHU-DMC-01, 03, 04 | serial | `E2E-CHUES-DMC ` | nouveau |
 | `chues-demandes.spec.ts` | admin | CHU-DMC-05, CHU-DMC-06 | libre | aucune | nouveau |
-| `chues-lots-export.spec.ts` | admin | CHU-LOT-01, 03 à 09 | serial | `E2E-CHUES-LOT ` | nouveau, cible mouvante |
-| `chues-lots-export.roles.spec.ts` | commercial, banque | CHU-LOT-02 | libre | aucune | nouveau, cible mouvante |
+| `chues-lots-export.spec.ts` | admin | CHU-LOT-01, 03 à 09 | serial | `E2E-CHUES-LOT ` (représentants) ; **les lots créés ne sont pas nettoyables** | nouveau |
+| `chues-lots-export.roles.spec.ts` | commercial, banque | CHU-LOT-02 | libre | aucune | nouveau |
 | `chues-accessibilite.spec.ts` | commercial, superviseur | CHU-TRV-07 | libre | aucune | nouveau |
 | `prospects.spec.ts` | admin | CHU-TRV-02 | libre | aucune | **existant, mainteneur central** |
 
@@ -3077,35 +3079,36 @@ Rendu attendu sur les cartes d'usine (marques de `dashboard-layout.ts`) :
 
 | Carte | Titre affiché | Marque | Chiffre | Détail |
 | --- | --- | --- | --- | --- |
-| `appels-de-qualification` | « Appels aux représentants » | `tuile-courbe` | 4 | « dont 2 ont répondu » |
-| `taux-de-contact` | « Représentants joints » | `tuile` | 50 | aucun (§8, **Q-01**) |
-| `a-rappeler` | « Rappels promis » | `tuile` | 1 | aucun |
-| `taux-de-qualification` | « Représentants qui acceptent » | `tuile` | 50 | aucun |
-| `prospects-notes` | « Prospects notés » | `tuile-courbe` | 0 | « fiches saisies sur la période » |
-| `adhesions` | « Adhésions obtenues » | `tuile` | 0 | aucun |
-| `reste-a-appeler` | « Reste à appeler » | `tuile` | 0 | aucun (§1.8) |
-| `par-teleconseiller` | « Par téléconseiller » | `tableau` | ligne « Superviseur Fixture » : 4, 2, 0, 0 | colonnes « Appels », « Joints », « Prospects notés », « Adhésions » |
+| `taux-de-contact` | « Taux de contact » | `tuile` | 50,0 % | « 2 joints sur 4 appels » |
+| `a-rappeler` | « Taux de rendez-vous » | `tuile` | 25,0 % | « 1 rendez-vous sur 4 appels » |
+| `taux-de-qualification` | « Taux de qualification » | `tuile` | 50,0 % | « 1 acceptent sur 2 interrogés » |
+| `adhesions` | « Adhésions » | `tuile` | 0 | « sur 0 appels de conversion » |
+| `par-teleconseiller` | « Par téléconseiller » | `tableau` | ligne « Superviseur Fixture » : 4, 50,0 %, 25,0 %, 50,0 %, 0, 0 ; pied « Équipe » identique | colonnes « Appels », « Contact », « Rendez-vous », « Qualification », « Prospects notés », « Adhésions » |
 
 La colonne « Appels » du tableau vaut `repCalls + calls` = 4 + 0 = 4 : elle
 mélange volontairement les deux familles d'appels, et c'est ce contrat qu'il faut
 fixer.
 
-**CHU-CHF-01 | P1 | l'écran d'usine pose ses huit cartes pour un superviseur**
+**CHU-CHF-01 | P1 | l'écran d'usine pose ses cinq cartes pour un superviseur**
 Session : SUPERVISEUR. Fichier : `chues-chiffres.superviseur.spec.ts`.
-Assertions : les titres de carte exacts « Appels aux représentants »,
-« Représentants joints », « Rappels promis », « Représentants qui acceptent »,
-« Prospects notés », « Adhésions obtenues », « Reste à appeler », « Par
-téléconseiller » sont visibles ; « Encaissé » et « De l’appel à l’encaissement »
-ont un compte de 0 ; aucun `heading` « Chargement impossible », « Serveur
-injoignable » ni « Accès refusé ».
+Assertions : les titres de carte exacts « Taux de contact », « Taux de
+rendez-vous », « Taux de qualification », « Adhésions », « Par téléconseiller »
+sont visibles ; « Encaissé » et « De l’appel à l’encaissement » ont un compte
+de 0 ; aucun `heading` « Chargement impossible », « Serveur injoignable » ni
+« Accès refusé ».
 Échoue si : `GET /supervision/activite` répond 500 (§1.1) ; une carte d'usine
 disparaît ; ou les montants s'ouvrent à la supervision.
+Note : l'usine a été resserrée le 30 août 2026 à la demande du superviseur
+(`dashboard-layout.ts`, `USINE.chues`) : « Appels aux représentants » a fondu
+dans le détail du taux de contact, « Prospects notés » n'est plus qu'une colonne
+du tableau, « Reste à appeler » n'a plus d'extracteur web (Plan.md D3).
 Origine : CHU CHF-1.
 
-**CHU-CHF-02 | P1 | la direction voit en plus les deux cartes de montants**
+**CHU-CHF-02 | P1 | la direction voit en plus les cartes de résultat**
 Session : DIRECTION. Fichier : `chues-chiffres.direction.spec.ts`.
-Assertions : en plus des huit, les titres « Encaissé » et « De l’appel à
-l’encaissement » sont visibles ; le contenu de « Encaissé » contient « FCFA ».
+Assertions : en plus des cinq, les titres « Encaissé », « De l’appel à
+l’encaissement » et « Rendement par département » sont visibles ; le contenu de
+« Encaissé » contient « FCFA ».
 Échoue si : la règle `VOIT_LES_MONTANTS` du contrôleur et le catalogue client
 divergent, et un superviseur se voit proposer la recette.
 Origine : CHU CHF-2.
@@ -3152,15 +3155,13 @@ et le nombre de jours calculé.
 message n'annonce pas le seuil et l'utilisateur ne sait pas quoi raccourcir.
 Origine : CHU CHF-7.
 
-**CHU-CHF-08 | P2 | le sélecteur « Comparer à » garde ses trois choix et l'URL**
-Gestes : ouvrir le `combobox` nommé « Comparer à », choisir « Comparer à :
-période précédente », puis « Comparer à : rien ».
-Assertions : l'URL porte `comparaison=precedente` ; le déclencheur affiche le
-libellé complet et non la valeur `precedente` ; « Comparer à : rien » ne pose
-aucun paramètre dans l'URL.
-Échoue si : Base UI rend la valeur brute au lieu du libellé, comme il le faisait
-pour le sélecteur de téléconseiller.
-Origine : CHU CHF-8.
+**CHU-CHF-08 | P2 | « Comparer à » n'existe pas ici : rien sur cet écran ne compare deux périodes**
+Assertions : le `group` « Période affichée » est visible ; aucun `combobox`
+nommé « Comparer à ».
+Échoue si : le sélecteur revient sur cet écran, où il n'agit sur rien
+(`chiffres/vue.tsx` ne lit jamais `filters.comparaison` ; seul le registre des
+visites compare).
+Origine : CHU CHF-8, redéfini le 30 août 2026.
 
 **CHU-CHF-09 | P1 | la liste des téléconseillers inclut l'encadrement et exclut la banque**
 Données : les comptes de fixture existent.
@@ -3197,10 +3198,10 @@ Origine : CHU CHF-11.
 **CHU-CHF-12 | P1 | le tableau « Par téléconseiller » nomme tout le plateau, même sans acte**
 Gestes : période « Ce mois-ci », sans filtre de téléconseiller.
 Assertions : le tableau de la carte « Par téléconseiller » a pour en-têtes exacts
-« Téléconseiller », « Appels », « Joints », « Prospects notés », « Adhésions » ;
-il contient une ligne d'en-tête de rang pour « Awa Fixture », « Fatou Fixture »,
-« Superviseur Fixture », « Direction Fixture » ; il ne contient pas « Moussa
-Fixture ».
+« Téléconseiller », « Appels », « Contact », « Rendez-vous », « Qualification »,
+« Prospects notés », « Adhésions » ; il contient une ligne d'en-tête de rang pour
+« Awa Fixture », « Fatou Fixture », « Superviseur Fixture », « Direction
+Fixture » et un pied « Équipe » ; il ne contient pas « Moussa Fixture ».
 Échoue si : la liste est construite à partir des seules lignes d'activité au lieu
 du référentiel `teleconseillers`, et un agent sans acte disparaît du tableau, ce
 qui masque exactement ce qu'un superviseur cherche.
@@ -3209,11 +3210,9 @@ Origine : CHU CHF-12.
 **CHU-CHF-13 | P1 | le taux de contact vaut exactement 50 % sur 2 joints pour 4 appels**
 Session : SUPERVISEUR. Fichier : `chues-chiffres-taux.superviseur.spec.ts`.
 Données : R1 à R5 et les cinq tentatives ci-dessus.
-Assertions : la carte « Appels aux représentants » affiche le chiffre `4` et le
-détail « dont 2 ont répondu » ; la carte « Représentants joints » affiche le
-chiffre `50,0 %` (un taux s'affiche avec son unité, `affichage` de la tuile) ;
-le texte accessible de cette carte (`sr-only`) contient exactement
-« 50,0 % des appels aboutissent ». Relever d'abord la réponse à **Q-01**.
+Assertions : la carte « Taux de contact » affiche le chiffre `50,0 %` (un taux
+s'affiche avec son unité, `affichage` de la tuile) et le détail exact
+« 2 joints sur 4 appels ». Relever d'abord la réponse à **Q-01**.
 Échoue si : `REP_LIVE_OUTCOMES` change et le rappel promis ou l'injoignable
 sortent du dénominateur (le taux passerait à 100 % ou 66,7 %) ; un `CALLBACK` est
 compté comme joint (75 %) ; la borne haute `23:59:59.999` est exclusive et R4
@@ -3222,56 +3221,56 @@ R5 est comptée (5 appels, 40 %).
 Origine : CHU CHF-13.
 
 **CHU-CHF-14 | P1 | le taux de rappel vaut exactement 25 % sur 1 rappel pour 4 appels**
-Assertions : la carte « Rappels promis » affiche le chiffre `25,0 %` (un taux
-porte son unité) et le détail `1 appel à rappeler`.
+Assertions : la carte « Taux de rendez-vous » affiche le chiffre `25,0 %` (un
+taux porte son unité) et le détail « 1 rendez-vous sur 4 appels ».
 Échoue si : `repCallbackRate` est calculé sur les seuls appels joints (1/2 =
 50 %) au lieu de tous les appels vivants.
 Origine : CHU CHF-14.
 
 **CHU-CHF-15 | P1 | le taux de qualification vaut exactement 50 % sur 1 accepté pour 2 interrogés**
-Assertions : la carte « Représentants qui acceptent » affiche le chiffre `50` ;
-son texte accessible contient exactement « 1 sur 2 interrogés ».
+Assertions : la carte « Taux de qualification » affiche le chiffre `50,0 %` et
+le détail exact « 1 acceptent sur 2 interrogés ».
 Échoue si : le dénominateur devient le nombre d'appels (1/4 = 25 %) au lieu des
 représentants distincts ayant répondu ; ou le « dernier gagnant » n'est plus
 appliqué et un représentant rappelé compte deux fois.
 Origine : CHU CHF-15.
 
-**CHU-CHF-16 | P1 | la ligne d'équipe du tableau porte 4, 2, 0, 0**
+**CHU-CHF-16 | P1 | la ligne du superviseur porte ses trois taux, et le pied « Équipe » les mêmes**
 Assertions : dans la carte « Par téléconseiller », la ligne dont l'en-tête de
-rang vaut « Superviseur Fixture » porte, dans l'ordre, les cellules `4`, `2`,
-`0`, `0`.
-Échoue si : la colonne « Appels » cesse de sommer `repCalls + calls` et n'affiche
-plus que les appels de prospects (0) ; ou le filtre par téléconseiller ne borne
-pas le tableau et d'autres lignes apparaissent.
+rang vaut « Superviseur Fixture » porte, dans l'ordre, les cellules `4`,
+`50,0 %`, `25,0 %`, `50,0 %`, `0`, `0` ; la ligne « Équipe » (pied, alimentée
+par `totals`) porte exactement les mêmes, l'écran étant filtré sur ce compte.
+Échoue si : les taux par ligne sont moyennés au lieu d'être recalculés sur les
+sommes ; `repQuestioned` est sommé entre téléconseillers alors qu'un
+représentant n'est attribué qu'à qui a obtenu sa dernière réponse ; ou le filtre
+par téléconseiller ne borne pas le tableau et d'autres lignes apparaissent.
 Origine : CHU CHF-16.
 
 **CHU-CHF-17 | P2 | une journée sans aucun appel ne se lit pas « 0 % »** · **attendu rouge**
 Données : aucune tentative le `2026-02-05` pour ce compte.
 Gestes : ouvrir
 `/chues/statistiques?periode=libre&du=2026-02-05&au=2026-02-05&teleconseiller=<id superviseur>`.
-Assertions : la carte « Représentants joints » affiche le chiffre `0` ; son texte
-accessible contient « Sans objet », **pas** « 0,0 % ».
+Assertions : la carte « Taux de contact » affiche « Sans objet » et le détail
+« Aucun appel sur la période » ; nulle part « 0,0 % ».
 Échoue si : le repli `valeur ?? 0` de `scalaireTaux` masque le `null` du serveur
 et « personne appelé » devient indistinguable de « personne joint », ce que le
 contrat de `SupervisionActivityCountsDto` interdit explicitement.
-Note : à la lecture, le texte accessible rend bien « Sans objet » mais le chiffre
-affiché reste `0` (§1.7, §8 **Q-02**). C'est le défaut à rapporter.
 Origine : CHU CHF-17.
 
 **CHU-CHF-18 | P2 | le filtre par téléconseiller borne réellement les chiffres**
 Gestes : sur la même journée `2026-02-03`, comparer l'écran filtré sur
 `fixture.superviseur` et l'écran filtré sur `fixture.awa`.
-Assertions : filtré sur `fixture.awa`, la carte « Appels aux représentants »
-affiche `0` et le tableau « Par téléconseiller » ne contient qu'une ligne, celle
-d'« Awa Fixture ».
+Assertions : filtré sur `fixture.awa`, la carte « Taux de contact » affiche
+« Sans objet » et le tableau « Par téléconseiller » ne contient qu'une ligne
+d'agent, « Awa Fixture », suivie du pied « Équipe ».
 Échoue si : `commercialId` n'est pas transmis, ou n'est appliqué qu'aux lignes et
 pas aux totaux, et les chiffres d'un agent portent le travail de l'équipe.
 Origine : CHU CHF-18.
 
 **CHU-CHF-19 | P2 | un rechargement complet rend exactement le même écran**
-Gestes : ouvrir l'URL du jeu de données, relever le chiffre des quatre cartes de
+Gestes : ouvrir l'URL du jeu de données, relever le chiffre des trois cartes de
 taux, `page.reload()`.
-Assertions : l'URL est inchangée ; les quatre chiffres relevés sont identiques.
+Assertions : l'URL est inchangée ; les trois chiffres relevés sont identiques.
 Échoue si : les filtres ne vivent pas dans l'URL et un rechargement retombe sur
 « Ce mois-ci » et « Toute l'équipe ».
 Origine : CHU CHF-19.
@@ -3327,11 +3326,11 @@ les comptes.
 Origine : CHU DSP-2.
 
 **CHU-DSP-03 | P1 | retirer une carte, enregistrer, recharger : elle reste absente**
-Gestes : « Composer l’écran », cliquer « Retirer Reste à appeler »,
+Gestes : « Composer l’écran », cliquer « Retirer Adhésions »,
 « Enregistrer », attendre la fin du
 `PUT /api/v1/tableaux-de-bord/chues/disposition`, puis `page.reload()`.
 Assertions : après l'enregistrement, le mode est refermé (« Composer l’écran » de
-nouveau visible) ; le titre « Reste à appeler » a un compte de 0 ; après le
+nouveau visible) ; le titre « Adhésions » a un compte de 0 ; après le
 rechargement complet, il a toujours un compte de 0 ; le bouton « Revenir à
 l’écran par défaut » est désormais visible (la disposition est
 `source: 'utilisateur'`).
@@ -3341,13 +3340,13 @@ encore l'usine.
 Origine : CHU DSP-3.
 
 **CHU-DSP-04 | P1 | ajouter une carte depuis le tiroir**
-Gestes : mode composition, cliquer « Ajouter un graphique », choisir « Reste à
-appeler », « Enregistrer ».
+Gestes : mode composition, cliquer « Ajouter un graphique », choisir
+« Adhésions », « Enregistrer ».
 Assertions : le tiroir est titré « Ajouter un graphique » avec la description
 « Choisissez ce que vous voulez suivre. L’image montre la forme conseillée. » ; il
-propose « Reste à appeler » (retirée en CHU-DSP-03) et **ne propose pas** une
-carte déjà posée, par exemple « Prospects notés » ; après le choix, le tiroir se
-ferme et la carte réapparaît dans la grille.
+propose « Adhésions » (retirée en CHU-DSP-03) et **ne propose pas** une carte
+déjà posée, par exemple « Taux de contact » ; après le choix, le tiroir se ferme
+et la carte réapparaît dans la grille.
 Échoue si : le tiroir propose une source déjà placée et l'enregistrement crée un
 doublon que le serveur déduplique en silence.
 Origine : CHU DSP-4.
@@ -3362,10 +3361,9 @@ Origine : CHU DSP-5.
 
 **CHU-DSP-06 | P1 | l'ordre se change au clavier, sans glisser-déposer, et il est sauvegardé**
 Gestes : mode composition ; relever l'ordre des titres de carte ; cliquer le
-bouton nommé « Descendre Appels aux représentants » ; « Enregistrer » ;
-`page.reload()`.
-Assertions : après le clic, la première carte n'est plus « Appels aux
-représentants » ; le bouton « Monter » de la première carte de la grille est
+bouton nommé « Descendre Taux de contact » ; « Enregistrer » ; `page.reload()`.
+Assertions : après le clic, la première carte n'est plus « Taux de contact » ;
+le bouton « Monter » de la première carte de la grille est
 désactivé et le bouton « Descendre » de la dernière l'est aussi ; après le
 rechargement, l'ordre relevé est identique à celui d'après le clic.
 Échoue si : le réordonnancement n'est possible qu'à la souris, ce qui exclut le
@@ -3374,10 +3372,10 @@ rechargement.
 Origine : CHU DSP-6.
 
 **CHU-DSP-07 | P2 | la marque d'une carte se change et survit au rechargement**
-Gestes : mode composition, cliquer « Changer la présentation de Représentants
-joints », choisir « Jauge », « Enregistrer », `page.reload()`.
-Assertions : la carte « Représentants joints » rend un graphique de jauge et non
-la tuile ; après rechargement, c'est toujours le cas.
+Gestes : mode composition, cliquer « Changer la présentation de Taux de
+contact », choisir « Jauge », « Enregistrer », `page.reload()`.
+Assertions : la carte « Taux de contact » rend un graphique de jauge et non la
+tuile ; après rechargement, c'est toujours le cas.
 Échoue si : `sanitize` du serveur retombe sur la marque d'usine parce que la
 marque choisie n'est pas dans `compatibles`, et le choix de l'utilisateur
 disparaît sans message.
@@ -3387,8 +3385,8 @@ Origine : CHU DSP-7.
 **Ce scénario est le nettoyage du fichier : il reste le dernier.**
 Gestes : cliquer « Revenir à l’écran par défaut », attendre le
 `DELETE /api/v1/tableaux-de-bord/chues/disposition`, `page.reload()`.
-Assertions : les huit cartes d'usine sont de nouveau présentes dans l'ordre
-d'usine (« Appels aux représentants » en tête, « Par téléconseiller » en queue) ;
+Assertions : les cinq cartes d'usine sont de nouveau présentes dans l'ordre
+d'usine (« Taux de contact » en tête, « Par téléconseiller » en queue) ;
 le bouton « Revenir à l’écran par défaut » a disparu (la source est redevenue
 `usine` ou `defaut`).
 Échoue si : la remise à zéro laisse la disposition personnelle en base et l'écran
@@ -3414,10 +3412,10 @@ tout écran modifié.
 Origine : CHU DSP-10.
 
 **CHU-DSP-11 | P2 | la disposition est propre à chaque compte**
-Gestes : en SUPERVISEUR, retirer « Adhésions obtenues » et enregistrer ; dans un
+Gestes : en SUPERVISEUR, retirer « Adhésions » et enregistrer ; dans un
 contexte séparé porteur de l'état DIRECTION (aucune connexion supplémentaire,
 les deux états sont sur disque), ouvrir `/chues/statistiques`.
-Assertions : chez la DIRECTION, la carte « Adhésions obtenues » est **toujours
+Assertions : chez la DIRECTION, la carte « Adhésions » est **toujours
 présente**.
 Nettoyage : remettre la disposition du SUPERVISEUR à l'usine en fin de test par
 « Revenir à l’écran par défaut », geste utilisateur et non appel d'API.
@@ -3429,9 +3427,10 @@ Origine : CHU DSP-11.
 Gestes : en SUPERVISEUR, retirer une carte sur `/chues/statistiques`,
 enregistrer, puis ouvrir `/grand-public/statistiques` (**lecture seule**, aucune
 modification).
-Assertions : l'écran Grand Public garde ses cartes d'usine (`prospects-notes`,
-`adhesions`, `reste-a-appeler`, `par-teleconseiller`) ; la carte retirée côté
-CHUES n'existe de toute façon pas là-bas.
+Assertions : l'écran Grand Public garde ses cartes d'usine
+(`taux-de-joignabilite`, `prospects-notes`, `adhesions`, `par-teleconseiller`) ;
+la carte retirée côté CHUES, « Taux de qualification », n'existe de toute façon
+pas là-bas.
 Échoue si : le segment `ecran` du chemin est ignoré et les deux écrans partagent
 une disposition.
 Origine : CHU DSP-12.
@@ -4213,18 +4212,41 @@ suivante » sont gardés en butée.
 Échoue si : le décompte est absent et l'utilisateur ne sait pas s'il voit tout.
 Origine : CHU DMC-6.
 
-#### 7.4.17 Lots d'export · **cible mouvante**
+#### 7.4.17 Lots d'export répartis
 
-Routes : `/chues/campagnes`, `/chues/campagnes/[id]`. Les composants actuels
-(`components/lots-export/*`) sont provisoires ; `Plan.md` §4.2.4 décrit la cible.
-**Seuls CHU-LOT-01 et CHU-LOT-02 s'écrivent aujourd'hui** ; les sept autres
-attendent la livraison du lot web (§2.3).
+Routes : `/chues/campagnes`, `/chues/campagnes/[id]`. Un lot fige une sélection
+de fiches ET la répartit : l'ADMIN choisit une cible, coche des téléconseillers
+(l'ordre coché EST l'ordre du tourniquet), fixe « fiches par téléconseiller et
+par jour » et « nombre de jours ». Le serveur donne la fiche `k` au
+téléconseiller `k mod T`, le jour `1 + floor(k / (T × fichesParJour))`, et
+plafonne à `T × fichesParJour × jours`. Chaque téléconseiller a une fiche de
+programme PDF par jour ; l'ADMIN prend tout en ZIP, plus un classeur Excel.
+
+Contrat serveur : `POST /api/v1/lots-export` (ADMIN), `POST
+/api/v1/lots-export/apercu`, `GET /api/v1/lots-export` et `GET
+/api/v1/lots-export/{id}` (ADMIN, SUPERVISEUR, DIRECTION), `GET
+/{id}/programme.pdf?teleconseillerId=&jour=`, `GET /{id}/programmes.zip`, `GET
+/{id}/export.xlsx`. Les anciennes routes `fiches.zip` et `fiches/{position}.pdf`
+n'existent plus, et aucun `DELETE` de lot n'existe.
+
+**NETTOYAGE IMPOSSIBLE.** Le nom du lot est FABRIQUÉ par le web (« Représentants,
+30 août 2026 à 14:02 ») : aucun préfixe `E2E-CHUES-LOT ` ne peut y être posé, et
+rien ne supprime un lot. Chaque exécution laisse un lot de plus en base ; il ne
+porte aucune donnée propre, il ne fait que référencer des représentants
+existants. Seule la réserve de représentants
+(`E2E-CHUES-LOT Rep 01` à `21`, `+221 78 100 48 01` à `48 21`) est idempotente.
+
+Réglage commun aux scénarios de création : cible « Représentants (CHUES) », trois
+comptes cochés (**Awa Fixture**, **Fatou Fixture**, **Superviseur Fixture** —
+l'API accepte COMMERCIAL et SUPERVISEUR), 3 fiches par jour, 2 jours, donc
+**18 places** et six cellules de trois.
 
 **CHU-LOT-01 | P1 | la route rend la liste des lots et non l'ancien écran de campagnes**
 Session : ADMIN. Fichier : `chues-lots-export.spec.ts`.
-Assertions : `heading` niveau 1 « Lots d’export » ; sous-titre « Fiches figées
-pour Excel, impression ou terrain. » ; aucun texte « Distribuer les appels aux
-téléconseillers », « Répartition en tourniquet » ni « Lancer la campagne ».
+Assertions : `heading` niveau 1 « Lots d’export » ; la phrase qui dit qu'un lot
+« fige une sélection de fiches à une date donnée » ; bouton « Nouveau lot » ;
+aucun texte « Distribuer les appels aux téléconseillers », « Répartition en
+tourniquet » ni « Lancer la campagne ».
 Échoue si : la migration est partiellement déployée et l'ancien écran revient sur
 une route ; ou l'entrée de menu « Lots d’export » mène encore à une campagne.
 Origine : CHU LOT-1.
@@ -4232,61 +4254,93 @@ Origine : CHU LOT-1.
 **CHU-LOT-02 | P1 | l'écran est refusé à un téléconseiller et à un agent bancaire**
 Sessions : COMMERCIAL et BANQUE_FINANCE. Fichier :
 `chues-lots-export.roles.spec.ts`.
-Assertions : la page actuelle fait `redirect('/chues')` au lieu de rendre
+Assertions : la page fait `redirect('/chues')` au lieu de rendre
 `PermissionDenied` : l'URL finale est `/chues` pour un COMMERCIAL, et
-`/chues/banque` pour un agent bancaire (double renvoi).
-Échoue si : un rôle non autorisé atteint la liste des lots, ou le renvoi boucle.
+`/chues/banque` pour un agent bancaire (double renvoi). Seconde assertion,
+obligatoire : aucune réponse aboutie sur `/api/v1/lots-export` n'est observée
+pendant la navigation.
+Échoue si : un rôle non autorisé atteint la liste des lots, le renvoi boucle, ou
+l'écran lit les lots avant de changer d'adresse.
 Origine : CHU LOT-2. Recouvrement assumé avec **ROL-27**, qui fige le même renvoi
 dans la matrice.
 
-**CHU-LOT-03 | P1 | la création annonce le nombre de fiches avant de créer** · **cible mouvante**
-Cible `Plan.md` : « 340 fiches seront exportées », donné par
-`GET /api/v1/lots-export/apercu`, jamais estimé localement.
-Échoue si : l'aperçu est calculé côté client et diverge du tirage réel ; ou le lot
-est créé sans que l'utilisateur ait vu ce qu'il fige.
+**CHU-LOT-03 | P1 | le dialogue annonce la répartition avant de créer**
+Gestes : « Nouveau lot » ; dans le `dialog` « Nouveau lot d’export », `fieldset`
+« Que voulez-vous exporter ? » → radio « Représentants (CHUES) » ; `fieldset`
+« Téléconseillers » → « Tout décocher » puis les trois noms ; « Fiches par
+téléconseiller et par jour » = 3 ; « Nombre de jours » = 2.
+Assertions : la réponse de `POST /api/v1/lots-export/apercu` — interceptée par
+`page.waitForResponse`, et sur la requête qui porte EXACTEMENT ce réglage, le
+champ étant temporisé — rend `places` 18 et `retenues` 18 ; l'`output` d'aperçu
+porte « seront réparties » et le même nombre.
+Échoue si : l'aperçu est calculé côté navigateur et diverge du tirage réel ; ou le
+lot est créé sans que l'ADMIN ait vu ce qu'il fige.
 Origine : CHU LOT-3.
 
-**CHU-LOT-04 | P1 | un nom de moins de trois caractères est refusé** · **cible mouvante**
-Échoue si : un lot sans nom utilisable est créé et devient introuvable.
+**CHU-LOT-04 | P1 | un lot sans téléconseiller est refusé**
+Gestes : ouvrir le dialogue, choisir une cible, « Tout décocher ».
+Assertions : « Cochez au moins un téléconseiller. » est visible et le bouton
+« Créer le lot » est désactivé ; « Tout cocher » le réactive.
+Échoue si : un lot part sans destinataire et ses fiches ne sont données à
+personne.
+Note : remplace le scénario d'origine sur la longueur du nom, caduc — le nom
+n'est plus saisi.
 Origine : CHU LOT-4.
 
-**CHU-LOT-05 | P1 | le classeur Excel du lot est un vrai classeur** · **cible mouvante**
-Cible : `GET /api/v1/lots-export/{id}/export.xlsx`. Assertions : signature ZIP
-`50 4B 03 04`, taille supérieure à 1 000 octets, nom de fichier daté.
-Échoue si : un JSON d'erreur est relayé sous l'extension `.xlsx`, seul défaut que
-la taille et le nom ne révèlent pas.
-Note : aujourd'hui le lien porte un `href` et non un bouton de téléchargement ;
-`waitForEvent('download')` peut ne pas se déclencher si le serveur ne pose pas
-`Content-Disposition` (§8, **Q-22**).
+**CHU-LOT-05 | P1 | la création fige dix-huit fiches et le détail rend le tourniquet**
+Assertions : `POST /api/v1/lots-export` répond **201**, `itemCount` vaut 18 et
+`name` commence par « Représentants » ; le détail s'ouvre
+(`/chues/campagnes/{id}`, `heading` niveau 2 portant le nom fabriqué) ; le
+`table` « Programmes d’appel » porte 3 `rowheader`, les `columnheader` « Jour 1 »
+et « Jour 2 », et « 3 » dans chacune des six cellules, chaque cellule portant un
+bouton « Programme de <nom>, jour <n> ».
+Échoue si : le plafond n'est pas appliqué, ou la répartition donne tout au premier
+coché.
 Origine : CHU LOT-5.
 
-**CHU-LOT-06 | P1 | l'archive ZIP des fiches PDF est une vraie archive** · **cible mouvante**
-Cible : `GET /api/v1/lots-export/{id}/fiches.zip`. Assertions : signature ZIP ;
-plus d'un fichier à l'intérieur si le lot compte plus d'une fiche.
-Échoue si : l'archive est vide, ou contient un seul PDF pour un lot de 340
-fiches.
+**CHU-LOT-06 | P1 | le programme d'un téléconseiller est un vrai PDF, nommé**
+Gestes : cliquer « Programme de Awa Fixture, jour 1 ».
+Assertions : un événement `download` Playwright ; nom du fichier
+`programme-…-jour-1.pdf` ; les quatre premiers octets valent `%PDF` ; taille
+supérieure à 2 000 octets.
+Non couvert ici : le COMPTE des lignes numérotées dans le PDF. Aucun lecteur de
+PDF n'est installé dans `@crm/web`, et en poser un pour une assertion ne se
+justifie pas ; le texte du programme est éprouvé côté API par
+`apps/api/src/modules/lots-export/programme-pdf.test.ts`.
+Échoue si : la route rend du HTML d'erreur, ou le fichier arrive sans nom
+exploitable pour le terrain.
 Origine : CHU LOT-6.
 
-**CHU-LOT-07 | P2 | une fiche PDF isolée est un vrai PDF** · **cible mouvante**
-Cible : `GET /api/v1/lots-export/{id}/fiches/{itemId}.pdf`. Assertions : les
-quatre premiers octets valent `%PDF`.
-Échoue si : la route rend du HTML d'erreur.
+**CHU-LOT-07 | P1 | l'archive porte un programme par téléconseiller et par jour**
+Gestes : « Tous les programmes (ZIP) ».
+Assertions : le répertoire central de l'archive compte **six** entrées `.pdf`
+(3 téléconseillers × 2 jours). Le répertoire central est lu octet à octet dans la
+spec : `apps/web` est en `type: module` et aucun lecteur d'archive n'y est
+installé.
+Échoue si : l'archive est vide, ou ne contient qu'un PDF par téléconseiller
+toutes journées confondues.
 Origine : CHU LOT-7.
 
-**CHU-LOT-08 | P2 | le suivi compte les appels postérieurs à la création** · **cible mouvante**
-Cible : « 128 appels sur 340 fiches » ; un appel antérieur à la création ou
-portant sur une fiche hors lot ne compte pas.
-Données à poser : créer le lot, consigner un appel sur une fiche du lot, relire
-le détail.
-Échoue si : `callsSince` compte tous les appels de la base, ce qui rend le
-chiffre inutile.
-Origine : CHU LOT-8.
+**CHU-LOT-08 | P2 | le classeur du lot est un vrai classeur**
+Gestes : « Classeur Excel ».
+Assertions : `content-type` de la réponse contenant
+`spreadsheetml.sheet` ; signature ZIP `50 4B 03 04` ; taille supérieure à
+1 000 octets.
+Échoue si : un JSON d'erreur est relayé sous l'extension `.xlsx`, seul défaut que
+la taille et le nom ne révèlent pas.
+Origine : CHU LOT-5 (partie classeur) et CHU LOT-8.
 
-**CHU-LOT-09 | P2 | le lot est figé : une fiche créée après lui n'y entre pas** · **cible mouvante**
-Données : créer un lot sur un périmètre, puis créer une fiche `E2E-CHUES-LOT `
-dans ce périmètre, puis rouvrir le détail.
-Assertions : `itemCount` est inchangé ; la nouvelle fiche n'est pas dans le
-classeur exporté.
+**CHU-LOT-09 | P2 | le lot est figé : un représentant créé après lui n'y entre pas**
+Données : le `beforeAll` RETIRE le vingt-et-unième représentant laissé par une
+exécution précédente ; le scénario le crée après le lot.
+Assertions : deux aperçus encadrent la création, demandés avec assez de places
+pour que le plafond ne masque rien (3 jours) — `eligible` augmente
+exactement de un ; relu par `GET /api/v1/lots-export/{id}`, `itemCount` vaut
+toujours 18 et la somme de `repartition[].jours[].fiches` vaut 18.
+Limite connue : le tirage prend les fiches par `id` croissant, donc une fiche
+créée APRÈS le lot arriverait de toute façon en queue. Le contrôle par l'aperçu
+prouve que le vivier a bougé sans que le lot bouge ; il ne prouve pas encore
+qu'un lot recalculé à cap plus large garderait les mêmes fiches.
 Échoue si : le lot est recalculé à chaque lecture et le terrain reçoit un document
 différent de celui qu'on lui avait annoncé.
 Origine : CHU LOT-9.
@@ -6183,7 +6237,7 @@ d'écrire), **mainteneur** (décision d'infrastructure ou d'environnement),
 | **Q-19** | Un rappel promis par un superviseur apparaît-il dans la file, et son auteur figure-t-il dans le filtre « Téléconseiller » ? `rappels-view.tsx` demande `fetchUsers({ role: 'COMMERCIAL' })` alors que `/chues/statistiques` inclut désormais SUPERVISEUR et DIRECTION dans le plateau. | CHU-RAP-07 | navigateur, puis **produit** : les deux écrans donneraient deux définitions du plateau |
 | **Q-20** | « 0 » et « -5000 » laissent-ils le bouton « Confirmer l’encaissement » désactivé ? `workspaces.spec.ts` ne vérifie que le champ vide. | CHU-DOSD-01, CHU-DOSD-02 | navigateur |
 | **Q-21** | Deux onglets qui avancent le même dossier produisent quel résultat : deux transitions, un refus nommé, ou un saut d'étape ? Aucune trace d'un jeton de version dans le détail lu. | CHU-DOSD-07 | navigateur, puis **produit** |
-| **Q-22** | Cliquer « Excel » sur un lot déclenche-t-il un événement `download` Playwright, ou une navigation ? Le serveur pose-t-il `Content-Disposition: attachment` ? `lots-export-view.tsx` rend un `<a href>` sans attribut `download`. | CHU-LOT-05, CHU-LOT-06, CHU-LOT-07 | navigateur |
+| **Q-22** | ~~Cliquer « Excel » sur un lot déclenche-t-il un événement `download` Playwright, ou une navigation ?~~ **RÉPONDU** : `download` Playwright, dans les trois cas. Le serveur pose `Content-Disposition: attachment` sur `export.xlsx`, `programme.pdf` et `programmes.zip` (`lots-export.controller.ts`), et le web ne navigue pas : `useFileDownload` récupère le corps puis clique une ancre `download`. Le nom du fichier vient donc du web (`lotProgrammeFileName`, `lotExportFileName`), pas de l'en-tête. | CHU-LOT-06, CHU-LOT-07, CHU-LOT-08 | **répondu** |
 | **Q-23** | Que dit exactement le toast `CPI GO <?> publiée.` après la publication de `cpi-go-v7.apk` ? Le `versionName` n'a pas été extrait du manifeste. | ADM-APK-01, ADM-APK-13, ADM-APK-14 | navigateur ; lire la valeur une fois et la figer en constante nommée, jamais un `/CPI GO .+ publiée\./` |
 | **Q-24** | `/admin/commerciaux?page=2` affiche-t-il la deuxième page (seule l'interface manque) ou ignore-t-il le paramètre (la lecture aussi est cassée) ? | ADM-USR-17 | navigateur, puis **produit** |
 | **Q-25** | Quel texte exact s'affiche quand un téléphone de prospect Grand Public est déjà pris, et nomme-t-il la fiche existante avec un lien ? | GP-15 | navigateur |
@@ -6192,7 +6246,7 @@ d'écrire), **mainteneur** (décision d'infrastructure ou d'environnement),
 | **Q-28** | Après `POST /admin/demo/reset`, la liste `ENTREPRISE` du formulaire de saisie du registre, en espace démo, est-elle non vide, et quelles sont ses entrées ? | DEMO-05 | navigateur |
 | **Q-29** | Après `page.context().clearCookies()`, une action cliente rend-elle `Session expirée. Rechargez la page.` dans un toast, ou le prochain rendu serveur renvoie-t-il directement vers `/connexion` sans que le message apparaisse jamais ? Le layout du panel est `force-dynamic`. | TRA-04 | navigateur |
 | **Q-30** | La carte titrée « Reste à appeler » affiche-t-elle le nombre d'appels déjà consignés ? Son extraction lit `activite.totals.calls` avec la légende « appels consignés sur la période ». | CHU-CHF-01, CHU-DSP-04 | navigateur, puis **produit** : `Plan.md` §D3 prévoit de supprimer la carte |
-| **Q-31** | `getByRole('combobox', { name: 'Cible' })` trouve-t-il le `<select>` brut de la création de lot, ou faut-il passer par `getByLabel` ? Un audit axe sur cet écran remonte-t-il une violation ? Il est enveloppé dans un `<label>` sans `htmlFor` ni `aria-label`. | CHU-LOT-03, CHU-LOT-04 | navigateur (après livraison du lot web) |
+| **Q-31** | ~~`getByRole('combobox', { name: 'Cible' })` trouve-t-il le `<select>` brut de la création de lot ?~~ **SANS OBJET** : il n'y a plus de `<select>` brut. La cible se choisit en `radio` dans un `fieldset` « Que voulez-vous exporter ? », l'équipe en `checkbox` dans un `fieldset` « Téléconseillers ». Les deux champs nombre sont visés par `getByLabel` : le nom accessible est figé par le contrat d'écran, le type de l'`input` ne l'est pas. | CHU-LOT-03, CHU-LOT-04 | **répondu** |
 | **Q-32** | Quelle valeur porte réellement `SEED_FIXTURE_PASSWORD` sur l'environnement de test au moment de l'exécution, et l'alignement de `e2e/fixtures.ts` et `e2e/auth.setup.ts` est-il committé ? | **tout** : sans réponse, les cinq états de session non-admin ne se posent pas et rien de la matrice des rôles ne tourne | **mainteneur** (§3.1). C'est le **premier blocage à lever** |
 
 ---
@@ -6297,9 +6351,9 @@ pas et ne le rend pas partiellement sans déclarer ce qu'il n'a pas écrit.
 
 | État | Nombre | Détail |
 | --- | --- | --- |
-| Écrivables maintenant | **432** | tout le reste |
-| Cible mouvante, à ne pas écrire tant que le lot web n'est pas livré | **12** | CHU-ET3-02 à CHU-ET3-06 (5), CHU-LOT-03 à CHU-LOT-09 (7) |
-| Écrivables aujourd'hui **mais** marqués cible mouvante (l'attente peut changer sous le test) | 6 | CHU-ET3-01, CHU-LOT-01, CHU-LOT-02, ROL-30, CHU-HUB-06, ACC-COQ-04 |
+| Écrivables maintenant | **439** | tout le reste, lots d'export compris (§7.4.17 livré) |
+| Cible mouvante, à ne pas écrire tant que le lot web n'est pas livré | **5** | CHU-ET3-02 à CHU-ET3-06 |
+| Écrivables aujourd'hui **mais** marqués cible mouvante (l'attente peut changer sous le test) | 4 | CHU-ET3-01, ROL-30, CHU-HUB-06, ACC-COQ-04 |
 | Bloqués par un prérequis d'infrastructure | 1 | CHU-PRO-02 (septième état de session, §3.2) |
 | Conditionnels à la volumétrie, déclarés non joués si le seuil n'est pas atteint | 7 | ACC-REG-17, ACC-IMP-06, ACC-IMP-07, ACC-XLS-09, ACC-XLS-10, CHU-PRO-07, CHU-REP-05 |
 

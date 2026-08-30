@@ -1779,10 +1779,6 @@ void main() {
               ),
             ],
             prospects: const <ProspectDto>[],
-            callCampaigns: const <SyncCallCampaignDto>[],
-            callTasks: const <SyncCallTaskDto>[],
-            repCallCampaigns: const <SyncRepCallCampaignDto>[],
-            repCallTasks: const <SyncRepCallTaskDto>[],
             visites: const <SyncVisiteDto>[],
           ),
           deletions: const <SyncDeletionDto>[],
@@ -1822,10 +1818,6 @@ void main() {
                 parcours: const <Projet>[Projet.CHUES, Projet.GRAND_PUBLIC],
               ),
             ],
-            callCampaigns: const <SyncCallCampaignDto>[],
-            callTasks: const <SyncCallTaskDto>[],
-            repCallCampaigns: const <SyncRepCallCampaignDto>[],
-            repCallTasks: const <SyncRepCallTaskDto>[],
             visites: const <SyncVisiteDto>[],
           ),
           deletions: const <SyncDeletionDto>[],
@@ -1879,10 +1871,6 @@ void main() {
               ),
             ],
             prospects: const <ProspectDto>[],
-            callCampaigns: const <SyncCallCampaignDto>[],
-            callTasks: const <SyncCallTaskDto>[],
-            repCallCampaigns: const <SyncRepCallCampaignDto>[],
-            repCallTasks: const <SyncRepCallTaskDto>[],
             visites: const <SyncVisiteDto>[],
           ),
           deletions: const <SyncDeletionDto>[],
@@ -1921,10 +1909,6 @@ void main() {
             visiteReferentiels: const <SyncVisiteReferentielDto>[],
             representants: const <RepresentantDto>[],
             prospects: const <ProspectDto>[],
-            callCampaigns: const <SyncCallCampaignDto>[],
-            callTasks: const <SyncCallTaskDto>[],
-            repCallCampaigns: const <SyncRepCallCampaignDto>[],
-            repCallTasks: const <SyncRepCallTaskDto>[],
             visites: const <SyncVisiteDto>[],
           ),
           deletions: <SyncDeletionDto>[
@@ -1958,10 +1942,6 @@ void main() {
             visiteReferentiels: const <SyncVisiteReferentielDto>[],
             representants: const <RepresentantDto>[],
             prospects: const <ProspectDto>[],
-            callCampaigns: const <SyncCallCampaignDto>[],
-            callTasks: const <SyncCallTaskDto>[],
-            repCallCampaigns: const <SyncRepCallCampaignDto>[],
-            repCallTasks: const <SyncRepCallTaskDto>[],
             visites: const <SyncVisiteDto>[],
           ),
           deletions: const <SyncDeletionDto>[],
@@ -1989,29 +1969,6 @@ void main() {
               visiteReferentiels: const <SyncVisiteReferentielDto>[],
               representants: const <RepresentantDto>[],
               prospects: const <ProspectDto>[],
-              callCampaigns: <SyncCallCampaignDto>[
-                SyncCallCampaignDto(
-                  id: 'camp-1',
-                  name: 'Rentrée 2026',
-                  status: CampaignStatus.ACTIVE,
-                  spreadDays: 3,
-                  updatedAt: t0,
-                ),
-              ],
-              callTasks: <SyncCallTaskDto>[
-                SyncCallTaskDto(
-                  id: 'task-1',
-                  campaignId: 'camp-1',
-                  prospectId: 'pro-1',
-                  position: 1,
-                  dayIndex: 0,
-                  status: CallTaskStatus.OPEN,
-                  isActive: true,
-                  updatedAt: t0,
-                ),
-              ],
-              repCallCampaigns: const <SyncRepCallCampaignDto>[],
-              repCallTasks: const <SyncRepCallTaskDto>[],
               visites: const <SyncVisiteDto>[],
             ),
             deletions: const <SyncDeletionDto>[],
@@ -2023,15 +1980,6 @@ void main() {
 
         await engine.pullChanges();
 
-        final List<CallCampaign> campagnes = await db
-            .select(db.callCampaigns)
-            .get();
-        expect(campagnes.single.name, 'Rentrée 2026');
-        expect(campagnes.single.spreadDays, 3);
-
-        final List<CallTask> file = await db.select(db.callTasks).get();
-        expect(file.single.prospectId, 'pro-1');
-        expect(file.single.position, 1);
       },
     );
 
@@ -2067,10 +2015,6 @@ void main() {
               visiteReferentiels: const <SyncVisiteReferentielDto>[],
               representants: const <RepresentantDto>[],
               prospects: const <ProspectDto>[],
-              callCampaigns: const <SyncCallCampaignDto>[],
-              callTasks: const <SyncCallTaskDto>[],
-              repCallCampaigns: const <SyncRepCallCampaignDto>[],
-              repCallTasks: const <SyncRepCallTaskDto>[],
               visites: <SyncVisiteDto>[
                 SyncVisiteDto(
                   id: 'visite-1',

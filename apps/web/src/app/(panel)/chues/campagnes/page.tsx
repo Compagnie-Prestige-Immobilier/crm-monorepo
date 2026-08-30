@@ -2,40 +2,32 @@ import { HydrationBoundary, dehydrate } from '@tanstack/react-query';
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 
-import { PermissionDenied } from '@/components/permission-denied';
-import { CampaignsView } from '@/components/phase2/campaigns-view';
+import { LotsExportView } from '@/components/lots-export/lots-export-view';
 import { getServerApiClient } from '@/lib/api/server';
-import { parseCampaignFilters, type RawSearchParams } from '@/lib/campaign-filters';
-import { fetchCampaigns } from '@/lib/data/phase2';
+import { fetchLotsExport } from '@/lib/data/lots-export';
 import { getQueryClient } from '@/lib/query-client';
 import { queryKeys } from '@/lib/query-keys';
 import { guardRoles } from '@/lib/session';
 
-export const metadata: Metadata = { title: 'Campagnes d’appels prospects' };
+export const metadata: Metadata = { title: 'Lots d’export' };
 
-export default async function CampagnesPage({
-  searchParams,
-}: {
-  searchParams: Promise<RawSearchParams>;
-}) {
+export default async function LotsExportPage() {
   const guard = await guardRoles(['ADMIN', 'SUPERVISEUR', 'DIRECTION']);
   if (guard.status === 'anonymous') redirect('/connexion');
-  if (guard.status === 'denied') {
-    return (
-      <PermissionDenied role={guard.user.role} what="Le suivi des campagnes d’appels prospects" />
-    );
-  }
+  if (guard.status === 'denied') redirect('/chues');
 
-  const filters = parseCampaignFilters(await searchParams);
+  // La même requête que l'état initial de la vue, sinon la clé diffère et
+  // l'écran repart en chargement après l'hydratation.
+  const requete = { page: 1 };
   const queryClient = getQueryClient();
   await queryClient.prefetchQuery({
-    queryKey: [...queryKeys.campaigns(filters), 'CHUES'],
-    queryFn: () => fetchCampaigns(filters, getServerApiClient(), 'CHUES'),
+    queryKey: queryKeys.lotsExport(requete),
+    queryFn: () => fetchLotsExport(requete, getServerApiClient()),
   });
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <CampaignsView canManage={guard.user.role === 'ADMIN'} />
+      <LotsExportView canCreate={guard.user.role === 'ADMIN'} />
     </HydrationBoundary>
   );
 }

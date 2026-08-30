@@ -25,13 +25,10 @@ function carte(page: Page, titre: string) {
 }
 
 const CARTES_USINE = [
-  'Appels aux représentants',
-  'Représentants joints',
-  'Rappels promis',
-  'Représentants qui acceptent',
-  'Prospects notés',
-  'Adhésions obtenues',
-  'Reste à appeler',
+  'Taux de contact',
+  'Taux de rendez-vous',
+  'Taux de qualification',
+  'Adhésions',
   'Par téléconseiller',
 ] as const;
 
@@ -72,7 +69,7 @@ function ligneDePeriode(page: Page) {
   return page.getByRole('main').locator('p[aria-live="polite"]');
 }
 
-test('CHU-CHF-01 · l’écran d’usine pose ses huit cartes pour un superviseur', async ({ page }) => {
+test('CHU-CHF-01 · l’écran d’usine pose ses cinq cartes pour un superviseur', async ({ page }) => {
   await ouvrirLesChiffres(page);
 
   for (const titre of CARTES_USINE) {
@@ -159,23 +156,13 @@ test('CHU-CHF-07 · une plage de plus de 400 jours est refusée par un message',
   );
 });
 
-test('CHU-CHF-08 · le sélecteur « Comparer à » garde ses trois choix et l’URL', async ({ page }) => {
+test('CHU-CHF-08 · « Comparer à » n’existe pas ici : rien sur cet écran ne compare deux périodes', async ({
+  page,
+}) => {
   await ouvrirLesChiffres(page);
 
-  const comparer = page.getByRole('combobox', { name: 'Comparer à' });
-
-  await comparer.click();
-  await page.getByRole('option', { name: 'Comparer à : période précédente' }).click();
-  await expect(page).toHaveURL('/chues/statistiques?periode=ce-mois&comparaison=precedente');
-  // Le déclencheur doit dire le LIBELLÉ, jamais la valeur sérialisée.
-  // `toContainText` et non `toHaveText` : le chevron du déclencheur compte
-  // comme du texte.
-  await expect(comparer).toContainText('Comparer à : période précédente');
-
-  await comparer.click();
-  await page.getByRole('option', { name: 'Comparer à : rien' }).click();
-  await expect(page).toHaveURL('/chues/statistiques?periode=ce-mois');
-  await expect(comparer).toContainText('Comparer à : rien');
+  await expect(page.getByRole('group', { name: 'Période affichée' })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Comparer à' })).toHaveCount(0);
 });
 
 test('CHU-CHF-09 · la liste des téléconseillers inclut l’encadrement et exclut la banque', async ({
@@ -246,9 +233,18 @@ test('CHU-CHF-12 · le tableau « Par téléconseiller » nomme tout le plateau'
   const tableau = carte(page, 'Par téléconseiller').getByRole('table');
   await expect(tableau).toBeVisible();
 
-  for (const entete of ['Téléconseiller', 'Appels', 'Joints', 'Prospects notés', 'Adhésions']) {
+  for (const entete of [
+    'Téléconseiller',
+    'Appels',
+    'Contact',
+    'Rendez-vous',
+    'Qualification',
+    'Prospects notés',
+    'Adhésions',
+  ]) {
     await expect(tableau.getByRole('columnheader', { name: entete, exact: true })).toBeVisible();
   }
+  await expect(tableau.getByRole('rowheader', { name: 'Équipe', exact: true })).toBeVisible();
 
   for (const nom of ['Awa Fixture', 'Fatou Fixture', 'Superviseur Fixture', 'Direction Fixture']) {
     await expect(tableau.getByRole('rowheader', { name: nom, exact: true })).toBeVisible();

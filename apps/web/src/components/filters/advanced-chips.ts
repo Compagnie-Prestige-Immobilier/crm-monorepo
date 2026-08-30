@@ -26,7 +26,6 @@ export const ADVANCED_FILTER_LABELS: Record<AdvancedFilterKey, string> = {
   segment: 'Groupe (syndicat × banque)',
   phase2Status: 'Résultat de l’appel',
   enrollmentMethod: 'Comment il a adhéré',
-  campaignId: 'Campagne d’appels',
   enrollmentCapturedById: 'Adhésion obtenue par',
 };
 
@@ -78,11 +77,6 @@ function chipValue(
       return filters.enrollmentMethod === null
         ? null
         : ENROLLMENT_METHOD_LABELS[filters.enrollmentMethod];
-
-    case 'campaignId':
-      return filters.campaignId === null
-        ? null
-        : optionLabel(reference?.campagnes ?? [], filters.campaignId);
 
     case 'enrollmentCapturedById':
       return filters.enrollmentCapturedById === null

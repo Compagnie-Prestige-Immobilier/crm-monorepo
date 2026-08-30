@@ -340,29 +340,8 @@ describe('à qui appartient la fiche appelée', () => {
     if (row) row.createdById = createdById;
   };
 
-  it('la fiche d’un collègue est refusée, pas appliquée', async () => {
+  it('la fiche d’un collègue peut être appelée librement', async () => {
     seedProspectDe(PROSPECT_DE_BOB, 'com-bob');
-
-    const result = await sync.push(alice, push([attempt(PROSPECT_DE_BOB)]));
-
-    expect(statuses(result.body.results)).toEqual([SyncOpStatus.CONFLICT]);
-    expect(result.body.results[0]?.errorCode).toBe('ENTITY_ID_OWNED_BY_ANOTHER_USER');
-    expect(db.callAttempts.size).toBe(0);
-  });
-
-  /// Le cas qui a motivé la porte : la campagne confie une fiche que le
-  /// téléconseiller n'a pas saisie.
-  it('la fiche d’un collègue CONFIÉE par une campagne passe', async () => {
-    seedProspectDe(PROSPECT_DE_BOB, 'com-bob');
-    db.callTasks.set('task-1', {
-      id: 'task-1',
-      prospectId: PROSPECT_DE_BOB,
-      assignedToId: alice.id,
-      isActive: true,
-      status: 'OPEN',
-      campaignId: 'camp-1',
-      createdAt: new Date('2026-08-10T09:00:00.000Z'),
-    });
 
     const result = await sync.push(alice, push([attempt(PROSPECT_DE_BOB)]));
 
@@ -370,22 +349,4 @@ describe('à qui appartient la fiche appelée', () => {
     expect(db.callAttempts.size).toBe(1);
   });
 
-  /// Une tentative saisie hors ligne arrive souvent après que la file a été
-  /// soldée : la tâche close reste une autorisation.
-  it('une tâche déjà close autorise encore la remontée tardive', async () => {
-    seedProspectDe(PROSPECT_DE_BOB, 'com-bob');
-    db.callTasks.set('task-1', {
-      id: 'task-1',
-      prospectId: PROSPECT_DE_BOB,
-      assignedToId: alice.id,
-      isActive: false,
-      status: 'DONE',
-      campaignId: 'camp-1',
-      createdAt: new Date('2026-08-10T09:00:00.000Z'),
-    });
-
-    const result = await sync.push(alice, push([attempt(PROSPECT_DE_BOB)]));
-
-    expect(statuses(result.body.results)).toEqual([SyncOpStatus.APPLIED]);
-  });
 });

@@ -1,106 +1,693 @@
 import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
-import { LotExportCible, Prisma, Projet, Role, WhatsappStatus } from '@crm/database';
+import { LotExportCible, Prisma, Projet, Role } from '@crm/database';
+import ExcelJS from 'exceljs';
+import JSZip from 'jszip';
 import type { Writable } from 'node:stream';
+import { PassThrough } from 'node:stream';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { buildProspectWhere } from '../../common/prospect-where.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
-import type { ProspectFilterDto } from '../../common/dto/prospect-filter.dto.js';
 import type { RepresentantExportQueryDto } from '../representants/dto.js';
-import { ExportService } from '../export/export.service.js';
-import { RepresentantsExportService } from '../export/representants-export.service.js';
-import { CreateLotExportDto, LotExportAttemptDto, LotExportDetailDto, LotExportListDto, LotExportPreviewDto, LotExportQueryDto, LotExportSummaryDto } from './dto.js';
+import { EXPORT_INCLUDE, PROSPECT_COLUMNS, cellValue } from '../export/columns.js';
+import { markWorkbook, writeDemoWarningRow } from '../export/demo-marking.js';
+import { styleHeader } from '../export/import-template.workbook.js';
+import { toDakarCell } from '../export/dakar.js';
+import { lastAttemptsByProspect } from '../prospects/last-attempt.js';
+import { WorkspaceContext } from '../../workspaces/workspace.js';
+import { repartir } from './repartition.js';
+import { programmeFilename, writeProgrammePdf, type ProgrammeData } from './programme-pdf.js';
+import {
+  CreateLotExportDto,
+  LotExportAttemptDto,
+  LotExportDetailDto,
+  LotExportListDto,
+  LotExportPreviewDto,
+  LotExportQueryDto,
+  LotExportRepartitionDto,
+  LotExportSummaryDto,
+} from './dto.js';
 
 const ADMIN = { id: 'admin', role: Role.ADMIN } as const;
 const CHUNK = 5_000;
+const DETAIL_PAGE = 500;
+const DATE_FORMAT = 'dd/mm/yyyy hh:mm';
+const TELECONSEILLER_ROLES = [Role.COMMERCIAL, Role.SUPERVISEUR];
+
+interface Teleconseiller {
+  readonly id: string;
+  readonly fullName: string;
+}
+
+interface Distribution {
+  readonly teleconseillerIds: string[];
+  readonly fichesParJour: number;
+  readonly jours: number;
+}
+
+interface ItemRow {
+  readonly position: number;
+  readonly day: number;
+  readonly assigneeId: string | null;
+  readonly prospectId: string | null;
+  readonly representantId: string | null;
+  readonly assignee: { readonly fullName: string } | null;
+}
 
 @Injectable()
 export class LotsExportService {
-  constructor(private readonly prisma: PrismaService, private readonly exports: ExportService, private readonly repsExport: RepresentantsExportService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly demo: WorkspaceContext,
+  ) {}
 
   async preview(body: CreateLotExportDto): Promise<LotExportPreviewDto> {
-    const eligible = body.cible === LotExportCible.REPRESENTANTS
-      ? await this.prisma.representant.count({ where: this.representantWhere(body.representants) })
-      : await this.prisma.prospect.count({ where: buildProspectWhere(ADMIN, body.prospects ?? {}) });
-    return { eligible, scopeLabel: scopeLabel(body.cible, body.representants ?? body.prospects ?? {}) };
+    const equipe = await this.equipe(body.distribution.teleconseillerIds);
+    const places = equipe.length * body.distribution.fichesParJour * body.distribution.jours;
+    const eligible =
+      body.cible === LotExportCible.REPRESENTANTS
+        ? await this.prisma.representant.count({
+            where: this.representantWhere(body.representants),
+          })
+        : await this.prisma.prospect.count({
+            where: buildProspectWhere(ADMIN, body.prospects ?? {}),
+          });
+    const retenues = Math.min(eligible, places);
+    return {
+      eligible,
+      scopeLabel: scopeLabel(body.cible, body.representants ?? body.prospects ?? {}),
+      places,
+      retenues,
+      parTeleconseiller: Math.ceil(retenues / equipe.length),
+    };
   }
 
   async create(user: AuthenticatedUser, body: CreateLotExportDto): Promise<LotExportSummaryDto> {
-    const filters = body.cible === LotExportCible.REPRESENTANTS ? body.representants : body.prospects;
-    if (!filters) throw new UnprocessableEntityException({ code: 'LOT_EXPORT_FILTRES_REQUIS', message: 'Les critères de la cible sont requis.' });
-    const id = await this.prisma.$transaction(async (tx) => {
-      const items = body.cible === LotExportCible.REPRESENTANTS
-        ? (await tx.representant.findMany({ where: this.representantWhere(body.representants), orderBy: { id: 'asc' }, select: { id: true } })).map((row) => ({ representantId: row.id }))
-        : (await tx.prospect.findMany({ where: buildProspectWhere(user, body.prospects ?? {}), orderBy: { id: 'asc' }, select: { id: true } })).map((row) => ({ prospectId: row.id }));
-      if (!items.length) throw new UnprocessableEntityException({ code: 'LOT_EXPORT_CIBLE_VIDE', message: 'Aucune fiche ne correspond à cette cible.' });
-      const lot = await tx.lotExport.create({ data: { name: body.name.trim(), cible: body.cible, projet: body.cible === LotExportCible.REPRESENTANTS ? Projet.CHUES : body.prospects?.projet ?? null, filters: filters as Prisma.InputJsonValue, itemCount: items.length, createdById: user.id } });
-      for (let start = 0; start < items.length; start += CHUNK) await tx.lotExportItem.createMany({ data: items.slice(start, start + CHUNK).map((item, index) => ({ lotId: lot.id, position: start + index, ...item })) });
-      return lot.id;
-    }, { timeout: 120_000, maxWait: 15_000 });
+    const filters =
+      body.cible === LotExportCible.REPRESENTANTS ? body.representants : body.prospects;
+    if (!filters)
+      throw new UnprocessableEntityException({
+        code: 'LOT_EXPORT_FILTRES_REQUIS',
+        message: 'Les critères de la cible sont requis.',
+      });
+    const equipe = await this.equipe(body.distribution.teleconseillerIds);
+    const { fichesParJour, jours } = body.distribution;
+    const places = equipe.length * fichesParJour * jours;
+
+    const id = await this.prisma.$transaction(
+      async (tx) => {
+        const fiches =
+          body.cible === LotExportCible.REPRESENTANTS
+            ? await tx.representant.findMany({
+                where: this.representantWhere(body.representants),
+                orderBy: { id: 'asc' },
+                take: places,
+                select: { id: true },
+              })
+            : await tx.prospect.findMany({
+                where: buildProspectWhere(user, body.prospects ?? {}),
+                orderBy: { id: 'asc' },
+                take: places,
+                select: { id: true },
+              });
+        if (!fiches.length)
+          throw new UnprocessableEntityException({
+            code: 'LOT_EXPORT_CIBLE_VIDE',
+            message: 'Aucune fiche ne correspond à cette cible.',
+          });
+
+        const affectations = repartir(
+          fiches.length,
+          equipe.map((membre) => membre.id),
+          fichesParJour,
+          jours,
+        );
+        const lot = await tx.lotExport.create({
+          data: {
+            name: body.name.trim(),
+            cible: body.cible,
+            projet:
+              body.cible === LotExportCible.REPRESENTANTS
+                ? Projet.CHUES
+                : (body.prospects?.projet ?? null),
+            // La répartition voyage avec les critères : elle n'a pas de colonne,
+            // et un téléconseiller à zéro fiche ne laisse aucune ligne derrière lui.
+            filters: {
+              ...(filters as Record<string, unknown>),
+              distribution: {
+                teleconseillerIds: equipe.map((membre) => membre.id),
+                fichesParJour,
+                jours,
+              },
+            } as Prisma.InputJsonValue,
+            itemCount: affectations.length,
+            createdById: user.id,
+          },
+        });
+        for (let start = 0; start < affectations.length; start += CHUNK)
+          await tx.lotExportItem.createMany({
+            data: affectations.slice(start, start + CHUNK).map((affectation, index) => {
+              const fiche = fiches[start + index];
+              if (!fiche) throw new Error('Fiche absente de la répartition');
+              return {
+                lotId: lot.id,
+                position: start + index,
+                assigneeId: affectation.assigneeId,
+                day: affectation.day,
+                ...(body.cible === LotExportCible.REPRESENTANTS
+                  ? { representantId: fiche.id }
+                  : { prospectId: fiche.id }),
+              };
+            }),
+          });
+        return lot.id;
+      },
+      { timeout: 120_000, maxWait: 15_000 },
+    );
     return this.summary(id);
   }
 
   async list(query: LotExportQueryDto): Promise<LotExportListDto> {
-    const page = query.page ?? 1; const pageSize = query.pageSize ?? 25;
-    const where: Prisma.LotExportWhereInput = { ...(query.search ? { name: { contains: query.search.trim(), mode: 'insensitive' } } : {}), ...(query.cible ? { cible: query.cible } : {}), ...(query.createdById ? { createdById: query.createdById } : {}), ...(query.dateFrom || query.dateTo ? { createdAt: { ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}), ...(query.dateTo ? { lte: new Date(query.dateTo) } : {}) } } : {}) };
-    const [total, rows] = await Promise.all([this.prisma.lotExport.count({ where }), this.prisma.lotExport.findMany({ where, include: { createdBy: { select: { fullName: true } } }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (page - 1) * pageSize, take: pageSize })]);
-    return { items: await Promise.all(rows.map((row) => this.summary(row.id, row))), meta: { total, page, pageSize, pageCount: Math.max(1, Math.ceil(total / pageSize)) } };
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 25;
+    const where: Prisma.LotExportWhereInput = {
+      ...(query.search ? { name: { contains: query.search.trim(), mode: 'insensitive' } } : {}),
+      ...(query.cible ? { cible: query.cible } : {}),
+      ...(query.createdById ? { createdById: query.createdById } : {}),
+      ...(query.dateFrom || query.dateTo
+        ? {
+            createdAt: {
+              ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
+              ...(query.dateTo ? { lte: new Date(query.dateTo) } : {}),
+            },
+          }
+        : {}),
+    };
+    const [total, rows] = await Promise.all([
+      this.prisma.lotExport.count({ where }),
+      this.prisma.lotExport.findMany({
+        where,
+        include: { createdBy: { select: { fullName: true } } },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
+    return {
+      items: await Promise.all(rows.map((row) => this.summary(row.id, row))),
+      meta: { total, page, pageSize, pageCount: Math.max(1, Math.ceil(total / pageSize)) },
+    };
   }
 
   async get(id: string): Promise<LotExportDetailDto> {
-    const row = await this.prisma.lotExport.findUnique({ where: { id }, include: { createdBy: { select: { fullName: true } } } });
-    if (!row) throw new NotFoundException({ code: 'LOT_EXPORT_NOT_FOUND', message: 'Lot introuvable.' });
-    return { ...(await this.summary(id, row)), callsByTeleconseiller: await this.callsByUser(row.id, row.cible, row.createdAt), recentAttempts: await this.recentAttempts(row.id, row.cible, row.createdAt) };
+    const row = await this.prisma.lotExport.findUnique({
+      where: { id },
+      include: { createdBy: { select: { fullName: true } } },
+    });
+    if (!row)
+      throw new NotFoundException({ code: 'LOT_EXPORT_NOT_FOUND', message: 'Lot introuvable.' });
+
+    const groupes = await this.prisma.lotExportItem.groupBy({
+      by: ['assigneeId', 'day'],
+      where: { lotId: id },
+      _count: { _all: true },
+      _min: { position: true },
+    });
+    const stored = readDistribution(row.filters);
+    const ordre = stored?.teleconseillerIds ?? [
+      ...new Set(
+        [...groupes]
+          .sort((left, right) => (left._min.position ?? 0) - (right._min.position ?? 0))
+          .flatMap((groupe) => (groupe.assigneeId === null ? [] : [groupe.assigneeId])),
+      ),
+    ];
+    const jours = stored?.jours ?? Math.max(1, ...groupes.map((groupe) => groupe.day));
+    const fichesParJour =
+      stored?.fichesParJour ?? Math.max(1, ...groupes.map((groupe) => groupe._count._all));
+    const noms = new Map(
+      (
+        await this.prisma.user.findMany({
+          where: { id: { in: ordre } },
+          select: { id: true, fullName: true },
+        })
+      ).map((membre) => [membre.id, membre.fullName]),
+    );
+    const compte = new Map(
+      groupes.map((groupe) => [
+        `${groupe.assigneeId ?? ''}#${String(groupe.day)}`,
+        groupe._count._all,
+      ]),
+    );
+    const repartition: LotExportRepartitionDto[] = ordre.map((teleconseillerId) => ({
+      teleconseillerId,
+      teleconseillerName: noms.get(teleconseillerId) ?? 'Compte supprimé',
+      jours: Array.from({ length: jours }, (_, index) => ({
+        jour: index + 1,
+        fiches: compte.get(`${teleconseillerId}#${String(index + 1)}`) ?? 0,
+      })),
+    }));
+
+    return {
+      ...(await this.summary(id, row)),
+      callsByTeleconseiller: await this.callsByUser(row.id, row.cible, row.createdAt),
+      recentAttempts: await this.recentAttempts(row.id, row.cible, row.createdAt),
+      distribution: { fichesParJour, jours },
+      repartition,
+    };
   }
 
-  async writeXlsx(id: string, user: AuthenticatedUser, stream: Writable): Promise<void> {
-    const row = await this.prisma.lotExport.findUnique({ where: { id }, select: { cible: true, items: { orderBy: { position: 'asc' }, select: { representantId: true, prospectId: true } } } });
-    if (!row) throw new NotFoundException({ code: 'LOT_EXPORT_NOT_FOUND', message: 'Lot introuvable.' });
-    if (row.cible === LotExportCible.REPRESENTANTS) return this.repsExport.writeRepresentants(user, {}, stream, row.items.flatMap((item) => item.representantId ? [item.representantId] : []));
-    return this.exports.writeProspectsForIds(user, row.items.flatMap((item) => item.prospectId ? [item.prospectId] : []), stream);
+  /** Le classeur du lot : la répartition d'abord, la fiche ensuite. */
+  async writeXlsx(id: string, stream: Writable): Promise<void> {
+    const lot = await this.prisma.lotExport.findUnique({
+      where: { id },
+      select: { cible: true, filters: true },
+    });
+    if (!lot)
+      throw new NotFoundException({ code: 'LOT_EXPORT_NOT_FOUND', message: 'Lot introuvable.' });
+
+    const items = await this.prisma.lotExportItem.findMany({
+      where: { lotId: id },
+      orderBy: { position: 'asc' },
+      select: {
+        position: true,
+        day: true,
+        assigneeId: true,
+        prospectId: true,
+        representantId: true,
+        assignee: { select: { fullName: true } },
+      },
+    });
+    const ordonnes = trierParTeleconseiller(items, readDistribution(lot.filters));
+
+    const demoEnabled = this.demo.current() === 'demo';
+    const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({ stream, useStyles: true });
+    markWorkbook(workbook, demoEnabled);
+    if (lot.cible === LotExportCible.REPRESENTANTS)
+      await this.writeRepresentantsSheet(workbook, ordonnes, demoEnabled);
+    else await this.writeProspectsSheet(workbook, ordonnes, demoEnabled);
+    await workbook.commit();
+  }
+
+  writeProgramme(data: ProgrammeData, stream: Writable): Promise<void> {
+    return writeProgrammePdf(stream, data);
+  }
+
+  /** Rendue AVANT que la réponse ne soit détournée : après, un 404 ne partirait plus. */
+  async programmesZip(id: string): Promise<Buffer> {
+    const paires = await this.prisma.lotExportItem.groupBy({
+      by: ['assigneeId', 'day'],
+      where: { lotId: id, assigneeId: { not: null } },
+      _min: { position: true },
+    });
+    if (!paires.length)
+      throw new NotFoundException({
+        code: 'LOT_EXPORT_PROGRAMME_INTROUVABLE',
+        message: 'Ce lot ne porte aucun programme.',
+      });
+
+    const zip = new JSZip();
+    const ordonnees = [...paires].sort(
+      (left, right) =>
+        (left._min.position ?? 0) - (right._min.position ?? 0) || left.day - right.day,
+    );
+    for (const paire of ordonnees) {
+      if (paire.assigneeId === null) continue;
+      const data = await this.programme(id, paire.assigneeId, paire.day);
+      const nom = programmeFilename(data);
+      zip.file(zip.file(nom) ? `${paire.assigneeId}-${nom}` : nom, await this.pdfBuffer(data));
+    }
+    return zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+  }
+
+  async programme(id: string, teleconseillerId: string, jour: number): Promise<ProgrammeData> {
+    const lot = await this.prisma.lotExport.findUnique({
+      where: { id },
+      select: { name: true, cible: true, filters: true },
+    });
+    if (!lot)
+      throw new NotFoundException({ code: 'LOT_EXPORT_NOT_FOUND', message: 'Lot introuvable.' });
+
+    const items = await this.prisma.lotExportItem.findMany({
+      where: { lotId: id, assigneeId: teleconseillerId, day: jour },
+      orderBy: { position: 'asc' },
+      select: {
+        assignee: { select: { fullName: true } },
+        representant: { select: { fullName: true, phoneE164: true } },
+        prospect: { select: { nom: true, prenom: true, phoneE164: true } },
+      },
+    });
+    if (!items.length)
+      throw new NotFoundException({
+        code: 'LOT_EXPORT_PROGRAMME_INTROUVABLE',
+        message: 'Aucune fiche pour ce téléconseiller à cette journée.',
+      });
+
+    const stored = readDistribution(lot.filters);
+    const dayCount =
+      stored?.jours ??
+      (
+        await this.prisma.lotExportItem.aggregate({
+          where: { lotId: id },
+          _max: { day: true },
+        })
+      )._max.day ??
+      1;
+    const label = scopeLabel(lot.cible, lot.filters);
+    return {
+      teleconseillerName: items[0]?.assignee?.fullName ?? 'Téléconseiller',
+      dayNumber: jour,
+      dayCount,
+      lotName: lot.name,
+      cibleLabel: lot.cible === LotExportCible.REPRESENTANTS ? label : `Prospects : ${label}`,
+      generatedAt: new Date(),
+      rows: items.map((item, index) => ({
+        position: index + 1,
+        nom: item.representant?.fullName ?? item.prospect?.nom ?? '',
+        prenom: item.prospect?.prenom ?? '',
+        phoneE164: item.representant?.phoneE164 ?? item.prospect?.phoneE164 ?? '',
+      })),
+    };
+  }
+
+  private async pdfBuffer(data: ProgrammeData): Promise<Buffer> {
+    const out = new PassThrough();
+    const chunks: Buffer[] = [];
+    out.on('data', (chunk: Buffer) => chunks.push(chunk));
+    await writeProgrammePdf(out, data);
+    return Buffer.concat(chunks);
+  }
+
+  private async writeProspectsSheet(
+    workbook: ExcelJS.stream.xlsx.WorkbookWriter,
+    items: readonly ItemRow[],
+    demoEnabled: boolean,
+  ): Promise<void> {
+    const sheet = workbook.addWorksheet('Répartition', { views: [{ state: 'frozen', ySplit: 1 }] });
+    sheet.columns = [
+      ...REPARTITION_COLUMNS,
+      ...PROSPECT_COLUMNS.map((column) => ({
+        header: column.header,
+        key: column.key,
+        width: 22,
+        ...(column.isDate ? { style: { numFmt: DATE_FORMAT } } : {}),
+      })),
+    ];
+    styleHeader(sheet, sheet.columns.length);
+    writeDemoWarningRow(sheet, demoEnabled, sheet.columns.length);
+
+    for (let start = 0; start < items.length; start += DETAIL_PAGE) {
+      const page = items.slice(start, start + DETAIL_PAGE);
+      const ids = page.flatMap((item) => (item.prospectId ? [item.prospectId] : []));
+      const rows = await this.prisma.prospect.findMany({
+        where: { id: { in: ids } },
+        include: EXPORT_INCLUDE,
+      });
+      const attempts = await lastAttemptsByProspect(this.prisma, ids);
+      const byId = new Map(rows.map((row) => [row.id, row]));
+      for (const item of page) {
+        const row = item.prospectId ? byId.get(item.prospectId) : undefined;
+        if (!row) continue;
+        sheet
+          .addRow({
+            teleconseiller: item.assignee?.fullName ?? '',
+            jour: item.day,
+            ...Object.fromEntries(
+              PROSPECT_COLUMNS.map((column) => [
+                column.key,
+                cellValue(column, row, attempts.get(row.id)),
+              ]),
+            ),
+          })
+          .commit();
+      }
+    }
+    sheet.commit();
+  }
+
+  private async writeRepresentantsSheet(
+    workbook: ExcelJS.stream.xlsx.WorkbookWriter,
+    items: readonly ItemRow[],
+    demoEnabled: boolean,
+  ): Promise<void> {
+    const sheet = workbook.addWorksheet('Répartition', { views: [{ state: 'frozen', ySplit: 1 }] });
+    sheet.columns = [
+      ...REPARTITION_COLUMNS,
+      { header: 'Nom complet', key: 'fullName', width: 30 },
+      { header: 'Téléphone', key: 'phone', width: 20 },
+      { header: 'Département', key: 'departement', width: 24 },
+      { header: 'IEF', key: 'ief', width: 26 },
+      { header: 'Commercial', key: 'commercial', width: 26 },
+      { header: 'Notes', key: 'notes', width: 40 },
+      { header: 'Saisi le', key: 'clientCreatedAt', width: 20, style: { numFmt: DATE_FORMAT } },
+    ];
+    styleHeader(sheet, sheet.columns.length);
+    writeDemoWarningRow(sheet, demoEnabled, sheet.columns.length);
+
+    for (let start = 0; start < items.length; start += DETAIL_PAGE) {
+      const page = items.slice(start, start + DETAIL_PAGE);
+      const ids = page.flatMap((item) => (item.representantId ? [item.representantId] : []));
+      const rows = await this.prisma.representant.findMany({
+        where: { id: { in: ids } },
+        include: {
+          departement: { select: { name: true } },
+          ief: { select: { name: true } },
+          createdBy: { select: { fullName: true } },
+        },
+      });
+      const byId = new Map(rows.map((row) => [row.id, row]));
+      for (const item of page) {
+        const row = item.representantId ? byId.get(item.representantId) : undefined;
+        if (!row) continue;
+        sheet
+          .addRow({
+            teleconseiller: item.assignee?.fullName ?? '',
+            jour: item.day,
+            fullName: row.fullName,
+            phone: row.phoneE164,
+            departement: row.departement.name,
+            ief: row.ief?.name ?? '',
+            commercial: row.createdBy.fullName,
+            notes: row.notes ?? '',
+            clientCreatedAt: toDakarCell(row.clientCreatedAt),
+          })
+          .commit();
+      }
+    }
+    sheet.commit();
+  }
+
+  /** Les comptes cochés, dans l'ordre reçu : cet ordre EST le tourniquet. */
+  private async equipe(ids: readonly string[]): Promise<Teleconseiller[]> {
+    const uniques = new Set(ids);
+    const rows = await this.prisma.user.findMany({
+      where: {
+        id: { in: [...uniques] },
+        isActive: true,
+        deletedAt: null,
+        role: { in: TELECONSEILLER_ROLES },
+      },
+      select: { id: true, fullName: true },
+    });
+    if (uniques.size !== ids.length || rows.length !== uniques.size)
+      throw new UnprocessableEntityException({
+        code: 'LOT_EXPORT_TELECONSEILLER_INVALIDE',
+        message:
+          'Chaque téléconseiller doit être un compte actif, distinct, commercial ou superviseur.',
+      });
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    return ids.map((id) => {
+      const row = byId.get(id);
+      if (!row) throw new Error('Téléconseiller absent de la sélection');
+      return row;
+    });
   }
 
   private async summary(id: string, row?: any): Promise<LotExportSummaryDto> {
-    const lot = row ?? await this.prisma.lotExport.findUnique({ where: { id }, include: { createdBy: { select: { fullName: true } } } });
-    if (!lot) throw new NotFoundException({ code: 'LOT_EXPORT_NOT_FOUND', message: 'Lot introuvable.' });
+    const lot =
+      row ??
+      (await this.prisma.lotExport.findUnique({
+        where: { id },
+        include: { createdBy: { select: { fullName: true } } },
+      }));
+    if (!lot)
+      throw new NotFoundException({ code: 'LOT_EXPORT_NOT_FOUND', message: 'Lot introuvable.' });
     const stats = await this.stats(lot.id, lot.cible, lot.createdAt);
-    return { id: lot.id, name: lot.name, cible: lot.cible, projet: lot.projet, scopeLabel: scopeLabel(lot.cible, lot.filters), itemCount: lot.itemCount, createdById: lot.createdById, createdByName: lot.createdBy.fullName, createdAt: lot.createdAt.toISOString(), callsSince: stats.calls, fichesAppelees: stats.fiches };
+    return {
+      id: lot.id,
+      name: lot.name,
+      cible: lot.cible,
+      projet: lot.projet,
+      scopeLabel: scopeLabel(lot.cible, lot.filters),
+      itemCount: lot.itemCount,
+      createdById: lot.createdById,
+      createdByName: lot.createdBy.fullName,
+      createdAt: lot.createdAt.toISOString(),
+      callsSince: stats.calls,
+      fichesAppelees: stats.fiches,
+    };
   }
 
-  private async stats(id: string, cible: LotExportCible, createdAt: Date): Promise<{ calls: number; fiches: number }> {
-    const [row] = cible === LotExportCible.REPRESENTANTS
-      ? await this.prisma.$queryRaw<{ calls: number; fiches: number }[]>`SELECT COUNT(*)::int AS calls, COUNT(DISTINCT a."representantId")::int AS fiches FROM "lot_export_items" i INNER JOIN "rep_call_attempts" a ON a."representantId" = i."representantId" WHERE i."lotId" = ${id} AND a."clientCreatedAt" >= ${createdAt}`
-      : await this.prisma.$queryRaw<{ calls: number; fiches: number }[]>`SELECT COUNT(*)::int AS calls, COUNT(DISTINCT a."prospectId")::int AS fiches FROM "lot_export_items" i INNER JOIN "call_attempts" a ON a."prospectId" = i."prospectId" WHERE i."lotId" = ${id} AND a."clientCreatedAt" >= ${createdAt}`;
+  private async stats(
+    id: string,
+    cible: LotExportCible,
+    createdAt: Date,
+  ): Promise<{ calls: number; fiches: number }> {
+    const [row] =
+      cible === LotExportCible.REPRESENTANTS
+        ? await this.prisma.$queryRaw<
+            { calls: number; fiches: number }[]
+          >`SELECT COUNT(*)::int AS calls, COUNT(DISTINCT a."representantId")::int AS fiches FROM "lot_export_items" i INNER JOIN "rep_call_attempts" a ON a."representantId" = i."representantId" WHERE i."lotId" = ${id} AND a."clientCreatedAt" >= ${createdAt}`
+        : await this.prisma.$queryRaw<
+            { calls: number; fiches: number }[]
+          >`SELECT COUNT(*)::int AS calls, COUNT(DISTINCT a."prospectId")::int AS fiches FROM "lot_export_items" i INNER JOIN "call_attempts" a ON a."prospectId" = i."prospectId" WHERE i."lotId" = ${id} AND a."clientCreatedAt" >= ${createdAt}`;
     return row ?? { calls: 0, fiches: 0 };
   }
 
-  private async recentAttempts(id: string, cible: LotExportCible, createdAt: Date): Promise<LotExportAttemptDto[]> {
+  private async recentAttempts(
+    id: string,
+    cible: LotExportCible,
+    createdAt: Date,
+  ): Promise<LotExportAttemptDto[]> {
     if (cible === LotExportCible.REPRESENTANTS) {
-      const rows = await this.prisma.repCallAttempt.findMany({ where: { representant: { lotItems: { some: { lotId: id } } }, clientCreatedAt: { gte: createdAt } }, include: { representant: { select: { phoneE164: true } }, performedBy: { select: { fullName: true } } }, orderBy: [{ clientCreatedAt: 'desc' }, { id: 'desc' }], take: 50 });
-      return rows.map((row) => ({ id: row.id, phoneE164: row.representant.phoneE164, shortCode: '', outcome: row.outcome, method: null, comment: row.comment, performedByName: row.performedBy.fullName, createdAt: row.createdAt.toISOString(), email: null, fonctionnaire: null, engagementEnCours: null, dureeEtablissementMois: null, rendezVousAt: null }));
+      const rows = await this.prisma.repCallAttempt.findMany({
+        where: {
+          representant: { lotItems: { some: { lotId: id } } },
+          clientCreatedAt: { gte: createdAt },
+        },
+        include: {
+          representant: { select: { phoneE164: true } },
+          performedBy: { select: { fullName: true } },
+        },
+        orderBy: [{ clientCreatedAt: 'desc' }, { id: 'desc' }],
+        take: 50,
+      });
+      return rows.map((row) => ({
+        id: row.id,
+        phoneE164: row.representant.phoneE164,
+        shortCode: '',
+        outcome: row.outcome,
+        method: null,
+        comment: row.comment,
+        performedByName: row.performedBy.fullName,
+        createdAt: row.createdAt.toISOString(),
+        email: null,
+        fonctionnaire: null,
+        engagementEnCours: null,
+        dureeEtablissementMois: null,
+        rendezVousAt: null,
+      }));
     }
-    const rows = await this.prisma.callAttempt.findMany({ where: { prospect: { lotItems: { some: { lotId: id } } }, clientCreatedAt: { gte: createdAt } }, include: { prospect: { select: { phoneE164: true } }, performedBy: { select: { fullName: true } } }, orderBy: [{ clientCreatedAt: 'desc' }, { id: 'desc' }], take: 50 });
-    return rows.map((row) => ({ id: row.id, phoneE164: row.prospect.phoneE164, shortCode: '', outcome: row.outcome, method: row.method, comment: row.comment, performedByName: row.performedBy.fullName, createdAt: row.createdAt.toISOString(), email: row.email, fonctionnaire: row.fonctionnaire, engagementEnCours: row.engagementEnCours, dureeEtablissementMois: row.dureeEtablissementMois, rendezVousAt: row.rendezVousAt?.toISOString() ?? null }));
+    const rows = await this.prisma.callAttempt.findMany({
+      where: {
+        prospect: { lotItems: { some: { lotId: id } } },
+        clientCreatedAt: { gte: createdAt },
+      },
+      include: {
+        prospect: { select: { phoneE164: true } },
+        performedBy: { select: { fullName: true } },
+      },
+      orderBy: [{ clientCreatedAt: 'desc' }, { id: 'desc' }],
+      take: 50,
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      phoneE164: row.prospect.phoneE164,
+      shortCode: '',
+      outcome: row.outcome,
+      method: row.method,
+      comment: row.comment,
+      performedByName: row.performedBy.fullName,
+      createdAt: row.createdAt.toISOString(),
+      email: row.email,
+      fonctionnaire: row.fonctionnaire,
+      engagementEnCours: row.engagementEnCours,
+      dureeEtablissementMois: row.dureeEtablissementMois,
+      rendezVousAt: row.rendezVousAt?.toISOString() ?? null,
+    }));
   }
 
-  private async callsByUser(id: string, cible: LotExportCible, createdAt: Date): Promise<Record<string, number>> {
-    const rows = cible === LotExportCible.REPRESENTANTS
-      ? await this.prisma.$queryRaw<{ name: string; calls: number }[]>`SELECT u."fullName" AS name, COUNT(*)::int AS calls FROM "rep_call_attempts" a INNER JOIN "lot_export_items" i ON i."representantId" = a."representantId" INNER JOIN "users" u ON u."id" = a."performedById" WHERE i."lotId" = ${id} AND a."clientCreatedAt" >= ${createdAt} GROUP BY u."id", u."fullName"`
-      : await this.prisma.$queryRaw<{ name: string; calls: number }[]>`SELECT u."fullName" AS name, COUNT(*)::int AS calls FROM "call_attempts" a INNER JOIN "lot_export_items" i ON i."prospectId" = a."prospectId" INNER JOIN "users" u ON u."id" = a."performedById" WHERE i."lotId" = ${id} AND a."clientCreatedAt" >= ${createdAt} GROUP BY u."id", u."fullName"`;
+  private async callsByUser(
+    id: string,
+    cible: LotExportCible,
+    createdAt: Date,
+  ): Promise<Record<string, number>> {
+    const rows =
+      cible === LotExportCible.REPRESENTANTS
+        ? await this.prisma.$queryRaw<
+            { name: string; calls: number }[]
+          >`SELECT u."fullName" AS name, COUNT(*)::int AS calls FROM "rep_call_attempts" a INNER JOIN "lot_export_items" i ON i."representantId" = a."representantId" INNER JOIN "users" u ON u."id" = a."performedById" WHERE i."lotId" = ${id} AND a."clientCreatedAt" >= ${createdAt} GROUP BY u."id", u."fullName"`
+        : await this.prisma.$queryRaw<
+            { name: string; calls: number }[]
+          >`SELECT u."fullName" AS name, COUNT(*)::int AS calls FROM "call_attempts" a INNER JOIN "lot_export_items" i ON i."prospectId" = a."prospectId" INNER JOIN "users" u ON u."id" = a."performedById" WHERE i."lotId" = ${id} AND a."clientCreatedAt" >= ${createdAt} GROUP BY u."id", u."fullName"`;
     return Object.fromEntries(rows.map((row) => [row.name, row.calls]));
   }
 
   private representantWhere(query?: RepresentantExportQueryDto): Prisma.RepresentantWhereInput {
-    const value = query ?? {}; const where: Prisma.RepresentantWhereInput = { deletedAt: null };
-    if (value.search?.trim()) where.OR = [{ fullName: { contains: value.search.trim(), mode: 'insensitive' } }, { phoneE164: { contains: value.search.replace(/[^\d+]/g, '') } }];
-    if (value.departementId) where.departementId = value.departementId; if (value.iefId) where.iefId = value.iefId; if (value.relationStatus) where.relationStatus = value.relationStatus;
-    if (value.hasProspects === true) where.prospects = { some: { deletedAt: null } }; if (value.hasProspects === false) where.prospects = { none: { deletedAt: null } };
-    if (value.whatsappStatus) where.whatsappStatus = value.whatsappStatus; return where;
+    const value = query ?? {};
+    const where: Prisma.RepresentantWhereInput = { deletedAt: null };
+    if (value.search?.trim())
+      where.OR = [
+        { fullName: { contains: value.search.trim(), mode: 'insensitive' } },
+        { phoneE164: { contains: value.search.replace(/[^\d+]/g, '') } },
+      ];
+    if (value.departementId) where.departementId = value.departementId;
+    if (value.iefId) where.iefId = value.iefId;
+    if (value.relationStatus) where.relationStatus = value.relationStatus;
+    if (value.hasProspects === true) where.prospects = { some: { deletedAt: null } };
+    if (value.hasProspects === false) where.prospects = { none: { deletedAt: null } };
+    if (value.whatsappStatus) where.whatsappStatus = value.whatsappStatus;
+    return where;
   }
 }
 
+const REPARTITION_COLUMNS = [
+  { header: 'Téléconseiller', key: 'teleconseiller', width: 26 },
+  { header: 'Jour', key: 'jour', width: 8 },
+];
+
+function trierParTeleconseiller(
+  items: readonly ItemRow[],
+  distribution: Distribution | null,
+): ItemRow[] {
+  const rangs = new Map<string, number>();
+  for (const id of distribution?.teleconseillerIds ?? []) rangs.set(id, rangs.size);
+  for (const item of items)
+    if (item.assigneeId !== null && !rangs.has(item.assigneeId))
+      rangs.set(item.assigneeId, rangs.size);
+
+  const rangDe = (assigneeId: string | null): number =>
+    assigneeId === null
+      ? Number.MAX_SAFE_INTEGER
+      : (rangs.get(assigneeId) ?? Number.MAX_SAFE_INTEGER);
+
+  return [...items].sort(
+    (left, right) =>
+      rangDe(left.assigneeId) - rangDe(right.assigneeId) ||
+      left.day - right.day ||
+      left.position - right.position,
+  );
+}
+
+function readDistribution(filters: Prisma.JsonValue): Distribution | null {
+  if (typeof filters !== 'object' || filters === null || Array.isArray(filters)) return null;
+  const raw = (filters as Record<string, unknown>).distribution;
+  if (typeof raw !== 'object' || raw === null) return null;
+  const value = raw as Record<string, unknown>;
+  const teleconseillerIds = Array.isArray(value.teleconseillerIds)
+    ? value.teleconseillerIds.filter((id): id is string => typeof id === 'string')
+    : [];
+  const fichesParJour = typeof value.fichesParJour === 'number' ? value.fichesParJour : 0;
+  const jours = typeof value.jours === 'number' ? value.jours : 0;
+  if (!teleconseillerIds.length || fichesParJour < 1 || jours < 1) return null;
+  return { teleconseillerIds, fichesParJour, jours };
+}
+
 function scopeLabel(cible: LotExportCible, filters: any): string {
-  if (cible === LotExportCible.REPRESENTANTS) return filters.relationStatus ? `Représentants ${filters.relationStatus.toLowerCase()}` : 'Tous les représentants';
+  if (cible === LotExportCible.REPRESENTANTS)
+    return filters.relationStatus
+      ? `Représentants ${filters.relationStatus.toLowerCase()}`
+      : 'Tous les représentants';
   if (filters.segment) return `${filters.projet ?? 'Tous projets'}, segment ${filters.segment}`;
-  if (filters.type) return `${filters.projet ?? 'Grand Public'}, ${filters.type.toLowerCase().replace('_', ' ')}`;
+  if (filters.type)
+    return `${filters.projet ?? 'Grand Public'}, ${filters.type.toLowerCase().replace('_', ' ')}`;
   return filters.projet ?? 'Tous projets';
 }

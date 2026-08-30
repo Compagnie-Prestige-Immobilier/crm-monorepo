@@ -3,7 +3,6 @@ import 'dart:developer' as developer;
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../features/campagnes/campagnes.dart';
 import 'route_guard.dart';
 import 'route_paths.dart';
 
@@ -29,7 +28,6 @@ class RouteMemory {
     Routes.corrections,
     Routes.historique,
     Routes.phase2,
-    CampagnesRoutes.liste,
     Routes.notifications,
   ];
 

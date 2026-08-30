@@ -33,8 +33,6 @@ class SupervisedUserDto {
 
     required this.isActive,
 
-    required this.departementName,
-
     required this.presence,
 
     required this.hasLiveSession,
@@ -78,9 +76,6 @@ class SupervisedUserDto {
 
   @JsonKey(name: r'isActive', required: true, includeIfNull: false)
   final bool isActive;
-
-  @JsonKey(name: r'departementName', required: true, includeIfNull: true)
-  final String? departementName;
 
   @JsonKey(
     name: r'presence',
@@ -137,7 +132,6 @@ class SupervisedUserDto {
                 email,
                 role,
                 isActive,
-                departementName,
                 presence,
                 hasLiveSession,
                 sessionCount,
@@ -156,7 +150,6 @@ class SupervisedUserDto {
                 other.email,
                 other.role,
                 other.isActive,
-                other.departementName,
                 other.presence,
                 other.hasLiveSession,
                 other.sessionCount,
@@ -181,7 +174,6 @@ class SupervisedUserDto {
         email,
         role,
         isActive,
-        departementName,
         presence,
         hasLiveSession,
         sessionCount,

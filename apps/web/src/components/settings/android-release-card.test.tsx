@@ -22,9 +22,8 @@ vi.mock('@/lib/data/app-updates', async () => {
 });
 
 const { AndroidReleaseCard } = await import('@/components/settings/android-release-card');
-const { AndroidReleaseUploadToast } = await import(
-  '@/components/settings/android-release-upload-toast'
-);
+const { AndroidReleaseUploadToast } =
+  await import('@/components/settings/android-release-upload-toast');
 const { Toaster } = await import('@/components/ui/sonner');
 const { toast } = await import('sonner');
 

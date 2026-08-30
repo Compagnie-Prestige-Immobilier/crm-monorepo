@@ -16,9 +16,6 @@ import '../../features/historique/presentation/historique_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/permissions/presentation/battery_help_screen.dart';
-import '../../features/campagnes/campagnes.dart';
-import '../../features/campagnes/presentation/campagne_file_screen.dart';
-import '../../features/campagnes/presentation/campagnes_screen.dart';
 import '../../features/phase2/presentation/phase2_screen.dart';
 import '../../features/prospect/presentation/prospect_detail_screen.dart';
 import '../../features/prospect/presentation/prospect_entry_screen.dart';
@@ -227,28 +224,6 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         ),
       ),
       GoRoute(
-        path: CampagnesRoutes.grandPublicListe,
-        name: 'grandPublicCampagnes',
-        parentNavigatorKey: rootNavigatorKey,
-        builder: (BuildContext context, GoRouterState state) =>
-            const ProjectScope(
-              project: CpiProject.grandPublic,
-              child: CampagnesScreen(grandPublic: true),
-            ),
-      ),
-      GoRoute(
-        path: CampagnesRoutes.grandPublicFile,
-        name: 'grandPublicCampagneFile',
-        parentNavigatorKey: rootNavigatorKey,
-        builder: (BuildContext context, GoRouterState state) => ProjectScope(
-          project: CpiProject.grandPublic,
-          child: CampagneFileScreen(
-            campaignId: state.pathParameters[CampagnesRoutes.idParam] ?? '',
-            grandPublic: true,
-          ),
-        ),
-      ),
-      GoRoute(
         path: Routes.grandPublicRappels,
         name: 'grandPublicRappels',
         parentNavigatorKey: rootNavigatorKey,
@@ -265,7 +240,7 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         builder: _chues((GoRouterState state) => const RappelsScreen()),
       ),
       GoRoute(
-        path: CampagnesRoutes.grandPublicConsole,
+        path: '/grand-public/phase2',
         name: 'grandPublicConsole',
         parentNavigatorKey: rootNavigatorKey,
         builder: (BuildContext context, GoRouterState state) => ProjectScope(
@@ -403,39 +378,6 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         builder: _chues(
           (GoRouterState state) => Phase2Screen(
             prefillPhone: state.uri.queryParameters[Routes.prefillPhoneParam],
-          ),
-        ),
-      ),
-      GoRoute(
-        path: CampagnesRoutes.liste,
-        name: 'campagnes',
-        parentNavigatorKey: rootNavigatorKey,
-        builder: _chues(
-          (GoRouterState state) => CampagnesScreen(
-            representantsDabord:
-                state.uri.queryParameters[CampagnesRoutes.ongletParam] ==
-                CampagnesRoutes.ongletRepresentants,
-          ),
-        ),
-      ),
-      GoRoute(
-        path: CampagnesRoutes.repFile,
-        name: 'repCampagneFile',
-        parentNavigatorKey: rootNavigatorKey,
-        builder: _chues(
-          (GoRouterState state) => CampagneFileScreen(
-            campaignId: state.pathParameters[CampagnesRoutes.idParam] ?? '',
-            representants: true,
-          ),
-        ),
-      ),
-      GoRoute(
-        path: CampagnesRoutes.file,
-        name: 'campagneFile',
-        parentNavigatorKey: rootNavigatorKey,
-        builder: _chues(
-          (GoRouterState state) => CampagneFileScreen(
-            campaignId: state.pathParameters[CampagnesRoutes.idParam] ?? '',
           ),
         ),
       ),

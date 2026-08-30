@@ -108,7 +108,6 @@ export interface ProspectFilters {
   segment: BddSegment | null;
   phase2Status: Phase2Status | null;
   enrollmentMethod: EnrollmentMethod | null;
-  campaignId: string | null;
   enrollmentCapturedById: string | null;
   dateFrom: string | null;
   dateTo: string | null;
@@ -122,16 +121,6 @@ export type BddSegment = Schemas['BddSegment'];
 export type Phase2Status = Schemas['Phase2Status'];
 export type EnrollmentMethod = Schemas['EnrollmentMethod'];
 export type CallOutcome = Schemas['CallOutcome'];
-export type CampaignScope = Schemas['CampaignScope'];
-export type CampaignStatus = Schemas['CampaignStatus'];
-
-export type CampaignSummary = Schemas['CampaignSummaryDto'];
-export type CampaignDetail = Schemas['CampaignDetailDto'];
-export type CampaignCommercial = Schemas['CampaignCommercialDto'];
-export type CampaignAttempt = Schemas['CampaignAttemptDto'];
-export type CampaignProgress = Schemas['CampaignProgressDto'];
-export type CreateCampaignInput = Schemas['CreateCampaignDto'];
-
 export const BDD_SEGMENTS = [
   'BDD1',
   'BDD2',
@@ -145,30 +134,6 @@ export const SEGMENT_LABELS: Record<BddSegment, string> = {
   BDD3: 'BDD3 : autre syndicat / CBAO',
   BDD4: 'BDD4 : autre syndicat / autre banque',
 };
-
-export const CAMPAIGN_SCOPES = [
-  'ALL',
-  'BDD1',
-  'BDD2',
-  'BDD3',
-  'BDD4',
-  'GP1',
-  'GP2',
-  'GP3',
-  'GP4',
-] as const satisfies readonly CampaignScope[];
-
-export function campaignScopeLabel(scope: CampaignScope): string {
-  const labels: Record<CampaignScope, string> = {
-    ALL: 'Tous les groupes',
-    ...SEGMENT_LABELS,
-    GP1: 'GP1 : Fonctionnaire',
-    GP2: 'GP2 : Secteur privé',
-    GP3: 'GP3 : Informel',
-    GP4: 'GP4 : Diaspora',
-  };
-  return labels[scope];
-}
 
 export const PHASE2_STATUSES = [
   'PENDING',
@@ -229,19 +194,11 @@ export const REP_CALL_OUTCOME_VARIANTS: Record<RepCallOutcome, BadgeVariant> = {
   OTHER: 'outline',
 };
 
-export const CAMPAIGN_STATUS_LABELS: Record<CampaignStatus, string> = {
-  DRAFT: 'Brouillon',
-  ACTIVE: 'En cours',
-  PAUSED: 'Suspendue',
-  CLOSED: 'Clôturée',
-};
-
 type MissingFrom<Enum extends string, Listed extends string> = Exclude<Enum, Listed>;
 
 type FilterListCoverage = {
   PROSPECT_STATUTS: MissingFrom<ProspectStatut, (typeof PROSPECT_STATUTS)[number]>;
   BDD_SEGMENTS: MissingFrom<BddSegment, (typeof BDD_SEGMENTS)[number]>;
-  CAMPAIGN_SCOPES: MissingFrom<CampaignScope, (typeof CAMPAIGN_SCOPES)[number]>;
   PHASE2_STATUSES: MissingFrom<Phase2Status, (typeof PHASE2_STATUSES)[number]>;
   ENROLLMENT_METHODS: MissingFrom<EnrollmentMethod, (typeof ENROLLMENT_METHODS)[number]>;
   PROSPECT_SORT_FIELDS: MissingFrom<
@@ -345,5 +302,4 @@ export interface ReferenceData {
   regions: Region[];
   commerciaux: FilterOption[];
   representants: FilterOption[];
-  campagnes: FilterOption[];
 }

@@ -4,8 +4,8 @@ import { EMPTY_REPRESENTANT_FILTERS } from '@/lib/representant-filters';
 // références client, et la page en tirait `{...undefined}` — donc des filtres
 // sans `search`, et un écran d'ouverture en erreur.
 
-/** Les représentants qu'on n'a pas encore appelés. */
-export const A_APPELER = {
+/** Les représentants dont la relation n'a pas encore été tranchée. */
+export const NON_QUALIFIES = {
   ...EMPTY_REPRESENTANT_FILTERS,
   relationStatus: 'INCONNU' as const,
   pageSize: 1,

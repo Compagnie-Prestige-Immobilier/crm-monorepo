@@ -45,7 +45,6 @@ beforeEach(() => {
     iefs: [],
     regions: [],
     commerciaux: [],
-    campagnes: [],
     representants: [],
     professions: [
       {

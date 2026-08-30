@@ -99,9 +99,12 @@ export function periodeAffichee(filters: DashboardFilters): string {
 export function SelecteurPeriode({
   filters,
   onChange,
+  comparaison = true,
 }: {
   filters: DashboardFilters;
   onChange: (patch: Partial<DashboardFilters>) => void;
+  /** Un écran qui ne compare rien ne montre pas « Comparer à ». */
+  comparaison?: boolean;
 }) {
   const plage = plageDeFiltres(filters);
   const tropLarge = plageTropLarge(plage);
@@ -163,25 +166,27 @@ export function SelecteurPeriode({
           </PopoverContent>
         </Popover>
 
-        <Select
-          value={filters.comparaison}
-          onValueChange={(value) => {
-            if (value !== null) onChange({ comparaison: value });
-          }}
-        >
-          <SelectTrigger aria-label="Comparer à" size="sm" className="w-48">
-            <SelectValue>
-              {(valeur: Comparaison) => LIBELLES_COMPARAISON[valeur]}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {Object.entries(LIBELLES_COMPARAISON).map(([valeur, libelle]) => (
-              <SelectItem key={valeur} value={valeur}>
-                {libelle}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {comparaison ? (
+          <Select
+            value={filters.comparaison}
+            onValueChange={(value) => {
+              if (value !== null) onChange({ comparaison: value });
+            }}
+          >
+            <SelectTrigger aria-label="Comparer à" size="sm" className="w-48">
+              <SelectValue>
+                {(valeur: Comparaison) => LIBELLES_COMPARAISON[valeur]}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(LIBELLES_COMPARAISON).map(([valeur, libelle]) => (
+                <SelectItem key={valeur} value={valeur}>
+                  {libelle}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
       </div>
 
       {tropLarge ? (

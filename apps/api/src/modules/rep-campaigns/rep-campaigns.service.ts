@@ -13,7 +13,13 @@ import {
   type CreateRepCallAttemptDto,
   type RepCallAttemptResultDto,
 } from './dto.js';
-import { callbackAtNotAllowed, callbackAtRequired, commentRequired, promisedNotAllowed, representantNotFound } from './errors.js';
+import {
+  callbackAtNotAllowed,
+  callbackAtRequired,
+  commentRequired,
+  promisedNotAllowed,
+  representantNotFound,
+} from './errors.js';
 
 @Injectable()
 export class RepCampaignsService {
@@ -22,10 +28,16 @@ export class RepCampaignsService {
     private readonly representants: RepresentantsService,
   ) {}
 
-  async recordAttempt(user: AuthenticatedUser, body: CreateRepCallAttemptDto): Promise<RepCallAttemptResultDto> {
+  async recordAttempt(
+    user: AuthenticatedUser,
+    body: CreateRepCallAttemptDto,
+  ): Promise<RepCallAttemptResultDto> {
     const comment = validatedComment(body);
     const suggested = await this.resolveSuggested(body.suggestedPhone);
-    const existing = await this.prisma.repCallAttempt.findUnique({ where: { id: body.id }, select: { id: true } });
+    const existing = await this.prisma.repCallAttempt.findUnique({
+      where: { id: body.id },
+      select: { id: true },
+    });
     if (existing) return attemptResult(RepCallAttemptApplyStatus.DUPLICATE, existing.id, suggested);
 
     const representant = await this.prisma.representant.findFirst({
@@ -37,16 +49,18 @@ export class RepCampaignsService {
 
     const applied = await this.prisma.$transaction(async (tx) => {
       const inserted = await tx.repCallAttempt.createMany({
-        data: [{
-          id: body.id,
-          representantId: body.representantId,
-          performedById: user.id,
-          outcome: body.outcome,
-          promisedProspects: body.promisedProspects ?? null,
-          comment,
-          callbackAt: body.callbackAt ? new Date(body.callbackAt) : null,
-          clientCreatedAt: new Date(body.clientCreatedAt),
-        }],
+        data: [
+          {
+            id: body.id,
+            representantId: body.representantId,
+            performedById: user.id,
+            outcome: body.outcome,
+            promisedProspects: body.promisedProspects ?? null,
+            comment,
+            callbackAt: body.callbackAt ? new Date(body.callbackAt) : null,
+            clientCreatedAt: new Date(body.clientCreatedAt),
+          },
+        ],
         skipDuplicates: true,
       });
       if (inserted.count === 0) return false;
@@ -66,7 +80,10 @@ export class RepCampaignsService {
         });
       }
       if (Object.keys(whatsapp).length > 0) {
-        await tx.representant.update({ where: { id: body.representantId }, data: { ...whatsapp, rev: { increment: 1 } } });
+        await tx.representant.update({
+          where: { id: body.representantId },
+          data: { ...whatsapp, rev: { increment: 1 } },
+        });
       }
       if (body.relationStatus !== undefined) {
         await applyRelationChange(tx, {
@@ -80,13 +97,22 @@ export class RepCampaignsService {
       return true;
     });
 
-    return attemptResult(applied ? RepCallAttemptApplyStatus.APPLIED : RepCallAttemptApplyStatus.DUPLICATE, body.id, suggested);
+    return attemptResult(
+      applied ? RepCallAttemptApplyStatus.APPLIED : RepCallAttemptApplyStatus.DUPLICATE,
+      body.id,
+      suggested,
+    );
   }
 
-  private async resolveSuggested(phone: string | undefined): Promise<{ lookup: RepresentantLookupDto; resolvedRepresentantId: string | null } | null> {
+  private async resolveSuggested(
+    phone: string | undefined,
+  ): Promise<{ lookup: RepresentantLookupDto; resolvedRepresentantId: string | null } | null> {
     if (phone === undefined) return null;
     const lookup = await this.representants.lookup(phone);
-    const known = await this.prisma.representant.findFirst({ where: { phoneE164: lookup.phoneE164, deletedAt: null }, select: { id: true } });
+    const known = await this.prisma.representant.findFirst({
+      where: { phoneE164: lookup.phoneE164, deletedAt: null },
+      select: { id: true },
+    });
     return { lookup, resolvedRepresentantId: known?.id ?? null };
   }
 }
@@ -94,10 +120,13 @@ export class RepCampaignsService {
 function validatedComment(body: CreateRepCallAttemptDto): string | null {
   const comment = body.comment?.trim() || null;
   if (body.outcome === RepCallOutcome.OTHER && comment === null) throw commentRequired();
-  if (body.promisedProspects !== undefined && body.outcome !== RepCallOutcome.PROSPECTS_PROMISED) throw promisedNotAllowed();
+  if (body.promisedProspects !== undefined && body.outcome !== RepCallOutcome.PROSPECTS_PROMISED)
+    throw promisedNotAllowed();
   if (comment !== null && comment.length > COMMENT_MAX_LENGTH) throw commentRequired();
-  if (body.outcome === RepCallOutcome.CALLBACK && body.callbackAt === undefined) throw callbackAtRequired();
-  if (body.callbackAt !== undefined && body.outcome !== RepCallOutcome.CALLBACK) throw callbackAtNotAllowed();
+  if (body.outcome === RepCallOutcome.CALLBACK && body.callbackAt === undefined)
+    throw callbackAtRequired();
+  if (body.callbackAt !== undefined && body.outcome !== RepCallOutcome.CALLBACK)
+    throw callbackAtNotAllowed();
   return comment;
 }
 

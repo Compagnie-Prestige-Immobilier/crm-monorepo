@@ -26,7 +26,7 @@ const AFFLUENCE: PresetWidget[] = [
   { source: 'jour-le-plus-charge', marque: 'tuile', taille: 'demi' },
   { source: 'par-heure-jour-semaine', marque: 'carte-de-chaleur', taille: 'pleine' },
   { source: 'par-heure', marque: 'aire-polaire', taille: 'demi' },
-  { source: 'par-jour-semaine', marque: 'radar', taille: 'demi' },
+  { source: 'par-jour-semaine', marque: 'barres-verticales', taille: 'demi' },
 ];
 
 const ORGANISATION: PresetWidget[] = [

@@ -4,6 +4,8 @@ import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/ca
 import { cn } from '@/lib/utils';
 import { useCanvasPresentation } from '@/lib/use-canvas-presentation';
 
+const HAUTEURS = { compacte: 'min-h-20', normale: 'h-64', haute: 'h-80' } as const;
+
 export function ChartCard({
   title,
   description,
@@ -16,8 +18,11 @@ export function ChartCard({
   description?: string | undefined;
   children: ReactNode;
   className?: string | undefined;
-  /** Une carte pleine largeur mérite plus de hauteur qu'une demi-carte. */
-  hauteur?: 'normale' | 'haute';
+  /**
+   * Une carte pleine largeur mérite plus de hauteur qu'une demi-carte ; une
+   * tuile sans canvas n'a pas besoin de la zone réservée à Chart.js.
+   */
+  hauteur?: 'compacte' | 'normale' | 'haute';
   actions?: ReactNode | undefined;
 }) {
   const chartRegion = useRef<HTMLDivElement>(null);
@@ -37,7 +42,7 @@ export function ChartCard({
           auto-dimensionné produit une boucle de redimensionnement. */}
       <div
         ref={chartRegion}
-        className={cn('px-5 pb-1', hauteur === 'haute' ? 'h-80' : 'h-64')}
+        className={cn('px-5 pb-1', HAUTEURS[hauteur])}
         role="group"
         aria-label={`${title} graphique`}
       >

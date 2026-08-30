@@ -19,8 +19,6 @@ abstract class _$SupervisedUserDtoCWProxy {
 
   SupervisedUserDto isActive(bool isActive);
 
-  SupervisedUserDto departementName(String? departementName);
-
   SupervisedUserDto presence(PresenceState presence);
 
   SupervisedUserDto hasLiveSession(bool hasLiveSession);
@@ -54,7 +52,6 @@ abstract class _$SupervisedUserDtoCWProxy {
     String email,
     Role role,
     bool isActive,
-    String? departementName,
     PresenceState presence,
     bool hasLiveSession,
     num sessionCount,
@@ -91,10 +88,6 @@ class _$SupervisedUserDtoCWProxyImpl implements _$SupervisedUserDtoCWProxy {
 
   @override
   SupervisedUserDto isActive(bool isActive) => this(isActive: isActive);
-
-  @override
-  SupervisedUserDto departementName(String? departementName) =>
-      this(departementName: departementName);
 
   @override
   SupervisedUserDto presence(PresenceState presence) =>
@@ -149,7 +142,6 @@ class _$SupervisedUserDtoCWProxyImpl implements _$SupervisedUserDtoCWProxy {
     Object? email = const $CopyWithPlaceholder(),
     Object? role = const $CopyWithPlaceholder(),
     Object? isActive = const $CopyWithPlaceholder(),
-    Object? departementName = const $CopyWithPlaceholder(),
     Object? presence = const $CopyWithPlaceholder(),
     Object? hasLiveSession = const $CopyWithPlaceholder(),
     Object? sessionCount = const $CopyWithPlaceholder(),
@@ -186,10 +178,6 @@ class _$SupervisedUserDtoCWProxyImpl implements _$SupervisedUserDtoCWProxy {
           ? _value.isActive
           // ignore: cast_nullable_to_non_nullable
           : isActive as bool,
-      departementName: departementName == const $CopyWithPlaceholder()
-          ? _value.departementName
-          // ignore: cast_nullable_to_non_nullable
-          : departementName as String?,
       presence: presence == const $CopyWithPlaceholder()
           ? _value.presence
           // ignore: cast_nullable_to_non_nullable
@@ -256,7 +244,6 @@ SupervisedUserDto _$SupervisedUserDtoFromJson(Map<String, dynamic> json) =>
           'email',
           'role',
           'isActive',
-          'departementName',
           'presence',
           'hasLiveSession',
           'sessionCount',
@@ -283,10 +270,6 @@ SupervisedUserDto _$SupervisedUserDtoFromJson(Map<String, dynamic> json) =>
           ),
         ),
         isActive: $checkedConvert('isActive', (v) => v as bool),
-        departementName: $checkedConvert(
-          'departementName',
-          (v) => v as String?,
-        ),
         presence: $checkedConvert(
           'presence',
           (v) => $enumDecode(
@@ -331,7 +314,6 @@ Map<String, dynamic> _$SupervisedUserDtoToJson(SupervisedUserDto instance) =>
       'email': instance.email,
       'role': _$RoleEnumMap[instance.role]!,
       'isActive': instance.isActive,
-      'departementName': instance.departementName,
       'presence': _$PresenceStateEnumMap[instance.presence]!,
       'hasLiveSession': instance.hasLiveSession,
       'sessionCount': instance.sessionCount,

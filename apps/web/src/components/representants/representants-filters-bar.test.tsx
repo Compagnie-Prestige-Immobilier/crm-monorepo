@@ -53,7 +53,6 @@ beforeEach(() => {
     syndicats: [],
     commerciaux: [],
     representants: [],
-    campagnes: [],
   });
 });
 

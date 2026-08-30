@@ -60,7 +60,7 @@ void main() {
           installer ?? _FakeInstaller(),
         ),
         connectivitySourceProvider.overrideWithValue(
-          _FakeSource(interfaces, puis: puisInterfaces),
+          source ?? _FakeSource(interfaces),
         ),
         appUpdateClientProvider.overrideWithValue(() {
           final Dio dio = Dio(BaseOptions(baseUrl: 'https://exemple.test'));
@@ -73,9 +73,11 @@ void main() {
     return container;
   }
 
+  /// Large : la vérification d'empreinte passe par `Isolate.run`, dont le
+  /// démarrage coûte plus que le reste du cycle.
   Future<AppUpdateState> settle(ProviderContainer container) async {
     container.read(appUpdateControllerProvider);
-    await Future<void>.delayed(const Duration(milliseconds: 80));
+    await Future<void>.delayed(const Duration(milliseconds: 600));
     return container.read(appUpdateControllerProvider);
   }
 
@@ -139,7 +141,7 @@ void main() {
 
       final ProviderContainer container = build(adapter: _FailingAdapter());
       container.read(appUpdateControllerProvider);
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+      await Future<void>.delayed(const Duration(milliseconds: 150));
 
       final AppUpdateState state = container.read(appUpdateControllerProvider);
       expect(state.status, AppUpdateStatus.unreachable);
@@ -162,7 +164,7 @@ void main() {
       interfaces: const <ConnectivityResult>[ConnectivityResult.mobile],
     );
     container.read(appUpdateControllerProvider);
-    await Future<void>.delayed(const Duration(milliseconds: 50));
+    await Future<void>.delayed(const Duration(milliseconds: 150));
 
     final AppUpdateState state = container.read(appUpdateControllerProvider);
     expect(state.blocker, AppUpdateBlocker.meteredLink);
@@ -182,7 +184,7 @@ void main() {
   test('aucune mise à jour disponible : rien ne s\'affiche', () async {
     final ProviderContainer container = build(adapter: _NothingAdapter());
     container.read(appUpdateControllerProvider);
-    await Future<void>.delayed(const Duration(milliseconds: 50));
+    await Future<void>.delayed(const Duration(milliseconds: 150));
 
     final AppUpdateState state = container.read(appUpdateControllerProvider);
     expect(state.status, AppUpdateStatus.ready);
@@ -299,13 +301,19 @@ void main() {
     () async {
       // Le contrôle avait abouti : sans relire l'interface, l'échec du
       // transfert laissait un blocage dur sur un téléphone hors ligne.
+      final _FakeSource source = _FakeSource(<ConnectivityResult>[
+        ConnectivityResult.wifi,
+      ]);
       final AppUpdateState state = await settle(
         build(
+          source: source,
           adapter: _JsonAdapter(
             refusee(fileSize: 2048),
             coupeLeTransfert: true,
+            auTelechargement: () => source.interfaces = <ConnectivityResult>[
+              ConnectivityResult.none,
+            ],
           ),
-          puisInterfaces: const <ConnectivityResult>[ConnectivityResult.none],
         ),
       );
       expect(state.status, AppUpdateStatus.unreachable);
@@ -406,7 +414,7 @@ void main() {
     TestWidgetsFlutterBinding.instance.handleAppLifecycleStateChanged(
       AppLifecycleState.resumed,
     );
-    await Future<void>.delayed(const Duration(milliseconds: 50));
+    await Future<void>.delayed(const Duration(milliseconds: 150));
 
     expect(container.read(appUpdateControllerProvider).canInstall, isTrue);
     expect(installer.permissionChecks, greaterThan(0));
@@ -459,7 +467,14 @@ class _FakeInstaller implements UpdateInstaller {
 /// Le contrôle rend [body] ; l'URL de téléchargement rend [apk] quand il est
 /// fourni, pour que l'empreinte annoncée puisse réellement être vérifiée.
 class _JsonAdapter implements HttpClientAdapter {
-  _JsonAdapter(this.body, {this.apk, this.coupeLeTransfert = false});
+  _JsonAdapter(
+    this.body, {
+    this.apk,
+    this.coupeLeTransfert = false,
+    this.auTelechargement,
+  });
+
+  final void Function()? auTelechargement;
 
   final Map<String, Object?> body;
   final List<int>? apk;
@@ -482,6 +497,7 @@ class _JsonAdapter implements HttpClientAdapter {
   ) async {
     if (options.path == body['downloadUrl']) {
       rangeDemande = options.headers['Range'] as String?;
+      auTelechargement?.call();
       if (coupeLeTransfert) {
         return ResponseBody(
           Stream<Uint8List>.error(

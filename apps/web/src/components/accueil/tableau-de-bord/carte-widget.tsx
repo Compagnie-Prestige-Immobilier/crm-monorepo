@@ -24,6 +24,7 @@ import {
   type DashboardTaille,
   type DispositionPresentation,
   type DonneesSource,
+  type Forme,
 } from '@/components/accueil/tableau-de-bord/sources';
 import { ChartCard } from '@/components/dashboard/chart-card';
 import { ChoixGraphique, marqueTexte } from '@/components/dashboard/chart-visual';
@@ -42,6 +43,17 @@ import { cn } from '@/lib/utils';
 import type { DashboardWidget } from '@/lib/data/visites-dashboard';
 
 /** Un widget dont la source a quitté le catalogue reste nommé, jamais anonyme. */
+/** Une tuile sans canvas n'a pas besoin de la zone réservée à Chart.js. */
+function hauteurDe(
+  forme: Forme,
+  marque: DashboardMarque | undefined,
+  taille: DashboardTaille,
+): 'compacte' | 'normale' | 'haute' {
+  if (taille === 'pleine' || forme === 'equipe') return 'haute';
+  if (marque === 'tuile') return 'compacte';
+  return 'normale';
+}
+
 function entreeDe(catalogue: Catalogue, source: string): CatalogueEntree {
   return catalogue[source] ?? { label: source, forme: 'classement' };
 }
@@ -93,17 +105,18 @@ export function CarteWidget({
   const triPertinent = forme === 'classement';
   const reglagesVisibles = honors.palette || honors.valeurs || honors.legende || triPertinent;
 
+  // `min-w-0` : sans lui, un tableau large élargit la colonne de grille et toute la page défile.
   return (
     <div
       id={`widget-${widget.id}`}
       ref={setNodeRef}
       tabIndex={-1}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={cn(spanClass(widget.marque, widget.taille), isDragging && 'opacity-40')}
+      className={cn('min-w-0', spanClass(widget.marque, widget.taille), isDragging && 'opacity-40')}
     >
       <ChartCard
         title={titre}
-        hauteur={taille === 'pleine' ? 'haute' : 'normale'}
+        hauteur={hauteurDe(forme, widget.marque, taille)}
         actions={
           editing ? (
             <div className="flex shrink-0 items-center gap-0.5">

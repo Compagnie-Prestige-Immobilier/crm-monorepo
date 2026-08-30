@@ -13,12 +13,13 @@ export function prospectConditions(
 ): Prisma.Sql {
   const conditions: Prisma.Sql[] = [];
 
-  void user;
-
-  // Le filtre passe tel quel : la portée ci-dessus reste en AND et ne laisse
-  // remonter que ce que l'appelant a déjà en main.
+  if (!readsEveryone(user)) {
+    conditions.push(Prisma.sql`p."createdById" = ${user.id}`);
+  }
   if (filter.commercialId) {
-    conditions.push(Prisma.sql`p."createdById" = ${filter.commercialId}`);
+    conditions.push(
+      Prisma.sql`p."createdById" = ${readableOwnerId(user, filter.commercialId)}`,
+    );
   }
 
   if (!(filter.includeDeleted && isAdmin(user))) {
@@ -35,9 +36,8 @@ export function prospectConditions(
 }
 
 /**
- * `prospectReadScope` en SQL : ses propres fiches, ou celles qu'une campagne lui
- * a confiées. Les agrégats sont écrits en SQL brut, une clause Prisma ne s'y
- * réemploie pas ; c'est la même règle, elle doit bouger en même temps.
+ * Portée des prospects en SQL. Les agrégats sont écrits en SQL brut, une clause
+ * Prisma ne s'y réemploie pas ; c'est la même règle, elle doit bouger en même temps.
  */
 function prospectFilterConditions(filter: ProspectFilterDto): Prisma.Sql[] {
   const conditions: Prisma.Sql[] = [];

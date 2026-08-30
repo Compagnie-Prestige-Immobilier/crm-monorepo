@@ -1,0 +1,463 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Method App\\Http\\Controllers\\AtelierController\:\:addPhoto\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AtelierController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AtelierController\:\:complete\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AtelierController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AtelierController\:\:dashboard\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AtelierController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AtelierController\:\:handleRequest\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AtelierController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AtelierController\:\:removePhoto\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AtelierController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AtelierController\:\:reorderPhotos\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AtelierController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AtelierController\:\:requests\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AtelierController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AtelierController\:\:show\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AtelierController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AtelierController\:\:store\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AtelierController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AtelierController\:\:update\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AtelierController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Contracts\\Auth\\StatefulGuard\:\:factory\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Contracts\\Auth\\StatefulGuard\:\:refresh\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Contracts\\Auth\\StatefulGuard\:\:setToken\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:destroy\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:forgot\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:login\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:logout\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:me\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:refresh\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:register\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:reset\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:tokenResponse\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\AuthController\:\:update\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Parameter \#1 \$token of method App\\Http\\Controllers\\AuthController\:\:tokenResponse\(\) expects string, null given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Result of method Illuminate\\Contracts\\Auth\\StatefulGuard\:\:login\(\) \(void\) is used\.$#'
+			identifier: method.void
+			count: 2
+			path: app/Http/Controllers/AuthController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Client\:\:\$remaining_cfa\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/ClientController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Client\:\:\$total_spent_cfa\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/ClientController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\ClientController\:\:index\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/ClientController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\ClientController\:\:show\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/ClientController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\ClientController\:\:store\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/ClientController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\ClientController\:\:storeBeneficiary\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/ClientController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\ClientController\:\:update\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/ClientController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\ClientController\:\:updateBeneficiary\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/ClientController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\MarketplaceController\:\:completions\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/MarketplaceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\MarketplaceController\:\:contact\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/MarketplaceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\MarketplaceController\:\:favorite\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/MarketplaceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\MarketplaceController\:\:favorites\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/MarketplaceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\MarketplaceController\:\:myContacts\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/MarketplaceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\MarketplaceController\:\:report\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/MarketplaceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\MarketplaceController\:\:review\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/MarketplaceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\MarketplaceController\:\:reviews\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/MarketplaceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\MarketplaceController\:\:show\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/MarketplaceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\MarketplaceController\:\:unfavorite\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/MarketplaceController.php
+
+		-
+			message: '#^Relation ''reviews'' is not found in App\\Models\\Atelier model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Http/Controllers/MarketplaceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\OrderController\:\:index\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/OrderController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\OrderController\:\:pay\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/OrderController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\OrderController\:\:show\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/OrderController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\OrderController\:\:status\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/OrderController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\OrderController\:\:store\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/OrderController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\OrderController\:\:update\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/OrderController.php
+
+		-
+			message: '#^Method App\\Http\\Middleware\\EnsureRole\:\:handle\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Middleware/EnsureRole.php
+
+		-
+			message: '#^Method App\\Models\\Atelier\:\:clients\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Atelier.php
+
+		-
+			message: '#^Method App\\Models\\Atelier\:\:contacts\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Atelier.php
+
+		-
+			message: '#^Method App\\Models\\Atelier\:\:orders\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Atelier.php
+
+		-
+			message: '#^Method App\\Models\\Atelier\:\:reviews\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Atelier.php
+
+		-
+			message: '#^Method App\\Models\\Atelier\:\:scopePublic\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Atelier.php
+
+		-
+			message: '#^Method App\\Models\\Atelier\:\:scopePublic\(\) has parameter \$q with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: app/Models/Atelier.php
+
+		-
+			message: '#^Method App\\Models\\Atelier\:\:scopeWithDistance\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Atelier.php
+
+		-
+			message: '#^Method App\\Models\\Atelier\:\:scopeWithDistance\(\) has parameter \$q with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: app/Models/Atelier.php
+
+		-
+			message: '#^Method App\\Models\\Client\:\:atelier\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Client.php
+
+		-
+			message: '#^Method App\\Models\\Client\:\:beneficiaries\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Client.php
+
+		-
+			message: '#^Method App\\Models\\Client\:\:orders\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Client.php
+
+		-
+			message: '#^Method App\\Models\\Contact\:\:atelier\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Contact.php
+
+		-
+			message: '#^Method App\\Models\\Order\:\:atelier\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Order.php
+
+		-
+			message: '#^Method App\\Models\\Order\:\:beneficiary\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Order.php
+
+		-
+			message: '#^Method App\\Models\\Order\:\:client\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Order.php
+
+		-
+			message: '#^Method App\\Models\\Order\:\:payments\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Order.php
+
+		-
+			message: '#^Method App\\Models\\Payment\:\:order\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Payment.php
+
+		-
+			message: '#^Method App\\Models\\PortfolioPhoto\:\:atelier\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/PortfolioPhoto.php
+
+		-
+			message: '#^Method App\\Models\\Report\:\:user\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Report.php
+
+		-
+			message: '#^Method App\\Models\\Review\:\:user\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/Review.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:contacts\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:favorites\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:getJWTCustomClaims\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\Models\\User\:\:reviews\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Models/User.php
+
+		-
+			message: '#^Method App\\OpenApi\\ModelSchemas\:\:patch\(\) has parameter \$optional with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/OpenApi/ModelSchemas.php
+
+		-
+			message: '#^Method App\\OpenApi\\ModelSchemas\:\:patch\(\) has parameter \$required with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/OpenApi/ModelSchemas.php

@@ -23,10 +23,6 @@ abstract class _$CallbackDtoCWProxy {
 
   CallbackDto assignedToName(String assignedToName);
 
-  CallbackDto campaignId(String? campaignId);
-
-  CallbackDto taskId(String? taskId);
-
   CallbackDto overdue(bool overdue);
 
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `CallbackDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
@@ -44,8 +40,6 @@ abstract class _$CallbackDtoCWProxy {
     String? comment,
     String assignedToId,
     String assignedToName,
-    String? campaignId,
-    String? taskId,
     bool overdue,
   });
 }
@@ -84,12 +78,6 @@ class _$CallbackDtoCWProxyImpl implements _$CallbackDtoCWProxy {
       this(assignedToName: assignedToName);
 
   @override
-  CallbackDto campaignId(String? campaignId) => this(campaignId: campaignId);
-
-  @override
-  CallbackDto taskId(String? taskId) => this(taskId: taskId);
-
-  @override
   CallbackDto overdue(bool overdue) => this(overdue: overdue);
 
   @override
@@ -108,8 +96,6 @@ class _$CallbackDtoCWProxyImpl implements _$CallbackDtoCWProxy {
     Object? comment = const $CopyWithPlaceholder(),
     Object? assignedToId = const $CopyWithPlaceholder(),
     Object? assignedToName = const $CopyWithPlaceholder(),
-    Object? campaignId = const $CopyWithPlaceholder(),
-    Object? taskId = const $CopyWithPlaceholder(),
     Object? overdue = const $CopyWithPlaceholder(),
   }) {
     return CallbackDto(
@@ -145,14 +131,6 @@ class _$CallbackDtoCWProxyImpl implements _$CallbackDtoCWProxy {
           ? _value.assignedToName
           // ignore: cast_nullable_to_non_nullable
           : assignedToName as String,
-      campaignId: campaignId == const $CopyWithPlaceholder()
-          ? _value.campaignId
-          // ignore: cast_nullable_to_non_nullable
-          : campaignId as String?,
-      taskId: taskId == const $CopyWithPlaceholder()
-          ? _value.taskId
-          // ignore: cast_nullable_to_non_nullable
-          : taskId as String?,
       overdue: overdue == const $CopyWithPlaceholder()
           ? _value.overdue
           // ignore: cast_nullable_to_non_nullable
@@ -184,8 +162,6 @@ CallbackDto _$CallbackDtoFromJson(Map<String, dynamic> json) =>
           'comment',
           'assignedToId',
           'assignedToName',
-          'campaignId',
-          'taskId',
           'overdue',
         ],
       );
@@ -201,8 +177,6 @@ CallbackDto _$CallbackDtoFromJson(Map<String, dynamic> json) =>
         comment: $checkedConvert('comment', (v) => v as String?),
         assignedToId: $checkedConvert('assignedToId', (v) => v as String),
         assignedToName: $checkedConvert('assignedToName', (v) => v as String),
-        campaignId: $checkedConvert('campaignId', (v) => v as String?),
-        taskId: $checkedConvert('taskId', (v) => v as String?),
         overdue: $checkedConvert('overdue', (v) => v as bool),
       );
       return val;
@@ -218,7 +192,5 @@ Map<String, dynamic> _$CallbackDtoToJson(CallbackDto instance) =>
       'comment': instance.comment,
       'assignedToId': instance.assignedToId,
       'assignedToName': instance.assignedToName,
-      'campaignId': instance.campaignId,
-      'taskId': instance.taskId,
       'overdue': instance.overdue,
     };

@@ -17,7 +17,6 @@ import 'package:crm_api_client/src/model/analytics_totals_dto.dart';
 import 'package:crm_api_client/src/model/api_error_dto.dart';
 import 'package:crm_api_client/src/model/bank_aging_dto.dart';
 import 'package:crm_api_client/src/model/bdd_segment.dart';
-import 'package:crm_api_client/src/model/campaign_pilotage_dto.dart';
 import 'package:crm_api_client/src/model/data_quality_dto.dart';
 import 'package:crm_api_client/src/model/departement_yield_list_dto.dart';
 import 'package:crm_api_client/src/model/enrollment_method.dart';
@@ -59,8 +58,7 @@ class AnalyticsApi {
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
-  /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
-  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
+  /// * [appelePar] - Téléconseiller ayant consigné au moins une tentative sur la fiche.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -89,8 +87,7 @@ class AnalyticsApi {
     BddSegment? segment,
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
-    String? campaignId,
-    String? assignedToId,
+    String? appelePar,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -130,8 +127,7 @@ class AnalyticsApi {
       if (segment != null) r'segment': segment,
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
-      if (campaignId != null) r'campaignId': campaignId,
-      if (assignedToId != null) r'assignedToId': assignedToId,
+      if (appelePar != null) r'appelePar': appelePar,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -199,8 +195,7 @@ class AnalyticsApi {
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
-  /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
-  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
+  /// * [appelePar] - Téléconseiller ayant consigné au moins une tentative sur la fiche.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -229,8 +224,7 @@ class AnalyticsApi {
     BddSegment? segment,
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
-    String? campaignId,
-    String? assignedToId,
+    String? appelePar,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -270,8 +264,7 @@ class AnalyticsApi {
       if (segment != null) r'segment': segment,
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
-      if (campaignId != null) r'campaignId': campaignId,
-      if (assignedToId != null) r'assignedToId': assignedToId,
+      if (appelePar != null) r'appelePar': appelePar,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -339,8 +332,7 @@ class AnalyticsApi {
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
-  /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
-  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
+  /// * [appelePar] - Téléconseiller ayant consigné au moins une tentative sur la fiche.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -369,8 +361,7 @@ class AnalyticsApi {
     BddSegment? segment,
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
-    String? campaignId,
-    String? assignedToId,
+    String? appelePar,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -410,8 +401,7 @@ class AnalyticsApi {
       if (segment != null) r'segment': segment,
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
-      if (campaignId != null) r'campaignId': campaignId,
-      if (assignedToId != null) r'assignedToId': assignedToId,
+      if (appelePar != null) r'appelePar': appelePar,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -479,8 +469,7 @@ class AnalyticsApi {
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
-  /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
-  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
+  /// * [appelePar] - Téléconseiller ayant consigné au moins une tentative sur la fiche.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -509,8 +498,7 @@ class AnalyticsApi {
     BddSegment? segment,
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
-    String? campaignId,
-    String? assignedToId,
+    String? appelePar,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -550,8 +538,7 @@ class AnalyticsApi {
       if (segment != null) r'segment': segment,
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
-      if (campaignId != null) r'campaignId': campaignId,
-      if (assignedToId != null) r'assignedToId': assignedToId,
+      if (appelePar != null) r'appelePar': appelePar,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -619,8 +606,7 @@ class AnalyticsApi {
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
-  /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
-  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
+  /// * [appelePar] - Téléconseiller ayant consigné au moins une tentative sur la fiche.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -649,8 +635,7 @@ class AnalyticsApi {
     BddSegment? segment,
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
-    String? campaignId,
-    String? assignedToId,
+    String? appelePar,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -690,8 +675,7 @@ class AnalyticsApi {
       if (segment != null) r'segment': segment,
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
-      if (campaignId != null) r'campaignId': campaignId,
-      if (assignedToId != null) r'assignedToId': assignedToId,
+      if (appelePar != null) r'appelePar': appelePar,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -742,146 +726,6 @@ class AnalyticsApi {
     );
   }
 
-  /// Pilotage d’une campagne d’appels : joignabilité, cadence, fin projetée.
-  /// Sans &#x60;campaignId&#x60;, la mesure porte sur l’ensemble des campagnes ACTIVES. La progression était jusqu’ici calculée à la volée et ne remontait dans aucun tableau de bord : « 42 % faits » ne dit ni si les numéros répondent, ni quand la campagne se termine.
-  ///
-  /// Parameters:
-  /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
-  /// * [representantId]
-  /// * [banqueId]
-  /// * [syndicatId]
-  /// * [departementId]
-  /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
-  /// * [projet] - Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.
-  /// * [type] - Grand Public : fonctionnaire, secteur privé, informel, diaspora.
-  /// * [canalProvenanceId] - Grand Public : canal de provenance.
-  /// * [statut]
-  /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
-  /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
-  /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
-  /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
-  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
-  /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
-  /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
-  /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
-  /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
-  /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
-  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
-  /// * [headers] - Can be used to add additional headers to the request
-  /// * [extras] - Can be used to add flags to the request
-  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
-  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
-  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
-  ///
-  /// Returns a [Future] containing a [Response] with a [CampaignPilotageDto] as data
-  /// Throws [DioException] if API call or serialization fails
-  Future<Response<CampaignPilotageDto>> getCampaignPilotage({
-    String? search,
-    String? representantId,
-    String? banqueId,
-    String? syndicatId,
-    String? departementId,
-    String? commercialId,
-    Projet? projet,
-    ProspectType? type,
-    String? canalProvenanceId,
-    ProspectStatut? statut,
-    BddSegment? segment,
-    Phase2Status? phase2Status,
-    EnrollmentMethod? enrollmentMethod,
-    String? campaignId,
-    String? assignedToId,
-    String? enrollmentCapturedById,
-    String? origin,
-    DateTime? dateFrom,
-    DateTime? dateTo,
-    bool? includeDeleted = false,
-    CancelToken? cancelToken,
-    Map<String, dynamic>? headers,
-    Map<String, dynamic>? extra,
-    ValidateStatus? validateStatus,
-    ProgressCallback? onSendProgress,
-    ProgressCallback? onReceiveProgress,
-  }) async {
-    final _path = r'/api/v1/analytics/campaign-pilotage';
-    final _options = Options(
-      method: r'GET',
-      headers: <String, dynamic>{...?headers},
-      extra: <String, dynamic>{
-        'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
-        ],
-        ...?extra,
-      },
-      validateStatus: validateStatus,
-    );
-
-    final _queryParameters = <String, dynamic>{
-      if (search != null) r'search': search,
-      if (representantId != null) r'representantId': representantId,
-      if (banqueId != null) r'banqueId': banqueId,
-      if (syndicatId != null) r'syndicatId': syndicatId,
-      if (departementId != null) r'departementId': departementId,
-      if (commercialId != null) r'commercialId': commercialId,
-      if (projet != null) r'projet': projet,
-      if (type != null) r'type': type,
-      if (canalProvenanceId != null) r'canalProvenanceId': canalProvenanceId,
-      if (statut != null) r'statut': statut,
-      if (segment != null) r'segment': segment,
-      if (phase2Status != null) r'phase2Status': phase2Status,
-      if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
-      if (campaignId != null) r'campaignId': campaignId,
-      if (assignedToId != null) r'assignedToId': assignedToId,
-      if (enrollmentCapturedById != null)
-        r'enrollmentCapturedById': enrollmentCapturedById,
-      if (origin != null) r'origin': origin,
-      if (dateFrom != null) r'dateFrom': dateFrom,
-      if (dateTo != null) r'dateTo': dateTo,
-      if (includeDeleted != null) r'includeDeleted': includeDeleted,
-    };
-
-    final _response = await _dio.request<Object>(
-      _path,
-      options: _options,
-      queryParameters: _queryParameters,
-      cancelToken: cancelToken,
-      onSendProgress: onSendProgress,
-      onReceiveProgress: onReceiveProgress,
-    );
-
-    CampaignPilotageDto? _responseData;
-
-    try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<CampaignPilotageDto, CampaignPilotageDto>(
-              rawData,
-              'CampaignPilotageDto',
-              growable: true,
-            );
-    } catch (error, stackTrace) {
-      throw DioException(
-        requestOptions: _response.requestOptions,
-        response: _response,
-        type: DioExceptionType.unknown,
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
-
-    return Response<CampaignPilotageDto>(
-      data: _responseData,
-      headers: _response.headers,
-      isRedirect: _response.isRedirect,
-      requestOptions: _response.requestOptions,
-      redirects: _response.redirects,
-      statusCode: _response.statusCode,
-      statusMessage: _response.statusMessage,
-      extra: _response.extra,
-    );
-  }
-
   /// Part de numéros injoignables ou erronés, par représentant et par département.
   /// Se branche sur les issues d’appel UNREACHABLE et WRONG_NUMBER. Les deux listes comptent la même population de tentatives selon deux axes.
   ///
@@ -899,8 +743,7 @@ class AnalyticsApi {
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
-  /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
-  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
+  /// * [appelePar] - Téléconseiller ayant consigné au moins une tentative sur la fiche.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -929,8 +772,7 @@ class AnalyticsApi {
     BddSegment? segment,
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
-    String? campaignId,
-    String? assignedToId,
+    String? appelePar,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -970,8 +812,7 @@ class AnalyticsApi {
       if (segment != null) r'segment': segment,
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
-      if (campaignId != null) r'campaignId': campaignId,
-      if (assignedToId != null) r'assignedToId': assignedToId,
+      if (appelePar != null) r'appelePar': appelePar,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -1039,8 +880,7 @@ class AnalyticsApi {
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
-  /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
-  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
+  /// * [appelePar] - Téléconseiller ayant consigné au moins une tentative sur la fiche.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -1069,8 +909,7 @@ class AnalyticsApi {
     BddSegment? segment,
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
-    String? campaignId,
-    String? assignedToId,
+    String? appelePar,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -1110,8 +949,7 @@ class AnalyticsApi {
       if (segment != null) r'segment': segment,
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
-      if (campaignId != null) r'campaignId': campaignId,
-      if (assignedToId != null) r'assignedToId': assignedToId,
+      if (appelePar != null) r'appelePar': appelePar,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -1179,8 +1017,7 @@ class AnalyticsApi {
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
-  /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
-  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
+  /// * [appelePar] - Téléconseiller ayant consigné au moins une tentative sur la fiche.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -1209,8 +1046,7 @@ class AnalyticsApi {
     BddSegment? segment,
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
-    String? campaignId,
-    String? assignedToId,
+    String? appelePar,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -1250,8 +1086,7 @@ class AnalyticsApi {
       if (segment != null) r'segment': segment,
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
-      if (campaignId != null) r'campaignId': campaignId,
-      if (assignedToId != null) r'assignedToId': assignedToId,
+      if (appelePar != null) r'appelePar': appelePar,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -1319,8 +1154,7 @@ class AnalyticsApi {
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
-  /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
-  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
+  /// * [appelePar] - Téléconseiller ayant consigné au moins une tentative sur la fiche.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -1349,8 +1183,7 @@ class AnalyticsApi {
     BddSegment? segment,
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
-    String? campaignId,
-    String? assignedToId,
+    String? appelePar,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -1390,8 +1223,7 @@ class AnalyticsApi {
       if (segment != null) r'segment': segment,
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
-      if (campaignId != null) r'campaignId': campaignId,
-      if (assignedToId != null) r'assignedToId': assignedToId,
+      if (appelePar != null) r'appelePar': appelePar,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -1459,8 +1291,7 @@ class AnalyticsApi {
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
-  /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
-  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
+  /// * [appelePar] - Téléconseiller ayant consigné au moins une tentative sur la fiche.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -1489,8 +1320,7 @@ class AnalyticsApi {
     BddSegment? segment,
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
-    String? campaignId,
-    String? assignedToId,
+    String? appelePar,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -1530,8 +1360,7 @@ class AnalyticsApi {
       if (segment != null) r'segment': segment,
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
-      if (campaignId != null) r'campaignId': campaignId,
-      if (assignedToId != null) r'assignedToId': assignedToId,
+      if (appelePar != null) r'appelePar': appelePar,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -1599,8 +1428,7 @@ class AnalyticsApi {
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
-  /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
-  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
+  /// * [appelePar] - Téléconseiller ayant consigné au moins une tentative sur la fiche.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -1629,8 +1457,7 @@ class AnalyticsApi {
     BddSegment? segment,
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
-    String? campaignId,
-    String? assignedToId,
+    String? appelePar,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -1670,8 +1497,7 @@ class AnalyticsApi {
       if (segment != null) r'segment': segment,
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
-      if (campaignId != null) r'campaignId': campaignId,
-      if (assignedToId != null) r'assignedToId': assignedToId,
+      if (appelePar != null) r'appelePar': appelePar,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -1739,8 +1565,7 @@ class AnalyticsApi {
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
-  /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
-  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
+  /// * [appelePar] - Téléconseiller ayant consigné au moins une tentative sur la fiche.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -1769,8 +1594,7 @@ class AnalyticsApi {
     BddSegment? segment,
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
-    String? campaignId,
-    String? assignedToId,
+    String? appelePar,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -1810,8 +1634,7 @@ class AnalyticsApi {
       if (segment != null) r'segment': segment,
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
-      if (campaignId != null) r'campaignId': campaignId,
-      if (assignedToId != null) r'assignedToId': assignedToId,
+      if (appelePar != null) r'appelePar': appelePar,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -1879,8 +1702,7 @@ class AnalyticsApi {
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
-  /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
-  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
+  /// * [appelePar] - Téléconseiller ayant consigné au moins une tentative sur la fiche.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -1909,8 +1731,7 @@ class AnalyticsApi {
     BddSegment? segment,
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
-    String? campaignId,
-    String? assignedToId,
+    String? appelePar,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -1950,8 +1771,7 @@ class AnalyticsApi {
       if (segment != null) r'segment': segment,
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
-      if (campaignId != null) r'campaignId': campaignId,
-      if (assignedToId != null) r'assignedToId': assignedToId,
+      if (appelePar != null) r'appelePar': appelePar,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -2019,8 +1839,7 @@ class AnalyticsApi {
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
-  /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
-  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
+  /// * [appelePar] - Téléconseiller ayant consigné au moins une tentative sur la fiche.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -2049,8 +1868,7 @@ class AnalyticsApi {
     BddSegment? segment,
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
-    String? campaignId,
-    String? assignedToId,
+    String? appelePar,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -2090,8 +1908,7 @@ class AnalyticsApi {
       if (segment != null) r'segment': segment,
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
-      if (campaignId != null) r'campaignId': campaignId,
-      if (assignedToId != null) r'assignedToId': assignedToId,
+      if (appelePar != null) r'appelePar': appelePar,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -2159,8 +1976,7 @@ class AnalyticsApi {
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
-  /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
-  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
+  /// * [appelePar] - Téléconseiller ayant consigné au moins une tentative sur la fiche.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -2190,8 +2006,7 @@ class AnalyticsApi {
     BddSegment? segment,
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
-    String? campaignId,
-    String? assignedToId,
+    String? appelePar,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -2232,8 +2047,7 @@ class AnalyticsApi {
       if (segment != null) r'segment': segment,
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
-      if (campaignId != null) r'campaignId': campaignId,
-      if (assignedToId != null) r'assignedToId': assignedToId,
+      if (appelePar != null) r'appelePar': appelePar,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -2302,8 +2116,7 @@ class AnalyticsApi {
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
-  /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
-  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
+  /// * [appelePar] - Téléconseiller ayant consigné au moins une tentative sur la fiche.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -2335,8 +2148,7 @@ class AnalyticsApi {
     BddSegment? segment,
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
-    String? campaignId,
-    String? assignedToId,
+    String? appelePar,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -2378,8 +2190,7 @@ class AnalyticsApi {
       if (segment != null) r'segment': segment,
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
-      if (campaignId != null) r'campaignId': campaignId,
-      if (assignedToId != null) r'assignedToId': assignedToId,
+      if (appelePar != null) r'appelePar': appelePar,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -2548,8 +2359,7 @@ class AnalyticsApi {
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
-  /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
-  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
+  /// * [appelePar] - Téléconseiller ayant consigné au moins une tentative sur la fiche.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -2579,8 +2389,7 @@ class AnalyticsApi {
     BddSegment? segment,
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
-    String? campaignId,
-    String? assignedToId,
+    String? appelePar,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -2621,8 +2430,7 @@ class AnalyticsApi {
       if (segment != null) r'segment': segment,
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
-      if (campaignId != null) r'campaignId': campaignId,
-      if (assignedToId != null) r'assignedToId': assignedToId,
+      if (appelePar != null) r'appelePar': appelePar,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -2691,8 +2499,7 @@ class AnalyticsApi {
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
-  /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
-  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
+  /// * [appelePar] - Téléconseiller ayant consigné au moins une tentative sur la fiche.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -2722,8 +2529,7 @@ class AnalyticsApi {
     BddSegment? segment,
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
-    String? campaignId,
-    String? assignedToId,
+    String? appelePar,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -2764,8 +2570,7 @@ class AnalyticsApi {
       if (segment != null) r'segment': segment,
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
-      if (campaignId != null) r'campaignId': campaignId,
-      if (assignedToId != null) r'assignedToId': assignedToId,
+      if (appelePar != null) r'appelePar': appelePar,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
@@ -2834,8 +2639,7 @@ class AnalyticsApi {
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
-  /// * [campaignId] - Campagne d’appels : ne retient que les prospects portant une tâche de cette campagne.
-  /// * [assignedToId] - Téléconseiller à qui la tâche d’appel est ATTRIBUÉE. À ne pas confondre avec `commercialId`, auteur de la saisie de la fiche : sans ce filtre, un ADMIN qui demande une campagne reçoit toute la campagne au lieu de la file d’un seul agent.
+  /// * [appelePar] - Téléconseiller ayant consigné au moins une tentative sur la fiche.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -2864,8 +2668,7 @@ class AnalyticsApi {
     BddSegment? segment,
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
-    String? campaignId,
-    String? assignedToId,
+    String? appelePar,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -2905,8 +2708,7 @@ class AnalyticsApi {
       if (segment != null) r'segment': segment,
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
-      if (campaignId != null) r'campaignId': campaignId,
-      if (assignedToId != null) r'assignedToId': assignedToId,
+      if (appelePar != null) r'appelePar': appelePar,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,

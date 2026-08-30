@@ -289,9 +289,9 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/chues/campagnes',
-        label: 'Campagnes',
+        label: 'Lots d’export',
         icon: MegaphoneIcon,
-        description: 'Distribuer les appels aux téléconseillers',
+        description: 'Fiches exportées pour le terrain',
         roles: ENCADREMENT,
         secondary: true,
       },
@@ -328,9 +328,9 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/chues/campagnes',
-        label: 'Campagnes',
+        label: 'Lots d’export',
         icon: MegaphoneIcon,
-        description: 'Distribuer les appels aux téléconseillers',
+        description: 'Fiches exportées pour le terrain',
         roles: ['ADMIN'],
       },
       {
@@ -499,7 +499,7 @@ const SECTIONS: readonly NavSection[] = [
         href: '/grand-public/console',
         label: 'Appeler les prospects',
         icon: HeadsetIcon,
-        description: 'File d’appels et qualification',
+        description: 'Chercher un prospect et consigner l’appel',
         roles: ['COMMERCIAL'],
       },
       {
@@ -548,13 +548,6 @@ const SECTIONS: readonly NavSection[] = [
         roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR'],
       },
       {
-        href: '/grand-public/campagnes',
-        label: 'Campagnes',
-        icon: MegaphoneIcon,
-        description: 'Distribuer les appels aux téléconseillers',
-        roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR'],
-      },
-      {
         href: '/grand-public/rappels',
         label: 'Rappels',
         icon: ClockIcon,
@@ -566,7 +559,7 @@ const SECTIONS: readonly NavSection[] = [
         href: '/grand-public/console',
         label: 'Appeler les prospects',
         icon: HeadsetIcon,
-        description: 'File d’appels et qualification',
+        description: 'Chercher un prospect et consigner l’appel',
         roles: ['ADMIN'],
         secondary: true,
       },
