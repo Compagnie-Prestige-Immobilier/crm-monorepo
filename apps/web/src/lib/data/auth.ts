@@ -63,3 +63,11 @@ export async function fetchSessionUser(client: ApiClient = getApiClient()): Prom
 export async function revokeSession(refreshToken: string, client: ApiClient): Promise<void> {
   await client.POST('/api/v1/auth/logout', { body: { refreshToken } });
 }
+
+export async function changeMyPassword(
+  currentPassword: string,
+  newPassword: string,
+  client: ApiClient = getApiClient(),
+): Promise<void> {
+  unwrap(await client.PUT('/api/v1/auth/me/password', { body: { currentPassword, newPassword } }));
+}

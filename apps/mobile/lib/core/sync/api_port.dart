@@ -151,6 +151,10 @@ enum FailureKind {
   appUpdateRequired,
 }
 
+/// Code renvoyé par `PUT /api/v1/auth/me/password` quand le mot de passe
+/// actuel ne correspond pas.
+const String invalidCurrentPasswordCode = 'INVALID_CURRENT_PASSWORD';
+
 class ApiException implements Exception {
   const ApiException(
     this.code, {
@@ -194,6 +198,13 @@ abstract interface class ApiPort {
   Future<AuthTokens> refresh({required String refreshToken});
 
   Future<void> logout({required String refreshToken});
+
+  /// Lève un [ApiException] de code [invalidCurrentPasswordCode] si
+  /// [currentPassword] ne correspond pas au mot de passe en place.
+  Future<void> changeMyPassword({
+    required String currentPassword,
+    required String newPassword,
+  });
 
   Future<PullPage> pull({
     String? cursor,

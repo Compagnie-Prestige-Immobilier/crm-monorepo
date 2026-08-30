@@ -103,6 +103,41 @@ class DioApi implements ApiPort {
     });
   }
 
+  /// Hors `_guard` : `classify` réduit tout 401 à `UNAUTHORIZED` pour la
+  /// session, ce qui effacerait le code métier `INVALID_CURRENT_PASSWORD`.
+  @override
+  Future<void> changeMyPassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      await _auth.changeMyPassword(
+        changeMyPasswordDto: ChangeMyPasswordDto(
+          currentPassword: currentPassword,
+          newPassword: newPassword,
+        ),
+        extra: TimeoutProfile.push.extra,
+      );
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401 &&
+          _serverCode(e.response?.data) == invalidCurrentPasswordCode) {
+        throw ApiException(
+          invalidCurrentPasswordCode,
+          message: _serverMessage(e.response?.data),
+          statusCode: 401,
+          kind: FailureKind.terminal,
+        );
+      }
+      throw classify(e, 'changeMyPassword');
+    } on FormatException catch (e) {
+      throw _undecodableBody(
+        'changeMyPassword',
+        e is ResponseFormatException ? e.contentType : 'application/json',
+        e.message,
+      );
+    }
+  }
+
   static AuthTokens _toTokens(AuthTokensDto dto) {
     return AuthTokens(
       accessToken: dto.accessToken,

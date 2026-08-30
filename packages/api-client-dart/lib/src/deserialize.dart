@@ -37,6 +37,7 @@ import 'package:crm_api_client/src/model/call_recording_dto.dart';
 import 'package:crm_api_client/src/model/callback_dto.dart';
 import 'package:crm_api_client/src/model/callback_list_dto.dart';
 import 'package:crm_api_client/src/model/canal_provenance_dto.dart';
+import 'package:crm_api_client/src/model/change_my_password_dto.dart';
 import 'package:crm_api_client/src/model/change_prospect_segment_dto.dart';
 import 'package:crm_api_client/src/model/client_request_dto.dart';
 import 'package:crm_api_client/src/model/client_request_list_dto.dart';
@@ -382,6 +383,9 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'CallbackScope':
     case 'CanalProvenanceDto':
       return CanalProvenanceDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'ChangeMyPasswordDto':
+      return ChangeMyPasswordDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'ChangeProspectSegmentDto':
       return ChangeProspectSegmentDto.fromJson(value as Map<String, dynamic>)
