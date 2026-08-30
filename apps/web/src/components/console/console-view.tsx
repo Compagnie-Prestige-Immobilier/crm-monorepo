@@ -39,7 +39,6 @@ import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import {
   CALL_OUTCOME_LABELS,
-  ENROLLMENT_METHOD_LABELS,
   PHASE2_STATUS_LABELS,
   type CallOutcome,
   type EnrollmentMethod,
@@ -51,28 +50,23 @@ import { cn } from '@/lib/utils';
 
 type Projet = 'CHUES' | 'GRAND_PUBLIC';
 
-const METHOD_KEYS: readonly { key: string; method: EnrollmentMethod }[] = [
-  { key: '1', method: 'PLATFORM' },
-  { key: '2', method: 'PHYSICAL' },
-  { key: '3', method: 'VOICE_OR_ELECTRONIC_MESSAGING' },
-  { key: '9', method: 'APPOINTMENT' },
-];
-
-const OUTCOME_KEYS: readonly { key: string; outcome: CallOutcome }[] = [
-  { key: '4', outcome: 'UNREACHABLE' },
-  { key: '6', outcome: 'REFUSED' },
-  { key: '7', outcome: 'WRONG_NUMBER' },
+/** Ce que l'appel a donné, avant tout : la personne était-elle joignable. */
+const ISSUES: readonly { key: string; label: string; outcome: CallOutcome | 'JOIGNABLE' }[] = [
+  { key: '1', label: 'Joignable', outcome: 'JOIGNABLE' },
+  { key: '2', label: CALL_OUTCOME_LABELS.CALLBACK, outcome: 'CALLBACK' },
+  { key: '3', label: CALL_OUTCOME_LABELS.UNREACHABLE, outcome: 'UNREACHABLE' },
+  { key: '4', label: CALL_OUTCOME_LABELS.WRONG_NUMBER, outcome: 'WRONG_NUMBER' },
+  { key: '5', label: 'Autre', outcome: 'OTHER' },
 ];
 
 const KEYBOARD_MAP: readonly (readonly [string, string])[] = [
-  ['1 2 3 9', 'Il accepte : ouvre les renseignements d’adhésion'],
-  ['4', 'Injoignable'],
-  ['5', 'À rappeler, puis échéance'],
-  ['6', 'Refus'],
-  ['7', 'Mauvais numéro'],
-  ['8', 'Autre, puis commentaire'],
-  ['1 … 6', 'Échéance proposée, après 5'],
-  ['0', 'Saisir une autre échéance, après 5'],
+  ['1', 'Joignable : ouvre le dossier et l’adhésion'],
+  ['2', 'À rappeler, puis échéance'],
+  ['3', 'Injoignable'],
+  ['4', 'Mauvais numéro'],
+  ['5', 'Autre, puis commentaire'],
+  ['1 … 6', 'Échéance proposée, après 2'],
+  ['0', 'Saisir une autre échéance, après 2'],
   ['Entrée', 'Valider'],
   ['Échap', 'Annuler la saisie, ou revenir à la liste'],
   ['C', 'Copier le numéro'],
@@ -276,7 +270,10 @@ function ListeSkeleton() {
   );
 }
 
-/** La consignation d'un appel : issues au clavier, échéance, renseignements d'adhésion. */
+/**
+ * La consignation d'un appel, en deux temps : d'abord si la personne était
+ * joignable, puis, si oui, son dossier et la manière dont elle adhère.
+ */
 function Consignation({
   prospect,
   projet,
@@ -351,22 +348,19 @@ function Consignation({
     [closed, send, comment],
   );
 
-  const startConversion = useCallback(
-    (method: EnrollmentMethod) => {
-      if (closed || send.isPending) return;
-      setDraftOutcome(null);
-      setSlots(null);
-      setConversionErrors({});
-      setConversion(conversionFrom(prospect, method));
-    },
-    [closed, send.isPending, prospect],
-  );
+  const ouvrirDossier = useCallback(() => {
+    if (closed || send.isPending) return;
+    setDraftOutcome(null);
+    setSlots(null);
+    setConversionErrors({});
+    setConversion(conversionFrom(prospect));
+  }, [closed, send.isPending, prospect]);
 
   const submitConversion = useCallback(() => {
     if (conversion === null) return;
     const problems = validateConversion(conversion);
     setConversionErrors(problems);
-    if (Object.keys(problems).length > 0) return;
+    if (Object.keys(problems).length > 0 || conversion.method === null) return;
     record('METHOD_OBTAINED', conversion.method, null, conversion);
   }, [conversion, record]);
 
@@ -382,6 +376,16 @@ function Consignation({
     setFreeCallback('');
     setSlots(callbackSlots(Date.now()));
   }, [closed]);
+
+  const choisir = useCallback(
+    (outcome: CallOutcome | 'JOIGNABLE') => {
+      if (outcome === 'JOIGNABLE') ouvrirDossier();
+      else if (outcome === 'CALLBACK') startCallback();
+      else if (outcome === 'OTHER') startOther();
+      else record(outcome, null);
+    },
+    [ouvrirDossier, startCallback, startOther, record],
+  );
 
   const validate = useCallback(() => {
     if (conversion !== null) {
@@ -416,31 +420,14 @@ function Consignation({
     commentRef.current?.blur();
   }, [saisieEnCours, onAbandon]);
 
-  const outcomeShortcuts: Record<string, () => void> = {
-    '1': () => {
-      startConversion('PLATFORM');
-    },
-    '2': () => {
-      startConversion('PHYSICAL');
-    },
-    '3': () => {
-      startConversion('VOICE_OR_ELECTRONIC_MESSAGING');
-    },
-    '9': () => {
-      startConversion('APPOINTMENT');
-    },
-    '4': () => {
-      record('UNREACHABLE', null);
-    },
-    '5': startCallback,
-    '6': () => {
-      record('REFUSED', null);
-    },
-    '7': () => {
-      record('WRONG_NUMBER', null);
-    },
-    '8': startOther,
-  };
+  const issueShortcuts: Record<string, () => void> = Object.fromEntries(
+    ISSUES.map((issue) => [
+      issue.key,
+      () => {
+        choisir(issue.outcome);
+      },
+    ]),
+  );
 
   const slotShortcuts: Record<string, () => void> = Object.fromEntries(
     (slots ?? []).map((slot) => [
@@ -454,7 +441,7 @@ function Consignation({
     callbackRef.current?.focus();
   };
 
-  let digitShortcuts = outcomeShortcuts;
+  let digitShortcuts = issueShortcuts;
   if (slots !== null) digitShortcuts = slotShortcuts;
   if (conversion !== null) digitShortcuts = {};
 
@@ -530,73 +517,83 @@ function Consignation({
             Fiche déjà close ({PHASE2_STATUS_LABELS[prospect.phase2Status].toLowerCase()}). Rien à
             consigner ici.
           </div>
+        ) : conversion !== null ? (
+          <>
+            <p className="text-[0.8125rem] font-[600] text-muted-foreground">
+              Joignable · son dossier, et la manière dont il adhère
+            </p>
+
+            <ConversionFields
+              draft={conversion}
+              errors={conversionErrors}
+              phoneE164={prospect.phoneE164}
+              disabled={send.isPending}
+              onChange={(patch) => {
+                setConversion((draft) => (draft === null ? null : { ...draft, ...patch }));
+              }}
+            />
+
+            <Commentaire
+              value={comment}
+              obligatoire={false}
+              inputRef={commentRef}
+              onChange={setComment}
+              onValidate={validate}
+            />
+
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={submitConversion} disabled={send.isPending}>
+                Enregistrer l’adhésion
+                <Kbd>Entrée</Kbd>
+              </Button>
+              <Button
+                variant="outline"
+                disabled={send.isPending}
+                onClick={() => {
+                  record('REFUSED', null);
+                }}
+              >
+                Il refuse
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={send.isPending}
+                onClick={() => {
+                  setConversion(null);
+                  setConversionErrors({});
+                }}
+              >
+                Annuler
+                <Kbd>Échap</Kbd>
+              </Button>
+            </div>
+          </>
         ) : (
           <>
-            {conversion === null || slots !== null ? null : (
-              <ConversionFields
-                draft={conversion}
-                errors={conversionErrors}
-                phoneE164={prospect.phoneE164}
-                disabled={send.isPending}
-                onChange={(patch) => {
-                  setConversion((draft) => (draft === null ? null : { ...draft, ...patch }));
-                }}
-              />
-            )}
-
-            {conversion !== null || slots !== null ? null : (
-              <>
-                <fieldset className="flex flex-col gap-2" disabled={send.isPending}>
-                  <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
-                    Il accepte : de quelle manière ?
-                  </legend>
-                  <div className="flex flex-wrap gap-2">
-                    {METHOD_KEYS.map(({ key, method }) => (
-                      <Button
-                        key={key}
-                        variant="outline"
-                        onClick={() => {
-                          startConversion(method);
-                        }}
-                      >
-                        <Kbd>{key}</Kbd>
-                        {ENROLLMENT_METHOD_LABELS[method]}
-                      </Button>
-                    ))}
-                  </div>
-                </fieldset>
-
-                <fieldset className="flex flex-col gap-2" disabled={send.isPending}>
-                  <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
-                    Il n’accepte pas (pas encore)
-                  </legend>
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" onClick={startCallback}>
-                      <Kbd>5</Kbd>
-                      {CALL_OUTCOME_LABELS.CALLBACK}
-                    </Button>
-                    {OUTCOME_KEYS.map(({ key, outcome }) => (
-                      <Button
-                        key={key}
-                        variant="outline"
-                        onClick={() => {
-                          record(outcome, null);
-                        }}
-                      >
-                        <Kbd>{key}</Kbd>
-                        {CALL_OUTCOME_LABELS[outcome]}
-                      </Button>
-                    ))}
+            {slots !== null ? null : (
+              <fieldset className="flex flex-col gap-2" disabled={send.isPending}>
+                <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
+                  Comment s’est passé l’appel ?
+                </legend>
+                <div className="flex flex-wrap gap-2">
+                  {ISSUES.map((issue) => (
                     <Button
-                      variant={draftOutcome === 'OTHER' ? 'default' : 'outline'}
-                      onClick={startOther}
+                      key={issue.key}
+                      variant={
+                        issue.outcome === 'OTHER' && draftOutcome === 'OTHER'
+                          ? 'default'
+                          : 'outline'
+                      }
+                      onClick={() => {
+                        choisir(issue.outcome);
+                      }}
                     >
-                      <Kbd>8</Kbd>
-                      Autre
+                      <Kbd>{issue.key}</Kbd>
+                      {issue.label}
                     </Button>
-                  </div>
-                </fieldset>
-              </>
+                  ))}
+                </div>
+              </fieldset>
             )}
 
             {slots === null ? null : (
@@ -656,46 +653,13 @@ function Consignation({
               </fieldset>
             )}
 
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="console-comment" className="text-[0.875rem] font-[600]">
-                Commentaire
-                {draftOutcome === 'OTHER' ? ' (obligatoire pour Autre)' : ''}
-              </label>
-              <Textarea
-                id="console-comment"
-                ref={commentRef}
-                value={comment}
-                onChange={(event) => {
-                  setComment(event.target.value);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key !== 'Enter' || event.shiftKey) return;
-                  event.preventDefault();
-                  validate();
-                }}
-                placeholder="Entrée valide, Maj+Entrée passe à la ligne."
-              />
-            </div>
-
-            {conversion === null ? null : (
-              <div className="flex flex-wrap gap-2">
-                <Button onClick={submitConversion} disabled={send.isPending}>
-                  Enregistrer l’adhésion
-                  <Kbd>Entrée</Kbd>
-                </Button>
-                <Button
-                  variant="ghost"
-                  disabled={send.isPending}
-                  onClick={() => {
-                    setConversion(null);
-                    setConversionErrors({});
-                  }}
-                >
-                  Annuler
-                  <Kbd>Échap</Kbd>
-                </Button>
-              </div>
-            )}
+            <Commentaire
+              value={comment}
+              obligatoire={draftOutcome === 'OTHER'}
+              inputRef={commentRef}
+              onChange={setComment}
+              onValidate={validate}
+            />
           </>
         )}
       </section>
@@ -722,6 +686,43 @@ function Consignation({
           ))}
         </dl>
       </details>
+    </div>
+  );
+}
+
+function Commentaire({
+  value,
+  obligatoire,
+  inputRef,
+  onChange,
+  onValidate,
+}: {
+  value: string;
+  obligatoire: boolean;
+  inputRef: React.RefObject<HTMLTextAreaElement | null>;
+  onChange: (value: string) => void;
+  onValidate: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor="console-comment" className="text-[0.875rem] font-[600]">
+        Commentaire
+        {obligatoire ? ' (obligatoire pour Autre)' : ''}
+      </label>
+      <Textarea
+        id="console-comment"
+        ref={inputRef}
+        value={value}
+        onChange={(event) => {
+          onChange(event.target.value);
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter' || event.shiftKey) return;
+          event.preventDefault();
+          onValidate();
+        }}
+        placeholder="Entrée valide, Maj+Entrée passe à la ligne."
+      />
     </div>
   );
 }

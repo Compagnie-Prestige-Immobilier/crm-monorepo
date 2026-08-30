@@ -102,7 +102,7 @@ describe('RappelsView', () => {
   it('ouvre la fiche du rappel', async () => {
     await renderView();
 
-    const lien = await screen.findByRole('link', { name: 'Ouvrir la fiche' });
+    const lien = await screen.findByRole('link', { name: 'Consigner l’appel' });
     expect(lien.getAttribute('href')).toBe('/chues/console?fiche=p-9');
   });
 
@@ -110,7 +110,7 @@ describe('RappelsView', () => {
     setUrl('/grand-public/rappels');
     await renderView();
 
-    const lien = await screen.findByRole('link', { name: 'Ouvrir la fiche' });
+    const lien = await screen.findByRole('link', { name: 'Consigner l’appel' });
     expect(lien.getAttribute('href')).toBe('/grand-public/console?fiche=p-9');
     expect(fetchCallbacks).toHaveBeenCalledWith('overdue', null, undefined, 'GRAND_PUBLIC');
   });

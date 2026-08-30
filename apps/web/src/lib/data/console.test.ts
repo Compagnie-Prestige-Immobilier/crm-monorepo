@@ -345,7 +345,6 @@ describe('validateConversion', () => {
         'banqueId',
         'dureeEtablissementMois',
         'dureeSystemeMois',
-        'email',
         'engagementEnCours',
         'fonctionnaire',
         'incomeBandId',
@@ -355,6 +354,14 @@ describe('validateConversion', () => {
       ].sort(),
     );
     expect(validateConversion(vide, NOW).fonctionnaire).toMatch(/fonctionnaire/);
+  });
+
+  it('l’e-mail reste facultatif, même sur CHUES', () => {
+    expect(validateConversion(conversion({ email: '' }), NOW)).toEqual({});
+  });
+
+  it('exige la méthode d’enrôlement', () => {
+    expect(validateConversion(conversion({ method: null }), NOW).method).toMatch(/méthode/);
   });
 
   it('sur le Grand Public, seul le nom est exigé', () => {

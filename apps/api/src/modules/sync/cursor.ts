@@ -12,6 +12,7 @@ export const SYNC_STREAMS = [
   'iefs',
   'banques',
   'syndicats',
+  'incomeBands',
   'canauxProvenance',
   'visiteEntreprises',
   'visiteObjets',

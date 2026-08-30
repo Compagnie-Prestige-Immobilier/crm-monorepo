@@ -4041,6 +4041,8 @@ export interface components {
       iefs: components['schemas']['IefDto'][];
       banques: components['schemas']['BanqueDto'][];
       syndicats: components['schemas']['SyndicatDto'][];
+      /** @description Tranches de revenu mensuel : la conversion les demande hors réseau. */
+      incomeBands: components['schemas']['IncomeBandDto'][];
       canauxProvenance: components['schemas']['CanalProvenanceDto'][];
       /** @description Les quatre listes du registre des visites, réunies : chaque entrée porte sa nature. */
       visiteReferentiels: components['schemas']['SyncVisiteReferentielDto'][];

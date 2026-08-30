@@ -133,7 +133,7 @@ test('ET3-3 · les touches ouvrent l’échéance, les renseignements, et consig
 }) => {
   await ouvrirParRecherche(page, 'ouverte');
 
-  await page.keyboard.press('5');
+  await page.keyboard.press('2');
   await expect(fiche(page).getByText('Quand rappeler')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(fiche(page).getByText('Quand rappeler')).toHaveCount(0);
@@ -146,7 +146,7 @@ test('ET3-3 · les touches ouvrent l’échéance, les renseignements, et consig
   await expect(fiche(page).getByText('Phase 3 · Conversion')).toHaveCount(0);
 
   // ET3-4 : après enregistrement, retour à la liste. Personne n'est ouvert à sa place.
-  await page.keyboard.press('4');
+  await page.keyboard.press('3');
   await expect(page.getByRole('status')).toHaveText(
     `Appel enregistré pour ${NOM} ${FICHES.ouverte.prenom}.`,
   );
@@ -166,7 +166,7 @@ test('ET3-2b · un rappel promis revient ouvrir la fiche depuis les rappels', as
     `${NOM} ${FICHES.rappel.prenom}`,
   );
 
-  await page.keyboard.press('5');
+  await page.keyboard.press('2');
   await expect(fiche(page).getByText('Quand rappeler')).toBeVisible();
   await page.keyboard.press('1');
   await expect(page.getByRole('status')).toHaveText(
@@ -177,7 +177,7 @@ test('ET3-2b · un rappel promis revient ouvrir la fiche depuis les rappels', as
   await page.getByRole('tab', { name: 'Cette semaine' }).click();
   const ligne = page.getByRole('row').filter({ hasText: '78 100 91 02' });
   await expect(ligne).toHaveCount(1);
-  await ligne.getByRole('link', { name: 'Ouvrir la fiche' }).click();
+  await ligne.getByRole('link', { name: 'Consigner l’appel' }).click();
 
   await expect(page).toHaveURL(new RegExp(`/chues/console\\?fiche=${ids.rappel}`));
   await expect(fiche(page).getByRole('heading', { level: 2 })).toHaveText(
@@ -201,8 +201,9 @@ test('ET3-7 · l’adhésion exige le dossier complet, et le serveur l’enregis
 
   // Dossier incomplet : rien ne part, et chaque manque est nommé sous son champ.
   await page.getByRole('button', { name: /Enregistrer l’adhésion/ }).click();
-  await expect(page.getByText('L’adresse électronique est obligatoire.')).toBeVisible();
+  await expect(page.getByText('La profession est obligatoire.')).toBeVisible();
   await expect(page.getByText('Dites s’il est fonctionnaire.')).toBeVisible();
+  await expect(page.getByText('Choisissez la méthode d’enrôlement.')).toBeVisible();
 
   await page.getByLabel(/^E-mail/).fill('adhesion@example.sn');
   await page.getByLabel(/^Profession/).fill('Professeur de lettres');
@@ -221,6 +222,7 @@ test('ET3-7 · l’adhésion exige le dossier complet, et le serveur l’enregis
   await page.getByRole('option', { name: trancheLabel }).click();
   await page.getByRole('combobox', { name: /Durée du système de paiement/ }).click();
   await page.getByRole('option', { name: '2 ans (24 mois)' }).click();
+  await page.getByRole('radio', { name: 'Plateforme' }).check();
 
   await page.getByRole('button', { name: /Enregistrer l’adhésion/ }).click();
   await expect(page.getByRole('status')).toHaveText(
@@ -264,7 +266,9 @@ test('ET3-6 · une fiche déjà close refuse un nouvel appel en le disant', asyn
   await expect(fiche(page).getByRole('heading', { level: 2 })).toHaveText(
     `${NOM} ${FICHES.close.prenom}`,
   );
-  await page.keyboard.press('6');
+  // Le refus se consigne depuis le dossier : la personne était joignable.
+  await page.keyboard.press('1');
+  await page.getByRole('button', { name: 'Il refuse' }).click();
   await expect(page.getByRole('status')).toHaveText(
     `Appel enregistré pour ${NOM} ${FICHES.close.prenom}.`,
   );
@@ -273,6 +277,6 @@ test('ET3-6 · une fiche déjà close refuse un nouvel appel en le disant', asyn
   await expect(fiche(page).getByRole('status')).toContainText('Fiche déjà close (refus)');
   await expect(fiche(page).getByRole('button', { name: /Injoignable/ })).toHaveCount(0);
 
-  await page.keyboard.press('4');
+  await page.keyboard.press('3');
   await expect(page.getByRole('status')).toContainText('Fiche déjà close');
 });

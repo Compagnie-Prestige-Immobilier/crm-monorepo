@@ -195,7 +195,7 @@ export interface ConversionDraft {
   readonly incomeBandId: string;
   readonly paymentMode: PaymentMode | null;
   readonly dureeSystemeMois: string;
-  readonly method: EnrollmentMethod;
+  readonly method: EnrollmentMethod | null;
   readonly rendezVousAt: string;
 }
 
@@ -203,7 +203,10 @@ export type ConversionField = Exclude<keyof ConversionDraft, 'projet'>;
 export type ConversionErrors = Partial<Record<ConversionField, string>>;
 
 /** Le formulaire s'ouvre déjà rempli de ce que la fiche sait : on ne redemande rien. */
-export function conversionFrom(prospect: ProspectRow, method: EnrollmentMethod): ConversionDraft {
+export function conversionFrom(
+  prospect: ProspectRow,
+  method: EnrollmentMethod | null = null,
+): ConversionDraft {
   return {
     projet: prospect.projet,
     nom: prospect.nom,
@@ -249,8 +252,7 @@ export function validateConversion(
   }
 
   const email = draft.email.trim();
-  if (complet && email === '') errors.email = 'L’adresse électronique est obligatoire.';
-  else if (email !== '' && (email.length > EMAIL_MAX_LENGTH || !EMAIL_PATTERN.test(email))) {
+  if (email !== '' && (email.length > EMAIL_MAX_LENGTH || !EMAIL_PATTERN.test(email))) {
     errors.email = 'Cette adresse électronique n’en est pas une.';
   }
 
@@ -280,6 +282,8 @@ export function validateConversion(
   ) {
     errors.dureeSystemeMois = `La durée du système s’exprime en mois entiers, de 1 à ${String(DUREE_SYSTEME_MAX_MOIS)}.`;
   }
+
+  if (draft.method === null) errors.method = 'Choisissez la méthode d’enrôlement.';
 
   const rendezVous = draft.rendezVousAt.trim();
   if (draft.method === 'APPOINTMENT') {

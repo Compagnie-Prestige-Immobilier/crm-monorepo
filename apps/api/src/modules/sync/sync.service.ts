@@ -1068,6 +1068,14 @@ export class SyncService {
     cursor = advance(cursor, 'syndicats', lastPosition(syndicats));
     pageLengths.push(syndicats.length);
 
+    const incomeBands = await this.prisma.incomeBand.findMany({
+      where: keyset(cursor.streams.incomeBands, safeNow),
+      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+    });
+    cursor = advance(cursor, 'incomeBands', lastPosition(incomeBands));
+    pageLengths.push(incomeBands.length);
+
     const representants = await this.prisma.representant.findMany({
       where: {
         ...keyset(cursor.streams.representants, safeNow),
@@ -1177,6 +1185,16 @@ export class SyncService {
           secteur: row.secteur,
           isActive: row.isActive,
           sortOrder: row.sortOrder,
+          updatedAt: row.updatedAt.toISOString(),
+        })),
+        incomeBands: incomeBands.map((row) => ({
+          id: row.id,
+          code: row.code,
+          label: row.label,
+          minXof: row.minXof,
+          maxXof: row.maxXof,
+          position: row.position,
+          isActive: row.isActive,
           updatedAt: row.updatedAt.toISOString(),
         })),
         representants: representants

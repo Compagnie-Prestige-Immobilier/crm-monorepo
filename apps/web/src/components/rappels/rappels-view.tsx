@@ -171,7 +171,7 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
                             className={buttonVariants({ variant: 'outline', size: 'sm' })}
                           >
                             <PhoneCallIcon aria-hidden="true" />
-                            Ouvrir la fiche
+                            Consigner l’appel
                           </Link>
                           <Button
                             variant="ghost"
