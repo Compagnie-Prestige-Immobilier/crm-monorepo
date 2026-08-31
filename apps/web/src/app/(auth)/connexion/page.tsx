@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 
 import { Facade } from '@/app/(auth)/connexion/facade';
 import { LoginForm } from '@/app/(auth)/connexion/login-form';
+import { DevRoleSwitcher } from '@/components/auth/dev-role-switcher';
 import { homePathForRole } from '@/components/layout/nav-items';
 import { SESSION_EXPIRED_PARAM, SESSION_EXPIRED_VALUE } from '@/lib/api/session-expiry';
 import { getSession } from '@/lib/session';
@@ -103,6 +104,12 @@ export default async function ConnexionPage({
           ) : null}
 
           <div className="mt-8">
+            <DevRoleSwitcher
+              currentRole="ADMIN"
+              enabled={process.env.NODE_ENV === 'development'}
+              autoLogin
+              next={next}
+            />
             <LoginForm next={next} />
           </div>
         </div>
