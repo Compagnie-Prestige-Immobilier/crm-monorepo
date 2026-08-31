@@ -297,9 +297,11 @@ async function seedVisiteReferentiels(): Promise<void> {
 }
 
 async function seedAdmin(): Promise<void> {
-  const email = process.env.SEED_ADMIN_EMAIL;
-  const username = process.env.SEED_ADMIN_USERNAME;
-  const password = process.env.SEED_ADMIN_PASSWORD;
+  const devDefaults = process.env.NODE_ENV === 'development';
+  const email = process.env.SEED_ADMIN_EMAIL ?? (devDefaults ? 'admin@cpi.sn' : undefined);
+  const username = process.env.SEED_ADMIN_USERNAME ?? (devDefaults ? 'admin' : undefined);
+  const password =
+    process.env.SEED_ADMIN_PASSWORD ?? (devDefaults ? 'ChangeMoiEnProd2026' : undefined);
   const fullName = process.env.SEED_ADMIN_FULL_NAME ?? 'Administrateur CPI';
 
   if (!email || !username || !password) {
