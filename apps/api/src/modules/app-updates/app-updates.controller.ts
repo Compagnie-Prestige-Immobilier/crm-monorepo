@@ -28,7 +28,11 @@ import { AndroidReleaseDto, AndroidReleaseListDto, AppUpdateDto } from './dto.js
 
 // `@Throttle` fige sa limite au chargement du module, avant que `readEnv` ne
 // soit appelable ; `envSchema` valide la même variable au démarrage.
-const DOWNLOAD_RATE_LIMIT = Number(process.env.APK_DOWNLOAD_RATE_LIMIT) || 10;
+// Une reprise de téléchargement (requête Range) recompte, et une flotte
+// derrière un même wifi partage l'adresse : 10/h coupait le déploiement d'une
+// nouvelle version dès le premier bureau. La borne haute protège encore d'un
+// abus réel, le limiteur global couvrant le reste.
+const DOWNLOAD_RATE_LIMIT = Number(process.env.APK_DOWNLOAD_RATE_LIMIT) || 1000;
 
 @ApiTags('app-updates')
 @Controller({ path: 'app-updates', version: '1' })

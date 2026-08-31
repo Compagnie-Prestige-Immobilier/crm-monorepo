@@ -79,7 +79,7 @@ export const envSchema = z
         'APK_SIGNER_SHA256 must be a SHA-256 fingerprint (64 hex characters)',
       )
       .default(''),
-    APK_DOWNLOAD_RATE_LIMIT: z.coerce.number().int().positive().default(10),
+    APK_DOWNLOAD_RATE_LIMIT: z.coerce.number().int().positive().default(1000),
 
     CALL_RECORDING_DIR: z.string().min(1).default('./storage/call-recordings'),
     CALL_RECORDING_MAX_SIZE_BYTES: z.coerce

@@ -7,6 +7,7 @@ import { useState } from 'react';
 
 import { hasInbox, HUB_PATH, inboxPathFor, navTitle } from '@/components/layout/nav-items';
 import { SidebarNav } from '@/components/layout/sidebar-nav';
+import { DevRoleSwitcher } from '@/components/auth/dev-role-switcher';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { UserMenu } from '@/components/layout/user-menu';
 import { NotificationBell } from '@/components/notifications/notification-bell';
@@ -52,6 +53,8 @@ export function Topbar({ user }: { user: SessionUser }) {
       <h1 className="min-w-0 flex-1 truncate font-display text-[1.25rem] font-[700] tracking-[-0.02em]">
         {title}
       </h1>
+
+      <DevRoleSwitcher currentRole={user.role} enabled={process.env.NODE_ENV === 'development'} />
 
       <Link
         href={`${HUB_PATH}?retour=${encodeURIComponent(pathname)}`}
