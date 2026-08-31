@@ -560,6 +560,8 @@ class AppUpdateController extends Notifier<AppUpdateState> {
   String _apkName(AndroidRelease release) =>
       'cpi-go-${release.versionCode}.apk';
 
+  String _partName(AndroidRelease release) => '${_apkName(release)}.part';
+
   /// Hacher l'APK dans un isolate séparé. Un APK CPI GO fait des dizaines de
   /// mégaoctets : le hacher sur l'isolate principal fige l'interface assez
   /// longtemps pour qu'Android affiche « CPI GO ne répond pas ».
@@ -584,14 +586,20 @@ class AppUpdateController extends Notifier<AppUpdateState> {
     }
   }
 
-  /// Les APK des versions précédentes : plusieurs dizaines de mégaoctets gardés
-  /// pour rien sur un téléphone d'entrée de gamme.
-  Future<void> _purgeStaleApks(Directory updates, String keep) async {
+  /// Les fichiers des versions précédentes : plusieurs dizaines de mégaoctets
+  /// gardés pour rien sur un téléphone d'entrée de gamme. Le `.part` de la
+  /// version en cours est épargné : c'est lui qui porte la reprise.
+  Future<void> _purgeStaleApks(
+    Directory updates,
+    String keepApk,
+    String keepPart,
+  ) async {
     try {
       await for (final FileSystemEntity entry in updates.list()) {
         if (entry is! File) continue;
         final String name = p.basename(entry.path);
-        if (name == keep || !name.endsWith('.apk')) continue;
+        if (name == keepApk || name == keepPart) continue;
+        if (!name.endsWith('.apk') && !name.endsWith('.apk.part')) continue;
         await entry.delete();
       }
     } on Object {
@@ -599,19 +607,33 @@ class AppUpdateController extends Notifier<AppUpdateState> {
     }
   }
 
+  /// Attentes de reprise entre deux essais d'un flux coupé. Plafonnées : au-delà
+  /// l'utilisateur croit l'application figée. Trois attentes, quatre essais.
+  static const List<Duration> _resumeBackoff = <Duration>[
+    Duration(seconds: 1),
+    Duration(seconds: 2),
+    Duration(seconds: 4),
+  ];
+
   Future<void> _download(Dio dio, AndroidRelease release) async {
     final Directory updates = await _updatesDirectory();
     final String name = _apkName(release);
-    await _purgeStaleApks(updates, name);
-    final File target = File(p.join(updates.path, name));
-    final int onDisk = target.existsSync() ? target.lengthSync() : 0;
-    // Un fichier déjà complet arrive ici parce que son empreinte a été refusée.
-    // Demander `bytes=<taille>-` vaudrait un 416 à chaque essai : l'écran
-    // bloquant n'aurait plus AUCUNE issue. On repart de zéro.
-    final int existing = release.fileSize > 0 && onDisk >= release.fileSize
-        ? 0
-        : onDisk;
+    final String partName = _partName(release);
+    await _purgeStaleApks(updates, name, partName);
 
+    final File target = File(p.join(updates.path, name));
+    // Anti-boucle : un APK final n'existe QUE vérifié (renommé depuis le
+    // `.part`). Le retrouver signifie « prêt à installer », jamais « à
+    // retélécharger ». Sans ce court-circuit, ouvrir la fenêtre d'installation
+    // met CPI GO en arrière-plan, `onResume` relance `check()`, et le cycle
+    // repartait de zéro sans jamais poser le paquet.
+    if (await _verifiedApk(release) != null) {
+      _markReady(target);
+      return;
+    }
+
+    final File part = File(p.join(updates.path, partName));
+    final int existing = part.existsSync() ? part.lengthSync() : 0;
     final int missing = await _missingSpace(updates, release, existing);
     if (missing > 0) {
       if (!ref.mounted) return;
@@ -623,6 +645,48 @@ class AppUpdateController extends Notifier<AppUpdateState> {
       return;
     }
 
+    // Deux passes au plus : une empreinte fausse veut dire octets corrompus sur
+    // le disque, on repart alors d'un `.part` neuf. Une seconde faute est réelle.
+    for (int pass = 0; pass < 2; pass++) {
+      await _streamToPart(dio, release, part);
+      if (!ref.mounted) return;
+      if (await _digest(part.path) == release.sha256.toLowerCase()) {
+        _markReady(await part.rename(target.path));
+        return;
+      }
+      if (part.existsSync()) await part.delete();
+    }
+    throw StateError('La signature de la release ne correspond pas.');
+  }
+
+  /// Remplit le `.part` jusqu'au bout, en reprenant sur coupure via Range. Une
+  /// erreur réseau transitoire n'efface rien : elle attend, puis reprend à
+  /// l'octet déjà écrit. Après épuisement des reprises, l'erreur ressort pour
+  /// que [_apply] l'affiche — le `.part` reste pour une reprise ultérieure.
+  Future<void> _streamToPart(Dio dio, AndroidRelease release, File part) async {
+    for (int retry = 0; ; retry++) {
+      Object failure;
+      try {
+        await _pump(dio, release, part);
+        if (!ref.mounted) return;
+        if (release.fileSize <= 0 || part.lengthSync() >= release.fileSize) {
+          return;
+        }
+        failure = const SocketException('Flux interrompu avant la fin.');
+      } on Object catch (error) {
+        if (!_isTransient(error)) rethrow;
+        failure = error;
+      }
+      if (retry >= _resumeBackoff.length) throw failure;
+      await Future<void>.delayed(_resumeBackoff[retry]);
+    }
+  }
+
+  /// Une requête, un flux. Reprend sur 206, repart de zéro sur 200 (le serveur
+  /// a ignoré le Range ou le fichier a changé), traite 416 comme « déjà
+  /// complet » puisque le `.part` couvre alors toute la taille.
+  Future<void> _pump(Dio dio, AndroidRelease release, File part) async {
+    final int existing = part.existsSync() ? part.lengthSync() : 0;
     final Response<ResponseBody> response = await dio.get<ResponseBody>(
       release.downloadUrl,
       options: Options(
@@ -630,18 +694,20 @@ class AppUpdateController extends Notifier<AppUpdateState> {
         headers: <String, String>{
           if (existing > 0) 'Range': 'bytes=$existing-',
         },
-        validateStatus: (int? status) => status == 200 || status == 206,
+        validateStatus: (int? status) =>
+            status == 200 || status == 206 || status == 416,
       ),
     );
+    if (response.statusCode == 416) return;
     final bool append = existing > 0 && response.statusCode == 206;
-    final RandomAccessFile output = await target.open(
+    final RandomAccessFile output = await part.open(
       mode: append ? FileMode.append : FileMode.write,
     );
     int downloaded = append ? existing : 0;
     // Un APK de plusieurs dizaines de mégaoctets arrive en dizaines de milliers
     // de morceaux. Publier l'avancement à chaque morceau reconstruit l'écran
-    // autant de fois et fige l'application : Android affiche « CPI GO ne
-    // répond pas ». Le pour-cent affiché n'a besoin que de cent pas.
+    // autant de fois et fige l'application. Le pour-cent n'a besoin que de cent
+    // pas.
     int publie = -1;
     try {
       await for (final List<int> chunk in response.data!.stream) {
@@ -658,10 +724,31 @@ class AppUpdateController extends Notifier<AppUpdateState> {
     } finally {
       await output.close();
     }
-    if (await _digest(target.path) != release.sha256.toLowerCase()) {
-      await target.delete();
-      throw StateError('La signature de la release ne correspond pas.');
+  }
+
+  /// Une coupure passagère du transfert : à réessayer. Un 4xx/5xx applicatif,
+  /// non — il ressort tel quel.
+  bool _isTransient(Object error) {
+    if (error is SocketException ||
+        error is HttpException ||
+        error is TlsException) {
+      return true;
     }
+    if (error is! DioException) return false;
+    const Set<DioExceptionType> reseau = <DioExceptionType>{
+      DioExceptionType.connectionTimeout,
+      DioExceptionType.sendTimeout,
+      DioExceptionType.receiveTimeout,
+      DioExceptionType.connectionError,
+    };
+    if (reseau.contains(error.type)) return true;
+    final Object? inner = error.error;
+    return inner is SocketException ||
+        inner is HttpException ||
+        inner is TlsException;
+  }
+
+  void _markReady(File target) {
     if (!ref.mounted) return;
     state = _withGate(
       state.copyWith(

@@ -1,6 +1,8 @@
 package sn.cpi.go
 
 import android.app.Activity
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -14,13 +16,18 @@ import android.os.Handler
 import android.os.Looper
 import android.os.StatFs
 import android.provider.Settings
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.security.MessageDigest
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Pose l'APK téléchargé par [AppUpdateController] avec `PackageInstaller`.
@@ -41,22 +48,85 @@ class UpdatesChannel(private val activity: Activity) {
     private var channel: MethodChannel? = null
     private val worker = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
+    private val installing = AtomicBoolean(false)
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, Int.MIN_VALUE)
-            if (status == PackageInstaller.STATUS_SUCCESS) return
-            if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
-                val confirm = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_INTENT, Intent::class.java)
-                if (confirm == null) {
-                    report(status, "Écran de confirmation absent.")
-                    return
+            when (intent.getIntExtra(PackageInstaller.EXTRA_STATUS, Int.MIN_VALUE)) {
+                PackageInstaller.STATUS_SUCCESS -> installing.set(false)
+                PackageInstaller.STATUS_PENDING_USER_ACTION -> {
+                    installing.set(false)
+                    val confirm = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_INTENT, Intent::class.java)
+                    if (confirm == null) {
+                        report(PackageInstaller.STATUS_PENDING_USER_ACTION, "Écran de confirmation absent.")
+                    } else {
+                        presentConfirm(confirm)
+                    }
                 }
-                confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                activity.startActivity(confirm)
-                return
+                else -> {
+                    installing.set(false)
+                    val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, Int.MIN_VALUE)
+                    report(status, messageFor(status, intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)))
+                }
             }
-            report(status, intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE))
+        }
+    }
+
+    /**
+     * Un `BroadcastReceiver` réveillé alors que l'application est en arrière-plan
+     * ne peut pas démarrer d'activité (restriction de lancement en arrière-plan,
+     * Android 10+) : `startActivity` y est ignoré en silence. L'intent plein
+     * écran d'une notification est le déclencheur d'UI supporté depuis
+     * l'arrière-plan ; au premier plan on ouvre l'écran système directement.
+     */
+    private fun presentConfirm(confirm: Intent) {
+        confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val resumed = (activity as? LifecycleOwner)
+            ?.lifecycle?.currentState?.isAtLeast(Lifecycle.State.RESUMED) == true
+        if (resumed) {
+            activity.startActivity(confirm)
+        } else {
+            notifyConfirm(confirm)
+        }
+    }
+
+    private fun notifyConfirm(confirm: Intent) {
+        val manager = activity.getSystemService(NotificationManager::class.java) ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    CONFIRM_CHANNEL,
+                    "Mise à jour CPI GO",
+                    NotificationManager.IMPORTANCE_HIGH,
+                ),
+            )
+        }
+        var flags = PendingIntent.FLAG_UPDATE_CURRENT
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) flags = flags or PendingIntent.FLAG_IMMUTABLE
+        val pending = PendingIntent.getActivity(activity, CONFIRM_REQUEST, confirm, flags)
+        val notification = NotificationCompat.Builder(activity, CONFIRM_CHANNEL)
+            .setSmallIcon(android.R.drawable.stat_sys_download_done)
+            .setContentTitle("Mise à jour prête")
+            .setContentText("Appuyez pour terminer l'installation de CPI GO.")
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_RECOMMENDATION)
+            .setAutoCancel(true)
+            .setContentIntent(pending)
+            .setFullScreenIntent(pending, true)
+            .build()
+        manager.notify(CONFIRM_NOTIFICATION_ID, notification)
+    }
+
+    private fun messageFor(status: Int, systemMessage: String?): String {
+        if (!systemMessage.isNullOrBlank()) return systemMessage
+        return when (status) {
+            PackageInstaller.STATUS_FAILURE_BLOCKED -> "Installation bloquée par l'appareil."
+            PackageInstaller.STATUS_FAILURE_ABORTED -> "Installation annulée."
+            PackageInstaller.STATUS_FAILURE_INVALID -> "Fichier de mise à jour invalide ou corrompu."
+            PackageInstaller.STATUS_FAILURE_CONFLICT -> "Conflit avec l'application déjà installée."
+            PackageInstaller.STATUS_FAILURE_STORAGE -> "Espace de stockage insuffisant."
+            PackageInstaller.STATUS_FAILURE_INCOMPATIBLE -> "Mise à jour incompatible avec cet appareil."
+            else -> "Échec de l'installation."
         }
     }
 
@@ -89,6 +159,7 @@ class UpdatesChannel(private val activity: Activity) {
 
     fun dispose() {
         runCatching { activity.unregisterReceiver(receiver) }
+        NotificationManagerCompat.from(activity).cancel(CONFIRM_NOTIFICATION_ID)
         channel?.setMethodCallHandler(null)
         channel = null
         worker.shutdown()
@@ -128,14 +199,22 @@ class UpdatesChannel(private val activity: Activity) {
             result.error("SIGNER_MISMATCH", "Le fichier n'est pas signé par CPI.", null)
             return
         }
+        if (!installing.compareAndSet(false, true)) {
+            result.error("INSTALL_IN_PROGRESS", "Une installation est déjà en cours.", null)
+            return
+        }
         // L'APK fait des dizaines de mégaoctets : le recopier dans la session sur
-        // le fil principal fige l'interface assez longtemps pour un ANR.
+        // le fil principal fige l'interface assez longtemps pour un ANR. Le drapeau
+        // `installing` retombe sur le verdict de la session (voir receiver).
         worker.execute {
             val outcome = runCatching { openSessionAndCommit(apk) }
             main.post {
                 outcome.fold(
                     onSuccess = { result.success(it) },
-                    onFailure = { result.error("INSTALLER_FAILED", it.message, null) },
+                    onFailure = {
+                        installing.set(false)
+                        result.error("INSTALLER_FAILED", it.message, null)
+                    },
                 )
             }
         }
@@ -201,5 +280,8 @@ class UpdatesChannel(private val activity: Activity) {
         const val CHANNEL = "sn.cpi.go/updates"
         private const val ACTION_STATUS = "sn.cpi.go.INSTALL_STATUS"
         private const val APK_NAME = "cpi-go"
+        private const val CONFIRM_CHANNEL = "cpi_go_update_confirm"
+        private const val CONFIRM_NOTIFICATION_ID = 4201
+        private const val CONFIRM_REQUEST = 4202
     }
 }
