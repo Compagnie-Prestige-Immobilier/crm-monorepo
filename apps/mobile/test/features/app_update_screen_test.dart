@@ -83,21 +83,20 @@ void main() {
     release: release(),
   );
 
-  testWidgets('l\'outbox passe avant l\'installation', (
-    WidgetTester tester,
-  ) async {
-    await poser(tester, state: prete(), outbox: 2);
+  testWidgets(
+    'saisies en attente : l\'installation reste offerte, la file est signalée',
+    (WidgetTester tester) async {
+      await poser(tester, state: prete(), outbox: 2);
 
-    expect(find.text('2 saisies encore à envoyer'), findsOneWidget);
-    final CpiButton installer = tester.widget<CpiButton>(
-      find.widgetWithText(CpiButton, 'Installer'),
-    );
-    expect(
-      installer.onPressed,
-      isNull,
-      reason: 'installer remplace le processus : la file doit être vide',
-    );
-  });
+      // La bannière prévient, mais n'empêche pas : une mise à jour d'APK garde
+      // les données, donc les saisies survivent et partent après.
+      expect(find.text('2 saisies encore à envoyer'), findsOneWidget);
+      final CpiButton installer = tester.widget<CpiButton>(
+        find.widgetWithText(CpiButton, 'Installer'),
+      );
+      expect(installer.onPressed, isNotNull);
+    },
+  );
 
   testWidgets('file vide : l\'installation est offerte', (
     WidgetTester tester,

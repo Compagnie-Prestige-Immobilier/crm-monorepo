@@ -345,6 +345,39 @@ void main() {
   });
 
   test(
+    'un APK complet et intègre déjà sur disque passe prêt sans se retélécharger',
+    () async {
+      // La boucle d'installation : ouvrir la confirmation met CPI GO en
+      // arrière-plan, `onResume` relance `check()`, et l'ancien code
+      // retéléchargeait le fichier complet depuis zéro, si bien que l'install ne
+      // se posait jamais. L'adaptateur ne sert AUCUN octet d'APK valide : un
+      // retéléchargement échouerait l'empreinte, donc « prêt » ne peut venir que
+      // du fichier déjà sur disque.
+      final List<int> bytes = List<int>.filled(2048, 7);
+      Directory(p.join(support.path, 'updates')).createSync(recursive: true);
+      final File apk = File(p.join(support.path, 'updates', 'cpi-go-5.apk'))
+        ..writeAsBytesSync(bytes);
+
+      final _JsonAdapter adapter = _JsonAdapter(
+        refusee(
+          fileSize: bytes.length,
+          digest: sha256.convert(bytes).toString(),
+        ),
+      );
+      final AppUpdateState state = await settle(build(adapter: adapter));
+
+      expect(state.isReady, isTrue);
+      expect(state.localPath, endsWith('cpi-go-5.apk'));
+      expect(apk.existsSync(), isTrue);
+      expect(
+        adapter.rangeDemande,
+        isNull,
+        reason: 'le corps du téléchargement n\'a pas été redemandé',
+      );
+    },
+  );
+
+  test(
     'espace insuffisant : le manque est chiffré, rien n\'est écrit',
     () async {
       const int taille = 100 * 1024 * 1024;

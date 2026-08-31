@@ -117,7 +117,7 @@ class AppUpdateScreen extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  _primary(state, controller, pending: pending),
+                  _primary(state, controller),
                   if (!force) ...<Widget>[
                     const SizedBox(height: CpiSpacing.xs),
                     CpiButton(
@@ -135,11 +135,7 @@ class AppUpdateScreen extends ConsumerWidget {
 
 String _saisies(int count) => count > 1 ? 'saisies' : 'saisie';
 
-Widget _primary(
-  AppUpdateState state,
-  AppUpdateController controller, {
-  required int pending,
-}) {
+Widget _primary(AppUpdateState state, AppUpdateController controller) {
   if (state.isReady && !state.canInstall) {
     return CpiButton(
       'Autoriser l\'installation',
@@ -148,12 +144,15 @@ Widget _primary(
     );
   }
   if (state.isReady) {
+    // Une mise à jour d'APK GARDE les données de l'application : les saisies non
+    // envoyées survivent et partent après. Bloquer l'installation tant que la
+    // file n'est pas vide laissait un bouton mort sans explication, et rendait
+    // une mise à jour obligatoire impossible à poser. La bannière « X saisies à
+    // envoyer » suffit à prévenir.
     return CpiButton(
       'Installer',
       icon: PhosphorIconsRegular.deviceMobile,
-      // Installer, c'est remplacer le processus : ce qui n'est pas parti serait
-      // gardé, mais l'utilisateur ne saurait pas pourquoi la file n'est pas vide.
-      onPressed: pending > 0 ? null : controller.install,
+      onPressed: controller.install,
     );
   }
   if (state.blocker == AppUpdateBlocker.meteredLink) {
