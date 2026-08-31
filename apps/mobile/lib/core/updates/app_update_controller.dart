@@ -291,11 +291,14 @@ class AppUpdateController extends Notifier<AppUpdateState> {
       if (!ref.mounted) return;
       if (cached == null) {
         state = _withGate(
-          AppUpdateState(status: AppUpdateStatus.unreachable, error: '$error'),
+          AppUpdateState(
+            status: AppUpdateStatus.unreachable,
+            error: messageErreurReseau(error),
+          ),
         );
         return;
       }
-      await _apply(dio, cached, online: false, failure: '$error');
+      await _apply(dio, cached, online: false, failure: messageErreurReseau(error));
     } finally {
       // Le verdict est tombé : le garde-fou du démarrage n'a plus rien à
       // libérer, et un minuteur armé pour rien retient l'application en test
@@ -412,7 +415,7 @@ class AppUpdateController extends Notifier<AppUpdateState> {
               ? AppUpdateStatus.error
               : AppUpdateStatus.unreachable,
           release: release,
-          error: '$error',
+          error: messageErreurReseau(error),
           belowFloor: belowFloor,
         ),
         since: since,
@@ -719,4 +722,28 @@ class AppUpdateController extends Notifier<AppUpdateState> {
       return null;
     }
   }
+}
+
+/// L'écran de mise à jour montre CE message : jamais la `DioException` brute,
+/// qui affichait au terrain une page de trace en anglais.
+String messageErreurReseau(Object error) {
+  if (error is DioException) {
+    final int? code = error.response?.statusCode;
+    if (code == 429) {
+      return 'Trop de téléchargements en ce moment. Réessayez dans quelques minutes.';
+    }
+    if (code != null && code >= 500) {
+      return 'Le serveur de mise à jour est indisponible. Réessayez plus tard.';
+    }
+    const Set<DioExceptionType> reseau = <DioExceptionType>{
+      DioExceptionType.connectionTimeout,
+      DioExceptionType.sendTimeout,
+      DioExceptionType.receiveTimeout,
+      DioExceptionType.connectionError,
+    };
+    if (reseau.contains(error.type)) {
+      return 'Connexion instable. Réessayez, de préférence en Wi-Fi.';
+    }
+  }
+  return 'Le téléchargement a échoué. Réessayez.';
 }
