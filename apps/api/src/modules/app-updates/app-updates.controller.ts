@@ -1,4 +1,14 @@
-import { Controller, Get, Param, ParseIntPipe, Post, Query, Req, Res } from '@nestjs/common';
+import {
+  Controller,
+  type ExecutionContext,
+  Get,
+  Param,
+  ParseIntPipe,
+  Post,
+  Query,
+  Req,
+  Res,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -28,11 +38,24 @@ import { AndroidReleaseDto, AndroidReleaseListDto, AppUpdateDto } from './dto.js
 
 // `@Throttle` fige sa limite au chargement du module, avant que `readEnv` ne
 // soit appelable ; `envSchema` valide la même variable au démarrage.
-// Une reprise de téléchargement (requête Range) recompte, et une flotte
-// derrière un même wifi partage l'adresse : 10/h coupait le déploiement d'une
-// nouvelle version dès le premier bureau. La borne haute protège encore d'un
-// abus réel, le limiteur global couvrant le reste.
 const DOWNLOAD_RATE_LIMIT = Number(process.env.APK_DOWNLOAD_RATE_LIMIT) || 1000;
+
+// Une requête Range est une REPRISE, pas un nouveau départ : au Sénégal une
+// flotte NAT partage une IP publique, la compter la jetterait en 429 en pleine
+// reprise. On la range dans un compteur dédié et sans plafond (clé `-resume`,
+// limite MAX) ; seul un vrai départ, sans `Range`, consomme le quota par IP.
+const isResume = (context: ExecutionContext): boolean =>
+  context.switchToHttp().getRequest<FastifyRequest>().headers.range !== undefined;
+
+export const downloadThrottle = {
+  default: {
+    ttl: seconds(3_600),
+    limit: (context: ExecutionContext): number =>
+      isResume(context) ? Number.MAX_SAFE_INTEGER : DOWNLOAD_RATE_LIMIT,
+    generateKey: (context: ExecutionContext, tracker: string, name: string): string =>
+      `apk-download-${name}-${tracker}${isResume(context) ? '-resume' : ''}`,
+  },
+};
 
 @ApiTags('app-updates')
 @Controller({ path: 'app-updates', version: '1' })
@@ -55,7 +78,7 @@ export class AppUpdatesController {
   }
 
   @Public()
-  @Throttle({ default: { ttl: seconds(3_600), limit: DOWNLOAD_RATE_LIMIT } })
+  @Throttle(downloadThrottle)
   @Get('android/download')
   @ApiOperation({
     operationId: 'downloadAndroidUpdate',
