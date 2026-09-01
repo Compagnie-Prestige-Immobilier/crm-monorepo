@@ -79,7 +79,11 @@ export interface RepresentantImportRow {
   /** Le compte propriétaire de la fiche. `null` : celui qui a demandé l'import. */
   readonly ownerId: string | null;
   /** L'appel déjà passé, quand le fichier le date. */
-  readonly appel: { readonly date: Date; readonly outcome: RepCallOutcome } | null;
+  readonly appel: {
+    readonly date: Date;
+    readonly outcome: RepCallOutcome;
+    readonly comment: string | null;
+  } | null;
 }
 
 interface ReferentielRow {
@@ -213,6 +217,7 @@ export class RepresentantsImportAdapter implements ImportAdapter<
     const etablissement = cellAt(cells, 5);
     const complements = parseComplements(
       {
+        notes,
         relation: cellAt(cells, 6),
         whatsapp: cellAt(cells, 7),
         charge: cellAt(cells, 8),
@@ -435,6 +440,7 @@ export class RepresentantsImportAdapter implements ImportAdapter<
             representantId: id,
             performedById,
             outcome: appel.outcome,
+            comment: appel.comment,
             clientCreatedAt: appel.date,
           })),
       });
