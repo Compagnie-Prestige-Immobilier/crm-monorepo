@@ -97,7 +97,7 @@ describe('ce que la saisie exige', () => {
     const user = userEvent.setup();
     create.mockResolvedValue(created());
     mount();
-    await screen.findByRole('combobox', { name: /Banque de domiciliation/u });
+    await screen.findByRole('combobox', { name: /Canal de provenance/u });
 
     await fillIdentity();
     await user.click(screen.getByRole('button', { name: 'Enregistrer et suivant' }));
@@ -114,7 +114,7 @@ describe('ce que la saisie exige', () => {
   it('ne réclame ni banque, ni syndicat, ni canal, ni durée, ni profession', async () => {
     const user = userEvent.setup();
     mount();
-    await screen.findByRole('combobox', { name: /Banque de domiciliation/u });
+    await screen.findByRole('combobox', { name: /Canal de provenance/u });
 
     await user.click(screen.getByRole('button', { name: 'Enregistrer et suivant' }));
 
@@ -129,7 +129,7 @@ describe('ce que la saisie exige', () => {
   it('refuse un numéro qui n’a pas neuf chiffres', async () => {
     const user = userEvent.setup();
     mount();
-    await screen.findByRole('combobox', { name: /Banque de domiciliation/u });
+    await screen.findByRole('combobox', { name: /Canal de provenance/u });
 
     await user.type(screen.getByLabelText(/Prénom/u), 'Moussa');
     await user.type(screen.getByLabelText(/^Nom/u), 'Fall');
@@ -142,15 +142,30 @@ describe('ce que la saisie exige', () => {
 });
 
 describe('les champs facultatifs', () => {
+  it('adapte les renseignements à la situation choisie', async () => {
+    const user = userEvent.setup();
+    mount();
+
+    await user.click(screen.getByRole('button', { name: 'Informel' }));
+
+    expect(screen.getByRole('combobox', { name: 'Activité' })).toBeTruthy();
+    expect(screen.queryByRole('combobox', { name: /Banque de domiciliation/u })).toBeNull();
+    expect(screen.queryByRole('combobox', { name: 'Syndicat' })).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Fonctionnaire' }));
+
+    expect(screen.getByRole('combobox', { name: /Banque de domiciliation/u })).toBeTruthy();
+  });
+
   it('joint ceux qui ont été renseignés, et eux seuls', async () => {
     const user = userEvent.setup();
     create.mockResolvedValue(created());
     mount();
-    await screen.findByRole('combobox', { name: /Banque de domiciliation/u });
+    await screen.findByRole('combobox', { name: /Canal de provenance/u });
 
     await fillIdentity();
     await choose('Profession', 'Chauffeur');
-    await user.click(screen.getByRole('button', { name: 'Diaspora' }));
+    await user.click(screen.getByRole('button', { name: 'Secteur privé' }));
     await choose('Banque de domiciliation', 'CBAO');
     await choose('Canal de provenance', 'TikTok');
     await user.click(screen.getByRole('button', { name: 'Enregistrer et suivant' }));
@@ -161,7 +176,7 @@ describe('les champs facultatifs', () => {
         nom: 'Fall',
         phone: '+221771234567',
         professionId: 'pro-chauffeur',
-        type: 'DIASPORA',
+        type: 'SECTEUR_PRIVE',
         banqueId: 'bnq-cbao',
         canalProvenanceId: 'c-tiktok',
       });
@@ -205,7 +220,7 @@ describe('la rafale', () => {
     const user = userEvent.setup();
     create.mockResolvedValue(created());
     mount();
-    await screen.findByRole('combobox', { name: /Banque de domiciliation/u });
+    await screen.findByRole('combobox', { name: /Canal de provenance/u });
 
     await fillIdentity();
     await user.click(screen.getByRole('button', { name: 'Enregistrer et ouvrir la fiche' }));
@@ -241,7 +256,7 @@ describe('le numéro déjà pris', () => {
       ),
     );
     mount();
-    await screen.findByRole('combobox', { name: /Banque de domiciliation/u });
+    await screen.findByRole('combobox', { name: /Canal de provenance/u });
 
     await fillIdentity();
     await user.click(screen.getByRole('button', { name: 'Enregistrer et suivant' }));

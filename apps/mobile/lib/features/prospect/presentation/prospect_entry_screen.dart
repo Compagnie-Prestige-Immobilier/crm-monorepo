@@ -304,7 +304,7 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
     _scheduleLookup();
   }
 
-  /// Le nom, le numéro, et pour le Grand Public le secteur : rien d'autre. Un
+  /// Le nom, le numéro, et pour le Grand Public la situation : rien d'autre. Un
   /// champ de plus rendu obligatoire et la saisie est abandonnée sur le terrain.
   bool get _canSave =>
       _nom.text.trim().isNotEmpty &&
@@ -314,12 +314,15 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
 
   bool get _grandPublic => widget.projet == 'GRAND_PUBLIC';
 
+  bool get _salarie => _type == 'FONCTIONNAIRE' || _type == 'SECTEUR_PRIVE';
+
   int get _lastStep => _grandPublic ? 3 : 2;
 
   /// La question de l'étape, celle qui tient lieu de titre.
   String get _question => switch (_step) {
     1 => 'Qui est-ce ?',
     2 when _grandPublic => 'Que fait-il ?',
+    _ when _grandPublic && !_salarie => 'Comment l’a-t-il connu ?',
     _ => 'Sa banque, son syndicat',
   };
 
@@ -329,7 +332,7 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
     if (_step > 1) return null;
     if (_nom.text.trim().isEmpty) return 'Écrivez le nom';
     if (Phone.toE164(_phone.text) == null) return 'Écrivez le numéro complet';
-    if (_grandPublic && _type == null) return 'Choisissez le secteur';
+    if (_grandPublic && _type == null) return 'Choisissez la situation';
     return null;
   }
 
@@ -347,9 +350,10 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
   List<CpiRecapLine> get _recap => <CpiRecapLine>[
     CpiRecapLine('Nom complet', '${_prenom.text} ${_nom.text}'.trim()),
     CpiRecapLine('Téléphone', _phone.text),
-    if (_grandPublic) CpiRecapLine('Secteur', _ChampSecteur.libelle(_type)),
-    CpiRecapLine('Banque', _banque.text),
-    CpiRecapLine('Syndicat', _syndicat.text),
+    if (_grandPublic) CpiRecapLine('Situation', _ChampSituation.libelle(_type)),
+    if (!_grandPublic || _salarie) CpiRecapLine('Banque', _banque.text),
+    if (!_grandPublic || _type == 'FONCTIONNAIRE')
+      CpiRecapLine('Syndicat', _syndicat.text),
   ];
 
   Future<void> _save({required bool andNext}) async {
@@ -381,8 +385,10 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
         nom: _nom.text.trim(),
         prenom: _prenom.text.trim(),
         phoneE164: Phone.toE164(_phone.text)!,
-        banqueId: _banqueId,
-        syndicatId: _syndicatId,
+        banqueId: !_grandPublic || _salarie ? _banqueId : null,
+        syndicatId: !_grandPublic || _type == 'FONCTIONNAIRE'
+            ? _syndicatId
+            : null,
         representantId: _representantId,
         projet: widget.projet,
         type: _type,
@@ -404,7 +410,7 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
           _phone.clear();
           _profession.clear();
           _duree.clear();
-          // Le secteur repart à vide : le garder ferait enregistrer la fiche
+          // La situation repart à vide : la garder ferait enregistrer la fiche
           // suivante sous celui de la précédente sans que personne le relise.
           _type = null;
           _duplicateName = null;
@@ -719,10 +725,20 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
       ],
       if (_grandPublic) ...<Widget>[
         const SizedBox(height: CpiSpacing.md),
-        _ChampSecteur(
+        _ChampSituation(
           valeur: _type,
           onChanged: (String valeur) {
-            setState(() => _type = valeur);
+            setState(() {
+              _type = valeur;
+              if (!_salarie) {
+                _banqueId = null;
+                _banque.clear();
+              }
+              if (_type != 'FONCTIONNAIRE') {
+                _syndicatId = null;
+                _syndicat.clear();
+              }
+            });
             markDraftDirty();
             unawaited(flushDraft());
           },
@@ -734,7 +750,7 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
   /// Grand Public : ce qu'il fait, entre son identité et sa banque.
   List<Widget> _champsTravail() => <Widget>[
     CpiField(
-      label: 'Profession',
+      label: _type == 'INFORMEL' ? 'Activité' : 'Profession',
       controller: _profession,
       focusNode: _professionFocus,
       hint: 'Ex. Instituteur',
@@ -761,11 +777,15 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
     List<Syndicat> syndicats,
     List<CanauxProvenanceData> canaux,
   ) => <Widget>[
-    _champBanque(banques),
-    const SizedBox(height: CpiSpacing.md),
-    _champSyndicat(syndicats),
-    if (_grandPublic) ...<Widget>[
+    if (!_grandPublic || _salarie) ...<Widget>[
+      _champBanque(banques),
       const SizedBox(height: CpiSpacing.md),
+    ],
+    if (!_grandPublic || _type == 'FONCTIONNAIRE') ...<Widget>[
+      _champSyndicat(syndicats),
+      if (_grandPublic) const SizedBox(height: CpiSpacing.md),
+    ],
+    if (_grandPublic) ...<Widget>[
       LocalTypeahead(
         controller: _canal,
         focusNode: _canalFocus,
@@ -930,10 +950,10 @@ class _Footer extends StatelessWidget {
   );
 }
 
-/// Le secteur, seule question obligatoire du Grand Public en plus du nom et du
-/// numéro : c'est lui qui décide du mode de paiement proposé ensuite.
-class _ChampSecteur extends StatelessWidget {
-  const _ChampSecteur({required this.valeur, required this.onChanged});
+/// La situation, seule question obligatoire du Grand Public en plus du nom et
+/// du numéro : elle décide des renseignements proposés ensuite.
+class _ChampSituation extends StatelessWidget {
+  const _ChampSituation({required this.valeur, required this.onChanged});
 
   final String? valeur;
   final ValueChanged<String> onChanged;
@@ -949,13 +969,13 @@ class _ChampSecteur extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => CpiChoiceGroup<String>(
-    label: 'Secteur',
+    label: 'Situation',
     value: valeur,
     options: <CpiChoice<String>>[
       for (final MapEntry<String, String> e in _libelles.entries)
         CpiChoice<String>(value: e.key, label: e.value),
     ],
-    // Un secteur se corrige en touchant un autre choix, pas en le
+    // Une situation se corrige en touchant un autre choix, pas en le
     // retouchant : le vider laisserait une fiche invalide.
     onChanged: (String choisi) {
       if (choisi != valeur) onChanged(choisi);
