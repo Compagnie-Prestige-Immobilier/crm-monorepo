@@ -31,6 +31,20 @@ abstract class _$CreateRepCallAttemptDtoCWProxy {
 
   CreateRepCallAttemptDto profession(String? profession);
 
+  CreateRepCallAttemptDto etablissementConfirme(bool? etablissementConfirme);
+
+  CreateRepCallAttemptDto etablissement(String? etablissement);
+
+  CreateRepCallAttemptDto numeroConfirme(bool? numeroConfirme);
+
+  CreateRepCallAttemptDto phone(String? phone);
+
+  CreateRepCallAttemptDto contacte(bool? contacte);
+
+  CreateRepCallAttemptDto connaitUES(bool? connaitUES);
+
+  CreateRepCallAttemptDto syndicat(String? syndicat);
+
   CreateRepCallAttemptDto clientCreatedAt(DateTime clientCreatedAt);
 
   CreateRepCallAttemptDto callbackAt(DateTime? callbackAt);
@@ -54,6 +68,13 @@ abstract class _$CreateRepCallAttemptDtoCWProxy {
     WhatsappStatus? whatsappStatus,
     String? whatsappE164,
     String? profession,
+    bool? etablissementConfirme,
+    String? etablissement,
+    bool? numeroConfirme,
+    String? phone,
+    bool? contacte,
+    bool? connaitUES,
+    String? syndicat,
     DateTime clientCreatedAt,
     DateTime? callbackAt,
   });
@@ -114,6 +135,32 @@ class _$CreateRepCallAttemptDtoCWProxyImpl
       this(profession: profession);
 
   @override
+  CreateRepCallAttemptDto etablissementConfirme(bool? etablissementConfirme) =>
+      this(etablissementConfirme: etablissementConfirme);
+
+  @override
+  CreateRepCallAttemptDto etablissement(String? etablissement) =>
+      this(etablissement: etablissement);
+
+  @override
+  CreateRepCallAttemptDto numeroConfirme(bool? numeroConfirme) =>
+      this(numeroConfirme: numeroConfirme);
+
+  @override
+  CreateRepCallAttemptDto phone(String? phone) => this(phone: phone);
+
+  @override
+  CreateRepCallAttemptDto contacte(bool? contacte) => this(contacte: contacte);
+
+  @override
+  CreateRepCallAttemptDto connaitUES(bool? connaitUES) =>
+      this(connaitUES: connaitUES);
+
+  @override
+  CreateRepCallAttemptDto syndicat(String? syndicat) =>
+      this(syndicat: syndicat);
+
+  @override
   CreateRepCallAttemptDto clientCreatedAt(DateTime clientCreatedAt) =>
       this(clientCreatedAt: clientCreatedAt);
 
@@ -141,6 +188,13 @@ class _$CreateRepCallAttemptDtoCWProxyImpl
     Object? whatsappStatus = const $CopyWithPlaceholder(),
     Object? whatsappE164 = const $CopyWithPlaceholder(),
     Object? profession = const $CopyWithPlaceholder(),
+    Object? etablissementConfirme = const $CopyWithPlaceholder(),
+    Object? etablissement = const $CopyWithPlaceholder(),
+    Object? numeroConfirme = const $CopyWithPlaceholder(),
+    Object? phone = const $CopyWithPlaceholder(),
+    Object? contacte = const $CopyWithPlaceholder(),
+    Object? connaitUES = const $CopyWithPlaceholder(),
+    Object? syndicat = const $CopyWithPlaceholder(),
     Object? clientCreatedAt = const $CopyWithPlaceholder(),
     Object? callbackAt = const $CopyWithPlaceholder(),
   }) {
@@ -193,6 +247,35 @@ class _$CreateRepCallAttemptDtoCWProxyImpl
           ? _value.profession
           // ignore: cast_nullable_to_non_nullable
           : profession as String?,
+      etablissementConfirme:
+          etablissementConfirme == const $CopyWithPlaceholder()
+          ? _value.etablissementConfirme
+          // ignore: cast_nullable_to_non_nullable
+          : etablissementConfirme as bool?,
+      etablissement: etablissement == const $CopyWithPlaceholder()
+          ? _value.etablissement
+          // ignore: cast_nullable_to_non_nullable
+          : etablissement as String?,
+      numeroConfirme: numeroConfirme == const $CopyWithPlaceholder()
+          ? _value.numeroConfirme
+          // ignore: cast_nullable_to_non_nullable
+          : numeroConfirme as bool?,
+      phone: phone == const $CopyWithPlaceholder()
+          ? _value.phone
+          // ignore: cast_nullable_to_non_nullable
+          : phone as String?,
+      contacte: contacte == const $CopyWithPlaceholder()
+          ? _value.contacte
+          // ignore: cast_nullable_to_non_nullable
+          : contacte as bool?,
+      connaitUES: connaitUES == const $CopyWithPlaceholder()
+          ? _value.connaitUES
+          // ignore: cast_nullable_to_non_nullable
+          : connaitUES as bool?,
+      syndicat: syndicat == const $CopyWithPlaceholder()
+          ? _value.syndicat
+          // ignore: cast_nullable_to_non_nullable
+          : syndicat as String?,
       clientCreatedAt: clientCreatedAt == const $CopyWithPlaceholder()
           ? _value.clientCreatedAt
           // ignore: cast_nullable_to_non_nullable
@@ -257,6 +340,16 @@ CreateRepCallAttemptDto _$CreateRepCallAttemptDtoFromJson(
     ),
     whatsappE164: $checkedConvert('whatsappE164', (v) => v as String?),
     profession: $checkedConvert('profession', (v) => v as String?),
+    etablissementConfirme: $checkedConvert(
+      'etablissementConfirme',
+      (v) => v as bool?,
+    ),
+    etablissement: $checkedConvert('etablissement', (v) => v as String?),
+    numeroConfirme: $checkedConvert('numeroConfirme', (v) => v as bool?),
+    phone: $checkedConvert('phone', (v) => v as String?),
+    contacte: $checkedConvert('contacte', (v) => v as bool?),
+    connaitUES: $checkedConvert('connaitUES', (v) => v as bool?),
+    syndicat: $checkedConvert('syndicat', (v) => v as String?),
     clientCreatedAt: $checkedConvert(
       'clientCreatedAt',
       (v) => DateTime.parse(v as String),
@@ -286,6 +379,14 @@ Map<String, dynamic> _$CreateRepCallAttemptDtoToJson(
     'whatsappStatus': value,
   if (instance.whatsappE164 case final value?) 'whatsappE164': value,
   if (instance.profession case final value?) 'profession': value,
+  if (instance.etablissementConfirme case final value?)
+    'etablissementConfirme': value,
+  if (instance.etablissement case final value?) 'etablissement': value,
+  if (instance.numeroConfirme case final value?) 'numeroConfirme': value,
+  if (instance.phone case final value?) 'phone': value,
+  if (instance.contacte case final value?) 'contacte': value,
+  if (instance.connaitUES case final value?) 'connaitUES': value,
+  if (instance.syndicat case final value?) 'syndicat': value,
   'clientCreatedAt': instance.clientCreatedAt.toIso8601String(),
   if (instance.callbackAt?.toIso8601String() case final value?)
     'callbackAt': value,

@@ -36,6 +36,24 @@ export class CreateRepresentantDto {
   @MaxLength(160)
   fullName!: string;
 
+  @ApiPropertyOptional({
+    maxLength: 160,
+    description: 'Prénom, quand il a été recueilli séparément du nom complet.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  prenom?: string;
+
+  @ApiPropertyOptional({
+    maxLength: 200,
+    description: 'Établissement où il exerce. Ni l’IEF ni le département.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  etablissement?: string;
+
   @ApiProperty({
     maxLength: 40,
     description: 'Téléphone en saisie libre. Normalisé en E.164 par le serveur.',
@@ -132,6 +150,34 @@ export class UpdateRepresentantDto extends PartialType(CreateRepresentantDto) {
   @IsString()
   @MaxLength(PROFESSION_MAX_LENGTH)
   profession?: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    maxLength: 200,
+    description:
+      'Niveau de syndicat déclaré pendant la qualification. Texte libre, distinct du référentiel Syndicat des prospects. Chaîne vide : la valeur est effacée.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  syndicat?: string;
+
+  @ApiPropertyOptional({
+    type: Boolean,
+    description: 'Le représentant déclare connaître l’UES.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  connaitUES?: boolean;
+
+  @ApiPropertyOptional({
+    type: Boolean,
+    description:
+      'Le représentant déclare avoir déjà été contacté. Distinct de relationStatus, qui porte la décision ambassadeur/refus.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  contacte?: boolean;
 }
 
 export class RepresentantDto {
@@ -173,6 +219,12 @@ export class RepresentantDto {
   whatsappNumber!: string | null;
 
   @ApiProperty({ type: String, nullable: true }) profession!: string | null;
+
+  @ApiProperty({ type: String, nullable: true }) prenom!: string | null;
+  @ApiProperty({ type: String, nullable: true }) etablissement!: string | null;
+  @ApiProperty({ type: String, nullable: true }) syndicat!: string | null;
+  @ApiProperty({ type: Boolean, nullable: true }) connaitUES!: boolean | null;
+  @ApiProperty({ type: Boolean, nullable: true }) contacte!: boolean | null;
 }
 
 export class RepresentantListDto {

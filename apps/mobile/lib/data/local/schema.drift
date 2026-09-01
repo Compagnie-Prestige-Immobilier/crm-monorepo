@@ -210,6 +210,16 @@ CREATE TABLE representants (
     -- que rien ne le signale.
     whatsapp_e164 TEXT NULL,
     profession TEXT NULL,
+    -- Renseignements du script de qualification. Tous FACULTATIFS : une fiche
+    -- d'avant ce script n'en porte aucun, et la question peut ne pas avoir été
+    -- posée. Écrits à la saisie ET au pull, comme le reste de la fiche.
+    prenom TEXT NULL,
+    etablissement TEXT NULL,
+    syndicat TEXT NULL,
+    -- Tri-état : 1 oui, 0 non, NULL question non posée : même patron que
+    -- `call_attempts.fonctionnaire`.
+    connait_ues BOOLEAN NULL,
+    contacte BOOLEAN NULL,
     created_by_id TEXT NOT NULL,
     -- Horodatage de la saisie sur le terrain, distinct de l'arrivée en base :
     -- les deux peuvent être séparés de plusieurs jours hors ligne.

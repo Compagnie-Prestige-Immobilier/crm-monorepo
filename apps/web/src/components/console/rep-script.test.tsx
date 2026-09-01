@@ -63,6 +63,11 @@ function rep(over: Partial<ScriptedRepresentant> & { id: string }): ScriptedRepr
     whatsappE164: null,
     whatsappNumber: null,
     profession: null,
+    prenom: null,
+    etablissement: null,
+    syndicat: null,
+    connaitUES: null,
+    contacte: null,
     ...over,
   };
 }
@@ -100,6 +105,21 @@ async function choisir(nom: RegExp): Promise<void> {
 
 const repondre = async (label: string): Promise<void> => {
   await userEvent.click(screen.getByRole('button', { name: label }));
+};
+
+/** Répond à UNE question, désignée par sa légende, quand plusieurs Oui/Non coexistent. */
+const repondreA = async (legende: string, label: string): Promise<void> => {
+  const fieldset = screen.getByText(legende).closest('fieldset') as HTMLElement;
+  await userEvent.click(within(fieldset).getByRole('button', { name: label }));
+};
+
+/** Parcourt les questions 1 à 5 du script joignable, jusqu'à l'ambassadeur. */
+const parcoursJoignable = async (ambassadeur: 'Oui' | 'Non'): Promise<void> => {
+  await repondre('Joignable');
+  await repondreA('L’établissement de la fiche est-il confirmé ?', 'Oui');
+  await repondreA('A-t-il déjà été contacté ?', 'Oui');
+  await repondreA('Connaît-il l’UES ?', 'Oui');
+  await repondreA('Est-il représentant CPI CHUES ?', ambassadeur);
 };
 
 const dernierEnvoi = (): Record<string, unknown> => {
@@ -233,13 +253,9 @@ describe('RepScript : une seule tentative, à la fin', () => {
     await renderListe();
     await choisir(/Aminata Ndiaye/u);
 
-    await repondre('Joignable');
-    await repondre('Oui');
-    await userEvent.click(
-      within(
-        screen.getByText('A-t-il WhatsApp sur ce numéro ?').closest('fieldset') as HTMLElement,
-      ).getAllByRole('button', { name: 'Oui' })[0] as HTMLElement,
-    );
+    await parcoursJoignable('Oui');
+    await repondreA('Son numéro est-il confirmé ?', 'Oui');
+    await repondreA('A-t-il WhatsApp sur ce numéro ?', 'Oui');
     await enregistrer();
 
     await waitFor(() => {
@@ -250,6 +266,10 @@ describe('RepScript : une seule tentative, à la fin', () => {
       outcome: 'REACHED',
       relationStatus: 'AMBASSADEUR',
       whatsappStatus: 'MEME_NUMERO',
+      etablissementConfirme: true,
+      contacte: true,
+      connaitUES: true,
+      numeroConfirme: true,
     });
   });
 
@@ -257,8 +277,7 @@ describe('RepScript : une seule tentative, à la fin', () => {
     await renderListe();
     await choisir(/Aminata Ndiaye/u);
 
-    await repondre('Joignable');
-    await repondre('Non');
+    await parcoursJoignable('Non');
     await userEvent.type(screen.getByLabelText('Son numéro'), '77 111 22 33');
     await userEvent.type(screen.getByLabelText('Son nom et prénom'), 'Modou Sarr');
     await enregistrer();
@@ -471,8 +490,7 @@ describe('RepScript : la personne proposée se saisit dans n’importe quel ordr
   async function refuser(): Promise<void> {
     await renderListe();
     await choisir(/Aminata Ndiaye/u);
-    await repondre('Joignable');
-    await repondre('Non');
+    await parcoursJoignable('Non');
   }
 
   it('laisse les trois champs actifs d’emblée', async () => {

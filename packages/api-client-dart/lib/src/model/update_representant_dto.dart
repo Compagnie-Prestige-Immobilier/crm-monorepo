@@ -25,6 +25,10 @@ class UpdateRepresentantDto {
 
     this.fullName,
 
+    this.prenom,
+
+    this.etablissement,
+
     this.phone,
 
     this.departementId,
@@ -44,6 +48,12 @@ class UpdateRepresentantDto {
     this.whatsappE164,
 
     this.profession,
+
+    this.syndicat,
+
+    this.connaitUES,
+
+    this.contacte,
   });
 
   /// Identifiant UUID v7 généré par le client. Fourni par le mobile pour que les prospects saisis hors ligne puissent le référencer avant toute synchronisation.
@@ -52,6 +62,14 @@ class UpdateRepresentantDto {
 
   @JsonKey(name: r'fullName', required: false, includeIfNull: false)
   final String? fullName;
+
+  /// Prénom, quand il a été recueilli séparément du nom complet.
+  @JsonKey(name: r'prenom', required: false, includeIfNull: false)
+  final String? prenom;
+
+  /// Établissement où il exerce. Ni l’IEF ni le département.
+  @JsonKey(name: r'etablissement', required: false, includeIfNull: false)
+  final String? etablissement;
 
   /// Téléphone en saisie libre. Normalisé en E.164 par le serveur.
   @JsonKey(name: r'phone', required: false, includeIfNull: false)
@@ -101,6 +119,18 @@ class UpdateRepresentantDto {
   @JsonKey(name: r'profession', required: false, includeIfNull: false)
   final String? profession;
 
+  /// Niveau de syndicat déclaré pendant la qualification. Texte libre, distinct du référentiel Syndicat des prospects. Chaîne vide : la valeur est effacée.
+  @JsonKey(name: r'syndicat', required: false, includeIfNull: false)
+  final String? syndicat;
+
+  /// Le représentant déclare connaître l’UES.
+  @JsonKey(name: r'connaitUES', required: false, includeIfNull: false)
+  final bool? connaitUES;
+
+  /// Le représentant déclare avoir déjà été contacté. Distinct de relationStatus, qui porte la décision ambassadeur/refus.
+  @JsonKey(name: r'contacte', required: false, includeIfNull: false)
+  final bool? contacte;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is UpdateRepresentantDto &&
@@ -109,6 +139,8 @@ class UpdateRepresentantDto {
               [
                 id,
                 fullName,
+                prenom,
+                etablissement,
                 phone,
                 departementId,
                 iefId,
@@ -119,10 +151,15 @@ class UpdateRepresentantDto {
                 whatsappStatus,
                 whatsappE164,
                 profession,
+                syndicat,
+                connaitUES,
+                contacte,
               ],
               [
                 other.id,
                 other.fullName,
+                other.prenom,
+                other.etablissement,
                 other.phone,
                 other.departementId,
                 other.iefId,
@@ -133,6 +170,9 @@ class UpdateRepresentantDto {
                 other.whatsappStatus,
                 other.whatsappE164,
                 other.profession,
+                other.syndicat,
+                other.connaitUES,
+                other.contacte,
               ],
             );
   }
@@ -143,6 +183,8 @@ class UpdateRepresentantDto {
       mapPropsToHashCode([
         id,
         fullName,
+        prenom,
+        etablissement,
         phone,
         departementId,
         iefId,
@@ -153,6 +195,9 @@ class UpdateRepresentantDto {
         whatsappStatus,
         whatsappE164,
         profession,
+        syndicat,
+        connaitUES,
+        contacte,
       ]);
 
   factory UpdateRepresentantDto.fromJson(Map<String, dynamic> json) =>

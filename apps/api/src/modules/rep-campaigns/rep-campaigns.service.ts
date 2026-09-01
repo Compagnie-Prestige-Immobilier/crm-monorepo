@@ -3,6 +3,7 @@ import { ChangeSource, RepCallOutcome } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { type AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
+import { normalizePhone } from '../../common/phone.js';
 import { COMMENT_MAX_LENGTH } from '../phase2/attempt-rules.js';
 import { applyRelationChange } from '../representants/relation-change.js';
 import { resolveWhatsappPatch } from '../representants/whatsapp.js';
@@ -17,6 +18,7 @@ import {
   callbackAtNotAllowed,
   callbackAtRequired,
   commentRequired,
+  phoneConflict,
   promisedNotAllowed,
   representantNotFound,
 } from './errors.js';
@@ -42,10 +44,20 @@ export class RepCampaignsService {
 
     const representant = await this.prisma.representant.findFirst({
       where: { id: body.representantId, deletedAt: null },
-      select: { id: true, relationStatus: true, whatsappStatus: true, whatsappE164: true },
+      select: {
+        id: true,
+        relationStatus: true,
+        whatsappStatus: true,
+        whatsappE164: true,
+        phoneE164: true,
+      },
     });
     if (!representant) throw representantNotFound();
     const whatsapp = resolveWhatsappPatch(body, representant);
+    // Normalisé hors transaction (opération pure) ; un numéro illisible refuse
+    // la tentative entière, comme `suggestedPhone`.
+    const newPhone =
+      body.numeroConfirme === false && body.phone ? normalizePhone(body.phone) : undefined;
 
     const applied = await this.prisma.$transaction(async (tx) => {
       const inserted = await tx.repCallAttempt.createMany({
@@ -58,6 +70,11 @@ export class RepCampaignsService {
             promisedProspects: body.promisedProspects ?? null,
             comment,
             callbackAt: body.callbackAt ? new Date(body.callbackAt) : null,
+            etablissementConfirme: body.etablissementConfirme ?? null,
+            numeroConfirme: body.numeroConfirme ?? null,
+            contacte: body.contacte ?? null,
+            connaitUES: body.connaitUES ?? null,
+            syndicat: body.syndicat?.trim() || null,
             clientCreatedAt: new Date(body.clientCreatedAt),
           },
         ],
@@ -79,10 +96,32 @@ export class RepCampaignsService {
           },
         });
       }
-      if (Object.keys(whatsapp).length > 0) {
+
+      const changesPhone = newPhone !== undefined && newPhone !== representant.phoneE164;
+      if (changesPhone) {
+        // MÊME garde d'unicité que le module representants : lecture globale sur
+        // l'index partiel, jamais une contrainte SQL brute laissée lever.
+        const clash = await tx.representant.findFirst({
+          where: { phoneE164: newPhone, deletedAt: null, id: { not: body.representantId } },
+          select: { createdBy: { select: { fullName: true } } },
+        });
+        if (clash) throw phoneConflict(clash.createdBy.fullName);
+      }
+
+      const state = {
+        ...whatsapp,
+        ...(body.syndicat !== undefined ? { syndicat: body.syndicat.trim() || null } : {}),
+        ...(body.connaitUES !== undefined ? { connaitUES: body.connaitUES } : {}),
+        ...(body.contacte !== undefined ? { contacte: body.contacte } : {}),
+        ...(body.etablissementConfirme === false && body.etablissement !== undefined
+          ? { etablissement: body.etablissement.trim() || null }
+          : {}),
+        ...(changesPhone ? { phoneE164: newPhone } : {}),
+      };
+      if (Object.keys(state).length > 0) {
         await tx.representant.update({
           where: { id: body.representantId },
-          data: { ...whatsapp, rev: { increment: 1 } },
+          data: { ...state, rev: { increment: 1 } },
         });
       }
       if (body.relationStatus !== undefined) {

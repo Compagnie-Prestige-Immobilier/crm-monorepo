@@ -22,6 +22,7 @@ import 'generated_migrations/schema_v15.dart' as v15;
 import 'generated_migrations/schema_v18.dart' as v18;
 import 'generated_migrations/schema_v19.dart' as v19;
 import 'generated_migrations/schema_v20.dart' as v20;
+import 'generated_migrations/schema_v21.dart' as v21schema;
 
 /// Test doré de migration.
 ///
@@ -1827,30 +1828,48 @@ void main() {
       'INSERT INTO rep_callback_reminders '
       '(id, representant_id, full_name, phone_e164, scheduled_at, created_at) '
       'VALUES (?, ?, ?, ?, ?, ?)',
-      <Object?>['reminder-20', 'rep-20', 'Représentant 20', '+221770000020', _iso, _iso],
+      <Object?>[
+        'reminder-20',
+        'rep-20',
+        'Représentant 20',
+        '+221770000020',
+        _iso,
+        _iso,
+      ],
     );
     await old.customStatement(
       'INSERT INTO outbox '
       '(id, entity_type, entity_id, op, payload, next_attempt_at, created_at) '
       'VALUES (?, ?, ?, ?, ?, ?, ?)',
-      <Object?>['op-20', 'call_attempt', 'attempt-20', 'create', '{}', _iso, _iso],
+      <Object?>[
+        'op-20',
+        'call_attempt',
+        'attempt-20',
+        'create',
+        '{}',
+        _iso,
+        _iso,
+      ],
     );
     await old.close();
 
     final AppDatabase db = AppDatabase(schema.newConnection());
     await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
-    final List<QueryRow> obsolete = await db.customSelect(
-      'SELECT name FROM sqlite_master '
-      'WHERE type = \'table\' AND name IN '
-      '(\'call_campaigns\', \'call_tasks\', \'rep_call_campaigns\', \'rep_call_tasks\')',
-    ).get();
+    final List<QueryRow> obsolete = await db
+        .customSelect(
+          'SELECT name FROM sqlite_master '
+          'WHERE type = \'table\' AND name IN '
+          '(\'call_campaigns\', \'call_tasks\', \'rep_call_campaigns\', \'rep_call_tasks\')',
+        )
+        .get();
     expect(obsolete, isEmpty);
     expect(await db.countMyAttempts().getSingle(), 1);
     expect(await db.pendingRepCallbackReminders().get(), hasLength(1));
     expect(
-      await db.customSelect('SELECT id FROM outbox').getSingle().then(
-        (QueryRow row) => row.read<String>('id'),
-      ),
+      await db
+          .customSelect('SELECT id FROM outbox')
+          .getSingle()
+          .then((QueryRow row) => row.read<String>('id')),
       'op-20',
     );
     await db.close();
@@ -1957,6 +1976,112 @@ void main() {
     },
   );
 
+  // ── v21 → v22 : les renseignements du script de qualification ──────────────
+  //
+  // Cinq colonnes ajoutées à `representants`, LA table qui porte des fiches non
+  // encore synchronisées. `addColumn` et non recréation, car aucune contrainte
+  // nouvelle : toutes nullables. Ce qui doit être prouvé : la fiche déjà en base
+  // traverse, ses colonnes neuves s'écrivent, et une fiche d'avant le script
+  // sort avec du NUL partout, pas un « non » qui affirmerait une réponse.
+
+  test(
+    'v21 -> v22 ajoute les renseignements sans toucher aux fiches en file',
+    () async {
+      final schema = await verifier.schemaAt(21);
+
+      final v21schema.DatabaseAtV21 old = v21schema.DatabaseAtV21(
+        schema.newConnection(),
+      );
+      await old.customStatement('PRAGMA foreign_keys = ON;');
+      await old.customStatement(
+        'INSERT INTO departements (id, code, name, region_id, local_updated_at) '
+        'VALUES (?, ?, ?, ?, ?)',
+        <Object?>['dep-1', 'DK', 'Dakar', 'reg-1', _iso],
+      );
+      await old.customStatement(
+        'INSERT INTO representants '
+        '(id, full_name, phone_e164, departement_id, relation_status, '
+        ' whatsapp_status, created_by_id, client_created_at, local_updated_at) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        <Object?>[
+          'rep-22',
+          'Awa Ndiaye',
+          '+221771234567',
+          'dep-1',
+          'AMBASSADEUR',
+          'NON_DEMANDE',
+          'me',
+          _iso,
+          _iso,
+        ],
+      );
+      await old.customStatement(
+        'INSERT INTO outbox '
+        '(id, entity_type, entity_id, op, payload, next_attempt_at, created_at) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?)',
+        <Object?>[
+          'op-22',
+          'rep_call_attempt',
+          'a-22',
+          'create',
+          '{}',
+          _iso,
+          _iso,
+        ],
+      );
+      await old.close();
+
+      final AppDatabase db = AppDatabase(schema.newConnection());
+      await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
+
+      // La fiche a traversé, et ses colonnes neuves démarrent NULLES : une fiche
+      // d'avant le script n'a jamais été qualifiée, et son silence ne doit pas se
+      // lire comme un « non ».
+      final QueryRow fiche = await db
+          .customSelect(
+            'SELECT relation_status, prenom, etablissement, syndicat, '
+            '       connait_ues, contacte FROM representants',
+          )
+          .getSingle();
+      expect(fiche.read<String>('relation_status'), 'AMBASSADEUR');
+      expect(fiche.read<String?>('prenom'), isNull);
+      expect(fiche.read<String?>('etablissement'), isNull);
+      expect(fiche.read<String?>('syndicat'), isNull);
+      expect(fiche.read<bool?>('connait_ues'), isNull);
+      expect(fiche.read<bool?>('contacte'), isNull);
+
+      // Les colonnes s'ÉCRIVENT, tri-état compris : « la colonne existe » se
+      // vérifierait aussi sur une colonne au mauvais type.
+      await db.customStatement(
+        'UPDATE representants SET prenom = ?, etablissement = ?, syndicat = ?, '
+        '       connait_ues = ?, contacte = ? WHERE id = ?',
+        <Object?>['Awa', 'Lycée Blaise Diagne', 'SG', 1, 0, 'rep-22'],
+      );
+      final QueryRow apres = await db
+          .customSelect(
+            'SELECT prenom, etablissement, syndicat, connait_ues, contacte '
+            'FROM representants WHERE id = \'rep-22\'',
+          )
+          .getSingle();
+      expect(apres.read<String?>('prenom'), 'Awa');
+      expect(apres.read<String?>('etablissement'), 'Lycée Blaise Diagne');
+      expect(apres.read<String?>('syndicat'), 'SG');
+      expect(apres.read<bool?>('connait_ues'), isTrue);
+      expect(apres.read<bool?>('contacte'), isFalse);
+
+      // La file n'a rien perdu.
+      expect(
+        await db
+            .customSelect('SELECT id FROM outbox')
+            .getSingle()
+            .then((QueryRow row) => row.read<String>('id')),
+        'op-22',
+      );
+
+      await db.close();
+    },
+  );
+
   test('v11 -> courant traverse sans créer les tables de campagne', () async {
     final schema = await verifier.schemaAt(11);
     final v11.DatabaseAtV11 old = v11.DatabaseAtV11(schema.newConnection());
@@ -1970,16 +2095,19 @@ void main() {
 
     final AppDatabase db = AppDatabase(schema.newConnection());
     await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
-    final List<QueryRow> obsolete = await db.customSelect(
-      'SELECT name FROM sqlite_master '
-      'WHERE type = \'table\' AND name IN '
-      '(\'call_campaigns\', \'call_tasks\', \'rep_call_campaigns\', \'rep_call_tasks\')',
-    ).get();
+    final List<QueryRow> obsolete = await db
+        .customSelect(
+          'SELECT name FROM sqlite_master '
+          'WHERE type = \'table\' AND name IN '
+          '(\'call_campaigns\', \'call_tasks\', \'rep_call_campaigns\', \'rep_call_tasks\')',
+        )
+        .get();
     expect(obsolete, isEmpty);
     expect(
-      await db.customSelect('SELECT id FROM outbox').getSingle().then(
-        (QueryRow row) => row.read<String>('id'),
-      ),
+      await db
+          .customSelect('SELECT id FROM outbox')
+          .getSingle()
+          .then((QueryRow row) => row.read<String>('id')),
       'op-v11',
     );
     await db.close();

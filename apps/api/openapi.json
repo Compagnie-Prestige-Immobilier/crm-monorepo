@@ -19059,6 +19059,26 @@
           "profession": {
             "type": "string",
             "nullable": true
+          },
+          "prenom": {
+            "type": "string",
+            "nullable": true
+          },
+          "etablissement": {
+            "type": "string",
+            "nullable": true
+          },
+          "syndicat": {
+            "type": "string",
+            "nullable": true
+          },
+          "connaitUES": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "contacte": {
+            "type": "boolean",
+            "nullable": true
           }
         },
         "required": [
@@ -19081,7 +19101,12 @@
           "whatsappStatus",
           "whatsappE164",
           "whatsappNumber",
-          "profession"
+          "profession",
+          "prenom",
+          "etablissement",
+          "syndicat",
+          "connaitUES",
+          "contacte"
         ]
       },
       "RepresentantListDto": {
@@ -19252,6 +19277,16 @@
             "type": "string",
             "maxLength": 160
           },
+          "prenom": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Prénom, quand il a été recueilli séparément du nom complet."
+          },
+          "etablissement": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Établissement où il exerce. Ni l’IEF ni le département."
+          },
           "phone": {
             "type": "string",
             "maxLength": 40,
@@ -19290,6 +19325,16 @@
           "fullName": {
             "type": "string",
             "maxLength": 160
+          },
+          "prenom": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Prénom, quand il a été recueilli séparément du nom complet."
+          },
+          "etablissement": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Établissement où il exerce. Ni l’IEF ni le département."
           },
           "phone": {
             "type": "string",
@@ -19346,6 +19391,19 @@
             "type": "string",
             "maxLength": 120,
             "description": "Profession, en texte libre. Chaîne vide : la valeur est effacée."
+          },
+          "syndicat": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Niveau de syndicat déclaré pendant la qualification. Texte libre, distinct du référentiel Syndicat des prospects. Chaîne vide : la valeur est effacée."
+          },
+          "connaitUES": {
+            "type": "boolean",
+            "description": "Le représentant déclare connaître l’UES."
+          },
+          "contacte": {
+            "type": "boolean",
+            "description": "Le représentant déclare avoir déjà été contacté. Distinct de relationStatus, qui porte la décision ambassadeur/refus."
           }
         }
       },
@@ -20481,6 +20539,19 @@
             "maxLength": 160,
             "description": "Représentant : l’établissement où il exerce. Ni l’IEF ni le département."
           },
+          "syndicat": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Représentant : niveau de syndicat déclaré pendant la qualification. Texte libre, distinct du référentiel Syndicat des prospects."
+          },
+          "connaitUES": {
+            "type": "boolean",
+            "description": "Représentant : déclare connaître l’UES. Tri-état : absent laisse en place, la valeur n’est jamais remise à « non posée » depuis le client."
+          },
+          "contacte": {
+            "type": "boolean",
+            "description": "Représentant : déclare avoir déjà été contacté. Distinct de relationStatus, qui porte la décision ambassadeur/refus."
+          },
           "projet": {
             "description": "Prospect : le projet dont il relève. CHUES par défaut côté serveur.",
             "allOf": [
@@ -20666,7 +20737,7 @@
             "$ref": "#/components/schemas/SyncEntityDataDto"
           },
           "clearedFields": {
-            "description": "Champs que le client a explicitement VIDÉS. Un champ simplement absent de `data` reste inchangé ; un champ nommé ici est écrit à NULL. Valeurs acceptées : iefId, notes, whatsappE164, profession, prenom, etablissement, banqueId, syndicatId, representantId.",
+            "description": "Champs que le client a explicitement VIDÉS. Un champ simplement absent de `data` reste inchangé ; un champ nommé ici est écrit à NULL. Valeurs acceptées : iefId, notes, whatsappE164, profession, prenom, etablissement, syndicat, banqueId, syndicatId, representantId.",
             "type": "array",
             "items": {
               "type": "string"
@@ -22342,6 +22413,38 @@
             "type": "string",
             "maxLength": 120,
             "description": "Profession, en texte libre. Chaîne vide : la valeur est effacée."
+          },
+          "etablissementConfirme": {
+            "type": "boolean",
+            "description": "Script de qualification : l’établissement en fiche est-il confirmé. Faux avec `etablissement` renseigné remplace l’établissement courant."
+          },
+          "etablissement": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Nouvel établissement, quand `etablissementConfirme` vaut faux."
+          },
+          "numeroConfirme": {
+            "type": "boolean",
+            "description": "Script de qualification : le numéro en fiche est-il confirmé. Faux avec `phone` renseigné remplace le numéro courant, clé de déduplication comprise."
+          },
+          "phone": {
+            "type": "string",
+            "minLength": 6,
+            "maxLength": 40,
+            "description": "Nouveau numéro du représentant, quand `numeroConfirme` vaut faux. Saisie libre, normalisé en E.164 par le serveur."
+          },
+          "contacte": {
+            "type": "boolean",
+            "description": "Script de qualification : le représentant déclare avoir déjà été contacté."
+          },
+          "connaitUES": {
+            "type": "boolean",
+            "description": "Script de qualification : le représentant déclare connaître l’UES."
+          },
+          "syndicat": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Script de qualification : niveau de syndicat déclaré. Texte libre."
           },
           "clientCreatedAt": {
             "type": "string",

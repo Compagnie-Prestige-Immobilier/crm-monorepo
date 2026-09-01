@@ -462,6 +462,18 @@ model Representant {
   /// n'est pas établi, et `CallOutcomeReason` en donne le patron le jour venu.
   profession String?
 
+  /// Niveau de syndicat déclaré pendant la qualification. Texte libre, distinct
+  /// du référentiel `Syndicat` des prospects : c'est un renseignement recueilli
+  /// au téléphone, pas une clé étrangère à administrer.
+  syndicat String?
+  /// Le représentant dit connaître l'UES. Nullable : la question n'a pas
+  /// toujours été posée sur les fiches anciennes.
+  connaitUES Boolean?
+  /// Le représentant déclare avoir déjà été contacté. Distinct de
+  /// `relationStatus` (qui porte l'issue ambassadeur/refus) : ici c'est un
+  /// écran de qualification, pas la décision.
+  contacte Boolean?
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -1009,6 +1021,15 @@ model RepCallAttempt {
   /// Date du rappel promis. Renseigné SI ET SEULEMENT SI `outcome` vaut
   /// CALLBACK : c'est elle qui arme la notification côté mobile.
   callbackAt        DateTime?
+
+  /// Réponses du script de qualification (directrice commerciale), figées telles
+  /// qu'elles ont été dites pendant CET appel. La fiche `Representant` garde
+  /// l'état courant ; ces colonnes gardent la trace, appel par appel.
+  etablissementConfirme Boolean?
+  numeroConfirme        Boolean?
+  contacte              Boolean?
+  connaitUES            Boolean?
+  syndicat              String?
 
   clientCreatedAt DateTime
   createdAt       DateTime @default(now())

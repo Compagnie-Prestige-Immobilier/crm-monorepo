@@ -685,7 +685,6 @@ describe('une campagne ouvre l’écriture sur la fiche d’un autre', () => {
     expect(statuses(result.body.results)).toEqual([SyncOpStatus.CONFLICT]);
     expect(result.body.results[0]?.errorCode).toBe('ENTITY_ID_OWNED_BY_ANOTHER_USER');
   });
-
 });
 
 describe('écriture conditionnelle sur la révision', () => {
@@ -792,6 +791,60 @@ describe('champs vidés', () => {
     await sync.push(alice, batch([modifier({ clearedFields: ['iefId'] })], 'batch-3'));
 
     expect(db.representants.get(REP_ID)?.iefId).toBeNull();
+  });
+});
+
+describe('qualification du représentant, hors ligne', () => {
+  const createRepQualifie = (): SyncOperationDto => {
+    const op = createRep(REP_A, '77 123 45 67');
+    op.data = Object.assign(op.data ?? {}, {
+      prenom: 'Awa',
+      etablissement: 'Lycée Blaise Diagne',
+      syndicat: 'SUDES',
+      connaitUES: true,
+      contacte: false,
+    });
+    return op;
+  };
+
+  it('la création écrit désormais prenom et etablissement, avec le reste du script', async () => {
+    const result = await sync.push(alice, batch([createRepQualifie()]));
+    expect(statuses(result.body.results)).toEqual([SyncOpStatus.APPLIED]);
+
+    const row = db.representants.get(REP_A);
+    expect(row?.prenom).toBe('Awa');
+    expect(row?.etablissement).toBe('Lycée Blaise Diagne');
+    expect(row?.syndicat).toBe('SUDES');
+    expect(row?.connaitUES).toBe(true);
+    expect(row?.contacte).toBe(false);
+  });
+
+  it('une mise à jour porte le script, et clearedFields vide le syndicat', async () => {
+    await sync.push(alice, batch([createRepQualifie()]));
+
+    const update: SyncOperationDto = {
+      opId: opId(),
+      seq: 1,
+      entity: SyncEntity.REPRESENTANT,
+      op: SyncOp.UPDATE,
+      entityId: REP_A,
+      clientUpdatedAt: '2026-08-10T11:00:00.000Z',
+      baseRev: 1,
+      data: {
+        fullName: 'Rep A',
+        phone: '77 123 45 67',
+        departementId: '0198c000-0000-7000-8000-000000000001',
+        connaitUES: false,
+      },
+      clearedFields: ['syndicat'],
+    };
+
+    await sync.push(alice, batch([update], 'batch-2'));
+
+    const row = db.representants.get(REP_A);
+    expect(row?.connaitUES).toBe(false);
+    expect(row?.syndicat).toBeNull();
+    expect(row?.etablissement).toBe('Lycée Blaise Diagne');
   });
 });
 

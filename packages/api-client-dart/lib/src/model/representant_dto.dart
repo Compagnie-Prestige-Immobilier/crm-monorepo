@@ -60,6 +60,16 @@ class RepresentantDto {
     required this.whatsappNumber,
 
     required this.profession,
+
+    required this.prenom,
+
+    required this.etablissement,
+
+    required this.syndicat,
+
+    required this.connaitUES,
+
+    required this.contacte,
   });
 
   @JsonKey(name: r'id', required: true, includeIfNull: false)
@@ -136,6 +146,21 @@ class RepresentantDto {
   @JsonKey(name: r'profession', required: true, includeIfNull: true)
   final String? profession;
 
+  @JsonKey(name: r'prenom', required: true, includeIfNull: true)
+  final String? prenom;
+
+  @JsonKey(name: r'etablissement', required: true, includeIfNull: true)
+  final String? etablissement;
+
+  @JsonKey(name: r'syndicat', required: true, includeIfNull: true)
+  final String? syndicat;
+
+  @JsonKey(name: r'connaitUES', required: true, includeIfNull: true)
+  final bool? connaitUES;
+
+  @JsonKey(name: r'contacte', required: true, includeIfNull: true)
+  final bool? contacte;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is RepresentantDto &&
@@ -162,6 +187,11 @@ class RepresentantDto {
                 whatsappE164,
                 whatsappNumber,
                 profession,
+                prenom,
+                etablissement,
+                syndicat,
+                connaitUES,
+                contacte,
               ],
               [
                 other.id,
@@ -184,6 +214,11 @@ class RepresentantDto {
                 other.whatsappE164,
                 other.whatsappNumber,
                 other.profession,
+                other.prenom,
+                other.etablissement,
+                other.syndicat,
+                other.connaitUES,
+                other.contacte,
               ],
             );
   }
@@ -212,6 +247,11 @@ class RepresentantDto {
         whatsappE164,
         whatsappNumber,
         profession,
+        prenom,
+        etablissement,
+        syndicat,
+        connaitUES,
+        contacte,
       ]);
 
   factory RepresentantDto.fromJson(Map<String, dynamic> json) =>
