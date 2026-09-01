@@ -4,9 +4,13 @@
  * représentants, puis le téléverse.
  *
  * Usage :
- *   node scripts/import-repertoire.mjs <source.xlsx> [--api URL] [--out F] [--apply]
+ *   node scripts/import-repertoire.mjs <source.xlsx> [--enrichir] [--apply]
+ *                                      [--api URL] [--out F] [--sans-envoi]
  *
  * Sans `--apply` le script s'arrête après la SIMULATION : rien n'est écrit.
+ * `--enrichir` complète les fiches DÉJÀ en base au lieu de les compter en
+ * doublon — c'est le mode à prendre quand le répertoire a déjà été importé une
+ * fois sans ses colonnes de qualification. Il ne remplit que le vide.
  * Avec `--sans-envoi` il convertit seulement, sans se connecter à quoi que ce
  * soit — utile pour relire le classeur produit avant de le présenter au serveur.
  *
@@ -155,10 +159,18 @@ function numerosDe(cellule) {
 }
 
 function lireArguments(argv) {
-  const options = { api: DEFAULT_API, apply: false, sansEnvoi: false, source: null, out: null };
+  const options = {
+    api: DEFAULT_API,
+    apply: false,
+    enrichir: false,
+    sansEnvoi: false,
+    source: null,
+    out: null,
+  };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--apply') options.apply = true;
+    else if (arg === '--enrichir') options.enrichir = true;
     else if (arg === '--sans-envoi') options.sansEnvoi = true;
     else if (arg === '--api') options.api = argv[(i += 1)];
     else if (arg === '--out') options.out = argv[(i += 1)];
@@ -166,7 +178,8 @@ function lireArguments(argv) {
   }
   if (!options.source) {
     console.error(
-      'Usage : node scripts/import-repertoire.mjs <source.xlsx> [--api URL] [--out F] [--apply]',
+      'Usage : node scripts/import-repertoire.mjs <source.xlsx> [--enrichir] [--apply]' +
+        ' [--api URL] [--out F] [--sans-envoi]',
     );
     process.exit(2);
   }
@@ -380,7 +393,8 @@ async function appelerApi(url, init = {}) {
 function afficherRapport(rapport) {
   console.log(
     `  lues ${rapport.totalRows} · retenues ${rapport.valid} · rejetées ${rapport.rejected} ` +
-      `· doublons ${rapport.duplicates} · créées ${rapport.created}`,
+      `· doublons ${rapport.duplicates} · créées ${rapport.created} ` +
+      `· à compléter ${rapport.enrichable} · complétées ${rapport.enriched}`,
   );
   const parCode = new Map();
   for (const erreur of rapport.errors ?? []) {
@@ -421,10 +435,14 @@ async function chargerComptes(api, jeton) {
   }
 }
 
-async function envoyer(api, jeton, fichier, nom, dryRun) {
+async function envoyer(api, jeton, fichier, nom, dryRun, enrichir) {
   const formulaire = new FormData();
   formulaire.append('file', new Blob([await readFile(fichier)]), nom);
-  return appelerApi(`${api}/api/v1/representants/import?dryRun=${dryRun ? 'true' : 'false'}`, {
+  const requete = new URLSearchParams({
+    dryRun: String(dryRun),
+    enrichir: String(enrichir),
+  });
+  return appelerApi(`${api}/api/v1/representants/import?${requete.toString()}`, {
     method: 'POST',
     headers: { authorization: `Bearer ${jeton}` },
     body: formulaire,
@@ -494,8 +512,11 @@ if (options.sansEnvoi) {
 }
 
 const nomEnvoye = path.basename(options.out);
-console.log('\nSimulation (rien n’est écrit)');
-afficherRapport(await envoyer(options.api, session.accessToken, options.out, nomEnvoye, true));
+const envoi = (dryRun) =>
+  envoyer(options.api, session.accessToken, options.out, nomEnvoye, dryRun, options.enrichir);
+
+console.log(`\nSimulation (rien n’est écrit)${options.enrichir ? ', enrichissement compris' : ''}`);
+afficherRapport(await envoi(true));
 
 if (!options.apply) {
   console.log('\nRelancez avec --apply pour écrire.');
@@ -509,4 +530,4 @@ if (confirmation.trim() !== 'OUI') {
 }
 
 console.log('\nÉcriture');
-afficherRapport(await envoyer(options.api, session.accessToken, options.out, nomEnvoye, false));
+afficherRapport(await envoi(false));

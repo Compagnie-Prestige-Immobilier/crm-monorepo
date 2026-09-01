@@ -423,6 +423,19 @@ export class ImportReportDto {
   totalRows!: number;
 
   @ApiProperty({ type: Number, description: 'Lignes retenues.' }) valid!: number;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      'Fiches déjà en base à qui le fichier apporte quelque chose. Nul quand `enrichir` est faux.',
+  })
+  enrichable!: number;
+
+  @ApiProperty({
+    type: Number,
+    description: 'Fiches existantes réellement complétées. Nul en simulation.',
+  })
+  enriched!: number;
   @ApiProperty({ type: Number, description: 'Lignes rejetées.' }) rejected!: number;
 
   @ApiProperty({
@@ -459,6 +472,17 @@ export class ImportQueryDto {
   @Transform(queryBoolean)
   @IsBoolean()
   dryRun?: boolean;
+
+  @ApiPropertyOptional({
+    type: Boolean,
+    default: false,
+    description:
+      'Complète les fiches déjà en base au lieu de les rejeter. NE REMPLIT QUE LE VIDE : un statut déjà tranché, une note déjà écrite et une fiche qui porte déjà un appel ne sont jamais touchés.',
+  })
+  @IsOptional()
+  @Transform(queryBoolean)
+  @IsBoolean()
+  enrichir?: boolean;
 }
 
 export class RepresentantRelationChangeDto {
