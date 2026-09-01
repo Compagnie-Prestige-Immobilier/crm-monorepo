@@ -3353,6 +3353,10 @@ export interface components {
       totalRows: number;
       /** @description Lignes retenues. */
       valid: number;
+      /** @description Fiches déjà en base à qui le fichier apporte quelque chose. Nul quand `enrichir` est faux. */
+      enrichable: number;
+      /** @description Fiches existantes réellement complétées. Nul en simulation. */
+      enriched: number;
       /** @description Lignes rejetées. */
       rejected: number;
       /** @description Doublons de téléphone : déjà en base, ou répétés à l’intérieur du fichier. Comptés dans `rejected`. */
@@ -8416,6 +8420,8 @@ export interface operations {
       query?: {
         /** @description Simulation. Vaut VRAI par défaut : l’écriture doit être un acte explicite, pas ce qui arrive quand on oublie un paramètre. */
         dryRun?: boolean;
+        /** @description Complète les fiches déjà en base au lieu de les rejeter. NE REMPLIT QUE LE VIDE : un statut déjà tranché, une note déjà écrite et une fiche qui porte déjà un appel ne sont jamais touchés. */
+        enrichir?: boolean;
       };
       header?: never;
       path?: never;

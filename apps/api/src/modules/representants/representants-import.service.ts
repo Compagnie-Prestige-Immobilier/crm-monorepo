@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger, PayloadTooLargeException } from '@nestjs/common';
-import type { RepCallOutcome, RepresentantRelation, WhatsappStatus } from '@crm/database';
+import { RepresentantRelation, WhatsappStatus } from '@crm/database';
+import type { RepCallOutcome } from '@crm/database';
 import type { MultipartFile } from '@fastify/multipart';
 import type { FastifyRequest } from 'fastify';
 import ExcelJS from 'exceljs';
@@ -86,6 +87,7 @@ export class RepresentantsImportService {
     query: ImportQueryDto,
   ): Promise<ImportReportDto> {
     const dryRun = query.dryRun ?? true;
+    const enrichir = query.enrichir ?? false;
     const buffer = await this.readFile(request);
     // Le plafond de lignes est appliqué DANS la lecture, pas après : voir
     // `readSheet`. Un classeur de deux millions de lignes n'a plus l'occasion
@@ -93,55 +95,34 @@ export class RepresentantsImportService {
     const rows = await this.readSheet(buffer);
 
     const referentiels = await this.loadReferentiels();
-    const errors: ImportRowErrorDto[] = [];
-    const parsed: ParsedRow[] = [];
-    let duplicates = 0;
-
-    // Le téléphone déjà rencontré DANS LE FICHIER. Rempli au fil de la lecture,
-    // pour que la seconde occurrence soit rejetée et non la première : c'est
-    // celle du haut du fichier que l'utilisateur reconnaît.
-    const seen = new Map<string, number>();
-
-    for (const raw of rows) {
-      const outcome = parseRow(raw, referentiels);
-      if ('code' in outcome) {
-        errors.push(outcome);
-        continue;
-      }
-
-      const previous = seen.get(outcome.phoneE164);
-      if (previous !== undefined) {
-        duplicates += 1;
-        errors.push({
-          line: outcome.line,
-          code: 'DUPLICATE_IN_FILE',
-          message: `Ce numéro figure déjà à la ligne ${String(previous)} du fichier.`,
-          value: outcome.phoneE164,
-        });
-        continue;
-      }
-
-      seen.set(outcome.phoneE164, outcome.line);
-      parsed.push(outcome);
-    }
+    const { parsed, errors, duplicatesInFile } = analyser(rows, referentiels);
+    let duplicates = duplicatesInFile;
 
     // Le contrôle contre la base se fait en UNE requête, pas une par ligne : sur
     // 5 000 lignes, une lecture par ligne rendrait l'import inutilisable et
     // saturerait le pool de connexions.
-    const known = await this.existingPhones(parsed.map((row) => row.phoneE164));
+    const known = await this.existingByPhone(parsed.map((row) => row.phoneE164));
     const retained: ParsedRow[] = [];
+    const aEnrichir: Enrichissement[] = [];
     for (const row of parsed) {
-      if (known.has(row.phoneE164)) {
-        duplicates += 1;
-        errors.push({
-          line: row.line,
-          code: 'DUPLICATE_IN_DATABASE',
-          message: 'Un représentant porte déjà ce numéro en base.',
-          value: row.phoneE164,
-        });
+      const existante = known.get(row.phoneE164);
+      if (!existante) {
+        retained.push(row);
         continue;
       }
-      retained.push(row);
+
+      duplicates += 1;
+      const patch = enrichir ? enrichissementDe(row, existante, user.id) : null;
+      if (patch) aEnrichir.push(patch);
+      else errors.push(refusDoublon(row, enrichir));
+    }
+
+    let enriched = 0;
+    if (!dryRun && aEnrichir.length > 0) {
+      enriched = await this.applyEnrichissement(aEnrichir);
+      this.logger.log(
+        `Enrichissement représentants par ${user.username} : ${String(enriched)} fiches complétées.`,
+      );
     }
 
     let created = 0;
@@ -182,6 +163,10 @@ export class RepresentantsImportService {
       rejected: errors.length,
       duplicates,
       created,
+      // En simulation, le nombre de fiches qui SERAIENT complétées : c'est la
+      // question à laquelle l'écran doit répondre avant d'écrire.
+      enrichable: aEnrichir.length,
+      enriched,
       errors: errors.slice(0, MAX_REPORTED_ERRORS),
       preview: retained.slice(0, MAX_PREVIEW_ROWS).map((row): ImportRowPreviewDto => ({
         line: row.line,
@@ -286,20 +271,74 @@ export class RepresentantsImportService {
     return result.count;
   }
 
-  private async existingPhones(phones: readonly string[]): Promise<Set<string>> {
-    const found = new Set<string>();
+  /**
+   * Les fiches déjà en base, avec de quoi juger ce qui leur manque.
+   *
+   * Lue PAR TRANCHES et non ligne à ligne : sur 5 000 lignes, une requête par
+   * ligne rendrait l'import inutilisable et saturerait le pool.
+   */
+  private async existingByPhone(phones: readonly string[]): Promise<Map<string, FicheExistante>> {
+    const found = new Map<string, FicheExistante>();
     const CHUNK = 1_000;
 
     for (let start = 0; start < phones.length; start += CHUNK) {
       const slice = phones.slice(start, start + CHUNK);
       const rows = await this.prisma.representant.findMany({
         where: { phoneE164: { in: slice }, deletedAt: null },
-        select: { phoneE164: true },
+        select: {
+          id: true,
+          phoneE164: true,
+          etablissement: true,
+          notes: true,
+          relationStatus: true,
+          whatsappStatus: true,
+          _count: { select: { repCallAttempts: true } },
+        },
       });
-      for (const row of rows) found.add(row.phoneE164);
+      for (const row of rows) found.set(row.phoneE164, row);
     }
 
     return found;
+  }
+
+  /**
+   * Complète les fiches existantes, PAR TRANCHES et non en un bloc.
+   *
+   * L'enrichissement n'est pas « tout ou rien », et n'a pas à l'être : il ne
+   * remplit que du vide, donc le rejouer ne change rien la seconde fois. Une
+   * transaction unique de trois mille mises à jour tiendrait un verrou pendant
+   * des minutes pour perdre le tout sur la dernière ligne.
+   */
+  private async applyEnrichissement(rows: readonly Enrichissement[]): Promise<number> {
+    const CHUNK = 500;
+    let total = 0;
+
+    for (let start = 0; start < rows.length; start += CHUNK) {
+      const slice = rows.slice(start, start + CHUNK);
+      await this.prisma.$transaction(
+        async (tx) => {
+          for (const { id, champs } of slice) {
+            if (Object.keys(champs).length > 0) await tx.representant.update({ where: { id }, data: champs });
+          }
+          const appels = slice.flatMap(({ id, appel }) => (appel ? [{ id, appel }] : []));
+          if (appels.length > 0) {
+            await tx.repCallAttempt.createMany({
+              data: appels.map(({ id, appel }) => ({
+                id: uuidv7(),
+                representantId: id,
+                performedById: appel.performedById,
+                outcome: appel.outcome,
+                clientCreatedAt: appel.date,
+              })),
+            });
+          }
+        },
+        { timeout: IMPORT_TRANSACTION_TIMEOUT_MS, maxWait: IMPORT_TRANSACTION_MAX_WAIT_MS },
+      );
+      total += slice.length;
+    }
+
+    return total;
   }
 
   private async loadReferentiels(): Promise<Referentiels> {
@@ -472,6 +511,130 @@ export class RepresentantsImportService {
 interface RawRow {
   readonly line: number;
   readonly cells: readonly string[];
+}
+
+interface FicheExistante {
+  readonly id: string;
+  readonly etablissement: string | null;
+  readonly notes: string | null;
+  readonly relationStatus: RepresentantRelation;
+  readonly whatsappStatus: WhatsappStatus;
+  readonly _count: { readonly repCallAttempts: number };
+}
+
+interface Enrichissement {
+  readonly id: string;
+  readonly champs: {
+    etablissement?: string;
+    notes?: string;
+    relationStatus?: RepresentantRelation;
+    whatsappStatus?: WhatsappStatus;
+  };
+  readonly appel: {
+    readonly date: Date;
+    readonly outcome: RepCallOutcome;
+    readonly performedById: string;
+  } | null;
+}
+
+/**
+ * Ce que la ligne du fichier apporte à une fiche qui existe déjà. `null` si
+ * elle n'apporte rien.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * ON REMPLIT LE VIDE, ON N'ÉCRASE JAMAIS
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Le fichier est une photo du terrain à une date ; la fiche, elle, a pu être
+ * qualifiée depuis par un téléconseiller. Recopier le fichier par-dessus
+ * ferait reculer ce travail : un représentant passé AMBASSADEUR le mois
+ * dernier redeviendrait « refus » parce que le répertoire d'août le disait.
+ *
+ * D'où les gardes : un statut n'est posé que sur sa valeur PAR DÉFAUT
+ * (`INCONNU`, `NON_DEMANDE`), qui signifie « la question n'a pas été
+ * tranchée », et jamais sur une valeur déjà décidée. Et l'appel n'est ajouté
+ * qu'aux fiches qui n'en portent AUCUN : sans clé d'idempotence dans le
+ * classeur, un second passage créerait un doublon d'appel.
+ */
+/**
+ * Analyse les lignes et écarte la PREMIÈRE famille de doublons : le fichier
+ * contre lui-même.
+ *
+ * La SECONDE occurrence est rejetée, jamais la première : c'est celle du haut
+ * du fichier que l'utilisateur reconnaît.
+ */
+function analyser(
+  rows: readonly RawRow[],
+  referentiels: Referentiels,
+): { parsed: ParsedRow[]; errors: ImportRowErrorDto[]; duplicatesInFile: number } {
+  const parsed: ParsedRow[] = [];
+  const errors: ImportRowErrorDto[] = [];
+  const seen = new Map<string, number>();
+  let duplicatesInFile = 0;
+
+  for (const raw of rows) {
+    const outcome = parseRow(raw, referentiels);
+    if ('code' in outcome) {
+      errors.push(outcome);
+      continue;
+    }
+
+    const previous = seen.get(outcome.phoneE164);
+    if (previous !== undefined) {
+      duplicatesInFile += 1;
+      errors.push({
+        line: outcome.line,
+        code: 'DUPLICATE_IN_FILE',
+        message: `Ce numéro figure déjà à la ligne ${String(previous)} du fichier.`,
+        value: outcome.phoneE164,
+      });
+      continue;
+    }
+
+    seen.set(outcome.phoneE164, outcome.line);
+    parsed.push(outcome);
+  }
+
+  return { parsed, errors, duplicatesInFile };
+}
+
+const refusDoublon = (row: ParsedRow, enrichir: boolean): ImportRowErrorDto => ({
+  line: row.line,
+  code: 'DUPLICATE_IN_DATABASE',
+  message: enrichir
+    ? 'Un représentant porte déjà ce numéro, et rien ne manque sur sa fiche.'
+    : 'Un représentant porte déjà ce numéro en base.',
+  value: row.phoneE164,
+});
+
+function enrichissementDe(
+  row: ParsedRow,
+  fiche: FicheExistante,
+  appelantParDefautId: string,
+): Enrichissement | null {
+  const champs: Enrichissement['champs'] = {};
+  if (row.etablissement !== null && !fiche.etablissement) champs.etablissement = row.etablissement;
+  if (row.notes !== null && !fiche.notes) champs.notes = row.notes;
+  if (
+    row.relationStatus !== RepresentantRelation.INCONNU &&
+    fiche.relationStatus === RepresentantRelation.INCONNU
+  ) {
+    champs.relationStatus = row.relationStatus;
+  }
+  if (
+    row.whatsappStatus !== WhatsappStatus.NON_DEMANDE &&
+    fiche.whatsappStatus === WhatsappStatus.NON_DEMANDE
+  ) {
+    champs.whatsappStatus = row.whatsappStatus;
+  }
+
+  const appel =
+    row.appel !== null && fiche._count.repCallAttempts === 0
+      ? { ...row.appel, performedById: row.ownerId ?? appelantParDefautId }
+      : null;
+
+  if (Object.keys(champs).length === 0 && appel === null) return null;
+  return { id: fiche.id, champs, appel };
 }
 
 interface ReferentielRow {
