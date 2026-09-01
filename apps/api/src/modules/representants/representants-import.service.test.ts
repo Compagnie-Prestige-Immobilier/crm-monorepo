@@ -265,6 +265,45 @@ describe('import : simulation', () => {
     expect(report.errors[0]).toMatchObject({ code: 'DUPLICATE_IN_DATABASE' });
   });
 
+  it('REFUSE « Autre » sans note, comme la contrainte de la base', async () => {
+    const file = await workbookOf([
+      ['Fatou Ndiaye', '77 123 45 67', 'Dakar', '', '', '', '', '', '', '18/08/2026', 'Autre'],
+    ]);
+
+    const report = await service.import(ADMIN, requestWith(file), {});
+
+    expect(report.valid).toBe(0);
+    expect(report.errors[0]).toMatchObject({ code: 'CALL_COMMENT_REQUIRED' });
+  });
+
+  it('porte la note du fichier sur l’appel : la base l’exige sur « Autre »', async () => {
+    const file = await workbookOf([
+      [
+        'Fatou Ndiaye',
+        '77 123 45 67',
+        'Dakar',
+        '',
+        'à rappeler',
+        '',
+        '',
+        '',
+        '',
+        '18/08/2026',
+        'Autre',
+      ],
+    ]);
+    db.representant.createMany.mockImplementation((args: { data: { id: string }[] }) => {
+      db.representant.findMany.mockResolvedValue(args.data.map((row) => ({ id: row.id })));
+      return Promise.resolve({ count: args.data.length });
+    });
+
+    await service.import(ADMIN, requestWith(file), { dryRun: false });
+
+    expect(db.repCallAttempt.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ outcome: 'OTHER', comment: 'à rappeler' })],
+    });
+  });
+
   it('REFUSE une issue d’appel sans date : elle ne s’enregistrerait nulle part', async () => {
     const file = await workbookOf([
       ['Fatou Ndiaye', '77 123 45 67', 'Dakar', '', '', '', '', '', '', '', 'Injoignable'],

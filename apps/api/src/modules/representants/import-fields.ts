@@ -100,7 +100,12 @@ export interface Complements {
   readonly relationStatus: RepresentantRelation;
   readonly whatsappStatus: WhatsappStatus;
   readonly ownerId: string | null;
-  readonly appel: { readonly date: Date; readonly outcome: RepCallOutcome } | null;
+  readonly appel: {
+    readonly date: Date;
+    readonly outcome: RepCallOutcome;
+    /** Ce qui a été dit pendant CET appel. La base l'exige sur `OTHER`. */
+    readonly comment: string | null;
+  } | null;
 }
 
 /** Le refus d'une ligne, DÉSIGNÉ PAR LE RANG de la colonne fautive. */
@@ -119,7 +124,7 @@ export interface ComplementRefus {
  * verrait comme un import qui accepte ce que l'autre refuse.
  */
 export function parseComplements(
-  cells: Record<'relation' | 'whatsapp' | 'charge' | 'dateAppel' | 'issue', string>,
+  cells: Record<'notes' | 'relation' | 'whatsapp' | 'charge' | 'dateAppel' | 'issue', string>,
   comptes: ReadonlyMap<string, { readonly id: string }>,
 ): Complements | ComplementRefus {
   const relationStatus = parseRelation(cells.relation);
@@ -184,11 +189,25 @@ export function parseComplements(
     };
   }
 
+  // La MÊME règle qu'en base : `rep_call_attempts_other_requires_comment`.
+  // « Autre » sans un mot d'explication est un fourre-tout dont personne ne
+  // tire rien six mois plus tard — et la contrainte ferait échouer la tranche
+  // entière au lieu de cette seule ligne.
+  const comment = cells.notes.trim() === '' ? null : cells.notes.trim().slice(0, 2_000);
+  if (outcome === RepCallOutcome.OTHER && comment === null) {
+    return {
+      rang: 10,
+      code: 'CALL_COMMENT_REQUIRED',
+      message: 'L’issue « Autre » exige une note : sans elle, l’appel n’apprend rien.',
+      value: cells.issue,
+    };
+  }
+
   return {
     relationStatus,
     whatsappStatus,
     ownerId: owner?.id ?? null,
-    appel: date === null ? null : { date, outcome },
+    appel: date === null ? null : { date, outcome, comment },
   };
 }
 
