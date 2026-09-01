@@ -27,6 +27,11 @@ const NO_VALUE = '–';
 
 const SOURCE_LABELS = { WEB: 'Panneau', MOBILE: 'Mobile' } as const;
 
+function ouiNonNsp(value: boolean | null): string {
+  if (value === null) return NO_VALUE;
+  return value ? 'Oui' : 'Non';
+}
+
 export function RepresentantDetailView({
   representantId,
   author,
@@ -90,7 +95,14 @@ export function RepresentantDetailView({
         <CardHeader>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <CardTitle className="text-[1.25rem]">{representant.fullName}</CardTitle>
+              <CardTitle className="text-[1.25rem]">
+                {representant.fullName}
+                {representant.prenom === null || representant.prenom === '' ? null : (
+                  <span className="ml-2 text-[0.875rem] font-[400] text-muted-foreground">
+                    {representant.prenom}
+                  </span>
+                )}
+              </CardTitle>
               <p className="truncate text-[0.8125rem] text-muted-foreground tabular-nums">
                 {formatPhone(representant.phoneE164)}
               </p>
@@ -137,6 +149,22 @@ export function RepresentantDetailView({
             <div className="min-w-0">
               <dt className="text-muted-foreground">Profession</dt>
               <dd className="truncate font-[600]">{script.profession ?? 'Non demandée'}</dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-muted-foreground">Établissement</dt>
+              <dd className="truncate font-[600]">{representant.etablissement ?? NO_VALUE}</dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-muted-foreground">Niveau de syndicat</dt>
+              <dd className="truncate font-[600]">{representant.syndicat ?? NO_VALUE}</dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-muted-foreground">Déjà contacté</dt>
+              <dd className="truncate font-[600]">{ouiNonNsp(representant.contacte)}</dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-muted-foreground">Connaît l’UES</dt>
+              <dd className="truncate font-[600]">{ouiNonNsp(representant.connaitUES)}</dd>
             </div>
           </dl>
 

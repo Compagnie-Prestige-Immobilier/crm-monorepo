@@ -46,6 +46,20 @@ class CreateRepCallAttemptDto {
 
     this.profession,
 
+    this.etablissementConfirme,
+
+    this.etablissement,
+
+    this.numeroConfirme,
+
+    this.phone,
+
+    this.contacte,
+
+    this.connaitUES,
+
+    this.syndicat,
+
     required this.clientCreatedAt,
 
     this.callbackAt,
@@ -114,6 +128,38 @@ class CreateRepCallAttemptDto {
   @JsonKey(name: r'profession', required: false, includeIfNull: false)
   final String? profession;
 
+  /// Script de qualification : l’établissement en fiche est-il confirmé. Faux avec `etablissement` renseigné remplace l’établissement courant.
+  @JsonKey(
+    name: r'etablissementConfirme',
+    required: false,
+    includeIfNull: false,
+  )
+  final bool? etablissementConfirme;
+
+  /// Nouvel établissement, quand `etablissementConfirme` vaut faux.
+  @JsonKey(name: r'etablissement', required: false, includeIfNull: false)
+  final String? etablissement;
+
+  /// Script de qualification : le numéro en fiche est-il confirmé. Faux avec `phone` renseigné remplace le numéro courant, clé de déduplication comprise.
+  @JsonKey(name: r'numeroConfirme', required: false, includeIfNull: false)
+  final bool? numeroConfirme;
+
+  /// Nouveau numéro du représentant, quand `numeroConfirme` vaut faux. Saisie libre, normalisé en E.164 par le serveur.
+  @JsonKey(name: r'phone', required: false, includeIfNull: false)
+  final String? phone;
+
+  /// Script de qualification : le représentant déclare avoir déjà été contacté.
+  @JsonKey(name: r'contacte', required: false, includeIfNull: false)
+  final bool? contacte;
+
+  /// Script de qualification : le représentant déclare connaître l’UES.
+  @JsonKey(name: r'connaitUES', required: false, includeIfNull: false)
+  final bool? connaitUES;
+
+  /// Script de qualification : niveau de syndicat déclaré. Texte libre.
+  @JsonKey(name: r'syndicat', required: false, includeIfNull: false)
+  final String? syndicat;
+
   /// Horodatage de l’appel sur le terrain, distinct de son arrivée en base.
   @JsonKey(name: r'clientCreatedAt', required: true, includeIfNull: false)
   final DateTime clientCreatedAt;
@@ -140,6 +186,13 @@ class CreateRepCallAttemptDto {
                 whatsappStatus,
                 whatsappE164,
                 profession,
+                etablissementConfirme,
+                etablissement,
+                numeroConfirme,
+                phone,
+                contacte,
+                connaitUES,
+                syndicat,
                 clientCreatedAt,
                 callbackAt,
               ],
@@ -156,6 +209,13 @@ class CreateRepCallAttemptDto {
                 other.whatsappStatus,
                 other.whatsappE164,
                 other.profession,
+                other.etablissementConfirme,
+                other.etablissement,
+                other.numeroConfirme,
+                other.phone,
+                other.contacte,
+                other.connaitUES,
+                other.syndicat,
                 other.clientCreatedAt,
                 other.callbackAt,
               ],
@@ -178,6 +238,13 @@ class CreateRepCallAttemptDto {
         whatsappStatus,
         whatsappE164,
         profession,
+        etablissementConfirme,
+        etablissement,
+        numeroConfirme,
+        phone,
+        contacte,
+        connaitUES,
+        syndicat,
         clientCreatedAt,
         callbackAt,
       ]);

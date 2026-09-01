@@ -65,6 +65,64 @@ const KEYBOARD_MAP: readonly (readonly [string, string])[] = [
 
 const digitsOf = (value: string): number => value.replace(/\D/gu, '').length;
 
+function recapOuiNon(value: boolean | null): string | null {
+  if (value === null) return null;
+  return value ? 'Oui' : 'Non';
+}
+
+function recapEtablissement(confirme: boolean | null, nouvel: string): string | null {
+  if (confirme === null) return null;
+  if (confirme) return 'Confirmé';
+  return nouvel.trim() === '' ? 'À corriger' : nouvel.trim();
+}
+
+interface JoignableState {
+  etablissementConfirme: boolean | null;
+  nouvelEtablissement: string;
+  contacte: boolean | null;
+  connaitUES: boolean | null;
+  ambassadeur: boolean | null;
+  numeroConfirme: boolean | null;
+  nouveauNumero: string;
+  memeWhatsapp: boolean | null;
+  whatsapp: string;
+}
+
+/** Le script joignable, dans l'ordre : chaque réponse manquante bloque la suivante. */
+function manqueJoignable(s: JoignableState): string | null {
+  if (s.etablissementConfirme === null) return 'Dites si l’établissement est confirmé';
+  if (s.etablissementConfirme === false && s.nouvelEtablissement.trim() === '') {
+    return 'Écrivez le nouvel établissement';
+  }
+  if (s.contacte === null) return 'Dites s’il a déjà été contacté';
+  if (s.connaitUES === null) return 'Dites s’il connaît l’UES';
+  if (s.ambassadeur === null) return 'Dites s’il est représentant CPI CHUES';
+  if (s.ambassadeur !== true) return null;
+  if (s.numeroConfirme === null) return 'Dites si le numéro est confirmé';
+  if (s.numeroConfirme === false && digitsOf(s.nouveauNumero) < 9) {
+    return 'Écrivez le nouveau numéro';
+  }
+  if (s.memeWhatsapp === null) return 'Dites s’il a WhatsApp sur ce numéro';
+  if (s.memeWhatsapp === false && digitsOf(s.whatsapp) < 9) return 'Écrivez le numéro WhatsApp';
+  return null;
+}
+
+/** Confirmation de l'établissement, et sa nouvelle valeur seulement si infirmée. */
+function etablissementAnswer(confirme: boolean | null, nouvel: string): Partial<RepAnswer> {
+  if (confirme === null) return {};
+  const nom = nouvel.trim();
+  return { etablissementConfirme: confirme, ...(confirme === false && nom !== '' ? { etablissement: nom } : {}) };
+}
+
+/** Confirmation du numéro, et le nouveau numéro seulement s'il est infirmé et lisible. */
+function numeroAnswer(confirme: boolean | null, nouveau: string): Partial<RepAnswer> {
+  if (confirme === null) return {};
+  return {
+    numeroConfirme: confirme,
+    ...(confirme === false && digitsOf(nouveau) >= 9 ? { phone: nouveau.trim() } : {}),
+  };
+}
+
 /** Apparition d'une question qui n'était pas là : douce, et coupée si l'on préfère. */
 const REVELE = 'animate-in fade-in-0 slide-in-from-top-1 duration-200 motion-reduce:animate-none';
 
@@ -257,7 +315,14 @@ function Qualification({
 }) {
   const [etape, setEtape] = useState<1 | 2>(1);
   const [resultat, setResultat] = useState<Resultat | null>(null);
-  const [estRepresentant, setEstRepresentant] = useState<boolean | null>(null);
+  const [etablissementConfirme, setEtablissementConfirme] = useState<boolean | null>(null);
+  const [nouvelEtablissement, setNouvelEtablissement] = useState('');
+  const [contacte, setContacte] = useState<boolean | null>(null);
+  const [connaitUES, setConnaitUES] = useState<boolean | null>(null);
+  const [syndicat, setSyndicat] = useState('');
+  const [ambassadeur, setAmbassadeur] = useState<boolean | null>(null);
+  const [numeroConfirme, setNumeroConfirme] = useState<boolean | null>(null);
+  const [nouveauNumero, setNouveauNumero] = useState('');
   const [memeWhatsapp, setMemeWhatsapp] = useState<boolean | null>(null);
   const [whatsapp, setWhatsapp] = useState('');
   const [rappelAt, setRappelAt] = useState<string | null>(null);
@@ -284,26 +349,27 @@ function Qualification({
     },
   });
 
+  const joignable = resultat === 'JOIGNABLE';
   /** Une personne proposée n'a de sens que si l'appelé a dit non. */
-  const proposeQuelquUn = resultat === 'JOIGNABLE' && estRepresentant === false;
+  const proposeQuelquUn = joignable && ambassadeur === false;
   const suggestionCommencee =
     sugPhone.trim() !== '' || sugName.trim() !== '' || sugNote.trim() !== '';
 
   const manque = ((): string | null => {
     if (resultat === null) return 'Choisissez d’abord le résultat';
-    if (resultat === 'JOIGNABLE' && estRepresentant === null) {
-      return 'Dites s’il est représentant CPI CHUES';
-    }
-    if (resultat === 'JOIGNABLE' && estRepresentant === true && memeWhatsapp === null) {
-      return 'Dites s’il a WhatsApp sur ce numéro';
-    }
-    if (
-      resultat === 'JOIGNABLE' &&
-      estRepresentant === true &&
-      memeWhatsapp === false &&
-      digitsOf(whatsapp) < 9
-    ) {
-      return 'Écrivez le numéro WhatsApp';
+    if (joignable) {
+      const script = manqueJoignable({
+        etablissementConfirme,
+        nouvelEtablissement,
+        contacte,
+        connaitUES,
+        ambassadeur,
+        numeroConfirme,
+        nouveauNumero,
+        memeWhatsapp,
+        whatsapp,
+      });
+      if (script !== null) return script;
     }
     if (resultat === 'RAPPEL' && rappelAt === null) return 'Choisissez quand rappeler';
     // Le serveur jette une suggestion sans numéro : plutôt que d'effacer en
@@ -316,7 +382,7 @@ function Qualification({
 
   const enregistrer = (): void => {
     if (manque !== null || resultat === null || send.isPending) return;
-    const chuesOui = resultat === 'JOIGNABLE' && estRepresentant === true;
+    const chuesOui = joignable && ambassadeur === true;
 
     send.mutate({
       outcome:
@@ -330,6 +396,11 @@ function Qualification({
       ...(resultat === 'JOIGNABLE'
         ? { relationStatus: chuesOui ? ('AMBASSADEUR' as const) : ('REFUS' as const) }
         : {}),
+      ...(joignable ? etablissementAnswer(etablissementConfirme, nouvelEtablissement) : {}),
+      ...(joignable && contacte !== null ? { contacte } : {}),
+      ...(joignable && connaitUES !== null ? { connaitUES } : {}),
+      ...(joignable && syndicat.trim() !== '' ? { syndicat: syndicat.trim() } : {}),
+      ...(chuesOui ? numeroAnswer(numeroConfirme, nouveauNumero) : {}),
       ...(chuesOui
         ? {
             whatsappStatus:
@@ -418,9 +489,16 @@ function Qualification({
       </Button>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">
-          {representant.fullName}
-        </h2>
+        <div className="flex min-w-0 flex-col">
+          <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">
+            {representant.fullName}
+          </h2>
+          {representant.prenom === null && representant.etablissement === null ? null : (
+            <p className="text-[0.8125rem] text-muted-foreground">
+              {[representant.prenom, representant.etablissement].filter(Boolean).join(' · ')}
+            </p>
+          )}
+        </div>
         <RelationBadge status={representant.relationStatus} />
       </div>
 
@@ -454,7 +532,11 @@ function Qualification({
               onChange={(valeur) => {
                 setResultat(valeur);
                 if (valeur !== 'JOIGNABLE') {
-                  setEstRepresentant(null);
+                  setEtablissementConfirme(null);
+                  setContacte(null);
+                  setConnaitUES(null);
+                  setAmbassadeur(null);
+                  setNumeroConfirme(null);
                   setMemeWhatsapp(null);
                 }
                 if (valeur !== 'RAPPEL') setRappelAt(null);
@@ -462,23 +544,136 @@ function Qualification({
             />
           </Question>
 
-          {resultat === 'JOIGNABLE' ? (
+          {joignable ? (
+            <Question titre="L’établissement de la fiche est-il confirmé ?" anime>
+              <Choix
+                options={[
+                  { valeur: true, label: 'Oui' },
+                  { valeur: false, label: 'Non' },
+                ]}
+                value={etablissementConfirme}
+                onChange={(valeur) => {
+                  setEtablissementConfirme(valeur);
+                  if (valeur) setNouvelEtablissement('');
+                }}
+              />
+              {etablissementConfirme === false ? (
+                <div className={cn('flex max-w-80 flex-col gap-1.5', REVELE)}>
+                  <label htmlFor="rep-etablissement" className="text-[0.875rem] font-[600]">
+                    Nouvel établissement
+                  </label>
+                  <Input
+                    id="rep-etablissement"
+                    autoComplete="off"
+                    maxLength={160}
+                    value={nouvelEtablissement}
+                    onChange={(event) => {
+                      setNouvelEtablissement(event.target.value);
+                    }}
+                  />
+                </div>
+              ) : null}
+            </Question>
+          ) : null}
+
+          {joignable ? (
+            <Question titre="A-t-il déjà été contacté ?" anime>
+              <Choix
+                options={[
+                  { valeur: true, label: 'Oui' },
+                  { valeur: false, label: 'Non' },
+                ]}
+                value={contacte}
+                onChange={setContacte}
+              />
+            </Question>
+          ) : null}
+
+          {joignable ? (
+            <Question titre="Connaît-il l’UES ?" anime>
+              <Choix
+                options={[
+                  { valeur: true, label: 'Oui' },
+                  { valeur: false, label: 'Non' },
+                ]}
+                value={connaitUES}
+                onChange={setConnaitUES}
+              />
+            </Question>
+          ) : null}
+
+          {joignable ? (
+            <Question titre="Niveau de syndicat ? (facultatif)" anime>
+              <div className="flex max-w-80 flex-col gap-1.5">
+                <label htmlFor="rep-syndicat" className="sr-only">
+                  Niveau de syndicat
+                </label>
+                <Input
+                  id="rep-syndicat"
+                  autoComplete="off"
+                  maxLength={160}
+                  value={syndicat}
+                  onChange={(event) => {
+                    setSyndicat(event.target.value);
+                  }}
+                />
+              </div>
+            </Question>
+          ) : null}
+
+          {joignable ? (
             <Question titre="Est-il représentant CPI CHUES ?" anime>
               <Choix
                 options={[
                   { valeur: true, label: 'Oui' },
                   { valeur: false, label: 'Non' },
                 ]}
-                value={estRepresentant}
+                value={ambassadeur}
                 onChange={(valeur) => {
-                  setEstRepresentant(valeur);
-                  if (!valeur) setMemeWhatsapp(null);
+                  setAmbassadeur(valeur);
+                  if (!valeur) {
+                    setNumeroConfirme(null);
+                    setMemeWhatsapp(null);
+                  }
                 }}
               />
             </Question>
           ) : null}
 
-          {resultat === 'JOIGNABLE' && estRepresentant === true ? (
+          {joignable && ambassadeur === true ? (
+            <Question titre="Son numéro est-il confirmé ?" anime>
+              <Choix
+                options={[
+                  { valeur: true, label: 'Oui' },
+                  { valeur: false, label: 'Non' },
+                ]}
+                value={numeroConfirme}
+                onChange={(valeur) => {
+                  setNumeroConfirme(valeur);
+                  if (valeur) setNouveauNumero('');
+                }}
+              />
+              {numeroConfirme === false ? (
+                <div className={cn('flex max-w-80 flex-col gap-1.5', REVELE)}>
+                  <label htmlFor="rep-nouveau-numero" className="text-[0.875rem] font-[600]">
+                    Nouveau numéro
+                  </label>
+                  <Input
+                    id="rep-nouveau-numero"
+                    inputMode="tel"
+                    autoComplete="off"
+                    placeholder="77 123 45 67"
+                    value={nouveauNumero}
+                    onChange={(event) => {
+                      setNouveauNumero(event.target.value);
+                    }}
+                  />
+                </div>
+              ) : null}
+            </Question>
+          ) : null}
+
+          {joignable && ambassadeur === true ? (
             <Question titre="A-t-il WhatsApp sur ce numéro ?" anime>
               <Choix
                 options={[
@@ -606,11 +801,22 @@ function Qualification({
               intitule="Résultat"
               valeur={RESULTATS.find((item) => item.valeur === resultat)?.label ?? null}
             />
-            {resultat === 'JOIGNABLE' ? (
-              <Recap
-                intitule="Représentant CPI CHUES"
-                valeur={estRepresentant === null ? null : estRepresentant ? 'Oui' : 'Non'}
-              />
+            {joignable ? (
+              <>
+                <Recap
+                  intitule="Établissement"
+                  valeur={recapEtablissement(etablissementConfirme, nouvelEtablissement)}
+                />
+                <Recap intitule="Déjà contacté" valeur={recapOuiNon(contacte)} />
+                <Recap intitule="Connaît l’UES" valeur={recapOuiNon(connaitUES)} />
+                {syndicat.trim() === '' ? null : (
+                  <Recap intitule="Niveau de syndicat" valeur={syndicat.trim()} />
+                )}
+                <Recap intitule="Représentant CPI CHUES" valeur={recapOuiNon(ambassadeur)} />
+                {ambassadeur === true && numeroConfirme === false && digitsOf(nouveauNumero) >= 9 ? (
+                  <Recap intitule="Nouveau numéro" valeur={nouveauNumero.trim()} />
+                ) : null}
+              </>
             ) : null}
             {rappelAt === null ? null : (
               <Recap intitule="Rappel" valeur={formatCallbackAt(rappelAt, now)} />

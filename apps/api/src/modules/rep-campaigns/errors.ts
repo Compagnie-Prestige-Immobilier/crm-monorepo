@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 
 const error = (code: string, message: string): BadRequestException =>
   new BadRequestException({ code, message });
@@ -6,8 +6,17 @@ const error = (code: string, message: string): BadRequestException =>
 export const representantNotFound = (): NotFoundException =>
   new NotFoundException({ code: 'REPRESENTANT_NOT_FOUND', message: 'Représentant introuvable.' });
 
+export const phoneConflict = (ownerName: string): ConflictException =>
+  new ConflictException({
+    code: 'REPRESENTANT_PHONE_CONFLICT',
+    message: `Ce numéro est déjà celui d’un représentant enregistré par ${ownerName}.`,
+  });
+
 export const commentRequired = (): BadRequestException =>
-  error('REP_CAMPAIGN_COMMENT_REQUIRED', 'L’issue « Autre » exige un commentaire : sans lui, la case ne dit rien.');
+  error(
+    'REP_CAMPAIGN_COMMENT_REQUIRED',
+    'L’issue « Autre » exige un commentaire : sans lui, la case ne dit rien.',
+  );
 
 export const promisedNotAllowed = (): BadRequestException =>
   error(

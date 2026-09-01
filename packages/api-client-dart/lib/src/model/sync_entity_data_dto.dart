@@ -63,6 +63,12 @@ class SyncEntityDataDto {
 
     this.etablissement,
 
+    this.syndicat,
+
+    this.connaitUES,
+
+    this.contacte,
+
     this.projet,
 
     this.type,
@@ -199,6 +205,18 @@ class SyncEntityDataDto {
   /// Représentant : l’établissement où il exerce. Ni l’IEF ni le département.
   @JsonKey(name: r'etablissement', required: false, includeIfNull: false)
   final String? etablissement;
+
+  /// Représentant : niveau de syndicat déclaré pendant la qualification. Texte libre, distinct du référentiel Syndicat des prospects.
+  @JsonKey(name: r'syndicat', required: false, includeIfNull: false)
+  final String? syndicat;
+
+  /// Représentant : déclare connaître l’UES. Tri-état : absent laisse en place, la valeur n’est jamais remise à « non posée » depuis le client.
+  @JsonKey(name: r'connaitUES', required: false, includeIfNull: false)
+  final bool? connaitUES;
+
+  /// Représentant : déclare avoir déjà été contacté. Distinct de relationStatus, qui porte la décision ambassadeur/refus.
+  @JsonKey(name: r'contacte', required: false, includeIfNull: false)
+  final bool? contacte;
 
   /// Prospect : le projet dont il relève. CHUES par défaut côté serveur.
   @JsonKey(
@@ -356,6 +374,9 @@ class SyncEntityDataDto {
                 relationStatus,
                 relationReason,
                 etablissement,
+                syndicat,
+                connaitUES,
+                contacte,
                 projet,
                 type,
                 dureeSystemeMois,
@@ -401,6 +422,9 @@ class SyncEntityDataDto {
                 other.relationStatus,
                 other.relationReason,
                 other.etablissement,
+                other.syndicat,
+                other.connaitUES,
+                other.contacte,
                 other.projet,
                 other.type,
                 other.dureeSystemeMois,
@@ -452,6 +476,9 @@ class SyncEntityDataDto {
         relationStatus,
         relationReason,
         etablissement,
+        syndicat,
+        connaitUES,
+        contacte,
         projet,
         type,
         dureeSystemeMois,

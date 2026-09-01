@@ -26,6 +26,11 @@ export interface RepresentantRow {
   fullName: string;
   phoneE164: string;
   notes: string | null;
+  prenom?: string | null;
+  etablissement?: string | null;
+  syndicat?: string | null;
+  connaitUES?: boolean | null;
+  contacte?: boolean | null;
   iefId?: string | null;
   relationStatus?: string;
   rev: number;
@@ -129,11 +134,7 @@ function matches(row: Row, where: Row | undefined): boolean {
   return true;
 }
 
-function matchesFilter(
-  row: Row,
-  key: string,
-  expected: unknown,
-): boolean {
+function matchesFilter(row: Row, key: string, expected: unknown): boolean {
   if (key === 'AND') return (expected as Row[]).every((clause) => matches(row, clause));
   if (key === 'OR') return (expected as Row[]).some((clause) => matches(row, clause));
 

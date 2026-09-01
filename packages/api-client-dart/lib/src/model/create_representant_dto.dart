@@ -23,6 +23,10 @@ class CreateRepresentantDto {
 
     required this.fullName,
 
+    this.prenom,
+
+    this.etablissement,
+
     required this.phone,
 
     required this.departementId,
@@ -40,6 +44,14 @@ class CreateRepresentantDto {
 
   @JsonKey(name: r'fullName', required: true, includeIfNull: false)
   final String fullName;
+
+  /// Prénom, quand il a été recueilli séparément du nom complet.
+  @JsonKey(name: r'prenom', required: false, includeIfNull: false)
+  final String? prenom;
+
+  /// Établissement où il exerce. Ni l’IEF ni le département.
+  @JsonKey(name: r'etablissement', required: false, includeIfNull: false)
+  final String? etablissement;
 
   /// Téléphone en saisie libre. Normalisé en E.164 par le serveur.
   @JsonKey(name: r'phone', required: true, includeIfNull: false)
@@ -67,6 +79,8 @@ class CreateRepresentantDto {
               [
                 id,
                 fullName,
+                prenom,
+                etablissement,
                 phone,
                 departementId,
                 iefId,
@@ -76,6 +90,8 @@ class CreateRepresentantDto {
               [
                 other.id,
                 other.fullName,
+                other.prenom,
+                other.etablissement,
                 other.phone,
                 other.departementId,
                 other.iefId,
@@ -91,6 +107,8 @@ class CreateRepresentantDto {
       mapPropsToHashCode([
         id,
         fullName,
+        prenom,
+        etablissement,
         phone,
         departementId,
         iefId,

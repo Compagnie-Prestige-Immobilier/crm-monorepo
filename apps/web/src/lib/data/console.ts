@@ -587,6 +587,15 @@ export interface RepAnswer {
   readonly comment?: string;
   /** Exigée par le serveur pour l'issue CALLBACK, et par elle seule. */
   readonly callbackAt?: string;
+  readonly etablissementConfirme?: boolean;
+  /** Nouvel établissement, quand `etablissementConfirme` vaut faux. */
+  readonly etablissement?: string;
+  readonly numeroConfirme?: boolean;
+  /** Nouveau numéro, quand `numeroConfirme` vaut faux. */
+  readonly phone?: string;
+  readonly contacte?: boolean;
+  readonly connaitUES?: boolean;
+  readonly syndicat?: string;
 }
 
 export function buildRepAttempt(

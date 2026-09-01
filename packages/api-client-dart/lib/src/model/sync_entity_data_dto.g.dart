@@ -43,6 +43,12 @@ abstract class _$SyncEntityDataDtoCWProxy {
 
   SyncEntityDataDto etablissement(String? etablissement);
 
+  SyncEntityDataDto syndicat(String? syndicat);
+
+  SyncEntityDataDto connaitUES(bool? connaitUES);
+
+  SyncEntityDataDto contacte(bool? contacte);
+
   SyncEntityDataDto projet(Projet? projet);
 
   SyncEntityDataDto type(ProspectType? type);
@@ -118,6 +124,9 @@ abstract class _$SyncEntityDataDtoCWProxy {
     RepresentantRelation? relationStatus,
     String? relationReason,
     String? etablissement,
+    String? syndicat,
+    bool? connaitUES,
+    bool? contacte,
     Projet? projet,
     ProspectType? type,
     num? dureeSystemeMois,
@@ -214,6 +223,16 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
   @override
   SyncEntityDataDto etablissement(String? etablissement) =>
       this(etablissement: etablissement);
+
+  @override
+  SyncEntityDataDto syndicat(String? syndicat) => this(syndicat: syndicat);
+
+  @override
+  SyncEntityDataDto connaitUES(bool? connaitUES) =>
+      this(connaitUES: connaitUES);
+
+  @override
+  SyncEntityDataDto contacte(bool? contacte) => this(contacte: contacte);
 
   @override
   SyncEntityDataDto projet(Projet? projet) => this(projet: projet);
@@ -332,6 +351,9 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
     Object? relationStatus = const $CopyWithPlaceholder(),
     Object? relationReason = const $CopyWithPlaceholder(),
     Object? etablissement = const $CopyWithPlaceholder(),
+    Object? syndicat = const $CopyWithPlaceholder(),
+    Object? connaitUES = const $CopyWithPlaceholder(),
+    Object? contacte = const $CopyWithPlaceholder(),
     Object? projet = const $CopyWithPlaceholder(),
     Object? type = const $CopyWithPlaceholder(),
     Object? dureeSystemeMois = const $CopyWithPlaceholder(),
@@ -431,6 +453,18 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
           ? _value.etablissement
           // ignore: cast_nullable_to_non_nullable
           : etablissement as String?,
+      syndicat: syndicat == const $CopyWithPlaceholder()
+          ? _value.syndicat
+          // ignore: cast_nullable_to_non_nullable
+          : syndicat as String?,
+      connaitUES: connaitUES == const $CopyWithPlaceholder()
+          ? _value.connaitUES
+          // ignore: cast_nullable_to_non_nullable
+          : connaitUES as bool?,
+      contacte: contacte == const $CopyWithPlaceholder()
+          ? _value.contacte
+          // ignore: cast_nullable_to_non_nullable
+          : contacte as bool?,
       projet: projet == const $CopyWithPlaceholder()
           ? _value.projet
           // ignore: cast_nullable_to_non_nullable
@@ -589,6 +623,9 @@ SyncEntityDataDto _$SyncEntityDataDtoFromJson(Map<String, dynamic> json) =>
         ),
         relationReason: $checkedConvert('relationReason', (v) => v as String?),
         etablissement: $checkedConvert('etablissement', (v) => v as String?),
+        syndicat: $checkedConvert('syndicat', (v) => v as String?),
+        connaitUES: $checkedConvert('connaitUES', (v) => v as bool?),
+        contacte: $checkedConvert('contacte', (v) => v as bool?),
         projet: $checkedConvert(
           'projet',
           (v) => $enumDecodeNullable(
@@ -695,6 +732,9 @@ Map<String, dynamic> _$SyncEntityDataDtoToJson(
     'relationStatus': value,
   if (instance.relationReason case final value?) 'relationReason': value,
   if (instance.etablissement case final value?) 'etablissement': value,
+  if (instance.syndicat case final value?) 'syndicat': value,
+  if (instance.connaitUES case final value?) 'connaitUES': value,
+  if (instance.contacte case final value?) 'contacte': value,
   if (_$ProjetEnumMap[instance.projet] case final value?) 'projet': value,
   if (_$ProspectTypeEnumMap[instance.type] case final value?) 'type': value,
   if (instance.dureeSystemeMois case final value?) 'dureeSystemeMois': value,
