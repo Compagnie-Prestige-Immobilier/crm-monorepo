@@ -3,9 +3,10 @@
 import { useQuery } from '@tanstack/react-query';
 import Image from 'next/image';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 
-import { buttonVariants } from '@/components/ui/button';
+import { RepresentantFormDialog } from '@/components/representants/representant-form-dialog';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { callbackKeys, fetchCallbacks } from '@/lib/data/console';
 import { countPendingProspects } from '@/lib/data/phase2';
@@ -23,6 +24,7 @@ import { NON_QUALIFIES, SANS_PROSPECT, hubKeys } from '@/components/chues/hub-fi
  * passent eux-mêmes les appels. Les chiffres sont ceux que l'API sert à chacun.
  */
 export function HubView({ prenom }: { prenom: string }) {
+  const [nouveauRepresentant, setNouveauRepresentant] = useState(false);
   const nonQualifies = useQuery({
     queryKey: queryKeys.representants(NON_QUALIFIES),
     queryFn: () => fetchRepresentants(NON_QUALIFIES),
@@ -46,7 +48,7 @@ export function HubView({ prenom }: { prenom: string }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col items-start gap-2">
         {/* `alt` VIDE : le titre suit dans le même `h1`, et un texte de
             remplacement identique le ferait annoncer deux fois. */}
         <h1 className="flex items-center gap-3 font-display text-h1 font-[800]">
@@ -63,6 +65,9 @@ export function HubView({ prenom }: { prenom: string }) {
         <p className="text-[0.9375rem] text-muted-foreground">
           Bonjour {prenom}. Trois étapes, dans l’ordre.
         </p>
+        <Button variant="outline" onClick={() => setNouveauRepresentant(true)}>
+          Ajouter un représentant
+        </Button>
       </div>
 
       <ol className="grid gap-4 md:grid-cols-3">
@@ -117,6 +122,12 @@ export function HubView({ prenom }: { prenom: string }) {
           action={<Geste href="/chues/console" label="Convertir un prospect" />}
         />
       </ol>
+
+      <RepresentantFormDialog
+        open={nouveauRepresentant}
+        onOpenChange={setNouveauRepresentant}
+        representant={null}
+      />
     </div>
   );
 }

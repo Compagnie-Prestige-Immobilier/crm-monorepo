@@ -9,6 +9,7 @@ import 'package:cpi_go/features/accueil/presentation/registre_screen.dart';
 import 'package:cpi_go/features/auth/auth_controller.dart';
 import 'package:cpi_go/features/auth/auth_state.dart';
 import 'package:cpi_go/features/home/presentation/home_screen.dart';
+import 'package:cpi_go/features/representant/presentation/representant_form_screen.dart';
 import 'package:cpi_go/features/shell/grand_public_screen.dart';
 import 'package:cpi_go/features/shell/hub_screen.dart';
 import 'package:cpi_go/features/shell/projects.dart';
@@ -252,6 +253,29 @@ void main() {
       cpi,
       reason: 'le hub reprend le bordeaux CPI dès qu\'on quitte la coque',
     );
+
+    await unmount(tester);
+  });
+
+  testWidgets('le geste de départ permet de saisir un représentant', (
+    WidgetTester tester,
+  ) async {
+    await open(tester, 'COMMERCIAL');
+    await tester.tap(tile('Projet CHUES'));
+    await settle(tester);
+
+    await tester.tap(find.text('Commencer'));
+    await settle(tester);
+
+    expect(find.text('Ajouter un représentant'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('Ajouter un représentant')).dy,
+      lessThan(tester.getTopLeft(find.text('Ajouter un prospect')).dy),
+    );
+    await tester.tap(find.text('Ajouter un représentant'));
+    await settle(tester);
+
+    expect(find.byType(RepresentantFormScreen), findsOneWidget);
 
     await unmount(tester);
   });
