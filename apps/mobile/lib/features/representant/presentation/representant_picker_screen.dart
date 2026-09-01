@@ -202,9 +202,9 @@ class _Empty extends StatelessWidget {
   Widget build(BuildContext context) {
     if (query.isEmpty) {
       return const CpiEmptyState(
-        icon: PhosphorIconsDuotone.usersThree,
-        title: 'Aucun représentant',
-        message: 'Ils sont importés depuis le web.',
+        icon: PhosphorIconsDuotone.magnifyingGlass,
+        title: 'Cherchez un représentant',
+        message: 'Tapez son nom ou son numéro.',
       );
     }
     return const CpiEmptyState(

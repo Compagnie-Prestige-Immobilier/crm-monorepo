@@ -157,9 +157,6 @@ void main() {
     expect(continuer(tester).subtitle, 'Dites s\'il est ambassadeur');
 
     await taper(tester, tuile('Ambassadeur ?', 'Oui'));
-    expect(continuer(tester).subtitle, 'Confirmez le numéro');
-
-    await taper(tester, tuile('Confirmer le numéro ?', 'Oui'));
     expect(continuer(tester).subtitle, 'Dites s\'il a WhatsApp sur ce numéro');
 
     await taper(tester, tuile('A-t-il WhatsApp sur ce numéro ?', 'Oui'));
@@ -268,7 +265,6 @@ void main() {
       find.text('Il propose quelqu\'un d\'autre ? (facultatif)'),
       findsNothing,
     );
-    await taper(tester, tuile('Confirmer le numéro ?', 'Oui'));
     await taper(tester, tuile('A-t-il WhatsApp sur ce numéro ?', 'Oui'));
     await versLesDetails(tester);
     expect(
@@ -305,15 +301,11 @@ void main() {
     await tester.pump();
     await taper(tester, tuile('Avez-vous été contacté ?', 'Non'));
     await taper(tester, tuile('Connaissez-vous l\'UES ?', 'Oui'));
-    await tester.enterText(
-      champ('Niveau de syndicat (facultatif)'),
-      'Secrétaire général',
-    );
+    await tester.enterText(champ('Syndicat (facultatif)'), 'Syndicat');
+    await tester.pump();
+    await tester.tap(find.text('Syndicat Test').last);
     await tester.pump();
     await taper(tester, tuile('Ambassadeur ?', 'Oui'));
-    await taper(tester, tuile('Confirmer le numéro ?', 'Non'));
-    await tester.enterText(champ('Nouveau numéro'), '77 987 65 43');
-    await tester.pump();
     await taper(tester, tuile('A-t-il WhatsApp sur ce numéro ?', 'Oui'));
 
     await versLesDetails(tester);
@@ -332,18 +324,15 @@ void main() {
     expect(payload['etablissement'], 'Lycée Blaise Diagne');
     expect(payload['contacte'], false);
     expect(payload['connaitUES'], true);
-    expect(payload['syndicat'], 'Secrétaire général');
-    expect(payload['numeroConfirme'], false);
-    expect(payload['phone'], '+221779876543');
+    expect(payload['syndicat'], 'Syndicat Test');
     expect(payload['whatsappStatus'], 'MEME_NUMERO');
 
-    // La fiche locale a suivi : nouvel établissement et nouveau numéro.
+    // La fiche locale a suivi : nouvel établissement et syndicat.
     final Representant rep = await (db.select(
       db.representants,
     )..where((Representants r) => r.id.equals('rep-1'))).getSingle();
     expect(rep.etablissement, 'Lycée Blaise Diagne');
-    expect(rep.phoneE164, '+221779876543');
-    expect(rep.syndicat, 'Secrétaire général');
+    expect(rep.syndicat, 'Syndicat Test');
     expect(rep.connaitUes, isTrue);
     expect(rep.contacte, isFalse);
 
@@ -365,7 +354,6 @@ void main() {
     await taper(tester, find.text('Joignable'));
     await renseignements(tester);
     await taper(tester, tuile('Ambassadeur ?', 'Oui'));
-    await taper(tester, tuile('Confirmer le numéro ?', 'Oui'));
     await taper(tester, tuile('A-t-il WhatsApp sur ce numéro ?', 'Oui'));
     await versLesDetails(tester);
     await tester.tap(find.text('Enregistrer'));

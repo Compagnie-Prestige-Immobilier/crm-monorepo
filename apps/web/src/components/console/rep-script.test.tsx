@@ -6,6 +6,7 @@ import { ETAPES } from '@/components/chues/etapes';
 import { RepScript } from '@/components/console/rep-script';
 import { navTitle } from '@/components/layout/nav-items';
 import type * as ConsoleData from '@/lib/data/console';
+import type * as ReferenceData from '@/lib/data/reference';
 import type * as RepresentantsData from '@/lib/data/representants';
 import type { ScriptedRepresentant } from '@/lib/data/representants';
 import { REP_CALL_OUTCOME_LABELS } from '@/lib/types';
@@ -14,6 +15,7 @@ import { renderWithQuery } from '@/test/render-query';
 const fetchRepScriptQueue = vi.fn();
 const pushRepCallAttempt = vi.fn();
 const fetchRepresentants = vi.fn();
+const fetchReferenceData = vi.fn();
 const toastError = vi.fn();
 const toastSuccess = vi.fn();
 
@@ -24,6 +26,11 @@ vi.mock('@/lib/data/console', async (importOriginal) => {
     fetchRepScriptQueue: (...args: unknown[]) => fetchRepScriptQueue(...args) as unknown,
     pushRepCallAttempt: (...args: unknown[]) => pushRepCallAttempt(...args) as unknown,
   };
+});
+
+vi.mock('@/lib/data/reference', async (importOriginal) => {
+  const actual = await importOriginal<typeof ReferenceData>();
+  return { ...actual, fetchReferenceData: (...args: unknown[]) => fetchReferenceData(...args) };
 });
 
 vi.mock('@/lib/data/representants', async (importOriginal) => {
@@ -138,6 +145,10 @@ beforeEach(() => {
   });
   fetchRepresentants.mockReset();
   fetchRepresentants.mockResolvedValue(page([HORS_LISTE]));
+  fetchReferenceData.mockReset();
+  fetchReferenceData.mockResolvedValue({
+    syndicats: [{ id: 'snd-saes', name: 'SAES', sigle: 'SAES', isActive: true, sortOrder: 1 }],
+  });
   toastError.mockClear();
   toastSuccess.mockClear();
 });
@@ -254,7 +265,6 @@ describe('RepScript : une seule tentative, à la fin', () => {
     await choisir(/Aminata Ndiaye/u);
 
     await parcoursJoignable('Oui');
-    await repondreA('Son numéro est-il confirmé ?', 'Oui');
     await repondreA('A-t-il WhatsApp sur ce numéro ?', 'Oui');
     await enregistrer();
 
@@ -269,8 +279,34 @@ describe('RepScript : une seule tentative, à la fin', () => {
       etablissementConfirme: true,
       contacte: true,
       connaitUES: true,
-      numeroConfirme: true,
     });
+    expect(dernierEnvoi()).not.toHaveProperty('numeroConfirme');
+  });
+
+  it('envoie le NOM du syndicat choisi, pas son identifiant', async () => {
+    await renderListe();
+    await choisir(/Aminata Ndiaye/u);
+
+    await parcoursJoignable('Oui');
+    await userEvent.click(screen.getByRole('combobox', { name: /Syndicat/u }));
+    await userEvent.click(await screen.findByRole('option', { name: /SAES/u }));
+    await repondreA('A-t-il WhatsApp sur ce numéro ?', 'Oui');
+    await enregistrer();
+
+    await waitFor(() => {
+      expect(pushRepCallAttempt).toHaveBeenCalledTimes(1);
+    });
+    expect(dernierEnvoi()).toMatchObject({ syndicat: 'SAES' });
+  });
+
+  it('ne demande plus si le numéro est confirmé', async () => {
+    await renderListe();
+    await choisir(/Aminata Ndiaye/u);
+
+    await parcoursJoignable('Oui');
+
+    expect(screen.queryByText('Son numéro est-il confirmé ?')).toBeNull();
+    expect(screen.getByText('A-t-il WhatsApp sur ce numéro ?')).toBeTruthy();
   });
 
   it('consigne le refus et la personne proposée ensemble', async () => {

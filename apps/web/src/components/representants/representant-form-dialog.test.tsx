@@ -95,7 +95,7 @@ beforeEach(() => {
       },
     ],
     banques: [],
-    syndicats: [],
+    syndicats: [{ id: 'snd-saes', name: 'SAES', sigle: 'SAES', isActive: true, sortOrder: 1 }],
     commerciaux: [],
     representants: [],
   });
@@ -345,6 +345,22 @@ describe('RepresentantFormDialog, correction à froid du script', () => {
       expect(updateRepresentant).toHaveBeenCalled();
     });
     expect(updateRepresentant.mock.calls[0]?.[1]).toMatchObject({ profession: 'Proviseur' });
+  });
+
+  it('patche le NOM du syndicat choisi, pas son identifiant', async () => {
+    const user = userEvent.setup();
+    renderWithQuery(<RepresentantFormDialog open onOpenChange={vi.fn()} representant={FICHE} />);
+
+    await waitFor(() => {
+      expect(trigger('Syndicat').textContent).toContain('Choisir un syndicat');
+    });
+    await choose('Syndicat', 'SAES');
+    await user.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(() => {
+      expect(updateRepresentant).toHaveBeenCalled();
+    });
+    expect(updateRepresentant.mock.calls[0]?.[1]).toMatchObject({ syndicat: 'SAES' });
   });
 
   it('ne demande ni WhatsApp ni profession à la création', async () => {

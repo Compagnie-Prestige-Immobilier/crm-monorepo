@@ -159,9 +159,12 @@ class ReferenceRepository {
 
   Stream<List<RepresentantSyncViewData>> watchRepresentants({
     String? search,
-    int limit = 500,
   }) {
     final String terme = (search ?? '').trim();
+    // Annuaire de milliers de fiches : tout dérouler laisse croire à un total
+    // faux (« il n'y en a que 500 »). L'écran reste vide tant qu'on n'a pas
+    // cherché ; un résultat n'apparaît que pour une recherche explicite.
+    if (terme.isEmpty) return Stream<List<RepresentantSyncViewData>>.value(const []);
     final String pattern = '%${terme.toLowerCase()}%';
     // Un numéro se tape avec des espaces (« 77 152 11 62 ») et se range en
     // E.164 : sans cette seconde forme, aucune recherche par téléphone ne sort.
@@ -171,13 +174,11 @@ class ReferenceRepository {
         .customSelect(
           'SELECT * FROM representant_sync_view '
           'WHERE deleted_at IS NULL '
-          '  AND (?1 = \'%%\' OR lower(full_name) LIKE ?1 OR phone_e164 LIKE ?1 '
-          '       OR (?3 <> \'\' AND phone_e164 LIKE ?3)) '
-          'ORDER BY client_created_at DESC '
-          'LIMIT ?2',
+          '  AND (lower(full_name) LIKE ?1 OR phone_e164 LIKE ?1 '
+          '       OR (?2 <> \'\' AND phone_e164 LIKE ?2)) '
+          'ORDER BY client_created_at DESC',
           variables: <Variable<Object>>[
             Variable<String>(pattern),
-            Variable<int>(limit),
             Variable<String>(parNumero),
           ],
           readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
