@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger, PayloadTooLargeException } from '@nestjs/common';
+import type { RepCallOutcome, RepresentantRelation, WhatsappStatus } from '@crm/database';
 import type { MultipartFile } from '@fastify/multipart';
 import type { FastifyRequest } from 'fastify';
 import ExcelJS from 'exceljs';
@@ -8,12 +9,15 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import { tryNormalizePhone } from '../../common/phone.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { IMPORT_COLUMNS } from './import-template.js';
+import { normalizeKey, parseComplements } from './import-fields.js';
 import type {
   ImportQueryDto,
   ImportReportDto,
   ImportRowErrorDto,
   ImportRowPreviewDto,
 } from './dto.js';
+
+export { normalizeKey };
 
 /** Import Excel avec simulation préalable et dédoublonnage du téléphone normalisé. */
 
@@ -61,6 +65,13 @@ interface ParsedRow {
   readonly iefId: string | null;
   readonly iefName: string | null;
   readonly notes: string | null;
+  readonly etablissement: string | null;
+  readonly relationStatus: RepresentantRelation;
+  readonly whatsappStatus: WhatsappStatus;
+  /** Le compte propriétaire de la fiche. `null` : celui qui importe. */
+  readonly ownerId: string | null;
+  /** L'appel déjà passé, quand le fichier le date. */
+  readonly appel: { readonly date: Date; readonly outcome: RepCallOutcome } | null;
 }
 
 @Injectable()
@@ -179,6 +190,10 @@ export class RepresentantsImportService {
         departementName: row.departementName,
         iefName: row.iefName,
         notes: row.notes,
+        etablissement: row.etablissement,
+        relationStatus: row.relationStatus,
+        whatsappStatus: row.whatsappStatus,
+        calledAt: row.appel?.date.toISOString() ?? null,
       })),
     };
   }
@@ -202,20 +217,27 @@ export class RepresentantsImportService {
    */
   private async apply(user: AuthenticatedUser, rows: readonly ParsedRow[]): Promise<number> {
     const now = new Date();
+    // UUID v7 engendrés ICI et non dans le `map` d'écriture : les appels déjà
+    // passés s'y rattachent par clé étrangère, et il faut donc les connaître
+    // avant d'écrire. L'import n'a pas de client hors ligne, mais l'identifiant
+    // doit rester du même format que ceux du mobile, sinon l'ordre
+    // lexicographique cesse d'être l'ordre temporel.
+    const avecId = rows.map((row) => ({ row, id: uuidv7() }));
+
     const result = await this.prisma.$transaction(
-      async (tx) =>
-        tx.representant.createMany({
-          data: rows.map((row) => ({
-            // UUID v7 engendré ici : l'import n'a pas de client hors ligne, mais
-            // l'identifiant doit rester du même format que ceux du mobile, sinon
-            // l'ordre lexicographique cesse d'être l'ordre temporel.
-            id: uuidv7(),
+      async (tx) => {
+        const ecrites = await tx.representant.createMany({
+          data: avecId.map(({ row, id }) => ({
+            id,
             fullName: row.fullName,
             phoneE164: row.phoneE164,
             departementId: row.departementId,
             iefId: row.iefId,
             notes: row.notes,
-            createdById: user.id,
+            etablissement: row.etablissement,
+            relationStatus: row.relationStatus,
+            whatsappStatus: row.whatsappStatus,
+            createdById: row.ownerId ?? user.id,
             // La saisie terrain est inconnue pour un import : on retient l'instant
             // de l'import, et non une date inventée. Les statistiques d'activité
             // s'appuient dessus, une valeur fabriquée les fausserait.
@@ -226,7 +248,39 @@ export class RepresentantsImportService {
           // faire échouer les 4 999 autres. L'écart est RAPPORTÉ, voir
           // `import()` : silencieux, il contredirait la promesse « tout ou rien ».
           skipDuplicates: true,
-        }),
+        });
+
+        // Les appels ne se rattachent qu'aux fiches RÉELLEMENT écrites. Sans
+        // cette relecture, une ligne écartée par `skipDuplicates` laisserait un
+        // appel pointant sur un identifiant absent : la clé étrangère fait
+        // alors échouer toute la tranche, y compris les fiches légitimes.
+        const appels = avecId.flatMap(({ row, id }) =>
+          row.appel === null ? [] : [{ id, appel: row.appel, performedById: row.ownerId ?? user.id }],
+        );
+        if (appels.length > 0) {
+          const presentes = new Set(
+            (
+              await tx.representant.findMany({
+                where: { id: { in: appels.map(({ id }) => id) } },
+                select: { id: true },
+              })
+            ).map((found) => found.id),
+          );
+          await tx.repCallAttempt.createMany({
+            data: appels
+              .filter(({ id }) => presentes.has(id))
+              .map(({ id, appel, performedById }) => ({
+                id: uuidv7(),
+                representantId: id,
+                performedById,
+                outcome: appel.outcome,
+                clientCreatedAt: appel.date,
+              })),
+          });
+        }
+
+        return ecrites;
+      },
       { timeout: IMPORT_TRANSACTION_TIMEOUT_MS, maxWait: IMPORT_TRANSACTION_MAX_WAIT_MS },
     );
     return result.count;
@@ -249,7 +303,7 @@ export class RepresentantsImportService {
   }
 
   private async loadReferentiels(): Promise<Referentiels> {
-    const [departements, iefs] = await Promise.all([
+    const [departements, iefs, users] = await Promise.all([
       this.prisma.departement.findMany({
         where: { isActive: true },
         select: { id: true, name: true, code: true },
@@ -258,9 +312,22 @@ export class RepresentantsImportService {
         where: { isActive: true },
         select: { id: true, name: true, code: true, departementId: true },
       }),
+      this.prisma.user.findMany({
+        where: { isActive: true, deletedAt: null },
+        select: { id: true, username: true, email: true, fullName: true },
+      }),
     ]);
 
     return {
+      // Identifiant, e-mail ET nom complet : le classeur terrain désigne les
+      // chargés de compte par leur prénom d'usage, pas par leur identifiant.
+      users: new Map(
+        users.flatMap((row) => [
+          [normalizeKey(row.username), row],
+          [normalizeKey(row.email), row],
+          [normalizeKey(row.fullName), row],
+        ]),
+      ),
       // Indexés sur la forme NORMALISÉE (sans accent, sans casse) : un fichier
       // rempli à la main écrit « SAINT-LOUIS », « Saint Louis » et « saint
       // louis » pour le même département, et refuser les trois pour un accent
@@ -419,24 +486,7 @@ interface IefRow extends ReferentielRow {
 interface Referentiels {
   readonly departements: ReadonlyMap<string, ReferentielRow>;
   readonly iefs: ReadonlyMap<string, IefRow>;
-}
-
-/**
- * Clé de rapprochement d'un libellé de référentiel.
- *
- * Accents retirés, casse effacée, ponctuation et espaces compactés. Un fichier
- * rempli à la main écrit « SAINT-LOUIS », « Saint Louis » et « saint  louis »
- * pour le même département : les trois doivent tomber sur la même clé, sans
- * quoi l'import rejette des lignes parfaitement correctes et l'utilisateur en
- * conclut que l'outil ne marche pas.
- */
-export function normalizeKey(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
+  readonly users: ReadonlyMap<string, { readonly id: string }>;
 }
 
 /** Texte d'une cellule, quel que soit son type. Une formule rend son résultat. */
@@ -460,13 +510,22 @@ function cellText(value: ExcelJS.CellValue): string {
 
 /** Analyse une ligne. Rend soit la ligne prête à écrire, soit son motif de refus. */
 function parseRow(raw: RawRow, referentiels: Referentiels): ParsedRow | ImportRowErrorDto {
-  const [fullName, phone, departement, ief, notes] = [...raw.cells, '', '', '', '', ''] as [
-    string,
-    string,
-    string,
-    string,
-    string,
-  ];
+  // Par RANG dans le modèle, jamais par l'intitulé du fichier : un utilisateur
+  // renomme une colonne bien plus souvent qu'il n'en déplace une. Une colonne
+  // absente en fin de ligne se lit vide, et une cellule vide est simplement une
+  // information qu'on n'a pas.
+  const cellule = (rang: number): string => raw.cells[rang] ?? '';
+  const fullName = cellule(0);
+  const phone = cellule(1);
+  const departement = cellule(2);
+  const ief = cellule(3);
+  const notes = cellule(4);
+  const etablissement = cellule(5);
+  const relation = cellule(6);
+  const whatsapp = cellule(7);
+  const charge = cellule(8);
+  const dateAppel = cellule(9);
+  const issue = cellule(10);
 
   if (fullName.length < 2) {
     return {
@@ -521,6 +580,15 @@ function parseRow(raw: RawRow, referentiels: Referentiels): ParsedRow | ImportRo
     }
   }
 
+  const complements = parseComplements(
+    { relation, whatsapp, charge, dateAppel, issue },
+    referentiels.users,
+  );
+  if ('code' in complements) {
+    const { code, message, value } = complements;
+    return { line: raw.line, code, message, value: value || null };
+  }
+
   return {
     line: raw.line,
     fullName: fullName.slice(0, 160),
@@ -530,5 +598,8 @@ function parseRow(raw: RawRow, referentiels: Referentiels): ParsedRow | ImportRo
     iefId: iefRow?.id ?? null,
     iefName: iefRow?.name ?? null,
     notes: notes ? notes.slice(0, 2_000) : null,
+    etablissement: etablissement ? etablissement.slice(0, 200) : null,
+    ...complements,
   };
 }
+

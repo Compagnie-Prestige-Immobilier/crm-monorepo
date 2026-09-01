@@ -17698,6 +17698,72 @@
         ],
         "summary": "Consulte une campagne et les appels qui ont suivi.",
         "tags": ["lots-export"]
+      },
+      "delete": {
+        "operationId": "deleteLotExport",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Campagne supprimée."
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LOT_EXPORT_NOT_FOUND.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Supprime une campagne et sa répartition.",
+        "tags": ["lots-export"]
       }
     }
   },
@@ -19216,9 +19282,44 @@
           "notes": {
             "type": "string",
             "nullable": true
+          },
+          "etablissement": {
+            "type": "string",
+            "nullable": true
+          },
+          "relationStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RepresentantRelation"
+              }
+            ]
+          },
+          "whatsappStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WhatsappStatus"
+              }
+            ]
+          },
+          "calledAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "Date de l’appel déjà passé que la ligne enregistrera, s’il y en a un."
           }
         },
-        "required": ["line", "fullName", "phoneE164", "departementName", "iefName", "notes"]
+        "required": [
+          "line",
+          "fullName",
+          "phoneE164",
+          "departementName",
+          "iefName",
+          "notes",
+          "etablissement",
+          "relationStatus",
+          "whatsappStatus",
+          "calledAt"
+        ]
       },
       "ImportReportDto": {
         "type": "object",

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
@@ -20,6 +21,7 @@ import {
 import { Role } from '@crm/database';
 import type { FastifyReply } from 'fastify';
 import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
+import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
 import {
   CurrentUser,
   type AuthenticatedUser,
@@ -161,5 +163,19 @@ export class LotsExportController {
   @ApiResponse({ status: 200, type: LotExportDetailDto })
   get(@Param('id', ParseUUIDPipe) id: string): Promise<LotExportDetailDto> {
     return this.lots.get(id);
+  }
+
+  @Delete(':id')
+  @HttpCode(204)
+  @Roles(Role.ADMIN)
+  @ApiOperation({
+    operationId: 'deleteLotExport',
+    summary: 'Supprime une campagne et sa répartition.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({ status: 204, description: 'Campagne supprimée.' })
+  @ApiResponse({ status: 404, type: ApiErrorDto, description: 'LOT_EXPORT_NOT_FOUND.' })
+  remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
+    return this.lots.remove(id);
   }
 }

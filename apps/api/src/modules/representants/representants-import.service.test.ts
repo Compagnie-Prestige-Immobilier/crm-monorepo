@@ -34,18 +34,26 @@ const IEFS = [
   { id: 'ief-sl', name: 'Saint-Louis Ville', code: 'SLV', departementId: 'dep-sl' },
 ];
 
+const USERS = [
+  { id: 'user-khadim', username: 'khadim', email: 'khadim@cpi.sn', fullName: 'Khadim Diop' },
+];
+
 interface MockDb {
   representant: Record<'findMany' | 'createMany', MockFn>;
+  repCallAttempt: Record<'createMany', MockFn>;
   departement: Record<'findMany', MockFn>;
   ief: Record<'findMany', MockFn>;
+  user: Record<'findMany', MockFn>;
   $transaction: MockFn;
 }
 
 function prismaStub(): MockDb {
   const db: MockDb = {
     representant: { findMany: vi.fn().mockResolvedValue([]), createMany: vi.fn() },
+    repCallAttempt: { createMany: vi.fn().mockResolvedValue({ count: 0 }) },
     departement: { findMany: vi.fn().mockResolvedValue(DEPARTEMENTS) },
     ief: { findMany: vi.fn().mockResolvedValue(IEFS) },
+    user: { findMany: vi.fn().mockResolvedValue(USERS) },
     $transaction: vi.fn(),
   };
   // eslint-disable-next-line @typescript-eslint/no-misused-promises
@@ -118,6 +126,81 @@ describe('import : simulation', () => {
       iefName: 'Almadies',
       notes: 'Notes',
     });
+  });
+
+  it('porte l’établissement jusqu’à la ligne écrite', async () => {
+    const file = await workbookOf([
+      ['Fatou Ndiaye', '77 123 45 67', 'Dakar', '', '', 'Lycée Blaise Diagne'],
+    ]);
+
+    const report = await service.import(ADMIN, requestWith(file), { dryRun: false });
+
+    expect(report.preview[0]).toMatchObject({ etablissement: 'Lycée Blaise Diagne' });
+    expect(db.representant.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [expect.objectContaining({ etablissement: 'Lycée Blaise Diagne' })],
+      }),
+    );
+  });
+
+  it('rattache la fiche à son chargé de compte et enregistre l’appel déjà passé', async () => {
+    const file = await workbookOf([
+      [
+        'Fatou Ndiaye',
+        '77 123 45 67',
+        'Dakar',
+        '',
+        'Injoignable',
+        'Lycée Blaise Diagne',
+        'Ambassadeur',
+        'Même numéro',
+        'khadim',
+        '18/08/2026',
+        'Injoignable',
+      ],
+    ]);
+    // La relecture des fiches écrites doit rendre les identifiants que
+    // `createMany` vient de recevoir : c'est elle qui décide à quelles fiches
+    // les appels se rattachent.
+    db.representant.createMany.mockImplementation((args: { data: { id: string }[] }) => {
+      db.representant.findMany.mockResolvedValue(args.data.map((row) => ({ id: row.id })));
+      return Promise.resolve({ count: args.data.length });
+    });
+
+    await service.import(ADMIN, requestWith(file), { dryRun: false });
+
+    expect(db.representant.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [
+          expect.objectContaining({
+            relationStatus: 'AMBASSADEUR',
+            whatsappStatus: 'MEME_NUMERO',
+            etablissement: 'Lycée Blaise Diagne',
+            createdById: 'user-khadim',
+          }),
+        ],
+      }),
+    );
+    expect(db.repCallAttempt.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          performedById: 'user-khadim',
+          outcome: 'UNREACHABLE',
+          clientCreatedAt: new Date(Date.UTC(2026, 7, 18)),
+        }),
+      ],
+    });
+  });
+
+  it('REFUSE une issue d’appel sans date : elle ne s’enregistrerait nulle part', async () => {
+    const file = await workbookOf([
+      ['Fatou Ndiaye', '77 123 45 67', 'Dakar', '', '', '', '', '', '', '', 'Injoignable'],
+    ]);
+
+    const report = await service.import(ADMIN, requestWith(file), {});
+
+    expect(report.valid).toBe(0);
+    expect(report.errors[0]).toMatchObject({ code: 'CALL_DATE_MISSING' });
   });
 
   it('numérote les erreurs sur la ligne DU FICHIER, en-tête compris', async () => {
