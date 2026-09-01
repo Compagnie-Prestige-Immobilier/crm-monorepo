@@ -3,13 +3,12 @@ import { unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
 import { dakarLocalToIso } from '@/lib/format';
-import {
-  fetchRepresentants,
-  type RepresentantScriptPatch,
-  type ScriptedRepresentant,
-  type WhatsappStatus,
+import type {
+  RepresentantScriptPatch,
+  ScriptedRepresentant,
+  WhatsappStatus,
 } from '@/lib/data/representants';
-import { EMPTY_REPRESENTANT_FILTERS, type RepresentantRelation } from '@/lib/representant-filters';
+import type { RepresentantRelation } from '@/lib/representant-filters';
 import type {
   CallOutcome,
   EnrollmentMethod,
@@ -520,29 +519,11 @@ export async function pushCallAttempt(
   );
 }
 
-export const REP_QUEUE_SIZE = 200;
-
 export const repScriptKeys = {
   root: ['console', 'representants'] as const,
-  queue: ['console', 'representants', 'queue'] as const,
 };
 
-export interface RepScriptPage {
-  readonly items: ScriptedRepresentant[];
-  readonly total: number;
-}
-
-export async function fetchRepScriptQueue(
-  client: ApiClient = getApiClient(),
-): Promise<RepScriptPage> {
-  const page = await fetchRepresentants(
-    { ...EMPTY_REPRESENTANT_FILTERS, pageSize: REP_QUEUE_SIZE, sortDir: 'asc' },
-    client,
-  );
-  return { items: page.items, total: page.total };
-}
-
-/** Une relation tranchée n'a plus rien à donner au script : elle passe en queue de file. */
+/** Une relation tranchée n'a plus rien à donner au script : elle est en queue de file. */
 const REP_RELATION_RANK: Record<RepresentantRelation, number> = {
   INCONNU: 0,
   CONTACTE: 1,
@@ -552,17 +533,6 @@ const REP_RELATION_RANK: Record<RepresentantRelation, number> = {
 
 export function repRelationSettled(representant: ScriptedRepresentant): boolean {
   return REP_RELATION_RANK[representant.relationStatus] === 2;
-}
-
-export function buildRepQueue(items: readonly ScriptedRepresentant[]): ScriptedRepresentant[] {
-  return [...items].sort((left, right) => {
-    const gap = REP_RELATION_RANK[left.relationStatus] - REP_RELATION_RANK[right.relationStatus];
-    if (gap !== 0) return gap;
-    if (left.clientCreatedAt !== right.clientCreatedAt) {
-      return left.clientCreatedAt < right.clientCreatedAt ? -1 : 1;
-    }
-    return left.id < right.id ? -1 : 1;
-  });
 }
 
 export type RepCallOutcome = components['schemas']['RepCallOutcome'];
