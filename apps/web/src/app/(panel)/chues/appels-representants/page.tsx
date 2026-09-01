@@ -1,12 +1,8 @@
-import { HydrationBoundary, dehydrate } from '@tanstack/react-query';
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 
 import { RepScript } from '@/components/console/rep-script';
 import { PermissionDenied } from '@/components/permission-denied';
-import { getServerApiClient } from '@/lib/api/server';
-import { fetchRepScriptQueue, repScriptKeys } from '@/lib/data/console';
-import { getQueryClient } from '@/lib/query-client';
 import { guardRoles } from '@/lib/session';
 
 export const metadata: Metadata = { title: 'Qualifier un représentant' };
@@ -19,15 +15,5 @@ export default async function AppelsRepresentantsPage() {
     return <PermissionDenied role={guard.user.role} what="Les appels aux représentants" />;
   }
 
-  const queryClient = getQueryClient();
-  await queryClient.prefetchQuery({
-    queryKey: repScriptKeys.queue,
-    queryFn: () => fetchRepScriptQueue(getServerApiClient()),
-  });
-
-  return (
-    <HydrationBoundary state={dehydrate(queryClient)}>
-      <RepScript />
-    </HydrationBoundary>
-  );
+  return <RepScript />;
 }

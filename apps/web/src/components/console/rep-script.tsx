@@ -8,7 +8,6 @@ import { toast } from 'sonner';
 import { copyPhone } from '@/components/console/console-ui';
 import { useShortcuts } from '@/components/console/use-shortcuts';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
-import { useLive } from '@/components/live/use-live';
 import { QueryErrorState } from '@/components/query-error-state';
 import { RelationBadge } from '@/components/representants/relation-badge';
 import { RepresentantFormDialog } from '@/components/representants/representant-form-dialog';
@@ -26,10 +25,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import {
   buildRepAttempt,
-  buildRepQueue,
   callbackHalfHours,
   callbackSlots,
-  fetchRepScriptQueue,
   formatCallbackAt,
   pushRepCallAttempt,
   repRelationSettled,
@@ -107,7 +104,10 @@ function manqueJoignable(s: JoignableState): string | null {
 function etablissementAnswer(confirme: boolean | null, nouvel: string): Partial<RepAnswer> {
   if (confirme === null) return {};
   const nom = nouvel.trim();
-  return { etablissementConfirme: confirme, ...(confirme === false && nom !== '' ? { etablissement: nom } : {}) };
+  return {
+    etablissementConfirme: confirme,
+    ...(confirme === false && nom !== '' ? { etablissement: nom } : {}),
+  };
 }
 
 /** Apparition d'une question qui n'était pas là : douce, et coupée si l'on préfère. */
@@ -129,37 +129,29 @@ const annuaireFilters = (search: string): RepresentantFilters => ({
  * Étape 1 : qualifier un représentant, dans l'ordre et les mots de
  * l'application mobile.
  *
- * Rien n'est choisi d'office : l'écran ouvre sur la liste. La qualification ne
- * part au serveur qu'à « Enregistrer », en UNE tentative — c'est ce qui permet
- * de revenir sur chaque réponse jusqu'au bout.
+ * Rien n'est choisi d'office : l'écran ouvre sur la barre de recherche. La
+ * qualification ne part au serveur qu'à « Enregistrer », en UNE tentative —
+ * c'est ce qui permet de revenir sur chaque réponse jusqu'au bout.
  */
 export function RepScript() {
   const queryClient = useQueryClient();
-  const live = useLive();
 
   const [choisi, setChoisi] = useState<ScriptedRepresentant | null>(null);
   const [search, setSearch] = useState('');
   const [confirme, setConfirme] = useState<string | null>(null);
   const cherche = useDebouncedValue(search).trim();
 
-  const queue = useQuery({
-    queryKey: repScriptKeys.queue,
-    queryFn: () => fetchRepScriptQueue(),
-    refetchInterval: live.refetchInterval,
-  });
-
+  // Aucune liste par défaut : l'annuaire tient des milliers de fiches, tout
+  // dérouler laisse croire à un total faux. Rien ne s'affiche tant qu'on n'a
+  // pas cherché.
   const annuaire = useQuery({
     queryKey: queryKeys.representants(annuaireFilters(cherche)),
     queryFn: () => fetchRepresentants(annuaireFilters(cherche)),
-    enabled: choisi === null,
+    enabled: choisi === null && cherche !== '',
     placeholderData: (previous) => previous,
   });
 
-  const aQualifier = useMemo(() => buildRepQueue(queue.data?.items ?? []), [queue.data]);
-  // Sans recherche, l'écran ouvre sur les représentants dont la relation n'est
-  // pas tranchée. Il ne choisit personne pour autant.
-  const liste = cherche === '' && aQualifier.length > 0 ? aQualifier : (annuaire.data?.items ?? []);
-  const listeParDefaut = cherche === '' && aQualifier.length > 0;
+  const liste = cherche === '' ? [] : (annuaire.data?.items ?? []);
 
   const ouvrir = useCallback((row: ScriptedRepresentant) => {
     setConfirme(null);
@@ -169,20 +161,6 @@ export function RepScript() {
   const revenir = useCallback(() => {
     setChoisi(null);
   }, []);
-
-  if (queue.isPending) return <Skeleton className="h-96 w-full" />;
-
-  if (queue.isError) {
-    return (
-      <QueryErrorState
-        error={queue.error}
-        fallback="L’annuaire n’a pas pu être lu."
-        onRetry={() => {
-          void queue.refetch();
-        }}
-      />
-    );
-  }
 
   if (choisi !== null) {
     return (
@@ -209,51 +187,54 @@ export function RepScript() {
 
       <ChampAnnuaire value={search} onChange={setSearch} />
 
-      <p className="text-[0.8125rem] text-muted-foreground">Choisissez qui vous venez d’appeler.</p>
+      <p className="text-[0.8125rem] text-muted-foreground">
+        Cherchez qui vous venez d’appeler par nom ou numéro.
+      </p>
 
-      {annuaire.isError && !listeParDefaut ? (
-        <QueryErrorState
-          error={annuaire.error}
-          fallback="L’annuaire n’a pas pu être lu."
-          onRetry={() => {
-            void annuaire.refetch();
-          }}
-        />
-      ) : annuaire.isPending && !listeParDefaut ? (
-        <div className="flex flex-col gap-2">
-          <Skeleton className="h-14" />
-          <Skeleton className="h-14" />
-          <Skeleton className="h-14" />
-        </div>
-      ) : liste.length === 0 ? (
-        <p className="text-[0.9375rem]">Aucun résultat. Vérifiez le nom ou le numéro.</p>
-      ) : (
-        <ol className="flex flex-col gap-2">
-          {liste.map((row) => (
-            <li key={row.id}>
-              <button
-                type="button"
-                onClick={() => {
-                  ouvrir(row);
-                }}
-                className={cn(
-                  'flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-md border border-border px-3 py-3 text-left',
-                  'hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-                )}
-              >
-                <span className="flex min-w-0 flex-col">
-                  <span className="truncate text-[0.9375rem] font-[600]">{row.fullName}</span>
-                  <span className="text-[0.8125rem] text-muted-foreground">
-                    <span className="tabular-nums">{formatPhone(row.phoneE164)}</span>
-                    {row.departementName === null ? '' : ` · ${row.departementName}`}
+      {cherche !== '' &&
+        (annuaire.isError ? (
+          <QueryErrorState
+            error={annuaire.error}
+            fallback="L’annuaire n’a pas pu être lu."
+            onRetry={() => {
+              void annuaire.refetch();
+            }}
+          />
+        ) : annuaire.isPending ? (
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-14" />
+            <Skeleton className="h-14" />
+            <Skeleton className="h-14" />
+          </div>
+        ) : liste.length === 0 ? (
+          <p className="text-[0.9375rem]">Aucun résultat. Vérifiez le nom ou le numéro.</p>
+        ) : (
+          <ol className="flex flex-col gap-2">
+            {liste.map((row) => (
+              <li key={row.id}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    ouvrir(row);
+                  }}
+                  className={cn(
+                    'flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-md border border-border px-3 py-3 text-left',
+                    'hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                  )}
+                >
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate text-[0.9375rem] font-[600]">{row.fullName}</span>
+                    <span className="text-[0.8125rem] text-muted-foreground">
+                      <span className="tabular-nums">{formatPhone(row.phoneE164)}</span>
+                      {row.departementName === null ? '' : ` · ${row.departementName}`}
+                    </span>
                   </span>
-                </span>
-                <RelationBadge status={row.relationStatus} />
-              </button>
-            </li>
-          ))}
-        </ol>
-      )}
+                  <RelationBadge status={row.relationStatus} />
+                </button>
+              </li>
+            ))}
+          </ol>
+        ))}
     </div>
   );
 }
@@ -761,9 +742,7 @@ function Qualification({
                 />
                 <Recap intitule="Déjà contacté" valeur={recapOuiNon(contacte)} />
                 <Recap intitule="Connaît l’UES" valeur={recapOuiNon(connaitUES)} />
-                {syndicatName === '' ? null : (
-                  <Recap intitule="Syndicat" valeur={syndicatName} />
-                )}
+                {syndicatName === '' ? null : <Recap intitule="Syndicat" valeur={syndicatName} />}
                 <Recap intitule="Représentant CPI CHUES" valeur={recapOuiNon(ambassadeur)} />
               </>
             ) : null}
