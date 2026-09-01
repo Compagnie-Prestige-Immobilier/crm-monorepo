@@ -47,6 +47,16 @@ abstract class _$RepresentantDtoCWProxy {
 
   RepresentantDto profession(String? profession);
 
+  RepresentantDto prenom(String? prenom);
+
+  RepresentantDto etablissement(String? etablissement);
+
+  RepresentantDto syndicat(String? syndicat);
+
+  RepresentantDto connaitUES(bool? connaitUES);
+
+  RepresentantDto contacte(bool? contacte);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `RepresentantDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -74,6 +84,11 @@ abstract class _$RepresentantDtoCWProxy {
     String? whatsappE164,
     String? whatsappNumber,
     String? profession,
+    String? prenom,
+    String? etablissement,
+    String? syndicat,
+    bool? connaitUES,
+    bool? contacte,
   });
 }
 
@@ -155,6 +170,22 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
       this(profession: profession);
 
   @override
+  RepresentantDto prenom(String? prenom) => this(prenom: prenom);
+
+  @override
+  RepresentantDto etablissement(String? etablissement) =>
+      this(etablissement: etablissement);
+
+  @override
+  RepresentantDto syndicat(String? syndicat) => this(syndicat: syndicat);
+
+  @override
+  RepresentantDto connaitUES(bool? connaitUES) => this(connaitUES: connaitUES);
+
+  @override
+  RepresentantDto contacte(bool? contacte) => this(contacte: contacte);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `RepresentantDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -182,6 +213,11 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
     Object? whatsappE164 = const $CopyWithPlaceholder(),
     Object? whatsappNumber = const $CopyWithPlaceholder(),
     Object? profession = const $CopyWithPlaceholder(),
+    Object? prenom = const $CopyWithPlaceholder(),
+    Object? etablissement = const $CopyWithPlaceholder(),
+    Object? syndicat = const $CopyWithPlaceholder(),
+    Object? connaitUES = const $CopyWithPlaceholder(),
+    Object? contacte = const $CopyWithPlaceholder(),
   }) {
     return RepresentantDto(
       id: id == const $CopyWithPlaceholder()
@@ -264,6 +300,26 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
           ? _value.profession
           // ignore: cast_nullable_to_non_nullable
           : profession as String?,
+      prenom: prenom == const $CopyWithPlaceholder()
+          ? _value.prenom
+          // ignore: cast_nullable_to_non_nullable
+          : prenom as String?,
+      etablissement: etablissement == const $CopyWithPlaceholder()
+          ? _value.etablissement
+          // ignore: cast_nullable_to_non_nullable
+          : etablissement as String?,
+      syndicat: syndicat == const $CopyWithPlaceholder()
+          ? _value.syndicat
+          // ignore: cast_nullable_to_non_nullable
+          : syndicat as String?,
+      connaitUES: connaitUES == const $CopyWithPlaceholder()
+          ? _value.connaitUES
+          // ignore: cast_nullable_to_non_nullable
+          : connaitUES as bool?,
+      contacte: contacte == const $CopyWithPlaceholder()
+          ? _value.contacte
+          // ignore: cast_nullable_to_non_nullable
+          : contacte as bool?,
     );
   }
 }
@@ -304,6 +360,11 @@ RepresentantDto _$RepresentantDtoFromJson(
       'whatsappE164',
       'whatsappNumber',
       'profession',
+      'prenom',
+      'etablissement',
+      'syndicat',
+      'connaitUES',
+      'contacte',
     ],
   );
   final val = RepresentantDto(
@@ -344,6 +405,11 @@ RepresentantDto _$RepresentantDtoFromJson(
     whatsappE164: $checkedConvert('whatsappE164', (v) => v as String?),
     whatsappNumber: $checkedConvert('whatsappNumber', (v) => v as String?),
     profession: $checkedConvert('profession', (v) => v as String?),
+    prenom: $checkedConvert('prenom', (v) => v as String?),
+    etablissement: $checkedConvert('etablissement', (v) => v as String?),
+    syndicat: $checkedConvert('syndicat', (v) => v as String?),
+    connaitUES: $checkedConvert('connaitUES', (v) => v as bool?),
+    contacte: $checkedConvert('contacte', (v) => v as bool?),
   );
   return val;
 });
@@ -370,6 +436,11 @@ Map<String, dynamic> _$RepresentantDtoToJson(RepresentantDto instance) =>
       'whatsappE164': instance.whatsappE164,
       'whatsappNumber': instance.whatsappNumber,
       'profession': instance.profession,
+      'prenom': instance.prenom,
+      'etablissement': instance.etablissement,
+      'syndicat': instance.syndicat,
+      'connaitUES': instance.connaitUES,
+      'contacte': instance.contacte,
     };
 
 const _$RepresentantRelationEnumMap = {

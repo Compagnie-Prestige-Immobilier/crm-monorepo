@@ -62,6 +62,11 @@ const FICHE = {
   whatsappE164: null,
   whatsappNumber: null,
   profession: null,
+  prenom: null,
+  etablissement: null,
+  syndicat: null,
+  connaitUES: null,
+  contacte: null,
 } as RepresentantRow;
 
 beforeEach(() => {

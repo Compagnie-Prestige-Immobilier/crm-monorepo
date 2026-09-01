@@ -89,6 +89,11 @@ export const CLEARABLE_FIELDS = [
   'profession',
   'prenom',
   'etablissement',
+  // Texte libre facultatif, comme `profession` et `etablissement` : un
+  // téléconseiller peut corriger vers vide. Les booléens `connaitUES`/`contacte`
+  // ne sont PAS clearables : `null` y dit « question non posée », un état que le
+  // client fixe en avant, jamais en effaçant (patron de `fonctionnaire`).
+  'syndicat',
   // Les trois liens d'un prospect sont NULLABLES depuis le Grand Public. Sans
   // eux ici, retirer une banque saisie par erreur disparaissait à l'envoi
   // (`includeIfNull: false` supprime le `null`) et le tirage suivant réécrivait
@@ -235,6 +240,34 @@ export class SyncEntityDataDto {
   @IsString()
   @MaxLength(160)
   etablissement?: string;
+
+  @ApiPropertyOptional({
+    maxLength: 200,
+    description:
+      'Représentant : niveau de syndicat déclaré pendant la qualification. Texte libre, distinct du référentiel Syndicat des prospects.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  syndicat?: string;
+
+  @ApiPropertyOptional({
+    type: Boolean,
+    description:
+      'Représentant : déclare connaître l’UES. Tri-état : absent laisse en place, la valeur n’est jamais remise à « non posée » depuis le client.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  connaitUES?: boolean;
+
+  @ApiPropertyOptional({
+    type: Boolean,
+    description:
+      'Représentant : déclare avoir déjà été contacté. Distinct de relationStatus, qui porte la décision ambassadeur/refus.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  contacte?: boolean;
 
   @ApiPropertyOptional({
     enum: Projet,

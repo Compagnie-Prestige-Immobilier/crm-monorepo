@@ -8,6 +8,7 @@ import '../../core/sync/outbox_status.dart';
 import '../../core/sync/phase2_directory_sync.dart';
 import '../../core/sync/sync_engine.dart';
 import '../../core/utils/ids.dart';
+import '../../core/utils/phone.dart';
 import '../../core/utils/whatsapp.dart';
 import '../local/database.dart';
 
@@ -873,11 +874,28 @@ class WriteRepository {
     String? suggestedPhone,
     String? suggestedName,
     String? suggestedNote,
+    bool? etablissementConfirme,
+    String? etablissementSaisi,
+    bool? contacte,
+    bool? connaitUES,
+    String? syndicat,
+    bool? numeroConfirme,
+    String? numeroSaisi,
     String? id,
   }) async {
     final String entityId = id ?? Ids.newId();
     final DateTime now = _clock.now();
     final String? normalizedComment = normalizeComment(comment);
+    final String? normalizedSyndicat = normalizeComment(syndicat);
+    // Nouvelle valeur retenue UNIQUEMENT sur un « non » : sur un « oui » la
+    // fiche est déjà juste, et recopier l'ancienne valeur donnerait deux
+    // vérités à tenir d'accord.
+    final String? nouvelEtablissement = etablissementConfirme == false
+        ? normalizeComment(etablissementSaisi)
+        : null;
+    final String? nouveauNumero = numeroConfirme == false
+        ? Phone.toE164(numeroSaisi ?? '') ?? normalizeComment(numeroSaisi)
+        : null;
     // Le serveur ne retient le nom et la note qu'avec un numéro : sans lui, la
     // suggestion ne désigne personne et l'envoi partirait avec des restes.
     final String? suggested = normalizeComment(suggestedPhone);
@@ -911,6 +929,21 @@ class WriteRepository {
           whatsappE164: whatsappStatus == null
               ? const Value<String?>.absent()
               : Value<String?>(whatsapp),
+          etablissement: nouvelEtablissement == null
+              ? const Value<String?>.absent()
+              : Value<String?>(nouvelEtablissement),
+          phoneE164: nouveauNumero == null
+              ? const Value<String>.absent()
+              : Value<String>(nouveauNumero),
+          syndicat: normalizedSyndicat == null
+              ? const Value<String?>.absent()
+              : Value<String?>(normalizedSyndicat),
+          connaitUes: connaitUES == null
+              ? const Value<bool?>.absent()
+              : Value<bool?>(connaitUES),
+          contacte: contacte == null
+              ? const Value<bool?>.absent()
+              : Value<bool?>(contacte),
           localUpdatedAt: Value<DateTime>(now),
         ),
       );
@@ -945,6 +978,16 @@ class WriteRepository {
           'suggestedPhone': ?suggested,
           'suggestedName': ?suggestedFullName,
           'suggestedNote': ?suggestedComment,
+          // Renseignements du script. Les clés portent le nom exact des champs
+          // de `CreateRepCallAttemptDto` : le `?` n'omet que le NUL, `false`
+          // reste une réponse, là où son absence se lirait « non posée ».
+          'etablissementConfirme': ?etablissementConfirme,
+          'etablissement': ?nouvelEtablissement,
+          'contacte': ?contacte,
+          'connaitUES': ?connaitUES,
+          'syndicat': ?normalizedSyndicat,
+          'numeroConfirme': ?numeroConfirme,
+          'phone': ?nouveauNumero,
           'clientCreatedAt': now.toUtc().toIso8601String(),
         },
         now: now,

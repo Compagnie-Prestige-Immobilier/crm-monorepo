@@ -3298,6 +3298,11 @@ export interface components {
       /** @description Numéro joignable sur WhatsApp, recomposé : `phoneE164` sur MEME_NUMERO, `whatsappE164` sur AUTRE_NUMERO, nul sinon. */
       whatsappNumber: string | null;
       profession: string | null;
+      prenom: string | null;
+      etablissement: string | null;
+      syndicat: string | null;
+      connaitUES: boolean | null;
+      contacte: boolean | null;
     };
     RepresentantListDto: {
       items: components['schemas']['RepresentantDto'][];
@@ -3357,6 +3362,10 @@ export interface components {
        */
       id?: string;
       fullName: string;
+      /** @description Prénom, quand il a été recueilli séparément du nom complet. */
+      prenom?: string;
+      /** @description Établissement où il exerce. Ni l’IEF ni le département. */
+      etablissement?: string;
       /**
        * @description Téléphone en saisie libre. Normalisé en E.164 par le serveur.
        * @example 77 123 45 67
@@ -3383,6 +3392,10 @@ export interface components {
        */
       id?: string;
       fullName?: string;
+      /** @description Prénom, quand il a été recueilli séparément du nom complet. */
+      prenom?: string;
+      /** @description Établissement où il exerce. Ni l’IEF ni le département. */
+      etablissement?: string;
       /**
        * @description Téléphone en saisie libre. Normalisé en E.164 par le serveur.
        * @example 77 123 45 67
@@ -3411,6 +3424,12 @@ export interface components {
       whatsappE164?: string;
       /** @description Profession, en texte libre. Chaîne vide : la valeur est effacée. */
       profession?: string;
+      /** @description Niveau de syndicat déclaré pendant la qualification. Texte libre, distinct du référentiel Syndicat des prospects. Chaîne vide : la valeur est effacée. */
+      syndicat?: string;
+      /** @description Le représentant déclare connaître l’UES. */
+      connaitUES?: boolean;
+      /** @description Le représentant déclare avoir déjà été contacté. Distinct de relationStatus, qui porte la décision ambassadeur/refus. */
+      contacte?: boolean;
     };
     /**
      * @description Le canal qui a écrit la bascule.
@@ -3868,6 +3887,12 @@ export interface components {
       relationReason?: string;
       /** @description Représentant : l’établissement où il exerce. Ni l’IEF ni le département. */
       etablissement?: string;
+      /** @description Représentant : niveau de syndicat déclaré pendant la qualification. Texte libre, distinct du référentiel Syndicat des prospects. */
+      syndicat?: string;
+      /** @description Représentant : déclare connaître l’UES. Tri-état : absent laisse en place, la valeur n’est jamais remise à « non posée » depuis le client. */
+      connaitUES?: boolean;
+      /** @description Représentant : déclare avoir déjà été contacté. Distinct de relationStatus, qui porte la décision ambassadeur/refus. */
+      contacte?: boolean;
       /** @description Prospect : le projet dont il relève. CHUES par défaut côté serveur. */
       projet?: components['schemas']['Projet'];
       /** @description Prospect hors CHUES : ce qu’il est. Jamais obligatoire. */
@@ -3974,7 +3999,7 @@ export interface components {
       /** @description Révision serveur sur laquelle le client s’est basé. Fournie sur update/delete, elle transforme une écriture aveugle en écriture conditionnelle. */
       baseRev?: number;
       data?: components['schemas']['SyncEntityDataDto'];
-      /** @description Champs que le client a explicitement VIDÉS. Un champ simplement absent de `data` reste inchangé ; un champ nommé ici est écrit à NULL. Valeurs acceptées : iefId, notes, whatsappE164, profession, prenom, etablissement, banqueId, syndicatId, representantId. */
+      /** @description Champs que le client a explicitement VIDÉS. Un champ simplement absent de `data` reste inchangé ; un champ nommé ici est écrit à NULL. Valeurs acceptées : iefId, notes, whatsappE164, profession, prenom, etablissement, syndicat, banqueId, syndicatId, representantId. */
       clearedFields?: string[];
     };
     SyncPushDto: {
@@ -4528,6 +4553,20 @@ export interface components {
       whatsappE164?: string;
       /** @description Profession, en texte libre. Chaîne vide : la valeur est effacée. */
       profession?: string;
+      /** @description Script de qualification : l’établissement en fiche est-il confirmé. Faux avec `etablissement` renseigné remplace l’établissement courant. */
+      etablissementConfirme?: boolean;
+      /** @description Nouvel établissement, quand `etablissementConfirme` vaut faux. */
+      etablissement?: string;
+      /** @description Script de qualification : le numéro en fiche est-il confirmé. Faux avec `phone` renseigné remplace le numéro courant, clé de déduplication comprise. */
+      numeroConfirme?: boolean;
+      /** @description Nouveau numéro du représentant, quand `numeroConfirme` vaut faux. Saisie libre, normalisé en E.164 par le serveur. */
+      phone?: string;
+      /** @description Script de qualification : le représentant déclare avoir déjà été contacté. */
+      contacte?: boolean;
+      /** @description Script de qualification : le représentant déclare connaître l’UES. */
+      connaitUES?: boolean;
+      /** @description Script de qualification : niveau de syndicat déclaré. Texte libre. */
+      syndicat?: string;
       /**
        * Format: date-time
        * @description Horodatage de l’appel sur le terrain, distinct de son arrivée en base.

@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsEnum,
   IsISO8601,
   IsInt,
@@ -131,6 +132,73 @@ export class CreateRepCallAttemptDto {
   @IsString()
   @MaxLength(PROFESSION_MAX_LENGTH)
   profession?: string;
+
+  @ApiPropertyOptional({
+    type: Boolean,
+    description:
+      'Script de qualification : l’établissement en fiche est-il confirmé. Faux avec `etablissement` renseigné remplace l’établissement courant.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  etablissementConfirme?: boolean;
+
+  @ApiPropertyOptional({
+    type: String,
+    maxLength: 200,
+    description: 'Nouvel établissement, quand `etablissementConfirme` vaut faux.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  etablissement?: string;
+
+  @ApiPropertyOptional({
+    type: Boolean,
+    description:
+      'Script de qualification : le numéro en fiche est-il confirmé. Faux avec `phone` renseigné remplace le numéro courant, clé de déduplication comprise.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  numeroConfirme?: boolean;
+
+  @ApiPropertyOptional({
+    type: String,
+    minLength: 6,
+    maxLength: 40,
+    description:
+      'Nouveau numéro du représentant, quand `numeroConfirme` vaut faux. Saisie libre, normalisé en E.164 par le serveur.',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(6)
+  @MaxLength(40)
+  phone?: string;
+
+  @ApiPropertyOptional({
+    type: Boolean,
+    description: 'Script de qualification : le représentant déclare avoir déjà été contacté.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  contacte?: boolean;
+
+  @ApiPropertyOptional({
+    type: Boolean,
+    description: 'Script de qualification : le représentant déclare connaître l’UES.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  connaitUES?: boolean;
+
+  @ApiPropertyOptional({
+    type: String,
+    maxLength: 200,
+    description: 'Script de qualification : niveau de syndicat déclaré. Texte libre.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  syndicat?: string;
 
   @ApiProperty({
     type: String,

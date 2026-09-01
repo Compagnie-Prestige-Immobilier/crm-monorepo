@@ -14,7 +14,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 21;
+  int get schemaVersion => 22;
 
   /// Les colonnes ajoutées à `call_attempts` par la v19. Déclarées ici parce
   /// que TROIS paliers recopient cette table : chacun engendre sa forme
@@ -237,6 +237,17 @@ class AppDatabase extends _$AppDatabase {
         await customStatement(
           'DELETE FROM sync_state WHERE collection = \'referentiels_mirror\'',
         );
+      }
+      if (from < 22 && to >= 22) {
+        // `representants` n'a jamais été recréée par un palier antérieur : les
+        // cinq colonnes du script s'ajoutent donc sans condition. Toutes
+        // nullables : une fiche déjà en base n'a jamais été qualifiée par ce
+        // script, et son absence de réponse ne doit rien affirmer.
+        await m.addColumn(representants, representants.prenom);
+        await m.addColumn(representants, representants.etablissement);
+        await m.addColumn(representants, representants.syndicat);
+        await m.addColumn(representants, representants.connaitUes);
+        await m.addColumn(representants, representants.contacte);
       }
     },
     beforeOpen: (OpeningDetails details) async {
