@@ -257,9 +257,10 @@ void main() {
             '`changes.representants` : la fiche est vivante, elle doit '
             'redevenir visible',
       );
-      expect(await ReferenceRepository(db).watchRepresentants().first, [
-        isNotNull,
-      ]);
+      final List<RepresentantSyncViewData> trouve = await ReferenceRepository(
+        db,
+      ).watchRepresentants(search: '+221770000001').first;
+      expect(trouve.map((RepresentantSyncViewData r) => r.id), <String>['rep-1']);
     });
 
     test('le prospect, lui, est bien rouvert par le même chemin', () async {

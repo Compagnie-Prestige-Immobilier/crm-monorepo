@@ -173,6 +173,9 @@ const _$DashboardSourceEnumMap = {
   DashboardSource.adhesions: 'adhesions',
   DashboardSource.resteAAppeler: 'reste-a-appeler',
   DashboardSource.parTeleconseiller: 'par-teleconseiller',
+  DashboardSource.couvertureDerniereCampagne: 'couverture-derniere-campagne',
+  DashboardSource.horsAttributionDerniereCampagne:
+      'hors-attribution-derniere-campagne',
   DashboardSource.encaisse: 'encaisse',
   DashboardSource.deLAppelALEncaissement: 'de-l-appel-a-l-encaissement',
   DashboardSource.methodesDAdhesion: 'methodes-d-adhesion',

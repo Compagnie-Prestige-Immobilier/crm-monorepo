@@ -32,6 +32,26 @@ const LOT = {
   callsSince: 128,
   fichesAppelees: 91,
   callsByTeleconseiller: { 'Awa Fixture': 80, 'Fatou Fixture': 48 },
+  performance: [
+    {
+      teleconseillerId: 'u-awa',
+      teleconseillerName: 'Awa Fixture',
+      assigned: 90,
+      treated: 72,
+      completionRate: 80,
+      assignedCalls: 80,
+      outsideAssignmentCalls: 3,
+    },
+    {
+      teleconseillerId: 'u-fatou',
+      teleconseillerName: 'Fatou Fixture',
+      assigned: 50,
+      treated: 19,
+      completionRate: 38,
+      assignedCalls: 21,
+      outsideAssignmentCalls: 0,
+    },
+  ],
   distribution: { fichesParJour: 50, jours: 2 },
   repartition: [
     {
@@ -92,6 +112,16 @@ describe('LotExportDetailView', () => {
       ),
     ).toBeTruthy();
     expect(screen.getByText('Awa Fixture : 80')).toBeTruthy();
+  });
+
+  it('sépare les fiches traitées des appels hors attribution', async () => {
+    renderWithQuery(<LotExportDetailView id="lot-1" />);
+
+    const tableau = await screen.findByRole('table', { name: 'Performance de la campagne' });
+    const awa = within(tableau).getByRole('row', { name: /Awa Fixture/ });
+    expect(within(awa).getByText('72 sur 90')).toBeTruthy();
+    expect(within(awa).getByText('80 %')).toBeTruthy();
+    expect(within(awa).getByText('3')).toBeTruthy();
   });
 
   it('passe le classeur par le téléchargement authentifié, et non par un lien nu', async () => {

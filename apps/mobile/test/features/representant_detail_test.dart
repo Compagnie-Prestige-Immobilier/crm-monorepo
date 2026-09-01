@@ -705,6 +705,12 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
     }
 
+    /// L'annuaire ne se déroule qu'à la recherche : rien avant qu'on tape.
+    Future<void> chercher(WidgetTester tester, String terme) async {
+      await tester.enterText(find.byType(EditableText).first, terme);
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+
     testWidgets('le tap emmène saisir un prospect, sans feuille de choix', (
       WidgetTester tester,
     ) async {
@@ -717,6 +723,7 @@ void main() {
         fullName: 'Ousmane Fall',
       );
       await mountPicker(tester);
+      await chercher(tester, 'Ousmane');
 
       await tester.tap(find.text('Ousmane Fall'));
       await tester.pump();
@@ -738,7 +745,9 @@ void main() {
         fullName: 'Ousmane Fall',
       );
       await mountPicker(tester);
+      await chercher(tester, 'Ousmane');
 
+      expect(find.text('Ousmane Fall'), findsOneWidget);
       expect(find.byKey(const Key('ouvrir-la-fiche')), findsNothing);
 
       await teardownTree(tester);
@@ -756,6 +765,7 @@ void main() {
         fullName: 'Ousmane Fall',
       );
       await mountPicker(tester);
+      await chercher(tester, 'Ousmane');
 
       await tester.longPress(find.text('Ousmane Fall'));
       await tester.pump();
@@ -782,6 +792,7 @@ void main() {
 
       expect(find.text('Qui avez-vous appelé ?'), findsOneWidget);
 
+      await chercher(tester, 'Ousmane');
       await tester.tap(find.text('Ousmane Fall'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));

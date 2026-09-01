@@ -104,8 +104,8 @@ export const PURGE_DOMAINS: readonly PurgeDomain[] = [
   },
   {
     key: 'lotsExport',
-    label: 'Lots d’export',
-    hint: 'Lots de fiches figés pour Excel et le terrain.',
+    label: 'Campagnes',
+    hint: 'Campagnes de fiches réparties pour le terrain.',
     steps: ['lotExportItems', 'lotsExport'],
     requires: [],
   },
@@ -163,14 +163,7 @@ export const PURGE_DOMAINS: readonly PurgeDomain[] = [
     label: 'Comptes téléconseillers',
     hint: 'Comptes et tout ce qu’ils ont saisi.',
     steps: ['commercialAccounts'],
-    requires: [
-      'dossiers',
-      'tentatives',
-      'fileAppels',
-      'lotsExport',
-      'prospects',
-      'representants',
-    ],
+    requires: ['dossiers', 'tentatives', 'fileAppels', 'lotsExport', 'prospects', 'representants'],
   },
   {
     key: 'finances',

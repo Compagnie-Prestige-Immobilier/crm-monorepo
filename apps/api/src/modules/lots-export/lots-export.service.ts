@@ -14,13 +14,14 @@ import { styleHeader } from '../export/import-template.workbook.js';
 import { toDakarCell } from '../export/dakar.js';
 import { lastAttemptsByProspect } from '../prospects/last-attempt.js';
 import { WorkspaceContext } from '../../workspaces/workspace.js';
-import { repartir } from './repartition.js';
+import { capaciteParJour, repartir, type MembreRepartition } from './repartition.js';
 import { programmeFilename, writeProgrammePdf, type ProgrammeData } from './programme-pdf.js';
 import {
   CreateLotExportDto,
   LotExportAttemptDto,
   LotExportDetailDto,
   LotExportListDto,
+  LotExportPerformanceDto,
   LotExportPreviewDto,
   LotExportQueryDto,
   LotExportRepartitionDto,
@@ -31,11 +32,12 @@ const ADMIN = { id: 'admin', role: Role.ADMIN } as const;
 const CHUNK = 5_000;
 const DETAIL_PAGE = 500;
 const DATE_FORMAT = 'dd/mm/yyyy hh:mm';
-const TELECONSEILLER_ROLES = [Role.COMMERCIAL, Role.SUPERVISEUR];
+const TELECONSEILLER_ROLES = [Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION];
 
 interface Teleconseiller {
   readonly id: string;
   readonly fullName: string;
+  readonly role: Role;
 }
 
 interface Distribution {
@@ -53,6 +55,15 @@ interface ItemRow {
   readonly assignee: { readonly fullName: string } | null;
 }
 
+interface PerformanceRow {
+  id: string;
+  name: string;
+  assigned: number;
+  treated: number;
+  assignedCalls: number;
+  outsideAssignmentCalls: number;
+}
+
 @Injectable()
 export class LotsExportService {
   constructor(
@@ -62,7 +73,8 @@ export class LotsExportService {
 
   async preview(body: CreateLotExportDto): Promise<LotExportPreviewDto> {
     const equipe = await this.equipe(body.distribution.teleconseillerIds);
-    const places = equipe.length * body.distribution.fichesParJour * body.distribution.jours;
+    const membres = capacites(equipe, body.distribution.fichesParJour);
+    const places = placesDe(membres, body.distribution.jours);
     const eligible =
       body.cible === LotExportCible.REPRESENTANTS
         ? await this.prisma.representant.count({
@@ -91,7 +103,8 @@ export class LotsExportService {
       });
     const equipe = await this.equipe(body.distribution.teleconseillerIds);
     const { fichesParJour, jours } = body.distribution;
-    const places = equipe.length * fichesParJour * jours;
+    const membres = capacites(equipe, fichesParJour);
+    const places = placesDe(membres, jours);
 
     const id = await this.prisma.$transaction(
       async (tx) => {
@@ -115,12 +128,7 @@ export class LotsExportService {
             message: 'Aucune fiche ne correspond à cette cible.',
           });
 
-        const affectations = repartir(
-          fiches.length,
-          equipe.map((membre) => membre.id),
-          fichesParJour,
-          jours,
-        );
+        const affectations = repartir(fiches.length, membres, jours);
         const lot = await tx.lotExport.create({
           data: {
             name: body.name.trim(),
@@ -172,6 +180,7 @@ export class LotsExportService {
     const where: Prisma.LotExportWhereInput = {
       ...(query.search ? { name: { contains: query.search.trim(), mode: 'insensitive' } } : {}),
       ...(query.cible ? { cible: query.cible } : {}),
+      ...(query.projet ? { projet: query.projet } : {}),
       ...(query.createdById ? { createdById: query.createdById } : {}),
       ...(query.dateFrom || query.dateTo
         ? {
@@ -204,7 +213,10 @@ export class LotsExportService {
       include: { createdBy: { select: { fullName: true } } },
     });
     if (!row)
-      throw new NotFoundException({ code: 'LOT_EXPORT_NOT_FOUND', message: 'Lot introuvable.' });
+      throw new NotFoundException({
+        code: 'LOT_EXPORT_NOT_FOUND',
+        message: 'Campagne introuvable.',
+      });
 
     const groupes = await this.prisma.lotExportItem.groupBy({
       by: ['assigneeId', 'day'],
@@ -252,6 +264,7 @@ export class LotsExportService {
       recentAttempts: await this.recentAttempts(row.id, row.cible, row.createdAt),
       distribution: { fichesParJour, jours },
       repartition,
+      performance: await this.performance(row.id, row.cible, row.createdAt),
     };
   }
 
@@ -262,7 +275,10 @@ export class LotsExportService {
       select: { cible: true, filters: true },
     });
     if (!lot)
-      throw new NotFoundException({ code: 'LOT_EXPORT_NOT_FOUND', message: 'Lot introuvable.' });
+      throw new NotFoundException({
+        code: 'LOT_EXPORT_NOT_FOUND',
+        message: 'Campagne introuvable.',
+      });
 
     const items = await this.prisma.lotExportItem.findMany({
       where: { lotId: id },
@@ -301,7 +317,7 @@ export class LotsExportService {
     if (!paires.length)
       throw new NotFoundException({
         code: 'LOT_EXPORT_PROGRAMME_INTROUVABLE',
-        message: 'Ce lot ne porte aucun programme.',
+        message: 'Cette campagne ne porte aucun programme.',
       });
 
     const zip = new JSZip();
@@ -324,14 +340,17 @@ export class LotsExportService {
       select: { name: true, cible: true, filters: true },
     });
     if (!lot)
-      throw new NotFoundException({ code: 'LOT_EXPORT_NOT_FOUND', message: 'Lot introuvable.' });
+      throw new NotFoundException({
+        code: 'LOT_EXPORT_NOT_FOUND',
+        message: 'Campagne introuvable.',
+      });
 
     const items = await this.prisma.lotExportItem.findMany({
       where: { lotId: id, assigneeId: teleconseillerId, day: jour },
       orderBy: { position: 'asc' },
       select: {
         assignee: { select: { fullName: true } },
-        representant: { select: { fullName: true, phoneE164: true } },
+        representant: { select: { fullName: true, etablissement: true, phoneE164: true } },
         prospect: { select: { nom: true, prenom: true, phoneE164: true } },
       },
     });
@@ -361,8 +380,10 @@ export class LotsExportService {
       generatedAt: new Date(),
       rows: items.map((item, index) => ({
         position: index + 1,
-        nom: item.representant?.fullName ?? item.prospect?.nom ?? '',
-        prenom: item.prospect?.prenom ?? '',
+        fullName:
+          item.representant?.fullName ??
+          [item.prospect?.nom, item.prospect?.prenom].filter(Boolean).join(' '),
+        etablissement: item.representant?.etablissement ?? '',
         phoneE164: item.representant?.phoneE164 ?? item.prospect?.phoneE164 ?? '',
       })),
     };
@@ -485,13 +506,13 @@ export class LotsExportService {
         deletedAt: null,
         role: { in: TELECONSEILLER_ROLES },
       },
-      select: { id: true, fullName: true },
+      select: { id: true, fullName: true, role: true },
     });
     if (uniques.size !== ids.length || rows.length !== uniques.size)
       throw new UnprocessableEntityException({
         code: 'LOT_EXPORT_TELECONSEILLER_INVALIDE',
         message:
-          'Chaque téléconseiller doit être un compte actif, distinct, commercial ou superviseur.',
+          'Chaque téléconseiller doit être un compte actif et distinct de téléconseil, supervision ou direction.',
       });
     const byId = new Map(rows.map((row) => [row.id, row]));
     return ids.map((id) => {
@@ -509,7 +530,10 @@ export class LotsExportService {
         include: { createdBy: { select: { fullName: true } } },
       }));
     if (!lot)
-      throw new NotFoundException({ code: 'LOT_EXPORT_NOT_FOUND', message: 'Lot introuvable.' });
+      throw new NotFoundException({
+        code: 'LOT_EXPORT_NOT_FOUND',
+        message: 'Campagne introuvable.',
+      });
     const stats = await this.stats(lot.id, lot.cible, lot.createdAt);
     return {
       id: lot.id,
@@ -621,6 +645,87 @@ export class LotsExportService {
     return Object.fromEntries(rows.map((row) => [row.name, row.calls]));
   }
 
+  private async performance(
+    id: string,
+    cible: LotExportCible,
+    createdAt: Date,
+  ): Promise<LotExportPerformanceDto[]> {
+    const tentatives =
+      cible === LotExportCible.REPRESENTANTS
+        ? Prisma.sql`SELECT "representantId" AS "targetId", "performedById", "clientCreatedAt" FROM "rep_call_attempts"`
+        : Prisma.sql`SELECT "prospectId" AS "targetId", "performedById", "clientCreatedAt" FROM "call_attempts"`;
+    const target =
+      cible === LotExportCible.REPRESENTANTS
+        ? Prisma.sql`i."representantId"`
+        : Prisma.sql`i."prospectId"`;
+
+    const rows = await this.prisma.$queryRaw<PerformanceRow[]>`
+      WITH tentatives AS (${tentatives}),
+      membres AS (
+        SELECT
+          i."assigneeId" AS id,
+          u."fullName" AS name,
+          COUNT(*)::int AS assigned
+        FROM "lot_export_items" i
+        INNER JOIN "users" u ON u.id = i."assigneeId"
+        WHERE i."lotId" = ${id} AND i."assigneeId" IS NOT NULL
+        GROUP BY i."assigneeId", u."fullName"
+      ),
+      conformes AS (
+        SELECT
+          i."assigneeId" AS id,
+          COUNT(a."targetId")::int AS "assignedCalls",
+          COUNT(DISTINCT i.position)::int AS treated
+        FROM "lot_export_items" i
+        INNER JOIN tentatives a
+          ON a."targetId" = ${target}
+          AND a."performedById" = i."assigneeId"
+          AND a."clientCreatedAt" >= ${createdAt}
+        WHERE i."lotId" = ${id} AND i."assigneeId" IS NOT NULL
+        GROUP BY i."assigneeId"
+      ),
+      hors_attribution AS (
+        SELECT
+          a."performedById" AS id,
+          COUNT(*)::int AS "outsideAssignmentCalls"
+        FROM "lot_export_items" i
+        INNER JOIN tentatives a
+          ON a."targetId" = ${target}
+          AND a."performedById" <> i."assigneeId"
+          AND a."clientCreatedAt" >= ${createdAt}
+        WHERE i."lotId" = ${id}
+          AND a."performedById" IN (
+            SELECT own."assigneeId"
+            FROM "lot_export_items" own
+            WHERE own."lotId" = ${id} AND own."assigneeId" IS NOT NULL
+          )
+        GROUP BY a."performedById"
+      )
+      SELECT
+        m.id,
+        m.name,
+        m.assigned,
+        COALESCE(c.treated, 0)::int AS treated,
+        COALESCE(c."assignedCalls", 0)::int AS "assignedCalls",
+        COALESCE(h."outsideAssignmentCalls", 0)::int AS "outsideAssignmentCalls"
+      FROM membres m
+      LEFT JOIN conformes c ON c.id = m.id
+      LEFT JOIN hors_attribution h ON h.id = m.id
+      ORDER BY m.name ASC
+    `;
+
+    return rows.map((row) => ({
+      teleconseillerId: row.id,
+      teleconseillerName: row.name,
+      assigned: row.assigned,
+      treated: row.treated,
+      completionRate:
+        row.assigned === 0 ? 0 : Math.round((row.treated / row.assigned) * 1_000) / 10,
+      assignedCalls: row.assignedCalls,
+      outsideAssignmentCalls: row.outsideAssignmentCalls,
+    }));
+  }
+
   private representantWhere(query?: RepresentantExportQueryDto): Prisma.RepresentantWhereInput {
     const value = query ?? {};
     const where: Prisma.RepresentantWhereInput = { deletedAt: null };
@@ -637,6 +742,17 @@ export class LotsExportService {
     if (value.whatsappStatus) where.whatsappStatus = value.whatsappStatus;
     return where;
   }
+}
+
+function placesDe(membres: readonly MembreRepartition[], jours: number): number {
+  return membres.reduce((total, membre) => total + membre.fichesParJour, 0) * jours;
+}
+
+function capacites(equipe: readonly Teleconseiller[], fichesParJour: number) {
+  return equipe.map((membre) => ({
+    assigneeId: membre.id,
+    fichesParJour: capaciteParJour(membre.role, fichesParJour),
+  }));
 }
 
 const REPARTITION_COLUMNS = [

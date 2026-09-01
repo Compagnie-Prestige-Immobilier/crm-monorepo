@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 
 import { copyPhone } from '@/components/console/console-ui';
 import { useShortcuts } from '@/components/console/use-shortcuts';
-import { useLive } from '@/components/live/use-live';
+import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { QueryErrorState } from '@/components/query-error-state';
 import { RelationBadge } from '@/components/representants/relation-badge';
 import { RepresentantFormDialog } from '@/components/representants/representant-form-dialog';
@@ -25,16 +25,15 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import {
   buildRepAttempt,
-  buildRepQueue,
   callbackHalfHours,
   callbackSlots,
-  fetchRepScriptQueue,
   formatCallbackAt,
   pushRepCallAttempt,
   repRelationSettled,
   repScriptKeys,
   type RepAnswer,
 } from '@/lib/data/console';
+import { fetchReferenceData } from '@/lib/data/reference';
 import { fetchRepresentants, type ScriptedRepresentant } from '@/lib/data/representants';
 import { formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
@@ -82,8 +81,6 @@ interface JoignableState {
   contacte: boolean | null;
   connaitUES: boolean | null;
   ambassadeur: boolean | null;
-  numeroConfirme: boolean | null;
-  nouveauNumero: string;
   memeWhatsapp: boolean | null;
   whatsapp: string;
 }
@@ -98,10 +95,6 @@ function manqueJoignable(s: JoignableState): string | null {
   if (s.connaitUES === null) return 'Dites s’il connaît l’UES';
   if (s.ambassadeur === null) return 'Dites s’il est représentant CPI CHUES';
   if (s.ambassadeur !== true) return null;
-  if (s.numeroConfirme === null) return 'Dites si le numéro est confirmé';
-  if (s.numeroConfirme === false && digitsOf(s.nouveauNumero) < 9) {
-    return 'Écrivez le nouveau numéro';
-  }
   if (s.memeWhatsapp === null) return 'Dites s’il a WhatsApp sur ce numéro';
   if (s.memeWhatsapp === false && digitsOf(s.whatsapp) < 9) return 'Écrivez le numéro WhatsApp';
   return null;
@@ -111,15 +104,9 @@ function manqueJoignable(s: JoignableState): string | null {
 function etablissementAnswer(confirme: boolean | null, nouvel: string): Partial<RepAnswer> {
   if (confirme === null) return {};
   const nom = nouvel.trim();
-  return { etablissementConfirme: confirme, ...(confirme === false && nom !== '' ? { etablissement: nom } : {}) };
-}
-
-/** Confirmation du numéro, et le nouveau numéro seulement s'il est infirmé et lisible. */
-function numeroAnswer(confirme: boolean | null, nouveau: string): Partial<RepAnswer> {
-  if (confirme === null) return {};
   return {
-    numeroConfirme: confirme,
-    ...(confirme === false && digitsOf(nouveau) >= 9 ? { phone: nouveau.trim() } : {}),
+    etablissementConfirme: confirme,
+    ...(confirme === false && nom !== '' ? { etablissement: nom } : {}),
   };
 }
 
@@ -142,37 +129,29 @@ const annuaireFilters = (search: string): RepresentantFilters => ({
  * Étape 1 : qualifier un représentant, dans l'ordre et les mots de
  * l'application mobile.
  *
- * Rien n'est choisi d'office : l'écran ouvre sur la liste. La qualification ne
- * part au serveur qu'à « Enregistrer », en UNE tentative — c'est ce qui permet
- * de revenir sur chaque réponse jusqu'au bout.
+ * Rien n'est choisi d'office : l'écran ouvre sur la barre de recherche. La
+ * qualification ne part au serveur qu'à « Enregistrer », en UNE tentative —
+ * c'est ce qui permet de revenir sur chaque réponse jusqu'au bout.
  */
 export function RepScript() {
   const queryClient = useQueryClient();
-  const live = useLive();
 
   const [choisi, setChoisi] = useState<ScriptedRepresentant | null>(null);
   const [search, setSearch] = useState('');
   const [confirme, setConfirme] = useState<string | null>(null);
   const cherche = useDebouncedValue(search).trim();
 
-  const queue = useQuery({
-    queryKey: repScriptKeys.queue,
-    queryFn: () => fetchRepScriptQueue(),
-    refetchInterval: live.refetchInterval,
-  });
-
+  // Aucune liste par défaut : l'annuaire tient des milliers de fiches, tout
+  // dérouler laisse croire à un total faux. Rien ne s'affiche tant qu'on n'a
+  // pas cherché.
   const annuaire = useQuery({
     queryKey: queryKeys.representants(annuaireFilters(cherche)),
     queryFn: () => fetchRepresentants(annuaireFilters(cherche)),
-    enabled: choisi === null,
+    enabled: choisi === null && cherche !== '',
     placeholderData: (previous) => previous,
   });
 
-  const aQualifier = useMemo(() => buildRepQueue(queue.data?.items ?? []), [queue.data]);
-  // Sans recherche, l'écran ouvre sur les représentants dont la relation n'est
-  // pas tranchée. Il ne choisit personne pour autant.
-  const liste = cherche === '' && aQualifier.length > 0 ? aQualifier : (annuaire.data?.items ?? []);
-  const listeParDefaut = cherche === '' && aQualifier.length > 0;
+  const liste = cherche === '' ? [] : (annuaire.data?.items ?? []);
 
   const ouvrir = useCallback((row: ScriptedRepresentant) => {
     setConfirme(null);
@@ -182,20 +161,6 @@ export function RepScript() {
   const revenir = useCallback(() => {
     setChoisi(null);
   }, []);
-
-  if (queue.isPending) return <Skeleton className="h-96 w-full" />;
-
-  if (queue.isError) {
-    return (
-      <QueryErrorState
-        error={queue.error}
-        fallback="L’annuaire n’a pas pu être lu."
-        onRetry={() => {
-          void queue.refetch();
-        }}
-      />
-    );
-  }
 
   if (choisi !== null) {
     return (
@@ -222,51 +187,54 @@ export function RepScript() {
 
       <ChampAnnuaire value={search} onChange={setSearch} />
 
-      <p className="text-[0.8125rem] text-muted-foreground">Choisissez qui vous venez d’appeler.</p>
+      <p className="text-[0.8125rem] text-muted-foreground">
+        Cherchez qui vous venez d’appeler par nom ou numéro.
+      </p>
 
-      {annuaire.isError && !listeParDefaut ? (
-        <QueryErrorState
-          error={annuaire.error}
-          fallback="L’annuaire n’a pas pu être lu."
-          onRetry={() => {
-            void annuaire.refetch();
-          }}
-        />
-      ) : annuaire.isPending && !listeParDefaut ? (
-        <div className="flex flex-col gap-2">
-          <Skeleton className="h-14" />
-          <Skeleton className="h-14" />
-          <Skeleton className="h-14" />
-        </div>
-      ) : liste.length === 0 ? (
-        <p className="text-[0.9375rem]">Aucun résultat. Vérifiez le nom ou le numéro.</p>
-      ) : (
-        <ol className="flex flex-col gap-2">
-          {liste.map((row) => (
-            <li key={row.id}>
-              <button
-                type="button"
-                onClick={() => {
-                  ouvrir(row);
-                }}
-                className={cn(
-                  'flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-md border border-border px-3 py-3 text-left',
-                  'hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-                )}
-              >
-                <span className="flex min-w-0 flex-col">
-                  <span className="truncate text-[0.9375rem] font-[600]">{row.fullName}</span>
-                  <span className="text-[0.8125rem] text-muted-foreground">
-                    <span className="tabular-nums">{formatPhone(row.phoneE164)}</span>
-                    {row.departementName === null ? '' : ` · ${row.departementName}`}
+      {cherche !== '' &&
+        (annuaire.isError ? (
+          <QueryErrorState
+            error={annuaire.error}
+            fallback="L’annuaire n’a pas pu être lu."
+            onRetry={() => {
+              void annuaire.refetch();
+            }}
+          />
+        ) : annuaire.isPending ? (
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-14" />
+            <Skeleton className="h-14" />
+            <Skeleton className="h-14" />
+          </div>
+        ) : liste.length === 0 ? (
+          <p className="text-[0.9375rem]">Aucun résultat. Vérifiez le nom ou le numéro.</p>
+        ) : (
+          <ol className="flex flex-col gap-2">
+            {liste.map((row) => (
+              <li key={row.id}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    ouvrir(row);
+                  }}
+                  className={cn(
+                    'flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-md border border-border px-3 py-3 text-left',
+                    'hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                  )}
+                >
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate text-[0.9375rem] font-[600]">{row.fullName}</span>
+                    <span className="text-[0.8125rem] text-muted-foreground">
+                      <span className="tabular-nums">{formatPhone(row.phoneE164)}</span>
+                      {row.departementName === null ? '' : ` · ${row.departementName}`}
+                    </span>
                   </span>
-                </span>
-                <RelationBadge status={row.relationStatus} />
-              </button>
-            </li>
-          ))}
-        </ol>
-      )}
+                  <RelationBadge status={row.relationStatus} />
+                </button>
+              </li>
+            ))}
+          </ol>
+        ))}
     </div>
   );
 }
@@ -319,10 +287,8 @@ function Qualification({
   const [nouvelEtablissement, setNouvelEtablissement] = useState('');
   const [contacte, setContacte] = useState<boolean | null>(null);
   const [connaitUES, setConnaitUES] = useState<boolean | null>(null);
-  const [syndicat, setSyndicat] = useState('');
+  const [syndicatId, setSyndicatId] = useState<string | null>(null);
   const [ambassadeur, setAmbassadeur] = useState<boolean | null>(null);
-  const [numeroConfirme, setNumeroConfirme] = useState<boolean | null>(null);
-  const [nouveauNumero, setNouveauNumero] = useState('');
   const [memeWhatsapp, setMemeWhatsapp] = useState<boolean | null>(null);
   const [whatsapp, setWhatsapp] = useState('');
   const [rappelAt, setRappelAt] = useState<string | null>(null);
@@ -337,6 +303,17 @@ function Qualification({
   const [avertiTranchee, setAvertiTranchee] = useState(repRelationSettled(representant));
 
   const now = useMemo(() => Date.now(), []);
+
+  const reference = useQuery({
+    queryKey: queryKeys.reference,
+    queryFn: () => fetchReferenceData(),
+    staleTime: 5 * 60_000,
+  });
+  const syndicatOptions = (reference.data?.syndicats ?? [])
+    .filter((syndicat) => syndicat.isActive)
+    .map((syndicat) => ({ value: syndicat.id, label: syndicat.name, hint: syndicat.sigle }));
+  const syndicatName =
+    reference.data?.syndicats.find((syndicat) => syndicat.id === syndicatId)?.name ?? '';
 
   const send = useMutation({
     mutationFn: (answer: RepAnswer) => pushRepCallAttempt(buildRepAttempt(representant.id, answer)),
@@ -364,8 +341,6 @@ function Qualification({
         contacte,
         connaitUES,
         ambassadeur,
-        numeroConfirme,
-        nouveauNumero,
         memeWhatsapp,
         whatsapp,
       });
@@ -399,8 +374,7 @@ function Qualification({
       ...(joignable ? etablissementAnswer(etablissementConfirme, nouvelEtablissement) : {}),
       ...(joignable && contacte !== null ? { contacte } : {}),
       ...(joignable && connaitUES !== null ? { connaitUES } : {}),
-      ...(joignable && syndicat.trim() !== '' ? { syndicat: syndicat.trim() } : {}),
-      ...(chuesOui ? numeroAnswer(numeroConfirme, nouveauNumero) : {}),
+      ...(joignable && syndicatName !== '' ? { syndicat: syndicatName } : {}),
       ...(chuesOui
         ? {
             whatsappStatus:
@@ -536,7 +510,6 @@ function Qualification({
                   setContacte(null);
                   setConnaitUES(null);
                   setAmbassadeur(null);
-                  setNumeroConfirme(null);
                   setMemeWhatsapp(null);
                 }
                 if (valeur !== 'RAPPEL') setRappelAt(null);
@@ -603,21 +576,15 @@ function Qualification({
           ) : null}
 
           {joignable ? (
-            <Question titre="Niveau de syndicat ? (facultatif)" anime>
-              <div className="flex max-w-80 flex-col gap-1.5">
-                <label htmlFor="rep-syndicat" className="sr-only">
-                  Niveau de syndicat
-                </label>
-                <Input
-                  id="rep-syndicat"
-                  autoComplete="off"
-                  maxLength={160}
-                  value={syndicat}
-                  onChange={(event) => {
-                    setSyndicat(event.target.value);
-                  }}
-                />
-              </div>
+            <Question titre="Sur quel syndicat ? (facultatif)" anime>
+              <FilterCombobox
+                className="max-w-80"
+                label="Syndicat (facultatif)"
+                placeholder="Choisir un syndicat"
+                value={syndicatId}
+                options={syndicatOptions}
+                onChange={setSyndicatId}
+              />
             </Question>
           ) : null}
 
@@ -631,45 +598,9 @@ function Qualification({
                 value={ambassadeur}
                 onChange={(valeur) => {
                   setAmbassadeur(valeur);
-                  if (!valeur) {
-                    setNumeroConfirme(null);
-                    setMemeWhatsapp(null);
-                  }
+                  if (!valeur) setMemeWhatsapp(null);
                 }}
               />
-            </Question>
-          ) : null}
-
-          {joignable && ambassadeur === true ? (
-            <Question titre="Son numéro est-il confirmé ?" anime>
-              <Choix
-                options={[
-                  { valeur: true, label: 'Oui' },
-                  { valeur: false, label: 'Non' },
-                ]}
-                value={numeroConfirme}
-                onChange={(valeur) => {
-                  setNumeroConfirme(valeur);
-                  if (valeur) setNouveauNumero('');
-                }}
-              />
-              {numeroConfirme === false ? (
-                <div className={cn('flex max-w-80 flex-col gap-1.5', REVELE)}>
-                  <label htmlFor="rep-nouveau-numero" className="text-[0.875rem] font-[600]">
-                    Nouveau numéro
-                  </label>
-                  <Input
-                    id="rep-nouveau-numero"
-                    inputMode="tel"
-                    autoComplete="off"
-                    placeholder="77 123 45 67"
-                    value={nouveauNumero}
-                    onChange={(event) => {
-                      setNouveauNumero(event.target.value);
-                    }}
-                  />
-                </div>
-              ) : null}
             </Question>
           ) : null}
 
@@ -759,6 +690,26 @@ function Qualification({
             </Question>
           ) : null}
 
+          {resultat === null ? null : (
+            <Question titre="Quelque chose à ajouter ? (facultatif)" anime>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="rep-commentaire" className="text-[0.875rem] font-[600]">
+                  Commentaire
+                </label>
+                <Textarea
+                  id="rep-commentaire"
+                  rows={3}
+                  maxLength={2000}
+                  placeholder="En une phrase"
+                  value={commentaire}
+                  onChange={(event) => {
+                    setCommentaire(event.target.value);
+                  }}
+                />
+              </div>
+            </Question>
+          )}
+
           <div className="flex flex-col gap-1.5">
             <Button
               className="self-start"
@@ -776,24 +727,6 @@ function Qualification({
         </div>
       ) : (
         <div className="flex flex-col gap-5">
-          <Question titre="Quelque chose à ajouter ?">
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="rep-commentaire" className="text-[0.875rem] font-[600]">
-                Commentaire
-              </label>
-              <Textarea
-                id="rep-commentaire"
-                rows={3}
-                maxLength={2000}
-                placeholder="En une phrase"
-                value={commentaire}
-                onChange={(event) => {
-                  setCommentaire(event.target.value);
-                }}
-              />
-            </div>
-          </Question>
-
           <dl className="flex flex-col gap-1 rounded-lg border border-border bg-card px-4 py-3 text-[0.875rem]">
             <Recap intitule="Personne appelée" valeur={representant.fullName} />
             <Recap intitule="Téléphone" valeur={formatPhone(representant.phoneE164)} />
@@ -809,13 +742,8 @@ function Qualification({
                 />
                 <Recap intitule="Déjà contacté" valeur={recapOuiNon(contacte)} />
                 <Recap intitule="Connaît l’UES" valeur={recapOuiNon(connaitUES)} />
-                {syndicat.trim() === '' ? null : (
-                  <Recap intitule="Niveau de syndicat" valeur={syndicat.trim()} />
-                )}
+                {syndicatName === '' ? null : <Recap intitule="Syndicat" valeur={syndicatName} />}
                 <Recap intitule="Représentant CPI CHUES" valeur={recapOuiNon(ambassadeur)} />
-                {ambassadeur === true && numeroConfirme === false && digitsOf(nouveauNumero) >= 9 ? (
-                  <Recap intitule="Nouveau numéro" valeur={nouveauNumero.trim()} />
-                ) : null}
               </>
             ) : null}
             {rappelAt === null ? null : (
@@ -827,6 +755,9 @@ function Qualification({
                 valeur={[sugPhone.trim(), sugName.trim()].filter(Boolean).join(' · ')}
               />
             ) : null}
+            {commentaire.trim() === '' ? null : (
+              <Recap intitule="Commentaire" valeur={commentaire.trim()} />
+            )}
           </dl>
 
           {/* Un seul retour à l'écran, en tête : deux boutons du même nom

@@ -52,7 +52,7 @@ export class LotsExportController {
   ) {}
   @Post()
   @Roles(Role.ADMIN)
-  @ApiOperation({ operationId: 'createLotExport', summary: 'Crée un lot de fiches exportées.' })
+  @ApiOperation({ operationId: 'createLotExport', summary: 'Crée une campagne de fiches.' })
   @ApiResponse({ status: 201, type: LotExportSummaryDto })
   create(
     @CurrentUser() user: AuthenticatedUser,
@@ -73,7 +73,7 @@ export class LotsExportController {
   }
   @Get()
   @Roles(Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
-  @ApiOperation({ operationId: 'listLotsExport', summary: 'Liste les lots d’export.' })
+  @ApiOperation({ operationId: 'listLotsExport', summary: 'Liste les campagnes.' })
   @ApiResponse({ status: 200, type: LotExportListDto })
   list(@Query() query: LotExportQueryDto): Promise<LotExportListDto> {
     return this.lots.list(query);
@@ -83,7 +83,7 @@ export class LotsExportController {
   @ApiProduces(XLSX_MIME)
   @ApiOperation({
     operationId: 'downloadLotExportXlsx',
-    summary: 'Télécharge le classeur figé du lot.',
+    summary: 'Télécharge le classeur figé de la campagne.',
   })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({
@@ -93,7 +93,7 @@ export class LotsExportController {
   async xlsx(@Param('id', ParseUUIDPipe) id: string, @Res() reply: FastifyReply): Promise<void> {
     reply.hijack();
     reply.raw.setHeader('Content-Type', XLSX_MIME);
-    reply.raw.setHeader('Content-Disposition', `attachment; filename="lot-${id}.xlsx"`);
+    reply.raw.setHeader('Content-Disposition', `attachment; filename="campagne-${id}.xlsx"`);
     reply.raw.setHeader('Cache-Control', 'no-store');
     setDemoHeader(reply.raw, this.workspace.current() === 'demo');
     await this.lots.writeXlsx(id, reply.raw);
@@ -129,7 +129,7 @@ export class LotsExportController {
   @ApiProduces('application/zip')
   @ApiOperation({
     operationId: 'downloadLotExportProgrammesZip',
-    summary: 'Télécharge tous les programmes du lot.',
+    summary: 'Télécharge tous les programmes de la campagne.',
   })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({
@@ -143,7 +143,10 @@ export class LotsExportController {
     const archive = await this.lots.programmesZip(id);
     reply.hijack();
     reply.raw.setHeader('Content-Type', 'application/zip');
-    reply.raw.setHeader('Content-Disposition', `attachment; filename="lot-${id}-programmes.zip"`);
+    reply.raw.setHeader(
+      'Content-Disposition',
+      `attachment; filename="campagne-${id}-programmes.zip"`,
+    );
     reply.raw.setHeader('Content-Length', archive.byteLength);
     reply.raw.setHeader('Cache-Control', 'no-store');
     reply.raw.end(archive);
@@ -152,7 +155,7 @@ export class LotsExportController {
   @Roles(Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiOperation({
     operationId: 'getLotExport',
-    summary: 'Consulte un lot et les appels qui ont suivi.',
+    summary: 'Consulte une campagne et les appels qui ont suivi.',
   })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, type: LotExportDetailDto })

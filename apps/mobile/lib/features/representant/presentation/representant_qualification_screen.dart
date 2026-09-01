@@ -15,6 +15,7 @@ import '../../../ui/widgets/cpi_choice_group.dart';
 import '../../../ui/widgets/cpi_kit.dart';
 import '../../../ui/widgets/cpi_pressable.dart';
 import '../../../ui/widgets/cpi_steps.dart';
+import '../../../ui/widgets/local_typeahead.dart';
 import '../../../ui/widgets/phone_field.dart';
 import '../../permissions/alarme_permission.dart';
 import '../../phase2/presentation/callback_picker.dart';
@@ -42,14 +43,14 @@ class _RepresentantQualificationScreenState
   final TextEditingController suggestionNom = TextEditingController();
   final TextEditingController suggestionNote = TextEditingController();
   final TextEditingController nouvelEtablissement = TextEditingController();
-  final TextEditingController niveauSyndicat = TextEditingController();
-  final TextEditingController nouveauNumero = TextEditingController();
+  final TextEditingController syndicatNom = TextEditingController();
+  final FocusNode syndicatFocus = FocusNode();
   _Resultat? resultat;
   bool? etablissementConfirme;
   bool? aEteContacte;
   bool? connaitUES;
+  String? syndicatId;
   bool? ambassadeur;
-  bool? numeroConfirme;
   bool? memeNumeroWhatsapp;
   DateTime? rappelAt;
   bool saving = false;
@@ -74,8 +75,8 @@ class _RepresentantQualificationScreenState
     suggestionNom.dispose();
     suggestionNote.dispose();
     nouvelEtablissement.dispose();
-    niveauSyndicat.dispose();
-    nouveauNumero.dispose();
+    syndicatNom.dispose();
+    syndicatFocus.dispose();
     super.dispose();
   }
 
@@ -118,13 +119,6 @@ class _RepresentantQualificationScreenState
     if (ambassadeur == null) return 'Dites s\'il est ambassadeur';
 
     if (ambassadeur == true) {
-      if (numeroConfirme == null) return 'Confirmez le numéro';
-      if (numeroConfirme == false &&
-          Phone.parse(nouveauNumero.text) is! PhoneValid) {
-        return nouveauNumero.text.trim().isEmpty
-            ? 'Écrivez le nouveau numéro'
-            : 'Nouveau numéro incomplet';
-      }
       if (memeNumeroWhatsapp == null) {
         return 'Dites s\'il a WhatsApp sur ce numéro';
       }
@@ -174,14 +168,9 @@ class _RepresentantQualificationScreenState
         CpiRecapLine('Nouvel établissement', nouvelEtablissement.text.trim()),
       CpiRecapLine('A été contacté', _ouiNon(aEteContacte)),
       CpiRecapLine('Connaît l\'UES', _ouiNon(connaitUES)),
-      if (niveauSyndicat.text.trim().isNotEmpty)
-        CpiRecapLine('Niveau de syndicat', niveauSyndicat.text.trim()),
+      if (syndicatNom.text.trim().isNotEmpty)
+        CpiRecapLine('Syndicat', syndicatNom.text.trim()),
       CpiRecapLine('Ambassadeur', _ouiNon(ambassadeur)),
-      if (ambassadeur == true && numeroConfirme == false)
-        CpiRecapLine(
-          'Nouveau numéro',
-          Phone.format(Phone.toE164(nouveauNumero.text) ?? ''),
-        ),
     ],
     if (proposeQuelquUn && suggestionCommencee)
       CpiRecapLine(
@@ -191,14 +180,15 @@ class _RepresentantQualificationScreenState
           suggestionNom.text.trim(),
         ].where((String s) => s.isNotEmpty).join(' · '),
       ),
+    if (commentaire.text.trim().isNotEmpty)
+      CpiRecapLine('Commentaire', commentaire.text.trim()),
   ];
 
   bool get aSaisi =>
       resultat != null ||
       commentaire.text.trim().isNotEmpty ||
       nouvelEtablissement.text.trim().isNotEmpty ||
-      niveauSyndicat.text.trim().isNotEmpty ||
-      nouveauNumero.text.trim().isNotEmpty ||
+      syndicatNom.text.trim().isNotEmpty ||
       suggestionCommencee;
 
   Future<void> quitter() async {
@@ -308,9 +298,7 @@ class _RepresentantQualificationScreenState
             etablissementSaisi: joignable ? nouvelEtablissement.text : null,
             contacte: joignable ? aEteContacte : null,
             connaitUES: joignable ? connaitUES : null,
-            syndicat: joignable ? niveauSyndicat.text : null,
-            numeroConfirme: ambassadeurOui ? numeroConfirme : null,
-            numeroSaisi: ambassadeurOui ? nouveauNumero.text : null,
+            syndicat: joignable ? syndicatNom.text : null,
             // Seulement quand la personne appelée n'est pas ambassadeur :
             // ailleurs, la question de la remplaçante n'a pas été posée.
             suggestedPhone: proposeQuelquUn
@@ -519,15 +507,9 @@ class _RepresentantQualificationScreenState
           value: connaitUES,
           onChanged: (bool value) => setState(() => connaitUES = value),
         ),
-        // 4. Niveau de syndicat, texte libre et FACULTATIF.
+        // 4. Sur quel syndicat ? Choisi dans le référentiel, FACULTATIF.
         const SizedBox(height: CpiSpacing.md),
-        CpiField(
-          label: 'Niveau de syndicat (facultatif)',
-          controller: niveauSyndicat,
-          hint: 'Ex. Secrétaire général',
-          onChanged: (String _) => setState(() {}),
-          textCapitalization: TextCapitalization.sentences,
-        ),
+        _champSyndicat(),
         // 5. Ambassadeur : c'est l'ancien « représentant CPI CHUES », mapping
         // outcome/relationStatus inchangé.
         const SizedBox(height: CpiSpacing.md),
@@ -536,34 +518,13 @@ class _RepresentantQualificationScreenState
           value: ambassadeur,
           onChanged: (bool value) => setState(() {
             ambassadeur = value;
-            if (!value) {
-              numeroConfirme = null;
-              memeNumeroWhatsapp = null;
-            }
+            if (!value) memeNumeroWhatsapp = null;
           }),
         ),
-        // Numéro et WhatsApp ne se posent qu'à un ambassadeur : sur un non, la
-        // fiche ferme en REFUS et l'on passe à la personne proposée.
+        // WhatsApp ne se pose qu'à un ambassadeur : sur un non, la fiche ferme
+        // en REFUS et l'on passe à la personne proposée.
         if (ambassadeur == true) ...<Widget>[
-          // 6. Le numéro en fiche est-il le bon ?
-          const SizedBox(height: CpiSpacing.md),
-          _OuiNon(
-            label: 'Confirmer le numéro ?',
-            value: numeroConfirme,
-            onChanged: (bool value) => setState(() => numeroConfirme = value),
-          ),
-          CpiReveal(
-            visible: numeroConfirme == false,
-            child: Padding(
-              padding: const EdgeInsets.only(top: CpiSpacing.sm),
-              child: PhoneField(
-                controller: nouveauNumero,
-                label: 'Nouveau numéro',
-                onChanged: (String _) => setState(() {}),
-              ),
-            ),
-          ),
-          // 7. WhatsApp sur ce numéro ? Comportement existant, conservé.
+          // 6. WhatsApp sur le numéro en fiche ?
           const SizedBox(height: CpiSpacing.md),
           _OuiNon(
             label: 'A-t-il WhatsApp sur ce numéro ?',
@@ -607,11 +568,55 @@ class _RepresentantQualificationScreenState
           onChanged: (DateTime? at) => setState(() => rappelAt = at),
         ),
       ],
+      if (resultat != null) ...<Widget>[
+        const SizedBox(height: CpiSpacing.lg),
+        CpiField(
+          label: 'Commentaire (facultatif)',
+          controller: commentaire,
+          hint: 'En une phrase',
+          maxLength: 2000,
+          maxLines: 3,
+          textCapitalization: TextCapitalization.sentences,
+          onChanged: (String _) => setState(() {}),
+        ),
+      ],
     ],
   );
 
-  /// Étape 2 : la personne proposée à la place, le commentaire, et la relecture
-  /// de ce qui part.
+  /// Syndicat pris dans le référentiel plutôt qu'en texte libre : la liste
+  /// redescend avec le reste et se cherche par nom ou sigle.
+  Widget _champSyndicat() {
+    final List<Syndicat> syndicats =
+        ref.watch(syndicatsProvider).value ?? const <Syndicat>[];
+    return LocalTypeahead(
+      controller: syndicatNom,
+      focusNode: syndicatFocus,
+      label: 'Syndicat (facultatif)',
+      hint: 'Ex. SAEMSS',
+      selectedId: syndicatId,
+      textInputAction: TextInputAction.done,
+      emptyHint: syndicats.isEmpty
+          ? 'La liste n\'est pas encore arrivée.'
+          : 'Aucun résultat',
+      options: syndicats
+          .map(
+            (Syndicat s) => TypeaheadOption(
+              id: s.id,
+              label: s.name,
+              secondary: s.sigle,
+              keywords: <String>[s.sigle, if (s.secteur != null) s.secteur!],
+            ),
+          )
+          .toList(growable: false),
+      onChanged: (String _) {
+        if (syndicatId != null) setState(() => syndicatId = null);
+      },
+      onSelected: (TypeaheadOption o) => setState(() => syndicatId = o.id),
+    );
+  }
+
+  /// Étape 2 : la relecture de ce qui part. Le commentaire se saisit à l'étape
+  /// de qualification, sous les questions.
   Widget _corpsDetails(
     ThemeData theme,
     RepresentantSyncViewData? representant,
@@ -623,16 +628,6 @@ class _RepresentantQualificationScreenState
       CpiSpacing.md,
     ),
     children: <Widget>[
-      CpiField(
-        label: 'Commentaire',
-        controller: commentaire,
-        hint: 'En une phrase',
-        maxLength: 2000,
-        maxLines: 3,
-        textCapitalization: TextCapitalization.sentences,
-        onChanged: (String _) => setState(() {}),
-      ),
-      const SizedBox(height: CpiSpacing.lg),
       CpiRecap(lines: recapDe(representant)),
     ],
   );

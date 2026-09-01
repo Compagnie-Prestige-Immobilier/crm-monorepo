@@ -736,7 +736,7 @@ describe('navigation d’un SUPERVISEUR', () => {
       'Contacts recommandés',
       'Représentants',
       'Prospects',
-      'Lots d’export',
+      'Campagnes',
     ]);
   });
 
@@ -997,15 +997,14 @@ describe('charge de la barre latérale', () => {
 });
 
 describe('mots interdits dans la barre', () => {
-  // « Phase n » est proscrit dans l'interface ; « campagne », « tâche » et
-  // « file d'appel » nomment une fonctionnalité retirée ; les autres sont du
+  // « Phase n » est proscrit dans l'interface ; « tâche » et « file d'appel »
+  // nomment une fonctionnalité retirée ; les autres sont du
   // vocabulaire d'équipe que personne n'emploie au téléphone.
   const PROSCRITS = [
     'phase',
     'pilotage',
     'console',
     'commercial',
-    'campagne',
     'tâche',
     'file d’appel',
   ];

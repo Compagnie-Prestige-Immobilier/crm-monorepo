@@ -2,7 +2,7 @@
 
 import { ShieldCheckIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { homePathForRole } from '@/components/layout/nav-items';
 import {
@@ -33,12 +33,10 @@ function roleFromPayload(payload: unknown, fallback: Role): Role {
 export function DevRoleSwitcher({
   currentRole,
   enabled,
-  autoLogin = false,
   next,
 }: {
   currentRole: Role;
   enabled: boolean;
-  autoLogin?: boolean;
   next?: string | null;
 }) {
   const router = useRouter();
@@ -71,14 +69,6 @@ export function DevRoleSwitcher({
     },
     [next, router],
   );
-
-  useEffect(() => {
-    if (!enabled || !autoLogin) return;
-    const timer = window.setTimeout(() => {
-      void loginAs(currentRole);
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [autoLogin, currentRole, enabled, loginAs]);
 
   if (!enabled) return null;
 

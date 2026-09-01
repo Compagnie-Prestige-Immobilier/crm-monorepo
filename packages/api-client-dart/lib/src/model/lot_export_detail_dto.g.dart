@@ -37,6 +37,8 @@ abstract class _$LotExportDetailDtoCWProxy {
 
   LotExportDetailDto repartition(List<LotExportRepartitionDto> repartition);
 
+  LotExportDetailDto performance(List<LotExportPerformanceDto> performance);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `LotExportDetailDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -59,6 +61,7 @@ abstract class _$LotExportDetailDtoCWProxy {
     Object callsByTeleconseiller,
     LotExportDistributionDto distribution,
     List<LotExportRepartitionDto> repartition,
+    List<LotExportPerformanceDto> performance,
   });
 }
 
@@ -122,6 +125,10 @@ class _$LotExportDetailDtoCWProxyImpl implements _$LotExportDetailDtoCWProxy {
       this(repartition: repartition);
 
   @override
+  LotExportDetailDto performance(List<LotExportPerformanceDto> performance) =>
+      this(performance: performance);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `LotExportDetailDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -144,6 +151,7 @@ class _$LotExportDetailDtoCWProxyImpl implements _$LotExportDetailDtoCWProxy {
     Object? callsByTeleconseiller = const $CopyWithPlaceholder(),
     Object? distribution = const $CopyWithPlaceholder(),
     Object? repartition = const $CopyWithPlaceholder(),
+    Object? performance = const $CopyWithPlaceholder(),
   }) {
     return LotExportDetailDto(
       id: id == const $CopyWithPlaceholder()
@@ -207,6 +215,10 @@ class _$LotExportDetailDtoCWProxyImpl implements _$LotExportDetailDtoCWProxy {
           ? _value.repartition
           // ignore: cast_nullable_to_non_nullable
           : repartition as List<LotExportRepartitionDto>,
+      performance: performance == const $CopyWithPlaceholder()
+          ? _value.performance
+          // ignore: cast_nullable_to_non_nullable
+          : performance as List<LotExportPerformanceDto>,
     );
   }
 }
@@ -242,6 +254,7 @@ LotExportDetailDto _$LotExportDetailDtoFromJson(Map<String, dynamic> json) =>
           'callsByTeleconseiller',
           'distribution',
           'repartition',
+          'performance',
         ],
       );
       final val = LotExportDetailDto(
@@ -295,6 +308,15 @@ LotExportDetailDto _$LotExportDetailDtoFromJson(Map<String, dynamic> json) =>
               )
               .toList(),
         ),
+        performance: $checkedConvert(
+          'performance',
+          (v) => (v as List<dynamic>)
+              .map(
+                (e) =>
+                    LotExportPerformanceDto.fromJson(e as Map<String, dynamic>),
+              )
+              .toList(),
+        ),
       );
       return val;
     });
@@ -316,6 +338,7 @@ Map<String, dynamic> _$LotExportDetailDtoToJson(LotExportDetailDto instance) =>
       'callsByTeleconseiller': instance.callsByTeleconseiller,
       'distribution': instance.distribution.toJson(),
       'repartition': instance.repartition.map((e) => e.toJson()).toList(),
+      'performance': instance.performance.map((e) => e.toJson()).toList(),
     };
 
 const _$LotExportCibleEnumMap = {
