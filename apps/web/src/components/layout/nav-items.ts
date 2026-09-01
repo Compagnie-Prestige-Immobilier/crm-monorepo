@@ -92,7 +92,7 @@ export const COQUES: readonly CoqueEntry[] = [
     id: 'grand-public',
     label: 'Projet Grand Public',
     path: '/grand-public',
-    description: 'Vente hors syndicat, en préparation',
+    description: 'Prospection, appels et conversion hors CHUES',
     roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR', 'COMMERCIAL'],
   },
   {
@@ -496,6 +496,13 @@ const SECTIONS: readonly NavSection[] = [
     items: [
       // ─── Téléconseiller ───────────────────────────────────────────────────
       {
+        href: '/grand-public',
+        label: 'Grand Public',
+        icon: UsersIcon,
+        description: 'Créer, retrouver et suivre les prospects',
+        roles: ['COMMERCIAL'],
+      },
+      {
         href: '/grand-public/console',
         label: 'Appeler les prospects',
         icon: HeadsetIcon,
@@ -514,13 +521,6 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Noter un prospect',
         icon: PlusCircleIcon,
         description: 'Saisie d’un prospect',
-        roles: ['COMMERCIAL'],
-      },
-      {
-        href: '/grand-public',
-        label: 'Mes prospects',
-        icon: UsersIcon,
-        description: 'Les fiches qu’il a notées',
         roles: ['COMMERCIAL'],
         secondary: true,
       },
