@@ -72,7 +72,11 @@ interface ParsedRow {
   /** Le compte propriétaire de la fiche. `null` : celui qui importe. */
   readonly ownerId: string | null;
   /** L'appel déjà passé, quand le fichier le date. */
-  readonly appel: { readonly date: Date; readonly outcome: RepCallOutcome } | null;
+  readonly appel: {
+    readonly date: Date;
+    readonly outcome: RepCallOutcome;
+    readonly comment: string | null;
+  } | null;
 }
 
 @Injectable()
@@ -259,6 +263,7 @@ export class RepresentantsImportService {
                 representantId: id,
                 performedById,
                 outcome: appel.outcome,
+                comment: appel.comment,
                 clientCreatedAt: appel.date,
               })),
           });
@@ -328,6 +333,7 @@ export class RepresentantsImportService {
                 representantId: id,
                 performedById: appel.performedById,
                 outcome: appel.outcome,
+                comment: appel.comment,
                 clientCreatedAt: appel.date,
               })),
             });
@@ -533,6 +539,7 @@ interface Enrichissement {
   readonly appel: {
     readonly date: Date;
     readonly outcome: RepCallOutcome;
+    readonly comment: string | null;
     readonly performedById: string;
   } | null;
 }
@@ -744,7 +751,7 @@ function parseRow(raw: RawRow, referentiels: Referentiels): ParsedRow | ImportRo
   }
 
   const complements = parseComplements(
-    { relation, whatsapp, charge, dateAppel, issue },
+    { notes, relation, whatsapp, charge, dateAppel, issue },
     referentiels.users,
   );
   if ('code' in complements) {
