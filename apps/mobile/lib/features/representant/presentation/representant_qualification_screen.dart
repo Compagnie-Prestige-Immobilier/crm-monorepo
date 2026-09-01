@@ -180,6 +180,8 @@ class _RepresentantQualificationScreenState
           suggestionNom.text.trim(),
         ].where((String s) => s.isNotEmpty).join(' · '),
       ),
+    if (commentaire.text.trim().isNotEmpty)
+      CpiRecapLine('Commentaire', commentaire.text.trim()),
   ];
 
   bool get aSaisi =>
@@ -566,6 +568,18 @@ class _RepresentantQualificationScreenState
           onChanged: (DateTime? at) => setState(() => rappelAt = at),
         ),
       ],
+      if (resultat != null) ...<Widget>[
+        const SizedBox(height: CpiSpacing.lg),
+        CpiField(
+          label: 'Commentaire (facultatif)',
+          controller: commentaire,
+          hint: 'En une phrase',
+          maxLength: 2000,
+          maxLines: 3,
+          textCapitalization: TextCapitalization.sentences,
+          onChanged: (String _) => setState(() {}),
+        ),
+      ],
     ],
   );
 
@@ -601,8 +615,8 @@ class _RepresentantQualificationScreenState
     );
   }
 
-  /// Étape 2 : la personne proposée à la place, le commentaire, et la relecture
-  /// de ce qui part.
+  /// Étape 2 : la relecture de ce qui part. Le commentaire se saisit à l'étape
+  /// de qualification, sous les questions.
   Widget _corpsDetails(
     ThemeData theme,
     RepresentantSyncViewData? representant,
@@ -614,16 +628,6 @@ class _RepresentantQualificationScreenState
       CpiSpacing.md,
     ),
     children: <Widget>[
-      CpiField(
-        label: 'Commentaire',
-        controller: commentaire,
-        hint: 'En une phrase',
-        maxLength: 2000,
-        maxLines: 3,
-        textCapitalization: TextCapitalization.sentences,
-        onChanged: (String _) => setState(() {}),
-      ),
-      const SizedBox(height: CpiSpacing.lg),
       CpiRecap(lines: recapDe(representant)),
     ],
   );

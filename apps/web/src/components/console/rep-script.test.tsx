@@ -243,7 +243,7 @@ describe('RepScript : les questions restent, et on peut revenir', () => {
     await repondre('Injoignable');
     await userEvent.click(screen.getByRole('button', { name: 'Continuer' }));
 
-    expect(screen.getByText('Quelque chose à ajouter ?')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Enregistrer' })).toBeTruthy();
 
     await userEvent.click(screen.getByRole('button', { name: /Étape précédente/u }));
 
@@ -360,12 +360,12 @@ describe('RepScript : une seule tentative, à la fin', () => {
     expect(screen.queryByRole('heading', { level: 2 })).toBeNull();
   });
 
-  it('joint le commentaire de la seconde étape', async () => {
+  it('joint le commentaire saisi à la qualification', async () => {
     await renderListe();
     await choisir(/Aminata Ndiaye/u);
     await repondre('Injoignable');
-    await userEvent.click(screen.getByRole('button', { name: 'Continuer' }));
     await userEvent.type(screen.getByLabelText('Commentaire'), 'Sonne dans le vide');
+    await userEvent.click(screen.getByRole('button', { name: 'Continuer' }));
     await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
 
     await waitFor(() => {

@@ -709,6 +709,26 @@ function Qualification({
             </Question>
           ) : null}
 
+          {resultat === null ? null : (
+            <Question titre="Quelque chose à ajouter ? (facultatif)" anime>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="rep-commentaire" className="text-[0.875rem] font-[600]">
+                  Commentaire
+                </label>
+                <Textarea
+                  id="rep-commentaire"
+                  rows={3}
+                  maxLength={2000}
+                  placeholder="En une phrase"
+                  value={commentaire}
+                  onChange={(event) => {
+                    setCommentaire(event.target.value);
+                  }}
+                />
+              </div>
+            </Question>
+          )}
+
           <div className="flex flex-col gap-1.5">
             <Button
               className="self-start"
@@ -726,24 +746,6 @@ function Qualification({
         </div>
       ) : (
         <div className="flex flex-col gap-5">
-          <Question titre="Quelque chose à ajouter ?">
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="rep-commentaire" className="text-[0.875rem] font-[600]">
-                Commentaire
-              </label>
-              <Textarea
-                id="rep-commentaire"
-                rows={3}
-                maxLength={2000}
-                placeholder="En une phrase"
-                value={commentaire}
-                onChange={(event) => {
-                  setCommentaire(event.target.value);
-                }}
-              />
-            </div>
-          </Question>
-
           <dl className="flex flex-col gap-1 rounded-lg border border-border bg-card px-4 py-3 text-[0.875rem]">
             <Recap intitule="Personne appelée" valeur={representant.fullName} />
             <Recap intitule="Téléphone" valeur={formatPhone(representant.phoneE164)} />
@@ -774,6 +776,9 @@ function Qualification({
                 valeur={[sugPhone.trim(), sugName.trim()].filter(Boolean).join(' · ')}
               />
             ) : null}
+            {commentaire.trim() === '' ? null : (
+              <Recap intitule="Commentaire" valeur={commentaire.trim()} />
+            )}
           </dl>
 
           {/* Un seul retour à l'écran, en tête : deux boutons du même nom
