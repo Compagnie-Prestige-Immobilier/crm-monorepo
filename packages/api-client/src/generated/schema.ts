@@ -2810,7 +2810,8 @@ export interface paths {
     get: operations['getLotExport'];
     put?: never;
     post?: never;
-    delete?: never;
+    /** Supprime une campagne et sa répartition. */
+    delete: operations['deleteLotExport'];
     options?: never;
     head?: never;
     patch?: never;
@@ -3336,6 +3337,14 @@ export interface components {
       departementName: string;
       iefName: string | null;
       notes: string | null;
+      etablissement: string | null;
+      relationStatus: components['schemas']['RepresentantRelation'];
+      whatsappStatus: components['schemas']['WhatsappStatus'];
+      /**
+       * Format: date-time
+       * @description Date de l’appel déjà passé que la ligne enregistrera, s’il y en a un.
+       */
+      calledAt: string | null;
     };
     ImportReportDto: {
       /** @description Vrai si rien n’a été écrit. Le premier temps de l’import est TOUJOURS une simulation : appliquer 4 000 lignes sans les avoir vues ne se rattrape pas. */
@@ -16472,6 +16481,62 @@ export interface operations {
       };
       /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
       403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  deleteLotExport: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Campagne supprimée. */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description LOT_EXPORT_NOT_FOUND. */
+      404: {
         headers: {
           [name: string]: unknown;
         };

@@ -1,13 +1,21 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import { BoxesIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  BoxesIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  PlusIcon,
+  Trash2Icon,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
+import { toast } from 'sonner';
 
 import { LotCreateDialog } from '@/components/lots-export/lot-create-dialog';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -18,8 +26,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { fetchLotsExport, type LotExportQuery } from '@/lib/data/lots-export';
+import { deleteLotExport, fetchLotsExport, type LotExportQuery } from '@/lib/data/lots-export';
 import { formatDate, formatNumber } from '@/lib/format';
+import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 
@@ -46,6 +55,20 @@ export function LotsExportView({ canCreate }: { canCreate: boolean }) {
   const [cible, setCible] = useState<FiltreCible>(TOUTES);
   const [page, setPage] = useState(1);
   const [creationOuverte, setCreationOuverte] = useState(false);
+  const [aSupprimer, setASupprimer] = useState<{ id: string; name: string } | null>(null);
+
+  const queryClient = useQueryClient();
+  const suppression = useMutation({
+    mutationFn: (id: string) => deleteLotExport(id),
+    onSuccess: async () => {
+      toast.success('Campagne supprimée.');
+      setASupprimer(null);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.lotsExportRoot });
+    },
+    onError: (error) => {
+      toastApiError(error, 'La campagne n’a pas pu être supprimée.');
+    },
+  });
 
   const rechercheDifferee = useDebouncedValue(recherche);
   const requete = requeteLots(page, rechercheDifferee, cible);
@@ -168,9 +191,24 @@ export function LotsExportView({ canCreate }: { canCreate: boolean }) {
                         {lot.name}
                       </Link>
                     </h2>
-                    <p className="text-[0.8125rem] text-muted-foreground">
-                      {formatDate(lot.createdAt)}, par {lot.createdByName}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-[0.8125rem] text-muted-foreground">
+                        {formatDate(lot.createdAt)}, par {lot.createdByName}
+                      </p>
+                      {canCreate ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Supprimer ${lot.name}`}
+                          onClick={() => {
+                            setASupprimer({ id: lot.id, name: lot.name });
+                          }}
+                        >
+                          <Trash2Icon className="size-4" aria-hidden="true" />
+                        </Button>
+                      ) : null}
+                    </div>
                   </div>
                   <p className="text-[0.875rem]">
                     {lot.scopeLabel} ·{' '}
@@ -222,6 +260,20 @@ export function LotsExportView({ canCreate }: { canCreate: boolean }) {
       {canCreate ? (
         <LotCreateDialog open={creationOuverte} onOpenChange={setCreationOuverte} />
       ) : null}
+
+      <ConfirmDialog
+        open={aSupprimer !== null}
+        onOpenChange={(ouvert) => {
+          if (!ouvert) setASupprimer(null);
+        }}
+        title={`Supprimer « ${aSupprimer?.name ?? ''} » ?`}
+        description="La campagne et sa répartition disparaissent. Les fiches et les appels déjà consignés restent en base."
+        confirmLabel="Supprimer"
+        pending={suppression.isPending}
+        onConfirm={() => {
+          if (aSupprimer) suppression.mutate(aSupprimer.id);
+        }}
+      />
     </div>
   );
 }

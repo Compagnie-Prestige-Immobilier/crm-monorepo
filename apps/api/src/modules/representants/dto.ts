@@ -394,6 +394,21 @@ export class ImportRowPreviewDto {
   @ApiProperty() departementName!: string;
   @ApiProperty({ type: String, nullable: true }) iefName!: string | null;
   @ApiProperty({ type: String, nullable: true }) notes!: string | null;
+  @ApiProperty({ type: String, nullable: true }) etablissement!: string | null;
+
+  @ApiProperty({ enum: RepresentantRelation, enumName: 'RepresentantRelation' })
+  relationStatus!: RepresentantRelation;
+
+  @ApiProperty({ enum: WhatsappStatus, enumName: 'WhatsappStatus' })
+  whatsappStatus!: WhatsappStatus;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    format: 'date-time',
+    description: 'Date de l’appel déjà passé que la ligne enregistrera, s’il y en a un.',
+  })
+  calledAt!: string | null;
 }
 
 export class ImportReportDto {

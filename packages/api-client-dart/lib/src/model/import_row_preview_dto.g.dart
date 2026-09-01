@@ -19,6 +19,14 @@ abstract class _$ImportRowPreviewDtoCWProxy {
 
   ImportRowPreviewDto notes(String? notes);
 
+  ImportRowPreviewDto etablissement(String? etablissement);
+
+  ImportRowPreviewDto relationStatus(RepresentantRelation relationStatus);
+
+  ImportRowPreviewDto whatsappStatus(WhatsappStatus whatsappStatus);
+
+  ImportRowPreviewDto calledAt(DateTime? calledAt);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `ImportRowPreviewDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -32,6 +40,10 @@ abstract class _$ImportRowPreviewDtoCWProxy {
     String departementName,
     String? iefName,
     String? notes,
+    String? etablissement,
+    RepresentantRelation relationStatus,
+    WhatsappStatus whatsappStatus,
+    DateTime? calledAt,
   });
 }
 
@@ -61,6 +73,21 @@ class _$ImportRowPreviewDtoCWProxyImpl implements _$ImportRowPreviewDtoCWProxy {
   ImportRowPreviewDto notes(String? notes) => this(notes: notes);
 
   @override
+  ImportRowPreviewDto etablissement(String? etablissement) =>
+      this(etablissement: etablissement);
+
+  @override
+  ImportRowPreviewDto relationStatus(RepresentantRelation relationStatus) =>
+      this(relationStatus: relationStatus);
+
+  @override
+  ImportRowPreviewDto whatsappStatus(WhatsappStatus whatsappStatus) =>
+      this(whatsappStatus: whatsappStatus);
+
+  @override
+  ImportRowPreviewDto calledAt(DateTime? calledAt) => this(calledAt: calledAt);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `ImportRowPreviewDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -74,6 +101,10 @@ class _$ImportRowPreviewDtoCWProxyImpl implements _$ImportRowPreviewDtoCWProxy {
     Object? departementName = const $CopyWithPlaceholder(),
     Object? iefName = const $CopyWithPlaceholder(),
     Object? notes = const $CopyWithPlaceholder(),
+    Object? etablissement = const $CopyWithPlaceholder(),
+    Object? relationStatus = const $CopyWithPlaceholder(),
+    Object? whatsappStatus = const $CopyWithPlaceholder(),
+    Object? calledAt = const $CopyWithPlaceholder(),
   }) {
     return ImportRowPreviewDto(
       line: line == const $CopyWithPlaceholder()
@@ -100,6 +131,22 @@ class _$ImportRowPreviewDtoCWProxyImpl implements _$ImportRowPreviewDtoCWProxy {
           ? _value.notes
           // ignore: cast_nullable_to_non_nullable
           : notes as String?,
+      etablissement: etablissement == const $CopyWithPlaceholder()
+          ? _value.etablissement
+          // ignore: cast_nullable_to_non_nullable
+          : etablissement as String?,
+      relationStatus: relationStatus == const $CopyWithPlaceholder()
+          ? _value.relationStatus
+          // ignore: cast_nullable_to_non_nullable
+          : relationStatus as RepresentantRelation,
+      whatsappStatus: whatsappStatus == const $CopyWithPlaceholder()
+          ? _value.whatsappStatus
+          // ignore: cast_nullable_to_non_nullable
+          : whatsappStatus as WhatsappStatus,
+      calledAt: calledAt == const $CopyWithPlaceholder()
+          ? _value.calledAt
+          // ignore: cast_nullable_to_non_nullable
+          : calledAt as DateTime?,
     );
   }
 }
@@ -126,6 +173,10 @@ ImportRowPreviewDto _$ImportRowPreviewDtoFromJson(Map<String, dynamic> json) =>
           'departementName',
           'iefName',
           'notes',
+          'etablissement',
+          'relationStatus',
+          'whatsappStatus',
+          'calledAt',
         ],
       );
       final val = ImportRowPreviewDto(
@@ -135,6 +186,27 @@ ImportRowPreviewDto _$ImportRowPreviewDtoFromJson(Map<String, dynamic> json) =>
         departementName: $checkedConvert('departementName', (v) => v as String),
         iefName: $checkedConvert('iefName', (v) => v as String?),
         notes: $checkedConvert('notes', (v) => v as String?),
+        etablissement: $checkedConvert('etablissement', (v) => v as String?),
+        relationStatus: $checkedConvert(
+          'relationStatus',
+          (v) => $enumDecode(
+            _$RepresentantRelationEnumMap,
+            v,
+            unknownValue: RepresentantRelation.unknownDefaultOpenApi,
+          ),
+        ),
+        whatsappStatus: $checkedConvert(
+          'whatsappStatus',
+          (v) => $enumDecode(
+            _$WhatsappStatusEnumMap,
+            v,
+            unknownValue: WhatsappStatus.unknownDefaultOpenApi,
+          ),
+        ),
+        calledAt: $checkedConvert(
+          'calledAt',
+          (v) => v == null ? null : DateTime.parse(v as String),
+        ),
       );
       return val;
     });
@@ -148,4 +220,24 @@ Map<String, dynamic> _$ImportRowPreviewDtoToJson(
   'departementName': instance.departementName,
   'iefName': instance.iefName,
   'notes': instance.notes,
+  'etablissement': instance.etablissement,
+  'relationStatus': _$RepresentantRelationEnumMap[instance.relationStatus]!,
+  'whatsappStatus': _$WhatsappStatusEnumMap[instance.whatsappStatus]!,
+  'calledAt': instance.calledAt?.toIso8601String(),
+};
+
+const _$RepresentantRelationEnumMap = {
+  RepresentantRelation.INCONNU: 'INCONNU',
+  RepresentantRelation.CONTACTE: 'CONTACTE',
+  RepresentantRelation.AMBASSADEUR: 'AMBASSADEUR',
+  RepresentantRelation.REFUS: 'REFUS',
+  RepresentantRelation.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$WhatsappStatusEnumMap = {
+  WhatsappStatus.NON_DEMANDE: 'NON_DEMANDE',
+  WhatsappStatus.MEME_NUMERO: 'MEME_NUMERO',
+  WhatsappStatus.AUTRE_NUMERO: 'AUTRE_NUMERO',
+  WhatsappStatus.AUCUN: 'AUCUN',
+  WhatsappStatus.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

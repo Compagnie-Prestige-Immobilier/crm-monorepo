@@ -3,6 +3,8 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:crm_api_client/src/model/representant_relation.dart';
+import 'package:crm_api_client/src/model/whatsapp_status.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/src/equatable_utils.dart';
@@ -30,6 +32,14 @@ class ImportRowPreviewDto {
     required this.iefName,
 
     required this.notes,
+
+    required this.etablissement,
+
+    required this.relationStatus,
+
+    required this.whatsappStatus,
+
+    required this.calledAt,
   });
 
   @JsonKey(name: r'line', required: true, includeIfNull: false)
@@ -51,12 +61,46 @@ class ImportRowPreviewDto {
   @JsonKey(name: r'notes', required: true, includeIfNull: true)
   final String? notes;
 
+  @JsonKey(name: r'etablissement', required: true, includeIfNull: true)
+  final String? etablissement;
+
+  @JsonKey(
+    name: r'relationStatus',
+    required: true,
+    includeIfNull: false,
+    unknownEnumValue: RepresentantRelation.unknownDefaultOpenApi,
+  )
+  final RepresentantRelation relationStatus;
+
+  @JsonKey(
+    name: r'whatsappStatus',
+    required: true,
+    includeIfNull: false,
+    unknownEnumValue: WhatsappStatus.unknownDefaultOpenApi,
+  )
+  final WhatsappStatus whatsappStatus;
+
+  /// Date de l’appel déjà passé que la ligne enregistrera, s’il y en a un.
+  @JsonKey(name: r'calledAt', required: true, includeIfNull: true)
+  final DateTime? calledAt;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is ImportRowPreviewDto &&
             runtimeType == other.runtimeType &&
             equals(
-              [line, fullName, phoneE164, departementName, iefName, notes],
+              [
+                line,
+                fullName,
+                phoneE164,
+                departementName,
+                iefName,
+                notes,
+                etablissement,
+                relationStatus,
+                whatsappStatus,
+                calledAt,
+              ],
               [
                 other.line,
                 other.fullName,
@@ -64,6 +108,10 @@ class ImportRowPreviewDto {
                 other.departementName,
                 other.iefName,
                 other.notes,
+                other.etablissement,
+                other.relationStatus,
+                other.whatsappStatus,
+                other.calledAt,
               ],
             );
   }
@@ -78,6 +126,10 @@ class ImportRowPreviewDto {
         departementName,
         iefName,
         notes,
+        etablissement,
+        relationStatus,
+        whatsappStatus,
+        calledAt,
       ]);
 
   factory ImportRowPreviewDto.fromJson(Map<String, dynamic> json) =>

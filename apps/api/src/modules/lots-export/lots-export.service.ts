@@ -207,6 +207,24 @@ export class LotsExportService {
     };
   }
 
+  /**
+   * Supprime une campagne et sa répartition.
+   *
+   * Les fiches ne bougent pas : `LotExportItem` cascade sur le lot, mais ses
+   * relations vers le représentant et le prospect ne sont que des pointeurs. Un
+   * lot est un tirage imprimé, pas un propriétaire. Les appels qui ont suivi
+   * vivent dans `RepCallAttempt`, sans lien avec le lot : les effacer avec lui
+   * effacerait le travail des téléconseillers.
+   */
+  async remove(id: string): Promise<void> {
+    const { count } = await this.prisma.lotExport.deleteMany({ where: { id } });
+    if (count === 0)
+      throw new NotFoundException({
+        code: 'LOT_EXPORT_NOT_FOUND',
+        message: 'Campagne introuvable.',
+      });
+  }
+
   async get(id: string): Promise<LotExportDetailDto> {
     const row = await this.prisma.lotExport.findUnique({
       where: { id },

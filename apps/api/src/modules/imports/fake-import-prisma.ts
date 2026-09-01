@@ -27,6 +27,23 @@ export interface FakeIef {
   isActive: boolean;
 }
 
+export interface FakeUser {
+  id: string;
+  username: string;
+  email: string;
+  fullName: string;
+  isActive: boolean;
+  deletedAt: Date | null;
+}
+
+export interface FakeRepCallAttempt {
+  id: string;
+  representantId: string;
+  performedById: string;
+  outcome: string;
+  clientCreatedAt: Date;
+}
+
 export class FakeUniqueViolation extends Error {
   readonly code = 'P2002';
   readonly meta = { target: ['phoneE164'], modelName: 'Representant' };
@@ -51,6 +68,15 @@ export const IEF_ALMADIES: FakeIef = {
   code: 'ALM',
   departementId: DEPARTEMENT_DAKAR.id,
   isActive: true,
+};
+
+export const USER_KHADIM: FakeUser = {
+  id: 'user-khadim',
+  username: 'khadim',
+  email: 'khadim@cpi.sn',
+  fullName: 'Khadim Diop',
+  isActive: true,
+  deletedAt: null,
 };
 
 export interface FakeJobSeed {
@@ -192,6 +218,8 @@ export class FakeImportPrisma {
   representants: FakeRepresentant[] = [];
   departements: FakeDepartement[] = [DEPARTEMENT_DAKAR];
   iefs: FakeIef[] = [IEF_ALMADIES];
+  users: FakeUser[] = [USER_KHADIM];
+  repCallAttempts: FakeRepCallAttempt[] = [];
 
   onBeforeCreateMany?: () => void;
 
@@ -256,12 +284,23 @@ export class FakeImportPrisma {
 
   get representant() {
     return {
-      findMany: (args: { where?: Where }): Promise<{ phoneE164: string }[]> =>
-        Promise.resolve(
+      // La PROJECTION est respectée : le moteur relit tantôt les téléphones
+      // (contrôle des doublons), tantôt les identifiants (rattachement des
+      // appels déjà passés). Une doublure qui rendrait toujours le téléphone
+      // ferait échouer le second usage sans rien dire d'utile.
+      findMany: (args: {
+        where?: Where;
+        select?: Record<string, boolean>;
+      }): Promise<Record<string, unknown>[]> => {
+        const champs = Object.keys(args.select ?? { phoneE164: true });
+        return Promise.resolve(
           this.representants
             .filter((row) => matches(row, args.where))
-            .map((row) => ({ phoneE164: row.phoneE164 })),
-        ),
+            .map((row) =>
+              Object.fromEntries(champs.map((champ) => [champ, (row as never)[champ]])),
+            ),
+        );
+      },
 
       createMany: ({
         data,
@@ -317,12 +356,39 @@ export class FakeImportPrisma {
     };
   }
 
+  get user() {
+    return {
+      findMany: (args: { where?: Where }): Promise<FakeUser[]> =>
+        Promise.resolve(
+          this.users.filter((row) => matches(row, args.where)).map((row) => ({ ...row })),
+        ),
+    };
+  }
+
+  get repCallAttempt() {
+    return {
+      createMany: ({ data }: { data: Record<string, unknown>[] }): Promise<{ count: number }> => {
+        for (const row of data) {
+          this.repCallAttempts.push({
+            id: row.id as string,
+            representantId: row.representantId as string,
+            performedById: row.performedById as string,
+            outcome: String(row.outcome),
+            clientCreatedAt: row.clientCreatedAt as Date,
+          });
+        }
+        return Promise.resolve({ count: data.length });
+      },
+    };
+  }
+
   async $transaction<T>(run: (tx: FakeImportPrisma) => Promise<T>): Promise<T> {
     this.transactions += 1;
     this.onBeforeTransaction?.(this.transactions);
 
     const jobs = this.jobs.map((job) => ({ ...job }));
     const representants = this.representants.map((row) => ({ ...row }));
+    const appels = this.repCallAttempts.map((row) => ({ ...row }));
 
     try {
       const result = await run(this);
@@ -331,6 +397,7 @@ export class FakeImportPrisma {
     } catch (error) {
       this.jobs = jobs;
       this.representants = representants;
+      this.repCallAttempts = appels;
       throw error;
     }
   }

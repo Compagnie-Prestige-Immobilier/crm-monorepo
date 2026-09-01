@@ -48,6 +48,10 @@ const DRY_RUN_REPORT = {
       departementName: 'Dakar',
       iefName: 'IEF Dakar Plateau',
       notes: null,
+      etablissement: 'Lycée Blaise Diagne',
+      relationStatus: 'INCONNU',
+      whatsappStatus: 'NON_DEMANDE',
+      calledAt: null,
     },
     {
       line: 3,
@@ -56,6 +60,10 @@ const DRY_RUN_REPORT = {
       departementName: 'Thiès',
       iefName: null,
       notes: 'Remis en tournée',
+      etablissement: null,
+      relationStatus: 'AMBASSADEUR',
+      whatsappStatus: 'MEME_NUMERO',
+      calledAt: '2026-08-18T00:00:00.000Z',
     },
   ],
 };
