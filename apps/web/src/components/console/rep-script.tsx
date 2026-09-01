@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 
 import { copyPhone } from '@/components/console/console-ui';
 import { useShortcuts } from '@/components/console/use-shortcuts';
+import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { useLive } from '@/components/live/use-live';
 import { QueryErrorState } from '@/components/query-error-state';
 import { RelationBadge } from '@/components/representants/relation-badge';
@@ -35,6 +36,7 @@ import {
   repScriptKeys,
   type RepAnswer,
 } from '@/lib/data/console';
+import { fetchReferenceData } from '@/lib/data/reference';
 import { fetchRepresentants, type ScriptedRepresentant } from '@/lib/data/representants';
 import { formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
@@ -82,8 +84,6 @@ interface JoignableState {
   contacte: boolean | null;
   connaitUES: boolean | null;
   ambassadeur: boolean | null;
-  numeroConfirme: boolean | null;
-  nouveauNumero: string;
   memeWhatsapp: boolean | null;
   whatsapp: string;
 }
@@ -98,10 +98,6 @@ function manqueJoignable(s: JoignableState): string | null {
   if (s.connaitUES === null) return 'Dites s’il connaît l’UES';
   if (s.ambassadeur === null) return 'Dites s’il est représentant CPI CHUES';
   if (s.ambassadeur !== true) return null;
-  if (s.numeroConfirme === null) return 'Dites si le numéro est confirmé';
-  if (s.numeroConfirme === false && digitsOf(s.nouveauNumero) < 9) {
-    return 'Écrivez le nouveau numéro';
-  }
   if (s.memeWhatsapp === null) return 'Dites s’il a WhatsApp sur ce numéro';
   if (s.memeWhatsapp === false && digitsOf(s.whatsapp) < 9) return 'Écrivez le numéro WhatsApp';
   return null;
@@ -112,15 +108,6 @@ function etablissementAnswer(confirme: boolean | null, nouvel: string): Partial<
   if (confirme === null) return {};
   const nom = nouvel.trim();
   return { etablissementConfirme: confirme, ...(confirme === false && nom !== '' ? { etablissement: nom } : {}) };
-}
-
-/** Confirmation du numéro, et le nouveau numéro seulement s'il est infirmé et lisible. */
-function numeroAnswer(confirme: boolean | null, nouveau: string): Partial<RepAnswer> {
-  if (confirme === null) return {};
-  return {
-    numeroConfirme: confirme,
-    ...(confirme === false && digitsOf(nouveau) >= 9 ? { phone: nouveau.trim() } : {}),
-  };
 }
 
 /** Apparition d'une question qui n'était pas là : douce, et coupée si l'on préfère. */
@@ -319,10 +306,8 @@ function Qualification({
   const [nouvelEtablissement, setNouvelEtablissement] = useState('');
   const [contacte, setContacte] = useState<boolean | null>(null);
   const [connaitUES, setConnaitUES] = useState<boolean | null>(null);
-  const [syndicat, setSyndicat] = useState('');
+  const [syndicatId, setSyndicatId] = useState<string | null>(null);
   const [ambassadeur, setAmbassadeur] = useState<boolean | null>(null);
-  const [numeroConfirme, setNumeroConfirme] = useState<boolean | null>(null);
-  const [nouveauNumero, setNouveauNumero] = useState('');
   const [memeWhatsapp, setMemeWhatsapp] = useState<boolean | null>(null);
   const [whatsapp, setWhatsapp] = useState('');
   const [rappelAt, setRappelAt] = useState<string | null>(null);
@@ -337,6 +322,17 @@ function Qualification({
   const [avertiTranchee, setAvertiTranchee] = useState(repRelationSettled(representant));
 
   const now = useMemo(() => Date.now(), []);
+
+  const reference = useQuery({
+    queryKey: queryKeys.reference,
+    queryFn: () => fetchReferenceData(),
+    staleTime: 5 * 60_000,
+  });
+  const syndicatOptions = (reference.data?.syndicats ?? [])
+    .filter((syndicat) => syndicat.isActive)
+    .map((syndicat) => ({ value: syndicat.id, label: syndicat.name, hint: syndicat.sigle }));
+  const syndicatName =
+    reference.data?.syndicats.find((syndicat) => syndicat.id === syndicatId)?.name ?? '';
 
   const send = useMutation({
     mutationFn: (answer: RepAnswer) => pushRepCallAttempt(buildRepAttempt(representant.id, answer)),
@@ -364,8 +360,6 @@ function Qualification({
         contacte,
         connaitUES,
         ambassadeur,
-        numeroConfirme,
-        nouveauNumero,
         memeWhatsapp,
         whatsapp,
       });
@@ -399,8 +393,7 @@ function Qualification({
       ...(joignable ? etablissementAnswer(etablissementConfirme, nouvelEtablissement) : {}),
       ...(joignable && contacte !== null ? { contacte } : {}),
       ...(joignable && connaitUES !== null ? { connaitUES } : {}),
-      ...(joignable && syndicat.trim() !== '' ? { syndicat: syndicat.trim() } : {}),
-      ...(chuesOui ? numeroAnswer(numeroConfirme, nouveauNumero) : {}),
+      ...(joignable && syndicatName !== '' ? { syndicat: syndicatName } : {}),
       ...(chuesOui
         ? {
             whatsappStatus:
@@ -536,7 +529,6 @@ function Qualification({
                   setContacte(null);
                   setConnaitUES(null);
                   setAmbassadeur(null);
-                  setNumeroConfirme(null);
                   setMemeWhatsapp(null);
                 }
                 if (valeur !== 'RAPPEL') setRappelAt(null);
@@ -603,21 +595,15 @@ function Qualification({
           ) : null}
 
           {joignable ? (
-            <Question titre="Niveau de syndicat ? (facultatif)" anime>
-              <div className="flex max-w-80 flex-col gap-1.5">
-                <label htmlFor="rep-syndicat" className="sr-only">
-                  Niveau de syndicat
-                </label>
-                <Input
-                  id="rep-syndicat"
-                  autoComplete="off"
-                  maxLength={160}
-                  value={syndicat}
-                  onChange={(event) => {
-                    setSyndicat(event.target.value);
-                  }}
-                />
-              </div>
+            <Question titre="Sur quel syndicat ? (facultatif)" anime>
+              <FilterCombobox
+                className="max-w-80"
+                label="Syndicat (facultatif)"
+                placeholder="Choisir un syndicat"
+                value={syndicatId}
+                options={syndicatOptions}
+                onChange={setSyndicatId}
+              />
             </Question>
           ) : null}
 
@@ -631,45 +617,9 @@ function Qualification({
                 value={ambassadeur}
                 onChange={(valeur) => {
                   setAmbassadeur(valeur);
-                  if (!valeur) {
-                    setNumeroConfirme(null);
-                    setMemeWhatsapp(null);
-                  }
+                  if (!valeur) setMemeWhatsapp(null);
                 }}
               />
-            </Question>
-          ) : null}
-
-          {joignable && ambassadeur === true ? (
-            <Question titre="Son numéro est-il confirmé ?" anime>
-              <Choix
-                options={[
-                  { valeur: true, label: 'Oui' },
-                  { valeur: false, label: 'Non' },
-                ]}
-                value={numeroConfirme}
-                onChange={(valeur) => {
-                  setNumeroConfirme(valeur);
-                  if (valeur) setNouveauNumero('');
-                }}
-              />
-              {numeroConfirme === false ? (
-                <div className={cn('flex max-w-80 flex-col gap-1.5', REVELE)}>
-                  <label htmlFor="rep-nouveau-numero" className="text-[0.875rem] font-[600]">
-                    Nouveau numéro
-                  </label>
-                  <Input
-                    id="rep-nouveau-numero"
-                    inputMode="tel"
-                    autoComplete="off"
-                    placeholder="77 123 45 67"
-                    value={nouveauNumero}
-                    onChange={(event) => {
-                      setNouveauNumero(event.target.value);
-                    }}
-                  />
-                </div>
-              ) : null}
             </Question>
           ) : null}
 
@@ -809,13 +759,10 @@ function Qualification({
                 />
                 <Recap intitule="Déjà contacté" valeur={recapOuiNon(contacte)} />
                 <Recap intitule="Connaît l’UES" valeur={recapOuiNon(connaitUES)} />
-                {syndicat.trim() === '' ? null : (
-                  <Recap intitule="Niveau de syndicat" valeur={syndicat.trim()} />
+                {syndicatName === '' ? null : (
+                  <Recap intitule="Syndicat" valeur={syndicatName} />
                 )}
                 <Recap intitule="Représentant CPI CHUES" valeur={recapOuiNon(ambassadeur)} />
-                {ambassadeur === true && numeroConfirme === false && digitsOf(nouveauNumero) >= 9 ? (
-                  <Recap intitule="Nouveau numéro" valeur={nouveauNumero.trim()} />
-                ) : null}
               </>
             ) : null}
             {rappelAt === null ? null : (

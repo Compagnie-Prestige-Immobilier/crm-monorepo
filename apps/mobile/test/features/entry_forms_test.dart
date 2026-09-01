@@ -1384,8 +1384,8 @@ void main() {
       await tester.pumpWidget(hostPicker());
       await tester.pumpAndSettle();
 
-      expect(find.text('Aucun représentant'), findsOneWidget);
-      expect(find.text('Ils sont importés depuis le web.'), findsOneWidget);
+      expect(find.text('Cherchez un représentant'), findsOneWidget);
+      expect(find.text('Tapez son nom ou son numéro.'), findsOneWidget);
       expect(bouton('Créer un représentant'), findsNothing);
 
       await tester.enterText(find.byType(EditableText).first, 'Ousmane');
@@ -1441,6 +1441,8 @@ void main() {
       await tester.pumpWidget(hostPicker());
       await tester.pumpAndSettle();
 
+      await tester.enterText(find.byType(EditableText).first, 'Ousmane');
+      await tester.pump(const Duration(milliseconds: 400));
       await tester.tap(find.text('Ousmane Fall'));
       await tester.pumpAndSettle();
 

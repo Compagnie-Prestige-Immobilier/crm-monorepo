@@ -155,7 +155,7 @@ export function RepresentantDetailView({
               <dd className="truncate font-[600]">{representant.etablissement ?? NO_VALUE}</dd>
             </div>
             <div className="min-w-0">
-              <dt className="text-muted-foreground">Niveau de syndicat</dt>
+              <dt className="text-muted-foreground">Syndicat</dt>
               <dd className="truncate font-[600]">{representant.syndicat ?? NO_VALUE}</dd>
             </div>
             <div className="min-w-0">

@@ -590,9 +590,6 @@ export interface RepAnswer {
   readonly etablissementConfirme?: boolean;
   /** Nouvel établissement, quand `etablissementConfirme` vaut faux. */
   readonly etablissement?: string;
-  readonly numeroConfirme?: boolean;
-  /** Nouveau numéro, quand `numeroConfirme` vaut faux. */
-  readonly phone?: string;
   readonly contacte?: boolean;
   readonly connaitUES?: boolean;
   readonly syndicat?: string;

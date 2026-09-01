@@ -23,9 +23,9 @@ import '../../../ui/widgets/search_field.dart';
 import '../../../ui/widgets/sync_status_icon.dart';
 import '../../../ui/async_value_x.dart';
 
-/// La base des représentants vient du web : ici on ne crée que des prospects,
-/// et toujours en choisissant d'abord chez qui.
-void ouvrirAjoutDeProspect(BuildContext context) {
+/// La base des représentants vient du web : on ne les crée pas ici, on en
+/// choisit un pour l'appeler et le qualifier.
+void ouvrirAppelRepresentant(BuildContext context) {
   unawaited(HapticFeedback.selectionClick());
   context.pushOnce(Routes.representants);
 }
@@ -70,7 +70,7 @@ class _HistoriqueScreenState extends ConsumerState<HistoriqueScreen> {
     final CpiConnectivity network = ref.watch(connectivityProvider);
 
     return CpiScaffold(
-      title: 'Mes fiches',
+      title: 'Représentants',
       banner: network == CpiConnectivity.online
           ? null
           : const Padding(
@@ -81,15 +81,15 @@ class _HistoriqueScreenState extends ConsumerState<HistoriqueScreen> {
                 CpiSpacing.sm,
               ),
               child: CpiStatusBand(
-                text: 'Hors ligne. Vos fiches sont gardées.',
+                text: 'Hors ligne. Les représentants restent consultables.',
                 tone: CpiTone.warning,
               ),
             ),
       footer: CpiActionBar(
         child: CpiButton(
-          'Ajouter un prospect',
-          icon: PhosphorIconsRegular.plus,
-          onPressed: () => ouvrirAjoutDeProspect(context),
+          'Appeler un représentant',
+          icon: PhosphorIconsRegular.phoneCall,
+          onPressed: () => ouvrirAppelRepresentant(context),
         ),
       ),
       body: Column(
@@ -152,7 +152,7 @@ class _Liste extends ConsumerWidget {
             CpiSpacing.xs,
           ),
           child: Text(
-            '${list.length} fiche${list.length > 1 ? 's' : ''}',
+            '${list.length} représentant${list.length > 1 ? 's' : ''}',
             style: theme.textTheme.titleSmall,
           ),
         ),
@@ -243,16 +243,10 @@ class _EmptyHistorique extends StatelessWidget {
         ),
       );
     }
-    return CpiEmptyState(
-      icon: PhosphorIconsDuotone.clockCounterClockwise,
-      title: 'Aucune fiche',
-      message: 'Ajoutez un prospect chez un représentant pour commencer.',
-      action: CpiButton(
-        'Ajouter un prospect',
-        icon: PhosphorIconsRegular.plus,
-        expand: false,
-        onPressed: () => ouvrirAjoutDeProspect(context),
-      ),
+    return const CpiEmptyState(
+      icon: PhosphorIconsDuotone.magnifyingGlass,
+      title: 'Cherchez un représentant',
+      message: 'Tapez un nom ou un numéro pour le retrouver.',
     );
   }
 }
