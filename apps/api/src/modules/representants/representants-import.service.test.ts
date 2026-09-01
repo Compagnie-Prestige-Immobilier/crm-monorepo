@@ -39,7 +39,7 @@ const USERS = [
 ];
 
 interface MockDb {
-  representant: Record<'findMany' | 'createMany', MockFn>;
+  representant: Record<'findMany' | 'createMany' | 'update', MockFn>;
   repCallAttempt: Record<'createMany', MockFn>;
   departement: Record<'findMany', MockFn>;
   ief: Record<'findMany', MockFn>;
@@ -49,7 +49,11 @@ interface MockDb {
 
 function prismaStub(): MockDb {
   const db: MockDb = {
-    representant: { findMany: vi.fn().mockResolvedValue([]), createMany: vi.fn() },
+    representant: {
+      findMany: vi.fn().mockResolvedValue([]),
+      createMany: vi.fn(),
+      update: vi.fn().mockResolvedValue({}),
+    },
     repCallAttempt: { createMany: vi.fn().mockResolvedValue({ count: 0 }) },
     departement: { findMany: vi.fn().mockResolvedValue(DEPARTEMENTS) },
     ief: { findMany: vi.fn().mockResolvedValue(IEFS) },
@@ -190,6 +194,75 @@ describe('import : simulation', () => {
         }),
       ],
     });
+  });
+
+  it('complète une fiche existante SANS écraser ce qui a déjà été tranché', async () => {
+    const file = await workbookOf([
+      [
+        'Fatou Ndiaye',
+        '77 123 45 67',
+        'Dakar',
+        '',
+        'Note du répertoire',
+        'Lycée Blaise Diagne',
+        'Refus',
+        'Aucun',
+        '',
+        '18/08/2026',
+        'Injoignable',
+      ],
+    ]);
+    // La fiche a DÉJÀ été qualifiée ambassadeur et porte une note : seuls
+    // l'établissement, le WhatsApp et l'appel manquent.
+    db.representant.findMany.mockResolvedValue([
+      {
+        id: 'rep-1',
+        phoneE164: '+221771234567',
+        etablissement: null,
+        notes: 'Qualifié en tournée',
+        relationStatus: 'AMBASSADEUR',
+        whatsappStatus: 'NON_DEMANDE',
+        _count: { repCallAttempts: 0 },
+      },
+    ]);
+
+    const report = await service.import(ADMIN, requestWith(file), {
+      dryRun: false,
+      enrichir: true,
+    });
+
+    expect(report.enrichable).toBe(1);
+    expect(report.enriched).toBe(1);
+    expect(db.representant.update).toHaveBeenCalledWith({
+      where: { id: 'rep-1' },
+      data: { etablissement: 'Lycée Blaise Diagne', whatsappStatus: 'AUCUN' },
+    });
+    expect(db.repCallAttempt.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ representantId: 'rep-1', outcome: 'UNREACHABLE' })],
+    });
+  });
+
+  it('n’enrichit RIEN sans le drapeau : le doublon reste un refus', async () => {
+    const file = await workbookOf([
+      ['Fatou Ndiaye', '77 123 45 67', 'Dakar', '', '', 'Lycée Blaise Diagne'],
+    ]);
+    db.representant.findMany.mockResolvedValue([
+      {
+        id: 'rep-1',
+        phoneE164: '+221771234567',
+        etablissement: null,
+        notes: null,
+        relationStatus: 'INCONNU',
+        whatsappStatus: 'NON_DEMANDE',
+        _count: { repCallAttempts: 0 },
+      },
+    ]);
+
+    const report = await service.import(ADMIN, requestWith(file), { dryRun: false });
+
+    expect(report.enriched).toBe(0);
+    expect(db.representant.update).not.toHaveBeenCalled();
+    expect(report.errors[0]).toMatchObject({ code: 'DUPLICATE_IN_DATABASE' });
   });
 
   it('REFUSE une issue d’appel sans date : elle ne s’enregistrerait nulle part', async () => {
