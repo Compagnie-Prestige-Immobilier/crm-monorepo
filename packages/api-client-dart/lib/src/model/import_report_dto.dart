@@ -27,6 +27,10 @@ class ImportReportDto {
 
     required this.valid,
 
+    required this.enrichable,
+
+    required this.enriched,
+
     required this.rejected,
 
     required this.duplicates,
@@ -49,6 +53,14 @@ class ImportReportDto {
   /// Lignes retenues.
   @JsonKey(name: r'valid', required: true, includeIfNull: false)
   final num valid;
+
+  /// Fiches déjà en base à qui le fichier apporte quelque chose. Nul quand `enrichir` est faux.
+  @JsonKey(name: r'enrichable', required: true, includeIfNull: false)
+  final num enrichable;
+
+  /// Fiches existantes réellement complétées. Nul en simulation.
+  @JsonKey(name: r'enriched', required: true, includeIfNull: false)
+  final num enriched;
 
   /// Lignes rejetées.
   @JsonKey(name: r'rejected', required: true, includeIfNull: false)
@@ -79,6 +91,8 @@ class ImportReportDto {
                 dryRun,
                 totalRows,
                 valid,
+                enrichable,
+                enriched,
                 rejected,
                 duplicates,
                 created,
@@ -89,6 +103,8 @@ class ImportReportDto {
                 other.dryRun,
                 other.totalRows,
                 other.valid,
+                other.enrichable,
+                other.enriched,
                 other.rejected,
                 other.duplicates,
                 other.created,
@@ -105,6 +121,8 @@ class ImportReportDto {
         dryRun,
         totalRows,
         valid,
+        enrichable,
+        enriched,
         rejected,
         duplicates,
         created,

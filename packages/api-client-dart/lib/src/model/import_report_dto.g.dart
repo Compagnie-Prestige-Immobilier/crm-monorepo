@@ -13,6 +13,10 @@ abstract class _$ImportReportDtoCWProxy {
 
   ImportReportDto valid(num valid);
 
+  ImportReportDto enrichable(num enrichable);
+
+  ImportReportDto enriched(num enriched);
+
   ImportReportDto rejected(num rejected);
 
   ImportReportDto duplicates(num duplicates);
@@ -33,6 +37,8 @@ abstract class _$ImportReportDtoCWProxy {
     bool dryRun,
     num totalRows,
     num valid,
+    num enrichable,
+    num enriched,
     num rejected,
     num duplicates,
     num created,
@@ -55,6 +61,12 @@ class _$ImportReportDtoCWProxyImpl implements _$ImportReportDtoCWProxy {
 
   @override
   ImportReportDto valid(num valid) => this(valid: valid);
+
+  @override
+  ImportReportDto enrichable(num enrichable) => this(enrichable: enrichable);
+
+  @override
+  ImportReportDto enriched(num enriched) => this(enriched: enriched);
 
   @override
   ImportReportDto rejected(num rejected) => this(rejected: rejected);
@@ -84,6 +96,8 @@ class _$ImportReportDtoCWProxyImpl implements _$ImportReportDtoCWProxy {
     Object? dryRun = const $CopyWithPlaceholder(),
     Object? totalRows = const $CopyWithPlaceholder(),
     Object? valid = const $CopyWithPlaceholder(),
+    Object? enrichable = const $CopyWithPlaceholder(),
+    Object? enriched = const $CopyWithPlaceholder(),
     Object? rejected = const $CopyWithPlaceholder(),
     Object? duplicates = const $CopyWithPlaceholder(),
     Object? created = const $CopyWithPlaceholder(),
@@ -103,6 +117,14 @@ class _$ImportReportDtoCWProxyImpl implements _$ImportReportDtoCWProxy {
           ? _value.valid
           // ignore: cast_nullable_to_non_nullable
           : valid as num,
+      enrichable: enrichable == const $CopyWithPlaceholder()
+          ? _value.enrichable
+          // ignore: cast_nullable_to_non_nullable
+          : enrichable as num,
+      enriched: enriched == const $CopyWithPlaceholder()
+          ? _value.enriched
+          // ignore: cast_nullable_to_non_nullable
+          : enriched as num,
       rejected: rejected == const $CopyWithPlaceholder()
           ? _value.rejected
           // ignore: cast_nullable_to_non_nullable
@@ -145,6 +167,8 @@ ImportReportDto _$ImportReportDtoFromJson(Map<String, dynamic> json) =>
           'dryRun',
           'totalRows',
           'valid',
+          'enrichable',
+          'enriched',
           'rejected',
           'duplicates',
           'created',
@@ -156,6 +180,8 @@ ImportReportDto _$ImportReportDtoFromJson(Map<String, dynamic> json) =>
         dryRun: $checkedConvert('dryRun', (v) => v as bool),
         totalRows: $checkedConvert('totalRows', (v) => v as num),
         valid: $checkedConvert('valid', (v) => v as num),
+        enrichable: $checkedConvert('enrichable', (v) => v as num),
+        enriched: $checkedConvert('enriched', (v) => v as num),
         rejected: $checkedConvert('rejected', (v) => v as num),
         duplicates: $checkedConvert('duplicates', (v) => v as num),
         created: $checkedConvert('created', (v) => v as num),
@@ -182,6 +208,8 @@ Map<String, dynamic> _$ImportReportDtoToJson(ImportReportDto instance) =>
       'dryRun': instance.dryRun,
       'totalRows': instance.totalRows,
       'valid': instance.valid,
+      'enrichable': instance.enrichable,
+      'enriched': instance.enriched,
       'rejected': instance.rejected,
       'duplicates': instance.duplicates,
       'created': instance.created,
