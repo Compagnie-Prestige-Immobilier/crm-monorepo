@@ -3,6 +3,7 @@ import { unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
 import type { ActivityRange } from '@/lib/data/admin';
+import { fetchDerniereCampagne, type CampagnePerformance } from '@/lib/data/lots-export';
 
 type Schemas = components['schemas'];
 
@@ -15,6 +16,7 @@ export type ChiffresDelais = Schemas['AnalyticsDelaysDto'];
 export type ChiffresRendement = Schemas['DepartementYieldListDto'];
 export type ChiffresMethodes = Schemas['EnrollmentMethodListDto'];
 export type ChiffresBanques = Schemas['NamedCountListDto'];
+export type ChiffresCampagne = CampagnePerformance | null;
 
 /** Le périmètre commun à toutes les requêtes de l'écran. */
 export interface PerimetreChiffres {
@@ -110,4 +112,10 @@ export async function fetchChiffresBanques(
       params: { query: filtresProspect(perimetre) },
     }),
   );
+}
+
+export async function fetchChiffresCampagne(
+  perimetre: PerimetreChiffres,
+): Promise<ChiffresCampagne> {
+  return fetchDerniereCampagne(perimetre.projet, perimetre.commercialId);
 }

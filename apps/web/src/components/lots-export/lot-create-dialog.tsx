@@ -106,25 +106,19 @@ function entierBorne(saisie: string, defaut: number, min: number, max: number): 
 }
 
 /** L'aperçu vient entièrement du serveur : rien n'est recompté ici. */
-function texteApercu(
-  apercu: LotExportPreview,
-  equipe: number,
-  fichesParJour: number,
-  jours: number,
-): string {
-  const { eligible, places, retenues, parTeleconseiller } = apercu;
+function texteApercu(apercu: LotExportPreview, jours: number): string {
+  const { eligible, places, retenues } = apercu;
   if (eligible === 0) return 'Aucune fiche ne correspond.';
 
   const pluriel = eligible > 1 ? 's' : '';
   const disponibles = `${formatNumber(eligible)} fiche${pluriel} disponible${pluriel}`;
-  const reparties = `${formatNumber(retenues)} seront réparties, ${formatNumber(parTeleconseiller)} par téléconseiller`;
+  const reparties = `${formatNumber(retenues)} seront réparties selon les capacités choisies`;
 
   if (eligible <= places) {
-    const calcul = `${formatNumber(equipe)} téléconseiller${equipe > 1 ? 's' : ''} × ${formatNumber(fichesParJour)} par jour × ${formatNumber(jours)} jour${jours > 1 ? 's' : ''} = ${formatNumber(places)} places`;
-    return `${disponibles}. ${calcul} : les ${reparties}.`;
+    return `${disponibles}. ${formatNumber(places)} places pondérées sur ${formatNumber(jours)} jour${jours > 1 ? 's' : ''} : les ${reparties}.`;
   }
 
-  return `${disponibles} pour ${formatNumber(places)} places : ${reparties} ; ${formatNumber(eligible - retenues)} attendront un prochain lot.`;
+  return `${disponibles} pour ${formatNumber(places)} places : ${reparties} ; ${formatNumber(eligible - retenues)} attendront une prochaine campagne.`;
 }
 
 /**
@@ -437,7 +431,10 @@ function ChampTeleconseillers({
                       );
                     }}
                   />
-                  <span className="min-w-0 flex-1 truncate">{compte.fullName}</span>
+                  <span className="min-w-0 flex-1 truncate">
+                    {compte.fullName}
+                    {compte.role === 'COMMERCIAL' ? '' : ' (20 %)'}
+                  </span>
                 </label>
               </li>
             );
@@ -452,13 +449,11 @@ function ApercuLot({
   apercu,
   stable,
   equipe,
-  fichesParJour,
   jours,
 }: {
   apercu: UseQueryResult<LotExportPreview>;
   stable: boolean;
   equipe: number;
-  fichesParJour: number;
   jours: number;
 }) {
   return (
@@ -472,7 +467,7 @@ function ApercuLot({
             </span>
           );
         if (!apercu.isSuccess || !stable) return 'Comptage des fiches…';
-        return texteApercu(apercu.data, equipe, fichesParJour, jours);
+        return texteApercu(apercu.data, jours);
       })()}
     </output>
   );
@@ -559,7 +554,7 @@ function FormulaireDeLot({ onCree, onAnnule }: { onCree: () => void; onAnnule: (
       }),
     onSuccess: (lot) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.lotsExportRoot });
-      toast.success(`${lot.name} créé : ${formatNumber(lot.itemCount)} fiches réparties.`);
+      toast.success(`Campagne créée : ${formatNumber(lot.itemCount)} fiches réparties.`);
       onCree();
       router.push(`/chues/campagnes/${lot.id}`);
     },
@@ -568,10 +563,10 @@ function FormulaireDeLot({ onCree, onAnnule }: { onCree: () => void; onAnnule: (
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Nouveau lot d’export</DialogTitle>
+        <DialogTitle>Nouvelle campagne</DialogTitle>
         <DialogDescription>
-          Choisissez qui vous exportez, puis répartissez les fiches entre vos téléconseillers :
-          chacun reçoit sa fiche de programme à imprimer.
+          Choisissez les fiches et les personnes qui les traiteront. Chacun reçoit son programme à
+          imprimer.
         </DialogDescription>
       </DialogHeader>
 
@@ -657,17 +652,11 @@ function FormulaireDeLot({ onCree, onAnnule }: { onCree: () => void; onAnnule: (
         </Field>
       </div>
 
-      <ApercuLot
-        apercu={apercu}
-        stable={critereStable}
-        equipe={equipe.length}
-        fichesParJour={fichesParJour}
-        jours={jours}
-      />
+      <ApercuLot apercu={apercu} stable={critereStable} equipe={equipe.length} jours={jours} />
 
       {creation.isError ? (
         <p role="alert" className="text-[0.875rem] text-destructive">
-          {apiErrorText(creation.error, 'Le lot n’a pas pu être créé.')}
+          {apiErrorText(creation.error, 'La campagne n’a pas pu être créée.')}
         </p>
       ) : null}
 
@@ -685,7 +674,7 @@ function FormulaireDeLot({ onCree, onAnnule }: { onCree: () => void; onAnnule: (
           {creation.isPending ? (
             <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
           ) : null}
-          Créer le lot
+          Créer la campagne
         </Button>
       </DialogFooter>
     </>

@@ -17,13 +17,14 @@ import 'package:crm_api_client/src/model/lot_export_detail_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_list_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_preview_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_summary_dto.dart';
+import 'package:crm_api_client/src/model/projet.dart';
 
 class LotsExportApi {
   final Dio _dio;
 
   const LotsExportApi(this._dio);
 
-  /// Crée un lot de fiches exportées.
+  /// Crée une campagne de fiches.
   ///
   ///
   /// Parameters:
@@ -202,7 +203,7 @@ class LotsExportApi {
     );
   }
 
-  /// Télécharge tous les programmes du lot.
+  /// Télécharge tous les programmes de la campagne.
   ///
   ///
   /// Parameters:
@@ -279,7 +280,7 @@ class LotsExportApi {
     );
   }
 
-  /// Télécharge le classeur figé du lot.
+  /// Télécharge le classeur figé de la campagne.
   ///
   ///
   /// Parameters:
@@ -356,7 +357,7 @@ class LotsExportApi {
     );
   }
 
-  /// Consulte un lot et les appels qui ont suivi.
+  /// Consulte une campagne et les appels qui ont suivi.
   ///
   ///
   /// Parameters:
@@ -438,12 +439,13 @@ class LotsExportApi {
     );
   }
 
-  /// Liste les lots d’export.
+  /// Liste les campagnes.
   ///
   ///
   /// Parameters:
   /// * [search]
   /// * [cible]
+  /// * [projet]
   /// * [createdById]
   /// * [dateFrom]
   /// * [dateTo]
@@ -461,6 +463,7 @@ class LotsExportApi {
   Future<Response<LotExportListDto>> listLotsExport({
     String? search,
     LotExportCible? cible,
+    Projet? projet,
     String? createdById,
     DateTime? dateFrom,
     DateTime? dateTo,
@@ -489,6 +492,7 @@ class LotsExportApi {
     final _queryParameters = <String, dynamic>{
       if (search != null) r'search': search,
       if (cible != null) r'cible': cible,
+      if (projet != null) r'projet': projet,
       if (createdById != null) r'createdById': createdById,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,

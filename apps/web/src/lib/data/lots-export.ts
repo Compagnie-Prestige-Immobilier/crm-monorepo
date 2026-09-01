@@ -11,6 +11,7 @@ export type LotExportSummary = Schemas['LotExportSummaryDto'];
 export type LotExportDetail = Schemas['LotExportDetailDto'];
 export type CreateLotExportInput = Schemas['CreateLotExportDto'];
 export type LotExportPreview = Schemas['LotExportPreviewDto'];
+export type CampagnePerformance = Pick<LotExportDetail, 'name' | 'performance'>;
 export type LotExportQuery = NonNullable<operations['listLotsExport']['parameters']['query']>;
 
 export async function fetchLotsExport(
@@ -46,6 +47,25 @@ export async function fetchLotExport(
   return unwrap(await client.GET('/api/v1/lots-export/{id}', { params: { path: { id } } }));
 }
 
+export async function fetchDerniereCampagne(
+  projet: Schemas['Projet'],
+  teleconseillerId: string | null,
+  client: ApiClient = getApiClient(),
+): Promise<CampagnePerformance | null> {
+  const liste = await fetchLotsExport({ projet, page: 1, pageSize: 1 }, client);
+  const resume = liste.items[0];
+  if (resume === undefined) return null;
+
+  const campagne = await fetchLotExport(resume.id, client);
+  return {
+    name: campagne.name,
+    performance:
+      teleconseillerId === null
+        ? campagne.performance
+        : campagne.performance.filter((ligne) => ligne.teleconseillerId === teleconseillerId),
+  };
+}
+
 export function lotExportUrl(id: string, format: 'xlsx' | 'zip'): string {
   return `/api/v1/lots-export/${encodeURIComponent(id)}/${format === 'xlsx' ? 'export.xlsx' : 'programmes.zip'}`;
 }
@@ -66,7 +86,7 @@ function slug(value: string): string {
 
 export function lotExportFileName(name: string, format: 'xlsx' | 'zip'): string {
   const base = slug(name);
-  return `lot-${base === '' ? 'export' : base}.${format === 'xlsx' ? 'xlsx' : 'zip'}`;
+  return `campagne-${base === '' ? 'export' : base}.${format === 'xlsx' ? 'xlsx' : 'zip'}`;
 }
 
 export function lotProgrammeFileName(teleconseillerName: string, jour: number): string {
@@ -77,23 +97,24 @@ export function lotProgrammeFileName(teleconseillerName: string, jour: number): 
 export interface Teleconseiller {
   id: string;
   fullName: string;
+  role: 'COMMERCIAL' | 'SUPERVISEUR' | 'DIRECTION';
 }
 
-/**
- * Les deux rôles qui passent des appels. L'API filtre sur un rôle à la fois,
- * d'où les deux requêtes.
- */
 export async function fetchTeleconseillers(
   client: ApiClient = getApiClient(),
 ): Promise<Teleconseiller[]> {
   const pages = await Promise.all(
-    (['COMMERCIAL', 'SUPERVISEUR'] as const).map((role) =>
+    (['COMMERCIAL', 'SUPERVISEUR', 'DIRECTION'] as const).map((role) =>
       client.GET('/api/v1/users', { params: { query: { role, isActive: true, pageSize: 50 } } }),
     ),
   );
 
   return pages
     .flatMap((page) => unwrap(page).items)
-    .map((user) => ({ id: user.id, fullName: user.fullName }))
+    .map((user) => ({
+      id: user.id,
+      fullName: user.fullName,
+      role: user.role as Teleconseiller['role'],
+    }))
     .sort((a, b) => a.fullName.localeCompare(b.fullName, 'fr'));
 }

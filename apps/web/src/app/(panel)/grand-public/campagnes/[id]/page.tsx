@@ -2,4 +2,4 @@ import type { Metadata } from 'next';
 
 export { default } from '../../../chues/campagnes/[id]/page';
 
-export const metadata: Metadata = { title: 'Lot d’export Grand Public' };
+export const metadata: Metadata = { title: 'Campagne Grand Public' };

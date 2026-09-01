@@ -29,7 +29,7 @@ export type UpdateTemplateInput = Schemas['UpdateNotificationTemplateDto'];
 export const CATEGORY_LABELS: Record<NotificationCategory, string> = {
   ANNONCE: 'Annonce',
   RAPPEL: 'Rappel',
-  CAMPAGNE: 'Lot d’export',
+  CAMPAGNE: 'Campagne',
   DOSSIER: 'Dossier',
   SYSTEME: 'Système',
 };

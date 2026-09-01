@@ -100,6 +100,7 @@ import 'package:crm_api_client/src/model/lot_export_detail_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_distribution_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_distribution_input_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_list_dto.dart';
+import 'package:crm_api_client/src/model/lot_export_performance_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_preview_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_repartition_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_repartition_jour_dto.dart';
@@ -589,6 +590,9 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'LotExportListDto':
       return LotExportListDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'LotExportPerformanceDto':
+      return LotExportPerformanceDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'LotExportPreviewDto':
       return LotExportPreviewDto.fromJson(value as Map<String, dynamic>)

@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { explain, type StatKey } from '@/lib/stat-explanations';
 
-export function StatInfo({ stat, label }: { stat: StatKey; label: string }) {
+export function InfoPopover({ label, description }: { label: string; description: string }) {
   const [hovered, setHovered] = useState(false);
   const [pinned, setPinned] = useState(false);
 
@@ -35,9 +35,13 @@ export function StatInfo({ stat, label }: { stat: StatKey; label: string }) {
       <PopoverContent align="start" sideOffset={6} className="w-80 p-3" initialFocus={pinned}>
         <div className="flex flex-col gap-1">
           <p className="text-[0.8125rem] font-[700] text-foreground">{label}</p>
-          <p className="text-[0.8125rem] leading-[1.55] text-muted-foreground">{explain(stat)}</p>
+          <p className="text-[0.8125rem] leading-[1.55] text-muted-foreground">{description}</p>
         </div>
       </PopoverContent>
     </Popover>
   );
+}
+
+export function StatInfo({ stat, label }: { stat: StatKey; label: string }) {
+  return <InfoPopover label={label} description={explain(stat)} />;
 }

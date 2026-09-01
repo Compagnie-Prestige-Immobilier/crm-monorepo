@@ -129,6 +129,13 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1));
   }
 
+  /// La liste ne se remplit qu'à la recherche : rien ne s'affiche tant qu'on
+  /// n'a pas tapé un nom ou un numéro.
+  Future<void> chercher(WidgetTester tester, String terme) async {
+    await tester.enterText(find.byType(EditableText), terme);
+    await tester.pump(const Duration(milliseconds: 400));
+  }
+
   // La ligne d'un représentant empile trois actions à côté d'un titre et d'un
   // sous-titre : c'est la géométrie qui déborde en premier quand le texte
   // grandit, et l'écran vide du balayage général ne la peint jamais.
@@ -147,6 +154,7 @@ void main() {
       fullName: 'Abdoulaye Ousseynou Kane Diagne',
     );
     await mount(tester, textScale: 1.76);
+    await chercher(tester, 'Abdoulaye');
 
     expect(find.text('Abdoulaye Ousseynou Kane Diagne'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -166,6 +174,7 @@ void main() {
       fullName: 'Ousmane Fall',
     );
     await mount(tester);
+    await chercher(tester, 'Ousmane');
 
     await tester.drag(find.text('Ousmane Fall'), const Offset(-500, 0));
     await tester.pumpAndSettle();
@@ -191,6 +200,7 @@ void main() {
       fullName: 'Ousmane Fall',
     );
     await mountRouted(tester);
+    await chercher(tester, 'Ousmane');
 
     expect(find.text('Ouvrir la fiche'), findsNothing);
 
@@ -214,9 +224,10 @@ void main() {
       fullName: 'Ousmane Fall',
     );
     await mount(tester);
+    await chercher(tester, 'Ousmane');
 
     expect(find.text('Pas encore envoyé'), findsOneWidget);
-    expect(find.text('1 fiche'), findsOneWidget);
+    expect(find.text('1 représentant'), findsOneWidget);
 
     await teardownTree(tester);
   });
@@ -232,7 +243,7 @@ void main() {
 
     expect(find.text('Nouvelle fiche'), findsNothing);
 
-    await tester.tap(find.text('Ajouter un prospect').first);
+    await tester.tap(find.text('Appeler un représentant').first);
     await tester.pumpAndSettle();
 
     expect(find.text('CHEZ QUI'), findsOneWidget);
@@ -267,19 +278,25 @@ void main() {
     await teardownTree(tester);
   });
 
-  // Le pire des sept états vides ne montrait qu'une phrase seule.
-  testWidgets('l\'état vide porte une icône, un titre et une issue', (
+  // Sans recherche, l'écran invite à chercher : rien ne se déroule tout seul.
+  testWidgets('l\'état de départ invite à chercher un représentant', (
     WidgetTester tester,
   ) async {
+    await insertRepresentant(
+      db,
+      id: 'rep-1',
+      phone: '+221770000001',
+      fullName: 'Ousmane Fall',
+    );
     await mount(tester);
 
     expect(find.byType(CpiEmptyState), findsOneWidget);
-    expect(find.text('Aucune fiche'), findsOneWidget);
-    expect(find.textContaining('Ajoutez un prospect'), findsOneWidget);
+    expect(find.text('Cherchez un représentant'), findsOneWidget);
+    expect(find.text('Ousmane Fall'), findsNothing);
     final CpiEmptyState vide = tester.widget<CpiEmptyState>(
       find.byType(CpiEmptyState),
     );
-    expect(vide.action, isNotNull);
+    expect(vide.action, isNull);
 
     await teardownTree(tester);
   });
@@ -295,20 +312,18 @@ void main() {
     );
     await mount(tester);
 
-    // Le champ de recherche est le seul de l'écran ; `EditableText` le retrouve
-    // que la coque soit Material ou ForUI.
-    await tester.enterText(find.byType(EditableText), 'Aminata');
-    await tester.pump(const Duration(milliseconds: 400));
+    await chercher(tester, 'Ousmane');
+    expect(find.text('Ousmane Fall'), findsOneWidget);
 
+    await chercher(tester, 'Aminata');
     expect(find.text('Aucun résultat.'), findsOneWidget);
-    expect(find.text('Aucune fiche'), findsNothing);
+    expect(find.text('Ousmane Fall'), findsNothing);
 
-    // Le champ gardait son texte : la liste revenait entière sous une recherche
-    // toujours écrite dans la boîte.
+    // Effacer ramène l'écran de départ, pas la liste entière.
     await tester.tap(find.text('Effacer la recherche'));
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(find.text('Ousmane Fall'), findsOneWidget);
+    expect(find.text('Cherchez un représentant'), findsOneWidget);
     expect(find.text('Aminata'), findsNothing);
 
     await teardownTree(tester);

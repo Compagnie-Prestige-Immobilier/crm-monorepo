@@ -97,7 +97,7 @@ export function CarteWidget({
     isDragging,
   } = useSortable({ id: widget.id, disabled: !editing });
 
-  const { label: titre, forme } = entreeDe(catalogue, widget.source);
+  const { label: titre, forme, description } = entreeDe(catalogue, widget.source);
   const evaluees = donnees === undefined ? [] : evaluerMarques(forme, mesurerDonnees(donnees));
   const taille: DashboardTaille = widget.taille ?? 'demi';
   const honors = reglagesHonores(widget.marque);
@@ -116,6 +116,7 @@ export function CarteWidget({
     >
       <ChartCard
         title={titre}
+        info={description}
         hauteur={hauteurDe(forme, widget.marque, taille)}
         actions={
           editing ? (

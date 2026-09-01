@@ -248,7 +248,7 @@ export function DatabaseDumpCard() {
               <li>Toutes les fiches prospects, avec les noms et les numéros de téléphone.</li>
               <li>Tous les dossiers bancaires, avec les montants en francs CFA.</li>
               <li>Tous les comptes utilisateurs, avec les empreintes de leurs mots de passe.</li>
-              <li>Tous les lots d’export, les demandes clients et l’historique des actions.</li>
+              <li>Toutes les campagnes, les demandes clients et l’historique des actions.</li>
               <li>L’espace démo possède sa propre base et ne peut pas produire cette archive.</li>
             </ul>
 

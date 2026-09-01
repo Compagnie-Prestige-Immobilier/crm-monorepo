@@ -6,14 +6,15 @@ import { ETAPES } from '@/components/chues/etapes';
 import { RepScript } from '@/components/console/rep-script';
 import { navTitle } from '@/components/layout/nav-items';
 import type * as ConsoleData from '@/lib/data/console';
+import type * as ReferenceData from '@/lib/data/reference';
 import type * as RepresentantsData from '@/lib/data/representants';
 import type { ScriptedRepresentant } from '@/lib/data/representants';
 import { REP_CALL_OUTCOME_LABELS } from '@/lib/types';
 import { renderWithQuery } from '@/test/render-query';
 
-const fetchRepScriptQueue = vi.fn();
 const pushRepCallAttempt = vi.fn();
 const fetchRepresentants = vi.fn();
+const fetchReferenceData = vi.fn();
 const toastError = vi.fn();
 const toastSuccess = vi.fn();
 
@@ -21,9 +22,13 @@ vi.mock('@/lib/data/console', async (importOriginal) => {
   const actual = await importOriginal<typeof ConsoleData>();
   return {
     ...actual,
-    fetchRepScriptQueue: (...args: unknown[]) => fetchRepScriptQueue(...args) as unknown,
     pushRepCallAttempt: (...args: unknown[]) => pushRepCallAttempt(...args) as unknown,
   };
+});
+
+vi.mock('@/lib/data/reference', async (importOriginal) => {
+  const actual = await importOriginal<typeof ReferenceData>();
+  return { ...actual, fetchReferenceData: (...args: unknown[]) => fetchReferenceData(...args) };
 });
 
 vi.mock('@/lib/data/representants', async (importOriginal) => {
@@ -92,14 +97,15 @@ const page = (items: readonly ScriptedRepresentant[]) => ({
 });
 
 async function renderListe(file: readonly ScriptedRepresentant[] = [PREMIER, SECOND]) {
-  fetchRepScriptQueue.mockResolvedValue({ items: [...file], total: file.length });
+  fetchRepresentants.mockResolvedValue(page(file));
   const view = renderWithQuery(<RepScript />);
   await screen.findByLabelText('Qui avez-vous appelé ?');
   return view;
 }
 
-/** Ouvre la qualification de quelqu'un, comme le ferait l'utilisatrice. */
+/** Ouvre la qualification de quelqu'un : la liste n'apparaît qu'à la recherche. */
 async function choisir(nom: RegExp): Promise<void> {
+  await userEvent.type(screen.getByLabelText('Qui avez-vous appelé ?'), 'a');
   await userEvent.click(await screen.findByRole('button', { name: nom }));
 }
 
@@ -129,7 +135,6 @@ const dernierEnvoi = (): Record<string, unknown> => {
 };
 
 beforeEach(() => {
-  fetchRepScriptQueue.mockReset();
   pushRepCallAttempt.mockReset();
   pushRepCallAttempt.mockResolvedValue({
     status: 'applied',
@@ -138,18 +143,23 @@ beforeEach(() => {
   });
   fetchRepresentants.mockReset();
   fetchRepresentants.mockResolvedValue(page([HORS_LISTE]));
+  fetchReferenceData.mockReset();
+  fetchReferenceData.mockResolvedValue({
+    syndicats: [{ id: 'snd-saes', name: 'SAES', sigle: 'SAES', isActive: true, sortOrder: 1 }],
+  });
   toastError.mockClear();
   toastSuccess.mockClear();
 });
 
 describe('RepScript : rien n’est choisi d’office', () => {
-  it('ouvre sur la recherche et la liste, sans fiche ni question', async () => {
+  it('ouvre sur la seule barre de recherche, sans liste ni fiche', async () => {
     await renderListe();
 
     expect(screen.getByLabelText('Qui avez-vous appelé ?')).toBeTruthy();
     expect(screen.queryByRole('heading', { level: 2 })).toBeNull();
     expect(screen.queryByText(/Comment s’est passé l’appel/u)).toBeNull();
-    expect(screen.getByRole('button', { name: /Aminata Ndiaye/u })).toBeTruthy();
+    // Aucune liste tant qu'on n'a pas cherché.
+    expect(screen.queryByRole('button', { name: /Aminata Ndiaye/u })).toBeNull();
   });
 
   it('n’ouvre la fiche et les questions qu’après un choix', async () => {
@@ -161,10 +171,9 @@ describe('RepScript : rien n’est choisi d’office', () => {
     expect(screen.getByText('Comment s’est passé l’appel ?')).toBeTruthy();
   });
 
-  it('montre la liste confiée d’abord, l’annuaire dès qu’on cherche', async () => {
-    await renderListe();
+  it('ne montre des résultats qu’une fois une recherche saisie', async () => {
+    await renderListe([HORS_LISTE]);
 
-    expect(screen.getByText('Choisissez qui vous venez d’appeler.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Bineta Diop/u })).toBeNull();
 
     await userEvent.type(screen.getByLabelText('Qui avez-vous appelé ?'), 'Bineta');
@@ -232,7 +241,7 @@ describe('RepScript : les questions restent, et on peut revenir', () => {
     await repondre('Injoignable');
     await userEvent.click(screen.getByRole('button', { name: 'Continuer' }));
 
-    expect(screen.getByText('Quelque chose à ajouter ?')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Enregistrer' })).toBeTruthy();
 
     await userEvent.click(screen.getByRole('button', { name: /Étape précédente/u }));
 
@@ -254,7 +263,6 @@ describe('RepScript : une seule tentative, à la fin', () => {
     await choisir(/Aminata Ndiaye/u);
 
     await parcoursJoignable('Oui');
-    await repondreA('Son numéro est-il confirmé ?', 'Oui');
     await repondreA('A-t-il WhatsApp sur ce numéro ?', 'Oui');
     await enregistrer();
 
@@ -269,8 +277,34 @@ describe('RepScript : une seule tentative, à la fin', () => {
       etablissementConfirme: true,
       contacte: true,
       connaitUES: true,
-      numeroConfirme: true,
     });
+    expect(dernierEnvoi()).not.toHaveProperty('numeroConfirme');
+  });
+
+  it('envoie le NOM du syndicat choisi, pas son identifiant', async () => {
+    await renderListe();
+    await choisir(/Aminata Ndiaye/u);
+
+    await parcoursJoignable('Oui');
+    await userEvent.click(screen.getByRole('combobox', { name: /Syndicat/u }));
+    await userEvent.click(await screen.findByRole('option', { name: /SAES/u }));
+    await repondreA('A-t-il WhatsApp sur ce numéro ?', 'Oui');
+    await enregistrer();
+
+    await waitFor(() => {
+      expect(pushRepCallAttempt).toHaveBeenCalledTimes(1);
+    });
+    expect(dernierEnvoi()).toMatchObject({ syndicat: 'SAES' });
+  });
+
+  it('ne demande plus si le numéro est confirmé', async () => {
+    await renderListe();
+    await choisir(/Aminata Ndiaye/u);
+
+    await parcoursJoignable('Oui');
+
+    expect(screen.queryByText('Son numéro est-il confirmé ?')).toBeNull();
+    expect(screen.getByText('A-t-il WhatsApp sur ce numéro ?')).toBeTruthy();
   });
 
   it('consigne le refus et la personne proposée ensemble', async () => {
@@ -324,12 +358,12 @@ describe('RepScript : une seule tentative, à la fin', () => {
     expect(screen.queryByRole('heading', { level: 2 })).toBeNull();
   });
 
-  it('joint le commentaire de la seconde étape', async () => {
+  it('joint le commentaire saisi à la qualification', async () => {
     await renderListe();
     await choisir(/Aminata Ndiaye/u);
     await repondre('Injoignable');
-    await userEvent.click(screen.getByRole('button', { name: 'Continuer' }));
     await userEvent.type(screen.getByLabelText('Commentaire'), 'Sonne dans le vide');
+    await userEvent.click(screen.getByRole('button', { name: 'Continuer' }));
     await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
 
     await waitFor(() => {

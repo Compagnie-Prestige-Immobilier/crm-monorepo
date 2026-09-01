@@ -289,7 +289,7 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/chues/campagnes',
-        label: 'Lots d’export',
+        label: 'Campagnes',
         icon: MegaphoneIcon,
         description: 'Fiches exportées pour le terrain',
         roles: ENCADREMENT,
@@ -328,7 +328,7 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/chues/campagnes',
-        label: 'Lots d’export',
+        label: 'Campagnes',
         icon: MegaphoneIcon,
         description: 'Fiches exportées pour le terrain',
         roles: ['ADMIN'],

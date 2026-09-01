@@ -113,7 +113,6 @@ export function RepresentantFormDialog({
   const professionId = useId();
   const prenomId = useId();
   const etablissementId = useId();
-  const syndicatId = useId();
   const connaitUESId = useId();
   const contacteId = useId();
 
@@ -173,6 +172,11 @@ export function RepresentantFormDialog({
   });
 
   const departements = reference?.departements ?? [];
+  const syndicatOptions = (reference?.syndicats ?? [])
+    .filter((item) => item.isActive)
+    .map((item) => ({ value: item.id, label: item.name, hint: item.sigle }));
+  // Le champ stocke le NOM du syndicat ; le combobox choisit par id, résolu ici.
+  const syndicatId = reference?.syndicats.find((item) => item.name === syndicat)?.id ?? null;
   const regionId =
     departements.find((departement) => departement.id === departementId)?.regionId ?? regionDraft;
 
@@ -542,18 +546,17 @@ export function RepresentantFormDialog({
                 </div>
               </div>
 
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor={syndicatId}>Niveau de syndicat</Label>
-                <Input
-                  id={syndicatId}
-                  value={syndicat}
-                  maxLength={160}
-                  autoComplete="off"
-                  onChange={(event) => {
-                    setSyndicat(event.target.value);
-                  }}
-                />
-              </div>
+              <FilterCombobox
+                label="Syndicat"
+                placeholder="Choisir un syndicat"
+                value={syndicatId}
+                options={syndicatOptions}
+                onChange={(value) => {
+                  setSyndicat(
+                    reference?.syndicats.find((item) => item.id === value)?.name ?? '',
+                  );
+                }}
+              />
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="flex flex-col gap-1.5">

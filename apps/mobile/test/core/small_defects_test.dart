@@ -87,7 +87,7 @@ void main() {
     });
   });
 
-  group('flux des représentants : une borne, comme pour les prospects', () {
+  group('flux des représentants : vide tant qu\'on n\'a pas cherché', () {
     late AppDatabase db;
     late ReferenceRepository repo;
 
@@ -97,28 +97,19 @@ void main() {
     });
     tearDown(() => db.close());
 
-    test(
-      'le flux est plafonné : l\'outbox le rejoue à chaque écriture',
-      () async {
-        for (int i = 0; i < 12; i++) {
-          await insertRepresentant(db, id: 'r$i', phone: '+2217700${1000 + i}');
-        }
+    test('sans recherche, la liste est vide même avec des fiches', () async {
+      for (int i = 0; i < 12; i++) {
+        await insertRepresentant(db, id: 'r$i', phone: '+2217700${1000 + i}');
+      }
 
-        final List<RepresentantSyncViewData> page = await repo
-            .watchRepresentants(limit: 5)
-            .first;
+      final List<RepresentantSyncViewData> vide = await repo
+          .watchRepresentants()
+          .first;
 
-        expect(
-          page,
-          hasLength(5),
-          reason:
-              'sans LIMIT, chaque changement d\'outbox rematérialisait la table '
-              'entière, jointure comprise',
-        );
-      },
-    );
+      expect(vide, isEmpty);
+    });
 
-    test('la recherche atteint ce qui est au-delà de la borne', () async {
+    test('la recherche atteint n\'importe quelle fiche', () async {
       for (int i = 0; i < 12; i++) {
         await insertRepresentant(
           db,
@@ -129,7 +120,7 @@ void main() {
       }
 
       final List<RepresentantSyncViewData> found = await repo
-          .watchRepresentants(search: 'Représentant 11', limit: 5)
+          .watchRepresentants(search: 'Représentant 11')
           .first;
 
       expect(found.map((RepresentantSyncViewData r) => r.id), <String>['r11']);
