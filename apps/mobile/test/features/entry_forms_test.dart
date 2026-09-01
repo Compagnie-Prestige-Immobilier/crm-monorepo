@@ -1375,9 +1375,7 @@ void main() {
       );
     });
 
-    // La base des représentants est importée depuis le web : le mobile ne la
-    // crée plus. Ni bouton de pied, ni « Créer « <recherche> » » sous un
-    // résultat vide.
+    // L'annuaire ne crée pas de représentant à partir d'une recherche vide.
     formTestWidgets('aucune création de représentant depuis l\'annuaire', (
       WidgetTester tester,
     ) async {
@@ -1394,6 +1392,18 @@ void main() {
 
       expect(find.text('Aucun résultat'), findsOneWidget);
       expect(bouton('Créer « Ousmane »'), findsNothing);
+    });
+
+    formTestWidgets('le représentant peut être passé', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(hostPicker());
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Continuer sans représentant'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('prospects'), findsOneWidget);
     });
 
     // Le formulaire de création reste routable pour la MODIFICATION d'une fiche

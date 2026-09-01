@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangleIcon, LoaderIcon } from 'lucide-react';
 import Link from 'next/link';
-import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useRef, useState, type KeyboardEvent } from 'react';
 import { toast } from 'sonner';
 
 import { FilterCombobox } from '@/components/filters/filter-combobox';
@@ -33,22 +33,13 @@ import { queryKeys } from '@/lib/query-keys';
 import { EMPTY_REPRESENTANT_FILTERS } from '@/lib/representant-filters';
 import type { FilterOption } from '@/lib/types';
 
-type FieldName = 'prenom' | 'nom' | 'phone' | 'representantId';
+type FieldName = 'prenom' | 'nom' | 'phone';
 
 type Errors = Partial<Record<FieldName, string>>;
 
 interface SaveVariables {
   input: CreateProspectInput;
   andNext: boolean;
-}
-
-function ChoiceError({ message }: { message: string | undefined }): ReactNode {
-  if (message === undefined) return null;
-  return (
-    <p role="alert" className="text-[0.75rem] text-destructive">
-      {message}
-    </p>
-  );
 }
 
 export function ProspectCreateForm({
@@ -136,10 +127,9 @@ export function ProspectCreateForm({
     if (nom.trim() === '') found.nom = 'Le nom est obligatoire.';
     if (phone.trim() === '') found.phone = 'Le numéro est obligatoire.';
     else if (e164 === null) found.phone = 'Numéro invalide pour le pays choisi.';
-    if (repId === null) found.representantId = 'Choisissez un représentant.';
 
     setErrors(found);
-    if (e164 === null || repId === null) return;
+    if (e164 === null) return;
     if (Object.keys(found).length > 0) return;
 
     setConflict(null);
@@ -148,7 +138,7 @@ export function ProspectCreateForm({
         prenom: prenom.trim(),
         nom: nom.trim(),
         phone: e164,
-        representantId: repId,
+        ...(repId === null ? {} : { representantId: repId }),
         ...(banqueId === null ? {} : { banqueId }),
         ...(syndicatId === null ? {} : { syndicatId }),
       },
@@ -190,9 +180,8 @@ export function ProspectCreateForm({
       {representantId === null ? (
         <div className="flex flex-col gap-1.5">
           <FilterCombobox
-            label="Représentant"
+            label="Représentant (facultatif)"
             placeholder="Choisir un représentant"
-            required
             value={repId}
             options={representantOptions}
             onChange={setRepId}
@@ -207,7 +196,6 @@ export function ProspectCreateForm({
               });
             }}
           />
-          <ChoiceError message={errors.representantId} />
         </div>
       ) : null}
 

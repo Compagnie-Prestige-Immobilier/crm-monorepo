@@ -10,6 +10,7 @@ import '../../../core/router/single_push.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/phone.dart';
 import '../../../data/local/database.dart';
+import '../../../ui/widgets/cpi_action_bar.dart';
 import '../../../ui/widgets/cpi_kit.dart';
 import '../../../ui/widgets/empty_state.dart';
 import '../../../ui/widgets/error_state.dart';
@@ -55,8 +56,16 @@ class _RepresentantPickerScreenState
             : 'Quel représentant ?',
         subtitle: widget.pourQualifier
             ? 'Cherchez son nom ou son numéro.'
-            : 'Celui qui vous a donné ce contact.',
+            : 'Facultatif. Choisissez-le s’il vous a donné ce contact.',
         leading: const CpiBackButton(),
+        footer: widget.pourQualifier
+            ? null
+            : CpiActionBar(
+                child: CpiButton(
+                  'Continuer sans représentant',
+                  onPressed: () => context.pushOnce(Routes.newProspect),
+                ),
+              ),
         body: Column(
           children: <Widget>[
             Padding(

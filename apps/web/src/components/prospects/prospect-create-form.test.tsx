@@ -117,15 +117,22 @@ describe('les champs obligatoires', () => {
     expect(create).not.toHaveBeenCalled();
   });
 
-  it('réclame un représentant quand l’URL n’en porte aucun', async () => {
+  it('enregistre sans représentant quand l’URL n’en porte aucun', async () => {
     const user = userEvent.setup();
+    create.mockResolvedValue(created());
     mount(null);
     await screen.findByRole('combobox', { name: /Représentant/u });
 
+    await fillIdentity('Moussa', 'Fall', '77 123 45 67');
     await user.click(screen.getByRole('button', { name: 'Enregistrer ce prospect' }));
 
-    expect(await screen.findByText('Choisissez un représentant.')).toBeTruthy();
-    expect(create).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(create).toHaveBeenCalledWith({
+        prenom: 'Moussa',
+        nom: 'Fall',
+        phone: '+221771234567',
+      });
+    });
   });
 
   it('n’offre pas une banque retirée du référentiel', async () => {
