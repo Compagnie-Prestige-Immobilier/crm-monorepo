@@ -63,8 +63,7 @@ export function LotsExportView({ canCreate }: { canCreate: boolean }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         {/* Le titre de la page est l'unique `h1`, rendu par la barre du panel. */}
         <p className="max-w-2xl text-[0.9375rem] text-muted-foreground">
-          Un lot fige une sélection de fiches à une date donnée, pour les télécharger en Excel ou en
-          PDF et suivre les appels passés dessus.
+          Une campagne répartit des fiches entre les téléconseillers et suit leur traitement.
         </p>
         {canCreate ? (
           <Button
@@ -74,18 +73,18 @@ export function LotsExportView({ canCreate }: { canCreate: boolean }) {
             }}
           >
             <PlusIcon aria-hidden="true" />
-            Nouveau lot
+            Nouvelle campagne
           </Button>
         ) : null}
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex min-w-56 flex-1 flex-col gap-1.5">
-          <Label htmlFor="lots-recherche">Rechercher un lot</Label>
+          <Label htmlFor="lots-recherche">Rechercher une campagne</Label>
           <Input
             id="lots-recherche"
             value={recherche}
-            placeholder="Nom du lot"
+            placeholder="Nom de la campagne"
             onChange={(event) => {
               setRecherche(event.target.value);
               setPage(1);
@@ -134,7 +133,7 @@ export function LotsExportView({ canCreate }: { canCreate: boolean }) {
               onRetry={() => {
                 void lots.refetch();
               }}
-              fallback="Les lots n’ont pas pu être chargés."
+              fallback="Les campagnes n’ont pas pu être chargées."
             />
           );
 
@@ -143,12 +142,14 @@ export function LotsExportView({ canCreate }: { canCreate: boolean }) {
             <div className="flex flex-col items-center gap-2 rounded-lg border border-border bg-card py-16 text-center shadow-elev-sm">
               <BoxesIcon className="size-8 text-muted-foreground" aria-hidden="true" />
               <p className="font-[600]">
-                {filtre ? 'Aucun lot ne correspond à ces critères.' : 'Aucun lot pour l’instant.'}
+                {filtre
+                  ? 'Aucune campagne ne correspond à ces critères.'
+                  : 'Aucune campagne pour l’instant.'}
               </p>
               <p className="max-w-md text-[0.8125rem] text-muted-foreground">
                 {filtre
                   ? 'Élargissez la recherche ou changez la cible.'
-                  : 'Créez-en un pour exporter des fiches.'}
+                  : 'Créez-en une pour répartir des fiches.'}
               </p>
             </div>
           );

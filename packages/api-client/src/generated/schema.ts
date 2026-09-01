@@ -2720,10 +2720,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Liste les lots d’export. */
+    /** Liste les campagnes. */
     get: operations['listLotsExport'];
     put?: never;
-    /** Crée un lot de fiches exportées. */
+    /** Crée une campagne de fiches. */
     post: operations['createLotExport'];
     delete?: never;
     options?: never;
@@ -2755,7 +2755,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Télécharge le classeur figé du lot. */
+    /** Télécharge le classeur figé de la campagne. */
     get: operations['downloadLotExportXlsx'];
     put?: never;
     post?: never;
@@ -2789,7 +2789,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Télécharge tous les programmes du lot. */
+    /** Télécharge tous les programmes de la campagne. */
     get: operations['downloadLotExportProgrammesZip'];
     put?: never;
     post?: never;
@@ -2806,7 +2806,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Consulte un lot et les appels qui ont suivi. */
+    /** Consulte une campagne et les appels qui ont suivi. */
     get: operations['getLotExport'];
     put?: never;
     post?: never;
@@ -5828,6 +5828,8 @@ export interface components {
       | 'adhesions'
       | 'reste-a-appeler'
       | 'par-teleconseiller'
+      | 'couverture-derniere-campagne'
+      | 'hors-attribution-derniere-campagne'
       | 'encaisse'
       | 'de-l-appel-a-l-encaissement'
       | 'methodes-d-adhesion'
@@ -6071,6 +6073,16 @@ export interface components {
       teleconseillerName: string;
       jours: components['schemas']['LotExportRepartitionJourDto'][];
     };
+    LotExportPerformanceDto: {
+      /** Format: uuid */
+      teleconseillerId: string;
+      teleconseillerName: string;
+      assigned: number;
+      treated: number;
+      completionRate: number;
+      assignedCalls: number;
+      outsideAssignmentCalls: number;
+    };
     LotExportDetailDto: {
       /** Format: uuid */
       id: string;
@@ -6089,6 +6101,7 @@ export interface components {
       callsByTeleconseiller: Record<string, never>;
       distribution: components['schemas']['LotExportDistributionDto'];
       repartition: components['schemas']['LotExportRepartitionDto'][];
+      performance: components['schemas']['LotExportPerformanceDto'][];
     };
   };
   responses: never;
@@ -16123,6 +16136,7 @@ export interface operations {
       query?: {
         search?: string;
         cible?: components['schemas']['LotExportCible'];
+        projet?: components['schemas']['Projet'];
         createdById?: string;
         dateFrom?: string;
         dateTo?: string;

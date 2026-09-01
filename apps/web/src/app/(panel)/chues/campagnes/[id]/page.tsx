@@ -9,7 +9,7 @@ import { getQueryClient } from '@/lib/query-client';
 import { queryKeys } from '@/lib/query-keys';
 import { guardRoles } from '@/lib/session';
 
-export const metadata: Metadata = { title: 'Lot d’export' };
+export const metadata: Metadata = { title: 'Campagne' };
 
 export default async function LotExportDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const guard = await guardRoles(['ADMIN', 'SUPERVISEUR', 'DIRECTION']);

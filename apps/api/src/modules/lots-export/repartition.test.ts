@@ -3,7 +3,7 @@ import { LotExportCible } from '@crm/database';
 import { describe, expect, it } from 'vitest';
 
 import { CreateLotExportDto } from './dto.js';
-import { repartir } from './repartition.js';
+import { capaciteParJour, repartir } from './repartition.js';
 
 const EQUIPE = [
   '01931f3c-1a2b-7c4d-8e5f-000000000001',
@@ -12,6 +12,9 @@ const EQUIPE = [
   '01931f3c-1a2b-7c4d-8e5f-000000000004',
 ];
 
+const equipe = (capacites: readonly number[] = [50, 50, 50, 50]) =>
+  EQUIPE.map((assigneeId, index) => ({ assigneeId, fichesParJour: capacites[index] ?? 50 }));
+
 const compter = (
   affectations: readonly { assigneeId: string; day: number }[],
   assigneeId: string,
@@ -19,7 +22,7 @@ const compter = (
 
 describe('repartir', () => {
   it('étale 340 fiches sur 4 téléconseillers, 50 par jour, 2 jours', () => {
-    const affectations = repartir(340, EQUIPE, 50, 2);
+    const affectations = repartir(340, equipe(), 2);
 
     expect(affectations).toHaveLength(340);
     for (const id of EQUIPE) expect(compter(affectations, id)).toBe(85);
@@ -29,7 +32,7 @@ describe('repartir', () => {
   });
 
   it('plafonne à ce que la répartition peut absorber', () => {
-    const affectations = repartir(1_200, EQUIPE, 50, 2);
+    const affectations = repartir(1_200, equipe(), 2);
 
     expect(affectations).toHaveLength(400);
     for (const id of EQUIPE) expect(compter(affectations, id)).toBe(100);
@@ -37,7 +40,7 @@ describe('repartir', () => {
   });
 
   it('sert en tourniquet, dans l’ordre reçu', () => {
-    expect(repartir(6, EQUIPE, 50, 1).map((affectation) => affectation.assigneeId)).toEqual([
+    expect(repartir(6, equipe(), 1).map((affectation) => affectation.assigneeId)).toEqual([
       EQUIPE[0],
       EQUIPE[1],
       EQUIPE[2],
@@ -47,8 +50,21 @@ describe('repartir', () => {
     ]);
   });
 
+  it('borne supervision et direction à 20 % de la capacité des téléconseillers', () => {
+    const capacites = [
+      capaciteParJour('COMMERCIAL', 50),
+      capaciteParJour('COMMERCIAL', 50),
+      capaciteParJour('SUPERVISEUR', 50),
+      capaciteParJour('DIRECTION', 50),
+    ];
+    const affectations = repartir(120, equipe(capacites), 1);
+
+    expect(affectations).toHaveLength(120);
+    expect(EQUIPE.map((id) => compter(affectations, id))).toEqual([50, 50, 10, 10]);
+  });
+
   it('ne retient rien sans équipe', () => {
-    expect(repartir(100, [], 50, 1)).toEqual([]);
+    expect(repartir(100, [], 1)).toEqual([]);
   });
 });
 

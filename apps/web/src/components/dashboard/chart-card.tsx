@@ -1,6 +1,7 @@
 import { useRef, type ReactNode } from 'react';
 
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { InfoPopover } from '@/components/stats/stat-info';
 import { cn } from '@/lib/utils';
 import { useCanvasPresentation } from '@/lib/use-canvas-presentation';
 
@@ -13,6 +14,7 @@ export function ChartCard({
   className,
   hauteur = 'normale',
   actions,
+  info,
 }: {
   title: string;
   description?: string | undefined;
@@ -24,6 +26,7 @@ export function ChartCard({
    */
   hauteur?: 'compacte' | 'normale' | 'haute';
   actions?: ReactNode | undefined;
+  info?: string | undefined;
 }) {
   const chartRegion = useRef<HTMLDivElement>(null);
 
@@ -33,7 +36,10 @@ export function ChartCard({
     <Card className={cn('animate-rise', className)}>
       <CardHeader className={actions === undefined ? undefined : 'flex-row items-start gap-3'}>
         <div className="min-w-0 flex-1">
-          <CardTitle>{title}</CardTitle>
+          <CardTitle className="flex items-center gap-1.5">
+            {title}
+            {info === undefined ? null : <InfoPopover label={title} description={info} />}
+          </CardTitle>
           {description !== undefined ? <CardDescription>{description}</CardDescription> : null}
         </div>
         {actions}

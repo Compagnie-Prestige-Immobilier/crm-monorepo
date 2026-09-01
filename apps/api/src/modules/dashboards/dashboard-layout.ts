@@ -121,6 +121,11 @@ const SOURCE_MARQUES: Record<DashboardSource, ReglesDeMarque> = {
   adhesions: CHIFFRE,
   'reste-a-appeler': { defaut: 'tuile', compatibles: ['tuile'] },
   'par-teleconseiller': { defaut: 'tableau', compatibles: ['tableau'] },
+  'couverture-derniere-campagne': {
+    defaut: 'barres-100',
+    compatibles: ['barres-100', 'barres-empilees', 'tableau'],
+  },
+  'hors-attribution-derniere-campagne': CLASSEMENT,
   encaisse: CHIFFRE,
   'de-l-appel-a-l-encaissement': COMPOSITION,
   'methodes-d-adhesion': { defaut: 'anneau', compatibles: COMPOSITION_MARQUES },
@@ -256,15 +261,33 @@ const USINE: Record<DashboardEcran, readonly DashboardSource[]> = {
     'par-objet',
     'qualite-de-saisie',
   ],
-  chues: ['taux-de-contact', 'a-rappeler', 'taux-de-qualification', 'adhesions', 'par-teleconseiller'],
+  chues: [
+    'taux-de-contact',
+    'a-rappeler',
+    'taux-de-qualification',
+    'adhesions',
+    'par-teleconseiller',
+  ],
   'grand-public': ['taux-de-joignabilite', 'prospects-notes', 'adhesions', 'par-teleconseiller'],
 };
 
 /** Ce que la direction voit EN PLUS, ajouté après le tableau d'équipe : le résultat. */
 const USINE_DIRECTION: Record<DashboardEcran, readonly DashboardSource[]> = {
   visites: [],
-  chues: ['encaisse', 'de-l-appel-a-l-encaissement', 'rendement-par-departement'],
-  'grand-public': ['encaisse', 'de-l-appel-a-l-encaissement', 'methodes-d-adhesion'],
+  chues: [
+    'couverture-derniere-campagne',
+    'hors-attribution-derniere-campagne',
+    'encaisse',
+    'de-l-appel-a-l-encaissement',
+    'rendement-par-departement',
+  ],
+  'grand-public': [
+    'couverture-derniere-campagne',
+    'hors-attribution-derniere-campagne',
+    'encaisse',
+    'de-l-appel-a-l-encaissement',
+    'methodes-d-adhesion',
+  ],
 };
 
 export function dispositionUsine(

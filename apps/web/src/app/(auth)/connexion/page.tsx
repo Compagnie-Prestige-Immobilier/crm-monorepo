@@ -107,7 +107,6 @@ export default async function ConnexionPage({
             <DevRoleSwitcher
               currentRole="ADMIN"
               enabled={process.env.NODE_ENV === 'development'}
-              autoLogin
               next={next}
             />
             <LoginForm next={next} />

@@ -62,6 +62,8 @@ const SOURCES_PROSPECTS = [
   'adhesions',
   'reste-a-appeler',
   'par-teleconseiller',
+  'couverture-derniere-campagne',
+  'hors-attribution-derniere-campagne',
   'encaisse',
   'de-l-appel-a-l-encaissement',
   'methodes-d-adhesion',
