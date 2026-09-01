@@ -146,8 +146,10 @@ export function GrandPublicProspectForm({
     if (incomeBandId !== null) input.incomeBandId = incomeBandId;
     if (paymentMode !== null) input.paymentMode = paymentMode;
     if (type !== null) input.type = type;
-    if (banqueId !== null) input.banqueId = banqueId;
-    if (syndicatId !== null) input.syndicatId = syndicatId;
+    if ((type === 'FONCTIONNAIRE' || type === 'SECTEUR_PRIVE') && banqueId !== null) {
+      input.banqueId = banqueId;
+    }
+    if (type === 'FONCTIONNAIRE' && syndicatId !== null) input.syndicatId = syndicatId;
     if (paymentMode === 'ECHELONNE' && dureeMois !== null) input.dureeSystemeMois = dureeMois;
     if (canalId !== null) input.canalProvenanceId = canalId;
 
@@ -160,6 +162,7 @@ export function GrandPublicProspectForm({
   const selectedProfession = reference.data?.professions.find(
     (profession) => profession.id === professionId,
   );
+  const salaried = type === 'FONCTIONNAIRE' || type === 'SECTEUR_PRIVE';
 
   return (
     <form
@@ -254,16 +257,6 @@ export function GrandPublicProspectForm({
         </Card>
       ) : null}
 
-      <FilterCombobox
-        label="Profession"
-        placeholder="Rechercher une profession"
-        value={professionId}
-        options={(reference.data?.professions ?? [])
-          .filter((profession) => profession.isActive)
-          .map((profession) => ({ value: profession.id, label: profession.label }))}
-        onChange={setProfessionId}
-      />
-
       <fieldset className="flex flex-col gap-2">
         <legend className="mb-2 text-[0.875rem] font-[600] text-foreground">Situation</legend>
         <div className="flex flex-wrap gap-2">
@@ -277,7 +270,11 @@ export function GrandPublicProspectForm({
                 variant={active ? 'default' : 'outline'}
                 aria-pressed={active}
                 onClick={() => {
-                  setType(active ? null : option);
+                  const next = active ? null : option;
+                  setType(next);
+                  setErrors({});
+                  if (next !== 'FONCTIONNAIRE' && next !== 'SECTEUR_PRIVE') setBanqueId(null);
+                  if (next !== 'FONCTIONNAIRE') setSyndicatId(null);
                 }}
               >
                 {PROSPECT_TYPE_LABELS[option]}
@@ -287,37 +284,53 @@ export function GrandPublicProspectForm({
         </div>
       </fieldset>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <FilterCombobox
-          label="Banque de domiciliation"
-          placeholder="Choisir une banque"
-          value={banqueId}
-          options={(reference.data?.banques ?? [])
-            .filter((banque) => banque.isActive)
-            .map((banque) => ({ value: banque.id, label: banque.name, hint: banque.shortName }))}
-          onChange={setBanqueId}
-        />
-        {errors.banqueId ? (
-          <p role="alert" className="text-[0.75rem] text-destructive">
-            {errors.banqueId}
-          </p>
-        ) : null}
-        {selectedProfession?.isTeaching ? (
+      <FilterCombobox
+        label={type === 'INFORMEL' ? 'Activité' : 'Profession'}
+        placeholder="Rechercher une profession"
+        value={professionId}
+        options={(reference.data?.professions ?? [])
+          .filter((profession) => profession.isActive)
+          .map((profession) => ({ value: profession.id, label: profession.label }))}
+        onChange={(value) => {
+          setProfessionId(value);
+          const profession = reference.data?.professions.find((item) => item.id === value);
+          if (profession?.isTeaching !== true) setSyndicatId(null);
+        }}
+      />
+
+      {salaried ? (
+        <div className="grid gap-4 sm:grid-cols-2">
           <FilterCombobox
-            label="Syndicat"
-            placeholder="Choisir un syndicat"
-            value={syndicatId}
-            options={(reference.data?.syndicats ?? [])
-              .filter((syndicat) => syndicat.isActive)
-              .map((syndicat) => ({
-                value: syndicat.id,
-                label: syndicat.name,
-                hint: syndicat.sigle,
-              }))}
-            onChange={setSyndicatId}
+            label="Banque de domiciliation"
+            placeholder="Choisir une banque"
+            value={banqueId}
+            options={(reference.data?.banques ?? [])
+              .filter((banque) => banque.isActive)
+              .map((banque) => ({ value: banque.id, label: banque.name, hint: banque.shortName }))}
+            onChange={setBanqueId}
           />
-        ) : null}
-      </div>
+          {errors.banqueId ? (
+            <p role="alert" className="text-[0.75rem] text-destructive">
+              {errors.banqueId}
+            </p>
+          ) : null}
+          {type === 'FONCTIONNAIRE' && selectedProfession?.isTeaching ? (
+            <FilterCombobox
+              label="Syndicat"
+              placeholder="Choisir un syndicat"
+              value={syndicatId}
+              options={(reference.data?.syndicats ?? [])
+                .filter((syndicat) => syndicat.isActive)
+                .map((syndicat) => ({
+                  value: syndicat.id,
+                  label: syndicat.name,
+                  hint: syndicat.sigle,
+                }))}
+              onChange={setSyndicatId}
+            />
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <FilterCombobox

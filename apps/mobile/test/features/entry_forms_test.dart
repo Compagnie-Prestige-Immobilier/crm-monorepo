@@ -580,9 +580,9 @@ void main() {
       expect(values['syndicatId'], 'sy-1');
     });
 
-    // Le Grand Public n'exige que le nom, le numéro et le secteur. Rendre un
+    // Le Grand Public n'exige que le nom, le numéro et la situation. Rendre un
     // champ de plus obligatoire, c'est une fiche abandonnée sur le terrain.
-    formTestWidgets('le Grand Public attend le secteur, et rien de plus', (
+    formTestWidgets('le Grand Public attend la situation, et rien de plus', (
       WidgetTester tester,
     ) async {
       await tester.pumpWidget(
@@ -594,13 +594,13 @@ void main() {
       await tester.enterText(champ('Téléphone'), '77 000 00 42');
       await tester.pumpAndSettle();
 
-      // Étape 1 sur 3 : « Continuer » reste éteint tant que le secteur manque,
+      // Étape 1 sur 3 : « Continuer » reste éteint tant que la situation manque,
       // et il DIT lequel.
       final Finder continuer = bouton('Continuer');
       expect(tester.widget<CpiButton>(continuer).onPressed, isNull);
       expect(
         tester.widget<CpiButton>(continuer).subtitle,
-        'Choisissez le secteur',
+        'Choisissez la situation',
       );
 
       await tester.tap(find.text('Informel'));
@@ -611,8 +611,12 @@ void main() {
       // Les deux étapes suivantes sont facultatives : rien n'y retient.
       await tester.tap(continuer);
       await tester.pumpAndSettle();
+      expect(find.text('Activité'), findsOneWidget);
       await tester.tap(bouton('Continuer'));
       await tester.pumpAndSettle();
+      expect(find.text('Banque de domiciliation'), findsNothing);
+      expect(find.text('Syndicat'), findsNothing);
+      expect(find.text('Provenance'), findsOneWidget);
 
       expect(
         tester.widget<CpiButton>(bouton('Enregistrer et suivant')).onPressed,
