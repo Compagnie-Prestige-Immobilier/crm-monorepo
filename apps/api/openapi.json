@@ -3275,6 +3275,16 @@
               "default": true,
               "type": "boolean"
             }
+          },
+          {
+            "name": "enrichir",
+            "required": false,
+            "in": "query",
+            "description": "Complète les fiches déjà en base au lieu de les rejeter. NE REMPLIT QUE LE VIDE : un statut déjà tranché, une note déjà écrite et une fiche qui porte déjà un appel ne sont jamais touchés.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "requestBody": {
@@ -19336,6 +19346,14 @@
             "type": "number",
             "description": "Lignes retenues."
           },
+          "enrichable": {
+            "type": "number",
+            "description": "Fiches déjà en base à qui le fichier apporte quelque chose. Nul quand `enrichir` est faux."
+          },
+          "enriched": {
+            "type": "number",
+            "description": "Fiches existantes réellement complétées. Nul en simulation."
+          },
           "rejected": {
             "type": "number",
             "description": "Lignes rejetées."
@@ -19367,6 +19385,8 @@
           "dryRun",
           "totalRows",
           "valid",
+          "enrichable",
+          "enriched",
           "rejected",
           "duplicates",
           "created",
