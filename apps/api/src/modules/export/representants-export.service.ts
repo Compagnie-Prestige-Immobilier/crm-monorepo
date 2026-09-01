@@ -9,6 +9,11 @@ import { readableOwnerId, readScope } from '../../common/scope.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { WorkspaceContext } from '../../workspaces/workspace.js';
 import { IMPORT_COLUMNS, IMPORT_SHEET_NAME } from '../representants/import-template.js';
+import {
+  OUTCOME_LABELS,
+  RELATION_LABELS,
+  WHATSAPP_LABELS,
+} from '../representants/import-fields.js';
 import type { RepresentantExportQueryDto } from '../representants/dto.js';
 import { RepresentantSortField } from '../representants/dto.js';
 import {
@@ -88,10 +93,14 @@ export class RepresentantsExportService {
     await writeImportTemplate(stream, {
       sheetName: IMPORT_SHEET_NAME,
       columns: IMPORT_COLUMNS,
-      // Colonnes 3 et 4 de `IMPORT_COLUMNS` : Département et IEF.
+      // Rangs dans `IMPORT_COLUMNS` : Département, IEF, Statut relation,
+      // WhatsApp, Issue du dernier appel.
       dropdowns: [
         { column: 3, label: 'Départements', values: departements.map((row) => row.name) },
         { column: 4, label: 'IEF', values: iefs.map((row) => row.name) },
+        { column: 7, label: 'Relations', values: [...RELATION_LABELS] },
+        { column: 8, label: 'WhatsApp', values: [...WHATSAPP_LABELS] },
+        { column: 11, label: 'Issues', values: [...OUTCOME_LABELS] },
       ],
       rules: [
         ...COMMON_TEMPLATE_RULES,
