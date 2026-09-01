@@ -18,10 +18,7 @@ import '../../ui/widgets/search_field.dart';
 import '../../ui/widgets/sync_status_icon.dart';
 import 'app_shell.dart';
 
-/// Les prospects du Grand Public, en LECTURE.
-///
-/// La base vient du web : rien ne se crée ni ne se supprime ici. L'écran sert à
-/// retrouver quelqu'un avant ou après un appel, et la ligne ouvre sa fiche.
+/// Les prospects du Grand Public : retrouver une fiche ou en saisir une.
 class GrandPublicFichesScreen extends ConsumerWidget {
   const GrandPublicFichesScreen({super.key});
 
@@ -36,6 +33,13 @@ class GrandPublicFichesScreen extends ConsumerWidget {
     return CpiScaffold(
       title: 'Fiches',
       subtitle: 'Prospects hors CHUES',
+      actions: <Widget>[
+        CpiHeaderAction(
+          icon: PhosphorIconsRegular.userPlus,
+          label: 'Nouveau prospect',
+          onPressed: () => context.push(Routes.grandPublicNew).ignore(),
+        ),
+      ],
       banner: const PendingBanner(),
       body: prospects.whenEchecDAbord(
         loading: () => const Center(
@@ -197,7 +201,6 @@ class _Empty extends StatelessWidget {
     title: searching ? 'Aucun résultat' : 'Aucun prospect',
     message: searching
         ? 'Vérifiez le nom ou le numéro, ou effacez la recherche.'
-        : 'Les prospects arrivent du bureau. '
-              'Touchez « Recevoir les listes » dans Réglages.',
+        : 'Ajoutez le premier prospect depuis le bouton en haut de l’écran.',
   );
 }

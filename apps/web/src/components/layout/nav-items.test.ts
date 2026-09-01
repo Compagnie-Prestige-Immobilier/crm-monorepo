@@ -395,14 +395,14 @@ describe('navigation d’un téléconseiller', () => {
     ]);
   });
 
-  it('ouvre le Grand Public sur l’appel, la liste restant sous « Plus »', () => {
+  it('ouvre le Grand Public sur l’espace qui permet aussi de créer', () => {
     expect(hrefs('COMMERCIAL', 'grand-public')).toEqual([
+      '/grand-public',
       '/grand-public/console',
       '/grand-public/rappels',
       '/grand-public/nouveau',
-      '/grand-public',
     ]);
-    expect(coqueHomePath('COMMERCIAL', 'grand-public')).toBe('/grand-public/console');
+    expect(coqueHomePath('COMMERCIAL', 'grand-public')).toBe('/grand-public');
   });
 
   it('lui ouvre les prospects, que l’API borne déjà à ses fiches', () => {

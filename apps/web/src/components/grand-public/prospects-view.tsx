@@ -5,7 +5,9 @@ import {
   ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ClockIcon,
   InboxIcon,
+  PhoneCallIcon,
   PlusIcon,
   RotateCcwIcon,
   SlidersHorizontalIcon,
@@ -21,7 +23,7 @@ import { Absent } from '@/components/grand-public/absence';
 import { GrandPublicProspectForm } from '@/components/grand-public/prospect-form';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -173,12 +175,30 @@ export function GrandPublicProspectsView({ canCreate }: { canCreate: boolean }) 
             Les particuliers démarchés hors syndicat. Les fiches CHUES ne figurent pas ici.
           </p>
         </div>
-        {canCreate ? (
-          <Button size="lg" onClick={() => setCreateOpen(true)}>
-            <PlusIcon aria-hidden="true" />
-            Nouveau prospect
-          </Button>
-        ) : null}
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/grand-public/rappels"
+            className={buttonVariants({ variant: 'outline', size: 'lg' })}
+          >
+            <ClockIcon aria-hidden="true" />
+            Voir les rappels
+          </Link>
+          {canCreate ? (
+            <>
+              <Link
+                href="/grand-public/console"
+                className={buttonVariants({ variant: 'outline', size: 'lg' })}
+              >
+                <PhoneCallIcon aria-hidden="true" />
+                Appeler les prospects
+              </Link>
+              <Button size="lg" onClick={() => setCreateOpen(true)}>
+                <PlusIcon aria-hidden="true" />
+                Nouveau prospect
+              </Button>
+            </>
+          ) : null}
+        </div>
       </div>
 
       <section

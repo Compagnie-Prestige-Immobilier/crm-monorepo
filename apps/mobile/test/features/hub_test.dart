@@ -9,6 +9,7 @@ import 'package:cpi_go/features/accueil/presentation/registre_screen.dart';
 import 'package:cpi_go/features/auth/auth_controller.dart';
 import 'package:cpi_go/features/auth/auth_state.dart';
 import 'package:cpi_go/features/home/presentation/home_screen.dart';
+import 'package:cpi_go/features/prospect/presentation/prospect_entry_screen.dart';
 import 'package:cpi_go/features/representant/presentation/representant_form_screen.dart';
 import 'package:cpi_go/features/shell/grand_public_screen.dart';
 import 'package:cpi_go/features/shell/hub_screen.dart';
@@ -314,10 +315,15 @@ void main() {
     await settle(tester);
 
     expect(find.byType(GrandPublicScreen), findsOneWidget);
-    expect(find.text('Appels du jour'), findsOneWidget);
-    // La base vient du bureau : rien ne se crée depuis le téléphone.
-    expect(find.text('Nouveau prospect'), findsNothing);
+    expect(find.text('Appeler un prospect'), findsOneWidget);
+    expect(find.text('Nouveau prospect'), findsOneWidget);
 
+    await tester.tap(find.text('Nouveau prospect'));
+    await settle(tester);
+    expect(find.byType(ProspectEntryScreen), findsOneWidget);
+
+    await tester.tap(find.bySemanticsLabel('Retour'));
+    await settle(tester);
     await retourAuxProjets(tester);
     expect(find.byType(HubScreen), findsOneWidget);
 

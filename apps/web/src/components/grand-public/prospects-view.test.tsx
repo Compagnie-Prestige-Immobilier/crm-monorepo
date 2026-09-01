@@ -151,6 +151,19 @@ describe('l’état vide', () => {
 });
 
 describe('la liste', () => {
+  it('donne accès à la création, aux appels et aux rappels', async () => {
+    list.mockResolvedValue(page([]));
+    mount();
+
+    expect(await screen.findByRole('button', { name: 'Nouveau prospect' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Appeler les prospects' }).getAttribute('href')).toBe(
+      '/grand-public/console',
+    );
+    expect(screen.getByRole('link', { name: 'Voir les rappels' }).getAttribute('href')).toBe(
+      '/grand-public/rappels',
+    );
+  });
+
   it('ouvre la fiche depuis le nom', async () => {
     list.mockResolvedValue(page([row()]));
     mount();
