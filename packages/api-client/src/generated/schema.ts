@@ -3336,6 +3336,14 @@ export interface components {
       departementName: string;
       iefName: string | null;
       notes: string | null;
+      etablissement: string | null;
+      relationStatus: components['schemas']['RepresentantRelation'];
+      whatsappStatus: components['schemas']['WhatsappStatus'];
+      /**
+       * Format: date-time
+       * @description Date de l’appel déjà passé que la ligne enregistrera, s’il y en a un.
+       */
+      calledAt: string | null;
     };
     ImportReportDto: {
       /** @description Vrai si rien n’a été écrit. Le premier temps de l’import est TOUJOURS une simulation : appliquer 4 000 lignes sans les avoir vues ne se rattrape pas. */

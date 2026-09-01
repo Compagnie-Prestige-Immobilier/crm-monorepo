@@ -31,7 +31,8 @@ import {
   REPRESENTANTS_TEMPLATE_URL,
   type ImportReport,
 } from '@/lib/data/representants-import';
-import { formatNumber, formatPhone } from '@/lib/format';
+import { RelationBadge } from '@/components/representants/relation-badge';
+import { formatDate, formatNumber, formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import { cn } from '@/lib/utils';
@@ -323,6 +324,9 @@ function ImportReportPanel({
                     <TableHead>Téléphone</TableHead>
                     <TableHead>Département</TableHead>
                     <TableHead>IEF</TableHead>
+                    <TableHead>Établissement</TableHead>
+                    <TableHead>Relation</TableHead>
+                    <TableHead>Dernier appel</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -333,6 +337,15 @@ function ImportReportPanel({
                       <TableCell className="tabular-nums">{formatPhone(row.phoneE164)}</TableCell>
                       <TableCell>{row.departementName}</TableCell>
                       <TableCell className="text-muted-foreground">{row.iefName ?? '–'}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {row.etablissement ?? '–'}
+                      </TableCell>
+                      <TableCell>
+                        <RelationBadge status={row.relationStatus} />
+                      </TableCell>
+                      <TableCell className="text-muted-foreground tabular-nums">
+                        {row.calledAt === null ? '–' : formatDate(row.calledAt)}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

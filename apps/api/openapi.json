@@ -19216,9 +19216,44 @@
           "notes": {
             "type": "string",
             "nullable": true
+          },
+          "etablissement": {
+            "type": "string",
+            "nullable": true
+          },
+          "relationStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RepresentantRelation"
+              }
+            ]
+          },
+          "whatsappStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WhatsappStatus"
+              }
+            ]
+          },
+          "calledAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "Date de l’appel déjà passé que la ligne enregistrera, s’il y en a un."
           }
         },
-        "required": ["line", "fullName", "phoneE164", "departementName", "iefName", "notes"]
+        "required": [
+          "line",
+          "fullName",
+          "phoneE164",
+          "departementName",
+          "iefName",
+          "notes",
+          "etablissement",
+          "relationStatus",
+          "whatsappStatus",
+          "calledAt"
+        ]
       },
       "ImportReportDto": {
         "type": "object",

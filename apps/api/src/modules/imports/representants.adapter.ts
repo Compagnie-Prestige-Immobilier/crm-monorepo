@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { ImportKind, ImportMode } from '@crm/database';
+import type { RepCallOutcome, RepresentantRelation, WhatsappStatus } from '@crm/database';
 import { v7 as uuidv7 } from 'uuid';
 
 import { tryNormalizePhone } from '../../common/phone.js';
 import { IMPORT_COLUMNS } from '../representants/import-template.js';
-import { normalizeKey } from '../representants/representants-import.service.js';
+import { normalizeKey, parseComplements } from '../representants/import-fields.js';
 import { chunkOf } from './imports.job.js';
 import type {
   ChunkOutcome,
@@ -72,6 +73,13 @@ export interface RepresentantImportRow {
   readonly departementId: string;
   readonly iefId: string | null;
   readonly notes: string | null;
+  readonly etablissement: string | null;
+  readonly relationStatus: RepresentantRelation;
+  readonly whatsappStatus: WhatsappStatus;
+  /** Le compte propriétaire de la fiche. `null` : celui qui a demandé l'import. */
+  readonly ownerId: string | null;
+  /** L'appel déjà passé, quand le fichier le date. */
+  readonly appel: { readonly date: Date; readonly outcome: RepCallOutcome } | null;
 }
 
 interface ReferentielRow {
@@ -95,6 +103,7 @@ export interface RepresentantImportRun {
   readonly seen: Map<string, number>;
   readonly departements: ReadonlyMap<string, ReferentielRow>;
   readonly iefs: ReadonlyMap<string, IefRow>;
+  readonly users: ReadonlyMap<string, { readonly id: string }>;
 }
 
 /** Numéros interrogés en une fois lors du contrôle contre la base. */
@@ -116,6 +125,7 @@ const cellAt = (cells: Record<string, string>, index: number): string => {
 const columnAt = (index: number, fallback: string): string =>
   IMPORT_COLUMNS[index]?.header ?? fallback;
 
+
 @Injectable()
 export class RepresentantsImportAdapter implements ImportAdapter<
   RepresentantImportRow,
@@ -133,7 +143,7 @@ export class RepresentantsImportAdapter implements ImportAdapter<
    * de cet après-midi, sans redéploiement.
    */
   async prepare(ctx: ImportRunContext): Promise<RepresentantImportRun> {
-    const [departements, iefs] = await Promise.all([
+    const [departements, iefs, users] = await Promise.all([
       ctx.tx.departement.findMany({
         where: { isActive: true },
         select: { id: true, name: true, code: true },
@@ -142,9 +152,22 @@ export class RepresentantsImportAdapter implements ImportAdapter<
         where: { isActive: true },
         select: { id: true, name: true, code: true, departementId: true },
       }),
+      ctx.tx.user.findMany({
+        where: { isActive: true, deletedAt: null },
+        select: { id: true, username: true, email: true, fullName: true },
+      }),
     ]);
 
     return {
+      // Identifiant, e-mail ET nom complet : le classeur terrain désigne les
+      // chargés de compte par leur prénom d'usage, pas par leur identifiant.
+      users: new Map(
+        users.flatMap((row) => [
+          [normalizeKey(row.username), row],
+          [normalizeKey(row.email), row],
+          [normalizeKey(row.fullName), row],
+        ]),
+      ),
       // REMISE À ZÉRO à chaque course, et c'est ce qui rend une reprise
       // correcte : un travail repris relit son classeur depuis `processedRows`,
       // et les téléphones vus par le travailleur mort ne sont plus là pour
@@ -187,6 +210,21 @@ export class RepresentantsImportAdapter implements ImportAdapter<
     const departement = cellAt(cells, 2);
     const ief = cellAt(cells, 3);
     const notes = cellAt(cells, 4);
+    const etablissement = cellAt(cells, 5);
+    const complements = parseComplements(
+      {
+        relation: cellAt(cells, 6),
+        whatsapp: cellAt(cells, 7),
+        charge: cellAt(cells, 8),
+        dateAppel: cellAt(cells, 9),
+        issue: cellAt(cells, 10),
+      },
+      refs.users,
+    );
+    if ('code' in complements) {
+      const { rang, code, message } = complements;
+      return { ok: false, error: { rowNumber, column: columnAt(rang, ''), code, message } };
+    }
 
     if (fullName.length < 2) {
       return {
@@ -266,6 +304,8 @@ export class RepresentantsImportAdapter implements ImportAdapter<
         departementId: departementRow.id,
         iefId: iefRow?.id ?? null,
         notes: notes ? notes.slice(0, 2_000) : null,
+        etablissement: etablissement ? etablissement.slice(0, 200) : null,
+        ...complements,
       },
     };
   }
@@ -341,18 +381,24 @@ export class RepresentantsImportAdapter implements ImportAdapter<
     if (retained.length === 0) return { created: 0, skipped, errors };
 
     const now = new Date();
+    // UUID v7 engendrés AVANT l'écriture : les appels déjà passés s'y rattachent
+    // par clé étrangère, et il faut donc les connaître. L'import n'a pas de
+    // client hors ligne, mais l'identifiant doit rester du même format que ceux
+    // du mobile, sinon l'ordre lexicographique cesse d'être l'ordre temporel.
+    const avecId = retained.map((row) => ({ row, id: uuidv7() }));
+
     const written = await ctx.tx.representant.createMany({
-      data: retained.map((row) => ({
-        // UUID v7 engendré ici : l'import n'a pas de client hors ligne, mais
-        // l'identifiant doit rester du même format que ceux du mobile, sinon
-        // l'ordre lexicographique cesse d'être l'ordre temporel.
-        id: uuidv7(),
+      data: avecId.map(({ row, id }) => ({
+        id,
         fullName: row.fullName,
         phoneE164: row.phoneE164,
         departementId: row.departementId,
         iefId: row.iefId,
         notes: row.notes,
-        createdById: ctx.requestedById,
+        etablissement: row.etablissement,
+        relationStatus: row.relationStatus,
+        whatsappStatus: row.whatsappStatus,
+        createdById: row.ownerId ?? ctx.requestedById,
         // La saisie terrain est inconnue pour un import : on retient l'instant
         // de l'écriture, jamais une date inventée. Les statistiques d'activité
         // s'appuient dessus, une valeur fabriquée les fausserait.
@@ -363,6 +409,36 @@ export class RepresentantsImportAdapter implements ImportAdapter<
       // autres. L'ÉCART EST DIT, il n'est pas avalé, voir juste en dessous.
       skipDuplicates: true,
     });
+
+    // Les appels ne se rattachent qu'aux fiches RÉELLEMENT écrites : une ligne
+    // écartée par `skipDuplicates` laisserait un appel pointant sur un
+    // identifiant absent, et la clé étrangère ferait échouer toute la tranche.
+    const appels = avecId.flatMap(({ row, id }) =>
+      row.appel === null
+        ? []
+        : [{ id, appel: row.appel, performedById: row.ownerId ?? ctx.requestedById }],
+    );
+    if (appels.length > 0) {
+      const presentes = new Set(
+        (
+          await ctx.tx.representant.findMany({
+            where: { id: { in: appels.map(({ id }) => id) } },
+            select: { id: true },
+          })
+        ).map((found) => found.id),
+      );
+      await ctx.tx.repCallAttempt.createMany({
+        data: appels
+          .filter(({ id }) => presentes.has(id))
+          .map(({ id, appel, performedById }) => ({
+            id: uuidv7(),
+            representantId: id,
+            performedById,
+            outcome: appel.outcome,
+            clientCreatedAt: appel.date,
+          })),
+      });
+    }
 
     if (written.count < retained.length) {
       // Entre la lecture des téléphones connus et l'écriture, un commercial a pu
