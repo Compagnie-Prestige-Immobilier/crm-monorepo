@@ -57,6 +57,24 @@ const WHATSAPP_ITEMS = WHATSAPP_STATUSES.map((status) => ({
   label: WHATSAPP_STATUS_LABELS[status],
 }));
 
+/** Trois états, car le contrat porte `boolean | null` : « Indéterminé » n'écrit rien. */
+const TRISTATE_ITEMS: { value: 'oui' | 'non' | 'na'; label: string }[] = [
+  { value: 'oui', label: 'Oui' },
+  { value: 'non', label: 'Non' },
+  { value: 'na', label: 'Indéterminé' },
+];
+
+function triToString(value: boolean | null): 'oui' | 'non' | 'na' {
+  if (value === null) return 'na';
+  return value ? 'oui' : 'non';
+}
+
+function triFromString(value: string): boolean | null {
+  if (value === 'oui') return true;
+  if (value === 'non') return false;
+  return null;
+}
+
 export interface RepresentantPrefill {
   fullName: string;
   phone: string;
@@ -93,8 +111,18 @@ export function RepresentantFormDialog({
   const whatsappId = useId();
   const whatsappNumberId = useId();
   const professionId = useId();
+  const prenomId = useId();
+  const etablissementId = useId();
+  const syndicatId = useId();
+  const connaitUESId = useId();
+  const contacteId = useId();
 
   const [fullName, setFullName] = useState('');
+  const [prenom, setPrenom] = useState('');
+  const [etablissement, setEtablissement] = useState('');
+  const [syndicat, setSyndicat] = useState('');
+  const [connaitUES, setConnaitUES] = useState<boolean | null>(null);
+  const [contacte, setContacte] = useState<boolean | null>(null);
   const [phone, setPhone] = useState('');
   const [regionDraft, setRegionDraft] = useState<string | null>(null);
   const [departementId, setDepartementId] = useState<string | null>(null);
@@ -119,6 +147,11 @@ export function RepresentantFormDialog({
   useEffect(() => {
     if (!open) return;
     setFullName(representant?.fullName ?? prefill?.fullName ?? '');
+    setPrenom(representant?.prenom ?? '');
+    setEtablissement(representant?.etablissement ?? '');
+    setSyndicat(representant?.syndicat ?? '');
+    setConnaitUES(representant?.connaitUES ?? null);
+    setContacte(representant?.contacte ?? null);
     setPhone(representant === null ? (prefill?.phone ?? '') : formatPhone(representant.phoneE164));
     setRegionDraft(null);
     setDepartementId(representant?.departementId ?? null);
@@ -191,6 +224,17 @@ export function RepresentantFormDialog({
         if (profession.trim() !== (savedScript?.profession ?? '')) {
           patch.profession = profession.trim();
         }
+        if (prenom.trim() !== (representant.prenom ?? '')) patch.prenom = prenom.trim();
+        if (etablissement.trim() !== (representant.etablissement ?? '')) {
+          patch.etablissement = etablissement.trim();
+        }
+        if (syndicat.trim() !== (representant.syndicat ?? '')) patch.syndicat = syndicat.trim();
+        // Le contrat n'admet que `boolean` : « Indéterminé » ne peut pas remettre
+        // la valeur à null, il laisse donc la fiche telle quelle.
+        if (connaitUES !== null && connaitUES !== representant.connaitUES) {
+          patch.connaitUES = connaitUES;
+        }
+        if (contacte !== null && contacte !== representant.contacte) patch.contacte = contacte;
         return updateRepresentant(representant.id, patch);
       }
 
@@ -467,6 +511,97 @@ export function RepresentantFormDialog({
                 ))}
               </datalist>
             </div>
+          ) : null}
+
+          {isEdit && !pendantAppel ? (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor={prenomId}>Prénom</Label>
+                  <Input
+                    id={prenomId}
+                    value={prenom}
+                    maxLength={120}
+                    autoComplete="off"
+                    onChange={(event) => {
+                      setPrenom(event.target.value);
+                    }}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor={etablissementId}>Établissement</Label>
+                  <Input
+                    id={etablissementId}
+                    value={etablissement}
+                    maxLength={160}
+                    autoComplete="off"
+                    onChange={(event) => {
+                      setEtablissement(event.target.value);
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor={syndicatId}>Niveau de syndicat</Label>
+                <Input
+                  id={syndicatId}
+                  value={syndicat}
+                  maxLength={160}
+                  autoComplete="off"
+                  onChange={(event) => {
+                    setSyndicat(event.target.value);
+                  }}
+                />
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor={connaitUESId}>Connaît l’UES</Label>
+                  <Select
+                    items={TRISTATE_ITEMS}
+                    value={triToString(connaitUES)}
+                    onValueChange={(value) => {
+                      if (value === null) return;
+                      setConnaitUES(triFromString(value));
+                    }}
+                  >
+                    <SelectTrigger id={connaitUESId} className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TRISTATE_ITEMS.map((item) => (
+                        <SelectItem key={item.value} value={item.value}>
+                          {item.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor={contacteId}>Déjà contacté</Label>
+                  <Select
+                    items={TRISTATE_ITEMS}
+                    value={triToString(contacte)}
+                    onValueChange={(value) => {
+                      if (value === null) return;
+                      setContacte(triFromString(value));
+                    }}
+                  >
+                    <SelectTrigger id={contacteId} className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TRISTATE_ITEMS.map((item) => (
+                        <SelectItem key={item.value} value={item.value}>
+                          {item.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </>
           ) : null}
 
           <div className="flex flex-col gap-1.5">

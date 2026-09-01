@@ -93,6 +93,11 @@ export function toRepresentantDto(row: RepresentantRow): RepresentantDto {
     whatsappE164: row.whatsappE164,
     whatsappNumber: whatsappNumberOf(row),
     profession: row.profession,
+    prenom: row.prenom,
+    etablissement: row.etablissement,
+    syndicat: row.syndicat,
+    connaitUES: row.connaitUES,
+    contacte: row.contacte,
   };
 }
 
@@ -256,6 +261,8 @@ export class RepresentantsService {
         fullName: input.fullName.trim(),
         phoneE164,
         ...(input.notes ? { notes: input.notes } : {}),
+        ...(input.prenom ? { prenom: input.prenom.trim() } : {}),
+        ...(input.etablissement ? { etablissement: input.etablissement.trim() } : {}),
         departementId: input.departementId,
         iefId: input.iefId ?? null,
         createdById: user.id,
@@ -308,6 +315,13 @@ export class RepresentantsService {
           ...(input.fullName ? { fullName: input.fullName.trim() } : {}),
           ...(phoneE164 ? { phoneE164 } : {}),
           ...(input.notes !== undefined ? { notes: input.notes || null } : {}),
+          ...(input.prenom !== undefined ? { prenom: input.prenom.trim() || null } : {}),
+          ...(input.etablissement !== undefined
+            ? { etablissement: input.etablissement.trim() || null }
+            : {}),
+          ...(input.syndicat !== undefined ? { syndicat: input.syndicat.trim() || null } : {}),
+          ...(input.connaitUES !== undefined ? { connaitUES: input.connaitUES } : {}),
+          ...(input.contacte !== undefined ? { contacte: input.contacte } : {}),
           ...(input.departementId ? { departementId: input.departementId } : {}),
           ...(input.iefId === undefined ? {} : { iefId: input.iefId }),
           ...(input.clientCreatedAt ? { clientCreatedAt: new Date(input.clientCreatedAt) } : {}),

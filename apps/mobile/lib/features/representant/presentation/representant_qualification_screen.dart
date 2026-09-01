@@ -41,8 +41,15 @@ class _RepresentantQualificationScreenState
   final TextEditingController suggestionTelephone = TextEditingController();
   final TextEditingController suggestionNom = TextEditingController();
   final TextEditingController suggestionNote = TextEditingController();
+  final TextEditingController nouvelEtablissement = TextEditingController();
+  final TextEditingController niveauSyndicat = TextEditingController();
+  final TextEditingController nouveauNumero = TextEditingController();
   _Resultat? resultat;
-  bool? representantCpi;
+  bool? etablissementConfirme;
+  bool? aEteContacte;
+  bool? connaitUES;
+  bool? ambassadeur;
+  bool? numeroConfirme;
   bool? memeNumeroWhatsapp;
   DateTime? rappelAt;
   bool saving = false;
@@ -66,13 +73,16 @@ class _RepresentantQualificationScreenState
     suggestionTelephone.dispose();
     suggestionNom.dispose();
     suggestionNote.dispose();
+    nouvelEtablissement.dispose();
+    niveauSyndicat.dispose();
+    nouveauNumero.dispose();
     super.dispose();
   }
 
   /// Une personne proposée à la place de celle qu'on vient d'appeler : elle
-  /// n'a de sens que si le représentant a dit non.
+  /// n'a de sens que si le représentant n'est pas ambassadeur.
   bool get proposeQuelquUn =>
-      resultat == _Resultat.joignable && representantCpi == false;
+      resultat == _Resultat.joignable && ambassadeur == false;
 
   /// N'importe lequel des trois champs suffit à ouvrir la suggestion : ce que
   /// le téléconseiller a tapé ne doit pas disparaître faute de numéro.
@@ -85,27 +95,45 @@ class _RepresentantQualificationScreenState
   void erreur(BuildContext context, String message) =>
       cpiToast(context, message);
 
-  /// Ce qui retient la première étape : le résultat et ce qu'il entraîne.
+  /// Ce qui retient la première étape : le résultat et ce qu'il entraîne. Suit
+  /// l'ordre du script pour que le message nomme la première question restée
+  /// sans réponse.
   String? get manqueResultat {
     final _Resultat? choix = resultat;
     if (choix == null) return 'Choisissez d\'abord le résultat';
-    if (choix == _Resultat.joignable && representantCpi == null) {
-      return 'Dites s\'il est représentant CPI CHUES';
-    }
-    if (choix == _Resultat.joignable &&
-        representantCpi == true &&
-        memeNumeroWhatsapp == null) {
-      return 'Dites s\'il a WhatsApp sur ce numéro';
-    }
-    if (choix == _Resultat.joignable &&
-        representantCpi == true &&
-        memeNumeroWhatsapp == false &&
-        Phone.parse(whatsapp.text) is! PhoneValid) {
-      return 'Écrivez le numéro WhatsApp';
-    }
     if (choix == _Resultat.rappel && rappelAt == null) {
       return 'Choisissez quand rappeler';
     }
+    if (choix != _Resultat.joignable) return null;
+
+    if (etablissementConfirme == null) {
+      return 'Confirmez l\'établissement';
+    }
+    if (etablissementConfirme == false &&
+        nouvelEtablissement.text.trim().isEmpty) {
+      return 'Écrivez le nouvel établissement';
+    }
+    if (aEteContacte == null) return 'Dites s\'il a été contacté';
+    if (connaitUES == null) return 'Dites s\'il connaît l\'UES';
+    if (ambassadeur == null) return 'Dites s\'il est ambassadeur';
+
+    if (ambassadeur == true) {
+      if (numeroConfirme == null) return 'Confirmez le numéro';
+      if (numeroConfirme == false &&
+          Phone.parse(nouveauNumero.text) is! PhoneValid) {
+        return nouveauNumero.text.trim().isEmpty
+            ? 'Écrivez le nouveau numéro'
+            : 'Nouveau numéro incomplet';
+      }
+      if (memeNumeroWhatsapp == null) {
+        return 'Dites s\'il a WhatsApp sur ce numéro';
+      }
+      if (memeNumeroWhatsapp == false &&
+          Phone.parse(whatsapp.text) is! PhoneValid) {
+        return 'Écrivez le numéro WhatsApp';
+      }
+    }
+
     if (proposeQuelquUn &&
         suggestionCommencee &&
         Phone.parse(suggestionTelephone.text) is! PhoneValid) {
@@ -122,37 +150,55 @@ class _RepresentantQualificationScreenState
   /// réponse est complète : le bouton s'allume alors.
   String? get manque => manqueResultat;
 
-  List<CpiRecapLine> recapDe(RepresentantSyncViewData? representant) =>
-      <CpiRecapLine>[
-        CpiRecapLine('Personne appelée', representant?.fullName),
+  static String? _ouiNon(bool? value) =>
+      value == null ? null : (value ? 'Oui' : 'Non');
+
+  List<CpiRecapLine> recapDe(
+    RepresentantSyncViewData? representant,
+  ) => <CpiRecapLine>[
+    CpiRecapLine('Personne appelée', representant?.fullName),
+    CpiRecapLine(
+      'Téléphone',
+      representant == null ? null : Phone.format(representant.phoneE164),
+    ),
+    CpiRecapLine('Résultat', switch (resultat) {
+      _Resultat.joignable => 'Joignable',
+      _Resultat.rappel => 'À rappeler',
+      _Resultat.injoignable => 'Injoignable',
+      null => null,
+    }),
+    if (resultat == _Resultat.joignable) ...<CpiRecapLine>[
+      CpiRecapLine('Établissement confirmé', _ouiNon(etablissementConfirme)),
+      if (etablissementConfirme == false &&
+          nouvelEtablissement.text.trim().isNotEmpty)
+        CpiRecapLine('Nouvel établissement', nouvelEtablissement.text.trim()),
+      CpiRecapLine('A été contacté', _ouiNon(aEteContacte)),
+      CpiRecapLine('Connaît l\'UES', _ouiNon(connaitUES)),
+      if (niveauSyndicat.text.trim().isNotEmpty)
+        CpiRecapLine('Niveau de syndicat', niveauSyndicat.text.trim()),
+      CpiRecapLine('Ambassadeur', _ouiNon(ambassadeur)),
+      if (ambassadeur == true && numeroConfirme == false)
         CpiRecapLine(
-          'Téléphone',
-          representant == null ? null : Phone.format(representant.phoneE164),
+          'Nouveau numéro',
+          Phone.format(Phone.toE164(nouveauNumero.text) ?? ''),
         ),
-        CpiRecapLine('Résultat', switch (resultat) {
-          _Resultat.joignable => 'Joignable',
-          _Resultat.rappel => 'À rappeler',
-          _Resultat.injoignable => 'Injoignable',
-          null => null,
-        }),
-        if (resultat == _Resultat.joignable)
-          CpiRecapLine(
-            'Représentant CPI CHUES',
-            representantCpi == null ? null : (representantCpi! ? 'Oui' : 'Non'),
-          ),
-        if (proposeQuelquUn && suggestionCommencee)
-          CpiRecapLine(
-            'Personne proposée',
-            <String>[
-              Phone.format(Phone.toE164(suggestionTelephone.text) ?? ''),
-              suggestionNom.text.trim(),
-            ].where((String s) => s.isNotEmpty).join(' · '),
-          ),
-      ];
+    ],
+    if (proposeQuelquUn && suggestionCommencee)
+      CpiRecapLine(
+        'Personne proposée',
+        <String>[
+          Phone.format(Phone.toE164(suggestionTelephone.text) ?? ''),
+          suggestionNom.text.trim(),
+        ].where((String s) => s.isNotEmpty).join(' · '),
+      ),
+  ];
 
   bool get aSaisi =>
       resultat != null ||
       commentaire.text.trim().isNotEmpty ||
+      nouvelEtablissement.text.trim().isNotEmpty ||
+      niveauSyndicat.text.trim().isNotEmpty ||
+      nouveauNumero.text.trim().isNotEmpty ||
       suggestionCommencee;
 
   Future<void> quitter() async {
@@ -207,35 +253,22 @@ class _RepresentantQualificationScreenState
       erreur(context, 'Choisissez le résultat de l’appel.');
       return;
     }
-    if (choix == _Resultat.joignable && representantCpi == null) {
-      erreur(context, 'Indiquez si la personne est représentant CPI CHUES.');
+    // Le bouton ne s'allume que quand `manqueResultat` est nul ; ce garde-fou
+    // ne fait que nommer, sous la coque, la première question restée sans
+    // réponse si l'écriture est déclenchée autrement.
+    final String? manquant = manqueResultat;
+    if (manquant != null) {
+      erreur(context, manquant);
       return;
     }
-    if (choix == _Resultat.joignable &&
-        representantCpi == true &&
-        memeNumeroWhatsapp == null) {
-      erreur(context, 'Indiquez le compte WhatsApp.');
-      return;
-    }
-    if (choix == _Resultat.rappel && rappelAt == null) {
-      erreur(context, 'Choisissez une date de rappel.');
-      return;
-    }
+
+    final bool joignable = choix == _Resultat.joignable;
+    final bool ambassadeurOui = joignable && ambassadeur == true;
 
     String? whatsappE164;
-    if (choix == _Resultat.joignable &&
-        representantCpi == true &&
-        memeNumeroWhatsapp == false) {
-      final PhoneResult parsed = Phone.parse(whatsapp.text);
-      if (parsed is! PhoneValid) {
-        erreur(context, 'Saisissez un numéro WhatsApp valide.');
-        return;
-      }
-      whatsappE164 = parsed.e164;
+    if (ambassadeurOui && memeNumeroWhatsapp == false) {
+      whatsappE164 = (Phone.parse(whatsapp.text) as PhoneValid).e164;
     }
-
-    final bool chuesOui =
-        choix == _Resultat.joignable && representantCpi == true;
 
     // Avant l'écriture, et seulement quand un rappel est promis : c'est le
     // seul moment où la demande d'autorisation s'explique d'elle-même. Un
@@ -255,22 +288,31 @@ class _RepresentantQualificationScreenState
           .recordRepCallAttempt(
             representantId: widget.representantId,
             outcome: switch (choix) {
-              _Resultat.joignable => chuesOui ? 'REACHED' : 'REFUSED',
+              _Resultat.joignable => ambassadeurOui ? 'REACHED' : 'REFUSED',
               _Resultat.rappel => 'CALLBACK',
               _Resultat.injoignable => 'UNREACHABLE',
             },
             relationStatus: switch (choix) {
-              _Resultat.joignable => chuesOui ? 'AMBASSADEUR' : 'REFUS',
+              _Resultat.joignable => ambassadeurOui ? 'AMBASSADEUR' : 'REFUS',
               _ => null,
             },
-            whatsappStatus: chuesOui
+            whatsappStatus: ambassadeurOui
                 ? (memeNumeroWhatsapp! ? 'MEME_NUMERO' : 'AUTRE_NUMERO')
                 : null,
             whatsappE164: whatsappE164,
             comment: commentaire.text,
             callbackAt: rappelAt,
-            // Seulement quand la personne appelée a dit non : ailleurs, la
-            // question de la remplaçante n'a pas été posée.
+            // Les renseignements 1–4 se prennent sur tout appel joignable,
+            // ambassadeur ou non : ce sont des renseignements, pas une branche.
+            etablissementConfirme: joignable ? etablissementConfirme : null,
+            etablissementSaisi: joignable ? nouvelEtablissement.text : null,
+            contacte: joignable ? aEteContacte : null,
+            connaitUES: joignable ? connaitUES : null,
+            syndicat: joignable ? niveauSyndicat.text : null,
+            numeroConfirme: ambassadeurOui ? numeroConfirme : null,
+            numeroSaisi: ambassadeurOui ? nouveauNumero.text : null,
+            // Seulement quand la personne appelée n'est pas ambassadeur :
+            // ailleurs, la question de la remplaçante n'a pas été posée.
             suggestedPhone: proposeQuelquUn
                 ? Phone.toE164(suggestionTelephone.text)
                 : null,
@@ -407,12 +449,20 @@ class _RepresentantQualificationScreenState
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             Text(
-              representant?.fullName ?? 'Représentant',
+              representant == null
+                  ? 'Représentant'
+                  : <String>[
+                      representant.fullName,
+                      ?representant.prenom,
+                    ].where((String s) => s.isNotEmpty).join(' '),
               style: theme.textTheme.titleMedium,
             ),
             if (representant != null)
               Text(
-                Phone.format(representant.phoneE164),
+                <String>[
+                  Phone.format(representant.phoneE164),
+                  ?representant.etablissement,
+                ].where((String s) => s.isNotEmpty).join(' · '),
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -435,17 +485,85 @@ class _RepresentantQualificationScreenState
       ),
       if (resultat == _Resultat.joignable) ...<Widget>[
         const SizedBox(height: CpiSpacing.lg),
+        // 1. L'établissement en fiche est-il le bon ?
         _OuiNon(
-          label: 'Est-il représentant CPI CHUES ?',
-          value: representantCpi,
+          label: 'Confirmer l\'établissement ?',
+          value: etablissementConfirme,
+          onChanged: (bool value) =>
+              setState(() => etablissementConfirme = value),
+        ),
+        CpiReveal(
+          visible: etablissementConfirme == false,
+          child: Padding(
+            padding: const EdgeInsets.only(top: CpiSpacing.sm),
+            child: CpiField(
+              label: 'Nouvel établissement',
+              controller: nouvelEtablissement,
+              hint: 'Ex. Lycée Blaise Diagne',
+              onChanged: (String _) => setState(() {}),
+              textCapitalization: TextCapitalization.words,
+            ),
+          ),
+        ),
+        // 2. A-t-il déjà été contacté ?
+        const SizedBox(height: CpiSpacing.md),
+        _OuiNon(
+          label: 'Avez-vous été contacté ?',
+          value: aEteContacte,
+          onChanged: (bool value) => setState(() => aEteContacte = value),
+        ),
+        // 3. Connaît-il l'UES ?
+        const SizedBox(height: CpiSpacing.md),
+        _OuiNon(
+          label: 'Connaissez-vous l\'UES ?',
+          value: connaitUES,
+          onChanged: (bool value) => setState(() => connaitUES = value),
+        ),
+        // 4. Niveau de syndicat, texte libre et FACULTATIF.
+        const SizedBox(height: CpiSpacing.md),
+        CpiField(
+          label: 'Niveau de syndicat (facultatif)',
+          controller: niveauSyndicat,
+          hint: 'Ex. Secrétaire général',
+          onChanged: (String _) => setState(() {}),
+          textCapitalization: TextCapitalization.sentences,
+        ),
+        // 5. Ambassadeur : c'est l'ancien « représentant CPI CHUES », mapping
+        // outcome/relationStatus inchangé.
+        const SizedBox(height: CpiSpacing.md),
+        _OuiNon(
+          label: 'Ambassadeur ?',
+          value: ambassadeur,
           onChanged: (bool value) => setState(() {
-            representantCpi = value;
-            if (!value) memeNumeroWhatsapp = null;
+            ambassadeur = value;
+            if (!value) {
+              numeroConfirme = null;
+              memeNumeroWhatsapp = null;
+            }
           }),
         ),
-        // Hors CHUES, la question WhatsApp n'a aucun sens : la fiche ferme
-        // directement en REFUS sans qu'on la pose.
-        if (representantCpi == true) ...<Widget>[
+        // Numéro et WhatsApp ne se posent qu'à un ambassadeur : sur un non, la
+        // fiche ferme en REFUS et l'on passe à la personne proposée.
+        if (ambassadeur == true) ...<Widget>[
+          // 6. Le numéro en fiche est-il le bon ?
+          const SizedBox(height: CpiSpacing.md),
+          _OuiNon(
+            label: 'Confirmer le numéro ?',
+            value: numeroConfirme,
+            onChanged: (bool value) => setState(() => numeroConfirme = value),
+          ),
+          CpiReveal(
+            visible: numeroConfirme == false,
+            child: Padding(
+              padding: const EdgeInsets.only(top: CpiSpacing.sm),
+              child: PhoneField(
+                controller: nouveauNumero,
+                label: 'Nouveau numéro',
+                onChanged: (String _) => setState(() {}),
+              ),
+            ),
+          ),
+          // 7. WhatsApp sur ce numéro ? Comportement existant, conservé.
           const SizedBox(height: CpiSpacing.md),
           _OuiNon(
             label: 'A-t-il WhatsApp sur ce numéro ?',

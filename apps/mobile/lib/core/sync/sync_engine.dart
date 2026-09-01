@@ -1884,6 +1884,11 @@ class SyncEngine {
                 whatsappStatus: Value<String>(r.whatsappStatus.value),
                 whatsappE164: Value<String?>(r.whatsappE164),
                 profession: Value<String?>(r.profession),
+                prenom: Value<String?>(r.prenom),
+                etablissement: Value<String?>(r.etablissement),
+                syndicat: Value<String?>(r.syndicat),
+                connaitUes: Value<bool?>(r.connaitUES),
+                contacte: Value<bool?>(r.contacte),
                 createdById: r.createdById,
                 clientCreatedAt: r.clientCreatedAt,
                 rev: Value<int>(r.rev.toInt()),
@@ -1915,6 +1920,15 @@ class SyncEngine {
                   profession: const CustomExpression<String>(
                     'excluded.profession',
                   ),
+                  prenom: const CustomExpression<String>('excluded.prenom'),
+                  etablissement: const CustomExpression<String>(
+                    'excluded.etablissement',
+                  ),
+                  syndicat: const CustomExpression<String>('excluded.syndicat'),
+                  connaitUes: const CustomExpression<bool>(
+                    'excluded.connait_ues',
+                  ),
+                  contacte: const CustomExpression<bool>('excluded.contacte'),
                   rev: const CustomExpression<int>('excluded.rev'),
                   serverUpdatedAt: const CustomExpression<DateTime>(
                     'excluded.server_updated_at',

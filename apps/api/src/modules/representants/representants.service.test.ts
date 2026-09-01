@@ -66,6 +66,11 @@ const foreignRow = (): Record<string, unknown> => ({
   whatsappStatus: WhatsappStatus.NON_DEMANDE,
   whatsappE164: null,
   profession: null,
+  prenom: null,
+  etablissement: null,
+  syndicat: null,
+  connaitUES: null,
+  contacte: null,
   _count: { prospects: 42 },
 });
 
@@ -350,6 +355,40 @@ describe('bascule de relation par le panel', () => {
     });
 
     expect(historyOf().reason).toBeNull();
+  });
+
+  it('persiste les champs du script de qualification quand ils sont fournis', async () => {
+    db.representant.findFirst.mockResolvedValue(own());
+
+    await service.update(COMMERCIAL, 'rep-9', {
+      prenom: 'Awa',
+      etablissement: 'Lycée Blaise Diagne',
+      syndicat: 'SUDES',
+      connaitUES: true,
+      contacte: false,
+    });
+
+    const data = (db.representant.update.mock.calls[0] as [{ data: Record<string, unknown> }])[0]
+      .data;
+    expect(data).toMatchObject({
+      prenom: 'Awa',
+      etablissement: 'Lycée Blaise Diagne',
+      syndicat: 'SUDES',
+      connaitUES: true,
+      contacte: false,
+    });
+  });
+
+  it('vide un texte de qualification quand la chaîne est vide, sans toucher les booléens absents', async () => {
+    db.representant.findFirst.mockResolvedValue(own());
+
+    await service.update(COMMERCIAL, 'rep-9', { syndicat: '   ' });
+
+    const data = (db.representant.update.mock.calls[0] as [{ data: Record<string, unknown> }])[0]
+      .data;
+    expect(data.syndicat).toBeNull();
+    expect(data).not.toHaveProperty('connaitUES');
+    expect(data).not.toHaveProperty('contacte');
   });
 });
 

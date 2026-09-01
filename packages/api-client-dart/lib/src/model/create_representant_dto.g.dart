@@ -11,6 +11,10 @@ abstract class _$CreateRepresentantDtoCWProxy {
 
   CreateRepresentantDto fullName(String fullName);
 
+  CreateRepresentantDto prenom(String? prenom);
+
+  CreateRepresentantDto etablissement(String? etablissement);
+
   CreateRepresentantDto phone(String phone);
 
   CreateRepresentantDto departementId(String departementId);
@@ -30,6 +34,8 @@ abstract class _$CreateRepresentantDtoCWProxy {
   CreateRepresentantDto call({
     String? id,
     String fullName,
+    String? prenom,
+    String? etablissement,
     String phone,
     String departementId,
     String? iefId,
@@ -50,6 +56,13 @@ class _$CreateRepresentantDtoCWProxyImpl
 
   @override
   CreateRepresentantDto fullName(String fullName) => this(fullName: fullName);
+
+  @override
+  CreateRepresentantDto prenom(String? prenom) => this(prenom: prenom);
+
+  @override
+  CreateRepresentantDto etablissement(String? etablissement) =>
+      this(etablissement: etablissement);
 
   @override
   CreateRepresentantDto phone(String phone) => this(phone: phone);
@@ -78,6 +91,8 @@ class _$CreateRepresentantDtoCWProxyImpl
   CreateRepresentantDto call({
     Object? id = const $CopyWithPlaceholder(),
     Object? fullName = const $CopyWithPlaceholder(),
+    Object? prenom = const $CopyWithPlaceholder(),
+    Object? etablissement = const $CopyWithPlaceholder(),
     Object? phone = const $CopyWithPlaceholder(),
     Object? departementId = const $CopyWithPlaceholder(),
     Object? iefId = const $CopyWithPlaceholder(),
@@ -93,6 +108,14 @@ class _$CreateRepresentantDtoCWProxyImpl
           ? _value.fullName
           // ignore: cast_nullable_to_non_nullable
           : fullName as String,
+      prenom: prenom == const $CopyWithPlaceholder()
+          ? _value.prenom
+          // ignore: cast_nullable_to_non_nullable
+          : prenom as String?,
+      etablissement: etablissement == const $CopyWithPlaceholder()
+          ? _value.etablissement
+          // ignore: cast_nullable_to_non_nullable
+          : etablissement as String?,
       phone: phone == const $CopyWithPlaceholder()
           ? _value.phone
           // ignore: cast_nullable_to_non_nullable
@@ -135,6 +158,8 @@ CreateRepresentantDto _$CreateRepresentantDtoFromJson(
   final val = CreateRepresentantDto(
     id: $checkedConvert('id', (v) => v as String?),
     fullName: $checkedConvert('fullName', (v) => v as String),
+    prenom: $checkedConvert('prenom', (v) => v as String?),
+    etablissement: $checkedConvert('etablissement', (v) => v as String?),
     phone: $checkedConvert('phone', (v) => v as String),
     departementId: $checkedConvert('departementId', (v) => v as String),
     iefId: $checkedConvert('iefId', (v) => v as String?),
@@ -152,6 +177,8 @@ Map<String, dynamic> _$CreateRepresentantDtoToJson(
 ) => <String, dynamic>{
   if (instance.id case final value?) 'id': value,
   'fullName': instance.fullName,
+  if (instance.prenom case final value?) 'prenom': value,
+  if (instance.etablissement case final value?) 'etablissement': value,
   'phone': instance.phone,
   'departementId': instance.departementId,
   if (instance.iefId case final value?) 'iefId': value,

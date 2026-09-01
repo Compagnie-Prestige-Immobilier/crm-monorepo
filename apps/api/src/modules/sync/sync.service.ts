@@ -635,6 +635,13 @@ export class SyncService {
           fullName: data.fullName.trim(),
           phoneE164,
           ...definedValues({ notes: data.notes || undefined }),
+          ...definedValues({
+            prenom: data.prenom || undefined,
+            etablissement: data.etablissement || undefined,
+            syndicat: data.syndicat || undefined,
+            connaitUES: data.connaitUES,
+            contacte: data.contacte,
+          }),
           // Une fiche neuve part de `NON_DEMANDE`: le resolveur applique la
           // meme regle que le panneau, donc le CHECK ne peut pas etre viole
           // par le chemin hors ligne.
@@ -683,6 +690,7 @@ export class SyncService {
         phoneE164,
         ...clearableValue('notes', data.notes === '' ? null : data.notes, cleared, null),
         ...resolveWhatsappPatch(this.whatsappInputFor(data, cleared), existing),
+        ...this.representantProfilePatch(data, cleared),
         ...definedValues({ departementId: data.departementId || undefined }),
         ...clearableValue('iefId', data.iefId, cleared, null),
         rev: { increment: 1 },
@@ -729,8 +737,6 @@ export class SyncService {
     whatsappStatus?: WhatsappStatus;
     whatsappE164?: string;
     profession?: string;
-    prenom?: string;
-    etablissement?: string;
   } {
     return {
       ...definedValues({ whatsappStatus: data.whatsappStatus }),
@@ -738,11 +744,28 @@ export class SyncService {
         whatsappE164: cleared.has('whatsappE164') ? undefined : data.whatsappE164,
       }),
       ...clearableValue('profession', data.profession, cleared, ''),
-      // `prenom` sert au prospect ailleurs : c'est l'entite de l'operation qui
-      // leve l'ambiguite, pas une seconde cle qu'un ancien telephone n'enverrait
-      // jamais.
-      ...clearableValue('prenom', data.prenom, cleared, ''),
-      ...clearableValue('etablissement', data.etablissement, cleared, ''),
+    };
+  }
+
+  /**
+   * Champs de qualification du représentant, hors WhatsApp et relation. Les
+   * trois textes sont effaçables ; `connaitUES`/`contacte` sont des booléens
+   * tri-états que le client fixe en avant, jamais remis à « non posée ».
+   */
+  private representantProfilePatch(
+    data: SyncEntityDataDto,
+    cleared: ReadonlySet<string>,
+  ): Record<string, unknown> {
+    return {
+      ...clearableValue('prenom', data.prenom === '' ? null : data.prenom, cleared, null),
+      ...clearableValue(
+        'etablissement',
+        data.etablissement === '' ? null : data.etablissement,
+        cleared,
+        null,
+      ),
+      ...clearableValue('syndicat', data.syndicat === '' ? null : data.syndicat, cleared, null),
+      ...definedValues({ connaitUES: data.connaitUES, contacte: data.contacte }),
     };
   }
 

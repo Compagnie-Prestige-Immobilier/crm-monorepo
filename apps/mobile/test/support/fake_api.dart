@@ -580,6 +580,11 @@ RepresentantDto representantDto({
   WhatsappStatus whatsappStatus = WhatsappStatus.NON_DEMANDE,
   String? whatsappE164,
   String? profession,
+  String? prenom,
+  String? etablissement,
+  String? syndicat,
+  bool? connaitUES,
+  bool? contacte,
 }) => RepresentantDto(
   id: id,
   fullName: fullName,
@@ -588,6 +593,11 @@ RepresentantDto representantDto({
   relationStatus: relationStatus,
   whatsappStatus: whatsappStatus,
   whatsappE164: whatsappE164,
+  prenom: prenom,
+  etablissement: etablissement,
+  syndicat: syndicat,
+  connaitUES: connaitUES,
+  contacte: contacte,
   // Calcule par le SERVEUR: la fabrique reproduit sa regle plutot que d'en
   // inventer une autre.
   whatsappNumber: whatsappStatus == WhatsappStatus.MEME_NUMERO

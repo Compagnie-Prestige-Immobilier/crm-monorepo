@@ -11,6 +11,10 @@ abstract class _$UpdateRepresentantDtoCWProxy {
 
   UpdateRepresentantDto fullName(String? fullName);
 
+  UpdateRepresentantDto prenom(String? prenom);
+
+  UpdateRepresentantDto etablissement(String? etablissement);
+
   UpdateRepresentantDto phone(String? phone);
 
   UpdateRepresentantDto departementId(String? departementId);
@@ -31,6 +35,12 @@ abstract class _$UpdateRepresentantDtoCWProxy {
 
   UpdateRepresentantDto profession(String? profession);
 
+  UpdateRepresentantDto syndicat(String? syndicat);
+
+  UpdateRepresentantDto connaitUES(bool? connaitUES);
+
+  UpdateRepresentantDto contacte(bool? contacte);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `UpdateRepresentantDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -40,6 +50,8 @@ abstract class _$UpdateRepresentantDtoCWProxy {
   UpdateRepresentantDto call({
     String? id,
     String? fullName,
+    String? prenom,
+    String? etablissement,
     String? phone,
     String? departementId,
     String? iefId,
@@ -50,6 +62,9 @@ abstract class _$UpdateRepresentantDtoCWProxy {
     WhatsappStatus? whatsappStatus,
     String? whatsappE164,
     String? profession,
+    String? syndicat,
+    bool? connaitUES,
+    bool? contacte,
   });
 }
 
@@ -65,6 +80,13 @@ class _$UpdateRepresentantDtoCWProxyImpl
 
   @override
   UpdateRepresentantDto fullName(String? fullName) => this(fullName: fullName);
+
+  @override
+  UpdateRepresentantDto prenom(String? prenom) => this(prenom: prenom);
+
+  @override
+  UpdateRepresentantDto etablissement(String? etablissement) =>
+      this(etablissement: etablissement);
 
   @override
   UpdateRepresentantDto phone(String? phone) => this(phone: phone);
@@ -104,6 +126,16 @@ class _$UpdateRepresentantDtoCWProxyImpl
       this(profession: profession);
 
   @override
+  UpdateRepresentantDto syndicat(String? syndicat) => this(syndicat: syndicat);
+
+  @override
+  UpdateRepresentantDto connaitUES(bool? connaitUES) =>
+      this(connaitUES: connaitUES);
+
+  @override
+  UpdateRepresentantDto contacte(bool? contacte) => this(contacte: contacte);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `UpdateRepresentantDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -113,6 +145,8 @@ class _$UpdateRepresentantDtoCWProxyImpl
   UpdateRepresentantDto call({
     Object? id = const $CopyWithPlaceholder(),
     Object? fullName = const $CopyWithPlaceholder(),
+    Object? prenom = const $CopyWithPlaceholder(),
+    Object? etablissement = const $CopyWithPlaceholder(),
     Object? phone = const $CopyWithPlaceholder(),
     Object? departementId = const $CopyWithPlaceholder(),
     Object? iefId = const $CopyWithPlaceholder(),
@@ -123,6 +157,9 @@ class _$UpdateRepresentantDtoCWProxyImpl
     Object? whatsappStatus = const $CopyWithPlaceholder(),
     Object? whatsappE164 = const $CopyWithPlaceholder(),
     Object? profession = const $CopyWithPlaceholder(),
+    Object? syndicat = const $CopyWithPlaceholder(),
+    Object? connaitUES = const $CopyWithPlaceholder(),
+    Object? contacte = const $CopyWithPlaceholder(),
   }) {
     return UpdateRepresentantDto(
       id: id == const $CopyWithPlaceholder()
@@ -133,6 +170,14 @@ class _$UpdateRepresentantDtoCWProxyImpl
           ? _value.fullName
           // ignore: cast_nullable_to_non_nullable
           : fullName as String?,
+      prenom: prenom == const $CopyWithPlaceholder()
+          ? _value.prenom
+          // ignore: cast_nullable_to_non_nullable
+          : prenom as String?,
+      etablissement: etablissement == const $CopyWithPlaceholder()
+          ? _value.etablissement
+          // ignore: cast_nullable_to_non_nullable
+          : etablissement as String?,
       phone: phone == const $CopyWithPlaceholder()
           ? _value.phone
           // ignore: cast_nullable_to_non_nullable
@@ -173,6 +218,18 @@ class _$UpdateRepresentantDtoCWProxyImpl
           ? _value.profession
           // ignore: cast_nullable_to_non_nullable
           : profession as String?,
+      syndicat: syndicat == const $CopyWithPlaceholder()
+          ? _value.syndicat
+          // ignore: cast_nullable_to_non_nullable
+          : syndicat as String?,
+      connaitUES: connaitUES == const $CopyWithPlaceholder()
+          ? _value.connaitUES
+          // ignore: cast_nullable_to_non_nullable
+          : connaitUES as bool?,
+      contacte: contacte == const $CopyWithPlaceholder()
+          ? _value.contacte
+          // ignore: cast_nullable_to_non_nullable
+          : contacte as bool?,
     );
   }
 }
@@ -194,6 +251,8 @@ UpdateRepresentantDto _$UpdateRepresentantDtoFromJson(
   final val = UpdateRepresentantDto(
     id: $checkedConvert('id', (v) => v as String?),
     fullName: $checkedConvert('fullName', (v) => v as String?),
+    prenom: $checkedConvert('prenom', (v) => v as String?),
+    etablissement: $checkedConvert('etablissement', (v) => v as String?),
     phone: $checkedConvert('phone', (v) => v as String?),
     departementId: $checkedConvert('departementId', (v) => v as String?),
     iefId: $checkedConvert('iefId', (v) => v as String?),
@@ -221,6 +280,9 @@ UpdateRepresentantDto _$UpdateRepresentantDtoFromJson(
     ),
     whatsappE164: $checkedConvert('whatsappE164', (v) => v as String?),
     profession: $checkedConvert('profession', (v) => v as String?),
+    syndicat: $checkedConvert('syndicat', (v) => v as String?),
+    connaitUES: $checkedConvert('connaitUES', (v) => v as bool?),
+    contacte: $checkedConvert('contacte', (v) => v as bool?),
   );
   return val;
 });
@@ -230,6 +292,8 @@ Map<String, dynamic> _$UpdateRepresentantDtoToJson(
 ) => <String, dynamic>{
   if (instance.id case final value?) 'id': value,
   if (instance.fullName case final value?) 'fullName': value,
+  if (instance.prenom case final value?) 'prenom': value,
+  if (instance.etablissement case final value?) 'etablissement': value,
   if (instance.phone case final value?) 'phone': value,
   if (instance.departementId case final value?) 'departementId': value,
   if (instance.iefId case final value?) 'iefId': value,
@@ -243,6 +307,9 @@ Map<String, dynamic> _$UpdateRepresentantDtoToJson(
     'whatsappStatus': value,
   if (instance.whatsappE164 case final value?) 'whatsappE164': value,
   if (instance.profession case final value?) 'profession': value,
+  if (instance.syndicat case final value?) 'syndicat': value,
+  if (instance.connaitUES case final value?) 'connaitUES': value,
+  if (instance.contacte case final value?) 'contacte': value,
 };
 
 const _$RepresentantRelationEnumMap = {

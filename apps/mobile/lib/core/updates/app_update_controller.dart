@@ -194,6 +194,18 @@ appUpdateControllerProvider =
       AppUpdateController.new,
     );
 
+/// Attentes de reprise entre deux essais d'un flux coupé. Plafonnées : au-delà
+/// l'utilisateur croit l'application figée. Trois attentes, quatre essais. En
+/// test, surchargé à zéro pour ne pas faire durer la suite d'autant.
+final Provider<List<Duration>> appUpdateRetryDelaysProvider =
+    Provider<List<Duration>>(
+      (Ref ref) => const <Duration>[
+        Duration(seconds: 1),
+        Duration(seconds: 2),
+        Duration(seconds: 4),
+      ],
+    );
+
 final Provider<Dio Function()> appUpdateClientProvider =
     Provider<Dio Function()>((Ref ref) {
       return () => Dio(
@@ -607,13 +619,7 @@ class AppUpdateController extends Notifier<AppUpdateState> {
     }
   }
 
-  /// Attentes de reprise entre deux essais d'un flux coupé. Plafonnées : au-delà
-  /// l'utilisateur croit l'application figée. Trois attentes, quatre essais.
-  static const List<Duration> _resumeBackoff = <Duration>[
-    Duration(seconds: 1),
-    Duration(seconds: 2),
-    Duration(seconds: 4),
-  ];
+  List<Duration> get _resumeBackoff => ref.read(appUpdateRetryDelaysProvider);
 
   Future<void> _download(Dio dio, AndroidRelease release) async {
     final Directory updates = await _updatesDirectory();
