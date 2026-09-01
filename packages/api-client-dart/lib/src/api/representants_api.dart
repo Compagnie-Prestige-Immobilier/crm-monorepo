@@ -482,6 +482,7 @@ class RepresentantsApi {
   /// Parameters:
   /// * [file]
   /// * [dryRun] - Simulation. Vaut VRAI par défaut : l’écriture doit être un acte explicite, pas ce qui arrive quand on oublie un paramètre.
+  /// * [enrichir] - Complète les fiches déjà en base au lieu de les rejeter. NE REMPLIT QUE LE VIDE : un statut déjà tranché, une note déjà écrite et une fiche qui porte déjà un appel ne sont jamais touchés.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -494,6 +495,7 @@ class RepresentantsApi {
   Future<Response<ImportReportDto>> importRepresentants({
     required MultipartFile file,
     bool? dryRun = true,
+    bool? enrichir = false,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -517,6 +519,7 @@ class RepresentantsApi {
 
     final _queryParameters = <String, dynamic>{
       if (dryRun != null) r'dryRun': dryRun,
+      if (enrichir != null) r'enrichir': enrichir,
     };
 
     dynamic _bodyData;
