@@ -15,8 +15,8 @@ import {
 const rows = (count: number): ProgrammeRow[] =>
   Array.from({ length: count }, (_, index) => ({
     position: index + 1,
-    nom: `Ndiaye${String(index + 1)}`,
-    prenom: `Fatou${String(index + 1)}`,
+    fullName: `Fatou${String(index + 1)} Ndiaye${String(index + 1)}`,
+    etablissement: `École ${String(index + 1)}`,
     phoneE164: `+2217810${String(index).padStart(5, '0')}`,
   }));
 
@@ -53,15 +53,16 @@ describe('writeProgrammePdf', () => {
     expect(text).toContain('Page 2 / 2');
     expect(text).not.toContain('Page 3');
     expect(text.split('Téléphone').length - 1).toBe(2);
-    expect(text.split('Prénom').length - 1).toBe(2);
+    expect(text.split('Nom complet').length - 1).toBe(2);
+    expect(text.split('Établissement').length - 1).toBe(2);
   });
 
-  it('porte les 50 lignes : numéro, nom, prénom, téléphone lisible', async () => {
+  it('porte les 50 lignes : numéro, nom complet, établissement et téléphone lisible', async () => {
     const text = extractPdfText(await render(DATA));
 
     for (const row of DATA.rows) {
-      expect(text).toContain(row.nom);
-      expect(text).toContain(row.prenom);
+      expect(text).toContain(row.fullName);
+      expect(text).toContain(row.etablissement);
       expect(text).toContain(formatPhone(row.phoneE164));
     }
     expect(text).toContain('+221 78 100 00 00');
@@ -85,15 +86,23 @@ describe('writeProgrammePdf', () => {
     expect(text).toContain('Page 1 / 1');
   });
 
-  it('laisse un nom complet seul dans la colonne Nom', async () => {
+  it('laisse un nom complet dans une seule colonne', async () => {
     const text = extractPdfText(
       await render({
         ...DATA,
-        rows: [{ position: 1, nom: 'Moussa Sarr', prenom: '', phoneE164: '+221781004801' }],
+        rows: [
+          {
+            position: 1,
+            fullName: 'Moussa Sarr',
+            etablissement: 'Lycée de Bakel',
+            phoneE164: '+221781004801',
+          },
+        ],
       }),
     );
 
     expect(text).toContain('Moussa Sarr');
+    expect(text).toContain('Lycée de Bakel');
     expect(text).toContain('+221 78 100 48 01');
   });
 

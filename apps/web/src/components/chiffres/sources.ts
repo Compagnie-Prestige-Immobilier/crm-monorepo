@@ -9,6 +9,7 @@ import type {
 import type {
   ChiffresActivite,
   ChiffresBanques,
+  ChiffresCampagne,
   ChiffresDelais,
   ChiffresEntonnoir,
   ChiffresMethodes,
@@ -22,7 +23,8 @@ import type { Role } from '@/lib/types';
 export type ChiffreSource = components['schemas']['DashboardSource'];
 
 /** Une requête, et les cartes qui en vivent. Rien d'autre n'est lancé. */
-export type Jeu = 'activite' | 'entonnoir' | 'delais' | 'rendement' | 'methodes' | 'banques';
+export type Jeu =
+  'activite' | 'entonnoir' | 'delais' | 'rendement' | 'methodes' | 'banques' | 'campagne';
 
 export interface Jeux {
   activite?: ChiffresActivite;
@@ -31,6 +33,7 @@ export interface Jeux {
   rendement?: ChiffresRendement;
   methodes?: ChiffresMethodes;
   banques?: ChiffresBanques;
+  campagne?: ChiffresCampagne;
 }
 
 export interface SourceChiffre {
@@ -255,9 +258,54 @@ export const SOURCES_CHIFFRES = {
     label: 'Par téléconseiller',
     forme: 'equipe',
     jeu: 'activite',
-    description: 'Les mêmes taux, téléconseiller par téléconseiller, avec la ligne d’équipe en pied.',
+    description:
+      'Les mêmes taux, téléconseiller par téléconseiller, avec la ligne d’équipe en pied.',
     groupe: 'Équipe',
     extraire: ({ activite }) => (activite === undefined ? null : tableauEquipe(activite, true)),
+  },
+  'couverture-derniere-campagne': {
+    label: 'Couverture de la dernière campagne',
+    forme: 'composition',
+    jeu: 'campagne',
+    description:
+      'Pour chaque téléconseiller, la part des fiches assignées qui ont reçu au moins un appel. La période choisie ne change pas la dernière campagne.',
+    groupe: 'Campagnes',
+    extraire: ({ campagne }) =>
+      campagne == null
+        ? null
+        : {
+            forme: 'composition',
+            donnee: campagne.performance.map((ligne) => ({
+              ligne: ligne.teleconseillerName,
+              segments: [
+                { id: 'traitees', label: 'Traitées', value: ligne.treated },
+                {
+                  id: 'restantes',
+                  label: 'Restantes',
+                  value: Math.max(0, ligne.assigned - ligne.treated),
+                },
+              ],
+            })),
+          },
+  },
+  'hors-attribution-derniere-campagne': {
+    label: 'Appels hors attribution',
+    forme: 'classement',
+    jeu: 'campagne',
+    description:
+      'Les appels passés sur une fiche confiée à un collègue dans la dernière campagne. La période choisie ne change pas la dernière campagne.',
+    groupe: 'Campagnes',
+    extraire: ({ campagne }) =>
+      campagne == null
+        ? null
+        : {
+            forme: 'classement',
+            donnee: campagne.performance.map((ligne) => ({
+              id: ligne.teleconseillerId,
+              label: ligne.teleconseillerName,
+              value: ligne.outsideAssignmentCalls,
+            })),
+          },
   },
   encaisse: {
     label: 'Encaissé',
@@ -411,6 +459,8 @@ const SOURCES_SUPERVISION: readonly string[] = [
   'encaisse',
   'de-l-appel-a-l-encaissement',
   'rendement-par-departement',
+  'couverture-derniere-campagne',
+  'hors-attribution-derniere-campagne',
 ];
 
 export function catalogueDe(input: {

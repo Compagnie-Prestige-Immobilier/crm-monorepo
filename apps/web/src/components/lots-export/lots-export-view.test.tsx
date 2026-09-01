@@ -62,8 +62,8 @@ const UN_LOT = {
 };
 
 const EQUIPE = [
-  { id: 'u-awa', fullName: 'Awa Fixture' },
-  { id: 'u-fatou', fullName: 'Fatou Fixture' },
+  { id: 'u-awa', fullName: 'Awa Fixture', role: 'COMMERCIAL' },
+  { id: 'u-fatou', fullName: 'Fatou Fixture', role: 'COMMERCIAL' },
 ];
 
 /** Deux téléconseillers × 50 fiches × 1 jour : 100 places pour 340 fiches. */
@@ -86,12 +86,12 @@ beforeEach(() => {
 });
 
 describe('LotsExportView, la liste', () => {
-  it('dit à quoi sert un lot, et ce qu’il faut faire quand il n’y en a aucun', async () => {
+  it('dit à quoi sert une campagne, et ce qu’il faut faire quand il n’y en a aucune', async () => {
     renderWithQuery(<LotsExportView canCreate />);
 
-    expect(await screen.findByText('Aucun lot pour l’instant.')).toBeTruthy();
-    expect(screen.getByText(/fige une sélection de fiches à une date donnée/)).toBeTruthy();
-    expect(screen.getByText('Créez-en un pour exporter des fiches.')).toBeTruthy();
+    expect(await screen.findByText('Aucune campagne pour l’instant.')).toBeTruthy();
+    expect(screen.getByText(/répartit des fiches entre les téléconseillers/)).toBeTruthy();
+    expect(screen.getByText('Créez-en une pour répartir des fiches.')).toBeTruthy();
   });
 
   it('annonce les appels passés sur les fiches depuis la création', async () => {
@@ -109,21 +109,21 @@ describe('LotsExportView, la liste', () => {
   it('cache la création à qui n’y a pas droit', async () => {
     renderWithQuery(<LotsExportView canCreate={false} />);
 
-    expect(await screen.findByText('Aucun lot pour l’instant.')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Nouveau lot' })).toBeNull();
+    expect(await screen.findByText('Aucune campagne pour l’instant.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Nouvelle campagne' })).toBeNull();
   });
 });
 
 async function ouvrirLaCreation(): Promise<ReturnType<typeof userEvent.setup>> {
   const user = userEvent.setup();
   renderWithQuery(<LotsExportView canCreate />);
-  await user.click(await screen.findByRole('button', { name: 'Nouveau lot' }));
+  await user.click(await screen.findByRole('button', { name: 'Nouvelle campagne' }));
   return user;
 }
 
 /** Le bouton n'est actif qu'une fois l'équipe lue et l'aperçu compté. */
 async function creerLeLot(user: ReturnType<typeof userEvent.setup>): Promise<void> {
-  const bouton = await screen.findByRole('button', { name: 'Créer le lot' });
+  const bouton = await screen.findByRole('button', { name: 'Créer la campagne' });
   await waitFor(() => {
     expect(bouton.hasAttribute('disabled')).toBe(false);
   });
@@ -149,6 +149,25 @@ describe('LotCreateDialog, la création', () => {
         }),
       );
     });
+  });
+
+  it('inclut supervision et direction en annonçant leur capacité réduite', async () => {
+    fetchTeleconseillers.mockReturnValue(
+      Promise.resolve([
+        { id: 'u-supervision', fullName: 'Superviseur Fixture', role: 'SUPERVISEUR' },
+        { id: 'u-direction', fullName: 'Direction Fixture', role: 'DIRECTION' },
+      ]),
+    );
+
+    await ouvrirLaCreation();
+
+    expect(
+      await screen.findByRole('checkbox', { name: 'Superviseur Fixture (20 %)' }),
+    ).toHaveProperty('checked', true);
+    expect(screen.getByRole('checkbox', { name: 'Direction Fixture (20 %)' })).toHaveProperty(
+      'checked',
+      true,
+    );
   });
 
   it('n’envoie que les comptes restés cochés', async () => {
@@ -178,7 +197,7 @@ describe('LotCreateDialog, la création', () => {
 
     expect(
       await screen.findByText(
-        '340 fiches disponibles pour 100 places : 100 seront réparties, 50 par téléconseiller ; 240 attendront un prochain lot.',
+        '340 fiches disponibles pour 100 places : 100 seront réparties selon les capacités choisies ; 240 attendront une prochaine campagne.',
       ),
     ).toBeTruthy();
   });
@@ -197,7 +216,7 @@ describe('LotCreateDialog, la création', () => {
 
     expect(
       await screen.findByText(
-        '80 fiches disponibles. 2 téléconseillers × 50 par jour × 1 jour = 100 places : les 80 seront réparties, 40 par téléconseiller.',
+        '80 fiches disponibles. 100 places pondérées sur 1 jour : les 80 seront réparties selon les capacités choisies.',
       ),
     ).toBeTruthy();
   });
@@ -207,7 +226,7 @@ describe('LotCreateDialog, la création', () => {
     await user.click(await screen.findByRole('button', { name: 'Tout décocher' }));
 
     expect(await screen.findByText('Cochez au moins un téléconseiller.')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Créer le lot' }).hasAttribute('disabled')).toBe(
+    expect(screen.getByRole('button', { name: 'Créer la campagne' }).hasAttribute('disabled')).toBe(
       true,
     );
   });
@@ -232,7 +251,7 @@ describe('LotCreateDialog, la création', () => {
   it('ne demande aucun nom : le lot est nommé depuis la cible et la date', async () => {
     const user = await ouvrirLaCreation();
 
-    expect(screen.queryByLabelText(/Nom du lot/)).toBeNull();
+    expect(screen.queryByLabelText(/Nom de la campagne/)).toBeNull();
     await creerLeLot(user);
 
     await waitFor(() => {
@@ -275,7 +294,7 @@ describe('LotCreateDialog, la création', () => {
     await ouvrirLaCreation();
 
     expect(await screen.findByText('Aucune fiche ne correspond.')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Créer le lot' }).hasAttribute('disabled')).toBe(
+    expect(screen.getByRole('button', { name: 'Créer la campagne' }).hasAttribute('disabled')).toBe(
       true,
     );
   });

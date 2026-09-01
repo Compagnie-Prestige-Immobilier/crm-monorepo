@@ -87,4 +87,11 @@ describe('assainissement de la disposition d’un écran de chiffres', () => {
     expect(direction).toContain('encaisse');
     expect(direction).toContain('de-l-appel-a-l-encaissement');
   });
+
+  it('place le suivi de la dernière campagne sur le tableau de bord de direction', () => {
+    const direction = dispositionUsine('chues', true).widgets.map((widget) => widget.source);
+
+    expect(direction).toContain('couverture-derniere-campagne');
+    expect(direction).toContain('hors-attribution-derniere-campagne');
+  });
 });

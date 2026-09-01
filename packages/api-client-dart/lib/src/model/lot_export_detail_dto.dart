@@ -8,6 +8,7 @@ import 'package:crm_api_client/src/model/lot_export_distribution_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_attempt_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_repartition_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_cible.dart';
+import 'package:crm_api_client/src/model/lot_export_performance_dto.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/src/equatable_utils.dart';
@@ -53,6 +54,8 @@ class LotExportDetailDto {
     required this.distribution,
 
     required this.repartition,
+
+    required this.performance,
   });
 
   @JsonKey(name: r'id', required: true, includeIfNull: false)
@@ -110,6 +113,9 @@ class LotExportDetailDto {
   @JsonKey(name: r'repartition', required: true, includeIfNull: false)
   final List<LotExportRepartitionDto> repartition;
 
+  @JsonKey(name: r'performance', required: true, includeIfNull: false)
+  final List<LotExportPerformanceDto> performance;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is LotExportDetailDto &&
@@ -131,6 +137,7 @@ class LotExportDetailDto {
                 callsByTeleconseiller,
                 distribution,
                 repartition,
+                performance,
               ],
               [
                 other.id,
@@ -148,6 +155,7 @@ class LotExportDetailDto {
                 other.callsByTeleconseiller,
                 other.distribution,
                 other.repartition,
+                other.performance,
               ],
             );
   }
@@ -171,6 +179,7 @@ class LotExportDetailDto {
         callsByTeleconseiller,
         distribution,
         repartition,
+        performance,
       ]);
 
   factory LotExportDetailDto.fromJson(Map<String, dynamic> json) =>

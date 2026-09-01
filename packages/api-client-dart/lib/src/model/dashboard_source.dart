@@ -60,6 +60,10 @@ enum DashboardSource {
   resteAAppeler(r'reste-a-appeler'),
   @JsonValue(r'par-teleconseiller')
   parTeleconseiller(r'par-teleconseiller'),
+  @JsonValue(r'couverture-derniere-campagne')
+  couvertureDerniereCampagne(r'couverture-derniere-campagne'),
+  @JsonValue(r'hors-attribution-derniere-campagne')
+  horsAttributionDerniereCampagne(r'hors-attribution-derniere-campagne'),
   @JsonValue(r'encaisse')
   encaisse(r'encaisse'),
   @JsonValue(r'de-l-appel-a-l-encaissement')

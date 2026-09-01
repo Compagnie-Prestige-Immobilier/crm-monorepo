@@ -94,6 +94,10 @@ export class LotExportQueryDto {
   @IsOptional()
   @IsEnum(LotExportCible)
   cible?: LotExportCible;
+  @ApiPropertyOptional({ enum: Projet, enumName: 'Projet' })
+  @IsOptional()
+  @IsEnum(Projet)
+  projet?: Projet;
   @ApiPropertyOptional({ format: 'uuid' }) @IsOptional() @IsUUID() createdById?: string;
   @ApiPropertyOptional({ format: 'date-time' }) @IsOptional() @IsISO8601() dateFrom?: string;
   @ApiPropertyOptional({ format: 'date-time' }) @IsOptional() @IsISO8601() dateTo?: string;
@@ -160,11 +164,22 @@ export class LotExportRepartitionDto {
   @ApiProperty() teleconseillerName!: string;
   @ApiProperty({ type: () => [LotExportRepartitionJourDto] }) jours!: LotExportRepartitionJourDto[];
 }
+export class LotExportPerformanceDto {
+  @ApiProperty({ format: 'uuid' }) teleconseillerId!: string;
+  @ApiProperty() teleconseillerName!: string;
+  @ApiProperty() assigned!: number;
+  @ApiProperty() treated!: number;
+  @ApiProperty() completionRate!: number;
+  @ApiProperty() assignedCalls!: number;
+  @ApiProperty() outsideAssignmentCalls!: number;
+}
 export class LotExportDetailDto extends LotExportSummaryDto {
   @ApiProperty({ type: () => [LotExportAttemptDto] }) recentAttempts!: LotExportAttemptDto[];
   @ApiProperty({ type: Object }) callsByTeleconseiller!: Record<string, number>;
   @ApiProperty({ type: () => LotExportDistributionDto }) distribution!: LotExportDistributionDto;
   @ApiProperty({ type: () => [LotExportRepartitionDto] }) repartition!: LotExportRepartitionDto[];
+  @ApiProperty({ type: () => [LotExportPerformanceDto] })
+  performance!: LotExportPerformanceDto[];
 }
 export class LotExportPreviewDto {
   @ApiProperty() eligible!: number;

@@ -17221,7 +17221,7 @@
             "bearer": []
           }
         ],
-        "summary": "Crée un lot de fiches exportées.",
+        "summary": "Crée une campagne de fiches.",
         "tags": ["lots-export"]
       },
       "get": {
@@ -17242,6 +17242,14 @@
             "in": "query",
             "schema": {
               "$ref": "#/components/schemas/LotExportCible"
+            }
+          },
+          {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
             }
           },
           {
@@ -17340,7 +17348,7 @@
             "bearer": []
           }
         ],
-        "summary": "Liste les lots d’export.",
+        "summary": "Liste les campagnes.",
         "tags": ["lots-export"]
       }
     },
@@ -17471,7 +17479,7 @@
             "bearer": []
           }
         ],
-        "summary": "Télécharge le classeur figé du lot.",
+        "summary": "Télécharge le classeur figé de la campagne.",
         "tags": ["lots-export"]
       }
     },
@@ -17623,7 +17631,7 @@
             "bearer": []
           }
         ],
-        "summary": "Télécharge tous les programmes du lot.",
+        "summary": "Télécharge tous les programmes de la campagne.",
         "tags": ["lots-export"]
       }
     },
@@ -17688,7 +17696,7 @@
             "bearer": []
           }
         ],
-        "summary": "Consulte un lot et les appels qui ont suivi.",
+        "summary": "Consulte une campagne et les appels qui ont suivi.",
         "tags": ["lots-export"]
       }
     }
@@ -26009,6 +26017,8 @@
           "adhesions",
           "reste-a-appeler",
           "par-teleconseiller",
+          "couverture-derniere-campagne",
+          "hors-attribution-derniere-campagne",
           "encaisse",
           "de-l-appel-a-l-encaissement",
           "methodes-d-adhesion",
@@ -26601,6 +26611,42 @@
         },
         "required": ["teleconseillerId", "teleconseillerName", "jours"]
       },
+      "LotExportPerformanceDto": {
+        "type": "object",
+        "properties": {
+          "teleconseillerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "teleconseillerName": {
+            "type": "string"
+          },
+          "assigned": {
+            "type": "number"
+          },
+          "treated": {
+            "type": "number"
+          },
+          "completionRate": {
+            "type": "number"
+          },
+          "assignedCalls": {
+            "type": "number"
+          },
+          "outsideAssignmentCalls": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "teleconseillerId",
+          "teleconseillerName",
+          "assigned",
+          "treated",
+          "completionRate",
+          "assignedCalls",
+          "outsideAssignmentCalls"
+        ]
+      },
       "LotExportDetailDto": {
         "type": "object",
         "properties": {
@@ -26665,6 +26711,12 @@
             "items": {
               "$ref": "#/components/schemas/LotExportRepartitionDto"
             }
+          },
+          "performance": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LotExportPerformanceDto"
+            }
           }
         },
         "required": [
@@ -26682,7 +26734,8 @@
           "recentAttempts",
           "callsByTeleconseiller",
           "distribution",
-          "repartition"
+          "repartition",
+          "performance"
         ]
       }
     }

@@ -31,7 +31,7 @@ import {
   lotProgrammeFileName,
   lotProgrammeUrl,
 } from '@/lib/data/lots-export';
-import { formatDate, formatDateTime, formatNumber, formatPhone } from '@/lib/format';
+import { formatDate, formatDateTime, formatNumber, formatPhone, formatRate } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
 import {
   CALL_OUTCOME_LABELS,
@@ -84,7 +84,7 @@ export function LotExportDetailView({ id }: { id: string }) {
         onRetry={() => {
           void lot.refetch();
         }}
-        fallback="Ce lot n’a pas pu être chargé."
+        fallback="Cette campagne n’a pas pu être chargée."
       />
     );
 
@@ -111,7 +111,7 @@ export function LotExportDetailView({ id }: { id: string }) {
         className="inline-flex w-fit items-center gap-1.5 text-[0.875rem] text-muted-foreground hover:underline focus-visible:underline"
       >
         <ArrowLeftIcon className="size-4" aria-hidden="true" />
-        Tous les lots d’export
+        Toutes les campagnes
       </Link>
 
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -170,8 +170,8 @@ export function LotExportDetailView({ id }: { id: string }) {
             Programmes d’appel
           </h3>
           <p className="mt-1 text-[0.875rem] text-muted-foreground">
-            {formatNumber(distribution.fichesParJour)} fiches par téléconseiller et par jour. Chaque
-            programme s’imprime sur une fiche.
+            Capacité principale : {formatNumber(distribution.fichesParJour)} fiches par jour. Les
+            comptes supervision et direction en reçoivent 20 %.
           </p>
         </CardHeader>
         <CardContent>
@@ -229,6 +229,66 @@ export function LotExportDetailView({ id }: { id: string }) {
               </TableBody>
             </Table>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <h3 className="font-display text-h4 font-[700] leading-tight tracking-[-0.02em]">
+            Performance de la campagne
+          </h3>
+          <p className="mt-1 text-[0.875rem] text-muted-foreground">
+            Une fiche est traitée quand la personne assignée y consigne au moins un appel. Un appel
+            hors attribution vise une fiche confiée à un collègue dans cette campagne.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <Table aria-label="Performance de la campagne">
+            <TableHeader>
+              <TableRow>
+                <TableHead scope="col">Téléconseiller</TableHead>
+                <TableHead scope="col" className="text-right">
+                  Traitées
+                </TableHead>
+                <TableHead scope="col" className="text-right">
+                  Couverture
+                </TableHead>
+                <TableHead scope="col" className="text-right">
+                  Appels attribués
+                </TableHead>
+                <TableHead scope="col" className="text-right">
+                  Hors attribution
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {lot.data.performance.map((ligne) => (
+                <TableRow key={ligne.teleconseillerId}>
+                  <th scope="row" className="px-3 py-2.5 text-left align-middle font-[600]">
+                    {ligne.teleconseillerName}
+                  </th>
+                  <TableCell className="text-right tabular-nums">
+                    {formatNumber(ligne.treated)} sur {formatNumber(ligne.assigned)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatRate(ligne.completionRate)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatNumber(ligne.assignedCalls)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {ligne.outsideAssignmentCalls === 0 ? (
+                      '0'
+                    ) : (
+                      <Badge variant="outline" className="border-warning/40 text-warning">
+                        {formatNumber(ligne.outsideAssignmentCalls)}
+                      </Badge>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 

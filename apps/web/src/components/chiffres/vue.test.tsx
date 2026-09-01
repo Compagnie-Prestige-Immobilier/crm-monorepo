@@ -1,7 +1,9 @@
 import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ChiffresView } from '@/components/chiffres/vue';
+import { catalogueDe } from '@/components/chiffres/sources';
 import type * as DispositionModule from '@/lib/data/disposition';
 import type { Role } from '@/lib/types';
 import { renderWithQuery } from '@/test/render-query';
@@ -21,6 +23,7 @@ vi.mock('@/lib/data/chiffres', () => ({
   fetchChiffresRendement: vi.fn<() => Promise<never>>(),
   fetchChiffresMethodes: vi.fn<() => Promise<never>>(),
   fetchChiffresBanques: vi.fn<() => Promise<never>>(),
+  fetchChiffresCampagne: vi.fn<() => Promise<never>>(),
 }));
 
 vi.mock('@/lib/data/disposition', async () => {
@@ -99,6 +102,41 @@ const disposition = (sources: string[]) => ({
 });
 
 describe('l’écran Chiffres, du squelette aux chiffres', () => {
+  it('représente la couverture et les appels hors attribution de la dernière campagne', () => {
+    const catalogue = catalogueDe({ chues: true, voitLesMontants: true, role: 'ADMIN' });
+    const campagne = {
+      name: 'Programme de 50 fiches',
+      performance: [
+        {
+          teleconseillerId: 'awa',
+          teleconseillerName: 'Awa Fixture',
+          assigned: 25,
+          treated: 15,
+          completionRate: 60,
+          assignedCalls: 18,
+          outsideAssignmentCalls: 4,
+        },
+      ],
+    };
+
+    expect(catalogue['couverture-derniere-campagne']?.extraire({ campagne })).toEqual({
+      forme: 'composition',
+      donnee: [
+        {
+          ligne: 'Awa Fixture',
+          segments: [
+            { id: 'traitees', label: 'Traitées', value: 15 },
+            { id: 'restantes', label: 'Restantes', value: 10 },
+          ],
+        },
+      ],
+    });
+    expect(catalogue['hors-attribution-derniere-campagne']?.extraire({ campagne })).toEqual({
+      forme: 'classement',
+      donnee: [{ id: 'awa', label: 'Awa Fixture', value: 4 }],
+    });
+  });
+
   it('affiche les cartes posées une fois la requête revenue', async () => {
     setUrl('/chues/statistiques');
     dispositionMock.mockResolvedValue(
@@ -123,6 +161,20 @@ describe('l’écran Chiffres, du squelette aux chiffres', () => {
     expect(screen.getAllByText('26').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Adhésions').length).toBeGreaterThan(0);
     expect(screen.getByText('Awa Sy')).toBeTruthy();
+  });
+
+  it('explique chaque KPI depuis son indice d’information', async () => {
+    setUrl('/chues/statistiques');
+    dispositionMock.mockResolvedValue(disposition(['prospects-notes']));
+    activiteMock.mockResolvedValue(activite);
+    const user = userEvent.setup();
+
+    renderWithQuery(<ChiffresView ecran="chues" role={SUPERVISEUR} />);
+
+    await user.click(await screen.findByRole('button', { name: 'À propos de Prospects notés' }));
+    expect(
+      await screen.findByText('Le nombre de nouvelles fiches saisies pendant la période.'),
+    ).toBeTruthy();
   });
 
   // Les taux par téléconseiller se relisent sur les sommes des lignes ; la

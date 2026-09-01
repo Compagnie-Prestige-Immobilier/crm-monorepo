@@ -6,8 +6,8 @@ import { CPI_BURGUNDY, CPI_RULE_GREY, CPI_ZEBRA, cpiLogo } from '../../common/br
 
 export interface ProgrammeRow {
   readonly position: number;
-  readonly nom: string;
-  readonly prenom: string;
+  readonly fullName: string;
+  readonly etablissement: string;
   readonly phoneE164: string;
 }
 
@@ -36,15 +36,15 @@ const BAND_GAP = 12;
 const TEXT_PAD = 7;
 
 interface Column {
-  readonly key: 'order' | 'nom' | 'prenom' | 'phone';
+  readonly key: 'order' | 'fullName' | 'etablissement' | 'phone';
   readonly header: string;
   readonly width: number;
 }
 
 const COLUMNS: readonly Column[] = [
-  { key: 'order', header: 'N°', width: 44 },
-  { key: 'nom', header: 'Nom', width: 176 },
-  { key: 'prenom', header: 'Prénom', width: 150 },
+  { key: 'order', header: 'N°', width: 36 },
+  { key: 'fullName', header: 'Nom complet', width: 164 },
+  { key: 'etablissement', header: 'Établissement', width: 176 },
   { key: 'phone', header: 'Téléphone', width: 0 },
 ];
 
@@ -193,8 +193,8 @@ function drawRow(doc: Doc, y: number, row: ProgrammeRow, index: number): void {
 
   doc.font('Helvetica').fontSize(BODY_SIZE).fillColor('#111111');
   text('order', String(row.position));
-  text('nom', row.nom);
-  text('prenom', row.prenom);
+  text('fullName', row.fullName);
+  text('etablissement', row.etablissement);
   text('phone', formatPhone(row.phoneE164));
 }
 
