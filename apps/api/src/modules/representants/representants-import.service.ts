@@ -95,37 +95,8 @@ export class RepresentantsImportService {
     const rows = await this.readSheet(buffer);
 
     const referentiels = await this.loadReferentiels();
-    const errors: ImportRowErrorDto[] = [];
-    const parsed: ParsedRow[] = [];
-    let duplicates = 0;
-
-    // Le téléphone déjà rencontré DANS LE FICHIER. Rempli au fil de la lecture,
-    // pour que la seconde occurrence soit rejetée et non la première : c'est
-    // celle du haut du fichier que l'utilisateur reconnaît.
-    const seen = new Map<string, number>();
-
-    for (const raw of rows) {
-      const outcome = parseRow(raw, referentiels);
-      if ('code' in outcome) {
-        errors.push(outcome);
-        continue;
-      }
-
-      const previous = seen.get(outcome.phoneE164);
-      if (previous !== undefined) {
-        duplicates += 1;
-        errors.push({
-          line: outcome.line,
-          code: 'DUPLICATE_IN_FILE',
-          message: `Ce numéro figure déjà à la ligne ${String(previous)} du fichier.`,
-          value: outcome.phoneE164,
-        });
-        continue;
-      }
-
-      seen.set(outcome.phoneE164, outcome.line);
-      parsed.push(outcome);
-    }
+    const { parsed, errors, duplicatesInFile } = analyser(rows, referentiels);
+    let duplicates = duplicatesInFile;
 
     // Le contrôle contre la base se fait en UNE requête, pas une par ligne : sur
     // 5 000 lignes, une lecture par ligne rendrait l'import inutilisable et
@@ -135,22 +106,15 @@ export class RepresentantsImportService {
     const aEnrichir: Enrichissement[] = [];
     for (const row of parsed) {
       const existante = known.get(row.phoneE164);
-      if (existante) {
-        duplicates += 1;
-        const patch = enrichissementDe(row, existante, user.id);
-        if (enrichir && patch) aEnrichir.push(patch);
-        else
-          errors.push({
-            line: row.line,
-            code: 'DUPLICATE_IN_DATABASE',
-            message: enrichir
-              ? 'Un représentant porte déjà ce numéro, et rien ne manque sur sa fiche.'
-              : 'Un représentant porte déjà ce numéro en base.',
-            value: row.phoneE164,
-          });
+      if (!existante) {
+        retained.push(row);
         continue;
       }
-      retained.push(row);
+
+      duplicates += 1;
+      const patch = enrichir ? enrichissementDe(row, existante, user.id) : null;
+      if (patch) aEnrichir.push(patch);
+      else errors.push(refusDoublon(row, enrichir));
     }
 
     let enriched = 0;
@@ -592,6 +556,57 @@ interface Enrichissement {
  * qu'aux fiches qui n'en portent AUCUN : sans clé d'idempotence dans le
  * classeur, un second passage créerait un doublon d'appel.
  */
+/**
+ * Analyse les lignes et écarte la PREMIÈRE famille de doublons : le fichier
+ * contre lui-même.
+ *
+ * La SECONDE occurrence est rejetée, jamais la première : c'est celle du haut
+ * du fichier que l'utilisateur reconnaît.
+ */
+function analyser(
+  rows: readonly RawRow[],
+  referentiels: Referentiels,
+): { parsed: ParsedRow[]; errors: ImportRowErrorDto[]; duplicatesInFile: number } {
+  const parsed: ParsedRow[] = [];
+  const errors: ImportRowErrorDto[] = [];
+  const seen = new Map<string, number>();
+  let duplicatesInFile = 0;
+
+  for (const raw of rows) {
+    const outcome = parseRow(raw, referentiels);
+    if ('code' in outcome) {
+      errors.push(outcome);
+      continue;
+    }
+
+    const previous = seen.get(outcome.phoneE164);
+    if (previous !== undefined) {
+      duplicatesInFile += 1;
+      errors.push({
+        line: outcome.line,
+        code: 'DUPLICATE_IN_FILE',
+        message: `Ce numéro figure déjà à la ligne ${String(previous)} du fichier.`,
+        value: outcome.phoneE164,
+      });
+      continue;
+    }
+
+    seen.set(outcome.phoneE164, outcome.line);
+    parsed.push(outcome);
+  }
+
+  return { parsed, errors, duplicatesInFile };
+}
+
+const refusDoublon = (row: ParsedRow, enrichir: boolean): ImportRowErrorDto => ({
+  line: row.line,
+  code: 'DUPLICATE_IN_DATABASE',
+  message: enrichir
+    ? 'Un représentant porte déjà ce numéro, et rien ne manque sur sa fiche.'
+    : 'Un représentant porte déjà ce numéro en base.',
+  value: row.phoneE164,
+});
+
 function enrichissementDe(
   row: ParsedRow,
   fiche: FicheExistante,
