@@ -26,6 +26,17 @@
  * 3. L'issue d'un appel se DEVINE du commentaire libre : « injoignable »,
  *    « sans réponse », « pas intéressé ». Le rapport donne le décompte par
  *    issue avant tout envoi, justement pour qu'il soit relu.
+ *
+ * LES CHARGÉS DE COMPTE DU RÉPERTOIRE 2026 NE SONT PAS DES COMPTES.
+ *
+ * La colonne « CC en charge » du répertoire consolidé nomme six personnes
+ * — khadim, balde, fall, yama, a sow, sala kelly — qui n'ont pas de compte
+ * dans le CRM : c'étaient des intervenants de passage. Aucune ne se rapproche,
+ * les 196 fiches concernées reviennent donc au compte qui importe, et le
+ * rapport les liste avant l'envoi. C'est le comportement voulu, pas un défaut à
+ * corriger : inventer un propriétaire fausserait les statistiques d'activité.
+ * Un futur répertoire rempli par des téléconseillers déclarés se rapprochera
+ * tout seul, sur l'identifiant, l'e-mail ou le nom complet.
  */
 import { createReadStream, createWriteStream } from 'node:fs';
 import { readFile } from 'node:fs/promises';
@@ -70,14 +81,6 @@ const ISSUES = [
   [/pas interess|non interess/, 'Refus'],
   [/a rappell?er|a relancer/, 'Autre'],
 ];
-
-/**
- * Rapprochements que le seul texte ne permet pas : « khadim » n'est
- * l'identifiant de personne, « mr balde » encore moins. À remplir une fois que
- * les vrais identifiants sont connus, sans quoi ces fiches reviennent au compte
- * qui importe.
- */
-const ALIAS_CHARGES = new Map([]);
 
 /**
  * La désignation d'un chargé de compte, débarrassée de sa civilité.
@@ -300,7 +303,7 @@ async function convertir(source, comptes) {
     let charge = '';
     if (brutCharge !== '') {
       const designation = cleCharge(brutCharge);
-      const compte = comptes.get(normalise(ALIAS_CHARGES.get(designation) ?? designation));
+      const compte = comptes.get(normalise(designation));
       if (compte) charge = compte;
       else compter(stats.chargesInconnus, designation);
     }

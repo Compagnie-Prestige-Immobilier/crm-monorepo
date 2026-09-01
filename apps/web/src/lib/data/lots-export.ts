@@ -47,6 +47,13 @@ export async function fetchLotExport(
   return unwrap(await client.GET('/api/v1/lots-export/{id}', { params: { path: { id } } }));
 }
 
+export async function deleteLotExport(
+  id: string,
+  client: ApiClient = getApiClient(),
+): Promise<void> {
+  unwrap(await client.DELETE('/api/v1/lots-export/{id}', { params: { path: { id } } }));
+}
+
 export async function fetchDerniereCampagne(
   projet: Schemas['Projet'],
   teleconseillerId: string | null,
