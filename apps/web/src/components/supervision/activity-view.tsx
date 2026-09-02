@@ -30,6 +30,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
+  ACTIVITY_COLUMNS,
   PERIOD_LABELS,
   activityCsv,
   activityCsvFileName,
@@ -42,10 +43,12 @@ import {
   presetRange,
   sortActivityLines,
   supervisionActivityKey,
+  type ActivityColumn,
+  type ActivityCounts,
+  type ActivityKey,
   type ActivityLine,
   type ActivityRange,
   type ActivitySortKey,
-  type ActivityTotals,
   type PeriodPreset,
   type SortDirection,
   type SupervisionGranularity,
@@ -56,37 +59,29 @@ import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
 import type { Projet } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
-interface Colonne {
-  key: Exclude<ActivitySortKey, 'name'>;
-  label: string;
-  taux?: boolean;
-  /** Propre à CHUES : le Grand Public n'a pas de représentants. */
-  representants?: boolean;
-}
-
-const COLUMNS: Colonne[] = [
-  { key: 'calls', label: 'Appels' },
-  { key: 'methodObtained', label: 'Méthodes' },
-  { key: 'unreachable', label: 'NRP / injoignables' },
-  { key: 'wrongNumber', label: 'Faux numéros' },
-  { key: 'refused', label: 'Refus' },
-  { key: 'callback', label: 'À rappeler' },
-  { key: 'reachRate', label: 'Joignabilité', taux: true },
-  { key: 'prospectsCreated', label: 'Prospects saisis' },
-  { key: 'representantsContacted', label: 'Représentants contactés', representants: true },
-];
-
-const colonnesActivite = (projet: Projet): Colonne[] =>
-  projet === 'GRAND_PUBLIC' ? COLUMNS.filter((colonne) => colonne.representants !== true) : COLUMNS;
+const TUILES: Record<Projet, { key: ActivityKey; icon: LucideIcon }[]> = {
+  CHUES: [
+    { key: 'repCalls', icon: PhoneCallIcon },
+    { key: 'repContactRate', icon: PhoneOffIcon },
+    { key: 'repCallback', icon: TargetIcon },
+    { key: 'prospectsCreated', icon: UserPlusIcon },
+  ],
+  GRAND_PUBLIC: [
+    { key: 'calls', icon: PhoneCallIcon },
+    { key: 'reachRate', icon: PhoneOffIcon },
+    { key: 'methodObtained', icon: TargetIcon },
+    { key: 'prospectsCreated', icon: UserPlusIcon },
+  ],
+};
 
 const PRESETS: Exclude<PeriodPreset, 'custom'>[] = ['today', 'week', 'last7'];
 
 export function ActivityView({ projet }: { projet: Projet }) {
-  const colonnes = colonnesActivite(projet);
+  const colonnes = ACTIVITY_COLUMNS[projet];
   const [preset, setPreset] = useState<PeriodPreset>('today');
   const [range, setRange] = useState<ActivityRange>(() => presetRange('today'));
   const [granularity, setGranularity] = useState<SupervisionGranularity>('day');
-  const [sortKey, setSortKey] = useState<ActivitySortKey>('calls');
+  const [sortKey, setSortKey] = useState<ActivitySortKey>(colonnes[0]?.key ?? 'name');
   const [sortDir, setSortDir] = useState<SortDirection>('desc');
 
   const { data, isPending, isError, error, refetch } = useQuery({
@@ -241,25 +236,19 @@ export function ActivityView({ projet }: { projet: Projet }) {
       {toolbar}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Tile index={0} label="Appels" value={formatNumber(totals.calls)} icon={PhoneCallIcon} />
-        <Tile
-          index={1}
-          label="Joignabilité"
-          value={formatRateOrNone(totals.reachRate)}
-          icon={PhoneOffIcon}
-        />
-        <Tile
-          index={2}
-          label="Méthodes obtenues"
-          value={formatNumber(totals.methodObtained)}
-          icon={TargetIcon}
-        />
-        <Tile
-          index={3}
-          label="Prospects saisis"
-          value={formatNumber(totals.prospectsCreated)}
-          icon={UserPlusIcon}
-        />
+        {TUILES[projet].map((tuile, index) => {
+          const colonne = colonnes.find((candidate) => candidate.key === tuile.key);
+          if (colonne === undefined) return null;
+          return (
+            <Tile
+              key={tuile.key}
+              index={index}
+              label={colonne.label}
+              value={valeurAffichee(colonne, totals[tuile.key])}
+              icon={tuile.icon}
+            />
+          );
+        })}
       </div>
 
       <Card>
@@ -336,13 +325,11 @@ export function ActivityView({ projet }: { projet: Projet }) {
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead>{granularity === 'week' ? 'Semaine' : 'Jour'}</TableHead>
-                  <TableHead className="text-right">Appels</TableHead>
-                  <TableHead className="text-right">Méthodes</TableHead>
-                  <TableHead className="text-right">NRP / injoignables</TableHead>
-                  <TableHead className="text-right">Faux numéros</TableHead>
-                  <TableHead className="text-right">Refus</TableHead>
-                  <TableHead className="text-right">À rappeler</TableHead>
-                  <TableHead className="text-right">Joignabilité</TableHead>
+                  {colonnes.map((colonne) => (
+                    <TableHead key={colonne.key} className="text-right">
+                      {colonne.label}
+                    </TableHead>
+                  ))}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -353,17 +340,9 @@ export function ActivityView({ projet }: { projet: Projet }) {
                         ? `Semaine du ${formatShortDate(bucket.bucket)}`
                         : formatShortDate(bucket.bucket)}
                     </TableCell>
-                    <TableCell className="text-right">{formatNumber(bucket.calls)}</TableCell>
-                    <TableCell className="text-right">
-                      {formatNumber(bucket.methodObtained)}
-                    </TableCell>
-                    <TableCell className="text-right">{formatNumber(bucket.unreachable)}</TableCell>
-                    <TableCell className="text-right">{formatNumber(bucket.wrongNumber)}</TableCell>
-                    <TableCell className="text-right">{formatNumber(bucket.refused)}</TableCell>
-                    <TableCell className="text-right">{formatNumber(bucket.callback)}</TableCell>
-                    <TableCell className="text-right">
-                      {formatRateOrNone(bucket.reachRate)}
-                    </TableCell>
+                    {colonnes.map((colonne) => (
+                      <Cellule key={colonne.key} colonne={colonne} valeur={bucket[colonne.key]} />
+                    ))}
                   </TableRow>
                 ))}
               </TableBody>
@@ -375,31 +354,34 @@ export function ActivityView({ projet }: { projet: Projet }) {
   );
 }
 
+function valeurAffichee(colonne: ActivityColumn, valeur: number | null, decimal = false): string {
+  if (colonne.taux === true) return formatRateOrNone(valeur);
+  const nombre = valeur ?? 0;
+  return decimal ? formatDecimal(nombre) : formatNumber(nombre);
+}
+
 function Cellule({
   colonne,
   valeur,
   decimal = false,
 }: {
-  colonne: Colonne;
+  colonne: ActivityColumn;
   valeur: number | null;
   decimal?: boolean;
 }) {
-  if (colonne.taux === true) {
-    return (
-      <TableCell className={cn('text-right', valeur === null && 'text-muted-foreground')}>
-        {formatRateOrNone(valeur)}
-      </TableCell>
-    );
-  }
-  const nombre = valeur ?? 0;
   return (
-    <TableCell className="text-right">
-      {decimal ? formatDecimal(nombre) : formatNumber(nombre)}
+    <TableCell
+      className={cn(
+        'text-right',
+        colonne.taux === true && valeur === null && 'text-muted-foreground',
+      )}
+    >
+      {valeurAffichee(colonne, valeur, decimal)}
     </TableCell>
   );
 }
 
-function ActivityRow({ line, colonnes }: { line: ActivityLine; colonnes: Colonne[] }) {
+function ActivityRow({ line, colonnes }: { line: ActivityLine; colonnes: ActivityColumn[] }) {
   const muted = !line.hasActivity;
   return (
     <TableRow className={cn(muted && 'bg-secondary/40 text-muted-foreground')}>
@@ -424,8 +406,8 @@ function TotalsRow({
   decimal = false,
 }: {
   label: string;
-  values: Omit<ActivityTotals, 'people'>;
-  colonnes: Colonne[];
+  values: ActivityCounts;
+  colonnes: ActivityColumn[];
   decimal?: boolean;
 }) {
   return (
