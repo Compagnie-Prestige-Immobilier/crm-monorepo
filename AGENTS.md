@@ -136,3 +136,11 @@ doit comprendre en une lecture, sans sauter entre les fichiers.
   ne pas relancer une commande dont les entrees n'ont pas change.
 - Prefixer les commandes par `rtk`, conformement a
   `/Users/cheikh/.codex/RTK.md`.
+
+## Agents specialises versionnes
+
+- Les agents du projet sont versionnes dans `.claude/agents/` pour Claude et
+  `.codex/agents/` pour Codex. Utiliser ces definitions locales plutot que de
+  dependre des copies du repertoire personnel.
+- Les deux repertoires decrivent les memes specialistes. Toute modification
+  d'un agent doit etre reportee dans les deux formats dans le meme changement.
