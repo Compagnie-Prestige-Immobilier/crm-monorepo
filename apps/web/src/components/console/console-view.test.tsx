@@ -8,6 +8,7 @@ import type * as ConsoleData from '@/lib/data/console';
 import type * as ProspectsData from '@/lib/data/prospects';
 import type * as ReferenceData from '@/lib/data/reference';
 import type { CallOutcome, ProspectFilters, ProspectRow } from '@/lib/types';
+import { prospectFixture } from '@/test/prospect-fixture';
 import { renderWithQuery } from '@/test/render-query';
 import { routerMock, setUrl } from '@/test/router-mock';
 
@@ -85,52 +86,7 @@ vi.mock('sonner', () => ({
 }));
 
 function prospect(over: Partial<ProspectRow> & { id: string }): ProspectRow {
-  return {
-    nom: 'Diallo',
-    prenom: 'Mamadou',
-    phoneE164: '+221771234567',
-    rev: 1,
-    statut: 'NOUVEAU',
-    banqueId: 'b-1',
-    banqueName: 'CBAO',
-    syndicatId: 's-1',
-    syndicatSigle: 'SUDES',
-    representantId: 'r-9',
-    representantName: 'Aminata Ndiaye',
-    representantPhoneE164: '+221770000000',
-    departementId: 'd-1',
-    departementName: 'Dakar',
-    ownedByCommercialId: 'u-1',
-    ownedByCommercialName: 'Fatou Sow',
-    projet: 'CHUES',
-    type: null,
-    profession: null,
-    professionId: null,
-    professionIsTeaching: null,
-    incomeBandId: null,
-    incomeBandLabel: null,
-    paymentMode: null,
-    journeys: [],
-    dureeSystemeMois: null,
-    canalProvenanceId: null,
-    canalProvenanceLabel: null,
-    segment: 'BDD1',
-    phase2Status: 'PENDING',
-    enrollmentMethod: null,
-    enrollmentCapturedById: null,
-    enrollmentCapturedByName: null,
-    enrollmentCapturedAt: null,
-    lastOutcome: null,
-    lastComment: null,
-    lastAttemptAt: null,
-    origin: null,
-    originLabel: null,
-    clientCreatedAt: '2026-01-01T00:00:00.000Z',
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-01-01T00:00:00.000Z',
-    deletedAt: null,
-    ...over,
-  };
+  return prospectFixture({ representantId: 'r-9', ...over });
 }
 
 const NEUVE = prospect({ id: 'p-1', nom: 'Neuve', prenom: 'Fiche' });

@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
+import { bankBasePath } from '@/lib/bank-filters';
 import {
   createBankCaseTransition,
   fetchBankCase,
@@ -48,12 +49,21 @@ import { formatDateTime, formatPhone } from '@/lib/format';
 import { formatXof, parseMoneyInput } from '@/lib/money';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
-import type { BankCaseTransition, BankRejectionReason, Role } from '@/lib/types';
+import type { BankCaseTransition, BankRejectionReason, Projet, Role } from '@/lib/types';
 
 const OTHER_REASON_CODE = 'AUTRE';
 
-export function BankCaseDetailView({ caseId, role }: { caseId: string; role: Role }) {
+export function BankCaseDetailView({
+  caseId,
+  role,
+  projet,
+}: {
+  caseId: string;
+  role: Role;
+  projet: Projet;
+}) {
   const queryClient = useQueryClient();
+  const listHref = `${bankBasePath(projet)}/dossiers`;
   const [advancing, setAdvancing] = useState(false);
   const [rejecting, setRejecting] = useState(false);
 
@@ -73,7 +83,7 @@ export function BankCaseDetailView({ caseId, role }: { caseId: string; role: Rol
   if (detail.isError) {
     return (
       <div className="flex flex-col gap-6">
-        <DetailBackLink href="/chues/dossiers">Tous les dossiers</DetailBackLink>
+        <DetailBackLink href={listHref}>Tous les dossiers</DetailBackLink>
         <QueryErrorState
           error={detail.error}
           onRetry={() => {
@@ -88,7 +98,7 @@ export function BankCaseDetailView({ caseId, role }: { caseId: string; role: Rol
   if (stages.isError) {
     return (
       <div className="flex flex-col gap-6">
-        <DetailBackLink href="/chues/dossiers">Tous les dossiers</DetailBackLink>
+        <DetailBackLink href={listHref}>Tous les dossiers</DetailBackLink>
         <QueryErrorState
           error={stages.error}
           onRetry={() => {
@@ -113,7 +123,7 @@ export function BankCaseDetailView({ caseId, role }: { caseId: string; role: Rol
 
   return (
     <div className="flex flex-col gap-6">
-      <DetailBackLink href="/chues/dossiers">Tous les dossiers</DetailBackLink>
+      <DetailBackLink href={listHref}>Tous les dossiers</DetailBackLink>
 
       {/* ─── En-tête ─────────────────────────────────────────────────── */}
       <Card className="animate-rise">

@@ -1714,6 +1714,282 @@
         "tags": ["referentiels"]
       }
     },
+    "/api/v1/referentiels/employeurs": {
+      "get": {
+        "operationId": "listEmployeurs",
+        "parameters": [
+          {
+            "name": "activeOnly",
+            "required": false,
+            "in": "query",
+            "description": "Ne renvoyer que les entrées actives.",
+            "schema": {
+              "default": true,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EmployeurDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Employeurs : ministères et grandes entreprises.",
+        "tags": ["referentiels"]
+      },
+      "post": {
+        "operationId": "createEmployeur",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEmployeurDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmployeurDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ajoute un employeur.",
+        "tags": ["referentiels"]
+      }
+    },
+    "/api/v1/referentiels/employeurs/{id}": {
+      "patch": {
+        "operationId": "updateEmployeur",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEmployeurDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmployeurDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Modifie un employeur.",
+        "tags": ["referentiels"]
+      }
+    },
+    "/api/v1/referentiels/pays": {
+      "get": {
+        "operationId": "listPays",
+        "parameters": [
+          {
+            "name": "activeOnly",
+            "required": false,
+            "in": "query",
+            "description": "Ne renvoyer que les entrées actives.",
+            "schema": {
+              "default": true,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PaysDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Pays de résidence, avec leur indicatif.",
+        "tags": ["referentiels"]
+      }
+    },
     "/api/v1/referentiels/offres": {
       "get": {
         "operationId": "listOffers",
@@ -7890,6 +8166,15 @@
             }
           },
           {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Projet d’entrée de la fiche liée. Sans filtre, les deux projets sortent.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
             "name": "agentId",
             "required": false,
             "in": "query",
@@ -8162,6 +8447,15 @@
             }
           },
           {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Projet d’entrée de la fiche liée. Sans filtre, les deux projets sortent.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
             "name": "agentId",
             "required": false,
             "in": "query",
@@ -8313,6 +8607,15 @@
               "maximum": 50,
               "default": 20,
               "type": "number"
+            }
+          },
+          {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Ne propose que les fiches entrées par ce projet. Sans filtre, les deux.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
             }
           }
         ],
@@ -9182,6 +9485,15 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Projet d’entrée de la fiche liée. Sans filtre, les deux projets sortent.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
             }
           },
           {
@@ -18379,6 +18691,75 @@
         },
         "required": ["id", "code", "label", "description", "position", "isActive", "updatedAt"]
       },
+      "EmployeurType": {
+        "type": "string",
+        "enum": ["MINISTERE", "ENTREPRISE", "AUTRE"]
+      },
+      "EmployeurDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "description": "Clé stable, jamais réécrite : les fiches la désignent."
+          },
+          "label": {
+            "type": "string"
+          },
+          "type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EmployeurType"
+              }
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["id", "code", "label", "type", "position", "isActive", "updatedAt"]
+      },
+      "PaysDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "description": "ISO 3166-1 alpha-2."
+          },
+          "label": {
+            "type": "string"
+          },
+          "indicatif": {
+            "type": "string",
+            "description": "Indicatif téléphonique sans le « + »."
+          },
+          "position": {
+            "type": "number"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["id", "code", "label", "indicatif", "position", "isActive", "updatedAt"]
+      },
       "ReferentielsBundleDto": {
         "type": "object",
         "properties": {
@@ -18423,6 +18804,18 @@
             "items": {
               "$ref": "#/components/schemas/OfferDto"
             }
+          },
+          "employeurs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EmployeurDto"
+            }
+          },
+          "pays": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaysDto"
+            }
           }
         },
         "required": [
@@ -18432,7 +18825,9 @@
           "regions",
           "professions",
           "incomeBands",
-          "offers"
+          "offers",
+          "employeurs",
+          "pays"
         ]
       },
       "CanalProvenanceDto": {
@@ -18564,6 +18959,67 @@
           "maxXof": {
             "type": "number",
             "minimum": 0
+          },
+          "position": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9999
+          },
+          "isActive": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "CreateEmployeurDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 60,
+            "pattern": "^[A-Z][A-Z0-9_]*$"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EmployeurType"
+              }
+            ]
+          },
+          "position": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9999
+          },
+          "isActive": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": ["code", "label", "type"]
+      },
+      "UpdateEmployeurDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 60,
+            "pattern": "^[A-Z][A-Z0-9_]*$"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EmployeurType"
+              }
+            ]
           },
           "position": {
             "type": "number",
@@ -19723,6 +20179,14 @@
         "type": "string",
         "enum": ["COMPTANT", "ECHELONNE"]
       },
+      "TypeContrat": {
+        "type": "string",
+        "enum": ["CDI", "CDD", "AUTRE"]
+      },
+      "ModeEpargne": {
+        "type": "string",
+        "enum": ["TONTINE", "MOBILE_MONEY", "BANQUE", "AUCUN"]
+      },
       "GrandPublicConsent": {
         "type": "string",
         "enum": ["NON_DEMANDE", "INTERESSE", "REFUSE"]
@@ -19893,6 +20357,66 @@
               }
             ]
           },
+          "employeurId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "employeur": {
+            "type": "string",
+            "nullable": true,
+            "description": "Libellé du référentiel, ou l’employeur saisi en clair à défaut."
+          },
+          "typeContrat": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TypeContrat"
+              }
+            ]
+          },
+          "ancienneteMois": {
+            "type": "number",
+            "nullable": true,
+            "description": "Ancienneté chez l’employeur, en MOIS."
+          },
+          "lieuActivite": {
+            "type": "string",
+            "nullable": true
+          },
+          "modeEpargne": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ModeEpargne"
+              }
+            ]
+          },
+          "paysResidenceId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "paysResidenceLabel": {
+            "type": "string",
+            "nullable": true
+          },
+          "villeResidence": {
+            "type": "string",
+            "nullable": true
+          },
+          "whatsappE164": {
+            "type": "string",
+            "nullable": true
+          },
+          "relaisNom": {
+            "type": "string",
+            "nullable": true
+          },
+          "relaisPhoneE164": {
+            "type": "string",
+            "nullable": true
+          },
           "journeys": {
             "type": "array",
             "items": {
@@ -20027,6 +20551,18 @@
           "incomeBandId",
           "incomeBandLabel",
           "paymentMode",
+          "employeurId",
+          "employeur",
+          "typeContrat",
+          "ancienneteMois",
+          "lieuActivite",
+          "modeEpargne",
+          "paysResidenceId",
+          "paysResidenceLabel",
+          "villeResidence",
+          "whatsappE164",
+          "relaisNom",
+          "relaisPhoneE164",
           "journeys",
           "dureeSystemeMois",
           "canalProvenanceId",
@@ -20126,6 +20662,67 @@
             "type": "string",
             "format": "uuid",
             "description": "Tranche de revenu mensuel déclaré."
+          },
+          "employeurId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Employeur du référentiel : ministère (fonctionnaire) ou entreprise (privé)."
+          },
+          "employeur": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Employeur en clair, si hors référentiel."
+          },
+          "typeContrat": {
+            "description": "Secteur privé : nature du contrat.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TypeContrat"
+              }
+            ]
+          },
+          "ancienneteMois": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 840,
+            "description": "Ancienneté chez l’employeur, en MOIS. Distincte de `dureeSystemeMois`."
+          },
+          "lieuActivite": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Informel : marché, quartier ou lieu d’activité."
+          },
+          "modeEpargne": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ModeEpargne"
+              }
+            ]
+          },
+          "paysResidenceId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Diaspora : pays de résidence."
+          },
+          "villeResidence": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "Diaspora : ville de résidence."
+          },
+          "whatsappE164": {
+            "type": "string",
+            "maxLength": 40,
+            "description": "Numéro WhatsApp, souvent international et distinct du numéro principal. Saisie libre, normalisé en E.164 par le serveur."
+          },
+          "relaisNom": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Diaspora : personne relais au Sénégal."
+          },
+          "relaisPhoneE164": {
+            "type": "string",
+            "maxLength": 40,
+            "description": "Téléphone du relais. Saisie libre, normalisé en E.164 par le serveur."
           },
           "paymentMode": {
             "allOf": [
@@ -20305,6 +20902,67 @@
             "type": "string",
             "format": "uuid",
             "description": "Tranche de revenu mensuel déclaré."
+          },
+          "employeurId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Employeur du référentiel : ministère (fonctionnaire) ou entreprise (privé)."
+          },
+          "employeur": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Employeur en clair, si hors référentiel."
+          },
+          "typeContrat": {
+            "description": "Secteur privé : nature du contrat.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TypeContrat"
+              }
+            ]
+          },
+          "ancienneteMois": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 840,
+            "description": "Ancienneté chez l’employeur, en MOIS. Distincte de `dureeSystemeMois`."
+          },
+          "lieuActivite": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Informel : marché, quartier ou lieu d’activité."
+          },
+          "modeEpargne": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ModeEpargne"
+              }
+            ]
+          },
+          "paysResidenceId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Diaspora : pays de résidence."
+          },
+          "villeResidence": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "Diaspora : ville de résidence."
+          },
+          "whatsappE164": {
+            "type": "string",
+            "maxLength": 40,
+            "description": "Numéro WhatsApp, souvent international et distinct du numéro principal. Saisie libre, normalisé en E.164 par le serveur."
+          },
+          "relaisNom": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Diaspora : personne relais au Sénégal."
+          },
+          "relaisPhoneE164": {
+            "type": "string",
+            "maxLength": 40,
+            "description": "Téléphone du relais. Saisie libre, normalisé en E.164 par le serveur."
           },
           "paymentMode": {
             "allOf": [
@@ -20643,7 +21301,7 @@
           "whatsappE164": {
             "type": "string",
             "maxLength": 40,
-            "description": "Représentant : numéro WhatsApp, seulement si le statut vaut AUTRE_NUMERO."
+            "description": "Représentant : numéro WhatsApp, seulement si le statut vaut AUTRE_NUMERO. Prospect de la diaspora : numéro WhatsApp, souvent le seul joignable."
           },
           "profession": {
             "type": "string",
@@ -20720,6 +21378,63 @@
                 "$ref": "#/components/schemas/PaymentMode"
               }
             ]
+          },
+          "employeurId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Prospect : employeur du référentiel. Fonctionnaire (ministère) ou privé."
+          },
+          "employeur": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Prospect : employeur en clair."
+          },
+          "typeContrat": {
+            "description": "Prospect du secteur privé : nature du contrat.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TypeContrat"
+              }
+            ]
+          },
+          "ancienneteMois": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 840,
+            "description": "Prospect : ancienneté chez l’employeur, en MOIS. Distincte de `dureeSystemeMois`."
+          },
+          "lieuActivite": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Prospect informel : lieu d’activité."
+          },
+          "modeEpargne": {
+            "description": "Prospect informel : comment il épargne.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ModeEpargne"
+              }
+            ]
+          },
+          "paysResidenceId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Prospect diaspora : pays de résidence."
+          },
+          "villeResidence": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "Prospect diaspora : ville de résidence."
+          },
+          "relaisNom": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Prospect diaspora : personne relais au Sénégal."
+          },
+          "relaisPhoneE164": {
+            "type": "string",
+            "maxLength": 40,
+            "description": "Prospect diaspora : téléphone du relais, normalisé en E.164 par le serveur."
           },
           "clientCreatedAt": {
             "type": "string",
@@ -21160,6 +21875,19 @@
               "$ref": "#/components/schemas/CanalProvenanceDto"
             }
           },
+          "employeurs": {
+            "description": "Employeurs : la situation du Grand Public se saisit hors réseau.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EmployeurDto"
+            }
+          },
+          "pays": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaysDto"
+            }
+          },
           "visiteReferentiels": {
             "description": "Les quatre listes du registre des visites, réunies : chaque entrée porte sa nature.",
             "type": "array",
@@ -21193,6 +21921,8 @@
           "syndicats",
           "incomeBands",
           "canauxProvenance",
+          "employeurs",
+          "pays",
           "visiteReferentiels",
           "representants",
           "prospects",

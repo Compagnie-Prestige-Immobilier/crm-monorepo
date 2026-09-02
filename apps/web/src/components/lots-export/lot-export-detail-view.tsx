@@ -25,6 +25,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
+  campagnesPath,
   fetchLotExport,
   lotExportFileName,
   lotExportUrl,
@@ -90,6 +91,7 @@ export function LotExportDetailView({ id }: { id: string }) {
 
   const {
     name,
+    projet,
     scopeLabel,
     itemCount,
     createdAt,
@@ -107,7 +109,7 @@ export function LotExportDetailView({ id }: { id: string }) {
   return (
     <div className="flex flex-col gap-6">
       <Link
-        href="/chues/campagnes"
+        href={campagnesPath(projet)}
         className="inline-flex w-fit items-center gap-1.5 text-[0.875rem] text-muted-foreground hover:underline focus-visible:underline"
       >
         <ArrowLeftIcon className="size-4" aria-hidden="true" />

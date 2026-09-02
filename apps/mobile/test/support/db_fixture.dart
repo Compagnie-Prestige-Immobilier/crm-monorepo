@@ -81,6 +81,39 @@ Future<void> seedReferentials(AppDatabase db) async {
           localUpdatedAt: t0,
         ),
       );
+  await db
+      .into(db.employeurs)
+      .insert(
+        EmployeursCompanion.insert(
+          id: 'emp-min',
+          code: 'MEN',
+          label: 'Ministère Test',
+          type: 'MINISTERE',
+          localUpdatedAt: t0,
+        ),
+      );
+  await db
+      .into(db.employeurs)
+      .insert(
+        EmployeursCompanion.insert(
+          id: 'emp-ent',
+          code: 'SONATEL',
+          label: 'Entreprise Test',
+          type: 'ENTREPRISE',
+          localUpdatedAt: t0,
+        ),
+      );
+  await db
+      .into(db.pays)
+      .insert(
+        PaysCompanion.insert(
+          id: 'pays-it',
+          code: 'IT',
+          label: 'Italie',
+          indicatif: '39',
+          localUpdatedAt: t0,
+        ),
+      );
 }
 
 /// Donne un libellé de région au département du décor et en ajoute un second

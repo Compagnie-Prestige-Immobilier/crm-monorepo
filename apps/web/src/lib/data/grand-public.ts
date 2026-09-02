@@ -168,42 +168,14 @@ export async function fetchCanauxProvenance(
   );
 }
 
-export interface GrandPublicProspectInput {
-  nom: string;
-  prenom: string;
-  phone: string;
-  profession?: string | undefined;
-  professionId?: string | undefined;
-  incomeBandId?: string | undefined;
-  paymentMode?: components['schemas']['PaymentMode'] | undefined;
-  banqueId?: string | undefined;
-  syndicatId?: string | undefined;
-  type?: ProspectType | undefined;
-  dureeSystemeMois?: number | undefined;
-  canalProvenanceId?: string | undefined;
-}
+/** Le contrat de création, moins le projet : il est posé ici et nulle part ailleurs. */
+export type GrandPublicProspectInput = Omit<CreateProspectInput, 'projet'>;
 
 export async function createGrandPublicProspect(
   input: GrandPublicProspectInput,
   client: ApiClient = getApiClient(),
 ): Promise<ProspectRow> {
-  const body: CreateProspectInput = {
-    nom: input.nom,
-    prenom: input.prenom,
-    phone: input.phone,
-    projet: GRAND_PUBLIC,
-  };
-  if (input.profession !== undefined) body.profession = input.profession;
-  if (input.professionId !== undefined) body.professionId = input.professionId;
-  if (input.incomeBandId !== undefined) body.incomeBandId = input.incomeBandId;
-  if (input.paymentMode !== undefined) body.paymentMode = input.paymentMode;
-  if (input.banqueId !== undefined) body.banqueId = input.banqueId;
-  if (input.syndicatId !== undefined) body.syndicatId = input.syndicatId;
-  if (input.type !== undefined) body.type = input.type;
-  if (input.dureeSystemeMois !== undefined) body.dureeSystemeMois = input.dureeSystemeMois;
-  if (input.canalProvenanceId !== undefined) body.canalProvenanceId = input.canalProvenanceId;
-
-  return createProspect(body, client);
+  return createProspect({ ...input, projet: GRAND_PUBLIC }, client);
 }
 
 export async function updateGrandPublicConsent(

@@ -14,5 +14,5 @@ export default async function NouveauDossierPage() {
     return <PermissionDenied role={guard.user.role} what="L’ouverture d’un dossier bancaire" />;
   }
 
-  return <BankCaseForm />;
+  return <BankCaseForm projet="CHUES" />;
 }

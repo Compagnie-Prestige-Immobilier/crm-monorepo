@@ -14,6 +14,8 @@ export const SYNC_STREAMS = [
   'syndicats',
   'incomeBands',
   'canauxProvenance',
+  'employeurs',
+  'pays',
   'visiteEntreprises',
   'visiteObjets',
   'visiteDirections',

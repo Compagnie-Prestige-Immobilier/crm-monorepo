@@ -21,17 +21,22 @@ import {
   ChangeSource,
   EnrollmentMethod,
   GrandPublicConsent,
+  ModeEpargne,
   PaymentMode,
   Phase2Status,
   Projet,
   ProspectStatut,
   ProspectType,
+  TypeContrat,
 } from '@crm/database';
 
 import { PageMetaDto } from '../../common/dto/prospect-filter.dto.js';
 
 /** Plafond du type `Int` de PostgreSQL, en FCFA. */
 const MONTANT_MAX_XOF = 2_147_483_647;
+
+/** 70 ans de carrière : au-delà, c'est une saisie en années prise pour des mois. */
+export const ANCIENNETE_MAX_MOIS = 840;
 
 export class CreateProspectDto {
   @ApiPropertyOptional({
@@ -125,6 +130,94 @@ export class CreateProspectDto {
   @IsUUID()
   incomeBandId?: string;
 
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Employeur du référentiel : ministère (fonctionnaire) ou entreprise (privé).',
+  })
+  @IsOptional()
+  @IsUUID()
+  employeurId?: string;
+
+  @ApiPropertyOptional({ maxLength: 160, description: 'Employeur en clair, si hors référentiel.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  employeur?: string;
+
+  @ApiPropertyOptional({
+    enum: TypeContrat,
+    enumName: 'TypeContrat',
+    description: 'Secteur privé : nature du contrat.',
+  })
+  @IsOptional()
+  @IsEnum(TypeContrat)
+  typeContrat?: TypeContrat;
+
+  @ApiPropertyOptional({
+    type: Number,
+    minimum: 0,
+    maximum: ANCIENNETE_MAX_MOIS,
+    description: 'Ancienneté chez l’employeur, en MOIS. Distincte de `dureeSystemeMois`.',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(ANCIENNETE_MAX_MOIS)
+  ancienneteMois?: number;
+
+  @ApiPropertyOptional({
+    maxLength: 160,
+    description: 'Informel : marché, quartier ou lieu d’activité.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  lieuActivite?: string;
+
+  @ApiPropertyOptional({ enum: ModeEpargne, enumName: 'ModeEpargne' })
+  @IsOptional()
+  @IsEnum(ModeEpargne)
+  modeEpargne?: ModeEpargne;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Diaspora : pays de résidence.' })
+  @IsOptional()
+  @IsUUID()
+  paysResidenceId?: string;
+
+  @ApiPropertyOptional({ maxLength: 120, description: 'Diaspora : ville de résidence.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  villeResidence?: string;
+
+  @ApiPropertyOptional({
+    maxLength: 40,
+    description:
+      'Numéro WhatsApp, souvent international et distinct du numéro principal. ' +
+      'Saisie libre, normalisé en E.164 par le serveur.',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(6)
+  @MaxLength(40)
+  whatsappE164?: string;
+
+  @ApiPropertyOptional({ maxLength: 160, description: 'Diaspora : personne relais au Sénégal.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  relaisNom?: string;
+
+  @ApiPropertyOptional({
+    maxLength: 40,
+    description: 'Téléphone du relais. Saisie libre, normalisé en E.164 par le serveur.',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(6)
+  @MaxLength(40)
+  relaisPhoneE164?: string;
+
   @ApiPropertyOptional({ enum: PaymentMode, enumName: 'PaymentMode' })
   @IsOptional()
   @IsEnum(PaymentMode)
@@ -205,6 +298,37 @@ export class ProspectDto {
   @ApiProperty({ type: String, nullable: true }) incomeBandLabel!: string | null;
   @ApiProperty({ enum: PaymentMode, enumName: 'PaymentMode', nullable: true })
   paymentMode!: PaymentMode | null;
+
+  @ApiProperty({ type: String, format: 'uuid', nullable: true }) employeurId!: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Libellé du référentiel, ou l’employeur saisi en clair à défaut.',
+  })
+  employeur!: string | null;
+
+  @ApiProperty({ enum: TypeContrat, enumName: 'TypeContrat', nullable: true })
+  typeContrat!: TypeContrat | null;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: 'Ancienneté chez l’employeur, en MOIS.',
+  })
+  ancienneteMois!: number | null;
+
+  @ApiProperty({ type: String, nullable: true }) lieuActivite!: string | null;
+
+  @ApiProperty({ enum: ModeEpargne, enumName: 'ModeEpargne', nullable: true })
+  modeEpargne!: ModeEpargne | null;
+
+  @ApiProperty({ type: String, format: 'uuid', nullable: true }) paysResidenceId!: string | null;
+  @ApiProperty({ type: String, nullable: true }) paysResidenceLabel!: string | null;
+  @ApiProperty({ type: String, nullable: true }) villeResidence!: string | null;
+  @ApiProperty({ type: String, nullable: true }) whatsappE164!: string | null;
+  @ApiProperty({ type: String, nullable: true }) relaisNom!: string | null;
+  @ApiProperty({ type: String, nullable: true }) relaisPhoneE164!: string | null;
 
   @ApiProperty({ type: () => [ProspectJourneyDto] })
   journeys!: ProspectJourneyDto[];

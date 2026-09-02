@@ -3,10 +3,12 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:crm_api_client/src/model/mode_epargne.dart';
 import 'package:crm_api_client/src/model/payment_mode.dart';
 import 'package:crm_api_client/src/model/projet.dart';
 import 'package:crm_api_client/src/model/prospect_type.dart';
 import 'package:crm_api_client/src/model/prospect_statut.dart';
+import 'package:crm_api_client/src/model/type_contrat.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/src/equatable_utils.dart';
@@ -46,6 +48,28 @@ class CreateProspectDto {
     this.professionId,
 
     this.incomeBandId,
+
+    this.employeurId,
+
+    this.employeur,
+
+    this.typeContrat,
+
+    this.ancienneteMois,
+
+    this.lieuActivite,
+
+    this.modeEpargne,
+
+    this.paysResidenceId,
+
+    this.villeResidence,
+
+    this.whatsappE164,
+
+    this.relaisNom,
+
+    this.relaisPhoneE164,
 
     this.paymentMode,
 
@@ -110,6 +134,61 @@ class CreateProspectDto {
   @JsonKey(name: r'incomeBandId', required: false, includeIfNull: false)
   final String? incomeBandId;
 
+  /// Employeur du référentiel : ministère (fonctionnaire) ou entreprise (privé).
+  @JsonKey(name: r'employeurId', required: false, includeIfNull: false)
+  final String? employeurId;
+
+  /// Employeur en clair, si hors référentiel.
+  @JsonKey(name: r'employeur', required: false, includeIfNull: false)
+  final String? employeur;
+
+  /// Secteur privé : nature du contrat.
+  @JsonKey(
+    name: r'typeContrat',
+    required: false,
+    includeIfNull: false,
+    unknownEnumValue: TypeContrat.unknownDefaultOpenApi,
+  )
+  final TypeContrat? typeContrat;
+
+  /// Ancienneté chez l’employeur, en MOIS. Distincte de `dureeSystemeMois`.
+  // minimum: 0
+  // maximum: 840
+  @JsonKey(name: r'ancienneteMois', required: false, includeIfNull: false)
+  final num? ancienneteMois;
+
+  /// Informel : marché, quartier ou lieu d’activité.
+  @JsonKey(name: r'lieuActivite', required: false, includeIfNull: false)
+  final String? lieuActivite;
+
+  @JsonKey(
+    name: r'modeEpargne',
+    required: false,
+    includeIfNull: false,
+    unknownEnumValue: ModeEpargne.unknownDefaultOpenApi,
+  )
+  final ModeEpargne? modeEpargne;
+
+  /// Diaspora : pays de résidence.
+  @JsonKey(name: r'paysResidenceId', required: false, includeIfNull: false)
+  final String? paysResidenceId;
+
+  /// Diaspora : ville de résidence.
+  @JsonKey(name: r'villeResidence', required: false, includeIfNull: false)
+  final String? villeResidence;
+
+  /// Numéro WhatsApp, souvent international et distinct du numéro principal. Saisie libre, normalisé en E.164 par le serveur.
+  @JsonKey(name: r'whatsappE164', required: false, includeIfNull: false)
+  final String? whatsappE164;
+
+  /// Diaspora : personne relais au Sénégal.
+  @JsonKey(name: r'relaisNom', required: false, includeIfNull: false)
+  final String? relaisNom;
+
+  /// Téléphone du relais. Saisie libre, normalisé en E.164 par le serveur.
+  @JsonKey(name: r'relaisPhoneE164', required: false, includeIfNull: false)
+  final String? relaisPhoneE164;
+
   @JsonKey(
     name: r'paymentMode',
     required: false,
@@ -158,6 +237,17 @@ class CreateProspectDto {
                 profession,
                 professionId,
                 incomeBandId,
+                employeurId,
+                employeur,
+                typeContrat,
+                ancienneteMois,
+                lieuActivite,
+                modeEpargne,
+                paysResidenceId,
+                villeResidence,
+                whatsappE164,
+                relaisNom,
+                relaisPhoneE164,
                 paymentMode,
                 dureeSystemeMois,
                 canalProvenanceId,
@@ -177,6 +267,17 @@ class CreateProspectDto {
                 other.profession,
                 other.professionId,
                 other.incomeBandId,
+                other.employeurId,
+                other.employeur,
+                other.typeContrat,
+                other.ancienneteMois,
+                other.lieuActivite,
+                other.modeEpargne,
+                other.paysResidenceId,
+                other.villeResidence,
+                other.whatsappE164,
+                other.relaisNom,
+                other.relaisPhoneE164,
                 other.paymentMode,
                 other.dureeSystemeMois,
                 other.canalProvenanceId,
@@ -202,6 +303,17 @@ class CreateProspectDto {
         profession,
         professionId,
         incomeBandId,
+        employeurId,
+        employeur,
+        typeContrat,
+        ancienneteMois,
+        lieuActivite,
+        modeEpargne,
+        paysResidenceId,
+        villeResidence,
+        whatsappE164,
+        relaisNom,
+        relaisPhoneE164,
         paymentMode,
         dureeSystemeMois,
         canalProvenanceId,

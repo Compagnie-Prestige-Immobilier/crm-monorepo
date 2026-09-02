@@ -57,7 +57,7 @@ describe('tableau d’activité des téléconseillers', () => {
   it('montre le téléconseiller sans aucun acte, à zéro et signalé', async () => {
     fetchMock.mockResolvedValue(payload());
 
-    renderWithQuery(<ActivityView />);
+    renderWithQuery(<ActivityView projet="CHUES" />);
 
     await waitFor(() => {
       expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
@@ -82,7 +82,7 @@ describe('tableau d’activité des téléconseillers', () => {
       }),
     );
 
-    renderWithQuery(<ActivityView />);
+    renderWithQuery(<ActivityView projet="CHUES" />);
 
     await waitFor(() => {
       expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
@@ -94,7 +94,7 @@ describe('tableau d’activité des téléconseillers', () => {
   it('affiche le total d’équipe et la moyenne par téléconseiller', async () => {
     fetchMock.mockResolvedValue(payload());
 
-    renderWithQuery(<ActivityView />);
+    renderWithQuery(<ActivityView projet="CHUES" />);
 
     await waitFor(() => {
       expect(screen.getByRole('rowheader', { name: 'Total équipe' })).toBeTruthy();
@@ -109,7 +109,7 @@ describe('tableau d’activité des téléconseillers', () => {
   it('trie sur la colonne cliquée', async () => {
     fetchMock.mockResolvedValue(payload());
 
-    renderWithQuery(<ActivityView />);
+    renderWithQuery(<ActivityView projet="CHUES" />);
 
     await waitFor(() => {
       expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
@@ -124,7 +124,7 @@ describe('tableau d’activité des téléconseillers', () => {
   it('bascule la fenêtre de jour en semaine', async () => {
     fetchMock.mockResolvedValue(payload());
 
-    renderWithQuery(<ActivityView />);
+    renderWithQuery(<ActivityView projet="CHUES" />);
 
     await waitFor(() => {
       expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
@@ -144,10 +144,22 @@ describe('tableau d’activité des téléconseillers', () => {
     expect(screen.getByText('Équipe, par semaine')).toBeTruthy();
   });
 
+  it('borne les chiffres au projet de la coque', async () => {
+    fetchMock.mockResolvedValue(payload());
+
+    renderWithQuery(<ActivityView projet="GRAND_PUBLIC" />);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({ projet: 'GRAND_PUBLIC' }) as unknown,
+      );
+    });
+  });
+
   it('demande la fenêtre du jour, puis celle des sept derniers jours', async () => {
     fetchMock.mockResolvedValue(payload());
 
-    renderWithQuery(<ActivityView />);
+    renderWithQuery(<ActivityView projet="CHUES" />);
 
     await waitFor(() => {
       expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();

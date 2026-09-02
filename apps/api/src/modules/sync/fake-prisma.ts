@@ -117,6 +117,17 @@ export interface ProspectRow {
   banqueId: string;
   syndicatId: string;
   representantId: string;
+  employeurId?: string | null;
+  employeur?: string | null;
+  typeContrat?: string | null;
+  ancienneteMois?: number | null;
+  lieuActivite?: string | null;
+  modeEpargne?: string | null;
+  paysResidenceId?: string | null;
+  villeResidence?: string | null;
+  whatsappE164?: string | null;
+  relaisNom?: string | null;
+  relaisPhoneE164?: string | null;
   createdById: string;
   clientCreatedAt: Date;
   createdAt: Date;

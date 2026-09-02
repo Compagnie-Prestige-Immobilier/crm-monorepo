@@ -8,8 +8,9 @@ import { useBankFilters } from '@/components/bank/use-bank-filters';
 import { useFileDownload } from '@/components/exports/download-button';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { countActiveBankFilters } from '@/lib/bank-filters';
+import { bankBasePath, countActiveBankFilters } from '@/lib/bank-filters';
 import { bankExportFileName, buildBankExportUrl } from '@/lib/data/export';
+import type { Projet } from '@/lib/types';
 
 const SHEETS: readonly { name: string; description: string }[] = [
   {
@@ -26,8 +27,8 @@ const SHEETS: readonly { name: string; description: string }[] = [
   },
 ];
 
-export function BankExportView() {
-  const { filters } = useBankFilters();
+export function BankExportView({ projet }: { projet: Projet }) {
+  const { filters } = useBankFilters(projet);
   const { pending, download } = useFileDownload();
   const activeCount = countActiveBankFilters(filters);
 
@@ -87,7 +88,10 @@ export function BankExportView() {
             </Button>
             {/* Un LIEN habillé en bouton : la primitive `Button` de Base UI
                 poserait `role="button"` sur le `<a>`. */}
-            <Link href="/chues/dossiers" className={buttonVariants({ variant: 'ghost' })}>
+            <Link
+              href={`${bankBasePath(projet)}/dossiers`}
+              className={buttonVariants({ variant: 'ghost' })}
+            >
               Voir la liste
             </Link>
           </div>

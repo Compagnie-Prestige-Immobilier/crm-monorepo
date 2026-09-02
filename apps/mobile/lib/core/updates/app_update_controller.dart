@@ -310,7 +310,12 @@ class AppUpdateController extends Notifier<AppUpdateState> {
         );
         return;
       }
-      await _apply(dio, cached, online: false, failure: messageErreurReseau(error));
+      await _apply(
+        dio,
+        cached,
+        online: false,
+        failure: messageErreurReseau(error),
+      );
     } finally {
       // Le verdict est tombé : le garde-fou du démarrage n'a plus rien à
       // libérer, et un minuteur armé pour rien retient l'application en test

@@ -245,6 +245,7 @@ class ExportApi {
   /// * [stageId]
   /// * [stageType]
   /// * [banqueId] - Banque de traitement du dossier.
+  /// * [projet] - Projet d’entrée de la fiche liée. Sans filtre, les deux projets sortent.
   /// * [agentId] - Agent créateur OU dernier intervenant sur le dossier.
   /// * [rejectionReasonId]
   /// * [dateFrom] - Borne basse sur la création, incluse.
@@ -265,6 +266,7 @@ class ExportApi {
     String? stageId,
     BankStageType? stageType,
     String? banqueId,
+    Projet? projet,
     String? agentId,
     String? rejectionReasonId,
     DateTime? dateFrom,
@@ -297,6 +299,7 @@ class ExportApi {
       if (stageId != null) r'stageId': stageId,
       if (stageType != null) r'stageType': stageType,
       if (banqueId != null) r'banqueId': banqueId,
+      if (projet != null) r'projet': projet,
       if (agentId != null) r'agentId': agentId,
       if (rejectionReasonId != null) r'rejectionReasonId': rejectionReasonId,
       if (dateFrom != null) r'dateFrom': dateFrom,

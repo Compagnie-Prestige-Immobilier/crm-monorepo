@@ -19,6 +19,10 @@ abstract class _$SyncChangesDtoCWProxy {
 
   SyncChangesDto canauxProvenance(List<CanalProvenanceDto> canauxProvenance);
 
+  SyncChangesDto employeurs(List<EmployeurDto> employeurs);
+
+  SyncChangesDto pays(List<PaysDto> pays);
+
   SyncChangesDto visiteReferentiels(
     List<SyncVisiteReferentielDto> visiteReferentiels,
   );
@@ -42,6 +46,8 @@ abstract class _$SyncChangesDtoCWProxy {
     List<SyndicatDto> syndicats,
     List<IncomeBandDto> incomeBands,
     List<CanalProvenanceDto> canauxProvenance,
+    List<EmployeurDto> employeurs,
+    List<PaysDto> pays,
     List<SyncVisiteReferentielDto> visiteReferentiels,
     List<RepresentantDto> representants,
     List<ProspectDto> prospects,
@@ -78,6 +84,13 @@ class _$SyncChangesDtoCWProxyImpl implements _$SyncChangesDtoCWProxy {
       this(canauxProvenance: canauxProvenance);
 
   @override
+  SyncChangesDto employeurs(List<EmployeurDto> employeurs) =>
+      this(employeurs: employeurs);
+
+  @override
+  SyncChangesDto pays(List<PaysDto> pays) => this(pays: pays);
+
+  @override
   SyncChangesDto visiteReferentiels(
     List<SyncVisiteReferentielDto> visiteReferentiels,
   ) => this(visiteReferentiels: visiteReferentiels);
@@ -107,6 +120,8 @@ class _$SyncChangesDtoCWProxyImpl implements _$SyncChangesDtoCWProxy {
     Object? syndicats = const $CopyWithPlaceholder(),
     Object? incomeBands = const $CopyWithPlaceholder(),
     Object? canauxProvenance = const $CopyWithPlaceholder(),
+    Object? employeurs = const $CopyWithPlaceholder(),
+    Object? pays = const $CopyWithPlaceholder(),
     Object? visiteReferentiels = const $CopyWithPlaceholder(),
     Object? representants = const $CopyWithPlaceholder(),
     Object? prospects = const $CopyWithPlaceholder(),
@@ -137,6 +152,14 @@ class _$SyncChangesDtoCWProxyImpl implements _$SyncChangesDtoCWProxy {
           ? _value.canauxProvenance
           // ignore: cast_nullable_to_non_nullable
           : canauxProvenance as List<CanalProvenanceDto>,
+      employeurs: employeurs == const $CopyWithPlaceholder()
+          ? _value.employeurs
+          // ignore: cast_nullable_to_non_nullable
+          : employeurs as List<EmployeurDto>,
+      pays: pays == const $CopyWithPlaceholder()
+          ? _value.pays
+          // ignore: cast_nullable_to_non_nullable
+          : pays as List<PaysDto>,
       visiteReferentiels: visiteReferentiels == const $CopyWithPlaceholder()
           ? _value.visiteReferentiels
           // ignore: cast_nullable_to_non_nullable
@@ -179,6 +202,8 @@ SyncChangesDto _$SyncChangesDtoFromJson(
       'syndicats',
       'incomeBands',
       'canauxProvenance',
+      'employeurs',
+      'pays',
       'visiteReferentiels',
       'representants',
       'prospects',
@@ -222,6 +247,18 @@ SyncChangesDto _$SyncChangesDtoFromJson(
           .map((e) => CanalProvenanceDto.fromJson(e as Map<String, dynamic>))
           .toList(),
     ),
+    employeurs: $checkedConvert(
+      'employeurs',
+      (v) => (v as List<dynamic>)
+          .map((e) => EmployeurDto.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    ),
+    pays: $checkedConvert(
+      'pays',
+      (v) => (v as List<dynamic>)
+          .map((e) => PaysDto.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    ),
     visiteReferentiels: $checkedConvert(
       'visiteReferentiels',
       (v) => (v as List<dynamic>)
@@ -261,6 +298,8 @@ Map<String, dynamic> _$SyncChangesDtoToJson(
   'syndicats': instance.syndicats.map((e) => e.toJson()).toList(),
   'incomeBands': instance.incomeBands.map((e) => e.toJson()).toList(),
   'canauxProvenance': instance.canauxProvenance.map((e) => e.toJson()).toList(),
+  'employeurs': instance.employeurs.map((e) => e.toJson()).toList(),
+  'pays': instance.pays.map((e) => e.toJson()).toList(),
   'visiteReferentiels': instance.visiteReferentiels
       .map((e) => e.toJson())
       .toList(),

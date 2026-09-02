@@ -6,7 +6,9 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   ClockIcon,
+  FileSpreadsheetIcon,
   InboxIcon,
+  LoaderIcon,
   PhoneCallIcon,
   PlusIcon,
   RotateCcwIcon,
@@ -15,6 +17,7 @@ import {
 import Link from 'next/link';
 import { useState } from 'react';
 
+import { useFileDownload } from '@/components/exports/download-button';
 import { DatePicker } from '@/components/filters/date-picker';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { SearchField } from '@/components/filters/search-field';
@@ -47,6 +50,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { buildGrandPublicExportUrl, grandPublicExportFileName } from '@/lib/data/export';
 import {
   EMPTY_GRAND_PUBLIC_FILTERS,
   PROSPECT_TYPES,
@@ -135,6 +139,7 @@ const STATUT_OPTIONS = PROSPECT_STATUTS.map((statut) => ({
 
 export function GrandPublicProspectsView({ canCreate }: { canCreate: boolean }) {
   const { filters, setFilters, resetFilters } = useUrlFilters(FILTERS_ADAPTER);
+  const telechargement = useFileDownload();
 
   const { draft: searchDraft, setDraft: setSearchDraft } = useDebouncedSearch(
     filters.search,
@@ -183,6 +188,28 @@ export function GrandPublicProspectsView({ canCreate }: { canCreate: boolean }) 
             <ClockIcon aria-hidden="true" />
             Voir les rappels
           </Link>
+          {/* Même règle que la liste CHUES : qui ne peut pas écrire n'exporte pas. */}
+          {canCreate ? (
+            <Button
+              variant="outline"
+              size="lg"
+              disabled={telechargement.pending}
+              onClick={() => {
+                void telechargement.download({
+                  url: buildGrandPublicExportUrl(filters),
+                  fileName: grandPublicExportFileName(),
+                  failureMessage: 'L’export a échoué.',
+                });
+              }}
+            >
+              {telechargement.pending ? (
+                <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <FileSpreadsheetIcon aria-hidden="true" />
+              )}
+              Exporter
+            </Button>
+          ) : null}
           {canCreate ? (
             <>
               <Link

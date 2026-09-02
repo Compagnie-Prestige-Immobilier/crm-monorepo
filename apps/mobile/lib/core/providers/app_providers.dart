@@ -277,6 +277,16 @@ final StreamProvider<List<IncomeBand>> incomeBandsProvider =
       return ref.watch(referenceRepositoryProvider).watchIncomeBands();
     });
 
+final StreamProvider<List<Employeur>> employeursProvider =
+    StreamProvider<List<Employeur>>((Ref ref) {
+      return ref.watch(referenceRepositoryProvider).watchEmployeurs();
+    });
+
+final StreamProvider<List<PaysRow>> paysProvider =
+    StreamProvider<List<PaysRow>>((Ref ref) {
+      return ref.watch(referenceRepositoryProvider).watchPays();
+    });
+
 final NotifierProvider<HistoriqueSearch, String> historiqueSearchProvider =
     NotifierProvider<HistoriqueSearch, String>(HistoriqueSearch.new);
 

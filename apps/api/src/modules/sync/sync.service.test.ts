@@ -586,6 +586,53 @@ describe('une fiche naît sans banque, sans syndicat et sans représentant', () 
     expect(row.profession).toBe('Mécanicien');
   });
 
+  it('la situation du Grand Public voyage, numéros compris', async () => {
+    const result = await sync.push(
+      alice,
+      batch([
+        saisirNu({
+          type: 'DIASPORA',
+          employeurId: '0198f000-0000-7000-8000-000000000001',
+          employeur: 'Restaurant Chez Fatou',
+          typeContrat: 'CDD',
+          ancienneteMois: 18,
+          lieuActivite: 'Marché Sandaga',
+          modeEpargne: 'TONTINE',
+          paysResidenceId: '0198f000-0000-7000-8000-000000000002',
+          villeResidence: 'Milan',
+          whatsappE164: '+39 320 111 22 33',
+          relaisNom: 'Awa Diop',
+          relaisPhoneE164: '77 000 00 11',
+          incomeBandId: '0198f000-0000-7000-8000-000000000003',
+        }),
+      ]),
+    );
+
+    expect(statuses(result.body.results)).toEqual([SyncOpStatus.APPLIED]);
+    const row = db.prospects.get(PROSPECT_NU) as unknown as Record<string, unknown>;
+    expect(row.incomeBandId).toBe('0198f000-0000-7000-8000-000000000003');
+    expect(row.employeurId).toBe('0198f000-0000-7000-8000-000000000001');
+    expect(row.employeur).toBe('Restaurant Chez Fatou');
+    expect(row.typeContrat).toBe('CDD');
+    expect(row.ancienneteMois).toBe(18);
+    expect(row.lieuActivite).toBe('Marché Sandaga');
+    expect(row.modeEpargne).toBe('TONTINE');
+    expect(row.paysResidenceId).toBe('0198f000-0000-7000-8000-000000000002');
+    expect(row.villeResidence).toBe('Milan');
+    // Numéro international conservé tel quel, relais recomposé en +221.
+    expect(row.whatsappE164).toBe('+393201112233');
+    expect(row.relaisNom).toBe('Awa Diop');
+    expect(row.relaisPhoneE164).toBe('+221770000011');
+  });
+
+  it('un numéro de relais illisible invalide la seule opération, pas le lot', async () => {
+    const result = await sync.push(alice, batch([saisirNu({ relaisPhoneE164: '12' })]));
+
+    expect(statuses(result.body.results)).toEqual([SyncOpStatus.INVALID]);
+    expect(result.body.results[0]?.errorCode).toBe('PHONE_INVALID');
+    expect(db.prospects.get(PROSPECT_NU)).toBeUndefined();
+  });
+
   // Les listes par projet, les statistiques et les rappels filtrent sur
   // `prospect_journeys`. Sans parcours, la fiche existe et n'est nulle part.
   it('la saisie ouvre le parcours du projet', async () => {

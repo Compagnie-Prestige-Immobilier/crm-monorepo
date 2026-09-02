@@ -53,6 +53,7 @@ import {
 import { downloadCsv } from '@/lib/csv';
 import { formatDecimal, formatNumber, formatRateOrNone, formatShortDate } from '@/lib/format';
 import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
+import type { Projet } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 const COLUMNS: { key: ActivitySortKey; label: string }[] = [
@@ -69,7 +70,7 @@ const COLUMNS: { key: ActivitySortKey; label: string }[] = [
 
 const PRESETS: Exclude<PeriodPreset, 'custom'>[] = ['today', 'week', 'last7'];
 
-export function ActivityView() {
+export function ActivityView({ projet }: { projet: Projet }) {
   const [preset, setPreset] = useState<PeriodPreset>('today');
   const [range, setRange] = useState<ActivityRange>(() => presetRange('today'));
   const [granularity, setGranularity] = useState<SupervisionGranularity>('day');
@@ -77,8 +78,8 @@ export function ActivityView() {
   const [sortDir, setSortDir] = useState<SortDirection>('desc');
 
   const { data, isPending, isError, error, refetch } = useQuery({
-    queryKey: supervisionActivityKey(range, granularity),
-    queryFn: () => fetchSupervisionActivite({ range, granularity }),
+    queryKey: supervisionActivityKey(range, granularity, projet),
+    queryFn: () => fetchSupervisionActivite({ range, granularity, projet }),
     placeholderData: keepPreviousData,
   });
 
@@ -159,7 +160,7 @@ export function ActivityView() {
               const lines = sortActivityLines(activityLines(data), sortKey, sortDir);
               downloadCsv(
                 activityCsv({ lines, totals: activityTotals(lines), range, granularity }),
-                activityCsvFileName(range),
+                activityCsvFileName(range, projet),
               );
             }}
           >

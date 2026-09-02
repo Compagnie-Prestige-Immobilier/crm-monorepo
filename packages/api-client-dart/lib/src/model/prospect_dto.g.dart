@@ -57,6 +57,30 @@ abstract class _$ProspectDtoCWProxy {
 
   ProspectDto paymentMode(PaymentMode? paymentMode);
 
+  ProspectDto employeurId(String? employeurId);
+
+  ProspectDto employeur(String? employeur);
+
+  ProspectDto typeContrat(TypeContrat? typeContrat);
+
+  ProspectDto ancienneteMois(num? ancienneteMois);
+
+  ProspectDto lieuActivite(String? lieuActivite);
+
+  ProspectDto modeEpargne(ModeEpargne? modeEpargne);
+
+  ProspectDto paysResidenceId(String? paysResidenceId);
+
+  ProspectDto paysResidenceLabel(String? paysResidenceLabel);
+
+  ProspectDto villeResidence(String? villeResidence);
+
+  ProspectDto whatsappE164(String? whatsappE164);
+
+  ProspectDto relaisNom(String? relaisNom);
+
+  ProspectDto relaisPhoneE164(String? relaisPhoneE164);
+
   ProspectDto journeys(List<ProspectJourneyDto> journeys);
 
   ProspectDto dureeSystemeMois(num? dureeSystemeMois);
@@ -127,6 +151,18 @@ abstract class _$ProspectDtoCWProxy {
     String? incomeBandId,
     String? incomeBandLabel,
     PaymentMode? paymentMode,
+    String? employeurId,
+    String? employeur,
+    TypeContrat? typeContrat,
+    num? ancienneteMois,
+    String? lieuActivite,
+    ModeEpargne? modeEpargne,
+    String? paysResidenceId,
+    String? paysResidenceLabel,
+    String? villeResidence,
+    String? whatsappE164,
+    String? relaisNom,
+    String? relaisPhoneE164,
     List<ProspectJourneyDto> journeys,
     num? dureeSystemeMois,
     String? canalProvenanceId,
@@ -244,6 +280,52 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
       this(paymentMode: paymentMode);
 
   @override
+  ProspectDto employeurId(String? employeurId) =>
+      this(employeurId: employeurId);
+
+  @override
+  ProspectDto employeur(String? employeur) => this(employeur: employeur);
+
+  @override
+  ProspectDto typeContrat(TypeContrat? typeContrat) =>
+      this(typeContrat: typeContrat);
+
+  @override
+  ProspectDto ancienneteMois(num? ancienneteMois) =>
+      this(ancienneteMois: ancienneteMois);
+
+  @override
+  ProspectDto lieuActivite(String? lieuActivite) =>
+      this(lieuActivite: lieuActivite);
+
+  @override
+  ProspectDto modeEpargne(ModeEpargne? modeEpargne) =>
+      this(modeEpargne: modeEpargne);
+
+  @override
+  ProspectDto paysResidenceId(String? paysResidenceId) =>
+      this(paysResidenceId: paysResidenceId);
+
+  @override
+  ProspectDto paysResidenceLabel(String? paysResidenceLabel) =>
+      this(paysResidenceLabel: paysResidenceLabel);
+
+  @override
+  ProspectDto villeResidence(String? villeResidence) =>
+      this(villeResidence: villeResidence);
+
+  @override
+  ProspectDto whatsappE164(String? whatsappE164) =>
+      this(whatsappE164: whatsappE164);
+
+  @override
+  ProspectDto relaisNom(String? relaisNom) => this(relaisNom: relaisNom);
+
+  @override
+  ProspectDto relaisPhoneE164(String? relaisPhoneE164) =>
+      this(relaisPhoneE164: relaisPhoneE164);
+
+  @override
   ProspectDto journeys(List<ProspectJourneyDto> journeys) =>
       this(journeys: journeys);
 
@@ -347,6 +429,18 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
     Object? incomeBandId = const $CopyWithPlaceholder(),
     Object? incomeBandLabel = const $CopyWithPlaceholder(),
     Object? paymentMode = const $CopyWithPlaceholder(),
+    Object? employeurId = const $CopyWithPlaceholder(),
+    Object? employeur = const $CopyWithPlaceholder(),
+    Object? typeContrat = const $CopyWithPlaceholder(),
+    Object? ancienneteMois = const $CopyWithPlaceholder(),
+    Object? lieuActivite = const $CopyWithPlaceholder(),
+    Object? modeEpargne = const $CopyWithPlaceholder(),
+    Object? paysResidenceId = const $CopyWithPlaceholder(),
+    Object? paysResidenceLabel = const $CopyWithPlaceholder(),
+    Object? villeResidence = const $CopyWithPlaceholder(),
+    Object? whatsappE164 = const $CopyWithPlaceholder(),
+    Object? relaisNom = const $CopyWithPlaceholder(),
+    Object? relaisPhoneE164 = const $CopyWithPlaceholder(),
     Object? journeys = const $CopyWithPlaceholder(),
     Object? dureeSystemeMois = const $CopyWithPlaceholder(),
     Object? canalProvenanceId = const $CopyWithPlaceholder(),
@@ -470,6 +564,54 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
           ? _value.paymentMode
           // ignore: cast_nullable_to_non_nullable
           : paymentMode as PaymentMode?,
+      employeurId: employeurId == const $CopyWithPlaceholder()
+          ? _value.employeurId
+          // ignore: cast_nullable_to_non_nullable
+          : employeurId as String?,
+      employeur: employeur == const $CopyWithPlaceholder()
+          ? _value.employeur
+          // ignore: cast_nullable_to_non_nullable
+          : employeur as String?,
+      typeContrat: typeContrat == const $CopyWithPlaceholder()
+          ? _value.typeContrat
+          // ignore: cast_nullable_to_non_nullable
+          : typeContrat as TypeContrat?,
+      ancienneteMois: ancienneteMois == const $CopyWithPlaceholder()
+          ? _value.ancienneteMois
+          // ignore: cast_nullable_to_non_nullable
+          : ancienneteMois as num?,
+      lieuActivite: lieuActivite == const $CopyWithPlaceholder()
+          ? _value.lieuActivite
+          // ignore: cast_nullable_to_non_nullable
+          : lieuActivite as String?,
+      modeEpargne: modeEpargne == const $CopyWithPlaceholder()
+          ? _value.modeEpargne
+          // ignore: cast_nullable_to_non_nullable
+          : modeEpargne as ModeEpargne?,
+      paysResidenceId: paysResidenceId == const $CopyWithPlaceholder()
+          ? _value.paysResidenceId
+          // ignore: cast_nullable_to_non_nullable
+          : paysResidenceId as String?,
+      paysResidenceLabel: paysResidenceLabel == const $CopyWithPlaceholder()
+          ? _value.paysResidenceLabel
+          // ignore: cast_nullable_to_non_nullable
+          : paysResidenceLabel as String?,
+      villeResidence: villeResidence == const $CopyWithPlaceholder()
+          ? _value.villeResidence
+          // ignore: cast_nullable_to_non_nullable
+          : villeResidence as String?,
+      whatsappE164: whatsappE164 == const $CopyWithPlaceholder()
+          ? _value.whatsappE164
+          // ignore: cast_nullable_to_non_nullable
+          : whatsappE164 as String?,
+      relaisNom: relaisNom == const $CopyWithPlaceholder()
+          ? _value.relaisNom
+          // ignore: cast_nullable_to_non_nullable
+          : relaisNom as String?,
+      relaisPhoneE164: relaisPhoneE164 == const $CopyWithPlaceholder()
+          ? _value.relaisPhoneE164
+          // ignore: cast_nullable_to_non_nullable
+          : relaisPhoneE164 as String?,
       journeys: journeys == const $CopyWithPlaceholder()
           ? _value.journeys
           // ignore: cast_nullable_to_non_nullable
@@ -593,6 +735,18 @@ ProspectDto _$ProspectDtoFromJson(
       'incomeBandId',
       'incomeBandLabel',
       'paymentMode',
+      'employeurId',
+      'employeur',
+      'typeContrat',
+      'ancienneteMois',
+      'lieuActivite',
+      'modeEpargne',
+      'paysResidenceId',
+      'paysResidenceLabel',
+      'villeResidence',
+      'whatsappE164',
+      'relaisNom',
+      'relaisPhoneE164',
       'journeys',
       'dureeSystemeMois',
       'canalProvenanceId',
@@ -680,6 +834,35 @@ ProspectDto _$ProspectDtoFromJson(
         unknownValue: PaymentMode.unknownDefaultOpenApi,
       ),
     ),
+    employeurId: $checkedConvert('employeurId', (v) => v as String?),
+    employeur: $checkedConvert('employeur', (v) => v as String?),
+    typeContrat: $checkedConvert(
+      'typeContrat',
+      (v) => $enumDecodeNullable(
+        _$TypeContratEnumMap,
+        v,
+        unknownValue: TypeContrat.unknownDefaultOpenApi,
+      ),
+    ),
+    ancienneteMois: $checkedConvert('ancienneteMois', (v) => v as num?),
+    lieuActivite: $checkedConvert('lieuActivite', (v) => v as String?),
+    modeEpargne: $checkedConvert(
+      'modeEpargne',
+      (v) => $enumDecodeNullable(
+        _$ModeEpargneEnumMap,
+        v,
+        unknownValue: ModeEpargne.unknownDefaultOpenApi,
+      ),
+    ),
+    paysResidenceId: $checkedConvert('paysResidenceId', (v) => v as String?),
+    paysResidenceLabel: $checkedConvert(
+      'paysResidenceLabel',
+      (v) => v as String?,
+    ),
+    villeResidence: $checkedConvert('villeResidence', (v) => v as String?),
+    whatsappE164: $checkedConvert('whatsappE164', (v) => v as String?),
+    relaisNom: $checkedConvert('relaisNom', (v) => v as String?),
+    relaisPhoneE164: $checkedConvert('relaisPhoneE164', (v) => v as String?),
     journeys: $checkedConvert(
       'journeys',
       (v) => (v as List<dynamic>)
@@ -787,6 +970,18 @@ Map<String, dynamic> _$ProspectDtoToJson(ProspectDto instance) =>
       'incomeBandId': instance.incomeBandId,
       'incomeBandLabel': instance.incomeBandLabel,
       'paymentMode': _$PaymentModeEnumMap[instance.paymentMode],
+      'employeurId': instance.employeurId,
+      'employeur': instance.employeur,
+      'typeContrat': _$TypeContratEnumMap[instance.typeContrat],
+      'ancienneteMois': instance.ancienneteMois,
+      'lieuActivite': instance.lieuActivite,
+      'modeEpargne': _$ModeEpargneEnumMap[instance.modeEpargne],
+      'paysResidenceId': instance.paysResidenceId,
+      'paysResidenceLabel': instance.paysResidenceLabel,
+      'villeResidence': instance.villeResidence,
+      'whatsappE164': instance.whatsappE164,
+      'relaisNom': instance.relaisNom,
+      'relaisPhoneE164': instance.relaisPhoneE164,
       'journeys': instance.journeys.map((e) => e.toJson()).toList(),
       'dureeSystemeMois': instance.dureeSystemeMois,
       'canalProvenanceId': instance.canalProvenanceId,
@@ -834,6 +1029,21 @@ const _$PaymentModeEnumMap = {
   PaymentMode.COMPTANT: 'COMPTANT',
   PaymentMode.ECHELONNE: 'ECHELONNE',
   PaymentMode.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$TypeContratEnumMap = {
+  TypeContrat.CDI: 'CDI',
+  TypeContrat.CDD: 'CDD',
+  TypeContrat.AUTRE: 'AUTRE',
+  TypeContrat.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$ModeEpargneEnumMap = {
+  ModeEpargne.TONTINE: 'TONTINE',
+  ModeEpargne.MOBILE_MONEY: 'MOBILE_MONEY',
+  ModeEpargne.BANQUE: 'BANQUE',
+  ModeEpargne.AUCUN: 'AUCUN',
+  ModeEpargne.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 
 const _$BddSegmentEnumMap = {

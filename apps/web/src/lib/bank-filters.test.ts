@@ -16,6 +16,8 @@ import {
 import { buildBankExportUrl } from '@/lib/data/export';
 
 const FULL: BankCaseFilters = {
+  // Le projet vient de la PAGE : l'URL des écrans ne le porte pas.
+  projet: null,
   search: 'CPI-2026',
   stageId: 'stage-1',
   stageType: 'OPEN',
@@ -46,6 +48,20 @@ describe('aller-retour filtres ⇄ URL', () => {
     const a = bankFiltersQueryKey({ ...EMPTY_BANK_FILTERS, banqueId: 'b', stageType: 'CASHED' });
     const b = bankFiltersQueryKey({ ...EMPTY_BANK_FILTERS, stageType: 'CASHED', banqueId: 'b' });
     expect(a).toBe(b);
+  });
+
+  it('sépare les deux coques : requête, cache et export portent le projet', () => {
+    const chues: BankCaseFilters = { ...EMPTY_BANK_FILTERS, projet: 'CHUES' };
+    const gp: BankCaseFilters = { ...EMPTY_BANK_FILTERS, projet: 'GRAND_PUBLIC' };
+
+    expect(toBankFilterQuery(gp).projet).toBe('GRAND_PUBLIC');
+    expect(toBankFilterQuery(EMPTY_BANK_FILTERS).projet).toBeUndefined();
+    expect(bankFiltersQueryKey(chues)).not.toBe(bankFiltersQueryKey(gp));
+    expect(buildBankExportUrl(gp)).toContain('projet=GRAND_PUBLIC');
+    // La route d'export n'a que l'URL pour savoir de quelle coque elle vient.
+    expect(parseBankFilters(new URL(buildBankExportUrl(gp), 'http://x').searchParams).projet).toBe(
+      'GRAND_PUBLIC',
+    );
   });
 
   it('lit la forme `Record` que Next passe aux pages serveur', () => {

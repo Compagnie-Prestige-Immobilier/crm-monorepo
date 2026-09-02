@@ -14,5 +14,5 @@ export default async function BanqueDashboardPage() {
     return <PermissionDenied role={guard.user.role} what="Le tableau de bord bancaire" />;
   }
 
-  return <BankDashboardView />;
+  return <BankDashboardView projet="CHUES" />;
 }

@@ -1781,6 +1781,8 @@ void main() {
             syndicats: const <SyndicatDto>[],
             canauxProvenance: const <CanalProvenanceDto>[],
             incomeBands: const <IncomeBandDto>[],
+            employeurs: const <EmployeurDto>[],
+            pays: const <PaysDto>[],
             visiteReferentiels: const <SyncVisiteReferentielDto>[],
             representants: <RepresentantDto>[
               representantDto(
@@ -1822,6 +1824,8 @@ void main() {
             syndicats: const <SyndicatDto>[],
             canauxProvenance: const <CanalProvenanceDto>[],
             incomeBands: const <IncomeBandDto>[],
+            employeurs: const <EmployeurDto>[],
+            pays: const <PaysDto>[],
             visiteReferentiels: const <SyncVisiteReferentielDto>[],
             representants: const <RepresentantDto>[],
             prospects: <ProspectDto>[
@@ -1874,6 +1878,8 @@ void main() {
             syndicats: const <SyndicatDto>[],
             canauxProvenance: const <CanalProvenanceDto>[],
             incomeBands: const <IncomeBandDto>[],
+            employeurs: const <EmployeurDto>[],
+            pays: const <PaysDto>[],
             visiteReferentiels: const <SyncVisiteReferentielDto>[],
             representants: <RepresentantDto>[
               representantDto(
@@ -1920,6 +1926,8 @@ void main() {
             syndicats: const <SyndicatDto>[],
             canauxProvenance: const <CanalProvenanceDto>[],
             incomeBands: const <IncomeBandDto>[],
+            employeurs: const <EmployeurDto>[],
+            pays: const <PaysDto>[],
             visiteReferentiels: const <SyncVisiteReferentielDto>[],
             representants: const <RepresentantDto>[],
             prospects: const <ProspectDto>[],
@@ -1963,6 +1971,8 @@ void main() {
                 updatedAt: t0,
               ),
             ],
+            employeurs: const <EmployeurDto>[],
+            pays: const <PaysDto>[],
             visiteReferentiels: const <SyncVisiteReferentielDto>[],
             representants: const <RepresentantDto>[],
             prospects: const <ProspectDto>[],
@@ -2008,6 +2018,28 @@ void main() {
             updatedAt: t0,
           ),
         ],
+        employeurs: <EmployeurDto>[
+          EmployeurDto(
+            id: 'emp-1',
+            code: 'MEN',
+            label: 'Ministère de l\'Éducation',
+            type: EmployeurType.MINISTERE,
+            position: 10,
+            isActive: true,
+            updatedAt: t0,
+          ),
+        ],
+        pays: <PaysDto>[
+          PaysDto(
+            id: 'pays-1',
+            code: 'IT',
+            label: 'Italie',
+            indicatif: '39',
+            position: 10,
+            isActive: true,
+            updatedAt: t0,
+          ),
+        ],
       );
 
       // L'appareil d'AVANT le palier : miroir déjà fait, et une page vide ne
@@ -2046,6 +2078,16 @@ void main() {
       )..where((IncomeBands t) => t.id.equals('rev-3'))).getSingle();
       expect(band.label, '500 000 à 800 000');
       expect(band.deletedAt, isNull);
+      // Le palier 23 efface le même marqueur : les deux listes neuves arrivent
+      // par ce miroir, sinon la diaspora n'aurait aucun pays à choisir.
+      final Employeur employeur = await (db.select(
+        db.employeurs,
+      )..where((Employeurs t) => t.id.equals('emp-1'))).getSingle();
+      expect(employeur.type, 'MINISTERE');
+      final PaysRow pays = await (db.select(
+        db.pays,
+      )..where((Pays t) => t.id.equals('pays-1'))).getSingle();
+      expect(pays.indicatif, '39');
       // Le miroir rend la liste ENTIÈRE : la tranche que le serveur ne sert
       // plus se retire, elle ne cohabite pas avec la génération neuve.
       expect(
@@ -2080,6 +2122,8 @@ void main() {
             syndicats: const <SyndicatDto>[],
             canauxProvenance: const <CanalProvenanceDto>[],
             incomeBands: const <IncomeBandDto>[],
+            employeurs: const <EmployeurDto>[],
+            pays: const <PaysDto>[],
             visiteReferentiels: const <SyncVisiteReferentielDto>[],
             representants: const <RepresentantDto>[],
             prospects: const <ProspectDto>[],
@@ -2108,6 +2152,8 @@ void main() {
               syndicats: const <SyndicatDto>[],
               canauxProvenance: const <CanalProvenanceDto>[],
               incomeBands: const <IncomeBandDto>[],
+              employeurs: const <EmployeurDto>[],
+              pays: const <PaysDto>[],
               visiteReferentiels: const <SyncVisiteReferentielDto>[],
               representants: const <RepresentantDto>[],
               prospects: const <ProspectDto>[],
@@ -2154,6 +2200,8 @@ void main() {
               syndicats: const <SyndicatDto>[],
               canauxProvenance: const <CanalProvenanceDto>[],
               incomeBands: const <IncomeBandDto>[],
+              employeurs: const <EmployeurDto>[],
+              pays: const <PaysDto>[],
               visiteReferentiels: const <SyncVisiteReferentielDto>[],
               representants: const <RepresentantDto>[],
               prospects: const <ProspectDto>[],
