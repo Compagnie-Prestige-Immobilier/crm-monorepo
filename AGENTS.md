@@ -108,3 +108,31 @@ extensible, pas celle qui prevoit un besoin qui n'existe pas.
 
 Le critere est la maintenance: quelqu'un qui ouvre ce fichier dans six mois
 doit comprendre en une lecture, sans sauter entre les fichiers.
+
+## Qualite du code
+
+- Respecter les linteurs et le formatage du depot. Ne pas desactiver une regle,
+  ajouter une suppression ou affaiblir la configuration pour faire passer un
+  changement.
+- Executer le lint et le controle de types du perimetre touche avant de
+  terminer. Corriger les erreurs introduites; signaler distinctement celles
+  qui existaient deja.
+- Garder une complexite cyclomatique basse: clauses de garde, conditions
+  aplaties et fonctions avec une responsabilite lisible.
+- Ne pas coder en dur une valeur metier, une URL, un secret ou une difference
+  d'environnement. Reutiliser les constantes, types, contrats et mecanismes de
+  configuration existants. Une constante locale evidente n'exige pas une
+  nouvelle abstraction.
+
+## Outils
+
+- Utiliser les skills disponibles lorsqu'ils correspondent directement a la
+  tache. Lire leurs instructions avant d'agir et ne pas charger un skill sans
+  rapport avec le travail.
+- Ne pas utiliser LazyWeb. Pour une information actuelle, consulter la
+  documentation officielle ou le registre qui fait autorite.
+- Chaque commande doit repondre a une question utile ou verifier le changement.
+  La limiter au perimetre concerne, preferer les variantes non interactives et
+  ne pas relancer une commande dont les entrees n'ont pas change.
+- Prefixer les commandes par `rtk`, conformement a
+  `/Users/cheikh/.codex/RTK.md`.

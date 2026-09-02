@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { RepCallOutcome, Role } from '@crm/database';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -60,6 +60,7 @@ beforeEach(() => {
         whatsappStatus: 'NON_DEMANDE',
         whatsappE164: null,
         phoneE164: '+221771234567',
+        lastCallAt: null,
       }),
     },
     $transaction: vi.fn((fn: (client: Tx) => unknown) => fn(tx)),
@@ -143,5 +144,107 @@ describe('correction du numéro pendant la qualification', () => {
     const result = await service.recordAttempt(ALICE, body);
     expect(result.status).toBe(RepCallAttemptApplyStatus.DUPLICATE);
     expect(db.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+describe('dernier appel porté par la fiche', () => {
+  const patch = (): Record<string, unknown> =>
+    (tx.representant.update.mock.calls[0] as [{ data: Record<string, unknown> }])[0].data;
+
+  it('un représentant joint peut demander un rappel : la fiche le porte', async () => {
+    const body = baseBody();
+    body.callbackAt = '2026-08-12T09:00:00.000Z';
+
+    await service.recordAttempt(ALICE, body);
+
+    expect(patch()).toMatchObject({
+      lastCallOutcome: RepCallOutcome.REACHED,
+      lastCallAt: new Date('2026-08-10T10:00:00.000Z'),
+      lastCallById: ALICE.id,
+      nextCallbackAt: new Date('2026-08-12T09:00:00.000Z'),
+    });
+  });
+
+  it('un appel de plus honore le rappel promis', async () => {
+    const body = baseBody();
+    body.outcome = RepCallOutcome.UNREACHABLE;
+
+    await service.recordAttempt(ALICE, body);
+
+    expect(patch()).toMatchObject({
+      lastCallOutcome: RepCallOutcome.UNREACHABLE,
+      nextCallbackAt: null,
+    });
+  });
+
+  it('une tentative arrivée hors ligne, plus ancienne que le dernier appel, ne réécrit pas la fiche', async () => {
+    db.representant.findFirst.mockResolvedValue({
+      id: REP,
+      relationStatus: 'INCONNU',
+      whatsappStatus: 'NON_DEMANDE',
+      whatsappE164: null,
+      phoneE164: '+221771234567',
+      lastCallAt: new Date('2026-08-11T10:00:00.000Z'),
+    });
+
+    await service.recordAttempt(ALICE, baseBody());
+
+    expect(tx.representant.update).not.toHaveBeenCalled();
+  });
+
+  it('l’issue « À rappeler » exige toujours sa date', async () => {
+    const body = baseBody();
+    body.outcome = RepCallOutcome.CALLBACK;
+
+    await expect(service.recordAttempt(ALICE, body)).rejects.toMatchObject({
+      response: { code: 'REP_CAMPAIGN_CALLBACK_AT_REQUIRED' },
+    });
+  });
+});
+
+describe('périmètre par campagne', () => {
+  it('un COMMERCIAL borne sa lecture à ses fiches et à ses attributions', async () => {
+    await service.recordAttempt(ALICE, baseBody());
+
+    const where = (
+      db.representant.findFirst.mock.calls[0] as [{ where: Record<string, unknown> }]
+    )[0].where;
+    expect(where).toMatchObject({
+      OR: [{ createdById: ALICE.id }, { lotItems: { some: { assigneeId: ALICE.id } } }],
+    });
+  });
+
+  it('un représentant HORS campagne est refusé, sans être nié', async () => {
+    // Hors périmètre pour la lecture bornée, présent pour la seconde.
+    db.representant.findFirst.mockImplementation((args: { where: { OR?: unknown } }) =>
+      Promise.resolve(args.where.OR ? null : { id: REP }),
+    );
+
+    await expect(service.recordAttempt(ALICE, baseBody())).rejects.toMatchObject({
+      response: { code: 'REP_CAMPAIGN_NOT_ASSIGNED' },
+    });
+    await expect(service.recordAttempt(ALICE, baseBody())).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('un représentant qui n’existe pas reste un 404', async () => {
+    db.representant.findFirst.mockResolvedValue(null);
+
+    await expect(service.recordAttempt(ALICE, baseBody())).rejects.toMatchObject({
+      response: { code: 'REPRESENTANT_NOT_FOUND' },
+    });
+  });
+
+  it('l’encadrement n’est borné par rien', async () => {
+    const SUP: AuthenticatedUser = { ...ALICE, id: 'sup-1', role: Role.SUPERVISEUR };
+
+    await service.recordAttempt(SUP, baseBody());
+
+    const where = (
+      db.representant.findFirst.mock.calls[0] as [{ where: Record<string, unknown> }]
+    )[0].where;
+    expect(where).not.toHaveProperty('OR');
   });
 });

@@ -53,6 +53,7 @@ export default async function ProspectsPage({
         canExport={canExportProspects(session?.role)}
         readOnly={readsOnly(session?.role)}
         simplified={session?.role === 'COMMERCIAL' || session?.role === 'SUPERVISEUR'}
+        campaignScoped={session?.role === 'COMMERCIAL'}
       />
     </HydrationBoundary>
   );

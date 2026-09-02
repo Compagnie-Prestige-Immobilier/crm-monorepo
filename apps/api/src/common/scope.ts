@@ -28,17 +28,26 @@ export const readScope = (
 
 /**
  * CE QU'UN TÉLÉCONSEILLER A EN MAIN : ses propres fiches, ou celles qu'une
- * campagne lui a confiées.
+ * campagne lui a confiées, tous lots et tous jours confondus.
  *
- * Écrite ici une seule fois, et servie au panneau comme au téléphone. Quand la
- * règle existait en deux exemplaires, le web bornait sur `createdById` seul et
- * affichait « aucun prospect à appeler » à la personne dont le mobile comptait
- * six fiches à appeler.
+ * Le `OR` est rendu tel quel plutôt que fondu dans la clause appelante : à la
+ * racine d'un `where` il écraserait la recherche libre, qui utilise déjà `OR`.
+ * Chaque appelant le pose donc dans un `AND`.
+ *
+ * `Representant` et `Prospect` portent tous deux `createdById` et `lotItems` :
+ * la même clause vaut pour les deux modèles.
  */
-/** Portée de lecture des PROSPECTS à l'écran. Tous les téléconseillers lisent leur coque. */
+export const attributionScope = (
+  user: Pick<AuthenticatedUser, 'id' | 'role'>,
+): Prisma.RepresentantWhereInput & Prisma.ProspectWhereInput =>
+  readsEveryone(user)
+    ? {}
+    : { OR: [{ createdById: user.id }, { lotItems: { some: { assigneeId: user.id } } }] };
+
+/** Portée de lecture des PROSPECTS à l'écran. */
 export const prospectReadScope = (
-  _user: Pick<AuthenticatedUser, 'id' | 'role'>,
-): Prisma.ProspectWhereInput => ({});
+  user: Pick<AuthenticatedUser, 'id' | 'role'>,
+): Prisma.ProspectWhereInput => attributionScope(user);
 
 /**
  * Portée des prospects sur le TÉLÉPHONE. Volontairement plus étroite que

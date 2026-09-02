@@ -14,6 +14,10 @@ enum RepresentantSortField {
   fullName(r'fullName'),
   @JsonValue(r'prospects')
   prospects(r'prospects'),
+  @JsonValue(r'lastCallAt')
+  lastCallAt(r'lastCallAt'),
+  @JsonValue(r'nextCallbackAt')
+  nextCallbackAt(r'nextCallbackAt'),
   @JsonValue(r'unknown_default_open_api')
   unknownDefaultOpenApi(r'unknown_default_open_api');
 

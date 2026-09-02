@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -796,7 +797,7 @@ export class SyncService {
     }
 
     try {
-      const result = await this.phase2Sync.applyCallAttempt(tx, user.id, {
+      const result = await this.phase2Sync.applyCallAttempt(tx, user, {
         id: operation.entityId,
         prospectId: data.prospectId,
         outcome: data.outcome,
@@ -850,7 +851,13 @@ export class SyncService {
           errorMessageOf(error),
         );
       }
-      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException ||
+        // Hors campagne : refus DÉFINITIF de l'opération, pas du lot. Une 403
+        // HTTP condamnerait les 199 autres tentatives du même envoi.
+        error instanceof ForbiddenException
+      ) {
         throw new OperationError(
           SyncOpStatus.INVALID,
           errorCodeOf(error) ?? 'CALL_ATTEMPT_INVALID',

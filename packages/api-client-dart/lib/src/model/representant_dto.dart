@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:crm_api_client/src/model/rep_call_outcome.dart';
 import 'package:crm_api_client/src/model/representant_relation.dart';
 import 'package:crm_api_client/src/model/whatsapp_status.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
@@ -70,6 +71,16 @@ class RepresentantDto {
     required this.connaitUES,
 
     required this.contacte,
+
+    required this.lastCallOutcome,
+
+    required this.lastCallAt,
+
+    required this.lastCallById,
+
+    required this.lastCallByName,
+
+    required this.nextCallbackAt,
   });
 
   @JsonKey(name: r'id', required: true, includeIfNull: false)
@@ -161,6 +172,28 @@ class RepresentantDto {
   @JsonKey(name: r'contacte', required: true, includeIfNull: true)
   final bool? contacte;
 
+  /// Issue du dernier appel. Nul : jamais appelé.
+  @JsonKey(
+    name: r'lastCallOutcome',
+    required: true,
+    includeIfNull: true,
+    unknownEnumValue: RepCallOutcome.unknownDefaultOpenApi,
+  )
+  final RepCallOutcome? lastCallOutcome;
+
+  @JsonKey(name: r'lastCallAt', required: true, includeIfNull: true)
+  final DateTime? lastCallAt;
+
+  @JsonKey(name: r'lastCallById', required: true, includeIfNull: true)
+  final String? lastCallById;
+
+  @JsonKey(name: r'lastCallByName', required: true, includeIfNull: true)
+  final String? lastCallByName;
+
+  /// Rappel promis par le dernier appel, tant qu’aucun appel ne l’a honoré.
+  @JsonKey(name: r'nextCallbackAt', required: true, includeIfNull: true)
+  final DateTime? nextCallbackAt;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is RepresentantDto &&
@@ -192,6 +225,11 @@ class RepresentantDto {
                 syndicat,
                 connaitUES,
                 contacte,
+                lastCallOutcome,
+                lastCallAt,
+                lastCallById,
+                lastCallByName,
+                nextCallbackAt,
               ],
               [
                 other.id,
@@ -219,6 +257,11 @@ class RepresentantDto {
                 other.syndicat,
                 other.connaitUES,
                 other.contacte,
+                other.lastCallOutcome,
+                other.lastCallAt,
+                other.lastCallById,
+                other.lastCallByName,
+                other.nextCallbackAt,
               ],
             );
   }
@@ -252,6 +295,11 @@ class RepresentantDto {
         syndicat,
         connaitUES,
         contacte,
+        lastCallOutcome,
+        lastCallAt,
+        lastCallById,
+        lastCallByName,
+        nextCallbackAt,
       ]);
 
   factory RepresentantDto.fromJson(Map<String, dynamic> json) =>

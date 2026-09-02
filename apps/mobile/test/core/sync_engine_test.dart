@@ -2271,6 +2271,97 @@ void main() {
         expect(lignes.single.visitorName, 'Awa Ndiaye');
       },
     );
+
+    // Un retrait d'attribution n'est annoncé par rien : le périmètre se
+    // REMPLACE, il ne fusionne pas.
+    test('le pull remplace le périmètre d\'appel', () async {
+      await db
+          .into(db.attributions)
+          .insert(
+            AttributionsCompanion.insert(kind: 'representant', id: 'perime'),
+          );
+      api.attributions = MesAttributionsDto(
+        representantIds: <String>['rep-1'],
+        prospectIds: <String>['pro-1'],
+        tout: false,
+      );
+
+      await engine.pullChanges();
+
+      final List<Attribution> lignes = await db.select(db.attributions).get();
+      expect(
+        lignes.map((Attribution a) => '${a.kind}:${a.id}').toList()..sort(),
+        <String>['borne:1', 'prospect:pro-1', 'representant:rep-1'],
+      );
+    });
+
+    // L'encadrement : aucun marqueur, donc aucun filtre.
+    test('« tout » ne pose pas le marqueur', () async {
+      api.attributions = MesAttributionsDto(
+        representantIds: const <String>[],
+        prospectIds: const <String>[],
+        tout: true,
+      );
+
+      await engine.pullChanges();
+
+      expect(await db.select(db.attributions).get(), isEmpty);
+    });
+
+    // Hors ligne, une borne périmée vaut mieux qu'un annuaire ouvert en grand.
+    test('sans réseau, le périmètre d\'hier reste', () async {
+      await db
+          .into(db.attributions)
+          .insert(
+            AttributionsCompanion.insert(kind: 'representant', id: 'rep-1'),
+          );
+
+      await engine.pullChanges();
+
+      expect(await db.select(db.attributions).get(), hasLength(1));
+    });
+
+    test('le pull descend le dernier appel du prospect', () async {
+      api.pullPages.add(
+        PullPage(
+          changes: SyncChangesDto(
+            departements: const <DepartementDto>[],
+            iefs: const <IefDto>[],
+            banques: const <BanqueDto>[],
+            syndicats: const <SyndicatDto>[],
+            canauxProvenance: const <CanalProvenanceDto>[],
+            incomeBands: const <IncomeBandDto>[],
+            professions: const <ProfessionDto>[],
+            employeurs: const <EmployeurDto>[],
+            pays: const <PaysDto>[],
+            visiteReferentiels: const <SyncVisiteReferentielDto>[],
+            representants: const <RepresentantDto>[],
+            prospects: <ProspectDto>[
+              prospectDto(
+                id: 'pro-1',
+                lastCallOutcome: CallOutcome.UNREACHABLE,
+                lastCallAt: t0,
+                lastCallById: 'u-1',
+              ),
+            ],
+            visites: const <SyncVisiteDto>[],
+          ),
+          deletions: const <SyncDeletionDto>[],
+          nextCursor: 'cur-2',
+          hasMore: false,
+          serverTime: t0,
+        ),
+      );
+
+      await engine.pullChanges();
+
+      final Prospect fiche = await (db.select(
+        db.prospects,
+      )..where((Prospects t) => t.id.equals('pro-1'))).getSingle();
+      expect(fiche.lastCallOutcome, 'UNREACHABLE');
+      expect(fiche.lastCallAt, t0);
+      expect(fiche.lastCallById, 'u-1');
+    });
   });
 
   group('SyncOutcome', () {

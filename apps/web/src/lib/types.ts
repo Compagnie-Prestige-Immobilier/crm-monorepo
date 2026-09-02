@@ -125,6 +125,7 @@ export const PROSPECT_SORT_FIELDS = [
   'nom',
   'prenom',
   'statut',
+  'lastCallAt',
 ] as const satisfies readonly Schemas['ProspectSortField'][];
 
 export type ProspectSortField = (typeof PROSPECT_SORT_FIELDS)[number];
@@ -205,6 +206,15 @@ export const CALL_OUTCOME_LABELS: Record<CallOutcome, string> = {
   REFUSED: 'Refus',
   WRONG_NUMBER: 'Mauvais numéro',
   OTHER: 'Autre',
+};
+
+export const CALL_OUTCOME_VARIANTS: Record<CallOutcome, BadgeVariant> = {
+  METHOD_OBTAINED: 'success',
+  UNREACHABLE: 'secondary',
+  CALLBACK: 'info',
+  REFUSED: 'destructive',
+  WRONG_NUMBER: 'warning',
+  OTHER: 'outline',
 };
 
 export type RepCallOutcome = Schemas['RepCallOutcome'];

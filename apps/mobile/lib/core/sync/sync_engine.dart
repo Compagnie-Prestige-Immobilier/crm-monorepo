@@ -1296,6 +1296,7 @@ class SyncEngine {
       }
       await mirrorVisiteReferentiels(force: listesBougees);
       await mirrorReferentiels(force: referentielsBouges);
+      await mirrorAttributions();
       return applied;
     } finally {
       _pulling = false;
@@ -1377,6 +1378,36 @@ class SyncEngine {
       }
     });
     return items.length;
+  }
+
+  /// Le périmètre d'appel du compte, REMPLACÉ en entier.
+  ///
+  /// Le pull est global : c'est ce miroir qui borne ce qu'un téléconseiller voit
+  /// et appelle. Un retrait d'attribution n'est annoncé par rien, d'où le
+  /// remplacement plutôt qu'une fusion. Un échec laisse le périmètre d'hier :
+  /// une borne périmée vaut mieux qu'un annuaire ouvert en grand.
+  Future<int> mirrorAttributions() async {
+    final MesAttributionsDto scope;
+    try {
+      scope = await _api.pullMesAttributions();
+    } on ApiException {
+      return 0;
+    }
+    final List<AttributionsCompanion> lignes = <AttributionsCompanion>[
+      if (!scope.tout)
+        AttributionsCompanion.insert(kind: attributionBorne, id: '1'),
+      for (final String id in scope.representantIds)
+        AttributionsCompanion.insert(kind: 'representant', id: id),
+      for (final String id in scope.prospectIds)
+        AttributionsCompanion.insert(kind: 'prospect', id: id),
+    ];
+    await _db.transaction(() async {
+      await _db.delete(_db.attributions).go();
+      await _db.batch(
+        (Batch batch) => batch.insertAll(_db.attributions, lignes),
+      );
+    });
+    return lignes.length;
   }
 
   Future<Set<String>> _citedCallReasonCodes() async {
@@ -2018,6 +2049,10 @@ class SyncEngine {
                 syndicat: Value<String?>(r.syndicat),
                 connaitUes: Value<bool?>(r.connaitUES),
                 contacte: Value<bool?>(r.contacte),
+                lastCallOutcome: Value<String?>(r.lastCallOutcome?.value),
+                lastCallAt: Value<DateTime?>(r.lastCallAt),
+                lastCallById: Value<String?>(r.lastCallById),
+                nextCallbackAt: Value<DateTime?>(r.nextCallbackAt),
                 createdById: r.createdById,
                 clientCreatedAt: r.clientCreatedAt,
                 rev: Value<int>(r.rev.toInt()),
@@ -2058,6 +2093,18 @@ class SyncEngine {
                     'excluded.connait_ues',
                   ),
                   contacte: const CustomExpression<bool>('excluded.contacte'),
+                  lastCallOutcome: const CustomExpression<String>(
+                    'excluded.last_call_outcome',
+                  ),
+                  lastCallAt: const CustomExpression<DateTime>(
+                    'excluded.last_call_at',
+                  ),
+                  lastCallById: const CustomExpression<String>(
+                    'excluded.last_call_by_id',
+                  ),
+                  nextCallbackAt: const CustomExpression<DateTime>(
+                    'excluded.next_callback_at',
+                  ),
                   rev: const CustomExpression<int>('excluded.rev'),
                   serverUpdatedAt: const CustomExpression<DateTime>(
                     'excluded.server_updated_at',
@@ -2104,6 +2151,9 @@ class SyncEngine {
                 whatsappE164: Value<String?>(p.whatsappE164),
                 relaisNom: Value<String?>(p.relaisNom),
                 relaisPhoneE164: Value<String?>(p.relaisPhoneE164),
+                lastCallOutcome: Value<String?>(p.lastCallOutcome?.value),
+                lastCallAt: Value<DateTime?>(p.lastCallAt),
+                lastCallById: Value<String?>(p.lastCallById),
                 createdById: p.ownedByCommercialId,
                 statut: Value<String>(p.statut.value),
                 clientCreatedAt: p.clientCreatedAt,
@@ -2177,6 +2227,15 @@ class SyncEngine {
                   ),
                   relaisPhoneE164: const CustomExpression<String>(
                     'excluded.relais_phone_e164',
+                  ),
+                  lastCallOutcome: const CustomExpression<String>(
+                    'excluded.last_call_outcome',
+                  ),
+                  lastCallAt: const CustomExpression<DateTime>(
+                    'excluded.last_call_at',
+                  ),
+                  lastCallById: const CustomExpression<String>(
+                    'excluded.last_call_by_id',
                   ),
                   statut: const CustomExpression<String>('excluded.statut'),
                   rev: const CustomExpression<int>('excluded.rev'),

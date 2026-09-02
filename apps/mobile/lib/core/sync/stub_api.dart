@@ -143,6 +143,17 @@ class StubApi implements ApiPort {
     );
   }
 
+  /// Même raison que [pullReferentiels] : un refus, jamais un périmètre vide,
+  /// que le miroir prendrait pour la vérité du serveur.
+  @override
+  Future<MesAttributionsDto> pullMesAttributions() async {
+    throw const ApiException(
+      'api_not_configured',
+      message: 'Aucun serveur configuré : le périmètre n\'est pas relu.',
+      kind: FailureKind.retryable,
+    );
+  }
+
   @override
   Future<RepresentantLookup> lookupRepresentantByPhone(String phone) async {
     return RepresentantLookup(found: false, phoneE164: phone);

@@ -107,6 +107,14 @@ abstract class _$ProspectDtoCWProxy {
 
   ProspectDto lastAttemptAt(DateTime? lastAttemptAt);
 
+  ProspectDto lastCallOutcome(CallOutcome? lastCallOutcome);
+
+  ProspectDto lastCallAt(DateTime? lastCallAt);
+
+  ProspectDto lastCallById(String? lastCallById);
+
+  ProspectDto lastCallByName(String? lastCallByName);
+
   ProspectDto origin(String? origin);
 
   ProspectDto originLabel(String? originLabel);
@@ -176,6 +184,10 @@ abstract class _$ProspectDtoCWProxy {
     CallOutcome? lastOutcome,
     String? lastComment,
     DateTime? lastAttemptAt,
+    CallOutcome? lastCallOutcome,
+    DateTime? lastCallAt,
+    String? lastCallById,
+    String? lastCallByName,
     String? origin,
     String? originLabel,
     DateTime clientCreatedAt,
@@ -377,6 +389,21 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
       this(lastAttemptAt: lastAttemptAt);
 
   @override
+  ProspectDto lastCallOutcome(CallOutcome? lastCallOutcome) =>
+      this(lastCallOutcome: lastCallOutcome);
+
+  @override
+  ProspectDto lastCallAt(DateTime? lastCallAt) => this(lastCallAt: lastCallAt);
+
+  @override
+  ProspectDto lastCallById(String? lastCallById) =>
+      this(lastCallById: lastCallById);
+
+  @override
+  ProspectDto lastCallByName(String? lastCallByName) =>
+      this(lastCallByName: lastCallByName);
+
+  @override
   ProspectDto origin(String? origin) => this(origin: origin);
 
   @override
@@ -454,6 +481,10 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
     Object? lastOutcome = const $CopyWithPlaceholder(),
     Object? lastComment = const $CopyWithPlaceholder(),
     Object? lastAttemptAt = const $CopyWithPlaceholder(),
+    Object? lastCallOutcome = const $CopyWithPlaceholder(),
+    Object? lastCallAt = const $CopyWithPlaceholder(),
+    Object? lastCallById = const $CopyWithPlaceholder(),
+    Object? lastCallByName = const $CopyWithPlaceholder(),
     Object? origin = const $CopyWithPlaceholder(),
     Object? originLabel = const $CopyWithPlaceholder(),
     Object? clientCreatedAt = const $CopyWithPlaceholder(),
@@ -666,6 +697,22 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
           ? _value.lastAttemptAt
           // ignore: cast_nullable_to_non_nullable
           : lastAttemptAt as DateTime?,
+      lastCallOutcome: lastCallOutcome == const $CopyWithPlaceholder()
+          ? _value.lastCallOutcome
+          // ignore: cast_nullable_to_non_nullable
+          : lastCallOutcome as CallOutcome?,
+      lastCallAt: lastCallAt == const $CopyWithPlaceholder()
+          ? _value.lastCallAt
+          // ignore: cast_nullable_to_non_nullable
+          : lastCallAt as DateTime?,
+      lastCallById: lastCallById == const $CopyWithPlaceholder()
+          ? _value.lastCallById
+          // ignore: cast_nullable_to_non_nullable
+          : lastCallById as String?,
+      lastCallByName: lastCallByName == const $CopyWithPlaceholder()
+          ? _value.lastCallByName
+          // ignore: cast_nullable_to_non_nullable
+          : lastCallByName as String?,
       origin: origin == const $CopyWithPlaceholder()
           ? _value.origin
           // ignore: cast_nullable_to_non_nullable
@@ -760,6 +807,10 @@ ProspectDto _$ProspectDtoFromJson(
       'lastOutcome',
       'lastComment',
       'lastAttemptAt',
+      'lastCallOutcome',
+      'lastCallAt',
+      'lastCallById',
+      'lastCallByName',
       'origin',
       'originLabel',
       'clientCreatedAt',
@@ -927,6 +978,20 @@ ProspectDto _$ProspectDtoFromJson(
       'lastAttemptAt',
       (v) => v == null ? null : DateTime.parse(v as String),
     ),
+    lastCallOutcome: $checkedConvert(
+      'lastCallOutcome',
+      (v) => $enumDecodeNullable(
+        _$CallOutcomeEnumMap,
+        v,
+        unknownValue: CallOutcome.unknownDefaultOpenApi,
+      ),
+    ),
+    lastCallAt: $checkedConvert(
+      'lastCallAt',
+      (v) => v == null ? null : DateTime.parse(v as String),
+    ),
+    lastCallById: $checkedConvert('lastCallById', (v) => v as String?),
+    lastCallByName: $checkedConvert('lastCallByName', (v) => v as String?),
     origin: $checkedConvert('origin', (v) => v as String?),
     originLabel: $checkedConvert('originLabel', (v) => v as String?),
     clientCreatedAt: $checkedConvert(
@@ -995,6 +1060,10 @@ Map<String, dynamic> _$ProspectDtoToJson(ProspectDto instance) =>
       'lastOutcome': _$CallOutcomeEnumMap[instance.lastOutcome],
       'lastComment': instance.lastComment,
       'lastAttemptAt': instance.lastAttemptAt?.toIso8601String(),
+      'lastCallOutcome': _$CallOutcomeEnumMap[instance.lastCallOutcome],
+      'lastCallAt': instance.lastCallAt?.toIso8601String(),
+      'lastCallById': instance.lastCallById,
+      'lastCallByName': instance.lastCallByName,
       'origin': instance.origin,
       'originLabel': instance.originLabel,
       'clientCreatedAt': instance.clientCreatedAt.toIso8601String(),

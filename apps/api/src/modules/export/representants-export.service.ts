@@ -5,7 +5,7 @@ import ExcelJS from 'exceljs';
 import { WhatsappStatus, type Prisma } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { readableOwnerId, readScope } from '../../common/scope.js';
+import { attributionScope, readableOwnerId } from '../../common/scope.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { WorkspaceContext } from '../../workspaces/workspace.js';
 import { IMPORT_COLUMNS, IMPORT_SHEET_NAME } from '../representants/import-template.js';
@@ -16,6 +16,7 @@ import {
 } from '../representants/import-fields.js';
 import type { RepresentantExportQueryDto } from '../representants/dto.js';
 import { RepresentantSortField } from '../representants/dto.js';
+import { suiviWhere } from '../representants/representants.service.js';
 import {
   COMMON_TEMPLATE_RULES,
   styleHeader,
@@ -200,8 +201,11 @@ export class RepresentantsExportService {
   ): Prisma.RepresentantWhereInput {
     const where: Prisma.RepresentantWhereInput = {
       deletedAt: null,
-      ...readScope(user),
+      ...suiviWhere(query),
     };
+    // Dans `AND`, comme la liste : `where.OR` porte la recherche libre.
+    const portee = attributionScope(user);
+    if (portee.OR) where.AND = [portee];
 
     if (query.commercialId) {
       where.createdById = readableOwnerId(user, query.commercialId);

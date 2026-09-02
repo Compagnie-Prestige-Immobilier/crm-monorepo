@@ -32,6 +32,7 @@ export enum ProspectSortField {
   NOM = 'nom',
   PRENOM = 'prenom',
   STATUT = 'statut',
+  LAST_CALL_AT = 'lastCallAt',
 }
 
 export enum SortOrder {
@@ -141,6 +142,15 @@ export class ProspectFilterDto {
   @IsOptional()
   @IsUUID()
   appelePar?: string;
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description:
+      'Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique.',
+  })
+  @IsOptional()
+  @IsUUID()
+  lastCallById?: string;
 
   @ApiPropertyOptional({
     format: 'uuid',

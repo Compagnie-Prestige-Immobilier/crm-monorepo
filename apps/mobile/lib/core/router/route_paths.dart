@@ -24,6 +24,11 @@ abstract final class Routes {
   static const String grandPublicRappels = '/grand-public/rappels';
   static const String rappels = '/rappels';
 
+  /// Les personnes que j'ai appelées. Deux chemins pour un seul écran, même
+  /// raison que [rappels].
+  static const String grandPublicMesContacts = '/grand-public/mes-contacts';
+  static const String mesContacts = '/mes-contacts';
+
   /// « À corriger » et « Réglages » sont les mêmes écrans que côté CHUES, sous
   /// un autre chemin : `go_router` n'admet pas une même route dans deux coques,
   /// et un onglet qui ferait changer de coque perdrait la palette et la pile du

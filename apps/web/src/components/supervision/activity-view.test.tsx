@@ -43,6 +43,16 @@ function payload(overrides: Partial<AdminModule.SupervisionActivity> = {}) {
         reachRate: 50,
         prospectsCreated: 2,
         representantsContacted: 2,
+        repCalls: 10,
+        repReached: 6,
+        repCallback: 2,
+        repUnreachable: 2,
+        repOther: 0,
+        repContactRate: 60,
+        repCallbackRate: 20,
+        repQuestioned: 5,
+        repQualified: 4,
+        repQualificationRate: 80,
       },
     ],
     teleconseillers: [
@@ -89,13 +99,60 @@ describe('tableau d’activité des téléconseillers', () => {
       }),
     );
 
-    renderWithQuery(<ActivityView projet="CHUES" />);
+    renderWithQuery(<ActivityView projet="GRAND_PUBLIC" />);
 
     await waitFor(() => {
       expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
     });
-    expect(within(rowOf('Alice Diop')).getAllByRole('cell')[6]?.textContent).toBe('0 %');
-    expect(within(rowOf('Bineta Fall')).getAllByRole('cell')[6]?.textContent).toBe('Sans objet');
+    expect(within(rowOf('Alice Diop')).getAllByRole('cell')[5]?.textContent).toBe('0 %');
+    expect(within(rowOf('Bineta Fall')).getAllByRole('cell')[5]?.textContent).toBe('Sans objet');
+  });
+
+  it('compte les appels aux représentants en CHUES, ceux aux prospects en Grand Public', async () => {
+    fetchMock.mockResolvedValue(payload());
+
+    const { unmount } = renderWithQuery(<ActivityView projet="CHUES" />);
+    await waitFor(() => {
+      expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
+    });
+    const chues = within(rowOf('Alice Diop')).getAllByRole('cell');
+    expect(chues[0]?.textContent).toBe('10');
+    expect(chues[4]?.textContent).toBe('60 %');
+    expect(chues[5]?.textContent).toBe('80 %');
+    expect(screen.queryByRole('button', { name: /Faux numéros/u })).toBeNull();
+    unmount();
+
+    renderWithQuery(<ActivityView projet="GRAND_PUBLIC" />);
+    await waitFor(() => {
+      expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
+    });
+    const gp = within(rowOf('Alice Diop')).getAllByRole('cell');
+    expect(gp[0]?.textContent).toBe('4');
+    // Un faux numéro compte parmi les injoignables.
+    expect(gp[2]?.textContent).toBe('2');
+    expect(screen.queryByRole('button', { name: 'Appels prospects' })).toBeNull();
+  });
+
+  it('bascule en CHUES des appels aux représentants vers ceux aux prospects', async () => {
+    fetchMock.mockResolvedValue(payload());
+
+    renderWithQuery(<ActivityView projet="CHUES" />);
+    await waitFor(() => {
+      expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
+    });
+    expect(within(rowOf('Alice Diop')).getAllByRole('cell')).toHaveLength(8);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Appels prospects' }));
+
+    const cells = within(rowOf('Alice Diop')).getAllByRole('cell');
+    expect(cells).toHaveLength(7);
+    expect(cells[0]?.textContent).toBe('4');
+    expect(screen.queryByRole('button', { name: /Représentants contactés/u })).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Exporter en CSV' }));
+    const csv = downloadMock.mock.calls.at(-1)?.[0] as string;
+    expect(csv).toContain('Appels prospects');
+    expect(downloadMock.mock.calls.at(-1)?.[1]).toContain('chues-prospects');
   });
 
   it('affiche le total d’équipe et la moyenne par téléconseiller', async () => {
@@ -107,9 +164,9 @@ describe('tableau d’activité des téléconseillers', () => {
       expect(screen.getByRole('rowheader', { name: 'Total équipe' })).toBeTruthy();
     });
     const totals = rowOf('Total équipe');
-    expect(within(totals).getAllByRole('cell')[0]?.textContent).toBe('4');
+    expect(within(totals).getAllByRole('cell')[0]?.textContent).toBe('10');
     expect(within(rowOf('Moyenne par téléconseiller')).getAllByRole('cell')[0]?.textContent).toBe(
-      '2,0',
+      '5,0',
     );
   });
 
@@ -123,7 +180,7 @@ describe('tableau d’activité des téléconseillers', () => {
     });
     expect(screen.getAllByRole('rowheader')[0]?.textContent).toContain('Alice Diop');
 
-    await userEvent.click(screen.getByRole('button', { name: /Appels/u }));
+    await userEvent.click(screen.getByRole('button', { name: 'Appels' }));
 
     expect(screen.getAllByRole('rowheader')[0]?.textContent).toContain('Bineta Fall');
   });
@@ -172,8 +229,8 @@ describe('tableau d’activité des téléconseillers', () => {
       expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
     });
     expect(screen.queryByRole('button', { name: /Représentants contactés/u })).toBeNull();
-    expect(within(rowOf('Alice Diop')).getAllByRole('cell')).toHaveLength(8);
-    expect(within(rowOf('Total équipe')).getAllByRole('cell')).toHaveLength(8);
+    expect(within(rowOf('Alice Diop')).getAllByRole('cell')).toHaveLength(7);
+    expect(within(rowOf('Total équipe')).getAllByRole('cell')).toHaveLength(7);
   });
 
   it('la garde en CHUES, et nomme le projet dans le CSV', async () => {
@@ -185,7 +242,7 @@ describe('tableau d’activité des téléconseillers', () => {
       expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
     });
     expect(screen.getByRole('button', { name: /Représentants contactés/u })).toBeTruthy();
-    expect(within(rowOf('Alice Diop')).getAllByRole('cell')).toHaveLength(9);
+    expect(within(rowOf('Alice Diop')).getAllByRole('cell')).toHaveLength(8);
 
     await userEvent.click(screen.getByRole('button', { name: 'Exporter en CSV' }));
 

@@ -26,7 +26,7 @@ import {
   CurrentUser,
   type AuthenticatedUser,
 } from '../../common/decorators/current-user.decorator.js';
-import { Roles } from '../../common/decorators/roles.decorator.js';
+import { PARCOURS_ROLES, Roles } from '../../common/decorators/roles.decorator.js';
 import { setDemoHeader } from '../export/demo-marking.js';
 import { WorkspaceContext } from '../../workspaces/workspace.js';
 import {
@@ -37,6 +37,7 @@ import {
   LotExportProgrammeQueryDto,
   LotExportQueryDto,
   LotExportSummaryDto,
+  MesAttributionsDto,
 } from './dto.js';
 import { LotsExportService } from './lots-export.service.js';
 import { programmeFilename } from './programme-pdf.js';
@@ -153,6 +154,20 @@ export class LotsExportController {
     reply.raw.setHeader('Cache-Control', 'no-store');
     reply.raw.end(archive);
   }
+  // AVANT `:id` : une route statique déclarée après serait masquée par le paramètre.
+  @Get('mes-attributions')
+  @Roles(...PARCOURS_ROLES)
+  @ApiOperation({
+    operationId: 'mesAttributions',
+    summary: 'Les fiches attribuées à l’appelant, tous lots confondus.',
+    description:
+      'Sert au mobile à borner son tirage. `tout: true` pour ADMIN, SUPERVISEUR et DIRECTION : les deux listes sont alors vides et aucun filtre ne s’applique.',
+  })
+  @ApiResponse({ status: 200, type: MesAttributionsDto })
+  mesAttributions(@CurrentUser() user: AuthenticatedUser): Promise<MesAttributionsDto> {
+    return this.lots.mesAttributions(user);
+  }
+
   @Get(':id')
   @Roles(Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiOperation({

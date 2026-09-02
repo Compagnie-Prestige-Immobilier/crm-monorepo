@@ -263,6 +263,55 @@ void main() {
     expect(find.text('Ousmane Fall'), findsOneWidget);
     expect(find.text('En retard'), findsOneWidget);
   });
+
+  // Un injoignable n'a promis aucun rappel : sans cette section, rien ne le
+  // ramène. Ceux d'un collègue ne me regardent pas.
+  rappelsTestWidgets('les injoignables de MES appels sont listés à part', (
+    WidgetTester tester,
+  ) async {
+    await insertRepresentant(
+      db,
+      id: 'rep-moi',
+      phone: '+221770000002',
+      fullName: 'Moussa Diop',
+      lastCallOutcome: 'UNREACHABLE',
+      lastCallAt: DateTime.utc(2026, 8, 11, 10),
+      lastCallById: 'u-1',
+    );
+    await insertRepresentant(
+      db,
+      id: 'rep-collegue',
+      phone: '+221770000003',
+      fullName: 'Aminata Ba',
+      lastCallOutcome: 'UNREACHABLE',
+      lastCallAt: DateTime.utc(2026, 8, 11, 11),
+      lastCallById: 'u-2',
+    );
+    await insertRepresentant(
+      db,
+      id: 'rep-joint',
+      phone: '+221770000004',
+      fullName: 'Cheikh Sy',
+      lastCallOutcome: 'REACHED',
+      lastCallAt: DateTime.utc(2026, 8, 11, 12),
+      lastCallById: 'u-1',
+    );
+
+    await ouvrir(tester, Routes.rappels);
+
+    expect(find.text('Injoignables'), findsOneWidget);
+    expect(find.text('Moussa Diop'), findsOneWidget);
+    expect(find.text('Aminata Ba'), findsNothing);
+    expect(find.text('Cheikh Sy'), findsNothing);
+    // La date du dernier appel, pas une heure de rappel, et rien n'est en
+    // retard : aucune promesse n'a été faite.
+    expect(find.textContaining('Dernier appel : '), findsOneWidget);
+    expect(find.text('En retard'), findsNothing);
+
+    await tester.tap(find.text('Moussa Diop'));
+    await settle(tester);
+    expect(find.text('+221 77 000 00 02'), findsOneWidget);
+  });
 }
 
 Future<void> settle(WidgetTester tester) async {

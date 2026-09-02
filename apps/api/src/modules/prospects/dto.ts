@@ -520,6 +520,22 @@ export class ProspectDto {
   @ApiProperty({ type: String, format: 'date-time', nullable: true })
   lastAttemptAt!: string | null;
 
+  /**
+   * Le dernier appel PORTÉ PAR LA FICHE, et non recalculé sur les tentatives :
+   * c'est lui qui descend au téléphone et qui filtre « mes contacts ».
+   */
+  @ApiProperty({ enum: CallOutcome, enumName: 'CallOutcome', nullable: true })
+  lastCallOutcome!: CallOutcome | null;
+
+  @ApiProperty({ type: String, format: 'date-time', nullable: true })
+  lastCallAt!: string | null;
+
+  @ApiProperty({ type: String, format: 'uuid', nullable: true })
+  lastCallById!: string | null;
+
+  @ApiProperty({ type: String, nullable: true })
+  lastCallByName!: string | null;
+
   @ApiProperty({
     type: String,
     nullable: true,

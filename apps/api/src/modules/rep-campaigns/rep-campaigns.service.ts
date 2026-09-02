@@ -4,6 +4,7 @@ import { ChangeSource, RepCallOutcome } from '@crm/database';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { type AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { normalizePhone } from '../../common/phone.js';
+import { attributionScope } from '../../common/scope.js';
 import { COMMENT_MAX_LENGTH } from '../phase2/attempt-rules.js';
 import { applyRelationChange } from '../representants/relation-change.js';
 import { resolveWhatsappPatch, type WhatsappPatch } from '../representants/whatsapp.js';
@@ -15,11 +16,11 @@ import {
   type RepCallAttemptResultDto,
 } from './dto.js';
 import {
-  callbackAtNotAllowed,
   callbackAtRequired,
   commentRequired,
   phoneConflict,
   promisedNotAllowed,
+  representantNotAssigned,
   representantNotFound,
 } from './errors.js';
 
@@ -43,16 +44,17 @@ export class RepCampaignsService {
     if (existing) return attemptResult(RepCallAttemptApplyStatus.DUPLICATE, existing.id, suggested);
 
     const representant = await this.prisma.representant.findFirst({
-      where: { id: body.representantId, deletedAt: null },
+      where: { id: body.representantId, deletedAt: null, ...attributionScope(user) },
       select: {
         id: true,
         relationStatus: true,
         whatsappStatus: true,
         whatsappE164: true,
         phoneE164: true,
+        lastCallAt: true,
       },
     });
-    if (!representant) throw representantNotFound();
+    if (!representant) throw await this.absent(body.representantId);
     const whatsapp = resolveWhatsappPatch(body, representant);
     // Normalisé hors transaction (opération pure) ; un numéro illisible refuse
     // la tentative entière, comme `suggestedPhone`.
@@ -92,7 +94,10 @@ export class RepCampaignsService {
         if (clash) throw phoneConflict(clash.createdBy.fullName);
       }
 
-      const state = representantPatch(body, whatsapp, changesPhone ? newPhone : undefined);
+      const state = {
+        ...representantPatch(body, whatsapp, changesPhone ? newPhone : undefined),
+        ...dernierAppel(body, user.id, representant.lastCallAt),
+      };
       if (Object.keys(state).length > 0) {
         await tx.representant.update({
           where: { id: body.representantId },
@@ -116,6 +121,15 @@ export class RepCampaignsService {
       body.id,
       suggested,
     );
+  }
+
+  /** Seconde lecture, hors périmètre : « pas à vous » ne se confond pas avec « n'existe pas ». */
+  private async absent(representantId: string): Promise<Error> {
+    const ailleurs = await this.prisma.representant.findFirst({
+      where: { id: representantId, deletedAt: null },
+      select: { id: true },
+    });
+    return ailleurs ? representantNotAssigned() : representantNotFound();
   }
 
   private async resolveSuggested(
@@ -166,6 +180,19 @@ function representantPatch(
   };
 }
 
+// Une tentative arrivée hors ligne peut être plus ancienne que le dernier appel
+// connu : elle ne réécrit pas la fiche.
+function dernierAppel(body: CreateRepCallAttemptDto, userId: string, lastCallAt: Date | null) {
+  const at = new Date(body.clientCreatedAt);
+  if (lastCallAt !== null && at < lastCallAt) return {};
+  return {
+    lastCallOutcome: body.outcome,
+    lastCallAt: at,
+    lastCallById: userId,
+    nextCallbackAt: body.callbackAt ? new Date(body.callbackAt) : null,
+  };
+}
+
 function validatedComment(body: CreateRepCallAttemptDto): string | null {
   const comment = body.comment?.trim() || null;
   if (body.outcome === RepCallOutcome.OTHER && comment === null) throw commentRequired();
@@ -174,8 +201,6 @@ function validatedComment(body: CreateRepCallAttemptDto): string | null {
   if (comment !== null && comment.length > COMMENT_MAX_LENGTH) throw commentRequired();
   if (body.outcome === RepCallOutcome.CALLBACK && body.callbackAt === undefined)
     throw callbackAtRequired();
-  if (body.callbackAt !== undefined && body.outcome !== RepCallOutcome.CALLBACK)
-    throw callbackAtNotAllowed();
   return comment;
 }
 

@@ -1,10 +1,21 @@
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 
 const error = (code: string, message: string): BadRequestException =>
   new BadRequestException({ code, message });
 
 export const representantNotFound = (): NotFoundException =>
   new NotFoundException({ code: 'REPRESENTANT_NOT_FOUND', message: 'Représentant introuvable.' });
+
+export const representantNotAssigned = (): ForbiddenException =>
+  new ForbiddenException({
+    code: 'REP_CAMPAIGN_NOT_ASSIGNED',
+    message: 'Ce représentant n’est pas dans vos campagnes.',
+  });
 
 export const phoneConflict = (ownerName: string): ConflictException =>
   new ConflictException({
@@ -26,9 +37,3 @@ export const promisedNotAllowed = (): BadRequestException =>
 
 export const callbackAtRequired = (): BadRequestException =>
   error('REP_CAMPAIGN_CALLBACK_AT_REQUIRED', 'L’issue « À rappeler » exige une date de rappel.');
-
-export const callbackAtNotAllowed = (): BadRequestException =>
-  error(
-    'REP_CAMPAIGN_CALLBACK_AT_NOT_ALLOWED',
-    'Une date de rappel n’est admise que pour l’issue CALLBACK.',
-  );

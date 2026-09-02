@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:drift/drift.dart' show QueryRow, ResultSetImplementation;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,7 +7,6 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/providers/app_providers.dart';
 import '../../../core/providers/sync_coordinator.dart';
-import '../../../data/local/database.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/router/single_push.dart';
 import '../../../core/theme/cpi_tokens.dart';
@@ -22,26 +20,6 @@ import '../../rappels/presentation/rappels_en_retard_banner.dart';
 import '../../shell/app_shell.dart';
 import '../../shell/projects.dart';
 import '../../shell/workspace_switch.dart';
-
-/// Les représentants qui ont dit oui et chez qui personne n'a encore été saisi :
-/// c'est exactement le travail de l'étape 2.
-final StreamProvider<int>
-representantsSansProspectProvider = StreamProvider<int>((Ref ref) {
-  final AppDatabase db = ref.watch(appDatabaseProvider);
-  return db
-      .customSelect(
-        'SELECT COUNT(*) AS c FROM representants r '
-        'WHERE r.deleted_at IS NULL AND r.relation_status = \'AMBASSADEUR\' '
-        'AND NOT EXISTS (SELECT 1 FROM prospects p '
-        '  WHERE p.representant_id = r.id AND p.deleted_at IS NULL)',
-        readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
-          db.representants,
-          db.prospects,
-        },
-      )
-      .watchSingle()
-      .map((QueryRow row) => row.read<int>('c'));
-});
 
 /// Le travail du jour, dans l'ordre des trois phases CHUES. Rien d'autre en
 /// haut de l'écran : ce sont les trois seules choses à faire.
@@ -59,20 +37,18 @@ class HomeScreen extends ConsumerWidget {
     );
     final List<ActivityDay> activity =
         ref.watch(activityLast7DaysProvider).value ?? const <ActivityDay>[];
-    final bool chiffresIllisibles = representants.hasError || prospects.hasError || sansProspect.hasError;
+    final bool chiffresIllisibles =
+        representants.hasError || prospects.hasError || sansProspect.hasError;
     final AsyncValue<int> aQualifier = representants;
     final AsyncValue<int> aConvertir = prospects;
 
     // Sans liste confiée, la qualification passe par l'annuaire : le
     // téléconseiller a souvent le fichier des représentants de son côté et
     // cherche la personne au nom ou au numéro.
-    void ouvrirQualification() => context.pushOnce(
-      Routes.representantsPourQualifier(),
-    );
+    void ouvrirQualification() =>
+        context.pushOnce(Routes.representantsPourQualifier());
 
-    void ouvrirConversion() => context.pushOnce(
-      Routes.phase2,
-    );
+    void ouvrirConversion() => context.pushOnce(Routes.phase2);
 
     final List<Widget> corps = <Widget>[
       const RappelsEnRetardBanner(padded: false),
@@ -299,6 +275,15 @@ class _Raccourcis extends ConsumerWidget {
           size: CpiIconSize.lg,
         ),
         onTap: () => context.pushOnce(Routes.rappels),
+      ),
+      CpiRow(
+        title: 'Mes contacts',
+        subtitle: 'Les personnes que vous avez appelées',
+        leading: const Icon(
+          PhosphorIconsRegular.addressBook,
+          size: CpiIconSize.lg,
+        ),
+        onTap: () => context.pushOnce(Routes.mesContacts),
       ),
       CpiRow(
         title: unread == 0

@@ -60,18 +60,18 @@ class AppDatabase extends _$AppDatabase {
       prospects.profession,
       prospects.dureeSystemeMois,
       prospects.canalProvenanceId,
-      ..._situationV23(prospects),
+      ..._prospectsV23(prospects),
     ],
     columnTransformer: <GeneratedColumn<Object>, Expression<Object>>{
       prospects.projet: const Constant<String>('CHUES'),
     },
   );
 
-  /// Les colonnes ajoutées à `prospects` par la v23 : la tranche de revenus et
-  /// les renseignements propres à la situation du prospect Grand Public.
-  /// Déclarées à part parce que la recopie de table les veut NEUVES et que le
-  /// palier v23, lui, les ajoute une à une.
-  static List<GeneratedColumn<Object>> _situationV23(Prospects prospects) =>
+  /// Les colonnes ajoutées à `prospects` par la v23 : la tranche de revenus, les
+  /// renseignements propres à la situation du prospect Grand Public et le résumé
+  /// du dernier appel. Déclarées à part parce que la recopie de table les veut
+  /// NEUVES et que le palier v23, lui, les ajoute une à une.
+  static List<GeneratedColumn<Object>> _prospectsV23(Prospects prospects) =>
       <GeneratedColumn<Object>>[
         prospects.professionId,
         prospects.incomeBandId,
@@ -86,6 +86,9 @@ class AppDatabase extends _$AppDatabase {
         prospects.whatsappE164,
         prospects.relaisNom,
         prospects.relaisPhoneE164,
+        prospects.lastCallOutcome,
+        prospects.lastCallAt,
+        prospects.lastCallById,
       ];
 
   @override
@@ -282,12 +285,22 @@ class AppDatabase extends _$AppDatabase {
         // courante : les colonnes y sont, et les rajouter échouerait. Même
         // garde qu'au palier v15.
         if (from >= 13) {
-          for (final GeneratedColumn<Object> colonne in _situationV23(
+          for (final GeneratedColumn<Object> colonne in _prospectsV23(
             prospects,
           )) {
             await m.addColumn(prospects, colonne);
           }
         }
+        // Le périmètre d'appel. Table neuve, remplie au premier pull : tant
+        // qu'elle est vide, aucun filtre ne s'applique.
+        await m.createTable(attributions);
+        // Résumé du dernier appel, écrit par le serveur. Comme au palier v22,
+        // `representants` n'a jamais été recréée : les colonnes s'ajoutent sans
+        // condition.
+        await m.addColumn(representants, representants.lastCallOutcome);
+        await m.addColumn(representants, representants.lastCallAt);
+        await m.addColumn(representants, representants.lastCallById);
+        await m.addColumn(representants, representants.nextCallbackAt);
         // Comme aux paliers v8 et v21 : le pull est un curseur keyset, et un
         // appareil déjà mis au miroir ne redemande plus les listes entières.
         // Sans ce marqueur effacé, les trois listes neuves resteraient vides à

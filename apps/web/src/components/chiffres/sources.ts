@@ -1,7 +1,6 @@
 import type { components } from '@crm/api-client';
 
 import type {
-  Catalogue,
   DonneesSource,
   EquipeLigne,
   Forme,
@@ -80,15 +79,20 @@ const scalaireTaux = (
 const joignables = (t: ChiffresTotaux): number => t.calls - t.unreachable - t.wrongNumber;
 
 const COLONNES_CHUES = [
-  'Appels',
+  'Appels représentants',
   'Contact',
   'Rendez-vous',
   'Qualification',
-  'Prospects notés',
-  'Adhésions',
+  'Prospects saisis',
+  'Méthodes obtenues',
 ] as const;
 
-const COLONNES_GRAND_PUBLIC = ['Appels', 'Joignabilité', 'Prospects notés', 'Adhésions'] as const;
+const COLONNES_GRAND_PUBLIC = [
+  'Appels prospects',
+  'Joignabilité',
+  'Prospects saisis',
+  'Méthodes obtenues',
+] as const;
 
 type Cumul = Pick<
   ChiffresTotaux,
@@ -164,47 +168,61 @@ function tableauEquipe(activite: ChiffresActivite, chues: boolean): DonneesSourc
   };
 }
 
+/** Les colonnes suivent le projet : sans représentant, aucun des taux CHUES n'a de sujet. */
+const parTeleconseiller = (chues: boolean): SourceChiffre => ({
+  label: 'Par téléconseiller',
+  forme: 'equipe',
+  jeu: 'activite',
+  description: chues
+    ? 'Les taux d’appel aux représentants, téléconseiller par téléconseiller, plus les fiches notées et les méthodes obtenues auprès des prospects. Ligne d’équipe en pied.'
+    : 'Les appels aux prospects, téléconseiller par téléconseiller, avec la ligne d’équipe en pied.',
+  groupe: 'Équipe',
+  extraire: ({ activite }) => (activite === undefined ? null : tableauEquipe(activite, chues)),
+});
+
 /**
  * Le catalogue de l'écran « Chiffres ». Une entrée par carte, et rien qui ne
  * soit pas une carte : tout ce qui s'affiche se déplace et se retire.
  */
 export const SOURCES_CHIFFRES = {
   'taux-de-contact': {
-    label: 'Taux de contact',
+    label: 'Taux de contact des représentants',
     forme: 'scalaire',
     jeu: 'activite',
-    description: 'La part des appels aux représentants où quelqu’un a décroché.',
-    groupe: 'Qualification',
+    description:
+      'La part des appels aux représentants où quelqu’un a décroché. Un refus compte : il a répondu.',
+    groupe: 'Appels aux représentants',
     extraire: ({ activite }) =>
       activite === undefined
         ? null
         : scalaireTaux(
             activite.totals.repContactRate,
-            `${formatNumber(activite.totals.repReached)} joints sur ${formatNumber(activite.totals.repCalls)} appels`,
-            'Aucun appel sur la période',
+            `${formatNumber(activite.totals.repReached)} joints sur ${formatNumber(activite.totals.repCalls)} appels aux représentants`,
+            'Aucun appel à un représentant sur la période',
           ),
   },
   'a-rappeler': {
-    label: 'Taux de rendez-vous',
+    label: 'Taux de rendez-vous des représentants',
     forme: 'scalaire',
     jeu: 'activite',
-    description: 'La part des appels aux représentants qui finissent par un rappel promis.',
-    groupe: 'Qualification',
+    description:
+      'La part des appels aux représentants qui finissent par un rappel promis, date posée.',
+    groupe: 'Appels aux représentants',
     extraire: ({ activite }) =>
       activite === undefined
         ? null
         : scalaireTaux(
             activite.totals.repCallbackRate,
-            `${formatNumber(activite.totals.repCallback)} rendez-vous sur ${formatNumber(activite.totals.repCalls)} appels`,
-            'Aucun appel sur la période',
+            `${formatNumber(activite.totals.repCallback)} rendez-vous sur ${formatNumber(activite.totals.repCalls)} appels aux représentants`,
+            'Aucun appel à un représentant sur la période',
           ),
   },
   'taux-de-qualification': {
-    label: 'Taux de qualification',
+    label: 'Taux de qualification des représentants',
     forme: 'scalaire',
     jeu: 'activite',
     description: 'La part des représentants interrogés qui acceptent d’être représentant CHUES.',
-    groupe: 'Qualification',
+    groupe: 'Appels aux représentants',
     extraire: ({ activite }) =>
       activite === undefined
         ? null
@@ -215,54 +233,48 @@ export const SOURCES_CHIFFRES = {
           ),
   },
   'taux-de-joignabilite': {
-    label: 'Taux de joignabilité',
+    label: 'Taux de joignabilité des prospects',
     forme: 'scalaire',
     jeu: 'activite',
-    description: 'La part des appels aux prospects dont le numéro s’est révélé exploitable.',
-    groupe: 'Conversion',
+    description:
+      'La part des appels aux prospects, à l’étape conversion, dont le numéro s’est révélé exploitable. Un faux numéro compte comme un injoignable.',
+    groupe: 'Appels aux prospects',
     extraire: ({ activite }) =>
       activite === undefined
         ? null
         : scalaireTaux(
             activite.totals.reachRate,
-            `${formatNumber(joignables(activite.totals))} numéros exploitables sur ${formatNumber(activite.totals.calls)} appels`,
-            'Aucun appel sur la période',
+            `${formatNumber(joignables(activite.totals))} numéros exploitables sur ${formatNumber(activite.totals.calls)} appels aux prospects`,
+            'Aucun appel à un prospect sur la période',
           ),
   },
   'prospects-notes': {
-    label: 'Prospects notés',
+    label: 'Prospects saisis',
     forme: 'scalaire',
     jeu: 'activite',
     description: 'Le nombre de nouvelles fiches saisies pendant la période.',
-    groupe: 'Conversion',
+    groupe: 'Saisie',
     extraire: ({ activite }) =>
       activite === undefined
         ? null
         : scalaire('fiches saisies sur la période', activite.totals.prospectsCreated),
   },
   adhesions: {
-    label: 'Adhésions',
+    label: 'Méthodes obtenues',
     forme: 'scalaire',
     jeu: 'activite',
-    description: 'Le nombre de personnes qui ont finalement adhéré.',
-    groupe: 'Résultats',
+    description:
+      'Les appels aux prospects qui se terminent par une méthode d’adhésion obtenue. Ce n’est pas encore un dossier bancaire.',
+    groupe: 'Appels aux prospects',
     extraire: ({ activite }) =>
       activite === undefined
         ? null
         : scalaire(
-            `sur ${formatNumber(activite.totals.calls)} appels de conversion`,
+            `sur ${formatNumber(activite.totals.calls)} appels aux prospects`,
             activite.totals.methodObtained,
           ),
   },
-  'par-teleconseiller': {
-    label: 'Par téléconseiller',
-    forme: 'equipe',
-    jeu: 'activite',
-    description:
-      'Les mêmes taux, téléconseiller par téléconseiller, avec la ligne d’équipe en pied.',
-    groupe: 'Équipe',
-    extraire: ({ activite }) => (activite === undefined ? null : tableauEquipe(activite, true)),
-  },
+  'par-teleconseiller': parTeleconseiller(false),
   'couverture-derniere-campagne': {
     label: 'Couverture de la dernière campagne',
     forme: 'composition',
@@ -352,7 +364,7 @@ export const SOURCES_CHIFFRES = {
     label: 'Méthodes d’adhésion',
     forme: 'composition',
     jeu: 'methodes',
-    description: 'Voir quelle méthode d’adhésion est choisie le plus souvent.',
+    description: 'Voir quelle méthode d’adhésion les prospects choisissent le plus souvent.',
     groupe: 'Résultats',
     extraire: ({ methodes }) =>
       methodes === undefined
@@ -432,22 +444,11 @@ export const SOURCES_CHIFFRES = {
   },
 } satisfies Partial<Record<ChiffreSource, SourceChiffre>>;
 
-export type SourceChiffreCle = keyof typeof SOURCES_CHIFFRES;
-
-/** Une clé qui n'existe pas dans le contrat de l'API rougit sur cette ligne. */
-export const SOURCES_DE_L_ECRAN: readonly ChiffreSource[] = Object.keys(
-  SOURCES_CHIFFRES,
-) as SourceChiffreCle[];
-
-/** Ce que la grille et le tiroir ont besoin de savoir : intitulé et forme. */
-export const CATALOGUE_CHIFFRES: Catalogue = SOURCES_CHIFFRES;
-
-/** Un représentant n'existe que dans CHUES : hors de lui, ces cartes seraient à zéro. */
+/** Un représentant n'existe que dans CHUES : ces taux seraient vides ailleurs. */
 const SOURCES_CHUES_SEULEMENT: readonly string[] = [
   'taux-de-contact',
   'a-rappeler',
   'taux-de-qualification',
-  'par-banque',
 ];
 
 /** Les montants ne s'ouvrent qu'à la direction, comme la disposition d'usine du serveur. */
@@ -475,11 +476,6 @@ export function catalogueDe(input: {
     return true;
   });
   const catalogue = Object.fromEntries(entrees);
-  // Le tableau d'équipe porte les colonnes du projet : sans représentant, pas de taux CHUES.
-  catalogue['par-teleconseiller'] = {
-    ...SOURCES_CHIFFRES['par-teleconseiller'],
-    extraire: ({ activite }) =>
-      activite === undefined ? null : tableauEquipe(activite, input.chues),
-  };
+  catalogue['par-teleconseiller'] = parTeleconseiller(input.chues);
   return catalogue;
 }
