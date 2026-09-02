@@ -1,6 +1,5 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Role } from '@crm/database';
 
 import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
 import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
@@ -8,7 +7,7 @@ import {
   CurrentUser,
   type AuthenticatedUser,
 } from '../../common/decorators/current-user.decorator.js';
-import { Roles } from '../../common/decorators/roles.decorator.js';
+import { PARCOURS_ROLES, Roles } from '../../common/decorators/roles.decorator.js';
 import { SuggestionsService } from './suggestions.service.js';
 import {
   SuggestionDto,
@@ -19,14 +18,15 @@ import {
 
 @ApiTags('suggestions')
 @ApiBearerAuth()
-@Roles(Role.ADMIN, Role.COMMERCIAL)
+// L'encadrement tranche les numéros suggérés comme le téléconseiller : en
+// lecture seule, il ne pouvait ni les accepter ni les écarter.
+@Roles(...PARCOURS_ROLES)
 @ApiErrors({ 400: true, 401: true, 403: true })
 @Controller({ path: 'suggestions', version: '1' })
 export class SuggestionsController {
   constructor(private readonly suggestions: SuggestionsService) {}
 
   @Get()
-  @Roles(Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiOperation({
     operationId: 'listSuggestions',
     summary: 'Numéros donnés par des représentants qui ont refusé.',

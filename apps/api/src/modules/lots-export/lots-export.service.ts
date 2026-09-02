@@ -8,6 +8,7 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import { buildProspectWhere } from '../../common/prospect-where.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { RepresentantExportQueryDto } from '../representants/dto.js';
+import { suiviWhere } from '../representants/representants.service.js';
 import { EXPORT_INCLUDE, PROSPECT_COLUMNS, cellValue } from '../export/columns.js';
 import { markWorkbook, writeDemoWarningRow } from '../export/demo-marking.js';
 import { styleHeader } from '../export/import-template.workbook.js';
@@ -751,7 +752,7 @@ export class LotsExportService {
 
   private representantWhere(query?: RepresentantExportQueryDto): Prisma.RepresentantWhereInput {
     const value = query ?? {};
-    const where: Prisma.RepresentantWhereInput = { deletedAt: null };
+    const where: Prisma.RepresentantWhereInput = { deletedAt: null, ...suiviWhere(value) };
     if (value.search?.trim())
       where.OR = [
         { fullName: { contains: value.search.trim(), mode: 'insensitive' } },

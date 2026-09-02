@@ -15,7 +15,6 @@ import {
   type RepCallAttemptResultDto,
 } from './dto.js';
 import {
-  callbackAtNotAllowed,
   callbackAtRequired,
   commentRequired,
   phoneConflict,
@@ -50,6 +49,7 @@ export class RepCampaignsService {
         whatsappStatus: true,
         whatsappE164: true,
         phoneE164: true,
+        lastCallAt: true,
       },
     });
     if (!representant) throw representantNotFound();
@@ -92,7 +92,10 @@ export class RepCampaignsService {
         if (clash) throw phoneConflict(clash.createdBy.fullName);
       }
 
-      const state = representantPatch(body, whatsapp, changesPhone ? newPhone : undefined);
+      const state = {
+        ...representantPatch(body, whatsapp, changesPhone ? newPhone : undefined),
+        ...dernierAppel(body, user.id, representant.lastCallAt),
+      };
       if (Object.keys(state).length > 0) {
         await tx.representant.update({
           where: { id: body.representantId },
@@ -166,6 +169,19 @@ function representantPatch(
   };
 }
 
+// Une tentative arrivée hors ligne peut être plus ancienne que le dernier appel
+// connu : elle ne réécrit pas la fiche.
+function dernierAppel(body: CreateRepCallAttemptDto, userId: string, lastCallAt: Date | null) {
+  const at = new Date(body.clientCreatedAt);
+  if (lastCallAt !== null && at < lastCallAt) return {};
+  return {
+    lastCallOutcome: body.outcome,
+    lastCallAt: at,
+    lastCallById: userId,
+    nextCallbackAt: body.callbackAt ? new Date(body.callbackAt) : null,
+  };
+}
+
 function validatedComment(body: CreateRepCallAttemptDto): string | null {
   const comment = body.comment?.trim() || null;
   if (body.outcome === RepCallOutcome.OTHER && comment === null) throw commentRequired();
@@ -174,8 +190,6 @@ function validatedComment(body: CreateRepCallAttemptDto): string | null {
   if (comment !== null && comment.length > COMMENT_MAX_LENGTH) throw commentRequired();
   if (body.outcome === RepCallOutcome.CALLBACK && body.callbackAt === undefined)
     throw callbackAtRequired();
-  if (body.callbackAt !== undefined && body.outcome !== RepCallOutcome.CALLBACK)
-    throw callbackAtNotAllowed();
   return comment;
 }
 

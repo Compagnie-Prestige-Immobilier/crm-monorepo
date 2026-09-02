@@ -164,7 +164,7 @@ class CreateRepCallAttemptDto {
   @JsonKey(name: r'clientCreatedAt', required: true, includeIfNull: false)
   final DateTime clientCreatedAt;
 
-  /// Date du rappel promis. Obligatoire si et seulement si l’issue vaut CALLBACK : c’est elle qui arme la notification côté mobile.
+  /// Date du rappel promis. Obligatoire pour l’issue CALLBACK, admise avec toute autre : un représentant joint peut demander à être rappelé. C’est elle qui arme la notification côté mobile.
   @JsonKey(name: r'callbackAt', required: false, includeIfNull: false)
   final DateTime? callbackAt;
 

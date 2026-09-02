@@ -57,6 +57,16 @@ abstract class _$RepresentantDtoCWProxy {
 
   RepresentantDto contacte(bool? contacte);
 
+  RepresentantDto lastCallOutcome(RepCallOutcome? lastCallOutcome);
+
+  RepresentantDto lastCallAt(DateTime? lastCallAt);
+
+  RepresentantDto lastCallById(String? lastCallById);
+
+  RepresentantDto lastCallByName(String? lastCallByName);
+
+  RepresentantDto nextCallbackAt(DateTime? nextCallbackAt);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `RepresentantDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -89,6 +99,11 @@ abstract class _$RepresentantDtoCWProxy {
     String? syndicat,
     bool? connaitUES,
     bool? contacte,
+    RepCallOutcome? lastCallOutcome,
+    DateTime? lastCallAt,
+    String? lastCallById,
+    String? lastCallByName,
+    DateTime? nextCallbackAt,
   });
 }
 
@@ -186,6 +201,26 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
   RepresentantDto contacte(bool? contacte) => this(contacte: contacte);
 
   @override
+  RepresentantDto lastCallOutcome(RepCallOutcome? lastCallOutcome) =>
+      this(lastCallOutcome: lastCallOutcome);
+
+  @override
+  RepresentantDto lastCallAt(DateTime? lastCallAt) =>
+      this(lastCallAt: lastCallAt);
+
+  @override
+  RepresentantDto lastCallById(String? lastCallById) =>
+      this(lastCallById: lastCallById);
+
+  @override
+  RepresentantDto lastCallByName(String? lastCallByName) =>
+      this(lastCallByName: lastCallByName);
+
+  @override
+  RepresentantDto nextCallbackAt(DateTime? nextCallbackAt) =>
+      this(nextCallbackAt: nextCallbackAt);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `RepresentantDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -218,6 +253,11 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
     Object? syndicat = const $CopyWithPlaceholder(),
     Object? connaitUES = const $CopyWithPlaceholder(),
     Object? contacte = const $CopyWithPlaceholder(),
+    Object? lastCallOutcome = const $CopyWithPlaceholder(),
+    Object? lastCallAt = const $CopyWithPlaceholder(),
+    Object? lastCallById = const $CopyWithPlaceholder(),
+    Object? lastCallByName = const $CopyWithPlaceholder(),
+    Object? nextCallbackAt = const $CopyWithPlaceholder(),
   }) {
     return RepresentantDto(
       id: id == const $CopyWithPlaceholder()
@@ -320,6 +360,26 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
           ? _value.contacte
           // ignore: cast_nullable_to_non_nullable
           : contacte as bool?,
+      lastCallOutcome: lastCallOutcome == const $CopyWithPlaceholder()
+          ? _value.lastCallOutcome
+          // ignore: cast_nullable_to_non_nullable
+          : lastCallOutcome as RepCallOutcome?,
+      lastCallAt: lastCallAt == const $CopyWithPlaceholder()
+          ? _value.lastCallAt
+          // ignore: cast_nullable_to_non_nullable
+          : lastCallAt as DateTime?,
+      lastCallById: lastCallById == const $CopyWithPlaceholder()
+          ? _value.lastCallById
+          // ignore: cast_nullable_to_non_nullable
+          : lastCallById as String?,
+      lastCallByName: lastCallByName == const $CopyWithPlaceholder()
+          ? _value.lastCallByName
+          // ignore: cast_nullable_to_non_nullable
+          : lastCallByName as String?,
+      nextCallbackAt: nextCallbackAt == const $CopyWithPlaceholder()
+          ? _value.nextCallbackAt
+          // ignore: cast_nullable_to_non_nullable
+          : nextCallbackAt as DateTime?,
     );
   }
 }
@@ -365,6 +425,11 @@ RepresentantDto _$RepresentantDtoFromJson(
       'syndicat',
       'connaitUES',
       'contacte',
+      'lastCallOutcome',
+      'lastCallAt',
+      'lastCallById',
+      'lastCallByName',
+      'nextCallbackAt',
     ],
   );
   final val = RepresentantDto(
@@ -410,6 +475,24 @@ RepresentantDto _$RepresentantDtoFromJson(
     syndicat: $checkedConvert('syndicat', (v) => v as String?),
     connaitUES: $checkedConvert('connaitUES', (v) => v as bool?),
     contacte: $checkedConvert('contacte', (v) => v as bool?),
+    lastCallOutcome: $checkedConvert(
+      'lastCallOutcome',
+      (v) => $enumDecodeNullable(
+        _$RepCallOutcomeEnumMap,
+        v,
+        unknownValue: RepCallOutcome.unknownDefaultOpenApi,
+      ),
+    ),
+    lastCallAt: $checkedConvert(
+      'lastCallAt',
+      (v) => v == null ? null : DateTime.parse(v as String),
+    ),
+    lastCallById: $checkedConvert('lastCallById', (v) => v as String?),
+    lastCallByName: $checkedConvert('lastCallByName', (v) => v as String?),
+    nextCallbackAt: $checkedConvert(
+      'nextCallbackAt',
+      (v) => v == null ? null : DateTime.parse(v as String),
+    ),
   );
   return val;
 });
@@ -441,6 +524,11 @@ Map<String, dynamic> _$RepresentantDtoToJson(RepresentantDto instance) =>
       'syndicat': instance.syndicat,
       'connaitUES': instance.connaitUES,
       'contacte': instance.contacte,
+      'lastCallOutcome': _$RepCallOutcomeEnumMap[instance.lastCallOutcome],
+      'lastCallAt': instance.lastCallAt?.toIso8601String(),
+      'lastCallById': instance.lastCallById,
+      'lastCallByName': instance.lastCallByName,
+      'nextCallbackAt': instance.nextCallbackAt?.toIso8601String(),
     };
 
 const _$RepresentantRelationEnumMap = {
@@ -457,4 +545,15 @@ const _$WhatsappStatusEnumMap = {
   WhatsappStatus.AUTRE_NUMERO: 'AUTRE_NUMERO',
   WhatsappStatus.AUCUN: 'AUCUN',
   WhatsappStatus.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$RepCallOutcomeEnumMap = {
+  RepCallOutcome.REACHED: 'REACHED',
+  RepCallOutcome.PROSPECTS_PROMISED: 'PROSPECTS_PROMISED',
+  RepCallOutcome.UNREACHABLE: 'UNREACHABLE',
+  RepCallOutcome.CALLBACK: 'CALLBACK',
+  RepCallOutcome.REFUSED: 'REFUSED',
+  RepCallOutcome.WRONG_NUMBER: 'WRONG_NUMBER',
+  RepCallOutcome.OTHER: 'OTHER',
+  RepCallOutcome.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

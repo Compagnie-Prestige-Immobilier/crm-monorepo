@@ -3309,6 +3309,25 @@
             }
           },
           {
+            "name": "suivi",
+            "required": false,
+            "in": "query",
+            "description": "A_RAPPELER : un rappel promis reste dû (`nextCallbackAt`), tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien.",
+            "schema": {
+              "$ref": "#/components/schemas/RepresentantSuivi"
+            }
+          },
+          {
+            "name": "lastCallById",
+            "required": false,
+            "in": "query",
+            "description": "Qui a passé le dernier appel. Un téléconseiller y met son propre identifiant.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "sortBy",
             "required": false,
             "in": "query",
@@ -16461,6 +16480,25 @@
             "schema": {
               "type": "boolean"
             }
+          },
+          {
+            "name": "suivi",
+            "required": false,
+            "in": "query",
+            "description": "A_RAPPELER : un rappel promis reste dû (`nextCallbackAt`), tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien.",
+            "schema": {
+              "$ref": "#/components/schemas/RepresentantSuivi"
+            }
+          },
+          {
+            "name": "lastCallById",
+            "required": false,
+            "in": "query",
+            "description": "Qui a passé le dernier appel. Un téléconseiller y met son propre identifiant.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -19513,13 +19551,37 @@
         "type": "string",
         "enum": ["NON_DEMANDE", "MEME_NUMERO", "AUTRE_NUMERO", "AUCUN"]
       },
+      "RepresentantSuivi": {
+        "type": "string",
+        "enum": ["A_RAPPELER", "INJOIGNABLE"]
+      },
       "RepresentantSortField": {
         "type": "string",
-        "enum": ["clientCreatedAt", "createdAt", "fullName", "prospects"]
+        "enum": [
+          "clientCreatedAt",
+          "createdAt",
+          "fullName",
+          "prospects",
+          "lastCallAt",
+          "nextCallbackAt"
+        ]
       },
       "SortOrder": {
         "type": "string",
         "enum": ["asc", "desc"]
+      },
+      "RepCallOutcome": {
+        "type": "string",
+        "enum": [
+          "REACHED",
+          "PROSPECTS_PROMISED",
+          "UNREACHABLE",
+          "CALLBACK",
+          "REFUSED",
+          "WRONG_NUMBER",
+          "OTHER"
+        ],
+        "description": "Issue du dernier appel. Nul : jamais appelé."
       },
       "RepresentantDto": {
         "type": "object",
@@ -19628,6 +19690,35 @@
           "contacte": {
             "type": "boolean",
             "nullable": true
+          },
+          "lastCallOutcome": {
+            "nullable": true,
+            "description": "Issue du dernier appel. Nul : jamais appelé.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RepCallOutcome"
+              }
+            ]
+          },
+          "lastCallAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastCallById": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "lastCallByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "nextCallbackAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Rappel promis par le dernier appel, tant qu’aucun appel ne l’a honoré."
           }
         },
         "required": [
@@ -19655,7 +19746,12 @@
           "etablissement",
           "syndicat",
           "connaitUES",
-          "contacte"
+          "contacte",
+          "lastCallOutcome",
+          "lastCallAt",
+          "lastCallById",
+          "lastCallByName",
+          "nextCallbackAt"
         ]
       },
       "RepresentantListDto": {
@@ -23213,18 +23309,6 @@
         },
         "required": ["items", "serverTime"]
       },
-      "RepCallOutcome": {
-        "type": "string",
-        "enum": [
-          "REACHED",
-          "PROSPECTS_PROMISED",
-          "UNREACHABLE",
-          "CALLBACK",
-          "REFUSED",
-          "WRONG_NUMBER",
-          "OTHER"
-        ]
-      },
       "CreateRepCallAttemptDto": {
         "type": "object",
         "properties": {
@@ -23338,7 +23422,7 @@
           "callbackAt": {
             "type": "string",
             "format": "date-time",
-            "description": "Date du rappel promis. Obligatoire si et seulement si l’issue vaut CALLBACK : c’est elle qui arme la notification côté mobile."
+            "description": "Date du rappel promis. Obligatoire pour l’issue CALLBACK, admise avec toute autre : un représentant joint peut demander à être rappelé. C’est elle qui arme la notification côté mobile."
           }
         },
         "required": ["id", "representantId", "outcome", "clientCreatedAt"]
@@ -27094,6 +27178,19 @@
           },
           "hasWhatsapp": {
             "type": "boolean"
+          },
+          "suivi": {
+            "description": "A_RAPPELER : un rappel promis reste dû (`nextCallbackAt`), tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RepresentantSuivi"
+              }
+            ]
+          },
+          "lastCallById": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Qui a passé le dernier appel. Un téléconseiller y met son propre identifiant."
           }
         }
       },

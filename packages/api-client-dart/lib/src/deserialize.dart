@@ -802,6 +802,7 @@ ReturnType deserialize<ReturnType, BaseType>(
           )
           as ReturnType;
     case 'RepresentantSortField':
+    case 'RepresentantSuivi':
     case 'ResetPasswordDto':
       return ResetPasswordDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;

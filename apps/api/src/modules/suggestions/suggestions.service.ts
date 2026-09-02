@@ -53,7 +53,8 @@ export class SuggestionsService {
     id: string,
     status: SuggestionStatus,
   ): Promise<SuggestionDto> {
-    const scope = isAdmin(user) ? {} : { suggestedById: user.id };
+    // Même périmètre que la liste : ce qu'on lit, on peut le solder.
+    const scope = readsEveryone(user) ? {} : { suggestedById: user.id };
     const courant = await this.prisma.representantSuggestion.findFirst({
       where: { id, deletedAt: null, ...scope },
       select: { status: true },
