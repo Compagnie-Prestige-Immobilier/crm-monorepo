@@ -3361,9 +3361,24 @@ export interface components {
     /** @enum {string} */
     WhatsappStatus: 'NON_DEMANDE' | 'MEME_NUMERO' | 'AUTRE_NUMERO' | 'AUCUN';
     /** @enum {string} */
-    RepresentantSortField: 'clientCreatedAt' | 'createdAt' | 'fullName' | 'prospects';
+    RepresentantSuivi: 'A_RAPPELER' | 'INJOIGNABLE';
+    /** @enum {string} */
+    RepresentantSortField:
+      'clientCreatedAt' | 'createdAt' | 'fullName' | 'prospects' | 'lastCallAt' | 'nextCallbackAt';
     /** @enum {string} */
     SortOrder: 'asc' | 'desc';
+    /**
+     * @description Issue du dernier appel. Nul : jamais appelé.
+     * @enum {string}
+     */
+    RepCallOutcome:
+      | 'REACHED'
+      | 'PROSPECTS_PROMISED'
+      | 'UNREACHABLE'
+      | 'CALLBACK'
+      | 'REFUSED'
+      | 'WRONG_NUMBER'
+      | 'OTHER';
     RepresentantDto: {
       /** Format: uuid */
       id: string;
@@ -3401,6 +3416,18 @@ export interface components {
       syndicat: string | null;
       connaitUES: boolean | null;
       contacte: boolean | null;
+      /** @description Issue du dernier appel. Nul : jamais appelé. */
+      lastCallOutcome: components['schemas']['RepCallOutcome'] | null;
+      /** Format: date-time */
+      lastCallAt: string | null;
+      /** Format: uuid */
+      lastCallById: string | null;
+      lastCallByName: string | null;
+      /**
+       * Format: date-time
+       * @description Rappel promis par le dernier appel, tant qu’aucun appel ne l’a honoré.
+       */
+      nextCallbackAt: string | null;
     };
     RepresentantListDto: {
       items: components['schemas']['RepresentantDto'][];
@@ -4714,15 +4741,6 @@ export interface components {
        */
       serverTime: string;
     };
-    /** @enum {string} */
-    RepCallOutcome:
-      | 'REACHED'
-      | 'PROSPECTS_PROMISED'
-      | 'UNREACHABLE'
-      | 'CALLBACK'
-      | 'REFUSED'
-      | 'WRONG_NUMBER'
-      | 'OTHER';
     CreateRepCallAttemptDto: {
       /**
        * Format: uuid
@@ -4771,7 +4789,7 @@ export interface components {
       clientCreatedAt: string;
       /**
        * Format: date-time
-       * @description Date du rappel promis. Obligatoire si et seulement si l’issue vaut CALLBACK : c’est elle qui arme la notification côté mobile.
+       * @description Date du rappel promis. Obligatoire pour l’issue CALLBACK, admise avec toute autre : un représentant joint peut demander à être rappelé. C’est elle qui arme la notification côté mobile.
        */
       callbackAt?: string;
     };
@@ -6121,6 +6139,13 @@ export interface components {
       relationStatus?: components['schemas']['RepresentantRelation'];
       whatsappStatus?: components['schemas']['WhatsappStatus'];
       hasWhatsapp?: boolean;
+      /** @description A_RAPPELER : un rappel promis reste dû (`nextCallbackAt`), tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien. */
+      suivi?: components['schemas']['RepresentantSuivi'];
+      /**
+       * Format: uuid
+       * @description Qui a passé le dernier appel. Un téléconseiller y met son propre identifiant.
+       */
+      lastCallById?: string;
     };
     LotExportProspectFilterDto: {
       /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
@@ -8643,6 +8668,10 @@ export interface operations {
         relationStatus?: components['schemas']['RepresentantRelation'];
         whatsappStatus?: components['schemas']['WhatsappStatus'];
         hasWhatsapp?: boolean;
+        /** @description A_RAPPELER : un rappel promis reste dû (`nextCallbackAt`), tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien. */
+        suivi?: components['schemas']['RepresentantSuivi'];
+        /** @description Qui a passé le dernier appel. Un téléconseiller y met son propre identifiant. */
+        lastCallById?: string;
         sortBy?: components['schemas']['RepresentantSortField'];
         sortOrder?: components['schemas']['SortOrder'];
         page?: number;
@@ -15790,6 +15819,10 @@ export interface operations {
         relationStatus?: components['schemas']['RepresentantRelation'];
         whatsappStatus?: components['schemas']['WhatsappStatus'];
         hasWhatsapp?: boolean;
+        /** @description A_RAPPELER : un rappel promis reste dû (`nextCallbackAt`), tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien. */
+        suivi?: components['schemas']['RepresentantSuivi'];
+        /** @description Qui a passé le dernier appel. Un téléconseiller y met son propre identifiant. */
+        lastCallById?: string;
       };
       header?: never;
       path?: never;

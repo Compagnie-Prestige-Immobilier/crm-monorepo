@@ -16,6 +16,7 @@ import {
 } from '../representants/import-fields.js';
 import type { RepresentantExportQueryDto } from '../representants/dto.js';
 import { RepresentantSortField } from '../representants/dto.js';
+import { suiviWhere } from '../representants/representants.service.js';
 import {
   COMMON_TEMPLATE_RULES,
   styleHeader,
@@ -201,6 +202,7 @@ export class RepresentantsExportService {
     const where: Prisma.RepresentantWhereInput = {
       deletedAt: null,
       ...readScope(user),
+      ...suiviWhere(query),
     };
 
     if (query.commercialId) {

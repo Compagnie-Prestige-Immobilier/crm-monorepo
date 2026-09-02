@@ -60,6 +60,7 @@ beforeEach(() => {
         whatsappStatus: 'NON_DEMANDE',
         whatsappE164: null,
         phoneE164: '+221771234567',
+        lastCallAt: null,
       }),
     },
     $transaction: vi.fn((fn: (client: Tx) => unknown) => fn(tx)),
@@ -143,5 +144,60 @@ describe('correction du numéro pendant la qualification', () => {
     const result = await service.recordAttempt(ALICE, body);
     expect(result.status).toBe(RepCallAttemptApplyStatus.DUPLICATE);
     expect(db.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+describe('dernier appel porté par la fiche', () => {
+  const patch = (): Record<string, unknown> =>
+    (tx.representant.update.mock.calls[0] as [{ data: Record<string, unknown> }])[0].data;
+
+  it('un représentant joint peut demander un rappel : la fiche le porte', async () => {
+    const body = baseBody();
+    body.callbackAt = '2026-08-12T09:00:00.000Z';
+
+    await service.recordAttempt(ALICE, body);
+
+    expect(patch()).toMatchObject({
+      lastCallOutcome: RepCallOutcome.REACHED,
+      lastCallAt: new Date('2026-08-10T10:00:00.000Z'),
+      lastCallById: ALICE.id,
+      nextCallbackAt: new Date('2026-08-12T09:00:00.000Z'),
+    });
+  });
+
+  it('un appel de plus honore le rappel promis', async () => {
+    const body = baseBody();
+    body.outcome = RepCallOutcome.UNREACHABLE;
+
+    await service.recordAttempt(ALICE, body);
+
+    expect(patch()).toMatchObject({
+      lastCallOutcome: RepCallOutcome.UNREACHABLE,
+      nextCallbackAt: null,
+    });
+  });
+
+  it('une tentative arrivée hors ligne, plus ancienne que le dernier appel, ne réécrit pas la fiche', async () => {
+    db.representant.findFirst.mockResolvedValue({
+      id: REP,
+      relationStatus: 'INCONNU',
+      whatsappStatus: 'NON_DEMANDE',
+      whatsappE164: null,
+      phoneE164: '+221771234567',
+      lastCallAt: new Date('2026-08-11T10:00:00.000Z'),
+    });
+
+    await service.recordAttempt(ALICE, baseBody());
+
+    expect(tx.representant.update).not.toHaveBeenCalled();
+  });
+
+  it('l’issue « À rappeler » exige toujours sa date', async () => {
+    const body = baseBody();
+    body.outcome = RepCallOutcome.CALLBACK;
+
+    await expect(service.recordAttempt(ALICE, body)).rejects.toMatchObject({
+      response: { code: 'REP_CAMPAIGN_CALLBACK_AT_REQUIRED' },
+    });
   });
 });

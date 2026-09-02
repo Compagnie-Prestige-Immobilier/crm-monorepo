@@ -20,6 +20,7 @@ import 'package:crm_api_client/src/model/projet.dart';
 import 'package:crm_api_client/src/model/prospect_statut.dart';
 import 'package:crm_api_client/src/model/prospect_type.dart';
 import 'package:crm_api_client/src/model/representant_relation.dart';
+import 'package:crm_api_client/src/model/representant_suivi.dart';
 import 'package:crm_api_client/src/model/whatsapp_status.dart';
 
 class ExportApi {
@@ -493,6 +494,8 @@ class ExportApi {
   /// * [relationStatus]
   /// * [whatsappStatus]
   /// * [hasWhatsapp]
+  /// * [suivi] - A_RAPPELER : un rappel promis reste dû (`nextCallbackAt`), tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien.
+  /// * [lastCallById] - Qui a passé le dernier appel. Un téléconseiller y met son propre identifiant.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -513,6 +516,8 @@ class ExportApi {
     RepresentantRelation? relationStatus,
     WhatsappStatus? whatsappStatus,
     bool? hasWhatsapp,
+    RepresentantSuivi? suivi,
+    String? lastCallById,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -545,6 +550,8 @@ class ExportApi {
       if (relationStatus != null) r'relationStatus': relationStatus,
       if (whatsappStatus != null) r'whatsappStatus': whatsappStatus,
       if (hasWhatsapp != null) r'hasWhatsapp': hasWhatsapp,
+      if (suivi != null) r'suivi': suivi,
+      if (lastCallById != null) r'lastCallById': lastCallById,
     };
 
     final _response = await _dio.request<Object>(

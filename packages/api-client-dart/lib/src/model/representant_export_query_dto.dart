@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:crm_api_client/src/model/representant_suivi.dart';
 import 'package:crm_api_client/src/model/representant_relation.dart';
 import 'package:crm_api_client/src/model/whatsapp_status.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
@@ -40,6 +41,10 @@ class RepresentantExportQueryDto {
     this.whatsappStatus,
 
     this.hasWhatsapp,
+
+    this.suivi,
+
+    this.lastCallById,
   });
 
   @JsonKey(name: r'search', required: false, includeIfNull: false)
@@ -87,6 +92,19 @@ class RepresentantExportQueryDto {
   @JsonKey(name: r'hasWhatsapp', required: false, includeIfNull: false)
   final bool? hasWhatsapp;
 
+  /// A_RAPPELER : un rappel promis reste dû (`nextCallbackAt`), tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien.
+  @JsonKey(
+    name: r'suivi',
+    required: false,
+    includeIfNull: false,
+    unknownEnumValue: RepresentantSuivi.unknownDefaultOpenApi,
+  )
+  final RepresentantSuivi? suivi;
+
+  /// Qui a passé le dernier appel. Un téléconseiller y met son propre identifiant.
+  @JsonKey(name: r'lastCallById', required: false, includeIfNull: false)
+  final String? lastCallById;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is RepresentantExportQueryDto &&
@@ -103,6 +121,8 @@ class RepresentantExportQueryDto {
                 relationStatus,
                 whatsappStatus,
                 hasWhatsapp,
+                suivi,
+                lastCallById,
               ],
               [
                 other.search,
@@ -115,6 +135,8 @@ class RepresentantExportQueryDto {
                 other.relationStatus,
                 other.whatsappStatus,
                 other.hasWhatsapp,
+                other.suivi,
+                other.lastCallById,
               ],
             );
   }
@@ -133,6 +155,8 @@ class RepresentantExportQueryDto {
         relationStatus,
         whatsappStatus,
         hasWhatsapp,
+        suivi,
+        lastCallById,
       ]);
 
   factory RepresentantExportQueryDto.fromJson(Map<String, dynamic> json) =>

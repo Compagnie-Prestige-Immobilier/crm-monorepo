@@ -255,16 +255,17 @@ model User {
   auditLogs     AuditLog[]
 
   // Phase 2
-  enrollmentsCaptured  Prospect[]               @relation("ProspectEnrollmentCapturedBy")
-  callAttempts         CallAttempt[]            @relation("CallAttemptPerformedBy")
-  journeysConsented    ProspectJourney[]        @relation("ProspectJourneyConsentBy")
-  journeysConverted    ProspectJourney[]        @relation("ProspectJourneyConvertedBy")
-  journeysEnrolled     ProspectJourney[]        @relation("ProspectJourneyEnrollmentCapturedBy")
-  journeysClosed       ProspectJourney[]        @relation("ProspectJourneyClosedBy")
-  conversionsConfirmed ProspectConversion[]     @relation("ProspectConversionConfirmedBy")
+  enrollmentsCaptured  Prospect[]           @relation("ProspectEnrollmentCapturedBy")
+  callAttempts         CallAttempt[]        @relation("CallAttemptPerformedBy")
+  journeysConsented    ProspectJourney[]    @relation("ProspectJourneyConsentBy")
+  journeysConverted    ProspectJourney[]    @relation("ProspectJourneyConvertedBy")
+  journeysEnrolled     ProspectJourney[]    @relation("ProspectJourneyEnrollmentCapturedBy")
+  journeysClosed       ProspectJourney[]    @relation("ProspectJourneyClosedBy")
+  conversionsConfirmed ProspectConversion[] @relation("ProspectConversionConfirmedBy")
 
-  repCallAttempts        RepCallAttempt[]            @relation("RepCallAttemptPerformedBy")
-  repSuggestions         RepresentantSuggestion[]    @relation("RepresentantSuggestionSuggestedBy")
+  repCallAttempts         RepCallAttempt[]         @relation("RepCallAttemptPerformedBy")
+  representantsLastCalled Representant[]           @relation("RepresentantLastCallBy")
+  repSuggestions          RepresentantSuggestion[] @relation("RepresentantSuggestionSuggestedBy")
 
   // Banque & Finance
   bankCasesCreated    BankCase[]           @relation("BankCaseCreatedBy")
@@ -355,10 +356,10 @@ model Departement {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users            User[]
-  representants    Representant[]
-  iefs             Ief[]
-  notifications    Notification[]    @relation("NotificationAudienceDepartement")
+  users         User[]
+  representants Representant[]
+  iefs          Ief[]
+  notifications Notification[] @relation("NotificationAudienceDepartement")
 
   @@unique([regionId, name])
   @@index([updatedAt])
@@ -386,7 +387,7 @@ model Ief {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  representants    Representant[]
+  representants Representant[]
 
   @@unique([departementId, name])
   @@index([updatedAt])
@@ -486,14 +487,24 @@ model Representant {
   /// Niveau de syndicat déclaré pendant la qualification. Texte libre, distinct
   /// du référentiel `Syndicat` des prospects : c'est un renseignement recueilli
   /// au téléphone, pas une clé étrangère à administrer.
-  syndicat String?
+  syndicat   String?
   /// Le représentant dit connaître l'UES. Nullable : la question n'a pas
   /// toujours été posée sur les fiches anciennes.
   connaitUES Boolean?
   /// Le représentant déclare avoir déjà été contacté. Distinct de
   /// `relationStatus` (qui porte l'issue ambassadeur/refus) : ici c'est un
   /// écran de qualification, pas la décision.
-  contacte Boolean?
+  contacte   Boolean?
+
+  /// Le DERNIER appel (par `clientCreatedAt`), recopié depuis `RepCallAttempt`
+  /// pour que les listes « injoignables » et « à rappeler » se filtrent sur la
+  /// fiche, et descendent au téléphone avec elle. `nextCallbackAt` est le
+  /// rappel promis par ce dernier appel : un appel de plus l'honore et l'efface.
+  lastCallOutcome RepCallOutcome?
+  lastCallAt      DateTime?
+  lastCallById    String?
+  lastCallBy      User?           @relation("RepresentantLastCallBy", fields: [lastCallById], references: [id], onDelete: Restrict)
+  nextCallbackAt  DateTime?
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -519,6 +530,8 @@ model Representant {
   @@index([deletedAt])
   @@index([relationStatus])
   @@index([relationStatus, departementId])
+  @@index([lastCallById, lastCallOutcome])
+  @@index([nextCallbackAt])
   @@index([whatsappStatus])
   @@map("representants")
 }
@@ -686,7 +699,7 @@ model Prospect {
   /// la tranche de synchronisation entiere.
   ///
   /// Fonctionnaire et secteur prive : l'employeur, en referentiel ou en clair.
-  employeurId String?
+  employeurId  String?
   employeurRef Employeur? @relation(fields: [employeurId], references: [id], onDelete: Restrict)
   employeur    String?
 
@@ -1004,11 +1017,11 @@ model AuditLog {
 // `performedById` est le téléconseiller qui a réellement passé l'appel.
 model CallAttempt {
   // UUID v7 généré par le mobile : sert aussi de clé d'idempotence.
-  id         String        @id
-  prospectId String
-  prospect   Prospect      @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  id            String   @id
+  prospectId    String
+  prospect      Prospect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
   performedById String
-  performedBy   User   @relation("CallAttemptPerformedBy", fields: [performedById], references: [id], onDelete: Restrict)
+  performedBy   User     @relation("CallAttemptPerformedBy", fields: [performedById], references: [id], onDelete: Restrict)
 
   /// L'EFFET de l'appel, dans le vocabulaire figé que les téléphones déployés
   /// savent émettre. Le motif exact, lui, se lit sur `reasonId`.
@@ -1060,13 +1073,13 @@ model CallAttempt {
 // stocké : un `missedAt` obligerait un cron à réécrire des millions de lignes
 // pour une information calculable.
 model ScheduledCallback {
-  id         String        @id @default(uuid(7))
-  prospectId String
-  prospect   Prospect      @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  id           String   @id @default(uuid(7))
+  prospectId   String
+  prospect     Prospect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
   // Le `performedById` de la tentative source, pas l'assigné de la tâche : c'est
   // celui qui a promis le rappel qui le doit.
   assignedToId String
-  assignedTo   User   @relation("ScheduledCallbackAssignedTo", fields: [assignedToId], references: [id], onDelete: Restrict)
+  assignedTo   User     @relation("ScheduledCallbackAssignedTo", fields: [assignedToId], references: [id], onDelete: Restrict)
 
   // Stocké en UTC, saisi en Africa/Dakar.
   scheduledAt DateTime
@@ -1101,11 +1114,11 @@ enum ScheduledCallbackStatus {
 /// n'est jamais modifiée : elle décrit un fait daté.
 model RepCallAttempt {
   // UUID v7 engendré par le client : sert aussi de clé d'idempotence.
-  id             String           @id
+  id             String       @id
   representantId String
-  representant   Representant     @relation(fields: [representantId], references: [id], onDelete: Cascade)
-  performedById String
-  performedBy   User   @relation("RepCallAttemptPerformedBy", fields: [performedById], references: [id], onDelete: Restrict)
+  representant   Representant @relation(fields: [representantId], references: [id], onDelete: Cascade)
+  performedById  String
+  performedBy    User         @relation("RepCallAttemptPerformedBy", fields: [performedById], references: [id], onDelete: Restrict)
 
   outcome           RepCallOutcome
   /// Nombre de fiches promises par le représentant, quand l'issue le prévoit.

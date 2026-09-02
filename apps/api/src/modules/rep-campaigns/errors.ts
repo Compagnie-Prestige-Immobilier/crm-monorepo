@@ -26,9 +26,3 @@ export const promisedNotAllowed = (): BadRequestException =>
 
 export const callbackAtRequired = (): BadRequestException =>
   error('REP_CAMPAIGN_CALLBACK_AT_REQUIRED', 'L’issue « À rappeler » exige une date de rappel.');
-
-export const callbackAtNotAllowed = (): BadRequestException =>
-  error(
-    'REP_CAMPAIGN_CALLBACK_AT_NOT_ALLOWED',
-    'Une date de rappel n’est admise que pour l’issue CALLBACK.',
-  );

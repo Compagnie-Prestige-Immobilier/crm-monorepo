@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ChangeSource, Prisma, WhatsappStatus } from '@crm/database';
+import { ChangeSource, Prisma, RepCallOutcome, WhatsappStatus } from '@crm/database';
 import { v7 as uuidv7 } from 'uuid';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
@@ -12,7 +12,7 @@ import { normalizePhone } from '../../common/phone.js';
 import { assertOwnership, isAdmin } from '../../common/scope.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { OkDto } from '../../common/dto/ok.dto.js';
-import { RepresentantSortField } from './dto.js';
+import { RepresentantSortField, RepresentantSuivi } from './dto.js';
 import type {
   CreateRepresentantCommentDto,
   CreateRepresentantDto,
@@ -21,6 +21,7 @@ import type {
   RepresentantCommentListDto,
   RepresentantCommentQueryDto,
   RepresentantDto,
+  RepresentantExportQueryDto,
   RepresentantListDto,
   RepresentantLookupDto,
   RepresentantQueryDto,
@@ -35,6 +36,7 @@ export const REPRESENTANT_INCLUDE = {
   departement: { select: { name: true } },
   ief: { select: { name: true } },
   createdBy: { select: { id: true, fullName: true } },
+  lastCallBy: { select: { fullName: true } },
   _count: { select: { prospects: { where: { deletedAt: null } } } },
 } satisfies Prisma.RepresentantInclude;
 
@@ -56,17 +58,37 @@ const INCLUDE = REPRESENTANT_INCLUDE;
 function orderByFor(query: RepresentantQueryDto): Prisma.RepresentantOrderByWithRelationInput[] {
   const direction = query.sortOrder ?? 'desc';
 
-  switch (query.sortBy) {
+  switch (query.sortBy ?? (query.suivi && TRI_DU_SUIVI[query.suivi])) {
     case RepresentantSortField.FULL_NAME:
       return [{ fullName: direction }, { id: 'desc' }];
     case RepresentantSortField.CREATED_AT:
       return [{ createdAt: direction }, { id: 'desc' }];
     case RepresentantSortField.PROSPECTS:
       return [{ prospects: { _count: direction } }, { id: 'desc' }];
+    case RepresentantSortField.LAST_CALL_AT:
+      return [{ lastCallAt: direction }, { id: 'desc' }];
+    case RepresentantSortField.NEXT_CALLBACK_AT:
+      // Le rappel le plus proche d'abord, sauf tri explicite.
+      return [{ nextCallbackAt: query.sortOrder ?? 'asc' }, { id: 'desc' }];
     case RepresentantSortField.CLIENT_CREATED_AT:
     default:
       return [{ clientCreatedAt: direction }, { id: 'desc' }];
   }
+}
+
+const TRI_DU_SUIVI: Record<RepresentantSuivi, RepresentantSortField> = {
+  [RepresentantSuivi.A_RAPPELER]: RepresentantSortField.NEXT_CALLBACK_AT,
+  [RepresentantSuivi.INJOIGNABLE]: RepresentantSortField.LAST_CALL_AT,
+};
+
+export function suiviWhere(query: RepresentantExportQueryDto): Prisma.RepresentantWhereInput {
+  return {
+    ...(query.lastCallById ? { lastCallById: query.lastCallById } : {}),
+    ...(query.suivi === RepresentantSuivi.A_RAPPELER ? { nextCallbackAt: { not: null } } : {}),
+    ...(query.suivi === RepresentantSuivi.INJOIGNABLE
+      ? { lastCallOutcome: RepCallOutcome.UNREACHABLE }
+      : {}),
+  };
 }
 
 type RepresentantRow = Prisma.RepresentantGetPayload<{ include: typeof REPRESENTANT_INCLUDE }>;
@@ -98,6 +120,11 @@ export function toRepresentantDto(row: RepresentantRow): RepresentantDto {
     syndicat: row.syndicat,
     connaitUES: row.connaitUES,
     contacte: row.contacte,
+    lastCallOutcome: row.lastCallOutcome,
+    lastCallAt: row.lastCallAt?.toISOString() ?? null,
+    lastCallById: row.lastCallById,
+    lastCallByName: row.lastCallBy?.fullName ?? null,
+    nextCallbackAt: row.nextCallbackAt?.toISOString() ?? null,
   };
 }
 
@@ -146,7 +173,7 @@ export class RepresentantsService {
 
     // L'ANNUAIRE est commun : la liste n'est bornée par aucun créateur, comme le
     // flux de synchronisation. Le cloisonnement demeure sur les PROSPECTS.
-    const where: Prisma.RepresentantWhereInput = { deletedAt: null };
+    const where: Prisma.RepresentantWhereInput = { deletedAt: null, ...suiviWhere(query) };
     if (query.commercialId) {
       where.createdById = query.commercialId;
     }
