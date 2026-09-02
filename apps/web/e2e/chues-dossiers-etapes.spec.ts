@@ -39,7 +39,9 @@ test('CHU-DOSE-03 · la butée haute et la butée basse sont gardées', async ({
   // Un clic en butée partirait en requête que l'API refuse : la butée se dit
   // par un bouton désactivé, pas par un message d'erreur après coup.
   await expect(etapes.first().getByRole('button', { name: /^Monter « / })).toBeDisabled();
-  await expect(etapes.nth(nombre - 1).getByRole('button', { name: /^Descendre « / })).toBeDisabled();
+  await expect(
+    etapes.nth(nombre - 1).getByRole('button', { name: /^Descendre « / }),
+  ).toBeDisabled();
 });
 
 test('CHU-DOSE-04 · l’écran tient sur 375 px', async ({ page }) => {
@@ -56,7 +58,10 @@ test('CHU-DOSE-04 · l’écran tient sur 375 px', async ({ page }) => {
 
   // Sous 1024 px, les quatre contrôles passent dans un menu : ce sont ses
   // entrées, et non plus les boutons à pictogramme, qui portent le geste.
-  await page.getByRole('button', { name: /^Actions pour « / }).first().click();
+  await page
+    .getByRole('button', { name: /^Actions pour « / })
+    .first()
+    .click();
   const menu = page.getByRole('menu');
   await expect(menu).toBeVisible();
 

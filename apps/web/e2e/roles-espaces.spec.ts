@@ -16,7 +16,11 @@ import { expect, test, type Page } from '@playwright/test';
 const TITRE_ACCES_REFUSE = 'Accès refusé';
 
 /** Les trois titres d'écran cassé. Aucun ne doit paraître à l'arrivée. */
-const TITRES_D_ECHEC = [TITRE_ACCES_REFUSE, 'Serveur injoignable', 'Chargement impossible'] as const;
+const TITRES_D_ECHEC = [
+  TITRE_ACCES_REFUSE,
+  'Serveur injoignable',
+  'Chargement impossible',
+] as const;
 
 const DESCRIPTIONS: Record<string, string> = {
   Accueil: 'Registre des visites du comptoir',

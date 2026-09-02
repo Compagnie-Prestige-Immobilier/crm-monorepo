@@ -25,6 +25,7 @@ export function ExactAmountsProvider({ children }: { children: ReactNode }) {
   const [exact, setExact] = useState(false);
 
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- préférence relue après hydratation
     setExact(readStored());
   }, []);
 

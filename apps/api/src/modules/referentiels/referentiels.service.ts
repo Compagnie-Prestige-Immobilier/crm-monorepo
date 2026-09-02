@@ -1,11 +1,23 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import type { Banque, Departement, Ief, Prisma, Region, Syndicat } from '@crm/database';
+import type {
+  Banque,
+  Departement,
+  EmployeurType,
+  Ief,
+  Prisma,
+  Region,
+  Syndicat,
+} from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import type {
   BanqueDto,
   CanalProvenanceDto,
   CreateBanqueDto,
+  CreateEmployeurDto,
+  EmployeurDto,
+  PaysDto,
+  UpdateEmployeurDto,
   CreateCanalProvenanceDto,
   UpdateCanalProvenanceDto,
   CreateDepartementDto,
@@ -116,6 +128,26 @@ const toIncomeBand = (row: {
   updatedAt: Date;
 }): IncomeBandDto => ({ ...row, updatedAt: row.updatedAt.toISOString() });
 
+const toEmployeur = (row: {
+  id: string;
+  code: string;
+  label: string;
+  type: EmployeurType;
+  position: number;
+  isActive: boolean;
+  updatedAt: Date;
+}): EmployeurDto => ({ ...row, updatedAt: row.updatedAt.toISOString() });
+
+const toPays = (row: {
+  id: string;
+  code: string;
+  label: string;
+  indicatif: string;
+  position: number;
+  isActive: boolean;
+  updatedAt: Date;
+}): PaysDto => ({ ...row, updatedAt: row.updatedAt.toISOString() });
+
 const toOffer = (row: {
   id: string;
   code: string;
@@ -131,17 +163,38 @@ export class ReferentielsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async bundle(query: ReferentielQueryDto): Promise<ReferentielsBundleDto> {
-    const [banques, syndicats, departements, regions, professions, incomeBands, offers] =
-      await Promise.all([
-        this.listBanques(query),
-        this.listSyndicats(query),
-        this.listDepartements(query),
-        this.listRegions(),
-        this.listProfessions(query),
-        this.listIncomeBands(query),
-        this.listOffers(query),
-      ]);
-    return { banques, syndicats, departements, regions, professions, incomeBands, offers };
+    const [
+      banques,
+      syndicats,
+      departements,
+      regions,
+      professions,
+      incomeBands,
+      offers,
+      employeurs,
+      pays,
+    ] = await Promise.all([
+      this.listBanques(query),
+      this.listSyndicats(query),
+      this.listDepartements(query),
+      this.listRegions(),
+      this.listProfessions(query),
+      this.listIncomeBands(query),
+      this.listOffers(query),
+      this.listEmployeurs(query),
+      this.listPays(query),
+    ]);
+    return {
+      banques,
+      syndicats,
+      departements,
+      regions,
+      professions,
+      incomeBands,
+      offers,
+      employeurs,
+      pays,
+    };
   }
 
   async listBanques(query: ReferentielQueryDto): Promise<BanqueDto[]> {
@@ -270,6 +323,32 @@ export class ReferentielsService {
 
   async updateIncomeBand(id: string, input: UpdateIncomeBandDto): Promise<IncomeBandDto> {
     return toIncomeBand(await this.prisma.incomeBand.update({ where: { id }, data: input }));
+  }
+
+  async listEmployeurs(query: ReferentielQueryDto): Promise<EmployeurDto[]> {
+    return (
+      await this.prisma.employeur.findMany({
+        where: activeFilter(query),
+        orderBy: [{ position: 'asc' }, { label: 'asc' }],
+      })
+    ).map(toEmployeur);
+  }
+
+  async createEmployeur(input: CreateEmployeurDto): Promise<EmployeurDto> {
+    return toEmployeur(await this.prisma.employeur.create({ data: input }));
+  }
+
+  async updateEmployeur(id: string, input: UpdateEmployeurDto): Promise<EmployeurDto> {
+    return toEmployeur(await this.prisma.employeur.update({ where: { id }, data: input }));
+  }
+
+  async listPays(query: ReferentielQueryDto): Promise<PaysDto[]> {
+    return (
+      await this.prisma.pays.findMany({
+        where: activeFilter(query),
+        orderBy: [{ position: 'asc' }, { label: 'asc' }],
+      })
+    ).map(toPays);
   }
 
   async listOffers(query: ReferentielQueryDto): Promise<OfferDto[]> {

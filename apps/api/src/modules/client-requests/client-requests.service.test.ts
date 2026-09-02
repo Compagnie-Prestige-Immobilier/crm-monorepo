@@ -76,7 +76,6 @@ function prismaStub(): MockDb {
     banque: { findUnique: vi.fn().mockResolvedValue({ id: 'banque-1' }) },
     $transaction: vi.fn(),
   };
-  // eslint-disable-next-line @typescript-eslint/no-misused-promises
   db.$transaction.mockImplementation((run: (tx: MockDb) => Promise<unknown>) => run(db));
   return db;
 }

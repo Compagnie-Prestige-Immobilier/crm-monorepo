@@ -84,6 +84,16 @@ export async function applyImportJob(
   return unwrap(await client.POST('/api/v1/imports/{id}/apply', { params: { path: { id } } }));
 }
 
+/** Ce qu'on peut déposer, dans l'ordre de la liste déroulante. */
+export const UPLOADABLE_IMPORT_KINDS = [
+  'PROSPECTS',
+  'PROSPECTS_GRAND_PUBLIC',
+  'REPRESENTANTS',
+  'VISITES',
+] as const satisfies readonly Exclude<ImportKind, 'VISITES_REGISTRE'>[];
+
+export type UploadableImportKind = (typeof UPLOADABLE_IMPORT_KINDS)[number];
+
 /** `VISITES_REGISTRE` n'y figure pas : son dépôt vit dans `visites-import.ts`, sur `/api/v1/visites/import`. */
 const UPLOAD_PATHS: Readonly<Record<Exclude<ImportKind, 'VISITES_REGISTRE'>, string>> = {
   REPRESENTANTS: '/api/v1/imports/representants',

@@ -53,23 +53,36 @@ import {
 import { downloadCsv } from '@/lib/csv';
 import { formatDecimal, formatNumber, formatRateOrNone, formatShortDate } from '@/lib/format';
 import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
+import type { Projet } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
-const COLUMNS: { key: ActivitySortKey; label: string }[] = [
+interface Colonne {
+  key: Exclude<ActivitySortKey, 'name'>;
+  label: string;
+  taux?: boolean;
+  /** Propre à CHUES : le Grand Public n'a pas de représentants. */
+  representants?: boolean;
+}
+
+const COLUMNS: Colonne[] = [
   { key: 'calls', label: 'Appels' },
   { key: 'methodObtained', label: 'Méthodes' },
   { key: 'unreachable', label: 'NRP / injoignables' },
   { key: 'wrongNumber', label: 'Faux numéros' },
   { key: 'refused', label: 'Refus' },
   { key: 'callback', label: 'À rappeler' },
-  { key: 'reachRate', label: 'Joignabilité' },
+  { key: 'reachRate', label: 'Joignabilité', taux: true },
   { key: 'prospectsCreated', label: 'Prospects saisis' },
-  { key: 'representantsContacted', label: 'Représentants contactés' },
+  { key: 'representantsContacted', label: 'Représentants contactés', representants: true },
 ];
+
+const colonnesActivite = (projet: Projet): Colonne[] =>
+  projet === 'GRAND_PUBLIC' ? COLUMNS.filter((colonne) => colonne.representants !== true) : COLUMNS;
 
 const PRESETS: Exclude<PeriodPreset, 'custom'>[] = ['today', 'week', 'last7'];
 
-export function ActivityView() {
+export function ActivityView({ projet }: { projet: Projet }) {
+  const colonnes = colonnesActivite(projet);
   const [preset, setPreset] = useState<PeriodPreset>('today');
   const [range, setRange] = useState<ActivityRange>(() => presetRange('today'));
   const [granularity, setGranularity] = useState<SupervisionGranularity>('day');
@@ -77,8 +90,8 @@ export function ActivityView() {
   const [sortDir, setSortDir] = useState<SortDirection>('desc');
 
   const { data, isPending, isError, error, refetch } = useQuery({
-    queryKey: supervisionActivityKey(range, granularity),
-    queryFn: () => fetchSupervisionActivite({ range, granularity }),
+    queryKey: supervisionActivityKey(range, granularity, projet),
+    queryFn: () => fetchSupervisionActivite({ range, granularity, projet }),
     placeholderData: keepPreviousData,
   });
 
@@ -158,8 +171,8 @@ export function ActivityView() {
               if (data === undefined) return;
               const lines = sortActivityLines(activityLines(data), sortKey, sortDir);
               downloadCsv(
-                activityCsv({ lines, totals: activityTotals(lines), range, granularity }),
-                activityCsvFileName(range),
+                activityCsv({ lines, totals: activityTotals(lines), range, granularity, projet }),
+                activityCsvFileName(range, projet),
               );
             }}
           >
@@ -264,7 +277,7 @@ export function ActivityView() {
                     }}
                   />
                 </TableHead>
-                {COLUMNS.map((column) => (
+                {colonnes.map((column) => (
                   <TableHead
                     key={column.key}
                     className="text-right"
@@ -284,11 +297,11 @@ export function ActivityView() {
             </TableHeader>
             <TableBody>
               {lines.map((line) => (
-                <ActivityRow key={line.id} line={line} />
+                <ActivityRow key={line.id} line={line} colonnes={colonnes} />
               ))}
               {lines.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={COLUMNS.length + 1} className="py-8 text-center">
+                  <TableCell colSpan={colonnes.length + 1} className="py-8 text-center">
                     Aucun compte téléconseiller. Créez-en un depuis les comptes.
                   </TableCell>
                 </TableRow>
@@ -296,8 +309,13 @@ export function ActivityView() {
             </TableBody>
             {lines.length > 0 ? (
               <TableFooter>
-                <TotalsRow label="Total équipe" values={totals} />
-                <TotalsRow label="Moyenne par téléconseiller" values={averages} decimal />
+                <TotalsRow label="Total équipe" values={totals} colonnes={colonnes} />
+                <TotalsRow
+                  label="Moyenne par téléconseiller"
+                  values={averages}
+                  colonnes={colonnes}
+                  decimal
+                />
               </TableFooter>
             ) : null}
           </Table>
@@ -357,7 +375,31 @@ export function ActivityView() {
   );
 }
 
-function ActivityRow({ line }: { line: ActivityLine }) {
+function Cellule({
+  colonne,
+  valeur,
+  decimal = false,
+}: {
+  colonne: Colonne;
+  valeur: number | null;
+  decimal?: boolean;
+}) {
+  if (colonne.taux === true) {
+    return (
+      <TableCell className={cn('text-right', valeur === null && 'text-muted-foreground')}>
+        {formatRateOrNone(valeur)}
+      </TableCell>
+    );
+  }
+  const nombre = valeur ?? 0;
+  return (
+    <TableCell className="text-right">
+      {decimal ? formatDecimal(nombre) : formatNumber(nombre)}
+    </TableCell>
+  );
+}
+
+function ActivityRow({ line, colonnes }: { line: ActivityLine; colonnes: Colonne[] }) {
   const muted = !line.hasActivity;
   return (
     <TableRow className={cn(muted && 'bg-secondary/40 text-muted-foreground')}>
@@ -368,17 +410,9 @@ function ActivityRow({ line }: { line: ActivityLine }) {
           {muted ? <Badge variant="outline">Aucun acte</Badge> : null}
         </span>
       </th>
-      <TableCell className="text-right">{formatNumber(line.calls)}</TableCell>
-      <TableCell className="text-right">{formatNumber(line.methodObtained)}</TableCell>
-      <TableCell className="text-right">{formatNumber(line.unreachable)}</TableCell>
-      <TableCell className="text-right">{formatNumber(line.wrongNumber)}</TableCell>
-      <TableCell className="text-right">{formatNumber(line.refused)}</TableCell>
-      <TableCell className="text-right">{formatNumber(line.callback)}</TableCell>
-      <TableCell className={cn('text-right', line.reachRate === null && 'text-muted-foreground')}>
-        {formatRateOrNone(line.reachRate)}
-      </TableCell>
-      <TableCell className="text-right">{formatNumber(line.prospectsCreated)}</TableCell>
-      <TableCell className="text-right">{formatNumber(line.representantsContacted)}</TableCell>
+      {colonnes.map((colonne) => (
+        <Cellule key={colonne.key} colonne={colonne} valeur={line[colonne.key]} />
+      ))}
     </TableRow>
   );
 }
@@ -386,27 +420,27 @@ function ActivityRow({ line }: { line: ActivityLine }) {
 function TotalsRow({
   label,
   values,
+  colonnes,
   decimal = false,
 }: {
   label: string;
   values: Omit<ActivityTotals, 'people'>;
+  colonnes: Colonne[];
   decimal?: boolean;
 }) {
-  const show = (value: number): string => (decimal ? formatDecimal(value) : formatNumber(value));
   return (
     <TableRow className="hover:bg-transparent">
       <th scope="row" className="px-3 py-2.5 text-left font-[600]">
         {label}
       </th>
-      <TableCell className="text-right">{show(values.calls)}</TableCell>
-      <TableCell className="text-right">{show(values.methodObtained)}</TableCell>
-      <TableCell className="text-right">{show(values.unreachable)}</TableCell>
-      <TableCell className="text-right">{show(values.wrongNumber)}</TableCell>
-      <TableCell className="text-right">{show(values.refused)}</TableCell>
-      <TableCell className="text-right">{show(values.callback)}</TableCell>
-      <TableCell className="text-right">{formatRateOrNone(values.reachRate)}</TableCell>
-      <TableCell className="text-right">{show(values.prospectsCreated)}</TableCell>
-      <TableCell className="text-right">{show(values.representantsContacted)}</TableCell>
+      {colonnes.map((colonne) => (
+        <Cellule
+          key={colonne.key}
+          colonne={colonne}
+          valeur={values[colonne.key]}
+          decimal={decimal}
+        />
+      ))}
     </TableRow>
   );
 }

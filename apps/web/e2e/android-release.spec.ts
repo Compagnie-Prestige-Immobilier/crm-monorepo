@@ -58,7 +58,9 @@ const DOSSIER_FIXTURES = fileURLToPath(
 const cheminFixture = (nom: string): string => `${DOSSIER_FIXTURES}${nom}`;
 
 const empreinte = (nom: string): string =>
-  createHash('sha256').update(readFileSync(cheminFixture(nom))).digest('hex');
+  createHash('sha256')
+    .update(readFileSync(cheminFixture(nom)))
+    .digest('hex');
 
 /** `shortHash` de `lib/data/app-updates.ts` : huit premiers, huit derniers. */
 const raccourci = (hex: string): string => `${hex.slice(0, 8)}…${hex.slice(-8)}`;
@@ -134,7 +136,10 @@ const enCours = () => page.getByRole('button', { name: 'Envoi en cours…' });
 const toast = (texte: string) => page.locator(TOAST).filter({ hasText: texte });
 const bandeau = (etiquette: string) => page.locator('p').filter({ hasText: etiquette });
 const barreDEnvoi = (fichier: string) =>
-  page.locator(TOAST).filter({ hasText: fichier }).filter({ has: page.getByRole('progressbar') });
+  page
+    .locator(TOAST)
+    .filter({ hasText: fichier })
+    .filter({ has: page.getByRole('progressbar') });
 
 async function deposer(fichier: string): Promise<void> {
   await page.getByLabel('Choisir un fichier APK').setInputFiles(cheminFixture(fichier));
@@ -354,7 +359,9 @@ test('ADM-APK-02 · la fenêtre dit ce que le serveur a lu dans le fichier', asy
   const fenetre = page.getByRole('dialog');
   await expect(fenetre).toBeVisible();
   await expect(
-    fenetre.getByText('Voici ce que le serveur a lu dans le fichier. Rien n’a été saisi à la main.'),
+    fenetre.getByText(
+      'Voici ce que le serveur a lu dans le fichier. Rien n’a été saisi à la main.',
+    ),
   ).toBeVisible();
 
   await expect(fenetre.getByRole('term')).toHaveText([
@@ -397,7 +404,9 @@ test('ADM-APK-03 · publier et rendre obligatoire sont deux gestes', async () =>
   await fenetre.getByRole('button', { name: 'Rendre obligatoire' }).click();
 
   await expect(toast(`CPI GO ${V7.version} est maintenant obligatoire.`)).toBeVisible();
-  await expect(fenetre.getByText('Cette version est déjà une mise à jour obligatoire.')).toBeVisible();
+  await expect(
+    fenetre.getByText('Cette version est déjà une mise à jour obligatoire.'),
+  ).toBeVisible();
   await expect(bandeau('Plancher obligatoire :')).toHaveText(
     `Plancher obligatoire : build ${String(V7.build)}`,
   );

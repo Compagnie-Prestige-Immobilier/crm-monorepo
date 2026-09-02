@@ -33,6 +33,7 @@ export function DeactivateUserDialog({
   const [erreur, setErreur] = useState<string | undefined>(undefined);
 
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- saisie remise à zéro par compte
     setRepreneur(null);
     setErreur(undefined);
   }, [user?.id]);

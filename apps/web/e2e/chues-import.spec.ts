@@ -1,4 +1,10 @@
-import { expect, test, type APIRequestContext, type APIResponse, type Page } from '@playwright/test';
+import {
+  expect,
+  test,
+  type APIRequestContext,
+  type APIResponse,
+  type Page,
+} from '@playwright/test';
 
 import { adminApi } from './fixtures';
 import { buildXlsx } from './xlsx';
@@ -185,9 +191,7 @@ test('CHU-IMP-05 l’écran d’import tient sur 375 px', async ({ page }) => {
   await page.goto('/chues/representants/import');
 
   await expect(page.getByRole('button', { name: 'Télécharger le modèle Excel' })).toBeVisible();
-  await expect(
-    page.getByText('Glissez le classeur ici, ou choisissez un fichier'),
-  ).toBeVisible();
+  await expect(page.getByText('Glissez le classeur ici, ou choisissez un fichier')).toBeVisible();
 
   const deborde = await page.evaluate(
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth,

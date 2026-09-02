@@ -1,19 +1,19 @@
 import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { describe, expect, it } from 'vitest';
 
 import { GrandPublicProspectDetail } from '@/components/grand-public/prospect-detail';
 import type { ProspectRow } from '@/lib/types';
+import { prospectFixture } from '@/test/prospect-fixture';
 import { renderWithQuery } from '@/test/render-query';
 
 const fiche = (over: Partial<ProspectRow> = {}): ProspectRow => {
   const projet = over.projet ?? 'GRAND_PUBLIC';
-  return {
+  return prospectFixture({
     id: 'p-1',
     nom: 'Fall',
     prenom: 'Moussa',
-    phoneE164: '+221771234567',
-    statut: 'NOUVEAU',
     projet: 'GRAND_PUBLIC',
     journeys:
       projet === 'GRAND_PUBLIC'
@@ -28,11 +28,6 @@ const fiche = (over: Partial<ProspectRow> = {}): ProspectRow => {
             },
           ]
         : [],
-    type: null,
-    profession: null,
-    dureeSystemeMois: null,
-    canalProvenanceId: null,
-    canalProvenanceLabel: null,
     banqueId: null,
     banqueName: null,
     syndicatId: null,
@@ -42,11 +37,8 @@ const fiche = (over: Partial<ProspectRow> = {}): ProspectRow => {
     segment: null,
     ownedByCommercialName: 'Alice Diop',
     clientCreatedAt: '2026-08-14T09:00:00.000Z',
-    lastOutcome: null,
-    lastComment: null,
-    lastAttemptAt: null,
     ...over,
-  } as ProspectRow;
+  });
 };
 
 /** La valeur portée par la ligne dont l'intitulé est `label`. */
@@ -158,6 +150,105 @@ describe('les autres absences', () => {
     expect(screen.getByRole('link', { name: /77 123 45 67/u }).getAttribute('href')).toBe(
       'tel:+221771234567',
     );
+  });
+});
+
+describe('les renseignements propres à la situation', () => {
+  it('n’écrit aucune ligne pour ce qui n’a pas été demandé', () => {
+    render(<GrandPublicProspectDetail prospect={fiche({ type: 'INFORMEL' })} />);
+
+    const presentes = [
+      'Employeur',
+      'Type de contrat',
+      'Ancienneté',
+      'Lieu d’activité',
+      'Mode d’épargne',
+      'Pays de résidence',
+      'WhatsApp',
+      'Personne relais',
+    ].filter((label) => screen.queryByText(label) !== null);
+
+    expect(presentes).toEqual([]);
+  });
+
+  it('nomme l’activité plutôt que la profession pour un informel', () => {
+    render(
+      <GrandPublicProspectDetail
+        prospect={fiche({
+          type: 'INFORMEL',
+          profession: 'Couturier',
+          lieuActivite: 'Marché Sandaga',
+          modeEpargne: 'TONTINE',
+        })}
+      />,
+    );
+
+    expect(within(ligne('Activité')).getByText('Couturier')).toBeTruthy();
+    expect(screen.queryByText('Profession')).toBeNull();
+    expect(within(ligne('Lieu d’activité')).getByText('Marché Sandaga')).toBeTruthy();
+    expect(within(ligne('Mode d’épargne')).getByText('Tontine')).toBeTruthy();
+  });
+
+  it('traduit le contrat et compte l’ancienneté en années', () => {
+    render(
+      <GrandPublicProspectDetail
+        prospect={fiche({
+          type: 'SECTEUR_PRIVE',
+          employeur: 'Sonatel',
+          typeContrat: 'CDD',
+          ancienneteMois: 30,
+        })}
+      />,
+    );
+
+    expect(within(ligne('Employeur')).getByText('Sonatel')).toBeTruthy();
+    expect(within(ligne('Type de contrat')).getByText('CDD')).toBeTruthy();
+    expect(within(ligne('Ancienneté')).getByText('2 ans et 6 mois')).toBeTruthy();
+  });
+
+  it('affiche la résidence, le WhatsApp et le relais d’un prospect de la diaspora', () => {
+    render(
+      <GrandPublicProspectDetail
+        prospect={fiche({
+          type: 'DIASPORA',
+          paysResidenceLabel: 'Italie',
+          villeResidence: 'Turin',
+          whatsappE164: '+393331234567',
+          relaisNom: 'Awa Fall',
+          relaisPhoneE164: '+221775554433',
+        })}
+      />,
+    );
+
+    expect(within(ligne('Pays de résidence')).getByText('Italie')).toBeTruthy();
+    expect(within(ligne('Ville de résidence')).getByText('Turin')).toBeTruthy();
+    expect(within(ligne('Personne relais')).getByText('Awa Fall')).toBeTruthy();
+    expect(ligne('WhatsApp').textContent).toContain('+39 333 123 4567');
+  });
+});
+
+describe('la modification', () => {
+  it('ouvre le formulaire garni sur « Modifier »', async () => {
+    const user = userEvent.setup();
+    render(<GrandPublicProspectDetail prospect={fiche()} canEdit />);
+
+    await user.click(screen.getByRole('button', { name: 'Modifier' }));
+
+    expect(await screen.findByRole('dialog', { name: /Modifier Moussa Fall/u })).toBeTruthy();
+    expect(screen.getByLabelText<HTMLInputElement>(/Prénom/u).value).toBe('Moussa');
+  });
+
+  it('ne l’offre pas à qui ne peut pas écrire', () => {
+    render(<GrandPublicProspectDetail prospect={fiche()} />);
+
+    expect(screen.queryByRole('button', { name: 'Modifier' })).toBeNull();
+  });
+
+  it('reste ouverte sur une fiche convertie', () => {
+    render(<GrandPublicProspectDetail prospect={fiche({ statut: 'CONVERTI' })} canEdit />);
+
+    expect(screen.getByRole('button', { name: 'Modifier' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Intéressé' })).toBeNull();
   });
 });
 

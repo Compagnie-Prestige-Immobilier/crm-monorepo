@@ -91,7 +91,7 @@ class Phase2DirectoryPage {
   final DateTime serverTime;
 }
 
-/// Les six référentiels de saisie, ENTIERS, actifs ou non.
+/// Les neuf référentiels de saisie, ENTIERS, actifs ou non.
 ///
 /// Le flux keyset ne sait dire que ce qui a CHANGÉ. Une ligne SUPPRIMÉE du
 /// serveur — base remontée, référentiel réimporté — n'y apparaît jamais : le
@@ -106,6 +106,9 @@ class ReferentielsSnapshot {
     required this.syndicats,
     required this.canauxProvenance,
     required this.incomeBands,
+    required this.professions,
+    required this.employeurs,
+    required this.pays,
   });
 
   final List<DepartementDto> departements;
@@ -114,6 +117,9 @@ class ReferentielsSnapshot {
   final List<SyndicatDto> syndicats;
   final List<CanalProvenanceDto> canauxProvenance;
   final List<IncomeBandDto> incomeBands;
+  final List<ProfessionDto> professions;
+  final List<EmployeurDto> employeurs;
+  final List<PaysDto> pays;
 }
 
 class RepresentantLookup {
@@ -235,7 +241,7 @@ abstract interface class ApiPort {
     required int payloadVersion,
   });
 
-  /// Les cinq référentiels de saisie, ENTIERS. Voir [ReferentielsSnapshot].
+  /// Les référentiels de saisie, ENTIERS. Voir [ReferentielsSnapshot].
   Future<ReferentielsSnapshot> pullReferentiels();
 
   Future<RepresentantLookup> lookupRepresentantByPhone(String phone);

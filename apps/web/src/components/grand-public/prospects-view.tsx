@@ -5,7 +5,11 @@ import {
   ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ClockIcon,
+  FileSpreadsheetIcon,
   InboxIcon,
+  LoaderIcon,
+  PhoneCallIcon,
   PlusIcon,
   RotateCcwIcon,
   SlidersHorizontalIcon,
@@ -13,6 +17,7 @@ import {
 import Link from 'next/link';
 import { useState } from 'react';
 
+import { useFileDownload } from '@/components/exports/download-button';
 import { DatePicker } from '@/components/filters/date-picker';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { SearchField } from '@/components/filters/search-field';
@@ -21,7 +26,7 @@ import { Absent } from '@/components/grand-public/absence';
 import { GrandPublicProspectForm } from '@/components/grand-public/prospect-form';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -45,6 +50,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { buildGrandPublicExportUrl, grandPublicExportFileName } from '@/lib/data/export';
 import {
   EMPTY_GRAND_PUBLIC_FILTERS,
   PROSPECT_TYPES,
@@ -131,8 +137,15 @@ const STATUT_OPTIONS = PROSPECT_STATUTS.map((statut) => ({
   label: PROSPECT_STATUT_LABELS[statut],
 }));
 
-export function GrandPublicProspectsView({ canCreate }: { canCreate: boolean }) {
+export function GrandPublicProspectsView({
+  canCreate,
+  canExport = false,
+}: {
+  canCreate: boolean;
+  canExport?: boolean;
+}) {
   const { filters, setFilters, resetFilters } = useUrlFilters(FILTERS_ADAPTER);
+  const telechargement = useFileDownload();
 
   const { draft: searchDraft, setDraft: setSearchDraft } = useDebouncedSearch(
     filters.search,
@@ -173,12 +186,51 @@ export function GrandPublicProspectsView({ canCreate }: { canCreate: boolean }) 
             Les particuliers démarchés hors syndicat. Les fiches CHUES ne figurent pas ici.
           </p>
         </div>
-        {canCreate ? (
-          <Button size="lg" onClick={() => setCreateOpen(true)}>
-            <PlusIcon aria-hidden="true" />
-            Nouveau prospect
-          </Button>
-        ) : null}
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/grand-public/rappels"
+            className={buttonVariants({ variant: 'outline', size: 'lg' })}
+          >
+            <ClockIcon aria-hidden="true" />
+            Voir les rappels
+          </Link>
+          {canExport ? (
+            <Button
+              variant="outline"
+              size="lg"
+              disabled={telechargement.pending}
+              onClick={() => {
+                void telechargement.download({
+                  url: buildGrandPublicExportUrl(filters),
+                  fileName: grandPublicExportFileName(),
+                  failureMessage: 'L’export a échoué.',
+                });
+              }}
+            >
+              {telechargement.pending ? (
+                <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <FileSpreadsheetIcon aria-hidden="true" />
+              )}
+              Exporter
+            </Button>
+          ) : null}
+          {canCreate ? (
+            <>
+              <Link
+                href="/grand-public/console"
+                className={buttonVariants({ variant: 'outline', size: 'lg' })}
+              >
+                <PhoneCallIcon aria-hidden="true" />
+                Appeler les prospects
+              </Link>
+              <Button size="lg" onClick={() => setCreateOpen(true)}>
+                <PlusIcon aria-hidden="true" />
+                Nouveau prospect
+              </Button>
+            </>
+          ) : null}
+        </div>
       </div>
 
       <section

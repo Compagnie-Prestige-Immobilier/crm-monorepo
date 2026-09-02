@@ -17,7 +17,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { BankStageType } from '@crm/database';
+import { BankStageType, Projet } from '@crm/database';
 
 import { PageMetaDto, SortOrder } from '../../common/dto/prospect-filter.dto.js';
 import { queryBoolean } from '../../common/dto/query-boolean.js';
@@ -299,6 +299,16 @@ export class BankCaseFilterDto {
   banqueId?: string;
 
   @ApiPropertyOptional({
+    enum: Projet,
+    enumName: 'Projet',
+    description:
+      'Parcours suivi par la fiche liée. Sans filtre, les deux projets sortent. Un même numéro peut suivre les deux.',
+  })
+  @IsOptional()
+  @IsEnum(Projet)
+  projet?: Projet;
+
+  @ApiPropertyOptional({
     format: 'uuid',
     description: 'Agent créateur OU dernier intervenant sur le dossier.',
   })
@@ -367,6 +377,18 @@ export class BankCaseQueryDto extends BankCaseFilterDto {
   sortOrder?: SortOrder;
 }
 
+export class BankCaseDetailQueryDto {
+  @ApiPropertyOptional({
+    enum: Projet,
+    enumName: 'Projet',
+    description:
+      'Restreint la lecture aux dossiers dont la fiche suit ce parcours. Un dossier hors parcours répond 404, comme un dossier inexistant.',
+  })
+  @IsOptional()
+  @IsEnum(Projet)
+  projet?: Projet;
+}
+
 export class ProspectSearchQueryDto {
   @ApiProperty({
     maxLength: 120,
@@ -393,6 +415,15 @@ export class ProspectSearchQueryDto {
   @Min(1)
   @Max(50)
   pageSize?: number;
+
+  @ApiPropertyOptional({
+    enum: Projet,
+    enumName: 'Projet',
+    description: 'Ne propose que les fiches entrées par ce projet. Sans filtre, les deux.',
+  })
+  @IsOptional()
+  @IsEnum(Projet)
+  projet?: Projet;
 }
 
 export class ProspectSearchItemDto {

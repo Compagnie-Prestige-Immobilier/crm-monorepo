@@ -198,11 +198,7 @@ async function cadran(page: Page, libelle: string): Promise<number> {
   return Number((valeur ?? '').replace(/[^\d]/gu, ''));
 }
 
-async function deposer(
-  page: Page,
-  nom: string,
-  lignes: readonly LigneRegistre[],
-): Promise<void> {
+async function deposer(page: Page, nom: string, lignes: readonly LigneRegistre[]): Promise<void> {
   await page.locator('input[type="file"]').setInputFiles({
     name: nom,
     mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -261,10 +257,9 @@ test.beforeAll(async () => {
         comment: `${PREFIXE} visite témoin`,
       },
     });
-    expect(
-      creation.status(),
-      `La visite témoin n’a pas été créée : ${await creation.text()}`,
-    ).toBe(201);
+    expect(creation.status(), `La visite témoin n’a pas été créée : ${await creation.text()}`).toBe(
+      201,
+    );
   } finally {
     await api.dispose();
   }

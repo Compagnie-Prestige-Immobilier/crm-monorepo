@@ -21,6 +21,10 @@ abstract class _$ReferentielsBundleDtoCWProxy {
 
   ReferentielsBundleDto offers(List<OfferDto> offers);
 
+  ReferentielsBundleDto employeurs(List<EmployeurDto> employeurs);
+
+  ReferentielsBundleDto pays(List<PaysDto> pays);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `ReferentielsBundleDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -35,6 +39,8 @@ abstract class _$ReferentielsBundleDtoCWProxy {
     List<ProfessionDto> professions,
     List<IncomeBandDto> incomeBands,
     List<OfferDto> offers,
+    List<EmployeurDto> employeurs,
+    List<PaysDto> pays,
   });
 }
 
@@ -73,6 +79,13 @@ class _$ReferentielsBundleDtoCWProxyImpl
   ReferentielsBundleDto offers(List<OfferDto> offers) => this(offers: offers);
 
   @override
+  ReferentielsBundleDto employeurs(List<EmployeurDto> employeurs) =>
+      this(employeurs: employeurs);
+
+  @override
+  ReferentielsBundleDto pays(List<PaysDto> pays) => this(pays: pays);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `ReferentielsBundleDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -87,6 +100,8 @@ class _$ReferentielsBundleDtoCWProxyImpl
     Object? professions = const $CopyWithPlaceholder(),
     Object? incomeBands = const $CopyWithPlaceholder(),
     Object? offers = const $CopyWithPlaceholder(),
+    Object? employeurs = const $CopyWithPlaceholder(),
+    Object? pays = const $CopyWithPlaceholder(),
   }) {
     return ReferentielsBundleDto(
       banques: banques == const $CopyWithPlaceholder()
@@ -117,6 +132,14 @@ class _$ReferentielsBundleDtoCWProxyImpl
           ? _value.offers
           // ignore: cast_nullable_to_non_nullable
           : offers as List<OfferDto>,
+      employeurs: employeurs == const $CopyWithPlaceholder()
+          ? _value.employeurs
+          // ignore: cast_nullable_to_non_nullable
+          : employeurs as List<EmployeurDto>,
+      pays: pays == const $CopyWithPlaceholder()
+          ? _value.pays
+          // ignore: cast_nullable_to_non_nullable
+          : pays as List<PaysDto>,
     );
   }
 }
@@ -145,6 +168,8 @@ ReferentielsBundleDto _$ReferentielsBundleDtoFromJson(
       'professions',
       'incomeBands',
       'offers',
+      'employeurs',
+      'pays',
     ],
   );
   final val = ReferentielsBundleDto(
@@ -190,6 +215,18 @@ ReferentielsBundleDto _$ReferentielsBundleDtoFromJson(
           .map((e) => OfferDto.fromJson(e as Map<String, dynamic>))
           .toList(),
     ),
+    employeurs: $checkedConvert(
+      'employeurs',
+      (v) => (v as List<dynamic>)
+          .map((e) => EmployeurDto.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    ),
+    pays: $checkedConvert(
+      'pays',
+      (v) => (v as List<dynamic>)
+          .map((e) => PaysDto.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    ),
   );
   return val;
 });
@@ -204,4 +241,6 @@ Map<String, dynamic> _$ReferentielsBundleDtoToJson(
   'professions': instance.professions.map((e) => e.toJson()).toList(),
   'incomeBands': instance.incomeBands.map((e) => e.toJson()).toList(),
   'offers': instance.offers.map((e) => e.toJson()).toList(),
+  'employeurs': instance.employeurs.map((e) => e.toJson()).toList(),
+  'pays': instance.pays.map((e) => e.toJson()).toList(),
 };

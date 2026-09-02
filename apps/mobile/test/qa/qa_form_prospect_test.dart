@@ -56,9 +56,11 @@ void main() {
     matching: find.byType(TextField),
   );
 
-  CpiButton bouton(WidgetTester tester, String label) => tester
-      .widget<CpiButton>(
-        find.byWidgetPredicate((Widget w) => w is CpiButton && w.label == label),
+  CpiButton bouton(WidgetTester tester, String label) =>
+      tester.widget<CpiButton>(
+        find.byWidgetPredicate(
+          (Widget w) => w is CpiButton && w.label == label,
+        ),
       );
 
   Future<void> ouvrir(WidgetTester tester, Widget screen) async {
@@ -127,8 +129,12 @@ void main() {
   });
 
   // ── FOR-02 ────────────────────────────────────────────────────────────────
-  // `SyncEntityDataDto.dureeSystemeMois` : @Min(1) @Max(600). Le champ n'a ni
+  // `SyncEntityDataDto.ancienneteMois` : @Min(0) @Max(840). Le champ n'a ni
   // borne ni limite de longueur, et `int.tryParse` prend tout.
+  //
+  // L'ancienneté part désormais dans `ancienneteMois` et non dans
+  // `dureeSystemeMois`, qui est la durée du plan de paiement : le formulaire
+  // écrivait la carrière du prospect dans le champ de son échéancier.
   testWidgets('l\'ancienneté à 0 mois puis à 9999 mois part telle quelle', (
     WidgetTester tester,
   ) async {
@@ -144,7 +150,9 @@ void main() {
     await continuer(tester);
     await enregistrerEtSuivant(tester);
 
-    expect((await chargeUtile())['dureeSystemeMois'], 0);
+    final Map<String, Object?> envoi = await chargeUtile();
+    expect(envoi['ancienneteMois'], 0);
+    expect(envoi.containsKey('dureeSystemeMois'), isFalse);
 
     await demonter(tester);
   });
@@ -164,7 +172,7 @@ void main() {
     await continuer(tester);
     await enregistrerEtSuivant(tester);
 
-    expect((await chargeUtile())['dureeSystemeMois'], 9999);
+    expect((await chargeUtile())['ancienneteMois'], 9999);
 
     await demonter(tester);
   });
@@ -172,19 +180,19 @@ void main() {
   // ── FOR-03 ────────────────────────────────────────────────────────────────
   // `SyncEntityDataDto.profession` : @MaxLength(120). Le même champ est borné
   // à 120 sur la fiche représentant et dans la conversion, pas ici.
-  testWidgets('une profession de 121 caractères part dans le lot', (
+  testWidgets('une activité de 121 caractères part dans le lot', (
     WidgetTester tester,
   ) async {
     await ouvrir(tester, const ProspectEntryScreen(projet: 'GRAND_PUBLIC'));
 
     await saisir(tester, 'Nom', 'Sarr');
     await saisir(tester, 'Téléphone', '77 123 45 69');
-    await tester.tap(find.text('Fonctionnaire'));
+    await tester.tap(find.text('Informel'));
     await tester.pumpAndSettle();
     await continuer(tester);
 
     final String trop = 'B' * 121;
-    await saisir(tester, 'Profession', trop);
+    await saisir(tester, 'Activité', trop);
     await continuer(tester);
     await enregistrerEtSuivant(tester);
 
@@ -209,7 +217,8 @@ void main() {
     expect(
       tester.widget<TextField>(champ('Téléphone')).controller!.text,
       '22 177 12 34',
-      reason: 'le masque a mangé l\'indicatif et coupé les deux derniers '
+      reason:
+          'le masque a mangé l\'indicatif et coupé les deux derniers '
           'chiffres',
     );
     expect(

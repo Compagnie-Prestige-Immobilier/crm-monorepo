@@ -60,9 +60,7 @@ function prismaStub(): MockDb {
     user: { findMany: vi.fn().mockResolvedValue(USERS) },
     $transaction: vi.fn(),
   };
-  // eslint-disable-next-line @typescript-eslint/no-misused-promises
   db.$transaction.mockImplementation((run: (tx: MockDb) => Promise<unknown>) => run(db));
-  // eslint-disable-next-line @typescript-eslint/no-misused-promises
   db.representant.createMany.mockImplementation((args: { data: unknown[] }) =>
     Promise.resolve({ count: args.data.length }),
   );

@@ -47,6 +47,8 @@ export const PROSPECT_INCLUDE = {
   canalProvenance: { select: { label: true } },
   professionRef: { select: { label: true, isTeaching: true } },
   incomeBand: { select: { label: true } },
+  employeurRef: { select: { label: true } },
+  paysResidence: { select: { label: true } },
   journeys: {
     select: {
       id: true,
@@ -81,6 +83,30 @@ function defined<T extends Record<string, unknown>>(
   return Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined)) as {
     [K in keyof T]?: Exclude<T[K], undefined>;
   };
+}
+
+/** `null` VIDE la colonne ; `undefined` la laisse. Ni l'un ni l'autre ne se normalise. */
+const trimOrNull = (value: string | null | undefined): string | null | undefined =>
+  value === null || value === undefined ? value : value.trim();
+
+const phoneOrNull = (value: string | null | undefined): string | null | undefined =>
+  value === null || value === undefined ? value : normalizePhone(value);
+
+/** Champs propres à la situation Grand Public, identiques à la création et à la mise à jour. */
+function situationGrandPublic(input: UpdateProspectDto): Record<string, unknown> {
+  return defined({
+    employeurId: input.employeurId,
+    employeur: trimOrNull(input.employeur),
+    typeContrat: input.typeContrat,
+    ancienneteMois: input.ancienneteMois,
+    lieuActivite: trimOrNull(input.lieuActivite),
+    modeEpargne: input.modeEpargne,
+    paysResidenceId: input.paysResidenceId,
+    villeResidence: trimOrNull(input.villeResidence),
+    whatsappE164: phoneOrNull(input.whatsappE164),
+    relaisNom: trimOrNull(input.relaisNom),
+    relaisPhoneE164: phoneOrNull(input.relaisPhoneE164),
+  });
 }
 
 const isoOrNull = (value: Date | null | undefined): string | null =>
@@ -217,6 +243,18 @@ export function toProspectDto(row: ProspectRow, lastAttempt?: LastAttempt): Pros
     incomeBandId: row.incomeBandId ?? null,
     incomeBandLabel: incomeBand.label,
     paymentMode: row.paymentMode ?? null,
+    employeurId: row.employeurId,
+    employeur: row.employeurRef?.label ?? row.employeur,
+    typeContrat: row.typeContrat,
+    ancienneteMois: row.ancienneteMois,
+    lieuActivite: row.lieuActivite,
+    modeEpargne: row.modeEpargne,
+    paysResidenceId: row.paysResidenceId,
+    paysResidenceLabel: row.paysResidence?.label ?? null,
+    villeResidence: row.villeResidence,
+    whatsappE164: row.whatsappE164,
+    relaisNom: row.relaisNom,
+    relaisPhoneE164: row.relaisPhoneE164,
     journeys: row.journeys.map((journey) => ({
       ...journey,
       consentAt: isoOrNull(journey.consentAt),
@@ -348,6 +386,7 @@ export class ProspectsService {
           canalProvenanceId: input.canalProvenanceId,
           statut: input.statut,
         }),
+        ...situationGrandPublic(input),
         journeys: {
           create: {
             projet,
@@ -418,6 +457,7 @@ export class ProspectsService {
           clientCreatedAt:
             input.clientCreatedAt === undefined ? undefined : new Date(input.clientCreatedAt),
         }),
+        ...situationGrandPublic(input),
         rev: { increment: 1 },
       },
       include: PROSPECT_INCLUDE,

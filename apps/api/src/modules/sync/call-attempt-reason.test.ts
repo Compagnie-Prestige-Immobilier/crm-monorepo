@@ -348,5 +348,4 @@ describe('à qui appartient la fiche appelée', () => {
     expect(statuses(result.body.results)).toEqual([SyncOpStatus.APPLIED]);
     expect(db.callAttempts.size).toBe(1);
   });
-
 });

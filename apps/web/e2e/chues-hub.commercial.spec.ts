@@ -125,10 +125,9 @@ test('CHU-HUB-06 la pastille « À faire maintenant » désigne la première ét
     const reponse = await api.get('/api/v1/representants', {
       params: { relationStatus: 'INCONNU', pageSize: '1' },
     });
-    expect(
-      reponse.ok(),
-      `GET /api/v1/representants a répondu ${String(reponse.status())}`,
-    ).toBe(true);
+    expect(reponse.ok(), `GET /api/v1/representants a répondu ${String(reponse.status())}`).toBe(
+      true,
+    );
     const page1 = (await reponse.json()) as { meta: { total: number } };
     expect(
       page1.meta.total,
@@ -160,9 +159,7 @@ test('CHU-HUB-08 l’écran tient sur 375 px', async ({ page }) => {
   ]);
 
   for (const etape of ETAPES) {
-    await expect(
-      contenu(page).getByRole('link', { name: etape.titre, exact: true }),
-    ).toBeVisible();
+    await expect(contenu(page).getByRole('link', { name: etape.titre, exact: true })).toBeVisible();
   }
 
   const largeur = await page.evaluate(() => document.documentElement.scrollWidth);

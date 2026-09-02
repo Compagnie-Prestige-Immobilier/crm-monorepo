@@ -15,14 +15,17 @@ import 'package:crm_api_client/src/model/canal_provenance_dto.dart';
 import 'package:crm_api_client/src/model/create_banque_dto.dart';
 import 'package:crm_api_client/src/model/create_canal_provenance_dto.dart';
 import 'package:crm_api_client/src/model/create_departement_dto.dart';
+import 'package:crm_api_client/src/model/create_employeur_dto.dart';
 import 'package:crm_api_client/src/model/create_income_band_dto.dart';
 import 'package:crm_api_client/src/model/create_offer_dto.dart';
 import 'package:crm_api_client/src/model/create_profession_dto.dart';
 import 'package:crm_api_client/src/model/create_syndicat_dto.dart';
 import 'package:crm_api_client/src/model/departement_dto.dart';
+import 'package:crm_api_client/src/model/employeur_dto.dart';
 import 'package:crm_api_client/src/model/ief_dto.dart';
 import 'package:crm_api_client/src/model/income_band_dto.dart';
 import 'package:crm_api_client/src/model/offer_dto.dart';
+import 'package:crm_api_client/src/model/pays_dto.dart';
 import 'package:crm_api_client/src/model/profession_dto.dart';
 import 'package:crm_api_client/src/model/referentiels_bundle_dto.dart';
 import 'package:crm_api_client/src/model/region_dto.dart';
@@ -31,6 +34,7 @@ import 'package:crm_api_client/src/model/syndicat_dto.dart';
 import 'package:crm_api_client/src/model/update_banque_dto.dart';
 import 'package:crm_api_client/src/model/update_canal_provenance_dto.dart';
 import 'package:crm_api_client/src/model/update_departement_dto.dart';
+import 'package:crm_api_client/src/model/update_employeur_dto.dart';
 import 'package:crm_api_client/src/model/update_income_band_dto.dart';
 import 'package:crm_api_client/src/model/update_offer_dto.dart';
 import 'package:crm_api_client/src/model/update_profession_dto.dart';
@@ -306,6 +310,98 @@ class ReferentielsApi {
     }
 
     return Response<DepartementDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Ajoute un employeur.
+  ///
+  ///
+  /// Parameters:
+  /// * [createEmployeurDto]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [EmployeurDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<EmployeurDto>> createEmployeur({
+    required CreateEmployeurDto createEmployeurDto,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/referentiels/employeurs';
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      _bodyData = jsonEncode(createEmployeurDto);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    EmployeurDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<EmployeurDto, EmployeurDto>(
+              rawData,
+              'EmployeurDto',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<EmployeurDto>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,
@@ -1013,6 +1109,88 @@ class ReferentielsApi {
     );
   }
 
+  /// Employeurs : ministères et grandes entreprises.
+  ///
+  ///
+  /// Parameters:
+  /// * [activeOnly] - Ne renvoyer que les entrées actives.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [List<EmployeurDto>] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<List<EmployeurDto>>> listEmployeurs({
+    bool? activeOnly = true,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/referentiels/employeurs';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (activeOnly != null) r'activeOnly': activeOnly,
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    List<EmployeurDto>? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<List<EmployeurDto>, EmployeurDto>(
+              rawData,
+              'List<EmployeurDto>',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<List<EmployeurDto>>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// Liste des IEF, éventuellement restreinte à un département.
   /// L’IEF est le découpage SCOLAIRE, distinct du découpage administratif : 59 IEF pour 46 départements. Les feuilles de route sont bâties dessus, et quatre IEF partagent le seul département de Dakar.
   ///
@@ -1251,6 +1429,88 @@ class ReferentielsApi {
     }
 
     return Response<List<OfferDto>>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Pays de résidence, avec leur indicatif.
+  ///
+  ///
+  /// Parameters:
+  /// * [activeOnly] - Ne renvoyer que les entrées actives.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [List<PaysDto>] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<List<PaysDto>>> listPays({
+    bool? activeOnly = true,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/referentiels/pays';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (activeOnly != null) r'activeOnly': activeOnly,
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    List<PaysDto>? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<List<PaysDto>, PaysDto>(
+              rawData,
+              'List<PaysDto>',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<List<PaysDto>>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,
@@ -1869,6 +2129,105 @@ class ReferentielsApi {
     }
 
     return Response<DepartementDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Modifie un employeur.
+  ///
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [updateEmployeurDto]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [EmployeurDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<EmployeurDto>> updateEmployeur({
+    required String id,
+    required UpdateEmployeurDto updateEmployeurDto,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/referentiels/employeurs/{id}'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
+    final _options = Options(
+      method: r'PATCH',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+      _bodyData = jsonEncode(updateEmployeurDto);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _options.compose(_dio.options, _path),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    EmployeurDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<EmployeurDto, EmployeurDto>(
+              rawData,
+              'EmployeurDto',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<EmployeurDto>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

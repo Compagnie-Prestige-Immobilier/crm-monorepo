@@ -264,7 +264,8 @@ test.describe('GP-20 refus de rôle', () => {
     const metier: string[] = [];
     page.on('response', async (reponse) => {
       const chemin = new URL(reponse.url()).pathname;
-      const cible = chemin.startsWith('/api/v1/prospects') || chemin.startsWith('/api/v1/referentiels');
+      const cible =
+        chemin.startsWith('/api/v1/prospects') || chemin.startsWith('/api/v1/referentiels');
       if (cible && reponse.status() < 400) metier.push(chemin);
     });
 
@@ -293,8 +294,10 @@ test.describe('GP-21 largeur 375 px', () => {
     const cadreNom = await nom.boundingBox();
     expect(cadrePrenom, 'le champ Prénom doit être rendu').not.toBeNull();
     expect(cadreNom, 'le champ Nom doit être rendu').not.toBeNull();
-    expect(cadreNom!.y, 'sous 640 px la grille sm:grid-cols-2 doit passer en une colonne').
-      toBeGreaterThan(cadrePrenom!.y);
+    expect(
+      cadreNom!.y,
+      'sous 640 px la grille sm:grid-cols-2 doit passer en une colonne',
+    ).toBeGreaterThan(cadrePrenom!.y);
 
     for (const libelle of ['Enregistrer et ouvrir la fiche', 'Enregistrer et suivant']) {
       const bouton = page.getByRole('button', { name: libelle });

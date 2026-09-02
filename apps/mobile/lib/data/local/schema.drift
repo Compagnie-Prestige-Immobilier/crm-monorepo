@@ -130,6 +130,61 @@ CREATE TABLE income_bands (
 CREATE INDEX income_bands_active_idx
     ON income_bands (is_active, sort_order, label);
 
+-- Le référentiel des professions, administré depuis le web. Sans lui en local,
+-- le mobile ne pouvait qu'écrire la profession en clair pendant que le web la
+-- choisissait dans la liste : deux vérités pour la même fiche.
+CREATE TABLE professions (
+    id TEXT NOT NULL PRIMARY KEY,
+    code TEXT NOT NULL,
+    label TEXT NOT NULL,
+    is_teaching BOOLEAN NOT NULL DEFAULT 0,
+    is_active BOOLEAN NOT NULL DEFAULT 1,
+    sort_order INTEGER NOT NULL DEFAULT 100,
+    local_updated_at DATETIME NOT NULL,
+    server_updated_at DATETIME NULL,
+    deleted_at DATETIME NULL
+);
+
+CREATE INDEX professions_active_idx
+    ON professions (is_active, sort_order, label);
+
+-- Ministères et entreprises, administrés depuis le web. `type` sépare les deux
+-- listes proposées au fonctionnaire et au salarié du privé.
+--
+-- Pas de CHECK sur `type` : la valeur vient du SERVEUR, comme partout ailleurs,
+-- et un quatrième type ajouté côté serveur avorterait la page de pull entière.
+CREATE TABLE employeurs (
+    id TEXT NOT NULL PRIMARY KEY,
+    code TEXT NOT NULL,
+    label TEXT NOT NULL,
+    type TEXT NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT 1,
+    sort_order INTEGER NOT NULL DEFAULT 100,
+    local_updated_at DATETIME NOT NULL,
+    server_updated_at DATETIME NULL,
+    deleted_at DATETIME NULL
+);
+
+CREATE INDEX employeurs_active_idx
+    ON employeurs (type, is_active, sort_order, label);
+
+-- Pays de résidence de la diaspora. `indicatif` est l'indicatif téléphonique
+-- SANS le « + » : il pré-remplit le champ international du prospect.
+CREATE TABLE pays (
+    id TEXT NOT NULL PRIMARY KEY,
+    code TEXT NOT NULL,
+    label TEXT NOT NULL,
+    indicatif TEXT NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT 1,
+    sort_order INTEGER NOT NULL DEFAULT 100,
+    local_updated_at DATETIME NOT NULL,
+    server_updated_at DATETIME NULL,
+    deleted_at DATETIME NULL
+-- Nommée : le singulier que drift déduirait de « pays » est « Pay ».
+) AS PaysRow;
+
+CREATE INDEX pays_active_idx ON pays (is_active, sort_order, label);
+
 -- Les quatre listes du registre des visites, dans UNE table : elles ont la même
 -- forme, et `kind` suffit à les séparer. Quatre tables jumelles auraient quatre
 -- fois le même code de pull et de lecture.
@@ -269,10 +324,34 @@ CREATE TABLE prospects (
     projet TEXT NOT NULL DEFAULT 'CHUES',
     type TEXT,
     profession TEXT,
+    -- La profession choisie au référentiel. `profession` reste le repli en clair
+    -- pour l'informel, que la liste ne couvrira jamais.
+    profession_id TEXT,
     duree_systeme_mois INTEGER,
     -- Pas de REFERENCES : le canal descend du serveur par le pull, et une fiche
     -- saisie hors ligne ne doit pas attendre que son referentiel soit arrive.
     canal_provenance_id TEXT,
+    income_band_id TEXT,
+    -- Les renseignements propres à la situation du prospect Grand Public. Tous
+    -- FACULTATIFS : une situation ne les demande pas tous, et rien de neuf ne
+    -- doit rendre une saisie de terrain impossible à enregistrer.
+    --
+    -- Ni REFERENCES ni CHECK, pour les deux raisons déjà écrites plus haut : le
+    -- référentiel peut n'être pas encore descendu, et une énumération élargie
+    -- côté serveur avorterait la page de pull entière.
+    employeur_id TEXT,
+    -- Le repli en clair quand l'employeur n'est pas au référentiel. Au pull, le
+    -- serveur y remet le libellé résolu.
+    employeur TEXT,
+    type_contrat TEXT,
+    anciennete_mois INTEGER,
+    lieu_activite TEXT,
+    mode_epargne TEXT,
+    pays_residence_id TEXT,
+    ville_residence TEXT,
+    whatsapp_e164 TEXT,
+    relais_nom TEXT,
+    relais_phone_e164 TEXT,
     statut TEXT NOT NULL DEFAULT 'NOUVEAU',
     client_created_at DATETIME NOT NULL,
     rev INTEGER NOT NULL DEFAULT 1,

@@ -1471,6 +1471,24 @@ class SyncEngine {
         (IncomeBandDto b) => b.id,
         _upsertIncomeBand,
       );
+      retired += await _mirrorKind<ProfessionDto>(
+        _db.professions,
+        snapshot.professions,
+        (ProfessionDto p) => p.id,
+        _upsertProfession,
+      );
+      retired += await _mirrorKind<EmployeurDto>(
+        _db.employeurs,
+        snapshot.employeurs,
+        (EmployeurDto e) => e.id,
+        _upsertEmployeur,
+      );
+      retired += await _mirrorKind<PaysDto>(
+        _db.pays,
+        snapshot.pays,
+        (PaysDto p) => p.id,
+        _upsertPays,
+      );
       // Le marqueur est posé DANS la transaction : une écriture interrompue ne
       // doit pas laisser croire que le miroir est fait.
       await _db
@@ -1493,7 +1511,10 @@ class SyncEngine {
       page.changes.banques.isNotEmpty ||
       page.changes.syndicats.isNotEmpty ||
       page.changes.canauxProvenance.isNotEmpty ||
-      page.changes.incomeBands.isNotEmpty;
+      page.changes.incomeBands.isNotEmpty ||
+      page.changes.professions.isNotEmpty ||
+      page.changes.employeurs.isNotEmpty ||
+      page.changes.pays.isNotEmpty;
 
   static const String referentielsMirrorKey = 'referentiels_mirror';
 
@@ -1806,6 +1827,102 @@ class SyncEngine {
         );
   }
 
+  Future<void> _upsertProfession(ProfessionDto p) async {
+    await _db
+        .into(_db.professions)
+        .insert(
+          ProfessionsCompanion.insert(
+            id: p.id,
+            code: p.code,
+            label: p.label,
+            isTeaching: Value<bool>(p.isTeaching),
+            isActive: Value<bool>(p.isActive),
+            sortOrder: Value<int>(p.position.toInt()),
+            localUpdatedAt: _clock.now(),
+            serverUpdatedAt: Value<DateTime?>(p.updatedAt),
+          ),
+          onConflict: DoUpdate<Professions, Profession>(
+            (Professions old) => ProfessionsCompanion.custom(
+              code: const CustomExpression<String>('excluded.code'),
+              label: const CustomExpression<String>('excluded.label'),
+              isTeaching: const CustomExpression<bool>('excluded.is_teaching'),
+              isActive: const CustomExpression<bool>('excluded.is_active'),
+              sortOrder: const CustomExpression<int>('excluded.sort_order'),
+              serverUpdatedAt: const CustomExpression<DateTime>(
+                'excluded.server_updated_at',
+              ),
+              localUpdatedAt: const CustomExpression<DateTime>(
+                'excluded.local_updated_at',
+              ),
+            ),
+          ),
+        );
+  }
+
+  Future<void> _upsertEmployeur(EmployeurDto e) async {
+    await _db
+        .into(_db.employeurs)
+        .insert(
+          EmployeursCompanion.insert(
+            id: e.id,
+            code: e.code,
+            label: e.label,
+            type: e.type.value,
+            isActive: Value<bool>(e.isActive),
+            sortOrder: Value<int>(e.position.toInt()),
+            localUpdatedAt: _clock.now(),
+            serverUpdatedAt: Value<DateTime?>(e.updatedAt),
+          ),
+          onConflict: DoUpdate<Employeurs, Employeur>(
+            (Employeurs old) => EmployeursCompanion.custom(
+              code: const CustomExpression<String>('excluded.code'),
+              label: const CustomExpression<String>('excluded.label'),
+              type: const CustomExpression<String>('excluded.type'),
+              isActive: const CustomExpression<bool>('excluded.is_active'),
+              sortOrder: const CustomExpression<int>('excluded.sort_order'),
+              serverUpdatedAt: const CustomExpression<DateTime>(
+                'excluded.server_updated_at',
+              ),
+              localUpdatedAt: const CustomExpression<DateTime>(
+                'excluded.local_updated_at',
+              ),
+            ),
+          ),
+        );
+  }
+
+  Future<void> _upsertPays(PaysDto p) async {
+    await _db
+        .into(_db.pays)
+        .insert(
+          PaysCompanion.insert(
+            id: p.id,
+            code: p.code,
+            label: p.label,
+            indicatif: p.indicatif,
+            isActive: Value<bool>(p.isActive),
+            sortOrder: Value<int>(p.position.toInt()),
+            localUpdatedAt: _clock.now(),
+            serverUpdatedAt: Value<DateTime?>(p.updatedAt),
+          ),
+          onConflict: DoUpdate<Pays, PaysRow>(
+            (Pays old) => PaysCompanion.custom(
+              code: const CustomExpression<String>('excluded.code'),
+              label: const CustomExpression<String>('excluded.label'),
+              indicatif: const CustomExpression<String>('excluded.indicatif'),
+              isActive: const CustomExpression<bool>('excluded.is_active'),
+              sortOrder: const CustomExpression<int>('excluded.sort_order'),
+              serverUpdatedAt: const CustomExpression<DateTime>(
+                'excluded.server_updated_at',
+              ),
+              localUpdatedAt: const CustomExpression<DateTime>(
+                'excluded.local_updated_at',
+              ),
+            ),
+          ),
+        );
+  }
+
   Future<int> _applyPage(PullPage page) async {
     int count = 0;
     await _db.transaction(() async {
@@ -1833,6 +1950,18 @@ class SyncEngine {
       }
       for (final IncomeBandDto b in page.changes.incomeBands) {
         await _upsertIncomeBand(b);
+        count++;
+      }
+      for (final ProfessionDto p in page.changes.professions) {
+        await _upsertProfession(p);
+        count++;
+      }
+      for (final EmployeurDto e in page.changes.employeurs) {
+        await _upsertEmployeur(e);
+        count++;
+      }
+      for (final PaysDto p in page.changes.pays) {
+        await _upsertPays(p);
         count++;
       }
       for (final SyndicatDto s in page.changes.syndicats) {
@@ -1962,6 +2091,19 @@ class SyncEngine {
                 profession: Value<String?>(p.profession),
                 dureeSystemeMois: Value<int?>(p.dureeSystemeMois?.toInt()),
                 canalProvenanceId: Value<String?>(p.canalProvenanceId),
+                incomeBandId: Value<String?>(p.incomeBandId),
+                employeurId: Value<String?>(p.employeurId),
+                employeur: Value<String?>(p.employeur),
+                typeContrat: Value<String?>(p.typeContrat?.value),
+                ancienneteMois: Value<int?>(p.ancienneteMois?.toInt()),
+                lieuActivite: Value<String?>(p.lieuActivite),
+                modeEpargne: Value<String?>(p.modeEpargne?.value),
+                professionId: Value<String?>(p.professionId),
+                paysResidenceId: Value<String?>(p.paysResidenceId),
+                villeResidence: Value<String?>(p.villeResidence),
+                whatsappE164: Value<String?>(p.whatsappE164),
+                relaisNom: Value<String?>(p.relaisNom),
+                relaisPhoneE164: Value<String?>(p.relaisPhoneE164),
                 createdById: p.ownedByCommercialId,
                 statut: Value<String>(p.statut.value),
                 clientCreatedAt: p.clientCreatedAt,
@@ -1996,6 +2138,45 @@ class SyncEngine {
                   ),
                   canalProvenanceId: const CustomExpression<String>(
                     'excluded.canal_provenance_id',
+                  ),
+                  incomeBandId: const CustomExpression<String>(
+                    'excluded.income_band_id',
+                  ),
+                  employeurId: const CustomExpression<String>(
+                    'excluded.employeur_id',
+                  ),
+                  employeur: const CustomExpression<String>(
+                    'excluded.employeur',
+                  ),
+                  typeContrat: const CustomExpression<String>(
+                    'excluded.type_contrat',
+                  ),
+                  ancienneteMois: const CustomExpression<int>(
+                    'excluded.anciennete_mois',
+                  ),
+                  lieuActivite: const CustomExpression<String>(
+                    'excluded.lieu_activite',
+                  ),
+                  modeEpargne: const CustomExpression<String>(
+                    'excluded.mode_epargne',
+                  ),
+                  professionId: const CustomExpression<String>(
+                    'excluded.profession_id',
+                  ),
+                  paysResidenceId: const CustomExpression<String>(
+                    'excluded.pays_residence_id',
+                  ),
+                  villeResidence: const CustomExpression<String>(
+                    'excluded.ville_residence',
+                  ),
+                  whatsappE164: const CustomExpression<String>(
+                    'excluded.whatsapp_e164',
+                  ),
+                  relaisNom: const CustomExpression<String>(
+                    'excluded.relais_nom',
+                  ),
+                  relaisPhoneE164: const CustomExpression<String>(
+                    'excluded.relais_phone_e164',
                   ),
                   statut: const CustomExpression<String>('excluded.statut'),
                   rev: const CustomExpression<int>('excluded.rev'),

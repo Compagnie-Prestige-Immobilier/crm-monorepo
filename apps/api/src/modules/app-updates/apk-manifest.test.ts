@@ -115,7 +115,7 @@ describe('assertPublishable', () => {
   it('refuse un versionCode ÉGAL à celui en ligne', () => {
     expect(() => {
       assertPublishable(cpiGo(7), 7);
-    }).toThrow();
+    }).toThrow('Une publication doit être STRICTEMENT');
   });
 
   it('refuse un versionCode inférieur et NOMME les deux nombres', () => {

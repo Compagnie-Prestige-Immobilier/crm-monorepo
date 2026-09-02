@@ -58,13 +58,17 @@ describe('curseur d’annuaire', () => {
   });
 
   it('porte un code métier exploitable par le mobile', () => {
+    let leve: unknown;
     try {
       decodeDirectoryCursor('!!!');
-      throw new Error('aucune exception levée');
     } catch (error) {
-      const body = (error as BadRequestException).getResponse() as { code?: string };
-      expect(body.code).toBe('PHASE2_DIRECTORY_CURSOR_INVALID');
+      leve = error;
     }
+
+    expect(leve).toBeInstanceOf(BadRequestException);
+    expect((leve as BadRequestException).getResponse()).toMatchObject({
+      code: 'PHASE2_DIRECTORY_CURSOR_INVALID',
+    });
   });
 
   it('convertit les microsecondes sans dériver', () => {

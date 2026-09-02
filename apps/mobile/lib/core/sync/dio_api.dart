@@ -317,6 +317,11 @@ class DioApi implements ApiPort {
         syndicats: body.syndicats,
         canauxProvenance: _body('canauxProvenance', canaux),
         incomeBands: _body('incomeBands', tranches),
+        // Servis par le bundle lui-même : trois listes courtes, aucun appel de
+        // plus à faire tenir dans la fenêtre du miroir.
+        professions: body.professions,
+        employeurs: body.employeurs,
+        pays: body.pays,
       );
     });
   }

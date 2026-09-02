@@ -14,7 +14,7 @@ import {
 import { getQueryClient } from '@/lib/query-client';
 import type { RawSearchParams } from '@/lib/search-params';
 import { guardRoles } from '@/lib/session';
-import { readsOnly } from '@/lib/types';
+import { canExportProspects, readsOnly } from '@/lib/types';
 
 export const metadata: Metadata = { title: 'Prospects Grand Public' };
 
@@ -46,7 +46,10 @@ export default async function GrandPublicPage({
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <GrandPublicProspectsView canCreate={!readsOnly(guard.user.role)} />
+      <GrandPublicProspectsView
+        canCreate={!readsOnly(guard.user.role)}
+        canExport={canExportProspects(guard.user.role)}
+      />
     </HydrationBoundary>
   );
 }

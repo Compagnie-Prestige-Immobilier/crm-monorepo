@@ -87,7 +87,7 @@ beforeEach(() => {
 
 describe('LotsExportView, la liste', () => {
   it('dit à quoi sert une campagne, et ce qu’il faut faire quand il n’y en a aucune', async () => {
-    renderWithQuery(<LotsExportView canCreate />);
+    renderWithQuery(<LotsExportView canCreate projet="CHUES" />);
 
     expect(await screen.findByText('Aucune campagne pour l’instant.')).toBeTruthy();
     expect(screen.getByText(/répartit des fiches entre les téléconseillers/)).toBeTruthy();
@@ -96,7 +96,7 @@ describe('LotsExportView, la liste', () => {
 
   it('annonce les appels passés sur les fiches depuis la création', async () => {
     fetchLotsExport.mockReturnValue(Promise.resolve(UN_LOT));
-    renderWithQuery(<LotsExportView canCreate />);
+    renderWithQuery(<LotsExportView canCreate projet="CHUES" />);
 
     expect(await screen.findByText('128 appels sur 91 fiches depuis la création.')).toBeTruthy();
     expect(screen.getByText(/CHUES, segment BDD2 ·/)).toBeTruthy();
@@ -107,16 +107,52 @@ describe('LotsExportView, la liste', () => {
   });
 
   it('cache la création à qui n’y a pas droit', async () => {
-    renderWithQuery(<LotsExportView canCreate={false} />);
+    renderWithQuery(<LotsExportView canCreate={false} projet="CHUES" />);
 
     expect(await screen.findByText('Aucune campagne pour l’instant.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Nouvelle campagne' })).toBeNull();
   });
+
+  it('ne demande que les campagnes du projet de la coque', async () => {
+    renderWithQuery(<LotsExportView canCreate projet="CHUES" />);
+
+    await waitFor(() => {
+      expect(fetchLotsExport).toHaveBeenLastCalledWith(
+        expect.objectContaining({ projet: 'CHUES' }),
+      );
+    });
+  });
+
+  it('garde la campagne Grand Public dans SA coque, et n’y filtre aucune cible', async () => {
+    fetchLotsExport.mockReturnValue(
+      Promise.resolve({
+        ...UN_LOT,
+        items: [
+          {
+            ...UN_LOT.items[0],
+            name: 'Prospects Grand Public, 30 août 2026',
+            projet: 'GRAND_PUBLIC',
+            scopeLabel: 'Grand Public',
+          },
+        ],
+      }),
+    );
+    renderWithQuery(<LotsExportView canCreate projet="GRAND_PUBLIC" />);
+
+    const lien = await screen.findByRole('link', { name: /Prospects Grand Public/ });
+    expect(lien.getAttribute('href')).toBe('/grand-public/campagnes/lot-1');
+    expect(fetchLotsExport).toHaveBeenLastCalledWith(
+      expect.objectContaining({ projet: 'GRAND_PUBLIC' }),
+    );
+    expect(screen.queryByLabelText('Cible')).toBeNull();
+  });
 });
 
-async function ouvrirLaCreation(): Promise<ReturnType<typeof userEvent.setup>> {
+async function ouvrirLaCreation(
+  projet: 'CHUES' | 'GRAND_PUBLIC' = 'CHUES',
+): Promise<ReturnType<typeof userEvent.setup>> {
   const user = userEvent.setup();
-  renderWithQuery(<LotsExportView canCreate />);
+  renderWithQuery(<LotsExportView canCreate projet={projet} />);
   await user.click(await screen.findByRole('button', { name: 'Nouvelle campagne' }));
   return user;
 }
@@ -323,5 +359,26 @@ describe('LotCreateDialog, la création', () => {
       expect(push).toHaveBeenCalledWith('/chues/campagnes/lot-neuf');
     });
     expect(download).not.toHaveBeenCalled();
+  });
+
+  it('en Grand Public, saute le choix de cible : il n’y en a qu’une', async () => {
+    const user = await ouvrirLaCreation('GRAND_PUBLIC');
+
+    expect(await screen.findByLabelText('Type de prospect')).toBeTruthy();
+    expect(screen.queryByRole('radio')).toBeNull();
+
+    await waitFor(() => {
+      expect(previewLotExport).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          cible: 'PROSPECTS',
+          prospects: expect.objectContaining({ projet: 'GRAND_PUBLIC' }),
+        }),
+      );
+    });
+
+    await creerLeLot(user);
+    await waitFor(() => {
+      expect(push).toHaveBeenCalledWith('/grand-public/campagnes/lot-neuf');
+    });
   });
 });

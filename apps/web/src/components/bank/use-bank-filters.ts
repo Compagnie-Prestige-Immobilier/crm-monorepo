@@ -11,8 +11,10 @@ import {
   serializeBankFilters,
   type BankCaseFilters,
 } from '@/lib/bank-filters';
+import type { Projet } from '@/lib/types';
 
-export function useBankFilters(): {
+/** `projet` vient de la page : l'URL ne le porte pas et ne peut donc pas le changer. */
+export function useBankFilters(projet: Projet | null = null): {
   filters: BankCaseFilters;
   setFilters: (patch: Partial<BankCaseFilters>) => void;
   resetFilters: () => void;
@@ -23,8 +25,8 @@ export function useBankFilters(): {
   const searchParams = useSearchParams();
 
   const filters = useMemo(
-    () => parseBankFilters(new URLSearchParams(searchParams.toString())),
-    [searchParams],
+    () => ({ ...parseBankFilters(new URLSearchParams(searchParams.toString())), projet }),
+    [searchParams, projet],
   );
 
   const buildHref = useCallback(

@@ -1,13 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  BoxesIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  PlusIcon,
-  Trash2Icon,
-} from 'lucide-react';
+import { BoxesIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon, Trash2Icon } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -26,10 +20,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { deleteLotExport, fetchLotsExport, type LotExportQuery } from '@/lib/data/lots-export';
+import {
+  campagnesPath,
+  deleteLotExport,
+  fetchLotsExport,
+  type LotExportQuery,
+} from '@/lib/data/lots-export';
 import { formatDate, formatNumber } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
+import type { Projet } from '@/lib/types';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 
 const TOUTES = 'TOUTES';
@@ -42,15 +42,21 @@ const CIBLE_OPTIONS = [
   { value: 'REPRESENTANTS', label: 'Représentants' },
 ] as const;
 
-function requeteLots(page: number, recherche: string, cible: FiltreCible): LotExportQuery {
+function requeteLots(
+  page: number,
+  recherche: string,
+  cible: FiltreCible,
+  projet: Projet,
+): LotExportQuery {
   return {
     page,
+    projet,
     ...(recherche.trim() === '' ? {} : { search: recherche.trim() }),
     ...(cible === TOUTES ? {} : { cible }),
   };
 }
 
-export function LotsExportView({ canCreate }: { canCreate: boolean }) {
+export function LotsExportView({ canCreate, projet }: { canCreate: boolean; projet: Projet }) {
   const [recherche, setRecherche] = useState('');
   const [cible, setCible] = useState<FiltreCible>(TOUTES);
   const [page, setPage] = useState(1);
@@ -71,7 +77,7 @@ export function LotsExportView({ canCreate }: { canCreate: boolean }) {
   });
 
   const rechercheDifferee = useDebouncedValue(recherche);
-  const requete = requeteLots(page, rechercheDifferee, cible);
+  const requete = requeteLots(page, rechercheDifferee, cible, projet);
 
   const lots = useQuery({
     queryKey: queryKeys.lotsExport(requete),
@@ -114,29 +120,33 @@ export function LotsExportView({ canCreate }: { canCreate: boolean }) {
             }}
           />
         </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="lots-cible">Cible</Label>
-          <Select
-            items={[...CIBLE_OPTIONS]}
-            value={cible}
-            onValueChange={(value) => {
-              if (value === null) return;
-              setCible(value);
-              setPage(1);
-            }}
-          >
-            <SelectTrigger id="lots-cible" className="min-w-52">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {CIBLE_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {/* Pas de choix de cible en Grand Public : un lot de représentants est
+            toujours CHUES, le filtre n'y rendrait jamais rien. */}
+        {projet === 'GRAND_PUBLIC' ? null : (
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="lots-cible">Cible</Label>
+            <Select
+              items={[...CIBLE_OPTIONS]}
+              value={cible}
+              onValueChange={(value) => {
+                if (value === null) return;
+                setCible(value);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger id="lots-cible" className="min-w-52">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CIBLE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
       {(() => {
@@ -185,7 +195,7 @@ export function LotsExportView({ canCreate }: { canCreate: boolean }) {
                   <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                     <h2 className="font-display text-[1.0625rem] font-[700]">
                       <Link
-                        href={`/chues/campagnes/${lot.id}`}
+                        href={`${campagnesPath(projet)}/${lot.id}`}
                         className="hover:underline focus-visible:underline"
                       >
                         {lot.name}
@@ -258,7 +268,7 @@ export function LotsExportView({ canCreate }: { canCreate: boolean }) {
       ) : null}
 
       {canCreate ? (
-        <LotCreateDialog open={creationOuverte} onOpenChange={setCreationOuverte} />
+        <LotCreateDialog open={creationOuverte} onOpenChange={setCreationOuverte} projet={projet} />
       ) : null}
 
       <ConfirmDialog

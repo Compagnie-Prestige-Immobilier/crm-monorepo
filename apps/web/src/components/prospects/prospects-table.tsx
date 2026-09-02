@@ -98,6 +98,7 @@ export function ProspectsTable({
     [canAdminister, filters.projet, readOnly],
   );
 
+  // oxlint-disable-next-line react/incompatible-library -- faux positif TanStack Table
   const table = useReactTable({
     data: data?.items ?? [],
     columns,

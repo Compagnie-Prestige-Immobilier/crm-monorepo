@@ -33,80 +33,99 @@ const TRENTE_POINTS = 30;
 const DIX_POINTS = 10;
 const SEUIL_ZERO = 0.3;
 
+interface Regles {
+  readonly recommandations: Map<DashboardMarque, string>;
+  readonly avertissements: Map<DashboardMarque, string>;
+}
+
+const CYCLE = 'Un cycle refermé se lit mieux qu’une ligne qui recommence.';
+
+function reglesDesParts(mesure: Mesure, compatibles: DashboardMarque[], regles: Regles): void {
+  if (mesure.nombreCategories > CINQ_PARTS) {
+    regles.recommandations.set(
+      'barres-horizontales',
+      'Au-delà de cinq parts, la hauteur d’une barre se compare mieux qu’un angle.',
+    );
+    if (compatibles.includes('anneau')) {
+      regles.avertissements.set('anneau', 'Illisible au-delà de cinq parts.');
+    }
+    if (compatibles.includes('camembert')) {
+      regles.avertissements.set('camembert', 'Illisible au-delà de cinq parts.');
+    }
+    return;
+  }
+
+  if (mesure.nombreCategories >= 2 && compatibles.includes('anneau')) {
+    regles.recommandations.set('anneau', 'La part se lit mieux que la hauteur.');
+  }
+}
+
+function reglesDeLaSerie(mesure: Mesure, regles: Regles): void {
+  if (mesure.nombrePoints > TRENTE_POINTS) {
+    regles.recommandations.set(
+      'courbe',
+      'Une série dense se lit en tendance, pas barre par barre.',
+    );
+    regles.avertissements.set('barres-verticales', 'Quatre-vingt-dix barres ne se lisent pas.');
+    return;
+  }
+
+  if (mesure.nombrePoints < DIX_POINTS) {
+    regles.recommandations.set(
+      'barres-verticales',
+      'Une série courte se compte, elle ne se tend pas.',
+    );
+    regles.avertissements.set('courbe', 'Une tendance sur sept points n’en est pas une.');
+  }
+}
+
+function comparerMarques(tableauEnTete: boolean) {
+  return (a: MarqueEvaluee, b: MarqueEvaluee): number => {
+    if (tableauEnTete && a.marque === 'tableau') return -1;
+    if (tableauEnTete && b.marque === 'tableau') return 1;
+    if (a.recommandee === b.recommandee) return 0;
+    return a.recommandee ? -1 : 1;
+  };
+}
+
 /**
  * Classe les marques compatibles avec une source au vu de ses données réelles.
  * Les règles de ce fichier sont pures et se testent une par une.
  */
 export function evaluerMarques(forme: Forme, mesure: Mesure): MarqueEvaluee[] {
   const compatibles = marquesCompatibles(forme);
-  const recommandations = new Map<DashboardMarque, string>();
-  const avertissements = new Map<DashboardMarque, string>();
+  const regles: Regles = { recommandations: new Map(), avertissements: new Map() };
 
   if (forme === 'classement' || forme === 'composition') {
-    if (mesure.nombreCategories > CINQ_PARTS) {
-      recommandations.set(
-        'barres-horizontales',
-        'Au-delà de cinq parts, la hauteur d’une barre se compare mieux qu’un angle.',
-      );
-      if (compatibles.includes('anneau')) {
-        avertissements.set('anneau', 'Illisible au-delà de cinq parts.');
-      }
-      if (compatibles.includes('camembert')) {
-        avertissements.set('camembert', 'Illisible au-delà de cinq parts.');
-      }
-    } else if (mesure.nombreCategories >= 2 && compatibles.includes('anneau')) {
-      recommandations.set('anneau', 'La part se lit mieux que la hauteur.');
-    }
+    reglesDesParts(mesure, compatibles, regles);
   }
-
-  if (forme === 'serie-temporelle') {
-    if (mesure.nombrePoints > TRENTE_POINTS) {
-      recommandations.set('courbe', 'Une série dense se lit en tendance, pas barre par barre.');
-      avertissements.set('barres-verticales', 'Quatre-vingt-dix barres ne se lisent pas.');
-    } else if (mesure.nombrePoints < DIX_POINTS) {
-      recommandations.set('barres-verticales', 'Une série courte se compte, elle ne se tend pas.');
-      avertissements.set('courbe', 'Une tendance sur sept points n’en est pas une.');
-    }
-  }
-
+  if (forme === 'serie-temporelle') reglesDeLaSerie(mesure, regles);
   if (forme === 'cyclique') {
-    recommandations.set(
-      'aire-polaire',
-      'Un cycle refermé se lit mieux qu’une ligne qui recommence.',
-    );
-    recommandations.set('radar', 'Un cycle refermé se lit mieux qu’une ligne qui recommence.');
+    regles.recommandations.set('aire-polaire', CYCLE);
+    regles.recommandations.set('radar', CYCLE);
   }
-
   if (forme === 'matrice') {
-    recommandations.set(
+    regles.recommandations.set(
       'carte-de-chaleur',
       'Une matrice ne se lit qu’en croisement : la couleur montre les deux axes à la fois.',
     );
   }
 
-  let tableauEnTete = false;
-  if (mesure.partZero > SEUIL_ZERO && compatibles.includes('tableau')) {
-    recommandations.set(
+  const tableauEnTete = mesure.partZero > SEUIL_ZERO && compatibles.includes('tableau');
+  if (tableauEnTete) {
+    regles.recommandations.set(
       'tableau',
       'La moitié des catégories sont à zéro : le tableau les nomme, un graphique les tairait.',
     );
-    tableauEnTete = true;
   }
 
   const evaluees = compatibles.map((marque): MarqueEvaluee => ({
     marque,
-    recommandee: recommandations.has(marque),
-    raison: recommandations.get(marque) ?? avertissements.get(marque) ?? null,
+    recommandee: regles.recommandations.has(marque),
+    raison: regles.recommandations.get(marque) ?? regles.avertissements.get(marque) ?? null,
   }));
 
-  return evaluees.sort((a, b) => {
-    if (tableauEnTete) {
-      if (a.marque === 'tableau') return -1;
-      if (b.marque === 'tableau') return 1;
-    }
-    if (a.recommandee === b.recommandee) return 0;
-    return a.recommandee ? -1 : 1;
-  });
+  return evaluees.sort(comparerMarques(tableauEnTete));
 }
 
 export function marqueRecommandee(forme: Forme, mesure: Mesure): DashboardMarque {

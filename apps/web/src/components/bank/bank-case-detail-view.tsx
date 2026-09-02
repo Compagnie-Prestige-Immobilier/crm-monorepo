@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
+import { bankBasePath } from '@/lib/bank-filters';
 import {
   createBankCaseTransition,
   fetchBankCase,
@@ -48,18 +49,59 @@ import { formatDateTime, formatPhone } from '@/lib/format';
 import { formatXof, parseMoneyInput } from '@/lib/money';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
-import type { BankCaseTransition, BankRejectionReason, Role } from '@/lib/types';
+import type { BankCaseTransition, BankRejectionReason, Projet, Role } from '@/lib/types';
 
 const OTHER_REASON_CODE = 'AUTRE';
 
-export function BankCaseDetailView({ caseId, role }: { caseId: string; role: Role }) {
+function ActionPrincipale({
+  action,
+  onAdvance,
+}: {
+  action: ReturnType<typeof primaryAction>;
+  onAdvance: () => void;
+}) {
+  if (action.kind === 'advance') {
+    return (
+      <Button type="button" onClick={onAdvance}>
+        <ArrowRightIcon aria-hidden="true" />
+        Passer à « {action.target.label} »
+      </Button>
+    );
+  }
+
+  if (action.kind === 'cash') {
+    return (
+      <Button type="button" onClick={onAdvance}>
+        <BanknoteIcon aria-hidden="true" />
+        Déclarer l’encaissement
+      </Button>
+    );
+  }
+
+  return (
+    <p role="status" className="text-[0.8125rem] text-muted-foreground">
+      {action.reason}
+    </p>
+  );
+}
+
+export function BankCaseDetailView({
+  caseId,
+  role,
+  projet,
+}: {
+  caseId: string;
+  role: Role;
+  projet: Projet;
+}) {
   const queryClient = useQueryClient();
+  const listHref = `${bankBasePath(projet)}/dossiers`;
   const [advancing, setAdvancing] = useState(false);
   const [rejecting, setRejecting] = useState(false);
 
   const detail = useQuery({
-    queryKey: queryKeys.bankCase(caseId),
-    queryFn: () => fetchBankCase(caseId),
+    queryKey: queryKeys.bankCase(caseId, projet),
+    queryFn: () => fetchBankCase(caseId, projet),
   });
 
   const stages = useQuery({
@@ -73,7 +115,7 @@ export function BankCaseDetailView({ caseId, role }: { caseId: string; role: Rol
   if (detail.isError) {
     return (
       <div className="flex flex-col gap-6">
-        <DetailBackLink href="/chues/dossiers">Tous les dossiers</DetailBackLink>
+        <DetailBackLink href={listHref}>Tous les dossiers</DetailBackLink>
         <QueryErrorState
           error={detail.error}
           onRetry={() => {
@@ -88,7 +130,7 @@ export function BankCaseDetailView({ caseId, role }: { caseId: string; role: Rol
   if (stages.isError) {
     return (
       <div className="flex flex-col gap-6">
-        <DetailBackLink href="/chues/dossiers">Tous les dossiers</DetailBackLink>
+        <DetailBackLink href={listHref}>Tous les dossiers</DetailBackLink>
         <QueryErrorState
           error={stages.error}
           onRetry={() => {
@@ -106,14 +148,14 @@ export function BankCaseDetailView({ caseId, role }: { caseId: string; role: Rol
   const canAct = !bankCase.isTerminal;
 
   function invalidate(): void {
-    void queryClient.invalidateQueries({ queryKey: queryKeys.bankCase(caseId) });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.bankCase(caseId, projet) });
     void queryClient.invalidateQueries({ queryKey: queryKeys.bankCasesRoot });
     void queryClient.invalidateQueries({ queryKey: queryKeys.bankAnalyticsRoot });
   }
 
   return (
     <div className="flex flex-col gap-6">
-      <DetailBackLink href="/chues/dossiers">Tous les dossiers</DetailBackLink>
+      <DetailBackLink href={listHref}>Tous les dossiers</DetailBackLink>
 
       {/* ─── En-tête ─────────────────────────────────────────────────── */}
       <Card className="animate-rise">
@@ -173,31 +215,12 @@ export function BankCaseDetailView({ caseId, role }: { caseId: string; role: Rol
                   vingt fois par jour. Le rejet est à côté, en `destructive`
                   et sans place privilégiée : il ne doit jamais être le bouton
                   qu'on atteint par réflexe. */}
-              {action.kind === 'advance' ? (
-                <Button
-                  type="button"
-                  onClick={() => {
-                    setAdvancing(true);
-                  }}
-                >
-                  <ArrowRightIcon aria-hidden="true" />
-                  Passer à « {action.target.label} »
-                </Button>
-              ) : action.kind === 'cash' ? (
-                <Button
-                  type="button"
-                  onClick={() => {
-                    setAdvancing(true);
-                  }}
-                >
-                  <BanknoteIcon aria-hidden="true" />
-                  Déclarer l’encaissement
-                </Button>
-              ) : (
-                <p role="status" className="text-[0.8125rem] text-muted-foreground">
-                  {action.reason}
-                </p>
-              )}
+              <ActionPrincipale
+                action={action}
+                onAdvance={() => {
+                  setAdvancing(true);
+                }}
+              />
 
               {rejectedStage !== undefined && rejectedStage.isActive ? (
                 <Button
@@ -417,6 +440,7 @@ function AdvanceDialog({
                 id={amountId}
                 inputMode="numeric"
                 autoComplete="off"
+                // oxlint-disable-next-line jsx-a11y/no-autofocus -- champ unique du dialogue
                 autoFocus
                 value={amount ?? ''}
                 placeholder="1200000"
@@ -640,6 +664,7 @@ function RejectDialog({
                   id={detailId}
                   value={detail}
                   maxLength={2000}
+                  // oxlint-disable-next-line jsx-a11y/no-autofocus -- champ unique du dialogue
                   autoFocus
                   aria-describedby={`${detailId}-aide`}
                   onChange={(event) => {

@@ -1,12 +1,13 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeftIcon, PhoneIcon } from 'lucide-react';
+import { ArrowLeftIcon, PencilIcon, PhoneIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
 import { Absent } from '@/components/grand-public/absence';
+import { GrandPublicProspectForm } from '@/components/grand-public/prospect-form';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,8 +39,10 @@ import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import {
   CALL_OUTCOME_LABELS,
+  MODE_EPARGNE_LABELS,
   PROSPECT_STATUT_LABELS,
   SEGMENT_LABELS,
+  TYPE_CONTRAT_LABELS,
   type ProspectRow,
   type ProspectStatut,
   type Offer,
@@ -71,6 +74,63 @@ function Texte({ value, absent }: { value: string | null; absent: string }) {
 }
 
 /**
+ * Un renseignement propre à une situation. Absent, la ligne DISPARAÎT : une
+ * fiche d'informel n'a pas à porter « Type de contrat : non renseigné ».
+ */
+function LigneSi({ label, value }: { label: string; value: string | null }) {
+  if (value === null || value === '') return null;
+  return (
+    <Ligne label={label}>
+      <span>{value}</span>
+    </Ligne>
+  );
+}
+
+function formatAnciennete(mois: number): string {
+  if (mois < 12) return `${String(mois)} mois`;
+  const ans = Math.floor(mois / 12);
+  const reste = mois % 12;
+  const debut = `${String(ans)} an${ans > 1 ? 's' : ''}`;
+  return reste === 0 ? debut : `${debut} et ${String(reste)} mois`;
+}
+
+const libelleMetier = (type: ProspectRow['type']): string =>
+  type === 'INFORMEL' ? 'Activité' : 'Profession';
+
+/** Les renseignements propres à la situation : chacun paraît s'il a été noté. */
+function LignesSituation({ prospect }: { prospect: ProspectRow }) {
+  const contrat = prospect.typeContrat;
+  const epargne = prospect.modeEpargne;
+  const anciennete = prospect.ancienneteMois;
+  const whatsapp = prospect.whatsappE164;
+  const relais = prospect.relaisPhoneE164;
+
+  return (
+    <>
+      <LigneSi label="Employeur" value={prospect.employeur} />
+      <LigneSi
+        label="Type de contrat"
+        value={contrat === null ? null : TYPE_CONTRAT_LABELS[contrat]}
+      />
+      <LigneSi
+        label="Ancienneté"
+        value={anciennete === null ? null : formatAnciennete(anciennete)}
+      />
+      <LigneSi label="Lieu d’activité" value={prospect.lieuActivite} />
+      <LigneSi
+        label="Mode d’épargne"
+        value={epargne === null ? null : MODE_EPARGNE_LABELS[epargne]}
+      />
+      <LigneSi label="Pays de résidence" value={prospect.paysResidenceLabel} />
+      <LigneSi label="Ville de résidence" value={prospect.villeResidence} />
+      <LigneSi label="WhatsApp" value={whatsapp === null ? null : formatPhone(whatsapp)} />
+      <LigneSi label="Personne relais" value={prospect.relaisNom} />
+      <LigneSi label="Téléphone du relais" value={relais === null ? null : formatPhone(relais)} />
+    </>
+  );
+}
+
+/**
  * Le segment se calcule par croisement syndicat × banque. Nommer ce qui manque
  * dit quoi aller chercher ; « BDD4 » aurait affirmé un croisement qui n'a pas eu lieu.
  */
@@ -80,6 +140,116 @@ function raisonSansSegment(prospect: ProspectRow): string {
   }
   if (prospect.banqueId === null) return 'La banque manque pour le calculer.';
   return 'Le syndicat manque pour le calculer.';
+}
+
+/** Le formulaire de saisie, garni de la fiche. Monté à l'ouverture seulement : il repart de la fiche. */
+function ModifierLaFiche({
+  canEdit,
+  prospect,
+  onEnregistre,
+}: {
+  canEdit: boolean;
+  prospect: ProspectRow;
+  onEnregistre: (prospect: ProspectRow) => void;
+}) {
+  const [ouverte, setOuverte] = useState(false);
+  if (!canEdit) return null;
+
+  return (
+    <>
+      <Button
+        variant="outline"
+        onClick={() => {
+          setOuverte(true);
+        }}
+      >
+        <PencilIcon aria-hidden="true" />
+        Modifier
+      </Button>
+      <Dialog open={ouverte} onOpenChange={setOuverte}>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              Modifier {prospect.prenom} {prospect.nom}
+            </DialogTitle>
+            <DialogDescription>
+              Un champ vidé efface le renseignement. Changer la situation retire ce qu’elle ne
+              demande plus.
+            </DialogDescription>
+          </DialogHeader>
+          {ouverte ? (
+            <GrandPublicProspectForm
+              embedded
+              initial={prospect}
+              onSaved={(saved) => {
+                onEnregistre(saved);
+                setOuverte(false);
+              }}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function ActionsConsentement({
+  consentement,
+  pending,
+  onConsent,
+  onConvertir,
+}: {
+  consentement: string | null;
+  pending: boolean;
+  onConsent: (value: 'INTERESSE' | 'REFUSE') => void;
+  onConvertir: () => void;
+}) {
+  return (
+    <>
+      <Button
+        variant={consentement === 'INTERESSE' ? 'default' : 'outline'}
+        onClick={() => {
+          onConsent('INTERESSE');
+        }}
+        disabled={pending}
+      >
+        Intéressé
+      </Button>
+      <Button
+        variant={consentement === 'REFUSE' ? 'destructive' : 'outline'}
+        onClick={() => {
+          onConsent('REFUSE');
+        }}
+        disabled={pending}
+      >
+        Refusé
+      </Button>
+      {consentement === 'INTERESSE' ? (
+        <Button onClick={onConvertir}>Confirmer la conversion</Button>
+      ) : null}
+    </>
+  );
+}
+
+function DernierAppel({ prospect }: { prospect: ProspectRow }) {
+  if (prospect.lastOutcome === null) return <Absent>Jamais appelé</Absent>;
+
+  return (
+    <span className="flex flex-col gap-0.5">
+      <span className="font-[600]">{CALL_OUTCOME_LABELS[prospect.lastOutcome]}</span>
+      {prospect.lastComment !== null && prospect.lastComment !== '' ? (
+        <span className="text-[0.8125rem] text-muted-foreground">{prospect.lastComment}</span>
+      ) : null}
+      {prospect.lastAttemptAt !== null ? (
+        <time
+          dateTime={prospect.lastAttemptAt}
+          className="text-[0.8125rem] text-muted-foreground tabular-nums"
+        >
+          {formatDateTime(prospect.lastAttemptAt)}
+        </time>
+      ) : null}
+    </span>
+  );
 }
 
 export function GrandPublicProspectDetail({
@@ -182,26 +352,18 @@ export function GrandPublicProspectDetail({
           <Badge variant={STATUT_VARIANT[journey.statut]} className="text-[0.8125rem]">
             {PROSPECT_STATUT_LABELS[journey.statut]}
           </Badge>
+          <ModifierLaFiche canEdit={canEdit} prospect={prospect} onEnregistre={refresh} />
           {canEdit && journey.statut !== 'CONVERTI' ? (
-            <>
-              <Button
-                variant={journey.consent === 'INTERESSE' ? 'default' : 'outline'}
-                onClick={() => consent.mutate('INTERESSE')}
-                disabled={consent.isPending}
-              >
-                Intéressé
-              </Button>
-              <Button
-                variant={journey.consent === 'REFUSE' ? 'destructive' : 'outline'}
-                onClick={() => consent.mutate('REFUSE')}
-                disabled={consent.isPending}
-              >
-                Refusé
-              </Button>
-              {journey.consent === 'INTERESSE' ? (
-                <Button onClick={() => setConversionOpen(true)}>Confirmer la conversion</Button>
-              ) : null}
-            </>
+            <ActionsConsentement
+              consentement={journey.consent}
+              pending={consent.isPending}
+              onConsent={(value) => {
+                consent.mutate(value);
+              }}
+              onConvertir={() => {
+                setConversionOpen(true);
+              }}
+            />
           ) : null}
         </div>
       </div>
@@ -219,9 +381,10 @@ export function GrandPublicProspectDetail({
                 PROSPECT_TYPE_LABELS[prospect.type]
               )}
             </Ligne>
-            <Ligne label="Profession">
+            <Ligne label={libelleMetier(prospect.type)}>
               <Texte value={prospect.profession} absent="Non renseignée" />
             </Ligne>
+            <LignesSituation prospect={prospect} />
             <Ligne label="Canal de provenance">
               <Texte value={prospect.canalProvenanceLabel} absent="Non renseigné" />
             </Ligne>
@@ -280,26 +443,7 @@ export function GrandPublicProspectDetail({
               </time>
             </Ligne>
             <Ligne label="Dernier appel">
-              {prospect.lastOutcome === null ? (
-                <Absent>Jamais appelé</Absent>
-              ) : (
-                <span className="flex flex-col gap-0.5">
-                  <span className="font-[600]">{CALL_OUTCOME_LABELS[prospect.lastOutcome]}</span>
-                  {prospect.lastComment !== null && prospect.lastComment !== '' ? (
-                    <span className="text-[0.8125rem] text-muted-foreground">
-                      {prospect.lastComment}
-                    </span>
-                  ) : null}
-                  {prospect.lastAttemptAt !== null ? (
-                    <time
-                      dateTime={prospect.lastAttemptAt}
-                      className="text-[0.8125rem] text-muted-foreground tabular-nums"
-                    >
-                      {formatDateTime(prospect.lastAttemptAt)}
-                    </time>
-                  ) : null}
-                </span>
-              )}
+              <DernierAppel prospect={prospect} />
             </Ligne>
           </dl>
         </CardContent>

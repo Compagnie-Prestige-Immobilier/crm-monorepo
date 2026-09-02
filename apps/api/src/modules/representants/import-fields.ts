@@ -21,12 +21,7 @@ export function normalizeKey(value: string): string {
 /** Libellés proposés en liste déroulante, dans l'ordre du parcours. */
 export const RELATION_LABELS = ['Inconnu', 'Contacté', 'Ambassadeur', 'Refus'] as const;
 
-export const WHATSAPP_LABELS = [
-  'Non demandé',
-  'Même numéro',
-  'Autre numéro',
-  'Aucun',
-] as const;
+export const WHATSAPP_LABELS = ['Non demandé', 'Même numéro', 'Autre numéro', 'Aucun'] as const;
 
 function tableDe<T extends string>(entrees: readonly (readonly [string, T])[]): Map<string, T> {
   const table = new Map<string, T>();
@@ -153,7 +148,8 @@ export function parseComplements(
     return {
       rang: 8,
       code: 'OWNER_UNKNOWN',
-      message: 'Chargé de compte introuvable. Identifiant, e-mail ou nom complet d’un compte actif.',
+      message:
+        'Chargé de compte introuvable. Identifiant, e-mail ou nom complet d’un compte actif.',
       value: cells.charge,
     };
   }

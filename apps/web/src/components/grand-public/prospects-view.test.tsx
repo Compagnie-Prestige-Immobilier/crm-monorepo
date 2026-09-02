@@ -10,15 +10,22 @@ import type { ProspectRow } from '@/lib/types';
 
 const list = vi.hoisted(() => vi.fn());
 const canaux = vi.hoisted(() => vi.fn());
+const download = vi.hoisted(() => vi.fn<(input: unknown) => Promise<void>>());
 
 vi.mock('@/lib/data/grand-public', async () => {
   const actual = await vi.importActual<typeof GrandPublicModule>('@/lib/data/grand-public');
   return { ...actual, fetchGrandPublicProspects: list, fetchCanauxProvenance: canaux };
 });
 
+vi.mock('@/components/exports/download-button', () => ({
+  useFileDownload: () => ({ pending: false, download }),
+}));
+
 beforeEach(() => {
   list.mockReset();
   canaux.mockReset();
+  download.mockReset();
+  download.mockResolvedValue(undefined);
   canaux.mockResolvedValue([
     { id: 'c-tiktok', code: 'TIKTOK', label: 'TikTok', position: 1, isActive: true, updatedAt: '' },
   ]);
@@ -54,8 +61,8 @@ function page(items: ProspectRow[], total = items.length) {
   return { items, total, page: 1, pageSize: 25, pageCount: Math.max(1, Math.ceil(total / 25)) };
 }
 
-function mount(canCreate = true) {
-  return renderWithQuery(<GrandPublicProspectsView canCreate={canCreate} />);
+function mount(canCreate = true, canExport = canCreate) {
+  return renderWithQuery(<GrandPublicProspectsView canCreate={canCreate} canExport={canExport} />);
 }
 
 describe('le segment absent', () => {
@@ -151,6 +158,19 @@ describe('l’état vide', () => {
 });
 
 describe('la liste', () => {
+  it('donne accès à la création, aux appels et aux rappels', async () => {
+    list.mockResolvedValue(page([]));
+    mount();
+
+    expect(await screen.findByRole('button', { name: 'Nouveau prospect' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Appeler les prospects' }).getAttribute('href')).toBe(
+      '/grand-public/console',
+    );
+    expect(screen.getByRole('link', { name: 'Voir les rappels' }).getAttribute('href')).toBe(
+      '/grand-public/rappels',
+    );
+  });
+
   it('ouvre la fiche depuis le nom', async () => {
     list.mockResolvedValue(page([row()]));
     mount();
@@ -193,6 +213,32 @@ describe('la liste', () => {
 
     await screen.findByText('Aucun prospect Grand Public n’a encore été saisi.');
     expect(screen.queryByRole('link', { name: /Nouveau prospect/u })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Exporter' })).toBeNull();
+  });
+
+  it('laisse exporter un rôle qui ne saisit pas, comme la DIRECTION', async () => {
+    list.mockResolvedValue(page([]));
+    mount(false, true);
+
+    expect(await screen.findByRole('button', { name: 'Exporter' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Nouveau prospect/u })).toBeNull();
+  });
+
+  it('exporte la vue filtrée, bornée au Grand Public', async () => {
+    const user = userEvent.setup();
+    setUrl('/grand-public?type=DIASPORA');
+    list.mockResolvedValue(page([]));
+    mount();
+
+    await user.click(await screen.findByRole('button', { name: 'Exporter' }));
+
+    await waitFor(() => {
+      expect(download).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: '/api/export/prospects?type=DIASPORA&projet=GRAND_PUBLIC',
+        }),
+      );
+    });
   });
 });
 

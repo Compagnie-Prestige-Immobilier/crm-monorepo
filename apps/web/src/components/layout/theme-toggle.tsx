@@ -23,6 +23,7 @@ export function ThemeToggle() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- drapeau d'hydratation client
     setMounted(true);
   }, []);
 

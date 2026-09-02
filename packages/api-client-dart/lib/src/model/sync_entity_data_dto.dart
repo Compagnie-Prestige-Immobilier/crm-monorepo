@@ -3,11 +3,13 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:crm_api_client/src/model/mode_epargne.dart';
 import 'package:crm_api_client/src/model/payment_mode.dart';
 import 'package:crm_api_client/src/model/projet.dart';
 import 'package:crm_api_client/src/model/prospect_type.dart';
 import 'package:crm_api_client/src/model/call_outcome.dart';
 import 'package:crm_api_client/src/model/prospect_statut.dart';
+import 'package:crm_api_client/src/model/type_contrat.dart';
 import 'package:crm_api_client/src/model/representant_relation.dart';
 import 'package:crm_api_client/src/model/enrollment_method.dart';
 import 'package:crm_api_client/src/model/whatsapp_status.dart';
@@ -80,6 +82,28 @@ class SyncEntityDataDto {
     this.incomeBandId,
 
     this.paymentMode,
+
+    this.professionId,
+
+    this.employeurId,
+
+    this.employeur,
+
+    this.typeContrat,
+
+    this.ancienneteMois,
+
+    this.lieuActivite,
+
+    this.modeEpargne,
+
+    this.paysResidenceId,
+
+    this.villeResidence,
+
+    this.relaisNom,
+
+    this.relaisPhoneE164,
 
     this.clientCreatedAt,
 
@@ -181,7 +205,7 @@ class SyncEntityDataDto {
   )
   final WhatsappStatus? whatsappStatus;
 
-  /// Représentant : numéro WhatsApp, seulement si le statut vaut AUTRE_NUMERO.
+  /// Représentant : numéro WhatsApp, seulement si le statut vaut AUTRE_NUMERO. Prospect de la diaspora : numéro WhatsApp, souvent le seul joignable.
   @JsonKey(name: r'whatsappE164', required: false, includeIfNull: false)
   final String? whatsappE164;
 
@@ -258,6 +282,62 @@ class SyncEntityDataDto {
     unknownEnumValue: PaymentMode.unknownDefaultOpenApi,
   )
   final PaymentMode? paymentMode;
+
+  /// Prospect : profession choisie dans le référentiel. Le texte libre `profession` reste le repli.
+  @JsonKey(name: r'professionId', required: false, includeIfNull: false)
+  final String? professionId;
+
+  /// Prospect : employeur du référentiel. Fonctionnaire (ministère) ou privé.
+  @JsonKey(name: r'employeurId', required: false, includeIfNull: false)
+  final String? employeurId;
+
+  /// Prospect : employeur en clair.
+  @JsonKey(name: r'employeur', required: false, includeIfNull: false)
+  final String? employeur;
+
+  /// Prospect du secteur privé : nature du contrat.
+  @JsonKey(
+    name: r'typeContrat',
+    required: false,
+    includeIfNull: false,
+    unknownEnumValue: TypeContrat.unknownDefaultOpenApi,
+  )
+  final TypeContrat? typeContrat;
+
+  /// Prospect : ancienneté chez l’employeur, en MOIS. Distincte de `dureeSystemeMois`.
+  // minimum: 0
+  // maximum: 840
+  @JsonKey(name: r'ancienneteMois', required: false, includeIfNull: false)
+  final num? ancienneteMois;
+
+  /// Prospect informel : lieu d’activité.
+  @JsonKey(name: r'lieuActivite', required: false, includeIfNull: false)
+  final String? lieuActivite;
+
+  /// Prospect informel : comment il épargne.
+  @JsonKey(
+    name: r'modeEpargne',
+    required: false,
+    includeIfNull: false,
+    unknownEnumValue: ModeEpargne.unknownDefaultOpenApi,
+  )
+  final ModeEpargne? modeEpargne;
+
+  /// Prospect diaspora : pays de résidence.
+  @JsonKey(name: r'paysResidenceId', required: false, includeIfNull: false)
+  final String? paysResidenceId;
+
+  /// Prospect diaspora : ville de résidence.
+  @JsonKey(name: r'villeResidence', required: false, includeIfNull: false)
+  final String? villeResidence;
+
+  /// Prospect diaspora : personne relais au Sénégal.
+  @JsonKey(name: r'relaisNom', required: false, includeIfNull: false)
+  final String? relaisNom;
+
+  /// Prospect diaspora : téléphone du relais, normalisé en E.164 par le serveur.
+  @JsonKey(name: r'relaisPhoneE164', required: false, includeIfNull: false)
+  final String? relaisPhoneE164;
 
   /// Horodatage de la saisie terrain.
   @JsonKey(name: r'clientCreatedAt', required: false, includeIfNull: false)
@@ -383,6 +463,17 @@ class SyncEntityDataDto {
                 canalProvenanceId,
                 incomeBandId,
                 paymentMode,
+                professionId,
+                employeurId,
+                employeur,
+                typeContrat,
+                ancienneteMois,
+                lieuActivite,
+                modeEpargne,
+                paysResidenceId,
+                villeResidence,
+                relaisNom,
+                relaisPhoneE164,
                 clientCreatedAt,
                 prospectId,
                 outcome,
@@ -431,6 +522,17 @@ class SyncEntityDataDto {
                 other.canalProvenanceId,
                 other.incomeBandId,
                 other.paymentMode,
+                other.professionId,
+                other.employeurId,
+                other.employeur,
+                other.typeContrat,
+                other.ancienneteMois,
+                other.lieuActivite,
+                other.modeEpargne,
+                other.paysResidenceId,
+                other.villeResidence,
+                other.relaisNom,
+                other.relaisPhoneE164,
                 other.clientCreatedAt,
                 other.prospectId,
                 other.outcome,
@@ -485,6 +587,17 @@ class SyncEntityDataDto {
         canalProvenanceId,
         incomeBandId,
         paymentMode,
+        professionId,
+        employeurId,
+        employeur,
+        typeContrat,
+        ancienneteMois,
+        lieuActivite,
+        modeEpargne,
+        paysResidenceId,
+        villeResidence,
+        relaisNom,
+        relaisPhoneE164,
         clientCreatedAt,
         prospectId,
         outcome,

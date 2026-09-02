@@ -325,6 +325,7 @@ function ReasonFormDialog({
     );
   }, [open, reason, reset]);
 
+  // oxlint-disable-next-line react/incompatible-library -- faux positif react-hook-form
   const effect = watch('effect');
   const color = watch('color');
 

@@ -193,6 +193,7 @@ function TemplateFormDialog({
 
   useEffect(() => {
     if (!open) return;
+    // oxlint-disable-next-line react/set-state-in-effect -- formulaire recalé à l'ouverture
     setName(template?.name ?? '');
     setCategory(template?.category ?? 'ANNONCE');
     setTitleTemplate(template?.titleTemplate ?? '');

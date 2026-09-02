@@ -85,6 +85,32 @@ function totalDiffs(job: VisitesImportJob): number {
   return job.createdRows + job.updatedRows;
 }
 
+interface Rapport {
+  id: string | undefined;
+  pret: boolean;
+  created: number;
+  updated: number;
+}
+
+function rapportDe(job: VisitesImportJob | undefined): Rapport {
+  return {
+    id: job?.id,
+    pret: job?.status === 'succeeded' && job.mode === 'DRY_RUN',
+    created: job?.createdRows ?? 0,
+    updated: job?.updatedRows ?? 0,
+  };
+}
+
+/** La péremption du rapport se relit à chaque appel : elle tombe sans geste. */
+function peutAppliquer(
+  job: VisitesImportJob | undefined,
+  selection: { created: number; updated: number },
+): boolean {
+  if (job === undefined || job.status !== 'succeeded' || job.mode !== 'DRY_RUN') return false;
+  if (new Date(job.expiresAt).getTime() <= Date.now()) return false;
+  return selection.created + selection.updated > 0;
+}
+
 export function RegistreImportView() {
   const queryClient = useQueryClient();
   const live = useLive();
@@ -116,14 +142,20 @@ export function RegistreImportView() {
 
   const job = jobQuery.data;
   const diffs = job === undefined ? 0 : totalDiffs(job);
-  const enReview = job?.status === 'succeeded' && job.mode === 'DRY_RUN' && diffs > 0;
+  const {
+    id: rapportId,
+    pret: rapportPret,
+    created: rapportCreated,
+    updated: rapportUpdated,
+  } = rapportDe(job);
+  const enReview = job !== undefined && rapportPret && diffs > 0;
 
   // La sélection démarre calée sur le rapport : le serveur pré-coche tout à la détection.
   useEffect(() => {
-    if (job === undefined) return;
-    if (job.status !== 'succeeded' || job.mode !== 'DRY_RUN') return;
-    setSelection({ created: job.createdRows, updated: job.updatedRows });
-  }, [job?.id, job?.status, job?.mode, job?.createdRows, job?.updatedRows]);
+    if (rapportId === undefined || !rapportPret) return;
+    // oxlint-disable-next-line react/set-state-in-effect -- sélection calée sur le rapport serveur
+    setSelection({ created: rapportCreated, updated: rapportUpdated });
+  }, [rapportId, rapportPret, rapportCreated, rapportUpdated]);
 
   const revueQuery = useQuery({
     queryKey: queryKeys.visitesImportRevue(jobId ?? '', page),
@@ -246,12 +278,7 @@ export function RegistreImportView() {
     deposit.mutate(candidate);
   }
 
-  const canApply =
-    job !== undefined &&
-    job.status === 'succeeded' &&
-    job.mode === 'DRY_RUN' &&
-    new Date(job.expiresAt).getTime() > Date.now() &&
-    selection.created + selection.updated > 0;
+  const canApply = peutAppliquer(job, selection);
 
   return (
     <div className="flex flex-col gap-6">
@@ -354,6 +381,7 @@ export function RegistreImportView() {
         <CardContent className="flex flex-col gap-3">
           {/* Zone de dépôt doublée d'un champ de fichier réel : le glisser-déposer
               n'est pas atteignable au clavier. */}
+          {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- input de fichier associé */}
           <label
             htmlFor={inputId}
             onDragOver={(event) => {
@@ -464,6 +492,43 @@ export function RegistreImportView() {
   );
 }
 
+function EtatAnalyse({ job, running }: { job: VisitesImportJob; running: boolean }) {
+  if (running) {
+    return (
+      <>
+        <LoaderIcon className="size-4 shrink-0 animate-spin" aria-hidden="true" />
+        Lecture du fichier…
+      </>
+    );
+  }
+
+  if (job.status === 'failed') {
+    return (
+      <>
+        <AlertTriangleIcon className="size-4 shrink-0 text-destructive" aria-hidden="true" />
+        {job.failureMsg ?? 'Le travail a échoué.'}
+      </>
+    );
+  }
+
+  if (job.status === 'expired') {
+    return (
+      <>
+        <AlertTriangleIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        Échéance passée : redéposez le fichier pour recommencer.
+      </>
+    );
+  }
+
+  return (
+    <>
+      <CheckCircle2Icon className="size-4 shrink-0 text-success" aria-hidden="true" />
+      Analyse terminée
+      {job.finishedAt === null ? '' : `, le ${formatDateTime(job.finishedAt)}`}.
+    </>
+  );
+}
+
 function AnalysePanel({ job, onReset }: { job: VisitesImportJob; onReset: () => void }) {
   const running = isRunning(job);
   const applied = job.status === 'succeeded' && job.mode === 'APPLY';
@@ -481,46 +546,7 @@ function AnalysePanel({ job, onReset }: { job: VisitesImportJob; onReset: () => 
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <p role="status" className="flex items-center gap-2 text-[0.9375rem] tabular-nums">
-          {(() => {
-            if (running)
-              return (
-                <>
-                  <LoaderIcon className="size-4 shrink-0 animate-spin" aria-hidden="true" />
-                  Lecture du fichier…
-                </>
-              );
-            return (() => {
-              if (job.status === 'failed')
-                return (
-                  <>
-                    <AlertTriangleIcon
-                      className="size-4 shrink-0 text-destructive"
-                      aria-hidden="true"
-                    />
-                    {job.failureMsg ?? 'Le travail a échoué.'}
-                  </>
-                );
-              return (() => {
-                if (job.status === 'expired')
-                  return (
-                    <>
-                      <AlertTriangleIcon
-                        className="size-4 shrink-0 text-muted-foreground"
-                        aria-hidden="true"
-                      />
-                      Échéance passée : redéposez le fichier pour recommencer.
-                    </>
-                  );
-                return (
-                  <>
-                    <CheckCircle2Icon className="size-4 shrink-0 text-success" aria-hidden="true" />
-                    Analyse terminée
-                    {job.finishedAt === null ? '' : `, le ${formatDateTime(job.finishedAt)}`}.
-                  </>
-                );
-              })();
-            })();
-          })()}
+          <EtatAnalyse job={job} running={running} />
         </p>
 
         {running ? null : (
@@ -555,41 +581,7 @@ function AnalysePanel({ job, onReset }: { job: VisitesImportJob; onReset: () => 
         ) : null}
 
         {job.report !== null && job.report.errors.length > 0 ? (
-          <div className="flex flex-col gap-2">
-            <h3 className="flex items-center gap-2 text-[0.9375rem] font-[600]">
-              <AlertTriangleIcon className="size-4 text-destructive" aria-hidden="true" />
-              Lignes refusées
-            </h3>
-            <p className="text-[0.8125rem] text-muted-foreground">
-              {formatNumber(job.report.errorRows)} ligne{job.report.errorRows > 1 ? 's' : ''}{' '}
-              refusée
-              {job.report.errorRows > 1 ? 's' : ''}
-              {job.report.truncated
-                ? `, ${formatNumber(job.report.maxReportedErrors)} premières affichées.`
-                : '.'}{' '}
-              Le numéro est celui de la ligne dans le classeur, en-tête compris.
-            </p>
-            <div className="rounded-lg border border-border">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="w-24">Ligne</TableHead>
-                    <TableHead className="w-56">Colonne</TableHead>
-                    <TableHead>Motif</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {job.report.errors.map((error, index) => (
-                    <TableRow key={`${String(error.rowNumber)}-${error.code}-${String(index)}`}>
-                      <TableCell className="tabular-nums">{error.rowNumber}</TableCell>
-                      <TableCell className="text-muted-foreground">{error.column ?? '–'}</TableCell>
-                      <TableCell>{error.message}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
+          <RapportErreurs report={job.report} />
         ) : null}
 
         {running ? null : (
@@ -601,6 +593,46 @@ function AnalysePanel({ job, onReset }: { job: VisitesImportJob; onReset: () => 
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function RapportErreurs({ report }: { report: NonNullable<VisitesImportJob['report']> }) {
+  const pluriel = report.errorRows > 1 ? 's' : '';
+
+  return (
+    <div className="flex flex-col gap-2">
+      <h3 className="flex items-center gap-2 text-[0.9375rem] font-[600]">
+        <AlertTriangleIcon className="size-4 text-destructive" aria-hidden="true" />
+        Lignes refusées
+      </h3>
+      <p className="text-[0.8125rem] text-muted-foreground">
+        {formatNumber(report.errorRows)} ligne{pluriel} refusée{pluriel}
+        {report.truncated
+          ? `, ${formatNumber(report.maxReportedErrors)} premières affichées.`
+          : '.'}{' '}
+        Le numéro est celui de la ligne dans le classeur, en-tête compris.
+      </p>
+      <div className="rounded-lg border border-border">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="w-24">Ligne</TableHead>
+              <TableHead className="w-56">Colonne</TableHead>
+              <TableHead>Motif</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {report.errors.map((error, index) => (
+              <TableRow key={`${String(error.rowNumber)}-${error.code}-${String(index)}`}>
+                <TableCell className="tabular-nums">{error.rowNumber}</TableCell>
+                <TableCell className="text-muted-foreground">{error.column ?? '–'}</TableCell>
+                <TableCell>{error.message}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
   );
 }
 
@@ -810,6 +842,32 @@ function ChangeRow({
   );
 }
 
+function ResumeSelection({ selection }: { selection: { created: number; updated: number } }) {
+  const pluralCreees = selection.created > 1 ? 's' : '';
+
+  return (
+    <>
+      {selection.created > 0 ? (
+        <>
+          <span className="font-display text-[1.5rem] font-[800] tabular-nums">
+            {formatNumber(selection.created)}
+          </span>{' '}
+          visite{pluralCreees} créée{pluralCreees}
+          {selection.updated > 0 ? ' et ' : ''}
+        </>
+      ) : null}
+      {selection.updated > 0 ? (
+        <>
+          <span className="font-display text-[1.5rem] font-[800] tabular-nums">
+            {formatNumber(selection.updated)}
+          </span>{' '}
+          corrigée{selection.updated > 1 ? 's' : ''}
+        </>
+      ) : null}
+    </>
+  );
+}
+
 function ApplyDialog({
   job,
   selection,
@@ -836,24 +894,7 @@ function ApplyDialog({
             </DialogHeader>
 
             <p className="rounded-md border border-border bg-secondary px-3 py-2.5 text-[0.875rem]">
-              {selection.created > 0 ? (
-                <>
-                  <span className="font-display text-[1.5rem] font-[800] tabular-nums">
-                    {formatNumber(selection.created)}
-                  </span>{' '}
-                  visite{selection.created > 1 ? 's' : ''} créée{selection.created > 1 ? 's' : ''}
-                  {selection.updated > 0 ? ' et ' : ''}
-                </>
-              ) : null}
-              {selection.updated > 0 ? (
-                <>
-                  <span className="font-display text-[1.5rem] font-[800] tabular-nums">
-                    {formatNumber(selection.updated)}
-                  </span>{' '}
-                  corrigée{selection.updated > 1 ? 's' : ''}
-                </>
-              ) : null}{' '}
-              à partir de « {job.fileName} ».
+              <ResumeSelection selection={selection} /> à partir de « {job.fileName} ».
             </p>
 
             <DialogFooter>

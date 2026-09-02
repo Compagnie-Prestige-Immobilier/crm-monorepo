@@ -34,6 +34,7 @@ import {
   PROFESSIONS,
   WHATSAPP_STATUS_LABELS,
   WHATSAPP_STATUSES,
+  type RepresentantScript,
   type UpdateRepresentantPatch,
   type WhatsappStatus,
 } from '@/lib/data/representants';
@@ -79,6 +80,363 @@ export interface RepresentantPrefill {
   fullName: string;
   phone: string;
   notes: string;
+}
+
+function ChampMotifRefus({
+  visible,
+  reasonId,
+  value,
+  onChange,
+}: {
+  visible: boolean;
+  reasonId: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  if (!visible) return null;
+
+  return (
+    <div className="mt-1 flex flex-col gap-1.5">
+      <Label htmlFor={reasonId}>Motif du refus</Label>
+      <Input
+        id={reasonId}
+        value={value}
+        maxLength={500}
+        autoComplete="off"
+        placeholder="Ce qu’il a répondu"
+        onChange={(event) => {
+          onChange(event.target.value);
+        }}
+      />
+      <p className="text-[0.75rem] text-muted-foreground">
+        Facultatif. Repris tel quel dans l’histoire de la relation.
+      </p>
+    </div>
+  );
+}
+
+function EnTeteFiche({ isEdit }: { isEdit: boolean }) {
+  return (
+    <DialogHeader>
+      <DialogTitle>{isEdit ? 'Modifier le représentant' : 'Nouveau représentant'}</DialogTitle>
+      <DialogDescription>
+        {isEdit
+          ? 'Le numéro sert de clé de rattachement des prospects déjà saisis.'
+          : 'Une fiche naît normalement en tournée. Cette saisie couvre l’exception.'}
+      </DialogDescription>
+    </DialogHeader>
+  );
+}
+
+function AideNumero({
+  phoneId,
+  conflict,
+  verification,
+}: {
+  phoneId: string;
+  conflict: { label: string; owner: string | null } | null;
+  verification: boolean;
+}) {
+  if (conflict === null) {
+    return (
+      <p id={`${phoneId}-aide`} className="text-[0.75rem] text-muted-foreground">
+        Vérifié contre la base avant enregistrement.
+        {verification ? ' Vérification en cours…' : ''}
+      </p>
+    );
+  }
+
+  return (
+    <p
+      id={`${phoneId}-conflit`}
+      role="alert"
+      className="flex flex-wrap items-center gap-1.5 text-[0.75rem] text-destructive"
+    >
+      <AlertTriangleIcon className="size-3.5 shrink-0" aria-hidden="true" />
+      Ce numéro est déjà celui de {conflict.label}
+      {conflict.owner === null ? '.' : `, saisi par ${conflict.owner}.`}
+    </p>
+  );
+}
+
+interface ChampsQualificationProps {
+  ids: { prenomId: string; etablissementId: string; connaitUESId: string; contacteId: string };
+  prenom: string;
+  onPrenom: (value: string) => void;
+  etablissement: string;
+  onEtablissement: (value: string) => void;
+  syndicatId: string | null;
+  syndicatOptions: { value: string; label: string; hint: string }[];
+  onSyndicat: (value: string | null) => void;
+  connaitUES: boolean | null;
+  onConnaitUES: (value: boolean | null) => void;
+  contacte: boolean | null;
+  onContacte: (value: boolean | null) => void;
+}
+
+/** Ce que l'appel a appris de la personne, hors campagne en cours. */
+function ChampsQualification(props: ChampsQualificationProps) {
+  return (
+    <>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor={props.ids.prenomId}>Prénom</Label>
+          <Input
+            id={props.ids.prenomId}
+            value={props.prenom}
+            maxLength={120}
+            autoComplete="off"
+            onChange={(event) => {
+              props.onPrenom(event.target.value);
+            }}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor={props.ids.etablissementId}>Établissement</Label>
+          <Input
+            id={props.ids.etablissementId}
+            value={props.etablissement}
+            maxLength={160}
+            autoComplete="off"
+            onChange={(event) => {
+              props.onEtablissement(event.target.value);
+            }}
+          />
+        </div>
+      </div>
+
+      <FilterCombobox
+        label="Syndicat"
+        placeholder="Choisir un syndicat"
+        value={props.syndicatId}
+        options={props.syndicatOptions}
+        onChange={props.onSyndicat}
+      />
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor={props.ids.connaitUESId}>Connaît l’UES</Label>
+          <Select
+            items={TRISTATE_ITEMS}
+            value={triToString(props.connaitUES)}
+            onValueChange={(value) => {
+              if (value === null) return;
+              props.onConnaitUES(triFromString(value));
+            }}
+          >
+            <SelectTrigger id={props.ids.connaitUESId} className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TRISTATE_ITEMS.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor={props.ids.contacteId}>Déjà contacté</Label>
+          <Select
+            items={TRISTATE_ITEMS}
+            value={triToString(props.contacte)}
+            onValueChange={(value) => {
+              if (value === null) return;
+              props.onContacte(triFromString(value));
+            }}
+          >
+            <SelectTrigger id={props.ids.contacteId} className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TRISTATE_ITEMS.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    </>
+  );
+}
+
+type Referentiels = Awaited<ReturnType<typeof fetchReferenceData>> | undefined;
+
+function referentielsDe(
+  reference: Referentiels,
+  choix: { syndicat: string; departementId: string | null; regionDraft: string | null },
+) {
+  const departements = reference?.departements ?? [];
+  const syndicats = reference?.syndicats ?? [];
+
+  return {
+    departements,
+    syndicatOptions: syndicats
+      .filter((item) => item.isActive)
+      .map((item) => ({ value: item.id, label: item.name, hint: item.sigle })),
+    // Le champ stocke le NOM du syndicat ; le combobox choisit par id, résolu ici.
+    syndicatId: syndicats.find((item) => item.name === choix.syndicat)?.id ?? null,
+    regionId:
+      departements.find((departement) => departement.id === choix.departementId)?.regionId ??
+      choix.regionDraft,
+  };
+}
+
+function ficheEnvoyable(etat: {
+  fullName: string;
+  phone: string;
+  departementId: string | null;
+  sansConflit: boolean;
+  pending: boolean;
+}): boolean {
+  const nom = etat.fullName.trim().length;
+  const chiffres = etat.phone.trim().replace(/\D/gu, '').length;
+  return (
+    nom >= 2 &&
+    nom <= 160 &&
+    chiffres >= 9 &&
+    etat.departementId !== null &&
+    etat.sansConflit &&
+    !etat.pending
+  );
+}
+
+interface SaisieFiche {
+  fullName: string;
+  phone: string;
+  departementId: string;
+  notes: string;
+  iefId: string | null;
+  relationStatus: RepresentantRelation;
+  relationReason: string;
+  switchingToRefus: boolean;
+  whatsappStatus: WhatsappStatus;
+  whatsappNumber: string;
+  profession: string;
+  prenom: string;
+  etablissement: string;
+  syndicat: string;
+  connaitUES: boolean | null;
+  contacte: boolean | null;
+}
+
+function corpsDeCreation(saisie: SaisieFiche): Parameters<typeof createRepresentant>[0] {
+  const body: Parameters<typeof createRepresentant>[0] = {
+    fullName: saisie.fullName.trim(),
+    phone: saisie.phone.trim(),
+    departementId: saisie.departementId,
+  };
+  if (saisie.iefId !== null) body.iefId = saisie.iefId;
+  const notes = saisie.notes.trim();
+  if (notes !== '') body.notes = notes;
+  return body;
+}
+
+function patchDuScript(
+  saisie: SaisieFiche,
+  savedScript: RepresentantScript | null,
+): UpdateRepresentantPatch {
+  const patch: UpdateRepresentantPatch = {};
+  if (saisie.whatsappStatus !== savedScript?.whatsappStatus) {
+    patch.whatsappStatus = saisie.whatsappStatus;
+  }
+  // Sur MEME_NUMERO le numero se relit sur `phoneE164` : le dupliquer
+  // fabriquerait deux verites a maintenir.
+  if (saisie.whatsappStatus === 'AUTRE_NUMERO' && saisie.whatsappNumber.trim() !== '') {
+    patch.whatsappE164 = saisie.whatsappNumber.trim();
+  }
+  if (saisie.profession.trim() !== (savedScript?.profession ?? '')) {
+    patch.profession = saisie.profession.trim();
+  }
+  return patch;
+}
+
+/** Ne repart que ce qui a CHANGÉ : le serveur refuse une bascule sans écart. */
+function patchDeFiche(
+  representant: RepresentantRow,
+  saisie: SaisieFiche,
+  savedScript: RepresentantScript | null,
+): UpdateRepresentantPatch {
+  const patch: UpdateRepresentantPatch = {
+    fullName: saisie.fullName.trim(),
+    phone: saisie.phone.trim(),
+    departementId: saisie.departementId,
+    notes: saisie.notes.trim(),
+  };
+  if (saisie.iefId !== null) patch.iefId = saisie.iefId;
+  // Un statut inchangé n'est PAS renvoyé : le serveur le refuserait sans rien
+  // écrire, et l'écran laisserait croire à une bascule historisée.
+  if (saisie.relationStatus !== representant.relationStatus) {
+    patch.relationStatus = saisie.relationStatus;
+  }
+  const reason = saisie.relationReason.trim();
+  if (saisie.switchingToRefus && reason !== '') patch.relationReason = reason;
+
+  Object.assign(patch, patchDuScript(saisie, savedScript));
+  if (saisie.prenom.trim() !== (representant.prenom ?? '')) patch.prenom = saisie.prenom.trim();
+  if (saisie.etablissement.trim() !== (representant.etablissement ?? '')) {
+    patch.etablissement = saisie.etablissement.trim();
+  }
+  if (saisie.syndicat.trim() !== (representant.syndicat ?? '')) {
+    patch.syndicat = saisie.syndicat.trim();
+  }
+  // Le contrat n'admet que `boolean` : « Indéterminé » ne peut pas remettre la
+  // valeur à null, il laisse donc la fiche telle quelle.
+  if (saisie.connaitUES !== null && saisie.connaitUES !== representant.connaitUES) {
+    patch.connaitUES = saisie.connaitUES;
+  }
+  if (saisie.contacte !== null && saisie.contacte !== representant.contacte) {
+    patch.contacte = saisie.contacte;
+  }
+  return patch;
+}
+
+function champsDeFiche(representant: RepresentantRow | null, prefill: RepresentantPrefill | null) {
+  if (representant === null) {
+    return {
+      fullName: prefill?.fullName ?? '',
+      prenom: '',
+      etablissement: '',
+      syndicat: '',
+      connaitUES: null as boolean | null,
+      contacte: null as boolean | null,
+      phone: prefill?.phone ?? '',
+      departementId: null as string | null,
+      iefId: null as string | null,
+      notes: prefill?.notes ?? '',
+      relationStatus: 'INCONNU' as RepresentantRelation,
+    };
+  }
+
+  return {
+    fullName: representant.fullName,
+    prenom: representant.prenom ?? '',
+    etablissement: representant.etablissement ?? '',
+    syndicat: representant.syndicat ?? '',
+    connaitUES: representant.connaitUES ?? null,
+    contacte: representant.contacte ?? null,
+    phone: formatPhone(representant.phoneE164),
+    departementId: representant.departementId as string | null,
+    iefId: representant.iefId ?? null,
+    notes: representant.notes ?? prefill?.notes ?? '',
+    relationStatus: representant.relationStatus as RepresentantRelation,
+  };
+}
+
+function valeursDeFiche(
+  representant: RepresentantRow | null,
+  prefill: RepresentantPrefill | null,
+  savedScript: RepresentantScript | null,
+) {
+  return {
+    ...champsDeFiche(representant, prefill),
+    whatsappStatus: savedScript?.whatsappStatus ?? ('NON_DEMANDE' as WhatsappStatus),
+    whatsappNumber: savedScript?.whatsappE164 ?? '',
+    profession: savedScript?.profession ?? '',
+  };
 }
 
 export function RepresentantFormDialog({
@@ -145,22 +503,24 @@ export function RepresentantFormDialog({
 
   useEffect(() => {
     if (!open) return;
-    setFullName(representant?.fullName ?? prefill?.fullName ?? '');
-    setPrenom(representant?.prenom ?? '');
-    setEtablissement(representant?.etablissement ?? '');
-    setSyndicat(representant?.syndicat ?? '');
-    setConnaitUES(representant?.connaitUES ?? null);
-    setContacte(representant?.contacte ?? null);
-    setPhone(representant === null ? (prefill?.phone ?? '') : formatPhone(representant.phoneE164));
+    const depart = valeursDeFiche(representant, prefill, savedScript);
+    // oxlint-disable-next-line react/set-state-in-effect -- formulaire recalé à l'ouverture
+    setFullName(depart.fullName);
+    setPrenom(depart.prenom);
+    setEtablissement(depart.etablissement);
+    setSyndicat(depart.syndicat);
+    setConnaitUES(depart.connaitUES);
+    setContacte(depart.contacte);
+    setPhone(depart.phone);
     setRegionDraft(null);
-    setDepartementId(representant?.departementId ?? null);
-    setIefId(representant?.iefId ?? null);
-    setNotes(representant?.notes ?? prefill?.notes ?? '');
-    setRelationStatus(representant?.relationStatus ?? 'INCONNU');
+    setDepartementId(depart.departementId);
+    setIefId(depart.iefId);
+    setNotes(depart.notes);
+    setRelationStatus(depart.relationStatus);
     setRelationReason('');
-    setWhatsappStatus(savedScript?.whatsappStatus ?? 'NON_DEMANDE');
-    setWhatsappNumber(savedScript?.whatsappE164 ?? '');
-    setProfession(savedScript?.profession ?? '');
+    setWhatsappStatus(depart.whatsappStatus);
+    setWhatsappNumber(depart.whatsappNumber);
+    setProfession(depart.profession);
     setConflict(null);
   }, [open, representant, prefill, savedScript]);
 
@@ -171,14 +531,11 @@ export function RepresentantFormDialog({
     enabled: open,
   });
 
-  const departements = reference?.departements ?? [];
-  const syndicatOptions = (reference?.syndicats ?? [])
-    .filter((item) => item.isActive)
-    .map((item) => ({ value: item.id, label: item.name, hint: item.sigle }));
-  // Le champ stocke le NOM du syndicat ; le combobox choisit par id, résolu ici.
-  const syndicatId = reference?.syndicats.find((item) => item.name === syndicat)?.id ?? null;
-  const regionId =
-    departements.find((departement) => departement.id === departementId)?.regionId ?? regionDraft;
+  const { departements, syndicatOptions, syndicatId, regionId } = referentielsDe(reference, {
+    syndicat,
+    departementId,
+    regionDraft,
+  });
 
   const checkPhone = useMutation({
     mutationFn: (value: string) => lookupRepresentantByPhone(value),
@@ -204,53 +561,30 @@ export function RepresentantFormDialog({
   const save = useMutation({
     mutationFn: () => {
       if (departementId === null) throw new Error('Département manquant.');
-
-      if (representant !== null) {
-        const patch: UpdateRepresentantPatch = {
-          fullName: fullName.trim(),
-          phone: phone.trim(),
-          departementId,
-          notes: notes.trim(),
-        };
-        if (iefId !== null) patch.iefId = iefId;
-        // Un statut inchangé n'est PAS renvoyé : le serveur le refuserait sans
-        // rien écrire, et l'écran laisserait croire à une bascule historisée.
-        if (relationStatus !== representant.relationStatus) patch.relationStatus = relationStatus;
-        const reason = relationReason.trim();
-        if (switchingToRefus && reason !== '') patch.relationReason = reason;
-
-        if (whatsappStatus !== savedScript?.whatsappStatus) patch.whatsappStatus = whatsappStatus;
-        // Sur MEME_NUMERO le numero se relit sur `phoneE164` : le dupliquer
-        // fabriquerait deux verites a maintenir.
-        if (whatsappStatus === 'AUTRE_NUMERO' && whatsappNumber.trim() !== '') {
-          patch.whatsappE164 = whatsappNumber.trim();
-        }
-        if (profession.trim() !== (savedScript?.profession ?? '')) {
-          patch.profession = profession.trim();
-        }
-        if (prenom.trim() !== (representant.prenom ?? '')) patch.prenom = prenom.trim();
-        if (etablissement.trim() !== (representant.etablissement ?? '')) {
-          patch.etablissement = etablissement.trim();
-        }
-        if (syndicat.trim() !== (representant.syndicat ?? '')) patch.syndicat = syndicat.trim();
-        // Le contrat n'admet que `boolean` : « Indéterminé » ne peut pas remettre
-        // la valeur à null, il laisse donc la fiche telle quelle.
-        if (connaitUES !== null && connaitUES !== representant.connaitUES) {
-          patch.connaitUES = connaitUES;
-        }
-        if (contacte !== null && contacte !== representant.contacte) patch.contacte = contacte;
-        return updateRepresentant(representant.id, patch);
-      }
-
-      const body: Parameters<typeof createRepresentant>[0] = {
-        fullName: fullName.trim(),
-        phone: phone.trim(),
+      const saisie: SaisieFiche = {
+        fullName,
+        phone,
         departementId,
+        notes,
+        iefId,
+        relationStatus,
+        relationReason,
+        switchingToRefus,
+        whatsappStatus,
+        whatsappNumber,
+        profession,
+        prenom,
+        etablissement,
+        syndicat,
+        connaitUES,
+        contacte,
       };
-      if (iefId !== null) body.iefId = iefId;
-      const trimmedNotes = notes.trim();
-      if (trimmedNotes !== '') body.notes = trimmedNotes;
-      return createRepresentant(body);
+
+      if (representant === null) return createRepresentant(corpsDeCreation(saisie));
+      return updateRepresentant(
+        representant.id,
+        patchDeFiche(representant, saisie, savedScript ?? null),
+      );
     },
     onSuccess: (saved) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.representantsRoot });
@@ -264,10 +598,13 @@ export function RepresentantFormDialog({
     },
   });
 
-  const nameValid = fullName.trim().length >= 2 && fullName.trim().length <= 160;
-  const phoneValid = phone.trim().replace(/\D/gu, '').length >= 9;
-  const canSubmit =
-    nameValid && phoneValid && departementId !== null && conflict === null && !save.isPending;
+  const canSubmit = ficheEnvoyable({
+    fullName,
+    phone,
+    departementId,
+    sansConflit: conflict === null,
+    pending: save.isPending,
+  });
 
   return (
     <Dialog
@@ -278,14 +615,7 @@ export function RepresentantFormDialog({
       }}
     >
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? 'Modifier le représentant' : 'Nouveau représentant'}</DialogTitle>
-          <DialogDescription>
-            {isEdit
-              ? 'Le numéro sert de clé de rattachement des prospects déjà saisis.'
-              : 'Une fiche naît normalement en tournée. Cette saisie couvre l’exception.'}
-          </DialogDescription>
-        </DialogHeader>
+        <EnTeteFiche isEdit={isEdit} />
 
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
@@ -331,22 +661,7 @@ export function RepresentantFormDialog({
                 if (value.replace(/\D/gu, '').length >= 9) checkPhone.mutate(value);
               }}
             />
-            {conflict === null ? (
-              <p id={`${phoneId}-aide`} className="text-[0.75rem] text-muted-foreground">
-                Vérifié contre la base avant enregistrement.
-                {checkPhone.isPending ? ' Vérification en cours…' : ''}
-              </p>
-            ) : (
-              <p
-                id={`${phoneId}-conflit`}
-                role="alert"
-                className="flex flex-wrap items-center gap-1.5 text-[0.75rem] text-destructive"
-              >
-                <AlertTriangleIcon className="size-3.5 shrink-0" aria-hidden="true" />
-                Ce numéro est déjà celui de {conflict.label}
-                {conflict.owner === null ? '.' : `, saisi par ${conflict.owner}.`}
-              </p>
-            )}
+            <AideNumero phoneId={phoneId} conflict={conflict} verification={checkPhone.isPending} />
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -427,24 +742,12 @@ export function RepresentantFormDialog({
                 Chaque changement est daté et signé dans l’histoire de la fiche.
               </p>
 
-              {switchingToRefus ? (
-                <div className="mt-1 flex flex-col gap-1.5">
-                  <Label htmlFor={reasonId}>Motif du refus</Label>
-                  <Input
-                    id={reasonId}
-                    value={relationReason}
-                    maxLength={500}
-                    autoComplete="off"
-                    placeholder="Ce qu’il a répondu"
-                    onChange={(event) => {
-                      setRelationReason(event.target.value);
-                    }}
-                  />
-                  <p className="text-[0.75rem] text-muted-foreground">
-                    Facultatif. Repris tel quel dans l’histoire de la relation.
-                  </p>
-                </div>
-              ) : null}
+              <ChampMotifRefus
+                visible={switchingToRefus}
+                reasonId={reasonId}
+                value={relationReason}
+                onChange={setRelationReason}
+              />
             </div>
           ) : null}
 
@@ -518,93 +821,22 @@ export function RepresentantFormDialog({
           ) : null}
 
           {isEdit && !pendantAppel ? (
-            <>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor={prenomId}>Prénom</Label>
-                  <Input
-                    id={prenomId}
-                    value={prenom}
-                    maxLength={120}
-                    autoComplete="off"
-                    onChange={(event) => {
-                      setPrenom(event.target.value);
-                    }}
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor={etablissementId}>Établissement</Label>
-                  <Input
-                    id={etablissementId}
-                    value={etablissement}
-                    maxLength={160}
-                    autoComplete="off"
-                    onChange={(event) => {
-                      setEtablissement(event.target.value);
-                    }}
-                  />
-                </div>
-              </div>
-
-              <FilterCombobox
-                label="Syndicat"
-                placeholder="Choisir un syndicat"
-                value={syndicatId}
-                options={syndicatOptions}
-                onChange={(value) => {
-                  setSyndicat(
-                    reference?.syndicats.find((item) => item.id === value)?.name ?? '',
-                  );
-                }}
-              />
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor={connaitUESId}>Connaît l’UES</Label>
-                  <Select
-                    items={TRISTATE_ITEMS}
-                    value={triToString(connaitUES)}
-                    onValueChange={(value) => {
-                      if (value === null) return;
-                      setConnaitUES(triFromString(value));
-                    }}
-                  >
-                    <SelectTrigger id={connaitUESId} className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TRISTATE_ITEMS.map((item) => (
-                        <SelectItem key={item.value} value={item.value}>
-                          {item.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor={contacteId}>Déjà contacté</Label>
-                  <Select
-                    items={TRISTATE_ITEMS}
-                    value={triToString(contacte)}
-                    onValueChange={(value) => {
-                      if (value === null) return;
-                      setContacte(triFromString(value));
-                    }}
-                  >
-                    <SelectTrigger id={contacteId} className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TRISTATE_ITEMS.map((item) => (
-                        <SelectItem key={item.value} value={item.value}>
-                          {item.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </>
+            <ChampsQualification
+              ids={{ prenomId, etablissementId, connaitUESId, contacteId }}
+              prenom={prenom}
+              onPrenom={setPrenom}
+              etablissement={etablissement}
+              onEtablissement={setEtablissement}
+              syndicatId={syndicatId}
+              syndicatOptions={syndicatOptions}
+              onSyndicat={(value) => {
+                setSyndicat(reference?.syndicats.find((item) => item.id === value)?.name ?? '');
+              }}
+              connaitUES={connaitUES}
+              onConnaitUES={setConnaitUES}
+              contacte={contacte}
+              onContacte={setContacte}
+            />
           ) : null}
 
           <div className="flex flex-col gap-1.5">

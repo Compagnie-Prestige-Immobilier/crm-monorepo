@@ -75,10 +75,10 @@ class LotExportDetailDto {
   @JsonKey(
     name: r'projet',
     required: true,
-    includeIfNull: true,
+    includeIfNull: false,
     unknownEnumValue: Projet.unknownDefaultOpenApi,
   )
-  final Projet? projet;
+  final Projet projet;
 
   @JsonKey(name: r'scopeLabel', required: true, includeIfNull: false)
   final String scopeLabel;

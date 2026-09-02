@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HubView } from '@/components/chues/hub-view';
@@ -115,6 +115,15 @@ describe('HubView : les trois étapes, dans l’ordre', () => {
       '/chues/prospects/nouveau',
       '/chues/console',
     ]);
+  });
+
+  it('ouvre la saisie complète d’un représentant depuis l’accueil', () => {
+    renderWithQuery(<HubView prenom="Fatou" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ajouter un représentant' }));
+
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Nouveau représentant' })).toBeTruthy();
   });
 
   it('montre un tiret plutôt qu’un chiffre faux quand l’API refuse', async () => {

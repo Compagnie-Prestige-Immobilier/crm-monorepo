@@ -13,7 +13,7 @@ abstract class _$CreateLotExportDtoCWProxy {
 
   CreateLotExportDto representants(RepresentantExportQueryDto? representants);
 
-  CreateLotExportDto prospects(ProspectFilterDto? prospects);
+  CreateLotExportDto prospects(LotExportProspectFilterDto? prospects);
 
   CreateLotExportDto distribution(LotExportDistributionInputDto distribution);
 
@@ -27,7 +27,7 @@ abstract class _$CreateLotExportDtoCWProxy {
     String name,
     LotExportCible cible,
     RepresentantExportQueryDto? representants,
-    ProspectFilterDto? prospects,
+    LotExportProspectFilterDto? prospects,
     LotExportDistributionInputDto distribution,
   });
 }
@@ -49,7 +49,7 @@ class _$CreateLotExportDtoCWProxyImpl implements _$CreateLotExportDtoCWProxy {
       this(representants: representants);
 
   @override
-  CreateLotExportDto prospects(ProspectFilterDto? prospects) =>
+  CreateLotExportDto prospects(LotExportProspectFilterDto? prospects) =>
       this(prospects: prospects);
 
   @override
@@ -86,7 +86,7 @@ class _$CreateLotExportDtoCWProxyImpl implements _$CreateLotExportDtoCWProxy {
       prospects: prospects == const $CopyWithPlaceholder()
           ? _value.prospects
           // ignore: cast_nullable_to_non_nullable
-          : prospects as ProspectFilterDto?,
+          : prospects as LotExportProspectFilterDto?,
       distribution: distribution == const $CopyWithPlaceholder()
           ? _value.distribution
           // ignore: cast_nullable_to_non_nullable
@@ -129,7 +129,7 @@ CreateLotExportDto _$CreateLotExportDtoFromJson(Map<String, dynamic> json) =>
           'prospects',
           (v) => v == null
               ? null
-              : ProspectFilterDto.fromJson(v as Map<String, dynamic>),
+              : LotExportProspectFilterDto.fromJson(v as Map<String, dynamic>),
         ),
         distribution: $checkedConvert(
           'distribution',

@@ -88,7 +88,9 @@ function lignes(page: Page) {
 
 async function chercher(page: Page, terme: string): Promise<void> {
   await page.getByRole('textbox', { name: 'Rechercher' }).fill(terme);
-  await expect(page).toHaveURL(new RegExp(`search=${encodeURIComponent(terme).replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}`));
+  await expect(page).toHaveURL(
+    new RegExp(`search=${encodeURIComponent(terme).replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}`),
+  );
 }
 
 test('GP-01 la liste rend sa page, pas seulement la coque du panel', async ({ page }) => {
@@ -96,7 +98,9 @@ test('GP-01 la liste rend sa page, pas seulement la coque du panel', async ({ pa
 
   await expect(page).toHaveTitle(/Prospects Grand Public/);
   await expect(
-    page.getByText('Les particuliers démarchés hors syndicat. Les fiches CHUES ne figurent pas ici.'),
+    page.getByText(
+      'Les particuliers démarchés hors syndicat. Les fiches CHUES ne figurent pas ici.',
+    ),
   ).toBeVisible();
 
   for (const colonne of [
@@ -146,7 +150,9 @@ test('GP-02 le filtre de statut vit dans l’URL et survit au rechargement', asy
   await expect(page).toHaveURL(/\/grand-public\?statut=NOUVEAU$/);
   await expect(compteur(page)).toHaveText(filtre);
   await expect(
-    page.getByRole('group', { name: 'Statut' }).getByRole('button', { name: 'Nouveau', exact: true }),
+    page
+      .getByRole('group', { name: 'Statut' })
+      .getByRole('button', { name: 'Nouveau', exact: true }),
   ).toHaveAttribute('aria-pressed', 'true');
 });
 
@@ -189,7 +195,9 @@ test('GP-04 « Tout effacer » retire tous les critères', async ({ page }) => {
   // que chacun des deux critères a disparu de l'URL ET de son contrôle.
   await expect(page).toHaveURL(/\/grand-public$/);
   await expect(
-    page.getByRole('group', { name: 'Statut' }).getByRole('button', { name: 'Nouveau', exact: true }),
+    page
+      .getByRole('group', { name: 'Statut' })
+      .getByRole('button', { name: 'Nouveau', exact: true }),
   ).toHaveAttribute('aria-pressed', 'false');
   await expect(page.getByRole('button', { name: 'Saisi à partir du' })).toHaveText('dd-mm-yyyy');
   await expect(page.getByRole('button', { name: 'Filtres', exact: true })).toBeVisible();
@@ -203,7 +211,9 @@ test('GP-05 la recherche par téléphone atteint le numéro normalisé', async (
   await expect(compteur(page)).toHaveText(/^Prospects affichés\s*:\s*1–1 sur 1$/u);
   await expect(lignes(page)).toHaveCount(2);
   await expect(
-    page.getByRole('table').getByRole('link', { name: `${PREFIXE} ${PREMIER.nom} +221 78 100 20 01` }),
+    page
+      .getByRole('table')
+      .getByRole('link', { name: `${PREFIXE} ${PREMIER.nom} +221 78 100 20 01` }),
   ).toBeVisible();
 });
 

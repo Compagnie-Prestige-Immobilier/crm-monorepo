@@ -6,6 +6,7 @@ import { formatPhone } from '@/lib/format';
 import type {
   Banque,
   Departement,
+  Employeur,
   FilterOption,
   Ief,
   IncomeBand,
@@ -58,6 +59,8 @@ export async function fetchReferenceData(
     professions: referentiels.professions,
     incomeBands: referentiels.incomeBands,
     offers: referentiels.offers,
+    employeurs: referentiels.employeurs,
+    pays: referentiels.pays,
     commerciaux: listeFacultative(users, (user) => ({
       value: user.id,
       label: user.fullName,
@@ -123,6 +126,14 @@ export async function fetchProfessions(client: ApiClient = getApiClient()): Prom
 export async function fetchIncomeBands(client: ApiClient = getApiClient()): Promise<IncomeBand[]> {
   return unwrap(
     await client.GET('/api/v1/referentiels/tranches-revenu', {
+      params: { query: { activeOnly: false } },
+    }),
+  );
+}
+
+export async function fetchEmployeurs(client: ApiClient = getApiClient()): Promise<Employeur[]> {
+  return unwrap(
+    await client.GET('/api/v1/referentiels/employeurs', {
       params: { query: { activeOnly: false } },
     }),
   );

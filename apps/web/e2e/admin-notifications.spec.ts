@@ -140,11 +140,7 @@ async function redigerVersTemoin(
 test('ADM-NOT-01 · les trois onglets vivent dans l’URL', async ({ page }) => {
   await ouvrirHistorique(page);
 
-  await expect(page.getByRole('tab')).toHaveText([
-    'Boîte de réception',
-    'Historique',
-    'Gabarits',
-  ]);
+  await expect(page.getByRole('tab')).toHaveText(['Boîte de réception', 'Historique', 'Gabarits']);
 
   await page.getByRole('tab', { name: 'Boîte de réception' }).click();
   await expect(page).toHaveURL(/\/admin\/notifications\?onglet=reception$/);
@@ -355,9 +351,9 @@ test('ADM-NOT-08 · le détail d’un envoi porte le titre de la notification', 
   // c'est ne pas savoir quel envoi on regarde.
   await expect(boite.getByRole('heading', { name: 'Détail de l’envoi' })).toHaveCount(0);
   await expect(boite.getByText('Une ligne par destinataire.')).toBeVisible();
-  await expect(boite.getByRole('table').getByRole('row').filter({ hasText: TEMOIN.fullName })).toHaveCount(
-    1,
-  );
+  await expect(
+    boite.getByRole('table').getByRole('row').filter({ hasText: TEMOIN.fullName }),
+  ).toHaveCount(1);
 });
 
 test('ADM-NOT-10 · le composeur reste utilisable à 375 px', async ({ page }) => {

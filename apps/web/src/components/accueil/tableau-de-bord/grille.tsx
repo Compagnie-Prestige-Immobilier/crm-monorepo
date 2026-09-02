@@ -57,70 +57,68 @@ import {
 import { EmptyChart } from '@/components/dashboard/empty-chart';
 import type { DashboardWidget } from '@/lib/data/visites-dashboard';
 
-export function renderMark(
-  source: string,
+type Presentation = DashboardWidget['presentation'];
+type DonneeDe<F extends DonneesSource['forme']> = Extract<DonneesSource, { forme: F }>['donnee'];
+
+function marqueScalaire(
+  donnee: DonneeDe<'scalaire'>,
   marque: DashboardMarque | undefined,
-  donnees: DonneesSource,
-  presentation: DashboardWidget['presentation'],
-  catalogue: Catalogue = SOURCES,
-  messageVide = 'Aucune visite sur la période.',
+  titre: string,
 ): ReactNode {
-  const titre = catalogue[source]?.label ?? source;
-
-  if (donnees.forme === 'equipe') {
-    return <TableauEquipe donnee={donnees.donnee} caption={titre} />;
+  const { valeur, libelle, serie, affichage } = donnee;
+  if (marque === 'jauge')
+    return <JaugeChart valeur={valeur} max={valeur * 1.2 || 1} libelle={titre} />;
+  if (marque === 'tuile-courbe' && serie !== undefined) {
+    return <TuileCourbeWidget valeur={valeur} libelle={titre} serie={serie} />;
   }
+  return (
+    <TuileWidget
+      valeur={valeur}
+      affichage={affichage}
+      libelle={titre}
+      detail={libelle === titre ? undefined : libelle}
+    />
+  );
+}
 
-  if (donnees.forme === 'scalaire') {
-    const { valeur, libelle, serie, affichage } = donnees.donnee;
-    if (marque === 'jauge')
-      return <JaugeChart valeur={valeur} max={valeur * 1.2 || 1} libelle={titre} />;
-    if (marque === 'tuile-courbe' && serie !== undefined) {
-      return <TuileCourbeWidget valeur={valeur} libelle={titre} serie={serie} />;
-    }
-    return (
-      <TuileWidget
-        valeur={valeur}
-        affichage={affichage}
-        libelle={titre}
-        detail={libelle === titre ? undefined : libelle}
-      />
-    );
-  }
-
-  if (donnees.forme === 'matrice') {
-    const { donnee } = donnees;
-    if (donnee.cellules.every((cellule) => cellule.value === 0)) {
-      return <EmptyChart message={messageVide} />;
-    }
-    if (marque === 'nuage') return <NuageChart matrice={donnee} presentation={presentation} />;
-    if (marque === 'bulles') return <BullesChart matrice={donnee} presentation={presentation} />;
-    return <CarteDeChaleurTable matrice={donnee} caption={titre} />;
-  }
-
-  if (donnees.forme === 'composition') {
-    const lignes = donnees.donnee;
-    const items = lignes[0]?.segments ?? [];
-    if (items.every((item) => item.value === 0)) return <EmptyChart message={messageVide} />;
-    if (marque === 'barres-empilees')
-      return <BarresEmpileesChart lignes={lignes} presentation={presentation} />;
-    if (marque === 'anneau') return <AnneauChart items={items} presentation={presentation} />;
-    if (marque === 'camembert') return <CamembertChart items={items} presentation={presentation} />;
-    if (marque === 'tableau') return <TableauWidget items={items} entete={titre} caption={titre} />;
-    return <Barres100Chart lignes={lignes} presentation={presentation} />;
-  }
-
-  // Le tri et le regroupement en « Autres » n'ont de sens que pour un
-  // classement : réordonner une série chronologique ou un cycle la rendrait
-  // illisible, l'ordre porte l'information.
-  const items =
-    donnees.forme === 'classement'
-      ? appliquerPresentation(donnees.donnee, presentation)
-      : donnees.donnee;
-  if (items.length === 0 || items.every((item) => item.value === 0)) {
+function marqueMatrice(
+  donnee: DonneeDe<'matrice'>,
+  marque: DashboardMarque | undefined,
+  titre: string,
+  presentation: Presentation,
+  messageVide: string,
+): ReactNode {
+  if (donnee.cellules.every((cellule) => cellule.value === 0)) {
     return <EmptyChart message={messageVide} />;
   }
+  if (marque === 'nuage') return <NuageChart matrice={donnee} presentation={presentation} />;
+  if (marque === 'bulles') return <BullesChart matrice={donnee} presentation={presentation} />;
+  return <CarteDeChaleurTable matrice={donnee} caption={titre} />;
+}
 
+function marqueComposition(
+  lignes: DonneeDe<'composition'>,
+  marque: DashboardMarque | undefined,
+  titre: string,
+  presentation: Presentation,
+  messageVide: string,
+): ReactNode {
+  const items = lignes[0]?.segments ?? [];
+  if (items.every((item) => item.value === 0)) return <EmptyChart message={messageVide} />;
+  if (marque === 'barres-empilees')
+    return <BarresEmpileesChart lignes={lignes} presentation={presentation} />;
+  if (marque === 'anneau') return <AnneauChart items={items} presentation={presentation} />;
+  if (marque === 'camembert') return <CamembertChart items={items} presentation={presentation} />;
+  if (marque === 'tableau') return <TableauWidget items={items} entete={titre} caption={titre} />;
+  return <Barres100Chart lignes={lignes} presentation={presentation} />;
+}
+
+function marqueSerie(
+  items: DonneeDe<'classement'>,
+  marque: DashboardMarque | undefined,
+  titre: string,
+  presentation: Presentation,
+): ReactNode {
   switch (marque) {
     case 'barres-horizontales':
       return <BarresHorizontalesChart items={items} presentation={presentation} />;
@@ -148,6 +146,35 @@ export function renderMark(
     default:
       return <BarresVerticalesChart items={items} presentation={presentation} />;
   }
+}
+
+export function renderMark(
+  source: string,
+  marque: DashboardMarque | undefined,
+  donnees: DonneesSource,
+  presentation: Presentation,
+  catalogue: Catalogue = SOURCES,
+  messageVide = 'Aucune visite sur la période.',
+): ReactNode {
+  const titre = catalogue[source]?.label ?? source;
+
+  if (donnees.forme === 'equipe') return <TableauEquipe donnee={donnees.donnee} caption={titre} />;
+  if (donnees.forme === 'scalaire') return marqueScalaire(donnees.donnee, marque, titre);
+  if (donnees.forme === 'matrice')
+    return marqueMatrice(donnees.donnee, marque, titre, presentation, messageVide);
+  if (donnees.forme === 'composition')
+    return marqueComposition(donnees.donnee, marque, titre, presentation, messageVide);
+
+  // Le tri et le regroupement en « Autres » n'ont de sens que pour un
+  // classement : réordonner une série chronologique ou un cycle la rendrait
+  // illisible, l'ordre porte l'information.
+  const items =
+    donnees.forme === 'classement'
+      ? appliquerPresentation(donnees.donnee, presentation)
+      : donnees.donnee;
+  if (items.every((item) => item.value === 0)) return <EmptyChart message={messageVide} />;
+
+  return marqueSerie(items, marque, titre, presentation);
 }
 
 /** dnd-kit ne traduit rien par défaut : ces textes seraient sinon lus en anglais. */

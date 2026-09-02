@@ -97,7 +97,7 @@ const apply = (override: Partial<CallAttemptOpDto> = {}): Promise<unknown> =>
   });
 
 const writtenRow = (): Record<string, unknown> =>
-  (tx.callAttempt.createMany.mock.calls[0]?.[0] as { data: Record<string, unknown>[] }).data[0] ??
+  (tx.callAttempt.createMany.mock.calls[0] as [{ data: Record<string, unknown>[] }])[0].data[0] ??
   {};
 
 describe('nature de la tentative écrite', () => {
@@ -107,6 +107,9 @@ describe('nature de la tentative écrite', () => {
 
   it('prospect réel : la tentative est réelle', async () => {
     await apply();
+
+    expect(writtenRow()).toMatchObject({ prospectId: 'p-1', performedById: 'com-1' });
+    expect(writtenRow()).not.toHaveProperty('isDemo');
   });
 });
 
@@ -255,7 +258,7 @@ describe('renseignements de conversion', () => {
 const RAPPEL = '2026-08-02T09:00:00.000Z';
 
 const callbackWritten = (): Record<string, unknown> =>
-  (tx.scheduledCallback.createMany.mock.calls[0]?.[0] as { data: Record<string, unknown>[] })
+  (tx.scheduledCallback.createMany.mock.calls[0] as [{ data: Record<string, unknown>[] }])[0]
     .data[0] ?? {};
 
 describe('rappel planifié', () => {

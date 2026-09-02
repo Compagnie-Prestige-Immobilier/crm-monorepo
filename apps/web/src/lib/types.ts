@@ -15,6 +15,30 @@ export type Syndicat = Schemas['SyndicatDto'];
 export type Profession = Schemas['ProfessionDto'];
 export type IncomeBand = Schemas['IncomeBandDto'];
 export type Offer = Schemas['OfferDto'];
+export type Employeur = Schemas['EmployeurDto'];
+export type EmployeurType = Schemas['EmployeurType'];
+export type Pays = Schemas['PaysDto'];
+export type TypeContrat = Schemas['TypeContrat'];
+export type ModeEpargne = Schemas['ModeEpargne'];
+
+export const EMPLOYEUR_TYPE_LABELS: Record<EmployeurType, string> = {
+  MINISTERE: 'Ministère',
+  ENTREPRISE: 'Entreprise',
+  AUTRE: 'Autre',
+};
+
+export const TYPE_CONTRAT_LABELS: Record<TypeContrat, string> = {
+  CDI: 'CDI',
+  CDD: 'CDD',
+  AUTRE: 'Autre',
+};
+
+export const MODE_EPARGNE_LABELS: Record<ModeEpargne, string> = {
+  TONTINE: 'Tontine',
+  MOBILE_MONEY: 'Mobile money',
+  BANQUE: 'Banque',
+  AUCUN: 'Aucune',
+};
 
 export type SessionUser = Schemas['AuthUserDto'];
 export type UserRow = Schemas['UserDto'];
@@ -71,6 +95,17 @@ export const ROLE_LABELS: Record<Role, string> = {
  */
 export const readsOnly = (role: Role | undefined): boolean =>
   role === 'SUPERVISEUR' || role === 'DIRECTION';
+
+/**
+ * L'export des prospects n'est pas un geste d'écriture : la DIRECTION y a droit
+ * côté API (`@Roles(ADMIN, COMMERCIAL, DIRECTION)`), l'écran le lui laisse.
+ */
+export const canExportProspects = (role: Role | undefined): boolean =>
+  role === 'ADMIN' || role === 'COMMERCIAL' || role === 'DIRECTION';
+
+/** Miroir de `@Roles` sur `GET /export/representants.xlsx`. */
+export const canExportRepresentants = (role: Role | undefined): boolean =>
+  role === 'ADMIN' || role === 'COMMERCIAL' || role === 'SUPERVISEUR' || role === 'DIRECTION';
 
 export const RETIRED_SUFFIX = '(retiré)';
 
@@ -299,6 +334,8 @@ export interface ReferenceData {
   professions: Profession[];
   incomeBands: IncomeBand[];
   offers: Offer[];
+  employeurs: Employeur[];
+  pays: Pays[];
   regions: Region[];
   commerciaux: FilterOption[];
   representants: FilterOption[];

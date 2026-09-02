@@ -80,7 +80,12 @@ test('CHU-CHF-01 · l’écran d’usine pose ses cinq cartes pour un superviseu
   await expect(carte(page, 'Encaissé')).toHaveCount(0);
   await expect(carte(page, 'De l’appel à l’encaissement')).toHaveCount(0);
 
-  for (const titre of ['Chargement impossible', 'Serveur injoignable', 'Erreur serveur', 'Accès refusé']) {
+  for (const titre of [
+    'Chargement impossible',
+    'Serveur injoignable',
+    'Erreur serveur',
+    'Accès refusé',
+  ]) {
     await expect(page.getByRole('heading', { name: titre, level: 2 })).toHaveCount(0);
   }
 });
@@ -113,7 +118,10 @@ test('CHU-CHF-06 · la plage libre écrit ses deux bornes dans l’URL et les r�
   await page.getByRole('button', { name: 'Du', exact: true }).click();
   await page.getByRole('combobox', { name: 'Mois affiché' }).click();
   await page.getByRole('option', { name: 'février' }).click();
-  await page.getByRole('grid', { name: 'Du' }).getByRole('gridcell', { name: '01 février 2026' }).click();
+  await page
+    .getByRole('grid', { name: 'Du' })
+    .getByRole('gridcell', { name: '01 février 2026' })
+    .click();
   // Les deux calendriers portent un sélecteur « Mois affiché » : ouvrir le
   // second avant que le premier ne soit démonté viole le mode strict.
   await expect(page.getByRole('grid', { name: 'Du' })).toHaveCount(0);
@@ -121,7 +129,10 @@ test('CHU-CHF-06 · la plage libre écrit ses deux bornes dans l’URL et les r�
   await page.getByRole('button', { name: 'Au', exact: true }).click();
   await page.getByRole('combobox', { name: 'Mois affiché' }).click();
   await page.getByRole('option', { name: 'février' }).click();
-  await page.getByRole('grid', { name: 'Au' }).getByRole('gridcell', { name: '28 février 2026' }).click();
+  await page
+    .getByRole('grid', { name: 'Au' })
+    .getByRole('gridcell', { name: '28 février 2026' })
+    .click();
   await expect(page.getByRole('grid', { name: 'Au' })).toHaveCount(0);
 
   await expect(page).toHaveURL('/chues/statistiques?periode=libre&du=2026-02-01&au=2026-02-28');
@@ -183,7 +194,9 @@ test('CHU-CHF-09 · la liste des téléconseillers inclut l’encadrement et exc
   }
 
   await expect(page.getByRole('option', { name: 'Moussa Fixture', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('option', { name: 'Administrateur CPI', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('option', { name: 'Administrateur CPI', exact: true })).toHaveCount(
+    0,
+  );
 });
 
 test('CHU-CHF-10 · le sélecteur affiche le nom, jamais l’identifiant', async ({ page }) => {
@@ -249,7 +262,9 @@ test('CHU-CHF-12 · le tableau « Par téléconseiller » nomme tout le plateau'
   for (const nom of ['Awa Fixture', 'Fatou Fixture', 'Superviseur Fixture', 'Direction Fixture']) {
     await expect(tableau.getByRole('rowheader', { name: nom, exact: true })).toBeVisible();
   }
-  await expect(tableau.getByRole('rowheader', { name: 'Moussa Fixture', exact: true })).toHaveCount(0);
+  await expect(tableau.getByRole('rowheader', { name: 'Moussa Fixture', exact: true })).toHaveCount(
+    0,
+  );
 });
 
 test('CHU-CHF-20 · l’écran en erreur propose de réessayer, il ne reste pas blanc', async ({
@@ -286,9 +301,10 @@ test('CHU-CHF-21 · l’écran tient sur 375 px', async ({ page }) => {
   }
 
   const largeurDocument = await page.evaluate(() => document.documentElement.scrollWidth);
-  expect(largeurDocument, 'la page entière ne doit pas défiler horizontalement').toBeLessThanOrEqual(
-    375,
-  );
+  expect(
+    largeurDocument,
+    'la page entière ne doit pas défiler horizontalement',
+  ).toBeLessThanOrEqual(375);
 });
 
 test('CHU-TDB-01 · les anciennes adresses hors coque arrivent aussi', async ({ page }) => {
@@ -301,7 +317,10 @@ test('CHU-TDB-01 · les anciennes adresses hors coque arrivent aussi', async ({ 
   await expect(page.getByRole('heading', { name: 'Page introuvable' })).toHaveCount(0);
 });
 
-test('CHU-TRV-03 · hors ligne, l’écran le dit au lieu de rester figé', async ({ page, context }) => {
+test('CHU-TRV-03 · hors ligne, l’écran le dit au lieu de rester figé', async ({
+  page,
+  context,
+}) => {
   await ouvrirLesChiffres(page);
 
   await context.setOffline(true);
@@ -335,7 +354,9 @@ test('CHU-TRV-04 · une API en 429 ne se lit pas comme une erreur de données', 
   await page.goto('/chues/statistiques');
 
   const erreur = page.getByRole('alert').filter({ hasText: 'Réessayer' });
-  await expect(page.getByRole('heading', { name: 'Chargement impossible', level: 2 })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Chargement impossible', level: 2 }),
+  ).toBeVisible();
   await expect(erreur).toContainText('Trop de requêtes. Patientez quelques secondes.');
   await expect(erreur.getByRole('button', { name: 'Réessayer' })).toBeVisible();
 

@@ -105,7 +105,9 @@ async function promettreUnRappel(
     response.ok(),
     `Remontée de la tentative : ${String(response.status())} ${await response.text()}`,
   ).toBe(true);
-  const body = (await response.json()) as { results: { status: string; errorCode: string | null }[] };
+  const body = (await response.json()) as {
+    results: { status: string; errorCode: string | null }[];
+  };
   expect(body.results[0]?.status, `Tentative refusée : ${JSON.stringify(body.results)}`).toBe(
     'applied',
   );
@@ -146,7 +148,9 @@ test('GP-31 · la file Grand Public ne demande et ne montre que du Grand Public'
   const ligne = page.getByRole('row').filter({ hasText: CIBLE_GP.affiche });
   await expect(ligne).toHaveCount(1);
 
-  expect(interrogations.length, 'aucun appel à /api/v1/phase2/callbacks observé').toBeGreaterThan(0);
+  expect(interrogations.length, 'aucun appel à /api/v1/phase2/callbacks observé').toBeGreaterThan(
+    0,
+  );
   for (const url of interrogations) {
     expect(
       url.searchParams.get('projet'),
@@ -165,7 +169,9 @@ test('GP-32 · chaque portée a son propre état vide', async ({ page }) => {
 
   // « En retard » est la portée d'ouverture ; l'échéance posée est à trois
   // jours, donc ni en retard ni dans la journée.
-  await expect(page.getByRole('heading', { name: 'Aucun rappel en retard', level: 2 })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Aucun rappel en retard', level: 2 }),
+  ).toBeVisible();
 
   await page.getByRole('tab', { name: 'Aujourd’hui' }).click();
   await expect(

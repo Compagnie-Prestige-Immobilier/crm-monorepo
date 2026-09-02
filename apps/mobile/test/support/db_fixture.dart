@@ -81,6 +81,62 @@ Future<void> seedReferentials(AppDatabase db) async {
           localUpdatedAt: t0,
         ),
       );
+  // Deux professions, et l'écart EST le décor : seule l'enseignante ouvre le
+  // syndicat, l'autre prouve qu'il reste fermé.
+  await db
+      .into(db.professions)
+      .insert(
+        ProfessionsCompanion.insert(
+          id: 'pro-ens',
+          code: 'INSTITUTEUR',
+          label: 'Instituteur Test',
+          isTeaching: const Value<bool>(true),
+          localUpdatedAt: t0,
+        ),
+      );
+  await db
+      .into(db.professions)
+      .insert(
+        ProfessionsCompanion.insert(
+          id: 'pro-autre',
+          code: 'COMPTABLE',
+          label: 'Comptable Test',
+          localUpdatedAt: t0,
+        ),
+      );
+  await db
+      .into(db.employeurs)
+      .insert(
+        EmployeursCompanion.insert(
+          id: 'emp-min',
+          code: 'MEN',
+          label: 'Ministère Test',
+          type: 'MINISTERE',
+          localUpdatedAt: t0,
+        ),
+      );
+  await db
+      .into(db.employeurs)
+      .insert(
+        EmployeursCompanion.insert(
+          id: 'emp-ent',
+          code: 'SONATEL',
+          label: 'Entreprise Test',
+          type: 'ENTREPRISE',
+          localUpdatedAt: t0,
+        ),
+      );
+  await db
+      .into(db.pays)
+      .insert(
+        PaysCompanion.insert(
+          id: 'pays-it',
+          code: 'IT',
+          label: 'Italie',
+          indicatif: '39',
+          localUpdatedAt: t0,
+        ),
+      );
 }
 
 /// Donne un libellé de région au département du décor et en ajoute un second

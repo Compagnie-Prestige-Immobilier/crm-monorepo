@@ -675,11 +675,10 @@ export function MixteChart({ items, label = 'Visites', presentation }: ItemsChar
   const theme = useChartTheme();
   const reducedMotion = usePrefersReducedMotion();
   const legende = presentation?.legende ?? true;
-  let cumul = 0;
-  const cumulatif = items.map((item) => {
-    cumul += item.value;
-    return cumul;
-  });
+  const cumulatif = items.reduce<number[]>(
+    (suite, item) => [...suite, (suite.at(-1) ?? 0) + item.value],
+    [],
+  );
   const options: ChartOptions<'bar' | 'line'> = {
     ...baseOptions(theme, reducedMotion),
     scales: {
@@ -789,12 +788,15 @@ export function CarteDeChaleurTable({
       ?.value ?? 0;
 
   return (
+    // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- zone défilable au clavier
     <div className="h-full overflow-auto" tabIndex={0}>
       <table className="w-full border-collapse text-[0.75rem]">
         <caption className="sr-only">{caption}</caption>
         <thead>
           <tr>
-            <th scope="col" />
+            <th scope="col">
+              <span className="sr-only">Ligne</span>
+            </th>
             {matrice.colonnes.map((colonne) => (
               <th
                 key={colonne}
@@ -846,6 +848,7 @@ export function TableauWidget({
 }) {
   const total = items.reduce((somme, item) => somme + item.value, 0);
   return (
+    // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- zone défilable au clavier
     <div className="h-full overflow-auto" tabIndex={0}>
       <table className="w-full text-[0.8125rem]">
         <caption className="sr-only">{caption}</caption>
@@ -898,6 +901,7 @@ export function TableauEquipe({ donnee, caption }: { donnee: EquipeDatum; captio
   }
 
   return (
+    // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- zone défilable au clavier
     <div className="h-full overflow-auto" tabIndex={0}>
       <table className="min-w-[42rem] w-full text-[0.875rem]">
         <caption className="sr-only">{caption}</caption>

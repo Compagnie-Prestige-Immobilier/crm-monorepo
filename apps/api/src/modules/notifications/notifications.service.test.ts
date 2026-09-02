@@ -967,7 +967,7 @@ describe('appels HTTP Brevo', () => {
     expect(result.outcomes[0]?.kind).toBeUndefined();
 
     expect(bodies).toHaveLength(1);
-    expect((bodies[0]?.to as unknown[]).length).toBe(3);
+    expect((bodies[0] as { to: unknown[] }).to.length).toBe(3);
     expect(bodies[0]?.sender).toEqual({ email: 'no-reply@cpi.sn', name: 'CPI GO' });
   });
 

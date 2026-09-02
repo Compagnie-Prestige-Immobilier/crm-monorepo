@@ -141,7 +141,6 @@ void main() {
     // lignes n'aidaient à aucun appel.
     for (final String bruit in <String>[
       'Secteur',
-      'Profession',
       'Banque',
       'Syndicat',
       'Date de saisie',
@@ -151,6 +150,54 @@ void main() {
 
     // Grand Public : personne ne l'a présentée, la ligne n'a pas lieu d'être.
     expect(find.text('Représentant'), findsNothing);
+
+    await unmount(tester);
+  });
+
+  // Ce que la SITUATION a fait renseigner se lit : sans lui, le téléconseiller
+  // rappelle un fonctionnaire sans savoir de quel ministère il vient. Un champ
+  // vide, en revanche, ne se dit pas : la fiche montre ce qu'on sait.
+  testWidgets('la fiche montre les renseignements de situation', (
+    WidgetTester tester,
+  ) async {
+    await open(tester, 'gp-1');
+
+    expect(find.text('Situation'), findsOneWidget);
+    expect(find.text('Fonctionnaire'), findsOneWidget);
+    expect(find.text('Profession'), findsOneWidget);
+    expect(find.text('Institutrice'), findsOneWidget);
+    for (final String vide in <String>[
+      'Ancienneté',
+      'Type de contrat',
+      'Pays de résidence',
+      'WhatsApp',
+      'Tranche de revenus',
+    ]) {
+      expect(find.text(vide), findsNothing, reason: '« $vide » est vide');
+    }
+
+    await unmount(tester);
+  });
+
+  // La fiche porte un IDENTIFIANT de profession : afficher l'identifiant brut
+  // ne dirait rien à personne, c'est le libellé du référentiel qui se lit.
+  testWidgets('la profession du référentiel se lit par son libellé', (
+    WidgetTester tester,
+  ) async {
+    await (db.update(
+      db.prospects,
+    )..where((Prospects t) => t.id.equals('gp-1'))).write(
+      const ProspectsCompanion(
+        profession: Value<String?>(null),
+        professionId: Value<String?>('pro-ens'),
+      ),
+    );
+
+    await open(tester, 'gp-1');
+
+    expect(find.text('Profession'), findsOneWidget);
+    expect(find.text('Instituteur Test'), findsOneWidget);
+    expect(find.text('pro-ens'), findsNothing);
 
     await unmount(tester);
   });

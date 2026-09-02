@@ -13,7 +13,7 @@ import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/src/equatable_utils.dart';
 
-part 'prospect_filter_dto.g.dart';
+part 'lot_export_prospect_filter_dto.g.dart';
 
 @CopyWith()
 @JsonSerializable(
@@ -22,9 +22,9 @@ part 'prospect_filter_dto.g.dart';
   disallowUnrecognizedKeys: false,
   explicitToJson: true,
 )
-class ProspectFilterDto {
-  /// Returns a new [ProspectFilterDto] instance.
-  ProspectFilterDto({
+class LotExportProspectFilterDto {
+  /// Returns a new [LotExportProspectFilterDto] instance.
+  LotExportProspectFilterDto({
     this.search,
 
     this.representantId,
@@ -36,8 +36,6 @@ class ProspectFilterDto {
     this.departementId,
 
     this.commercialId,
-
-    this.projet,
 
     this.type,
 
@@ -62,6 +60,8 @@ class ProspectFilterDto {
     this.dateTo,
 
     this.includeDeleted = false,
+
+    required this.projet,
   });
 
   /// Recherche libre sur le nom, le prénom ou le téléphone.
@@ -83,15 +83,6 @@ class ProspectFilterDto {
   /// Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
   @JsonKey(name: r'commercialId', required: false, includeIfNull: false)
   final String? commercialId;
-
-  /// Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.
-  @JsonKey(
-    name: r'projet',
-    required: false,
-    includeIfNull: false,
-    unknownEnumValue: Projet.unknownDefaultOpenApi,
-  )
-  final Projet? projet;
 
   /// Grand Public : fonctionnaire, secteur privé, informel, diaspora.
   @JsonKey(
@@ -158,9 +149,10 @@ class ProspectFilterDto {
     name: r'origin',
     required: false,
     includeIfNull: false,
-    unknownEnumValue: ProspectFilterDtoOriginEnum.unknownDefaultOpenApi,
+    unknownEnumValue:
+        LotExportProspectFilterDtoOriginEnum.unknownDefaultOpenApi,
   )
-  final ProspectFilterDtoOriginEnum? origin;
+  final LotExportProspectFilterDtoOriginEnum? origin;
 
   /// Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   @JsonKey(name: r'dateFrom', required: false, includeIfNull: false)
@@ -179,9 +171,18 @@ class ProspectFilterDto {
   )
   final bool? includeDeleted;
 
+  /// Projet du lot. Il est porté par la campagne et ne se devine pas après coup.
+  @JsonKey(
+    name: r'projet',
+    required: true,
+    includeIfNull: false,
+    unknownEnumValue: Projet.unknownDefaultOpenApi,
+  )
+  final Projet projet;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
-        other is ProspectFilterDto &&
+        other is LotExportProspectFilterDto &&
             runtimeType == other.runtimeType &&
             equals(
               [
@@ -191,7 +192,6 @@ class ProspectFilterDto {
                 syndicatId,
                 departementId,
                 commercialId,
-                projet,
                 type,
                 canalProvenanceId,
                 statut,
@@ -204,6 +204,7 @@ class ProspectFilterDto {
                 dateFrom,
                 dateTo,
                 includeDeleted,
+                projet,
               ],
               [
                 other.search,
@@ -212,7 +213,6 @@ class ProspectFilterDto {
                 other.syndicatId,
                 other.departementId,
                 other.commercialId,
-                other.projet,
                 other.type,
                 other.canalProvenanceId,
                 other.statut,
@@ -225,6 +225,7 @@ class ProspectFilterDto {
                 other.dateFrom,
                 other.dateTo,
                 other.includeDeleted,
+                other.projet,
               ],
             );
   }
@@ -239,7 +240,6 @@ class ProspectFilterDto {
         syndicatId,
         departementId,
         commercialId,
-        projet,
         type,
         canalProvenanceId,
         statut,
@@ -252,12 +252,13 @@ class ProspectFilterDto {
         dateFrom,
         dateTo,
         includeDeleted,
+        projet,
       ]);
 
-  factory ProspectFilterDto.fromJson(Map<String, dynamic> json) =>
-      _$ProspectFilterDtoFromJson(json);
+  factory LotExportProspectFilterDto.fromJson(Map<String, dynamic> json) =>
+      _$LotExportProspectFilterDtoFromJson(json);
 
-  Map<String, dynamic> toJson() => _$ProspectFilterDtoToJson(this);
+  Map<String, dynamic> toJson() => _$LotExportProspectFilterDtoToJson(this);
 
   @override
   String toString() {
@@ -266,7 +267,7 @@ class ProspectFilterDto {
 }
 
 /// Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
-enum ProspectFilterDtoOriginEnum {
+enum LotExportProspectFilterDtoOriginEnum {
   /// Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   @JsonValue(r'BANQUE')
   BANQUE(r'BANQUE'),
@@ -275,7 +276,7 @@ enum ProspectFilterDtoOriginEnum {
   @JsonValue(r'unknown_default_open_api')
   unknownDefaultOpenApi(r'unknown_default_open_api');
 
-  const ProspectFilterDtoOriginEnum(this.value);
+  const LotExportProspectFilterDtoOriginEnum(this.value);
 
   final String value;
 

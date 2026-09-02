@@ -13,7 +13,7 @@ abstract class _$LotExportDetailDtoCWProxy {
 
   LotExportDetailDto cible(LotExportCible cible);
 
-  LotExportDetailDto projet(Projet? projet);
+  LotExportDetailDto projet(Projet projet);
 
   LotExportDetailDto scopeLabel(String scopeLabel);
 
@@ -49,7 +49,7 @@ abstract class _$LotExportDetailDtoCWProxy {
     String id,
     String name,
     LotExportCible cible,
-    Projet? projet,
+    Projet projet,
     String scopeLabel,
     num itemCount,
     String createdById,
@@ -81,7 +81,7 @@ class _$LotExportDetailDtoCWProxyImpl implements _$LotExportDetailDtoCWProxy {
   LotExportDetailDto cible(LotExportCible cible) => this(cible: cible);
 
   @override
-  LotExportDetailDto projet(Projet? projet) => this(projet: projet);
+  LotExportDetailDto projet(Projet projet) => this(projet: projet);
 
   @override
   LotExportDetailDto scopeLabel(String scopeLabel) =>
@@ -169,7 +169,7 @@ class _$LotExportDetailDtoCWProxyImpl implements _$LotExportDetailDtoCWProxy {
       projet: projet == const $CopyWithPlaceholder()
           ? _value.projet
           // ignore: cast_nullable_to_non_nullable
-          : projet as Projet?,
+          : projet as Projet,
       scopeLabel: scopeLabel == const $CopyWithPlaceholder()
           ? _value.scopeLabel
           // ignore: cast_nullable_to_non_nullable
@@ -270,7 +270,7 @@ LotExportDetailDto _$LotExportDetailDtoFromJson(Map<String, dynamic> json) =>
         ),
         projet: $checkedConvert(
           'projet',
-          (v) => $enumDecodeNullable(
+          (v) => $enumDecode(
             _$ProjetEnumMap,
             v,
             unknownValue: Projet.unknownDefaultOpenApi,
@@ -326,7 +326,7 @@ Map<String, dynamic> _$LotExportDetailDtoToJson(LotExportDetailDto instance) =>
       'id': instance.id,
       'name': instance.name,
       'cible': _$LotExportCibleEnumMap[instance.cible]!,
-      'projet': _$ProjetEnumMap[instance.projet],
+      'projet': _$ProjetEnumMap[instance.projet]!,
       'scopeLabel': instance.scopeLabel,
       'itemCount': instance.itemCount,
       'createdById': instance.createdById,

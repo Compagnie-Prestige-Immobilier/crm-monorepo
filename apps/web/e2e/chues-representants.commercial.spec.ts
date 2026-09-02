@@ -31,7 +31,8 @@ const DECOMPTE = new RegExp(
   'u',
 );
 
-const UUID = /\/chues\/representants\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
+const UUID =
+  /\/chues\/representants\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
 
 /** Le champ, jamais son bouton d'effacement, qui porte « Effacer la recherche ». */
 const recherche = (page: Page) => page.getByRole('textbox', { name: 'Recherche', exact: true });

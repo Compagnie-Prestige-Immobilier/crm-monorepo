@@ -1,64 +1,69 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'prospect_filter_dto.dart';
+part of 'lot_export_prospect_filter_dto.dart';
 
 // **************************************************************************
 // CopyWithGenerator
 // **************************************************************************
 
-abstract class _$ProspectFilterDtoCWProxy {
-  ProspectFilterDto search(String? search);
+abstract class _$LotExportProspectFilterDtoCWProxy {
+  LotExportProspectFilterDto search(String? search);
 
-  ProspectFilterDto representantId(String? representantId);
+  LotExportProspectFilterDto representantId(String? representantId);
 
-  ProspectFilterDto banqueId(String? banqueId);
+  LotExportProspectFilterDto banqueId(String? banqueId);
 
-  ProspectFilterDto syndicatId(String? syndicatId);
+  LotExportProspectFilterDto syndicatId(String? syndicatId);
 
-  ProspectFilterDto departementId(String? departementId);
+  LotExportProspectFilterDto departementId(String? departementId);
 
-  ProspectFilterDto commercialId(String? commercialId);
+  LotExportProspectFilterDto commercialId(String? commercialId);
 
-  ProspectFilterDto projet(Projet? projet);
+  LotExportProspectFilterDto type(ProspectType? type);
 
-  ProspectFilterDto type(ProspectType? type);
+  LotExportProspectFilterDto canalProvenanceId(String? canalProvenanceId);
 
-  ProspectFilterDto canalProvenanceId(String? canalProvenanceId);
+  LotExportProspectFilterDto statut(ProspectStatut? statut);
 
-  ProspectFilterDto statut(ProspectStatut? statut);
+  LotExportProspectFilterDto segment(BddSegment? segment);
 
-  ProspectFilterDto segment(BddSegment? segment);
+  LotExportProspectFilterDto phase2Status(Phase2Status? phase2Status);
 
-  ProspectFilterDto phase2Status(Phase2Status? phase2Status);
+  LotExportProspectFilterDto enrollmentMethod(
+    EnrollmentMethod? enrollmentMethod,
+  );
 
-  ProspectFilterDto enrollmentMethod(EnrollmentMethod? enrollmentMethod);
+  LotExportProspectFilterDto appelePar(String? appelePar);
 
-  ProspectFilterDto appelePar(String? appelePar);
+  LotExportProspectFilterDto enrollmentCapturedById(
+    String? enrollmentCapturedById,
+  );
 
-  ProspectFilterDto enrollmentCapturedById(String? enrollmentCapturedById);
+  LotExportProspectFilterDto origin(
+    LotExportProspectFilterDtoOriginEnum? origin,
+  );
 
-  ProspectFilterDto origin(ProspectFilterDtoOriginEnum? origin);
+  LotExportProspectFilterDto dateFrom(DateTime? dateFrom);
 
-  ProspectFilterDto dateFrom(DateTime? dateFrom);
+  LotExportProspectFilterDto dateTo(DateTime? dateTo);
 
-  ProspectFilterDto dateTo(DateTime? dateTo);
+  LotExportProspectFilterDto includeDeleted(bool? includeDeleted);
 
-  ProspectFilterDto includeDeleted(bool? includeDeleted);
+  LotExportProspectFilterDto projet(Projet projet);
 
-  /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `ProspectFilterDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
+  /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `LotExportProspectFilterDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
   /// ```dart
-  /// ProspectFilterDto(...).copyWith(id: 12, name: "My name")
+  /// LotExportProspectFilterDto(...).copyWith(id: 12, name: "My name")
   /// ````
-  ProspectFilterDto call({
+  LotExportProspectFilterDto call({
     String? search,
     String? representantId,
     String? banqueId,
     String? syndicatId,
     String? departementId,
     String? commercialId,
-    Projet? projet,
     ProspectType? type,
     String? canalProvenanceId,
     ProspectStatut? statut,
@@ -67,101 +72,110 @@ abstract class _$ProspectFilterDtoCWProxy {
     EnrollmentMethod? enrollmentMethod,
     String? appelePar,
     String? enrollmentCapturedById,
-    ProspectFilterDtoOriginEnum? origin,
+    LotExportProspectFilterDtoOriginEnum? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
     bool? includeDeleted,
+    Projet projet,
   });
 }
 
-/// Proxy class for `copyWith` functionality. This is a callable class and can be used as follows: `instanceOfProspectFilterDto.copyWith(...)`. Additionally contains functions for specific fields e.g. `instanceOfProspectFilterDto.copyWith.fieldName(...)`
-class _$ProspectFilterDtoCWProxyImpl implements _$ProspectFilterDtoCWProxy {
-  const _$ProspectFilterDtoCWProxyImpl(this._value);
+/// Proxy class for `copyWith` functionality. This is a callable class and can be used as follows: `instanceOfLotExportProspectFilterDto.copyWith(...)`. Additionally contains functions for specific fields e.g. `instanceOfLotExportProspectFilterDto.copyWith.fieldName(...)`
+class _$LotExportProspectFilterDtoCWProxyImpl
+    implements _$LotExportProspectFilterDtoCWProxy {
+  const _$LotExportProspectFilterDtoCWProxyImpl(this._value);
 
-  final ProspectFilterDto _value;
-
-  @override
-  ProspectFilterDto search(String? search) => this(search: search);
+  final LotExportProspectFilterDto _value;
 
   @override
-  ProspectFilterDto representantId(String? representantId) =>
+  LotExportProspectFilterDto search(String? search) => this(search: search);
+
+  @override
+  LotExportProspectFilterDto representantId(String? representantId) =>
       this(representantId: representantId);
 
   @override
-  ProspectFilterDto banqueId(String? banqueId) => this(banqueId: banqueId);
+  LotExportProspectFilterDto banqueId(String? banqueId) =>
+      this(banqueId: banqueId);
 
   @override
-  ProspectFilterDto syndicatId(String? syndicatId) =>
+  LotExportProspectFilterDto syndicatId(String? syndicatId) =>
       this(syndicatId: syndicatId);
 
   @override
-  ProspectFilterDto departementId(String? departementId) =>
+  LotExportProspectFilterDto departementId(String? departementId) =>
       this(departementId: departementId);
 
   @override
-  ProspectFilterDto commercialId(String? commercialId) =>
+  LotExportProspectFilterDto commercialId(String? commercialId) =>
       this(commercialId: commercialId);
 
   @override
-  ProspectFilterDto projet(Projet? projet) => this(projet: projet);
+  LotExportProspectFilterDto type(ProspectType? type) => this(type: type);
 
   @override
-  ProspectFilterDto type(ProspectType? type) => this(type: type);
-
-  @override
-  ProspectFilterDto canalProvenanceId(String? canalProvenanceId) =>
+  LotExportProspectFilterDto canalProvenanceId(String? canalProvenanceId) =>
       this(canalProvenanceId: canalProvenanceId);
 
   @override
-  ProspectFilterDto statut(ProspectStatut? statut) => this(statut: statut);
+  LotExportProspectFilterDto statut(ProspectStatut? statut) =>
+      this(statut: statut);
 
   @override
-  ProspectFilterDto segment(BddSegment? segment) => this(segment: segment);
+  LotExportProspectFilterDto segment(BddSegment? segment) =>
+      this(segment: segment);
 
   @override
-  ProspectFilterDto phase2Status(Phase2Status? phase2Status) =>
+  LotExportProspectFilterDto phase2Status(Phase2Status? phase2Status) =>
       this(phase2Status: phase2Status);
 
   @override
-  ProspectFilterDto enrollmentMethod(EnrollmentMethod? enrollmentMethod) =>
-      this(enrollmentMethod: enrollmentMethod);
+  LotExportProspectFilterDto enrollmentMethod(
+    EnrollmentMethod? enrollmentMethod,
+  ) => this(enrollmentMethod: enrollmentMethod);
 
   @override
-  ProspectFilterDto appelePar(String? appelePar) => this(appelePar: appelePar);
+  LotExportProspectFilterDto appelePar(String? appelePar) =>
+      this(appelePar: appelePar);
 
   @override
-  ProspectFilterDto enrollmentCapturedById(String? enrollmentCapturedById) =>
-      this(enrollmentCapturedById: enrollmentCapturedById);
+  LotExportProspectFilterDto enrollmentCapturedById(
+    String? enrollmentCapturedById,
+  ) => this(enrollmentCapturedById: enrollmentCapturedById);
 
   @override
-  ProspectFilterDto origin(ProspectFilterDtoOriginEnum? origin) =>
-      this(origin: origin);
+  LotExportProspectFilterDto origin(
+    LotExportProspectFilterDtoOriginEnum? origin,
+  ) => this(origin: origin);
 
   @override
-  ProspectFilterDto dateFrom(DateTime? dateFrom) => this(dateFrom: dateFrom);
+  LotExportProspectFilterDto dateFrom(DateTime? dateFrom) =>
+      this(dateFrom: dateFrom);
 
   @override
-  ProspectFilterDto dateTo(DateTime? dateTo) => this(dateTo: dateTo);
+  LotExportProspectFilterDto dateTo(DateTime? dateTo) => this(dateTo: dateTo);
 
   @override
-  ProspectFilterDto includeDeleted(bool? includeDeleted) =>
+  LotExportProspectFilterDto includeDeleted(bool? includeDeleted) =>
       this(includeDeleted: includeDeleted);
 
   @override
-  /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `ProspectFilterDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
+  LotExportProspectFilterDto projet(Projet projet) => this(projet: projet);
+
+  @override
+  /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `LotExportProspectFilterDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
   /// ```dart
-  /// ProspectFilterDto(...).copyWith(id: 12, name: "My name")
+  /// LotExportProspectFilterDto(...).copyWith(id: 12, name: "My name")
   /// ````
-  ProspectFilterDto call({
+  LotExportProspectFilterDto call({
     Object? search = const $CopyWithPlaceholder(),
     Object? representantId = const $CopyWithPlaceholder(),
     Object? banqueId = const $CopyWithPlaceholder(),
     Object? syndicatId = const $CopyWithPlaceholder(),
     Object? departementId = const $CopyWithPlaceholder(),
     Object? commercialId = const $CopyWithPlaceholder(),
-    Object? projet = const $CopyWithPlaceholder(),
     Object? type = const $CopyWithPlaceholder(),
     Object? canalProvenanceId = const $CopyWithPlaceholder(),
     Object? statut = const $CopyWithPlaceholder(),
@@ -174,8 +188,9 @@ class _$ProspectFilterDtoCWProxyImpl implements _$ProspectFilterDtoCWProxy {
     Object? dateFrom = const $CopyWithPlaceholder(),
     Object? dateTo = const $CopyWithPlaceholder(),
     Object? includeDeleted = const $CopyWithPlaceholder(),
+    Object? projet = const $CopyWithPlaceholder(),
   }) {
-    return ProspectFilterDto(
+    return LotExportProspectFilterDto(
       search: search == const $CopyWithPlaceholder()
           ? _value.search
           // ignore: cast_nullable_to_non_nullable
@@ -200,10 +215,6 @@ class _$ProspectFilterDtoCWProxyImpl implements _$ProspectFilterDtoCWProxy {
           ? _value.commercialId
           // ignore: cast_nullable_to_non_nullable
           : commercialId as String?,
-      projet: projet == const $CopyWithPlaceholder()
-          ? _value.projet
-          // ignore: cast_nullable_to_non_nullable
-          : projet as Projet?,
       type: type == const $CopyWithPlaceholder()
           ? _value.type
           // ignore: cast_nullable_to_non_nullable
@@ -240,7 +251,7 @@ class _$ProspectFilterDtoCWProxyImpl implements _$ProspectFilterDtoCWProxy {
       origin: origin == const $CopyWithPlaceholder()
           ? _value.origin
           // ignore: cast_nullable_to_non_nullable
-          : origin as ProspectFilterDtoOriginEnum?,
+          : origin as LotExportProspectFilterDtoOriginEnum?,
       dateFrom: dateFrom == const $CopyWithPlaceholder()
           ? _value.dateFrom
           // ignore: cast_nullable_to_non_nullable
@@ -253,113 +264,120 @@ class _$ProspectFilterDtoCWProxyImpl implements _$ProspectFilterDtoCWProxy {
           ? _value.includeDeleted
           // ignore: cast_nullable_to_non_nullable
           : includeDeleted as bool?,
+      projet: projet == const $CopyWithPlaceholder()
+          ? _value.projet
+          // ignore: cast_nullable_to_non_nullable
+          : projet as Projet,
     );
   }
 }
 
-extension $ProspectFilterDtoCopyWith on ProspectFilterDto {
-  /// Returns a callable class that can be used as follows: `instanceOfProspectFilterDto.copyWith(...)` or like so:`instanceOfProspectFilterDto.copyWith.fieldName(...)`.
+extension $LotExportProspectFilterDtoCopyWith on LotExportProspectFilterDto {
+  /// Returns a callable class that can be used as follows: `instanceOfLotExportProspectFilterDto.copyWith(...)` or like so:`instanceOfLotExportProspectFilterDto.copyWith.fieldName(...)`.
   // ignore: library_private_types_in_public_api
-  _$ProspectFilterDtoCWProxy get copyWith =>
-      _$ProspectFilterDtoCWProxyImpl(this);
+  _$LotExportProspectFilterDtoCWProxy get copyWith =>
+      _$LotExportProspectFilterDtoCWProxyImpl(this);
 }
 
 // **************************************************************************
 // JsonSerializableGenerator
 // **************************************************************************
 
-ProspectFilterDto _$ProspectFilterDtoFromJson(Map<String, dynamic> json) =>
-    $checkedCreate('ProspectFilterDto', json, ($checkedConvert) {
-      final val = ProspectFilterDto(
-        search: $checkedConvert('search', (v) => v as String?),
-        representantId: $checkedConvert('representantId', (v) => v as String?),
-        banqueId: $checkedConvert('banqueId', (v) => v as String?),
-        syndicatId: $checkedConvert('syndicatId', (v) => v as String?),
-        departementId: $checkedConvert('departementId', (v) => v as String?),
-        commercialId: $checkedConvert('commercialId', (v) => v as String?),
-        projet: $checkedConvert(
-          'projet',
-          (v) => $enumDecodeNullable(
-            _$ProjetEnumMap,
-            v,
-            unknownValue: Projet.unknownDefaultOpenApi,
-          ),
-        ),
-        type: $checkedConvert(
-          'type',
-          (v) => $enumDecodeNullable(
-            _$ProspectTypeEnumMap,
-            v,
-            unknownValue: ProspectType.unknownDefaultOpenApi,
-          ),
-        ),
-        canalProvenanceId: $checkedConvert(
-          'canalProvenanceId',
-          (v) => v as String?,
-        ),
-        statut: $checkedConvert(
-          'statut',
-          (v) => $enumDecodeNullable(
-            _$ProspectStatutEnumMap,
-            v,
-            unknownValue: ProspectStatut.unknownDefaultOpenApi,
-          ),
-        ),
-        segment: $checkedConvert(
-          'segment',
-          (v) => $enumDecodeNullable(
-            _$BddSegmentEnumMap,
-            v,
-            unknownValue: BddSegment.unknownDefaultOpenApi,
-          ),
-        ),
-        phase2Status: $checkedConvert(
-          'phase2Status',
-          (v) => $enumDecodeNullable(
-            _$Phase2StatusEnumMap,
-            v,
-            unknownValue: Phase2Status.unknownDefaultOpenApi,
-          ),
-        ),
-        enrollmentMethod: $checkedConvert(
-          'enrollmentMethod',
-          (v) => $enumDecodeNullable(
-            _$EnrollmentMethodEnumMap,
-            v,
-            unknownValue: EnrollmentMethod.unknownDefaultOpenApi,
-          ),
-        ),
-        appelePar: $checkedConvert('appelePar', (v) => v as String?),
-        enrollmentCapturedById: $checkedConvert(
-          'enrollmentCapturedById',
-          (v) => v as String?,
-        ),
-        origin: $checkedConvert(
-          'origin',
-          (v) => $enumDecodeNullable(
-            _$ProspectFilterDtoOriginEnumEnumMap,
-            v,
-            unknownValue: ProspectFilterDtoOriginEnum.unknownDefaultOpenApi,
-          ),
-        ),
-        dateFrom: $checkedConvert(
-          'dateFrom',
-          (v) => v == null ? null : DateTime.parse(v as String),
-        ),
-        dateTo: $checkedConvert(
-          'dateTo',
-          (v) => v == null ? null : DateTime.parse(v as String),
-        ),
-        includeDeleted: $checkedConvert(
-          'includeDeleted',
-          (v) => v as bool? ?? false,
-        ),
-      );
-      return val;
-    });
+LotExportProspectFilterDto _$LotExportProspectFilterDtoFromJson(
+  Map<String, dynamic> json,
+) => $checkedCreate('LotExportProspectFilterDto', json, ($checkedConvert) {
+  $checkKeys(json, requiredKeys: const ['projet']);
+  final val = LotExportProspectFilterDto(
+    search: $checkedConvert('search', (v) => v as String?),
+    representantId: $checkedConvert('representantId', (v) => v as String?),
+    banqueId: $checkedConvert('banqueId', (v) => v as String?),
+    syndicatId: $checkedConvert('syndicatId', (v) => v as String?),
+    departementId: $checkedConvert('departementId', (v) => v as String?),
+    commercialId: $checkedConvert('commercialId', (v) => v as String?),
+    type: $checkedConvert(
+      'type',
+      (v) => $enumDecodeNullable(
+        _$ProspectTypeEnumMap,
+        v,
+        unknownValue: ProspectType.unknownDefaultOpenApi,
+      ),
+    ),
+    canalProvenanceId: $checkedConvert(
+      'canalProvenanceId',
+      (v) => v as String?,
+    ),
+    statut: $checkedConvert(
+      'statut',
+      (v) => $enumDecodeNullable(
+        _$ProspectStatutEnumMap,
+        v,
+        unknownValue: ProspectStatut.unknownDefaultOpenApi,
+      ),
+    ),
+    segment: $checkedConvert(
+      'segment',
+      (v) => $enumDecodeNullable(
+        _$BddSegmentEnumMap,
+        v,
+        unknownValue: BddSegment.unknownDefaultOpenApi,
+      ),
+    ),
+    phase2Status: $checkedConvert(
+      'phase2Status',
+      (v) => $enumDecodeNullable(
+        _$Phase2StatusEnumMap,
+        v,
+        unknownValue: Phase2Status.unknownDefaultOpenApi,
+      ),
+    ),
+    enrollmentMethod: $checkedConvert(
+      'enrollmentMethod',
+      (v) => $enumDecodeNullable(
+        _$EnrollmentMethodEnumMap,
+        v,
+        unknownValue: EnrollmentMethod.unknownDefaultOpenApi,
+      ),
+    ),
+    appelePar: $checkedConvert('appelePar', (v) => v as String?),
+    enrollmentCapturedById: $checkedConvert(
+      'enrollmentCapturedById',
+      (v) => v as String?,
+    ),
+    origin: $checkedConvert(
+      'origin',
+      (v) => $enumDecodeNullable(
+        _$LotExportProspectFilterDtoOriginEnumEnumMap,
+        v,
+        unknownValue:
+            LotExportProspectFilterDtoOriginEnum.unknownDefaultOpenApi,
+      ),
+    ),
+    dateFrom: $checkedConvert(
+      'dateFrom',
+      (v) => v == null ? null : DateTime.parse(v as String),
+    ),
+    dateTo: $checkedConvert(
+      'dateTo',
+      (v) => v == null ? null : DateTime.parse(v as String),
+    ),
+    includeDeleted: $checkedConvert(
+      'includeDeleted',
+      (v) => v as bool? ?? false,
+    ),
+    projet: $checkedConvert(
+      'projet',
+      (v) => $enumDecode(
+        _$ProjetEnumMap,
+        v,
+        unknownValue: Projet.unknownDefaultOpenApi,
+      ),
+    ),
+  );
+  return val;
+});
 
-Map<String, dynamic> _$ProspectFilterDtoToJson(
-  ProspectFilterDto instance,
+Map<String, dynamic> _$LotExportProspectFilterDtoToJson(
+  LotExportProspectFilterDto instance,
 ) => <String, dynamic>{
   if (instance.search case final value?) 'search': value,
   if (instance.representantId case final value?) 'representantId': value,
@@ -367,7 +385,6 @@ Map<String, dynamic> _$ProspectFilterDtoToJson(
   if (instance.syndicatId case final value?) 'syndicatId': value,
   if (instance.departementId case final value?) 'departementId': value,
   if (instance.commercialId case final value?) 'commercialId': value,
-  if (_$ProjetEnumMap[instance.projet] case final value?) 'projet': value,
   if (_$ProspectTypeEnumMap[instance.type] case final value?) 'type': value,
   if (instance.canalProvenanceId case final value?) 'canalProvenanceId': value,
   if (_$ProspectStatutEnumMap[instance.statut] case final value?)
@@ -380,17 +397,13 @@ Map<String, dynamic> _$ProspectFilterDtoToJson(
   if (instance.appelePar case final value?) 'appelePar': value,
   if (instance.enrollmentCapturedById case final value?)
     'enrollmentCapturedById': value,
-  if (_$ProspectFilterDtoOriginEnumEnumMap[instance.origin] case final value?)
+  if (_$LotExportProspectFilterDtoOriginEnumEnumMap[instance.origin]
+      case final value?)
     'origin': value,
   if (instance.dateFrom?.toIso8601String() case final value?) 'dateFrom': value,
   if (instance.dateTo?.toIso8601String() case final value?) 'dateTo': value,
   if (instance.includeDeleted case final value?) 'includeDeleted': value,
-};
-
-const _$ProjetEnumMap = {
-  Projet.CHUES: 'CHUES',
-  Projet.GRAND_PUBLIC: 'GRAND_PUBLIC',
-  Projet.unknownDefaultOpenApi: 'unknown_default_open_api',
+  'projet': _$ProjetEnumMap[instance.projet]!,
 };
 
 const _$ProspectTypeEnumMap = {
@@ -434,7 +447,14 @@ const _$EnrollmentMethodEnumMap = {
   EnrollmentMethod.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 
-const _$ProspectFilterDtoOriginEnumEnumMap = {
-  ProspectFilterDtoOriginEnum.BANQUE: 'BANQUE',
-  ProspectFilterDtoOriginEnum.unknownDefaultOpenApi: 'unknown_default_open_api',
+const _$LotExportProspectFilterDtoOriginEnumEnumMap = {
+  LotExportProspectFilterDtoOriginEnum.BANQUE: 'BANQUE',
+  LotExportProspectFilterDtoOriginEnum.unknownDefaultOpenApi:
+      'unknown_default_open_api',
+};
+
+const _$ProjetEnumMap = {
+  Projet.CHUES: 'CHUES',
+  Projet.GRAND_PUBLIC: 'GRAND_PUBLIC',
+  Projet.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

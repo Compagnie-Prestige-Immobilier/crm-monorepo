@@ -23,6 +23,7 @@ import 'generated_migrations/schema_v18.dart' as v18;
 import 'generated_migrations/schema_v19.dart' as v19;
 import 'generated_migrations/schema_v20.dart' as v20;
 import 'generated_migrations/schema_v21.dart' as v21schema;
+import 'generated_migrations/schema_v22.dart' as v22schema;
 
 /// Test doré de migration.
 ///
@@ -2081,6 +2082,157 @@ void main() {
       await db.close();
     },
   );
+
+  // ── v22 → v23 : les renseignements de situation du Grand Public ────────────
+  //
+  // Treize colonnes ajoutées à `prospects` et trois référentiels neufs. Ce qui
+  // doit être prouvé : la fiche déjà saisie traverse avec ses colonnes d'hier
+  // intactes, les neuves démarrent NULLES, et le marqueur de miroir est effacé
+  // — sans quoi `professions`, `employeurs` et `pays` resteraient vides à vie.
+
+  test('v22 -> v23 ajoute la situation sans toucher aux fiches en file', () async {
+    final schema = await verifier.schemaAt(22);
+
+    final v22schema.DatabaseAtV22 old = v22schema.DatabaseAtV22(
+      schema.newConnection(),
+    );
+    await old.customStatement('PRAGMA foreign_keys = ON;');
+    await old.customStatement(
+      'INSERT INTO prospects '
+      '(id, nom, prenom, phone_e164, created_by_id, projet, type, profession, '
+      ' duree_systeme_mois, statut, client_created_at, local_updated_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      <Object?>[
+        'pro-22',
+        'Ndiaye',
+        'Fatou',
+        '+221771234567',
+        'me',
+        'GRAND_PUBLIC',
+        'FONCTIONNAIRE',
+        'Institutrice',
+        24,
+        'NOUVEAU',
+        _iso,
+        _iso,
+      ],
+    );
+    await old.customStatement(
+      'INSERT INTO outbox '
+      '(id, entity_type, entity_id, op, payload, next_attempt_at, created_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?)',
+      <Object?>['op-23', 'prospect', 'pro-22', 'create', '{}', _iso, _iso],
+    );
+    // L'appareil est déjà mis au miroir : c'est celui que le palier doit
+    // soigner, sinon les deux listes neuves n'arrivent jamais.
+    await old.customStatement(
+      'INSERT INTO sync_state (collection, last_pulled_at) VALUES (?, ?)',
+      <Object?>['referentiels_mirror', _iso],
+    );
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
+
+    final QueryRow fiche = await db
+        .customSelect(
+          'SELECT profession, profession_id, duree_systeme_mois, '
+          '       income_band_id, employeur_id, '
+          '       employeur, type_contrat, anciennete_mois, lieu_activite, '
+          '       mode_epargne, pays_residence_id, ville_residence, '
+          '       whatsapp_e164, relais_nom, relais_phone_e164 FROM prospects',
+        )
+        .getSingle();
+    // Le texte libre d'hier SURVIT : la colonne de référentiel s'ajoute à côté,
+    // elle ne remplace pas ce qui a déjà été saisi.
+    expect(fiche.read<String?>('profession'), 'Institutrice');
+    // La durée du système de paiement ne DEVIENT pas l'ancienneté : ce sont
+    // deux renseignements distincts, et le formulaire écrivait dans la mauvaise.
+    expect(fiche.read<int?>('duree_systeme_mois'), 24);
+    expect(fiche.read<int?>('anciennete_mois'), isNull);
+    for (final String colonne in <String>[
+      'profession_id',
+      'income_band_id',
+      'employeur_id',
+      'employeur',
+      'type_contrat',
+      'lieu_activite',
+      'mode_epargne',
+      'pays_residence_id',
+      'ville_residence',
+      'whatsapp_e164',
+      'relais_nom',
+      'relais_phone_e164',
+    ]) {
+      expect(fiche.read<String?>(colonne), isNull, reason: colonne);
+    }
+
+    // Les colonnes s'ÉCRIVENT : « la colonne existe » se vérifierait aussi sur
+    // une colonne au mauvais type.
+    await db.customStatement(
+      'UPDATE prospects SET employeur = ?, anciennete_mois = ?, '
+      '       pays_residence_id = ?, whatsapp_e164 = ?, profession_id = ? '
+      'WHERE id = ?',
+      <Object?>[
+        'Éducation nationale',
+        36,
+        'pays-1',
+        '+393331234567',
+        'pro-1',
+        'pro-22',
+      ],
+    );
+    final QueryRow apres = await db
+        .customSelect(
+          'SELECT employeur, anciennete_mois, pays_residence_id, '
+          '       whatsapp_e164, profession_id '
+          'FROM prospects WHERE id = \'pro-22\'',
+        )
+        .getSingle();
+    expect(apres.read<String?>('employeur'), 'Éducation nationale');
+    expect(apres.read<int?>('anciennete_mois'), 36);
+    expect(apres.read<String?>('pays_residence_id'), 'pays-1');
+    expect(apres.read<String?>('whatsapp_e164'), '+393331234567');
+    expect(apres.read<String?>('profession_id'), 'pro-1');
+
+    // La table neuve accepte une ligne : « la table existe » se vérifierait
+    // aussi sur une table aux mauvaises colonnes.
+    await db.customStatement(
+      'INSERT INTO professions '
+      '(id, code, label, is_teaching, local_updated_at) VALUES (?, ?, ?, ?, ?)',
+      <Object?>['pro-1', 'INSTITUTEUR', 'Instituteur', 1, _iso],
+    );
+    expect(
+      await db
+          .customSelect('SELECT is_teaching FROM professions')
+          .getSingle()
+          .then((QueryRow row) => row.read<bool>('is_teaching')),
+      isTrue,
+    );
+
+    // Le marqueur effacé : le prochain passage relit les listes entières.
+    expect(
+      await db
+          .customSelect(
+            'SELECT COUNT(*) AS c FROM sync_state '
+            'WHERE collection = \'referentiels_mirror\'',
+          )
+          .getSingle()
+          .then((QueryRow row) => row.read<int>('c')),
+      0,
+    );
+
+    // La file n'a rien perdu.
+    expect(
+      await db
+          .customSelect('SELECT id FROM outbox')
+          .getSingle()
+          .then((QueryRow row) => row.read<String>('id')),
+      'op-23',
+    );
+
+    await db.close();
+  });
 
   test('v11 -> courant traverse sans créer les tables de campagne', () async {
     final schema = await verifier.schemaAt(11);

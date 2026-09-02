@@ -11,7 +11,7 @@ import { parseProspectFilters, type RawSearchParams } from '@/lib/filters';
 import { getQueryClient } from '@/lib/query-client';
 import { queryKeys } from '@/lib/query-keys';
 import { getSession, guardRoles } from '@/lib/session';
-import { readsOnly } from '@/lib/types';
+import { canExportProspects, readsOnly } from '@/lib/types';
 
 export const metadata: Metadata = { title: 'Prospects' };
 
@@ -50,6 +50,7 @@ export default async function ProspectsPage({
           Le SUPERVISEUR, lui, n'écrit rien du tout. */}
       <ProspectsView
         canAdminister={session?.role === 'ADMIN'}
+        canExport={canExportProspects(session?.role)}
         readOnly={readsOnly(session?.role)}
         simplified={session?.role === 'COMMERCIAL' || session?.role === 'SUPERVISEUR'}
       />

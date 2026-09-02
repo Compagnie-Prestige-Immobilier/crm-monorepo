@@ -112,6 +112,40 @@ class ReferenceRepository {
         .watch();
   }
 
+  Stream<List<Profession>> watchProfessions() {
+    return (_db.select(_db.professions)
+          ..where(
+            (Professions t) => t.isActive.equals(true) & t.deletedAt.isNull(),
+          )
+          ..orderBy(<OrderClauseGenerator<Professions>>[
+            (Professions t) => OrderingTerm.asc(t.sortOrder),
+            (Professions t) => OrderingTerm.asc(t.label),
+          ]))
+        .watch();
+  }
+
+  Stream<List<Employeur>> watchEmployeurs() {
+    return (_db.select(_db.employeurs)
+          ..where(
+            (Employeurs t) => t.isActive.equals(true) & t.deletedAt.isNull(),
+          )
+          ..orderBy(<OrderClauseGenerator<Employeurs>>[
+            (Employeurs t) => OrderingTerm.asc(t.sortOrder),
+            (Employeurs t) => OrderingTerm.asc(t.label),
+          ]))
+        .watch();
+  }
+
+  Stream<List<PaysRow>> watchPays() {
+    return (_db.select(_db.pays)
+          ..where((Pays t) => t.isActive.equals(true) & t.deletedAt.isNull())
+          ..orderBy(<OrderClauseGenerator<Pays>>[
+            (Pays t) => OrderingTerm.asc(t.sortOrder),
+            (Pays t) => OrderingTerm.asc(t.label),
+          ]))
+        .watch();
+  }
+
   /// Les motifs d'issue proposés à la saisie, avec repli sur les six motifs
   /// système tant que la table est vide : au premier lancement, avant la
   /// première synchronisation, le téléconseiller doit pouvoir enregistrer un
@@ -157,14 +191,14 @@ class ReferenceRepository {
     )..where((Departements t) => t.id.equals(id))).getSingleOrNull();
   }
 
-  Stream<List<RepresentantSyncViewData>> watchRepresentants({
-    String? search,
-  }) {
+  Stream<List<RepresentantSyncViewData>> watchRepresentants({String? search}) {
     final String terme = (search ?? '').trim();
     // Annuaire de milliers de fiches : tout dérouler laisse croire à un total
     // faux (« il n'y en a que 500 »). L'écran reste vide tant qu'on n'a pas
     // cherché ; un résultat n'apparaît que pour une recherche explicite.
-    if (terme.isEmpty) return Stream<List<RepresentantSyncViewData>>.value(const []);
+    if (terme.isEmpty) {
+      return Stream<List<RepresentantSyncViewData>>.value(const []);
+    }
     final String pattern = '%${terme.toLowerCase()}%';
     // Un numéro se tape avec des espaces (« 77 152 11 62 ») et se range en
     // E.164 : sans cette seconde forme, aucune recherche par téléphone ne sort.

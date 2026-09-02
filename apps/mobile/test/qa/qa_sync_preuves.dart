@@ -88,38 +88,41 @@ void main() {
       );
     });
 
-    test('« Réessayer » depuis « À corriger » garde aussi le batchId', () async {
-      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
-      await insertRepresentant(db, id: 'repB', phone: '+221770000002');
-      for (final String id in <String>['A', 'B']) {
-        await queueOp(
-          db,
-          id: 'OP$id',
-          entityType: 'representant',
-          entityId: 'rep$id',
-          op: 'update',
-          baseRev: 1,
-          payload: <String, Object?>{'fullName': 'Awa $id'},
+    test(
+      '« Réessayer » depuis « À corriger » garde aussi le batchId',
+      () async {
+        await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+        await insertRepresentant(db, id: 'repB', phone: '+221770000002');
+        for (final String id in <String>['A', 'B']) {
+          await queueOp(
+            db,
+            id: 'OP$id',
+            entityType: 'representant',
+            entityId: 'rep$id',
+            op: 'update',
+            baseRev: 1,
+            payload: <String, Object?>{'fullName': 'Awa $id'},
+          );
+        }
+        api.verdicts['OPB'] = invalidOn('OPB');
+        await engine.drain();
+
+        final OutboxData refusee = await outboxById(db, 'OPB');
+        expect(refusee.status, OutboxStatus.failed);
+        expect(refusee.batchId, api.calls.first.batchId);
+
+        await WriteRepository(db, clock: clock).retryOperation(refusee.seq);
+        final OutboxData reprise = await outboxById(db, 'OPB');
+        expect(
+          reprise.batchId,
+          isNull,
+          reason:
+              'le renvoi manuel réutilise sinon la clé d\'un lot de DEUX '
+              'opérations pour n\'en envoyer qu\'une : refus définitif, et le '
+              'bouton « Réessayer » ne peut plus rien débloquer',
         );
-      }
-      api.verdicts['OPB'] = invalidOn('OPB');
-      await engine.drain();
-
-      final OutboxData refusee = await outboxById(db, 'OPB');
-      expect(refusee.status, OutboxStatus.failed);
-      expect(refusee.batchId, api.calls.first.batchId);
-
-      await WriteRepository(db, clock: clock).retryOperation(refusee.seq);
-      final OutboxData reprise = await outboxById(db, 'OPB');
-      expect(
-        reprise.batchId,
-        isNull,
-        reason:
-            'le renvoi manuel réutilise sinon la clé d\'un lot de DEUX '
-            'opérations pour n\'en envoyer qu\'une : refus définitif, et le '
-            'bouton « Réessayer » ne peut plus rien débloquer',
-      );
-    });
+      },
+    );
 
     test('un 422 de clé réutilisée est classé « terminal »', () {
       final ApiException e = DioApi.classify(
@@ -173,49 +176,52 @@ void main() {
   // ── SYN-02 : la déconnexion ne rend pas l'appareil vierge ──────────────────
 
   group('SYN-02 changement de compte', () {
-    test('ce que `signOut` efface laisse la base du commercial précédent', () async {
-      await insertRepresentant(db, id: 'rep-1', phone: '+221770000009');
-      await insertProspect(
-        db,
-        id: 'p-1',
-        representantId: 'rep-1',
-        phone: '+221770000001',
-        createdById: 'awa',
-      );
-      await queueOp(
-        db,
-        id: 'OP1',
-        entityType: 'prospect',
-        entityId: 'p-1',
-        payload: <String, Object?>{'nom': 'Diop'},
-      );
-      await engine.writeCursor('curseur-de-awa');
+    test(
+      'ce que `signOut` efface laisse la base du commercial précédent',
+      () async {
+        await insertRepresentant(db, id: 'rep-1', phone: '+221770000009');
+        await insertProspect(
+          db,
+          id: 'p-1',
+          representantId: 'rep-1',
+          phone: '+221770000001',
+          createdById: 'awa',
+        );
+        await queueOp(
+          db,
+          id: 'OP1',
+          entityType: 'prospect',
+          entityId: 'p-1',
+          payload: <String, Object?>{'nom': 'Diop'},
+        );
+        await engine.writeCursor('curseur-de-awa');
 
-      // Exactement ce que fait `AuthController.signOut`
-      // (lib/features/auth/auth_controller.dart:118) côté base locale.
-      await Phase2DirectorySync(database: db, api: api, clock: clock).purge();
+        // Exactement ce que fait `AuthController.signOut`
+        // (lib/features/auth/auth_controller.dart:118) côté base locale.
+        await Phase2DirectorySync(database: db, api: api, clock: clock).purge();
 
-      expect(
-        await engine.readCursor(),
-        isNull,
-        reason:
-            'le curseur keyset du compte précédent survit : le commercial '
-            'suivant reprend la pagination là où le premier l\'a laissée et '
-            'ne reçoit jamais ses propres fiches antérieures',
-      );
-      expect(
-        await db.select(db.prospects).get(),
-        isEmpty,
-        reason: 'les fiches du compte précédent restent lisibles',
-      );
-      expect(
-        await allOutbox(db),
-        isEmpty,
-        reason:
-            'les saisies non parties du compte précédent repartiront sous le '
-            'jeton du compte suivant',
-      );
-    });
+        expect(
+          await engine.readCursor(),
+          isNull,
+          reason:
+              'le curseur keyset du compte précédent survit : le commercial '
+              'suivant reprend la pagination là où le premier l\'a laissée et '
+              'ne reçoit jamais ses propres fiches antérieures',
+        );
+        expect(
+          await db.select(db.prospects).get(),
+          isEmpty,
+          reason: 'les fiches du compte précédent restent lisibles',
+        );
+        expect(
+          await allOutbox(db),
+          isEmpty,
+          reason:
+              'les saisies non parties du compte précédent repartiront sous le '
+              'jeton du compte suivant',
+        );
+      },
+    );
   });
 
   // ── SYN-03 : la pierre tombale d'un représentant ne se lève jamais ──────────
@@ -260,7 +266,9 @@ void main() {
       final List<RepresentantSyncViewData> trouve = await ReferenceRepository(
         db,
       ).watchRepresentants(search: '+221770000001').first;
-      expect(trouve.map((RepresentantSyncViewData r) => r.id), <String>['rep-1']);
+      expect(trouve.map((RepresentantSyncViewData r) => r.id), <String>[
+        'rep-1',
+      ]);
     });
 
     test('le prospect, lui, est bien rouvert par le même chemin', () async {
@@ -495,6 +503,9 @@ SyncChangesDto _changesVides() => SyncChangesDto(
   syndicats: const <SyndicatDto>[],
   canauxProvenance: const <CanalProvenanceDto>[],
   incomeBands: const <IncomeBandDto>[],
+  professions: const <ProfessionDto>[],
+  employeurs: const <EmployeurDto>[],
+  pays: const <PaysDto>[],
   visiteReferentiels: const <SyncVisiteReferentielDto>[],
   representants: const <RepresentantDto>[],
   prospects: const <ProspectDto>[],

@@ -15,14 +15,15 @@ describe('anciennes adresses, d’avant le découpage en coques', () => {
   // Les notifications déjà envoyées portent l'adresse d'AVANT : aucun écran
   // déplacé ne doit avoir perdu la sienne.
   it('ramène chaque écran de CHUES et d’Admin à son adresse d’avant', () => {
-    for (const role of PANEL_ROLES) {
-      for (const coque of ['chues', 'admin'] as const) {
-        for (const { href } of navItems(role, coque)) {
-          if (NES_APRES.has(href)) continue;
-          const [, , racine = '', ...reste] = href.split('/');
-          expect(movedTarget(racine, reste), href).toBe(href);
-        }
-      }
+    const deplaces = PANEL_ROLES.flatMap((role) =>
+      (['chues', 'admin'] as const).flatMap((coque) =>
+        navItems(role, coque).map(({ href }) => href),
+      ),
+    ).filter((href) => !NES_APRES.has(href));
+
+    for (const href of deplaces) {
+      const [, , racine = '', ...reste] = href.split('/');
+      expect(movedTarget(racine, reste), href).toBe(href);
     }
   });
 

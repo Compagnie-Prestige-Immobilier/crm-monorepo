@@ -66,6 +66,153 @@ const COLOR_ROLES: readonly { value: string; label: string }[] = [
   { value: 'secondary', label: 'Neutre' },
 ];
 
+function motifDeVerrou(stage: BankCaseStage): string | null {
+  if (stage.isSystem) return 'Étape système : sa désactivation casserait le flux.';
+  if (stage.isInitial) return 'Étape initiale : tout nouveau dossier y entre.';
+  return null;
+}
+
+interface ActionsEtapeProps {
+  stage: BankCaseStage;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  locked: boolean;
+  lockedLabel: string | null;
+  reorderPending: boolean;
+  togglePending: boolean;
+  onMove: (direction: -1 | 1) => void;
+  onEdit: () => void;
+  onToggle: () => void;
+}
+
+/**
+ * Les mêmes quatre actions deux fois : alignées au-delà de 1024 px, repliées
+ * dans un menu en dessous, où quatre cibles de 44 px ne tiennent pas.
+ */
+function ActionsEtape(props: ActionsEtapeProps) {
+  const { stage, canMoveUp, canMoveDown, locked, lockedLabel } = props;
+  const toggleLabel = stage.isActive ? 'Désactiver' : 'Réactiver';
+  const monterOff = !canMoveUp || props.reorderPending;
+  const descendreOff = !canMoveDown || props.reorderPending;
+  const bascculeOff = locked || props.togglePending;
+
+  return (
+    <>
+      <div className="ml-auto hidden shrink-0 items-center gap-1 lg:flex">
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          aria-label={`Monter « ${stage.label} »`}
+          disabled={monterOff}
+          onClick={() => {
+            props.onMove(-1);
+          }}
+        >
+          <ChevronUpIcon className="size-4" aria-hidden="true" />
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          aria-label={`Descendre « ${stage.label} »`}
+          disabled={descendreOff}
+          onClick={() => {
+            props.onMove(1);
+          }}
+        >
+          <ChevronDownIcon className="size-4" aria-hidden="true" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={`Renommer « ${stage.label} »`}
+          onClick={props.onEdit}
+        >
+          <PencilIcon className="size-4" aria-hidden="true" />
+        </Button>
+        <Button
+          type="button"
+          variant={stage.isActive ? 'ghost' : 'secondary'}
+          size="sm"
+          className="tap-target"
+          disabled={bascculeOff}
+          onClick={props.onToggle}
+        >
+          {toggleLabel}
+        </Button>
+        {lockedLabel === null ? null : (
+          <span className="max-w-56 text-[0.75rem] leading-tight text-muted-foreground">
+            {lockedLabel}
+          </span>
+        )}
+      </div>
+
+      <div className="ml-auto shrink-0 lg:hidden">
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                aria-label={`Actions pour « ${stage.label} »`}
+              />
+            }
+          >
+            <MoreHorizontalIcon className="size-4" aria-hidden="true" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuItem
+              className="min-h-11"
+              disabled={monterOff}
+              onClick={() => {
+                props.onMove(-1);
+              }}
+            >
+              <ChevronUpIcon aria-hidden="true" />
+              Monter
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="min-h-11"
+              disabled={descendreOff}
+              onClick={() => {
+                props.onMove(1);
+              }}
+            >
+              <ChevronDownIcon aria-hidden="true" />
+              Descendre
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={props.onEdit}>
+              <PencilIcon aria-hidden="true" />
+              Renommer
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              disabled={bascculeOff}
+              variant={stage.isActive ? 'destructive' : 'default'}
+              onClick={props.onToggle}
+            >
+              {stage.isActive ? (
+                <PowerOffIcon aria-hidden="true" />
+              ) : (
+                <PowerIcon aria-hidden="true" />
+              )}
+              {toggleLabel}
+            </DropdownMenuItem>
+            {lockedLabel === null ? null : (
+              <p className="px-2 py-1.5 text-[0.75rem] leading-tight text-muted-foreground">
+                {lockedLabel}
+              </p>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </>
+  );
+}
+
 export function BankStagesView() {
   const queryClient = useQueryClient();
   const [creating, setCreating] = useState(false);
@@ -181,14 +328,6 @@ export function BankStagesView() {
               const canMoveDown = index < open.length - 1 && !(initialLocked && index === 0);
 
               const locked = stage.isSystem || stage.isInitial;
-              const lockedLabel = (() => {
-                if (stage.isSystem) return 'Étape système : sa désactivation casserait le flux.';
-                return (() => {
-                  if (stage.isInitial) return 'Étape initiale : tout nouveau dossier y entre.';
-                  return null;
-                })();
-              })();
-              const toggleLabel = stage.isActive ? 'Désactiver' : 'Réactiver';
               const toggle = (): void => {
                 if (stage.isActive) {
                   setDeactivating(stage);
@@ -234,128 +373,22 @@ export function BankStagesView() {
                   </div>
 
                   {/* ─── Actions, à partir de 1024 px ─────────────────────── */}
-                  <div className="ml-auto hidden shrink-0 items-center gap-1 lg:flex">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      aria-label={`Monter « ${stage.label} »`}
-                      disabled={!canMoveUp || reorder.isPending}
-                      onClick={() => {
-                        move(index, -1);
-                      }}
-                    >
-                      <ChevronUpIcon className="size-4" aria-hidden="true" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      aria-label={`Descendre « ${stage.label} »`}
-                      disabled={!canMoveDown || reorder.isPending}
-                      onClick={() => {
-                        move(index, 1);
-                      }}
-                    >
-                      <ChevronDownIcon className="size-4" aria-hidden="true" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Renommer « ${stage.label} »`}
-                      onClick={() => {
-                        setEditing(stage);
-                      }}
-                    >
-                      <PencilIcon className="size-4" aria-hidden="true" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={stage.isActive ? 'ghost' : 'secondary'}
-                      size="sm"
-                      className="tap-target"
-                      disabled={locked || toggleActive.isPending}
-                      onClick={toggle}
-                    >
-                      {toggleLabel}
-                    </Button>
-                    {lockedLabel === null ? null : (
-                      <span className="max-w-56 text-[0.75rem] leading-tight text-muted-foreground">
-                        {lockedLabel}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* ─── Actions, sous 1024 px ────────────────────────────────
-                      Les quatre contrôles tiennent dans un menu : quatre cibles
-                      de 44 px alignées demandent 200 px, largeur que l'écran
-                      n'a pas. Les libellés y sont ÉCRITS EN TOUTES LETTRES, ce
-                      que quatre pictogrammes ne disaient pas. */}
-                  <div className="ml-auto shrink-0 lg:hidden">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        render={
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            aria-label={`Actions pour « ${stage.label} »`}
-                          />
-                        }
-                      >
-                        <MoreHorizontalIcon className="size-4" aria-hidden="true" />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56">
-                        <DropdownMenuItem
-                          className="min-h-11"
-                          disabled={!canMoveUp || reorder.isPending}
-                          onClick={() => {
-                            move(index, -1);
-                          }}
-                        >
-                          <ChevronUpIcon aria-hidden="true" />
-                          Monter
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="min-h-11"
-                          disabled={!canMoveDown || reorder.isPending}
-                          onClick={() => {
-                            move(index, 1);
-                          }}
-                        >
-                          <ChevronDownIcon aria-hidden="true" />
-                          Descendre
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setEditing(stage);
-                          }}
-                        >
-                          <PencilIcon aria-hidden="true" />
-                          Renommer
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          disabled={locked || toggleActive.isPending}
-                          variant={stage.isActive ? 'destructive' : 'default'}
-                          onClick={toggle}
-                        >
-                          {stage.isActive ? (
-                            <PowerOffIcon aria-hidden="true" />
-                          ) : (
-                            <PowerIcon aria-hidden="true" />
-                          )}
-                          {toggleLabel}
-                        </DropdownMenuItem>
-                        {lockedLabel === null ? null : (
-                          <p className="px-2 py-1.5 text-[0.75rem] leading-tight text-muted-foreground">
-                            {lockedLabel}
-                          </p>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
+                  <ActionsEtape
+                    stage={stage}
+                    canMoveUp={canMoveUp}
+                    canMoveDown={canMoveDown}
+                    locked={locked}
+                    lockedLabel={motifDeVerrou(stage)}
+                    reorderPending={reorder.isPending}
+                    togglePending={toggleActive.isPending}
+                    onMove={(direction) => {
+                      move(index, direction);
+                    }}
+                    onEdit={() => {
+                      setEditing(stage);
+                    }}
+                    onToggle={toggle}
+                  />
                 </li>
               );
             })}
@@ -457,6 +490,54 @@ export function BankStagesView() {
   );
 }
 
+function codeAcceptable(mode: 'create' | 'edit', code: string): boolean {
+  return mode === 'edit' || /^[A-Z][A-Z0-9_]{1,39}$/u.test(code.trim().toUpperCase());
+}
+
+function libelleAcceptable(label: string): boolean {
+  const taille = label.trim().length;
+  return taille >= 2 && taille <= 80;
+}
+
+function ChampCode({
+  codeId,
+  code,
+  valide,
+  onChange,
+}: {
+  codeId: string;
+  code: string;
+  valide: boolean;
+  onChange: (code: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={codeId}>
+        Code
+        <span className="text-destructive" aria-label="obligatoire">
+          *
+        </span>
+      </Label>
+      <Input
+        id={codeId}
+        value={code}
+        maxLength={40}
+        autoComplete="off"
+        spellCheck={false}
+        placeholder="VALIDATION_DIRECTION"
+        aria-describedby={`${codeId}-aide`}
+        aria-invalid={code !== '' && !valide}
+        onChange={(event) => {
+          onChange(event.target.value.toUpperCase());
+        }}
+      />
+      <p id={`${codeId}-aide`} className="text-[0.75rem] text-muted-foreground">
+        Majuscules, chiffres et tirets bas. Définitif.
+      </p>
+    </div>
+  );
+}
+
 function StageFormDialog({
   mode,
   stage,
@@ -506,8 +587,8 @@ function StageFormDialog({
     },
   });
 
-  const codeValid = mode === 'edit' || /^[A-Z][A-Z0-9_]{1,39}$/u.test(code.trim().toUpperCase());
-  const labelValid = label.trim().length >= 2 && label.trim().length <= 80;
+  const codeValid = codeAcceptable(mode, code);
+  const labelValid = libelleAcceptable(label);
 
   return (
     <Dialog
@@ -532,30 +613,7 @@ function StageFormDialog({
 
         <div className="flex flex-col gap-4">
           {mode === 'create' ? (
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor={codeId}>
-                Code
-                <span className="text-destructive" aria-label="obligatoire">
-                  *
-                </span>
-              </Label>
-              <Input
-                id={codeId}
-                value={code}
-                maxLength={40}
-                autoComplete="off"
-                spellCheck={false}
-                placeholder="VALIDATION_DIRECTION"
-                aria-describedby={`${codeId}-aide`}
-                aria-invalid={code !== '' && !codeValid}
-                onChange={(event) => {
-                  setCode(event.target.value.toUpperCase());
-                }}
-              />
-              <p id={`${codeId}-aide`} className="text-[0.75rem] text-muted-foreground">
-                Majuscules, chiffres et tirets bas. Définitif.
-              </p>
-            </div>
+            <ChampCode codeId={codeId} code={code} valide={codeValid} onChange={setCode} />
           ) : null}
 
           <div className="flex flex-col gap-1.5">

@@ -41,6 +41,74 @@ import { formatDateTime } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 
+/**
+ * `role="status"` : l'état change tout seul pendant le sondage, hors du flux de
+ * lecture. Sans annonce, un lecteur d'écran ne saurait pas que l'export est
+ * devenu téléchargeable.
+ */
+function EtatExport({
+  data,
+  running,
+  notice,
+}: {
+  data: Awaited<ReturnType<typeof fetchDatabaseDump>>;
+  running: boolean;
+  notice: string | null;
+}) {
+  return (
+    <div role="status" className="flex flex-col gap-2">
+      {running ? (
+        <p className="flex items-start gap-2 text-[0.875rem]">
+          <LoaderIcon className="mt-0.5 size-4 shrink-0 animate-spin" aria-hidden="true" />
+          <span>
+            <span className="font-[600]">Export en cours.</span> L’opération dure plusieurs minutes.
+            Vous pouvez quitter le panel&nbsp;: la cloche des notifications vous préviendra dès que
+            l’archive sera prête.
+          </span>
+        </p>
+      ) : (
+        <p className="text-[0.875rem] text-muted-foreground">{dumpStatusLabel(data)}</p>
+      )}
+
+      {data.status === 'ready' ? (
+        <p className="text-[0.8125rem] text-muted-foreground">
+          {formatDumpSize(data.fileSize)}
+          {data.finishedAt === null ? null : (
+            <>
+              {' · produit le '}
+              <time dateTime={data.finishedAt}>{formatDateTime(data.finishedAt)}</time>
+            </>
+          )}
+          {data.expiresAt === null ? null : (
+            <>
+              {' · détruit le '}
+              <time dateTime={data.expiresAt}>{formatDateTime(data.expiresAt)}</time>
+            </>
+          )}
+        </p>
+      ) : null}
+
+      {data.status === 'ready' && data.sha256 !== null ? (
+        <p className="break-all text-[0.75rem] text-muted-foreground">sha256 {data.sha256}</p>
+      ) : null}
+
+      {data.status === 'failed' && data.failureReason !== null ? (
+        <p className="flex items-start gap-2 rounded-md border border-destructive/30 px-3 py-2.5 text-[0.8125rem] text-destructive">
+          <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <span>{data.failureReason}</span>
+        </p>
+      ) : null}
+
+      {notice === null ? null : (
+        <p className="flex items-start gap-2 rounded-md border border-accent-border/40 bg-accent-surface px-3 py-2.5 text-[0.8125rem] text-warning">
+          <MailIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <span>{notice}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function DatabaseDumpCard() {
   const queryClient = useQueryClient();
   const confirmId = useId();
@@ -103,59 +171,7 @@ export function DatabaseDumpCard() {
         </CardHeader>
 
         <CardContent className="flex flex-col gap-5">
-          {/* `role="status"` : l'état change tout seul pendant le sondage, hors
-              du flux de lecture. Sans annonce, un utilisateur de lecteur
-              d'écran ne saurait pas que l'export est devenu téléchargeable. */}
-          <div role="status" className="flex flex-col gap-2">
-            {running ? (
-              <p className="flex items-start gap-2 text-[0.875rem]">
-                <LoaderIcon className="mt-0.5 size-4 shrink-0 animate-spin" aria-hidden="true" />
-                <span>
-                  <span className="font-[600]">Export en cours.</span> L’opération dure plusieurs
-                  minutes. Vous pouvez quitter le panel&nbsp;: la cloche des notifications vous
-                  préviendra dès que l’archive sera prête.
-                </span>
-              </p>
-            ) : (
-              <p className="text-[0.875rem] text-muted-foreground">{dumpStatusLabel(data)}</p>
-            )}
-
-            {data.status === 'ready' ? (
-              <p className="text-[0.8125rem] text-muted-foreground">
-                {formatDumpSize(data.fileSize)}
-                {data.finishedAt === null ? null : (
-                  <>
-                    {' · produit le '}
-                    <time dateTime={data.finishedAt}>{formatDateTime(data.finishedAt)}</time>
-                  </>
-                )}
-                {data.expiresAt === null ? null : (
-                  <>
-                    {' · détruit le '}
-                    <time dateTime={data.expiresAt}>{formatDateTime(data.expiresAt)}</time>
-                  </>
-                )}
-              </p>
-            ) : null}
-
-            {data.status === 'ready' && data.sha256 !== null ? (
-              <p className="break-all text-[0.75rem] text-muted-foreground">sha256 {data.sha256}</p>
-            ) : null}
-
-            {data.status === 'failed' && data.failureReason !== null ? (
-              <p className="flex items-start gap-2 rounded-md border border-destructive/30 px-3 py-2.5 text-[0.8125rem] text-destructive">
-                <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                <span>{data.failureReason}</span>
-              </p>
-            ) : null}
-
-            {notice === null ? null : (
-              <p className="flex items-start gap-2 rounded-md border border-accent-border/40 bg-accent-surface px-3 py-2.5 text-[0.8125rem] text-warning">
-                <MailIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                <span>{notice}</span>
-              </p>
-            )}
-          </div>
+          <EtatExport data={data} running={running} notice={notice} />
 
           <div className="flex flex-wrap items-center gap-3">
             {data.downloadable ? (

@@ -50,6 +50,7 @@ export function ProspectMergeDialog({
   useEffect(() => {
     if (prospect === null) return;
     resetSearch('');
+    // oxlint-disable-next-line react/set-state-in-effect -- saisie recalée sur le prospect
     setSearch('');
     setDuplicate(null);
     setKeepOriginal(true);

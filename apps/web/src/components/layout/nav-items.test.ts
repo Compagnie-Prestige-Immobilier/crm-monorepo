@@ -63,9 +63,18 @@ const routeOf = (page: string): string =>
     .filter((segment) => segment !== '' && !segment.startsWith('('))
     .join('/')}`;
 
+/** Une page qui en RÉEXPORTE une autre hérite du garde de celle-ci. */
+function reexportOf(page: string): string | null {
+  const source = /export \{[^}]*\} from '([^']+)'/u.exec(readFileSync(page, 'utf8'));
+  if (source?.[1] === undefined) return null;
+  const cible = `${path.resolve(path.dirname(page), source[1])}.tsx`;
+  return existsSync(cible) ? cible : null;
+}
+
 /** Rôles admis par le `guardRoles` de l'écran ou d'un gabarit au-dessus. */
 function guardOf(page: string): Role[] {
-  const fichiers = [page];
+  const reexport = reexportOf(page);
+  const fichiers = reexport === null ? [page] : [page, reexport];
   for (let dir = path.dirname(page); ; dir = path.dirname(dir)) {
     fichiers.push(path.join(dir, 'layout.tsx'));
     if (dir === PANEL) break;
@@ -107,6 +116,7 @@ const ATTEINT_AUTREMENT: Readonly<Record<string, string>> = {
   '/chues/tableau-de-bord': 'redirige vers « Chiffres », qui l’a absorbé',
   '/grand-public/tableau-de-bord': 'redirige vers « Chiffres », qui l’a absorbé',
   '/chues/dossiers/nouveau': 'bouton · bank/bank-cases-view.tsx',
+  '/grand-public/dossiers/nouveau': 'bouton · bank/bank-cases-view.tsx',
   '/chues/representants/import': 'bouton · representants/representants-view.tsx',
   '/compte': 'menu du compte · layout/user-menu.tsx',
   '/notifications': 'cloche · notifications/notification-bell.tsx',
@@ -127,6 +137,7 @@ const MASQUEES: Readonly<Record<Role, readonly string[]>> = {
     '/chues/representants/import',
     '/chues/tableau-de-bord',
     '/compte',
+    '/grand-public/dossiers/nouveau',
     '/grand-public/tableau-de-bord',
     '/notifications',
   ],
@@ -150,7 +161,13 @@ const MASQUEES: Readonly<Record<Role, readonly string[]>> = {
   // Les deux redirections ne portent aucun garde : elles renvoient vers
   // « Chiffres », qui refuse lui-même qui n'y a pas droit.
   COMMERCIAL: ['/chues/tableau-de-bord', '/compte', '/grand-public/tableau-de-bord'],
-  BANQUE_FINANCE: ['/chues', '/chues/tableau-de-bord', '/compte', '/notifications'],
+  BANQUE_FINANCE: [
+    '/chues',
+    '/chues/tableau-de-bord',
+    '/compte',
+    '/grand-public/tableau-de-bord',
+    '/notifications',
+  ],
   ACCUEIL: ['/accueil/tableau-de-bord', '/compte', '/notifications'],
 };
 
@@ -204,11 +221,36 @@ describe('navigation d’un agent BANQUE_FINANCE', () => {
     }
   });
 
-  it('n’ouvre ni l’accueil, ni le grand public, ni l’administration', () => {
-    for (const coque of ['accueil', 'grand-public', 'admin'] as const) {
+  it('n’ouvre ni l’accueil ni l’administration', () => {
+    for (const coque of ['accueil', 'admin'] as const) {
       expect(navItems('BANQUE_FINANCE', coque), coque).toEqual([]);
       expect(coqueAllowed('BANQUE_FINANCE', coque), coque).toBe(false);
     }
+  });
+
+  it('retrouve ses quatre écrans bancaires dans la coque Grand Public, sans la prospection', () => {
+    expect(hrefs('BANQUE_FINANCE', 'grand-public')).toEqual([
+      '/grand-public/banque',
+      '/grand-public/dossiers',
+      '/grand-public/dossiers/nouveau',
+      // Sous « Plus ».
+      '/grand-public/dossiers/export',
+    ]);
+    expect(coqueHomePath('BANQUE_FINANCE', 'grand-public')).toBe('/grand-public/banque');
+  });
+
+  it('ne voit ni les étapes du flux ni les demandes de création côté Grand Public', () => {
+    const visible = hrefs('BANQUE_FINANCE', 'grand-public');
+    const interdits = [
+      '/grand-public',
+      '/grand-public/console',
+      '/grand-public/rappels',
+      '/grand-public/statistiques',
+      '/grand-public/dossiers/etapes',
+      '/grand-public/demandes-clients',
+    ].filter((href) => visible.includes(href));
+
+    expect(interdits).toEqual([]);
   });
 
   it('son écran d’ouverture est le tableau de bord BANCAIRE, nommé sans jargon', () => {
@@ -395,14 +437,14 @@ describe('navigation d’un téléconseiller', () => {
     ]);
   });
 
-  it('ouvre le Grand Public sur l’appel, la liste restant sous « Plus »', () => {
+  it('ouvre le Grand Public sur l’espace qui permet aussi de créer', () => {
     expect(hrefs('COMMERCIAL', 'grand-public')).toEqual([
+      '/grand-public',
       '/grand-public/console',
       '/grand-public/rappels',
       '/grand-public/nouveau',
-      '/grand-public',
     ]);
-    expect(coqueHomePath('COMMERCIAL', 'grand-public')).toBe('/grand-public/console');
+    expect(coqueHomePath('COMMERCIAL', 'grand-public')).toBe('/grand-public');
   });
 
   it('lui ouvre les prospects, que l’API borne déjà à ses fiches', () => {
@@ -559,7 +601,7 @@ describe('les quatre coques', () => {
     expect(ouvertes('DIRECTION')).toEqual(['accueil', 'chues', 'grand-public']);
     expect(ouvertes('SUPERVISEUR')).toEqual(['chues', 'grand-public']);
     expect(ouvertes('COMMERCIAL')).toEqual(['chues', 'grand-public']);
-    expect(ouvertes('BANQUE_FINANCE')).toEqual(['chues']);
+    expect(ouvertes('BANQUE_FINANCE')).toEqual(['chues', 'grand-public']);
     expect(ouvertes('ADMIN')).toEqual(['accueil', 'chues', 'grand-public', 'admin']);
   });
 
@@ -661,7 +703,7 @@ describe('écran d’atterrissage après connexion', () => {
 
   it('renvoie au hub une coque qu’un rôle ne peut pas ouvrir, au lieu d’un écran interdit', () => {
     expect(coqueHomePath('ACCUEIL', 'admin')).toBe('/espaces');
-    expect(coqueHomePath('BANQUE_FINANCE', 'grand-public')).toBe('/espaces');
+    expect(coqueHomePath('BANQUE_FINANCE', 'accueil')).toBe('/espaces');
   });
 });
 
@@ -891,8 +933,10 @@ describe('navigation de la DIRECTION', () => {
     expect(hrefs('DIRECTION', 'grand-public')).toEqual([
       '/grand-public/statistiques',
       '/grand-public',
+      '/grand-public/supervision',
       // Sous « Plus ».
       '/grand-public/rappels',
+      '/grand-public/campagnes',
     ]);
   });
 
@@ -954,24 +998,50 @@ describe('navigation du pilotage sur le Grand Public et le registre', () => {
     expect(hrefs('SUPERVISEUR', 'grand-public')).toEqual([
       '/grand-public/statistiques',
       '/grand-public',
+      '/grand-public/supervision',
       // Sous « Plus ».
       '/grand-public/rappels',
+      '/grand-public/campagnes',
     ]);
     expect(
       navItems('SUPERVISEUR', 'grand-public')
         .filter((item) => item.secondary === true)
         .map((item) => item.href),
-    ).toEqual(['/grand-public/rappels']);
+    ).toEqual(['/grand-public/rappels', '/grand-public/campagnes']);
+  });
+
+  it('suit l’équipe et les campagnes du Grand Public sans passer par CHUES', () => {
+    expect(navTitle('SUPERVISEUR', '/grand-public/supervision')).toBe('Mon équipe');
+    expect(navTitle('ADMIN', '/grand-public/campagnes')).toBe('Campagnes');
+    expect(hrefs('COMMERCIAL', 'grand-public')).not.toContain('/grand-public/supervision');
   });
 
   it('donne à l’ADMIN les deux écrans de saisie du Grand Public, sous « Plus »', () => {
     expect(hrefs('ADMIN', 'grand-public')).toEqual([
       '/grand-public/statistiques',
       '/grand-public',
+      '/grand-public/supervision',
+      '/grand-public/dossiers',
       // Sous « Plus ».
       '/grand-public/rappels',
+      '/grand-public/campagnes',
       '/grand-public/console',
       '/grand-public/nouveau',
+      '/grand-public/banque',
+      '/grand-public/dossiers/export',
+      // Le dépôt de classeurs vit dans la coque Admin ; le paramètre y
+      // présélectionne le classeur Grand Public.
+      '/admin/imports?kind=PROSPECTS_GRAND_PUBLIC',
+    ]);
+    expect(
+      navItems('ADMIN', 'grand-public')
+        .filter((item) => item.secondary !== true)
+        .map((item) => item.href),
+    ).toEqual([
+      '/grand-public/statistiques',
+      '/grand-public',
+      '/grand-public/supervision',
+      '/grand-public/dossiers',
     ]);
   });
 
@@ -1000,14 +1070,7 @@ describe('mots interdits dans la barre', () => {
   // « Phase n » est proscrit dans l'interface ; « tâche » et « file d'appel »
   // nomment une fonctionnalité retirée ; les autres sont du
   // vocabulaire d'équipe que personne n'emploie au téléphone.
-  const PROSCRITS = [
-    'phase',
-    'pilotage',
-    'console',
-    'commercial',
-    'tâche',
-    'file d’appel',
-  ];
+  const PROSCRITS = ['phase', 'pilotage', 'console', 'commercial', 'tâche', 'file d’appel'];
 
   it('ne laisse passer aucun jargon, pour aucun rôle', () => {
     const fautes = ENTREES.flatMap(({ role, item }) => {
