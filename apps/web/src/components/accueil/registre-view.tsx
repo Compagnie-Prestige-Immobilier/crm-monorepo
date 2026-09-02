@@ -101,6 +101,40 @@ function options(items: readonly VisiteReferentielItem[] | undefined): FilterOpt
   return (items ?? []).map((item) => ({ value: item.id, label: item.label }));
 }
 
+interface Pagination {
+  total: number;
+  page: number;
+  pageCount: number;
+  premiere: number;
+  derniere: number;
+}
+
+function pagination(
+  data: { total: number; page: number; pageCount: number } | undefined,
+  pageSize: number,
+): Pagination {
+  const total = data?.total ?? 0;
+  const page = data?.page ?? 1;
+  return {
+    total,
+    page,
+    pageCount: data?.pageCount ?? 1,
+    premiere: total === 0 ? 0 : (page - 1) * pageSize + 1,
+    derniere: Math.min(page * pageSize, total),
+  };
+}
+
+/** La journée seule : aucun critère posé, le registre n'est pas amputé. */
+function estJourSeul(filters: VisiteFilters, chips: number): boolean {
+  return (
+    !filters.toutePeriode &&
+    filters.dateFrom === null &&
+    filters.dateTo === null &&
+    filters.search === '' &&
+    chips === 0
+  );
+}
+
 export function RegistreView() {
   const queryClient = useQueryClient();
   const { filters, setFilters, resetFilters } = useUrlFilters(ADAPTER);
@@ -144,18 +178,12 @@ export function RegistreView() {
   // contredirait sur un tri par nom ou par entreprise.
   const items = registre.data?.items ?? [];
   const visites = filters.sortBy === 'visitedAt' ? orderVisites(items) : items;
-  const total = registre.data?.total ?? 0;
-  const page = registre.data?.page ?? 1;
-  const pageCount = registre.data?.pageCount ?? 1;
-  const premiere = total === 0 ? 0 : (page - 1) * filters.pageSize + 1;
-  const derniere = Math.min(page * filters.pageSize, total);
+  const { total, page, pageCount, premiere, derniere } = pagination(
+    registre.data,
+    filters.pageSize,
+  );
   const chips = buildVisiteAdvancedChips(filters, referentiels.data);
-  const jourSeul =
-    !filters.toutePeriode &&
-    filters.dateFrom === null &&
-    filters.dateTo === null &&
-    filters.search === '' &&
-    chips.length === 0;
+  const jourSeul = estJourSeul(filters, chips.length);
 
   function rafraichir(): void {
     void queryClient.invalidateQueries({ queryKey: ['visites'] });

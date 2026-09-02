@@ -23,7 +23,9 @@ const RAPPEL = {
   overdue: true,
 };
 
-test('CHU-RAP-07 le filtre par téléconseiller n’existe que pour l’encadrement', async ({ page }) => {
+test('CHU-RAP-07 le filtre par téléconseiller n’existe que pour l’encadrement', async ({
+  page,
+}) => {
   const serverTime = new Date();
   await page.route('**/api/v1/phase2/callbacks**', async (route) => {
     await route.fulfill({

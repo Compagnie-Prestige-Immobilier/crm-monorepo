@@ -221,7 +221,9 @@ test('CHU-RAP-06 l’état vide de chaque onglet a son propre texte', async ({ p
   await fileVide(page);
 
   await page.goto('/chues/rappels');
-  await expect(page.getByRole('heading', { name: 'Aucun rappel en retard', level: 2 })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Aucun rappel en retard', level: 2 }),
+  ).toBeVisible();
 
   await page.getByRole('tab', { name: 'Aujourd’hui' }).click();
   await expect(

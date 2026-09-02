@@ -60,6 +60,7 @@ export function ClientRequestDialog({
 
   useEffect(() => {
     if (!open) return;
+    // oxlint-disable-next-line react/set-state-in-effect -- formulaire recalé à l'ouverture
     setSent(false);
     const term = initialTerm.trim();
     const digits = term.replace(/\D/gu, '');

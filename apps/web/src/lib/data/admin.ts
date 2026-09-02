@@ -169,12 +169,18 @@ export function presetRange(
 export function supervisionActivityKey(
   range: ActivityRange,
   granularity: SupervisionGranularity,
+  projet: Schemas['Projet'],
 ): readonly unknown[] {
-  return ['supervision', 'activite', range.from, range.to, granularity];
+  return ['supervision', 'activite', range.from, range.to, granularity, projet];
 }
 
+/** `projet` est obligatoire : omis, l'API compte les deux projets dans les mêmes chiffres. */
 export async function fetchSupervisionActivite(
-  input: { range: ActivityRange; granularity: SupervisionGranularity },
+  input: {
+    range: ActivityRange;
+    granularity: SupervisionGranularity;
+    projet: Schemas['Projet'];
+  },
   client: ApiClient = getApiClient(),
 ): Promise<SupervisionActivity> {
   return unwrap(
@@ -184,6 +190,7 @@ export async function fetchSupervisionActivite(
           actFrom: `${input.range.from}T00:00:00.000Z`,
           actTo: `${input.range.to}T23:59:59.999Z`,
           granularity: input.granularity,
+          projet: input.projet,
         },
       },
     }),
@@ -407,70 +414,59 @@ const CSV_HEADERS = [
   'À rappeler',
   'Taux de joignabilité (%)',
   'Prospects saisis',
-  'Représentants contactés',
 ];
+
+const PROJET_LABELS: Record<Schemas['Projet'], string> = {
+  CHUES: 'CHUES',
+  GRAND_PUBLIC: 'Grand Public',
+};
 
 export function activityCsv(input: {
   lines: readonly ActivityLine[];
   totals: ActivityTotals;
   range: ActivityRange;
   granularity: SupervisionGranularity;
+  projet: Schemas['Projet'];
 }): string {
+  // Le Grand Public n'a pas de représentants : la colonne n'y est ni vide, ni à zéro.
+  const avecRepresentants = input.projet !== 'GRAND_PUBLIC';
+  const ligne = (
+    nom: string,
+    valeurs: Omit<ActivityTotals, 'people'>,
+  ): (string | number | null)[] => [
+    nom,
+    valeurs.calls,
+    valeurs.methodObtained,
+    valeurs.unreachable,
+    valeurs.wrongNumber,
+    valeurs.refused,
+    valeurs.callback,
+    valeurs.reachRate,
+    valeurs.prospectsCreated,
+    ...(avecRepresentants ? [valeurs.representantsContacted] : []),
+  ];
+
   const rows: (string | number | null)[][] = [
     [
-      `Activité des téléconseillers du ${input.range.from} au ${input.range.to}`,
+      `Activité des téléconseillers ${PROJET_LABELS[input.projet]} du ${input.range.from} au ${input.range.to}`,
       input.granularity === 'week' ? 'Par semaine' : 'Par jour',
     ],
     [],
-    CSV_HEADERS,
+    avecRepresentants ? [...CSV_HEADERS, 'Représentants contactés'] : CSV_HEADERS,
   ];
 
   for (const line of input.lines) {
-    rows.push([
-      line.isActive ? line.name : `${line.name} (désactivé)`,
-      line.calls,
-      line.methodObtained,
-      line.unreachable,
-      line.wrongNumber,
-      line.refused,
-      line.callback,
-      line.reachRate,
-      line.prospectsCreated,
-      line.representantsContacted,
-    ]);
+    rows.push(ligne(line.isActive ? line.name : `${line.name} (désactivé)`, line));
   }
 
-  const totals = input.totals;
-  const averages = activityAverages(totals);
-  rows.push([
-    'Total équipe',
-    totals.calls,
-    totals.methodObtained,
-    totals.unreachable,
-    totals.wrongNumber,
-    totals.refused,
-    totals.callback,
-    totals.reachRate,
-    totals.prospectsCreated,
-    totals.representantsContacted,
-  ]);
-  rows.push([
-    'Moyenne par téléconseiller',
-    averages.calls,
-    averages.methodObtained,
-    averages.unreachable,
-    averages.wrongNumber,
-    averages.refused,
-    averages.callback,
-    averages.reachRate,
-    averages.prospectsCreated,
-    averages.representantsContacted,
-  ]);
+  rows.push(ligne('Total équipe', input.totals));
+  rows.push(ligne('Moyenne par téléconseiller', activityAverages(input.totals)));
   return csvRows(rows);
 }
 
-export function activityCsvFileName(range: ActivityRange): string {
-  return range.from === range.to
-    ? `cpi-supervision-activite-${range.from}.csv`
-    : `cpi-supervision-activite-${range.from}_${range.to}.csv`;
+/** Le projet est dans le nom : les deux coques exportent la même période sur des chiffres différents. */
+export function activityCsvFileName(range: ActivityRange, projet: Schemas['Projet']): string {
+  const suffixe = projet === 'GRAND_PUBLIC' ? 'grand-public' : 'chues';
+  const periode = range.from === range.to ? range.from : `${range.from}_${range.to}`;
+  return `cpi-supervision-activite-${suffixe}-${periode}.csv`;
 }

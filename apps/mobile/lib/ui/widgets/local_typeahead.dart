@@ -276,19 +276,25 @@ class _LocalTypeaheadState extends State<LocalTypeahead>
     widget.onChanged?.call(value.text);
   }
 
-  /// Rouvre la liste d'un champ DÉJÀ rempli.
+  /// Rouvre la liste au premier appui, quel que soit l'état du champ.
   ///
-  /// `RawAutocomplete` ne recalcule ses options que lorsque le TEXTE du champ
-  /// change (`_onChangedField`, autocomplete.dart) : un champ prérempli — une
-  /// correction, un brouillon repris — n'ouvrait plus jamais sa liste, quel que
-  /// soit le nombre de tapes. Un aller-retour du texte la relance, sans que
-  /// l'écran ni le choix retenu ne bougent.
+  /// `RawAutocomplete` ne calcule ses options que lorsque le TEXTE du champ
+  /// change (`_onChangedField`, autocomplete.dart). Un champ prérempli — une
+  /// correction, un brouillon repris — n'ouvrait donc plus jamais sa liste.
+  /// Un champ VIDÉ par l'écran non plus : `TextEditingController.clear()`
+  /// pose le curseur à zéro, l'appui ne déplace donc rien, le contrôleur ne
+  /// notifie pas et la liste restait fermée jusqu'à la première frappe.
+  ///
+  /// Un aller-retour du texte la relance, sans que l'écran ni le choix retenu
+  /// ne bougent.
   void _revoirLaListe() {
     setState(() => _browsing = true);
     final TextEditingValue valeur = widget.controller.value;
-    if (valeur.text.isEmpty) return;
     _relance = true;
-    widget.controller.value = valeur.copyWith(text: '');
+    widget.controller.value = valeur.copyWith(
+      text: valeur.text.isEmpty ? ' ' : '',
+      selection: const TextSelection.collapsed(offset: 0),
+    );
     widget.controller.value = valeur;
     _relance = false;
   }

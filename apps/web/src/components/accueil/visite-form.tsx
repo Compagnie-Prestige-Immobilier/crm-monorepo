@@ -92,6 +92,72 @@ function ChoiceError({ message }: { message: string | undefined }): ReactNode {
   );
 }
 
+function valeursInitiales(visite: Visite | null) {
+  const maintenant = dakarNow();
+  if (visite === null) {
+    return {
+      date: maintenant.date as string | null,
+      time: maintenant.time,
+      visitorName: '',
+      phone: '',
+      entrepriseId: null as string | null,
+      directionId: null as string | null,
+      destinataireId: null as string | null,
+      objetId: null as string | null,
+      comment: '',
+    };
+  }
+
+  return {
+    date: visite.date as string | null,
+    // Une ligne dont l'heure n'a pas ete relevee ne doit pas repartir
+    // estampillee de l'heure de la correction.
+    time: visite.time ?? '',
+    visitorName: visite.visitorName,
+    phone: visite.phone ?? '',
+    entrepriseId: visite.entreprise.id as string | null,
+    directionId: visite.direction?.id ?? null,
+    destinataireId: visite.destinataire?.id ?? null,
+    objetId: visite.objet.id as string | null,
+    comment: visite.comment ?? '',
+  };
+}
+
+/** L'API refuse de déplacer une ligne d'un jour à l'autre : en correction, la date se montre. */
+function ChampDate({
+  correction,
+  dateId,
+  date,
+  erreur,
+  onChange,
+}: {
+  correction: boolean;
+  dateId: string;
+  date: string | null;
+  erreur: string | undefined;
+  onChange: (value: string | null) => void;
+}) {
+  if (correction) {
+    return (
+      <div className="flex flex-col gap-1.5">
+        <Label>{VISITE_COLONNES.date}</Label>
+        <p className="py-2 text-[0.9375rem] font-[600]">{date === null ? '' : formatDate(date)}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <DatePicker id={dateId} label={VISITE_COLONNES.date} value={date} onChange={onChange} />
+      {erreur === undefined ? null : (
+        <p role="alert" className="text-[0.75rem] text-[var(--destructive)]">
+          {erreur}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function VisiteForm({
   referentiels,
   visite = null,
@@ -106,19 +172,16 @@ export function VisiteForm({
   const dateId = useId();
   const nomRef = useRef<HTMLInputElement>(null);
 
-  const [date, setDate] = useState<string | null>(visite?.date ?? dakarNow().date);
-  // Une ligne dont l'heure n'a pas ete relevee ne doit pas repartir estampillee
-  // de l'heure de la correction.
-  const [time, setTime] = useState(visite === null ? dakarNow().time : (visite.time ?? ''));
-  const [visitorName, setVisitorName] = useState(visite?.visitorName ?? '');
-  const [phone, setPhone] = useState(visite?.phone ?? '');
-  const [entrepriseId, setEntrepriseId] = useState<string | null>(visite?.entreprise.id ?? null);
-  const [directionId, setDirectionId] = useState<string | null>(visite?.direction?.id ?? null);
-  const [destinataireId, setDestinataireId] = useState<string | null>(
-    visite?.destinataire?.id ?? null,
-  );
-  const [objetId, setObjetId] = useState<string | null>(visite?.objet.id ?? null);
-  const [comment, setComment] = useState(visite?.comment ?? '');
+  const depart = valeursInitiales(visite);
+  const [date, setDate] = useState<string | null>(depart.date);
+  const [time, setTime] = useState(depart.time);
+  const [visitorName, setVisitorName] = useState(depart.visitorName);
+  const [phone, setPhone] = useState(depart.phone);
+  const [entrepriseId, setEntrepriseId] = useState<string | null>(depart.entrepriseId);
+  const [directionId, setDirectionId] = useState<string | null>(depart.directionId);
+  const [destinataireId, setDestinataireId] = useState<string | null>(depart.destinataireId);
+  const [objetId, setObjetId] = useState<string | null>(depart.objetId);
+  const [comment, setComment] = useState(depart.comment);
   const [errors, setErrors] = useState<Errors>({});
 
   const correction = visite !== null;
@@ -201,25 +264,13 @@ export function VisiteForm({
           `xl:grid-cols-4` se déclenche sur la largeur de l'écran, pas celle du
           dialogue — quatre colonnes y tronquaient chaque valeur choisie. */}
       <div className="grid gap-4 md:grid-cols-2">
-        {correction ? (
-          // L'API refuse de déplacer une ligne d'un jour à l'autre : la date
-          // fixe la ligne dans le registre. On la montre, on ne la propose pas.
-          <div className="flex flex-col gap-1.5">
-            <Label>{VISITE_COLONNES.date}</Label>
-            <p className="py-2 text-[0.9375rem] font-[600]">
-              {date === null ? '' : formatDate(date)}
-            </p>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-1.5">
-            <DatePicker id={dateId} label={VISITE_COLONNES.date} value={date} onChange={setDate} />
-            {errors.date === undefined ? null : (
-              <p role="alert" className="text-[0.75rem] text-[var(--destructive)]">
-                {errors.date}
-              </p>
-            )}
-          </div>
-        )}
+        <ChampDate
+          correction={correction}
+          dateId={dateId}
+          date={date}
+          erreur={errors.date}
+          onChange={setDate}
+        />
 
         <Field label={VISITE_COLONNES.time}>
           {(props) => (
@@ -240,6 +291,7 @@ export function VisiteForm({
               {...props}
               ref={nomRef}
               maxLength={NOM_MAX}
+              // oxlint-disable-next-line jsx-a11y/no-autofocus -- saisie au comptoir, champ premier
               autoFocus={!correction}
               autoComplete="off"
               value={visitorName}

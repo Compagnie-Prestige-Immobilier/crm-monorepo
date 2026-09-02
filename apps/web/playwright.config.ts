@@ -86,6 +86,13 @@ export default defineConfig({
    * coupant le serveur sous les suites voisines.
    */
   ...(process.env.E2E_START_WEB === '1'
-    ? { webServer: { command: 'pnpm dev', url: WEB_URL, reuseExistingServer: true, timeout: 120_000 } }
+    ? {
+        webServer: {
+          command: 'pnpm dev',
+          url: WEB_URL,
+          reuseExistingServer: true,
+          timeout: 120_000,
+        },
+      }
     : {}),
 });

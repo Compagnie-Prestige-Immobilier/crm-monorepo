@@ -1,6 +1,10 @@
 import { NotificationAudience, type Prisma, type Role } from '@crm/database';
 
-import { audienceDepartementRetired, audienceRoleRequired, audienceUsersRequired } from './errors.js';
+import {
+  audienceDepartementRetired,
+  audienceRoleRequired,
+  audienceUsersRequired,
+} from './errors.js';
 
 export interface AudienceSelector {
   readonly audience: NotificationAudience;

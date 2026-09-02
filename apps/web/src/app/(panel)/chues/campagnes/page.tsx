@@ -18,7 +18,7 @@ export default async function LotsExportPage() {
 
   // La même requête que l'état initial de la vue, sinon la clé diffère et
   // l'écran repart en chargement après l'hydratation.
-  const requete = { page: 1 };
+  const requete = { page: 1, projet: 'CHUES' } as const;
   const queryClient = getQueryClient();
   await queryClient.prefetchQuery({
     queryKey: queryKeys.lotsExport(requete),
@@ -27,7 +27,7 @@ export default async function LotsExportPage() {
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <LotsExportView canCreate={guard.user.role === 'ADMIN'} />
+      <LotsExportView canCreate={guard.user.role === 'ADMIN'} projet="CHUES" />
     </HydrationBoundary>
   );
 }

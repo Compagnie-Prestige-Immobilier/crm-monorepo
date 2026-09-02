@@ -92,9 +92,10 @@ async function exigerEquipe(api: APIRequestContext): Promise<void> {
       compte,
       `Compte « ${nom} » absent : la base est-elle amorcée (pnpm db:seed) ?`,
     ).toBeDefined();
-    expect(compte?.isActive, `Compte « ${nom} » désactivé : il ne peut plus recevoir de fiches`).toBe(
-      true,
-    );
+    expect(
+      compte?.isActive,
+      `Compte « ${nom} » désactivé : il ne peut plus recevoir de fiches`,
+    ).toBe(true);
   }
 }
 
@@ -301,7 +302,9 @@ test('CHU-LOT-03 · le dialogue annonce la répartition avant de créer, et l’
   await expect(annonce).toContainText(String(apercu.retenues));
 });
 
-test('CHU-LOT-04 · sans téléconseiller coché, la création est refusée et dite', async ({ page }) => {
+test('CHU-LOT-04 · sans téléconseiller coché, la création est refusée et dite', async ({
+  page,
+}) => {
   const dialogue = await ouvrirDialogue(page);
   await dialogue.getByRole('radio', { name: 'Représentants (CHUES)' }).check();
 

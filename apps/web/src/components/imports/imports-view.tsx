@@ -56,9 +56,11 @@ import {
   IMPORT_KIND_LABELS,
   IMPORT_MAX_ROWS,
   IMPORT_TEMPLATES,
+  UPLOADABLE_IMPORT_KINDS,
   type ImportJob,
   type ImportJobReport,
   type ImportKind,
+  type UploadableImportKind,
 } from '@/lib/data/imports';
 import { formatDateTime, formatNumber } from '@/lib/format';
 import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
@@ -72,12 +74,8 @@ const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const ACCEPTED = '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 /** `items` est obligatoire sur le Select Base UI, sinon la gâchette montre la valeur brute. */
-const KIND_OPTIONS = [
-  { value: 'PROSPECTS', label: IMPORT_KIND_LABELS.PROSPECTS },
-  { value: 'PROSPECTS_GRAND_PUBLIC', label: IMPORT_KIND_LABELS.PROSPECTS_GRAND_PUBLIC },
-  { value: 'REPRESENTANTS', label: IMPORT_KIND_LABELS.REPRESENTANTS },
-  { value: 'VISITES', label: IMPORT_KIND_LABELS.VISITES },
-] as const satisfies readonly { value: ImportKind; label: string }[];
+const KIND_OPTIONS: readonly { value: UploadableImportKind; label: string }[] =
+  UPLOADABLE_IMPORT_KINDS.map((value) => ({ value, label: IMPORT_KIND_LABELS[value] }));
 
 const IMPORT_HINTS: Readonly<Record<ImportKind, string>> = {
   PROSPECTS:
@@ -187,7 +185,7 @@ function errorsCaption(report: ImportJobReport): string {
   )}. Corrigez celles-ci et redéposez le fichier : les suivantes apparaîtront.`;
 }
 
-export function ImportsView() {
+export function ImportsView({ initialKind = 'PROSPECTS' }: { initialKind?: UploadableImportKind }) {
   const queryClient = useQueryClient();
   const live = useLive();
   const inputId = useId();
@@ -195,7 +193,7 @@ export function ImportsView() {
   const inputRef = useRef<HTMLInputElement>(null);
   const template = useFileDownload();
 
-  const [kind, setKind] = useState<Exclude<ImportKind, 'VISITES_REGISTRE'>>('PROSPECTS');
+  const [kind, setKind] = useState<UploadableImportKind>(initialKind);
   const [dragging, setDragging] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -334,6 +332,7 @@ export function ImportsView() {
 
           {/* Le champ de fichier double la zone de dépôt : le glisser-déposer
               n'est pas atteignable au clavier. */}
+          {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- input de fichier associé */}
           <label
             htmlFor={inputId}
             onDragOver={(event) => {

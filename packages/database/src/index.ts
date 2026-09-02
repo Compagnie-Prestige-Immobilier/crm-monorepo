@@ -9,6 +9,8 @@ export * from './seed-data/call-outcomes.js';
 export * from './seed-data/canaux-provenance.js';
 export * from './seed-data/professions.js';
 export * from './seed-data/income-bands.js';
+export * from './seed-data/employeurs.js';
+export * from './seed-data/pays.js';
 export * from './seed-data/offers.js';
 export * from './segment.js';
 export * from './demo-workspace-factory.js';

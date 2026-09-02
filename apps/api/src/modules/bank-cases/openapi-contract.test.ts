@@ -104,9 +104,7 @@ const MODULES: Record<string, string[]> = {
     'approveClientRequest',
     'rejectClientRequest',
   ],
-  'rep-campaigns': [
-    'recordRepCallAttempt',
-  ],
+  'rep-campaigns': ['recordRepCallAttempt'],
   representants: [
     'listRepresentants',
     'createRepresentant',

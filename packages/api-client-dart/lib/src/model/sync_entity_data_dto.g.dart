@@ -61,6 +61,28 @@ abstract class _$SyncEntityDataDtoCWProxy {
 
   SyncEntityDataDto paymentMode(PaymentMode? paymentMode);
 
+  SyncEntityDataDto professionId(String? professionId);
+
+  SyncEntityDataDto employeurId(String? employeurId);
+
+  SyncEntityDataDto employeur(String? employeur);
+
+  SyncEntityDataDto typeContrat(TypeContrat? typeContrat);
+
+  SyncEntityDataDto ancienneteMois(num? ancienneteMois);
+
+  SyncEntityDataDto lieuActivite(String? lieuActivite);
+
+  SyncEntityDataDto modeEpargne(ModeEpargne? modeEpargne);
+
+  SyncEntityDataDto paysResidenceId(String? paysResidenceId);
+
+  SyncEntityDataDto villeResidence(String? villeResidence);
+
+  SyncEntityDataDto relaisNom(String? relaisNom);
+
+  SyncEntityDataDto relaisPhoneE164(String? relaisPhoneE164);
+
   SyncEntityDataDto clientCreatedAt(DateTime? clientCreatedAt);
 
   SyncEntityDataDto prospectId(String? prospectId);
@@ -133,6 +155,17 @@ abstract class _$SyncEntityDataDtoCWProxy {
     String? canalProvenanceId,
     String? incomeBandId,
     PaymentMode? paymentMode,
+    String? professionId,
+    String? employeurId,
+    String? employeur,
+    TypeContrat? typeContrat,
+    num? ancienneteMois,
+    String? lieuActivite,
+    ModeEpargne? modeEpargne,
+    String? paysResidenceId,
+    String? villeResidence,
+    String? relaisNom,
+    String? relaisPhoneE164,
     DateTime? clientCreatedAt,
     String? prospectId,
     CallOutcome? outcome,
@@ -257,6 +290,48 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
       this(paymentMode: paymentMode);
 
   @override
+  SyncEntityDataDto professionId(String? professionId) =>
+      this(professionId: professionId);
+
+  @override
+  SyncEntityDataDto employeurId(String? employeurId) =>
+      this(employeurId: employeurId);
+
+  @override
+  SyncEntityDataDto employeur(String? employeur) => this(employeur: employeur);
+
+  @override
+  SyncEntityDataDto typeContrat(TypeContrat? typeContrat) =>
+      this(typeContrat: typeContrat);
+
+  @override
+  SyncEntityDataDto ancienneteMois(num? ancienneteMois) =>
+      this(ancienneteMois: ancienneteMois);
+
+  @override
+  SyncEntityDataDto lieuActivite(String? lieuActivite) =>
+      this(lieuActivite: lieuActivite);
+
+  @override
+  SyncEntityDataDto modeEpargne(ModeEpargne? modeEpargne) =>
+      this(modeEpargne: modeEpargne);
+
+  @override
+  SyncEntityDataDto paysResidenceId(String? paysResidenceId) =>
+      this(paysResidenceId: paysResidenceId);
+
+  @override
+  SyncEntityDataDto villeResidence(String? villeResidence) =>
+      this(villeResidence: villeResidence);
+
+  @override
+  SyncEntityDataDto relaisNom(String? relaisNom) => this(relaisNom: relaisNom);
+
+  @override
+  SyncEntityDataDto relaisPhoneE164(String? relaisPhoneE164) =>
+      this(relaisPhoneE164: relaisPhoneE164);
+
+  @override
   SyncEntityDataDto clientCreatedAt(DateTime? clientCreatedAt) =>
       this(clientCreatedAt: clientCreatedAt);
 
@@ -360,6 +435,17 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
     Object? canalProvenanceId = const $CopyWithPlaceholder(),
     Object? incomeBandId = const $CopyWithPlaceholder(),
     Object? paymentMode = const $CopyWithPlaceholder(),
+    Object? professionId = const $CopyWithPlaceholder(),
+    Object? employeurId = const $CopyWithPlaceholder(),
+    Object? employeur = const $CopyWithPlaceholder(),
+    Object? typeContrat = const $CopyWithPlaceholder(),
+    Object? ancienneteMois = const $CopyWithPlaceholder(),
+    Object? lieuActivite = const $CopyWithPlaceholder(),
+    Object? modeEpargne = const $CopyWithPlaceholder(),
+    Object? paysResidenceId = const $CopyWithPlaceholder(),
+    Object? villeResidence = const $CopyWithPlaceholder(),
+    Object? relaisNom = const $CopyWithPlaceholder(),
+    Object? relaisPhoneE164 = const $CopyWithPlaceholder(),
     Object? clientCreatedAt = const $CopyWithPlaceholder(),
     Object? prospectId = const $CopyWithPlaceholder(),
     Object? outcome = const $CopyWithPlaceholder(),
@@ -489,6 +575,50 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
           ? _value.paymentMode
           // ignore: cast_nullable_to_non_nullable
           : paymentMode as PaymentMode?,
+      professionId: professionId == const $CopyWithPlaceholder()
+          ? _value.professionId
+          // ignore: cast_nullable_to_non_nullable
+          : professionId as String?,
+      employeurId: employeurId == const $CopyWithPlaceholder()
+          ? _value.employeurId
+          // ignore: cast_nullable_to_non_nullable
+          : employeurId as String?,
+      employeur: employeur == const $CopyWithPlaceholder()
+          ? _value.employeur
+          // ignore: cast_nullable_to_non_nullable
+          : employeur as String?,
+      typeContrat: typeContrat == const $CopyWithPlaceholder()
+          ? _value.typeContrat
+          // ignore: cast_nullable_to_non_nullable
+          : typeContrat as TypeContrat?,
+      ancienneteMois: ancienneteMois == const $CopyWithPlaceholder()
+          ? _value.ancienneteMois
+          // ignore: cast_nullable_to_non_nullable
+          : ancienneteMois as num?,
+      lieuActivite: lieuActivite == const $CopyWithPlaceholder()
+          ? _value.lieuActivite
+          // ignore: cast_nullable_to_non_nullable
+          : lieuActivite as String?,
+      modeEpargne: modeEpargne == const $CopyWithPlaceholder()
+          ? _value.modeEpargne
+          // ignore: cast_nullable_to_non_nullable
+          : modeEpargne as ModeEpargne?,
+      paysResidenceId: paysResidenceId == const $CopyWithPlaceholder()
+          ? _value.paysResidenceId
+          // ignore: cast_nullable_to_non_nullable
+          : paysResidenceId as String?,
+      villeResidence: villeResidence == const $CopyWithPlaceholder()
+          ? _value.villeResidence
+          // ignore: cast_nullable_to_non_nullable
+          : villeResidence as String?,
+      relaisNom: relaisNom == const $CopyWithPlaceholder()
+          ? _value.relaisNom
+          // ignore: cast_nullable_to_non_nullable
+          : relaisNom as String?,
+      relaisPhoneE164: relaisPhoneE164 == const $CopyWithPlaceholder()
+          ? _value.relaisPhoneE164
+          // ignore: cast_nullable_to_non_nullable
+          : relaisPhoneE164 as String?,
       clientCreatedAt: clientCreatedAt == const $CopyWithPlaceholder()
           ? _value.clientCreatedAt
           // ignore: cast_nullable_to_non_nullable
@@ -581,132 +711,155 @@ extension $SyncEntityDataDtoCopyWith on SyncEntityDataDto {
 // JsonSerializableGenerator
 // **************************************************************************
 
-SyncEntityDataDto _$SyncEntityDataDtoFromJson(Map<String, dynamic> json) =>
-    $checkedCreate('SyncEntityDataDto', json, ($checkedConvert) {
-      final val = SyncEntityDataDto(
-        fullName: $checkedConvert('fullName', (v) => v as String?),
-        nom: $checkedConvert('nom', (v) => v as String?),
-        prenom: $checkedConvert('prenom', (v) => v as String?),
-        phone: $checkedConvert('phone', (v) => v as String?),
-        departementId: $checkedConvert('departementId', (v) => v as String?),
-        iefId: $checkedConvert('iefId', (v) => v as String?),
-        banqueId: $checkedConvert('banqueId', (v) => v as String?),
-        syndicatId: $checkedConvert('syndicatId', (v) => v as String?),
-        representantId: $checkedConvert('representantId', (v) => v as String?),
-        body: $checkedConvert('body', (v) => v as String?),
-        statut: $checkedConvert(
-          'statut',
-          (v) => $enumDecodeNullable(
-            _$ProspectStatutEnumMap,
-            v,
-            unknownValue: ProspectStatut.unknownDefaultOpenApi,
-          ),
-        ),
-        notes: $checkedConvert('notes', (v) => v as String?),
-        whatsappStatus: $checkedConvert(
-          'whatsappStatus',
-          (v) => $enumDecodeNullable(
-            _$WhatsappStatusEnumMap,
-            v,
-            unknownValue: WhatsappStatus.unknownDefaultOpenApi,
-          ),
-        ),
-        whatsappE164: $checkedConvert('whatsappE164', (v) => v as String?),
-        profession: $checkedConvert('profession', (v) => v as String?),
-        relationStatus: $checkedConvert(
-          'relationStatus',
-          (v) => $enumDecodeNullable(
-            _$RepresentantRelationEnumMap,
-            v,
-            unknownValue: RepresentantRelation.unknownDefaultOpenApi,
-          ),
-        ),
-        relationReason: $checkedConvert('relationReason', (v) => v as String?),
-        etablissement: $checkedConvert('etablissement', (v) => v as String?),
-        syndicat: $checkedConvert('syndicat', (v) => v as String?),
-        connaitUES: $checkedConvert('connaitUES', (v) => v as bool?),
-        contacte: $checkedConvert('contacte', (v) => v as bool?),
-        projet: $checkedConvert(
-          'projet',
-          (v) => $enumDecodeNullable(
-            _$ProjetEnumMap,
-            v,
-            unknownValue: Projet.unknownDefaultOpenApi,
-          ),
-        ),
-        type: $checkedConvert(
-          'type',
-          (v) => $enumDecodeNullable(
-            _$ProspectTypeEnumMap,
-            v,
-            unknownValue: ProspectType.unknownDefaultOpenApi,
-          ),
-        ),
-        dureeSystemeMois: $checkedConvert('dureeSystemeMois', (v) => v as num?),
-        canalProvenanceId: $checkedConvert(
-          'canalProvenanceId',
-          (v) => v as String?,
-        ),
-        incomeBandId: $checkedConvert('incomeBandId', (v) => v as String?),
-        paymentMode: $checkedConvert(
-          'paymentMode',
-          (v) => $enumDecodeNullable(
-            _$PaymentModeEnumMap,
-            v,
-            unknownValue: PaymentMode.unknownDefaultOpenApi,
-          ),
-        ),
-        clientCreatedAt: $checkedConvert(
-          'clientCreatedAt',
-          (v) => v == null ? null : DateTime.parse(v as String),
-        ),
-        prospectId: $checkedConvert('prospectId', (v) => v as String?),
-        outcome: $checkedConvert(
-          'outcome',
-          (v) => $enumDecodeNullable(
-            _$CallOutcomeEnumMap,
-            v,
-            unknownValue: CallOutcome.unknownDefaultOpenApi,
-          ),
-        ),
-        reasonCode: $checkedConvert('reasonCode', (v) => v as String?),
-        method: $checkedConvert(
-          'method',
-          (v) => $enumDecodeNullable(
-            _$EnrollmentMethodEnumMap,
-            v,
-            unknownValue: EnrollmentMethod.unknownDefaultOpenApi,
-          ),
-        ),
-        comment: $checkedConvert('comment', (v) => v as String?),
-        callbackAt: $checkedConvert(
-          'callbackAt',
-          (v) => v == null ? null : DateTime.parse(v as String),
-        ),
-        email: $checkedConvert('email', (v) => v as String?),
-        fonctionnaire: $checkedConvert('fonctionnaire', (v) => v as bool?),
-        engagementEnCours: $checkedConvert(
-          'engagementEnCours',
-          (v) => v as bool?,
-        ),
-        dureeEtablissementMois: $checkedConvert(
-          'dureeEtablissementMois',
-          (v) => v as num?,
-        ),
-        rendezVousAt: $checkedConvert(
-          'rendezVousAt',
-          (v) => v == null ? null : DateTime.parse(v as String),
-        ),
-        visitorName: $checkedConvert('visitorName', (v) => v as String?),
-        visitDate: $checkedConvert('visitDate', (v) => v as String?),
-        visitTime: $checkedConvert('visitTime', (v) => v as String?),
-        entrepriseId: $checkedConvert('entrepriseId', (v) => v as String?),
-        objetId: $checkedConvert('objetId', (v) => v as String?),
-        directionId: $checkedConvert('directionId', (v) => v as String?),
-        destinataireId: $checkedConvert('destinataireId', (v) => v as String?),
-      );
-      return val;
-    });
+SyncEntityDataDto _$SyncEntityDataDtoFromJson(
+  Map<String, dynamic> json,
+) => $checkedCreate('SyncEntityDataDto', json, ($checkedConvert) {
+  final val = SyncEntityDataDto(
+    fullName: $checkedConvert('fullName', (v) => v as String?),
+    nom: $checkedConvert('nom', (v) => v as String?),
+    prenom: $checkedConvert('prenom', (v) => v as String?),
+    phone: $checkedConvert('phone', (v) => v as String?),
+    departementId: $checkedConvert('departementId', (v) => v as String?),
+    iefId: $checkedConvert('iefId', (v) => v as String?),
+    banqueId: $checkedConvert('banqueId', (v) => v as String?),
+    syndicatId: $checkedConvert('syndicatId', (v) => v as String?),
+    representantId: $checkedConvert('representantId', (v) => v as String?),
+    body: $checkedConvert('body', (v) => v as String?),
+    statut: $checkedConvert(
+      'statut',
+      (v) => $enumDecodeNullable(
+        _$ProspectStatutEnumMap,
+        v,
+        unknownValue: ProspectStatut.unknownDefaultOpenApi,
+      ),
+    ),
+    notes: $checkedConvert('notes', (v) => v as String?),
+    whatsappStatus: $checkedConvert(
+      'whatsappStatus',
+      (v) => $enumDecodeNullable(
+        _$WhatsappStatusEnumMap,
+        v,
+        unknownValue: WhatsappStatus.unknownDefaultOpenApi,
+      ),
+    ),
+    whatsappE164: $checkedConvert('whatsappE164', (v) => v as String?),
+    profession: $checkedConvert('profession', (v) => v as String?),
+    relationStatus: $checkedConvert(
+      'relationStatus',
+      (v) => $enumDecodeNullable(
+        _$RepresentantRelationEnumMap,
+        v,
+        unknownValue: RepresentantRelation.unknownDefaultOpenApi,
+      ),
+    ),
+    relationReason: $checkedConvert('relationReason', (v) => v as String?),
+    etablissement: $checkedConvert('etablissement', (v) => v as String?),
+    syndicat: $checkedConvert('syndicat', (v) => v as String?),
+    connaitUES: $checkedConvert('connaitUES', (v) => v as bool?),
+    contacte: $checkedConvert('contacte', (v) => v as bool?),
+    projet: $checkedConvert(
+      'projet',
+      (v) => $enumDecodeNullable(
+        _$ProjetEnumMap,
+        v,
+        unknownValue: Projet.unknownDefaultOpenApi,
+      ),
+    ),
+    type: $checkedConvert(
+      'type',
+      (v) => $enumDecodeNullable(
+        _$ProspectTypeEnumMap,
+        v,
+        unknownValue: ProspectType.unknownDefaultOpenApi,
+      ),
+    ),
+    dureeSystemeMois: $checkedConvert('dureeSystemeMois', (v) => v as num?),
+    canalProvenanceId: $checkedConvert(
+      'canalProvenanceId',
+      (v) => v as String?,
+    ),
+    incomeBandId: $checkedConvert('incomeBandId', (v) => v as String?),
+    paymentMode: $checkedConvert(
+      'paymentMode',
+      (v) => $enumDecodeNullable(
+        _$PaymentModeEnumMap,
+        v,
+        unknownValue: PaymentMode.unknownDefaultOpenApi,
+      ),
+    ),
+    professionId: $checkedConvert('professionId', (v) => v as String?),
+    employeurId: $checkedConvert('employeurId', (v) => v as String?),
+    employeur: $checkedConvert('employeur', (v) => v as String?),
+    typeContrat: $checkedConvert(
+      'typeContrat',
+      (v) => $enumDecodeNullable(
+        _$TypeContratEnumMap,
+        v,
+        unknownValue: TypeContrat.unknownDefaultOpenApi,
+      ),
+    ),
+    ancienneteMois: $checkedConvert('ancienneteMois', (v) => v as num?),
+    lieuActivite: $checkedConvert('lieuActivite', (v) => v as String?),
+    modeEpargne: $checkedConvert(
+      'modeEpargne',
+      (v) => $enumDecodeNullable(
+        _$ModeEpargneEnumMap,
+        v,
+        unknownValue: ModeEpargne.unknownDefaultOpenApi,
+      ),
+    ),
+    paysResidenceId: $checkedConvert('paysResidenceId', (v) => v as String?),
+    villeResidence: $checkedConvert('villeResidence', (v) => v as String?),
+    relaisNom: $checkedConvert('relaisNom', (v) => v as String?),
+    relaisPhoneE164: $checkedConvert('relaisPhoneE164', (v) => v as String?),
+    clientCreatedAt: $checkedConvert(
+      'clientCreatedAt',
+      (v) => v == null ? null : DateTime.parse(v as String),
+    ),
+    prospectId: $checkedConvert('prospectId', (v) => v as String?),
+    outcome: $checkedConvert(
+      'outcome',
+      (v) => $enumDecodeNullable(
+        _$CallOutcomeEnumMap,
+        v,
+        unknownValue: CallOutcome.unknownDefaultOpenApi,
+      ),
+    ),
+    reasonCode: $checkedConvert('reasonCode', (v) => v as String?),
+    method: $checkedConvert(
+      'method',
+      (v) => $enumDecodeNullable(
+        _$EnrollmentMethodEnumMap,
+        v,
+        unknownValue: EnrollmentMethod.unknownDefaultOpenApi,
+      ),
+    ),
+    comment: $checkedConvert('comment', (v) => v as String?),
+    callbackAt: $checkedConvert(
+      'callbackAt',
+      (v) => v == null ? null : DateTime.parse(v as String),
+    ),
+    email: $checkedConvert('email', (v) => v as String?),
+    fonctionnaire: $checkedConvert('fonctionnaire', (v) => v as bool?),
+    engagementEnCours: $checkedConvert('engagementEnCours', (v) => v as bool?),
+    dureeEtablissementMois: $checkedConvert(
+      'dureeEtablissementMois',
+      (v) => v as num?,
+    ),
+    rendezVousAt: $checkedConvert(
+      'rendezVousAt',
+      (v) => v == null ? null : DateTime.parse(v as String),
+    ),
+    visitorName: $checkedConvert('visitorName', (v) => v as String?),
+    visitDate: $checkedConvert('visitDate', (v) => v as String?),
+    visitTime: $checkedConvert('visitTime', (v) => v as String?),
+    entrepriseId: $checkedConvert('entrepriseId', (v) => v as String?),
+    objetId: $checkedConvert('objetId', (v) => v as String?),
+    directionId: $checkedConvert('directionId', (v) => v as String?),
+    destinataireId: $checkedConvert('destinataireId', (v) => v as String?),
+  );
+  return val;
+});
 
 Map<String, dynamic> _$SyncEntityDataDtoToJson(
   SyncEntityDataDto instance,
@@ -742,6 +895,19 @@ Map<String, dynamic> _$SyncEntityDataDtoToJson(
   if (instance.incomeBandId case final value?) 'incomeBandId': value,
   if (_$PaymentModeEnumMap[instance.paymentMode] case final value?)
     'paymentMode': value,
+  if (instance.professionId case final value?) 'professionId': value,
+  if (instance.employeurId case final value?) 'employeurId': value,
+  if (instance.employeur case final value?) 'employeur': value,
+  if (_$TypeContratEnumMap[instance.typeContrat] case final value?)
+    'typeContrat': value,
+  if (instance.ancienneteMois case final value?) 'ancienneteMois': value,
+  if (instance.lieuActivite case final value?) 'lieuActivite': value,
+  if (_$ModeEpargneEnumMap[instance.modeEpargne] case final value?)
+    'modeEpargne': value,
+  if (instance.paysResidenceId case final value?) 'paysResidenceId': value,
+  if (instance.villeResidence case final value?) 'villeResidence': value,
+  if (instance.relaisNom case final value?) 'relaisNom': value,
+  if (instance.relaisPhoneE164 case final value?) 'relaisPhoneE164': value,
   if (instance.clientCreatedAt?.toIso8601String() case final value?)
     'clientCreatedAt': value,
   if (instance.prospectId case final value?) 'prospectId': value,
@@ -811,6 +977,21 @@ const _$PaymentModeEnumMap = {
   PaymentMode.COMPTANT: 'COMPTANT',
   PaymentMode.ECHELONNE: 'ECHELONNE',
   PaymentMode.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$TypeContratEnumMap = {
+  TypeContrat.CDI: 'CDI',
+  TypeContrat.CDD: 'CDD',
+  TypeContrat.AUTRE: 'AUTRE',
+  TypeContrat.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$ModeEpargneEnumMap = {
+  ModeEpargne.TONTINE: 'TONTINE',
+  ModeEpargne.MOBILE_MONEY: 'MOBILE_MONEY',
+  ModeEpargne.BANQUE: 'BANQUE',
+  ModeEpargne.AUCUN: 'AUCUN',
+  ModeEpargne.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 
 const _$CallOutcomeEnumMap = {

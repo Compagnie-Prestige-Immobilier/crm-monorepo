@@ -231,8 +231,16 @@ export function validateConversion(
   draft: ConversionDraft,
   now: number = Date.now(),
 ): ConversionErrors {
-  const errors: ConversionErrors = {};
   const complet = draft.projet === 'CHUES';
+  return {
+    ...identiteErreurs(draft, complet),
+    ...dossierErreurs(draft, complet),
+    ...methodeErreurs(draft, now),
+  };
+}
+
+function identiteErreurs(draft: ConversionDraft, complet: boolean): ConversionErrors {
+  const errors: ConversionErrors = {};
 
   const nom = draft.nom.trim();
   if (nom === '') errors.nom = 'Le nom est obligatoire.';
@@ -255,22 +263,38 @@ export function validateConversion(
     errors.email = 'Cette adresse électronique n’en est pas une.';
   }
 
+  return errors;
+}
+
+const CHAMPS_CHUES: readonly [ConversionField, (draft: ConversionDraft) => boolean, string][] = [
+  ['fonctionnaire', (draft) => draft.fonctionnaire === null, 'Dites s’il est fonctionnaire.'],
+  ['syndicatId', (draft) => draft.syndicatId === '', 'Choisissez le syndicat.'],
+  ['banqueId', (draft) => draft.banqueId === '', 'Choisissez la banque.'],
+  [
+    'engagementEnCours',
+    (draft) => draft.engagementEnCours === null,
+    'Dites s’il a un engagement en cours à la banque.',
+  ],
+  ['incomeBandId', (draft) => draft.incomeBandId === '', 'Choisissez la tranche de revenu.'],
+];
+
+function chuesObligatoires(draft: ConversionDraft): ConversionErrors {
+  const errors: ConversionErrors = {};
+  for (const [field, manquant, message] of CHAMPS_CHUES) {
+    if (manquant(draft)) errors[field] = message;
+  }
+  return errors;
+}
+
+function dossierErreurs(draft: ConversionDraft, complet: boolean): ConversionErrors {
+  const errors: ConversionErrors = complet ? chuesObligatoires(draft) : {};
+
   const mois = draft.dureeEtablissementMois.trim();
   if (complet && mois === '') {
     errors.dureeEtablissementMois = 'La durée dans l’établissement est obligatoire.';
   } else if (mois !== '' && (!/^\d+$/u.test(mois) || Number(mois) > DUREE_ETABLISSEMENT_MAX_MOIS)) {
     errors.dureeEtablissementMois = `La durée s’exprime en mois entiers, de 0 à ${String(DUREE_ETABLISSEMENT_MAX_MOIS)}.`;
   }
-
-  if (complet && draft.fonctionnaire === null)
-    errors.fonctionnaire = 'Dites s’il est fonctionnaire.';
-  if (complet && draft.syndicatId === '') errors.syndicatId = 'Choisissez le syndicat.';
-  if (complet && draft.banqueId === '') errors.banqueId = 'Choisissez la banque.';
-  if (complet && draft.engagementEnCours === null) {
-    errors.engagementEnCours = 'Dites s’il a un engagement en cours à la banque.';
-  }
-  if (complet && draft.incomeBandId === '')
-    errors.incomeBandId = 'Choisissez la tranche de revenu.';
 
   const systeme = draft.dureeSystemeMois.trim();
   if (complet && systeme === '') {
@@ -281,6 +305,12 @@ export function validateConversion(
   ) {
     errors.dureeSystemeMois = `La durée du système s’exprime en mois entiers, de 1 à ${String(DUREE_SYSTEME_MAX_MOIS)}.`;
   }
+
+  return errors;
+}
+
+function methodeErreurs(draft: ConversionDraft, now: number): ConversionErrors {
+  const errors: ConversionErrors = {};
 
   if (draft.method === null) errors.method = 'Choisissez la méthode d’enrôlement.';
 

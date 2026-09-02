@@ -28,6 +28,8 @@ import {
   GRAND_PUBLIC_IMPORT_COLUMNS,
   GRAND_PUBLIC_IMPORT_HEADERS,
   GRAND_PUBLIC_SHEET_NAME,
+  MODE_EPARGNE_CHOICES,
+  TYPE_CONTRAT_CHOICES,
 } from '../imports/prospects-grand-public-template.js';
 import {
   COLUMNS_BY_HEADER_RULE,
@@ -104,7 +106,7 @@ export class ExportService {
 
   /** Grand Public : seuls le nom et le téléphone sont exigés, tout le reste peut rester vide. */
   async writeProspectsGrandPublicImportTemplate(stream: Writable): Promise<void> {
-    const [banques, syndicats, canaux] = await Promise.all([
+    const [banques, syndicats, canaux, employeurs, pays] = await Promise.all([
       this.prisma.banque.findMany({
         where: { isActive: true },
         select: { shortName: true },
@@ -118,6 +120,16 @@ export class ExportService {
       // Même ordre que `ProspectsGrandPublicImportAdapter.prepare`, qui énumère
       // les valeurs admises dans ses messages de refus.
       this.prisma.canalProvenance.findMany({
+        where: { isActive: true },
+        select: { label: true },
+        orderBy: [{ position: 'asc' }, { label: 'asc' }],
+      }),
+      this.prisma.employeur.findMany({
+        where: { isActive: true },
+        select: { label: true },
+        orderBy: [{ position: 'asc' }, { label: 'asc' }],
+      }),
+      this.prisma.pays.findMany({
         where: { isActive: true },
         select: { label: true },
         orderBy: [{ position: 'asc' }, { label: 'asc' }],
@@ -151,6 +163,26 @@ export class ExportService {
           label: 'Canaux de provenance',
           values: canaux.map((row) => row.label),
         },
+        {
+          column: rankOf(GRAND_PUBLIC_IMPORT_HEADERS.employeur),
+          label: 'Employeurs',
+          values: employeurs.map((row) => row.label),
+        },
+        {
+          column: rankOf(GRAND_PUBLIC_IMPORT_HEADERS.typeContrat),
+          label: 'Types de contrat',
+          values: [...TYPE_CONTRAT_CHOICES],
+        },
+        {
+          column: rankOf(GRAND_PUBLIC_IMPORT_HEADERS.modeEpargne),
+          label: 'Modes d’épargne',
+          values: [...MODE_EPARGNE_CHOICES],
+        },
+        {
+          column: rankOf(GRAND_PUBLIC_IMPORT_HEADERS.paysResidence),
+          label: 'Pays',
+          values: pays.map((row) => row.label),
+        },
       ],
       rules: [
         COLUMNS_BY_HEADER_RULE,
@@ -158,6 +190,7 @@ export class ExportService {
         'Seuls le Nom et le Téléphone sont exigés. Une cellule vide n’est pas une erreur : c’est une information qu’on n’a pas encore, et la ligne est écrite quand même.',
         'Le téléphone est la clé de déduplication, tous projets confondus : un numéro déjà porté par une fiche, CHUES comprise, est signalé et non écrit.',
         '« Fonctionnaire » à « oui » range la fiche en FONCTIONNAIRE. À « non », le type reste VIDE : le fichier ne dit pas s’il s’agit du secteur privé, de l’informel ou de la diaspora, et rien ne se devine ici.',
+        'Les dix dernières colonnes décrivent la situation. Un employeur hors liste est conservé en clair ; un pays de résidence hors liste refuse la ligne, car il désigne une entrée de référentiel qui ne se crée pas à l’import.',
       ],
     });
   }

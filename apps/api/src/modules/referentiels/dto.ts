@@ -1,7 +1,9 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
+import { EmployeurType } from '@crm/database';
 import {
   IsBoolean,
+  IsEnum,
   IsIn,
   IsInt,
   IsOptional,
@@ -116,6 +118,60 @@ export class CreateProfessionDto {
 }
 
 export class UpdateProfessionDto extends PartialType(CreateProfessionDto) {}
+
+export class EmployeurDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ description: 'Clé stable, jamais réécrite : les fiches la désignent.' })
+  code!: string;
+  @ApiProperty() label!: string;
+  @ApiProperty({ enum: EmployeurType, enumName: 'EmployeurType' }) type!: EmployeurType;
+  @ApiProperty({ type: Number }) position!: number;
+  @ApiProperty({ type: Boolean }) isActive!: boolean;
+  @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
+}
+
+export class CreateEmployeurDto {
+  @ApiProperty({ maxLength: 60, pattern: '^[A-Z][A-Z0-9_]*$' })
+  @IsString()
+  @Matches(/^[A-Z][A-Z0-9_]*$/u)
+  @MaxLength(60)
+  code!: string;
+
+  @ApiProperty({ maxLength: 160 })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(160)
+  label!: string;
+
+  @ApiProperty({ enum: EmployeurType, enumName: 'EmployeurType' })
+  @IsEnum(EmployeurType)
+  type!: EmployeurType;
+
+  @ApiPropertyOptional({ type: Number, minimum: 0, maximum: 9999 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(9999)
+  position?: number;
+
+  @ApiPropertyOptional({ type: Boolean, default: true })
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+}
+
+export class UpdateEmployeurDto extends PartialType(CreateEmployeurDto) {}
+
+/** Pays de résidence de la diaspora. Lecture seule : la liste ISO ne bouge pas. */
+export class PaysDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ description: 'ISO 3166-1 alpha-2.' }) code!: string;
+  @ApiProperty() label!: string;
+  @ApiProperty({ description: 'Indicatif téléphonique sans le « + ».' }) indicatif!: string;
+  @ApiProperty({ type: Number }) position!: number;
+  @ApiProperty({ type: Boolean }) isActive!: boolean;
+  @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
+}
 
 export class IncomeBandDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
@@ -270,6 +326,8 @@ export class ReferentielsBundleDto {
   @ApiProperty({ type: () => [ProfessionDto] }) professions!: ProfessionDto[];
   @ApiProperty({ type: () => [IncomeBandDto] }) incomeBands!: IncomeBandDto[];
   @ApiProperty({ type: () => [OfferDto] }) offers!: OfferDto[];
+  @ApiProperty({ type: () => [EmployeurDto] }) employeurs!: EmployeurDto[];
+  @ApiProperty({ type: () => [PaysDto] }) pays!: PaysDto[];
 }
 
 export class ReferentielQueryDto {

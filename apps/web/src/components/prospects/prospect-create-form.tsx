@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangleIcon, LoaderIcon } from 'lucide-react';
 import Link from 'next/link';
-import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useRef, useState, type KeyboardEvent } from 'react';
 import { toast } from 'sonner';
 
 import { FilterCombobox } from '@/components/filters/filter-combobox';
@@ -33,7 +33,7 @@ import { queryKeys } from '@/lib/query-keys';
 import { EMPTY_REPRESENTANT_FILTERS } from '@/lib/representant-filters';
 import type { FilterOption } from '@/lib/types';
 
-type FieldName = 'prenom' | 'nom' | 'phone' | 'representantId';
+type FieldName = 'prenom' | 'nom' | 'phone';
 
 type Errors = Partial<Record<FieldName, string>>;
 
@@ -42,12 +42,23 @@ interface SaveVariables {
   andNext: boolean;
 }
 
-function ChoiceError({ message }: { message: string | undefined }): ReactNode {
-  if (message === undefined) return null;
-  return (
-    <p role="alert" className="text-[0.75rem] text-destructive">
-      {message}
-    </p>
+function optionsRepresentants(source: {
+  createdRep: FilterOption | null;
+  repSearch: string;
+  connus: readonly FilterOption[];
+  trouves: readonly { id: string; fullName: string; phoneE164: string; departementName: string }[];
+}): FilterOption[] {
+  const trouves = source.trouves.map((item) => ({
+    value: item.id,
+    label: `${item.fullName} - ${formatPhone(item.phoneE164)}`,
+    hint: item.departementName,
+  }));
+  const candidats = [
+    ...(source.createdRep === null ? [] : [source.createdRep]),
+    ...(source.repSearch.trim() === '' ? source.connus : trouves),
+  ];
+  return candidats.filter(
+    (option, index, options) => options.findIndex((item) => item.value === option.value) === index,
   );
 }
 
@@ -136,10 +147,9 @@ export function ProspectCreateForm({
     if (nom.trim() === '') found.nom = 'Le nom est obligatoire.';
     if (phone.trim() === '') found.phone = 'Le numéro est obligatoire.';
     else if (e164 === null) found.phone = 'Numéro invalide pour le pays choisi.';
-    if (repId === null) found.representantId = 'Choisissez un représentant.';
 
     setErrors(found);
-    if (e164 === null || repId === null) return;
+    if (e164 === null) return;
     if (Object.keys(found).length > 0) return;
 
     setConflict(null);
@@ -148,7 +158,7 @@ export function ProspectCreateForm({
         prenom: prenom.trim(),
         nom: nom.trim(),
         phone: e164,
-        representantId: repId,
+        ...(repId === null ? {} : { representantId: repId }),
         ...(banqueId === null ? {} : { banqueId }),
         ...(syndicatId === null ? {} : { syndicatId }),
       },
@@ -157,17 +167,12 @@ export function ProspectCreateForm({
   }
 
   const plural = saved.length > 1 ? 's' : '';
-  const searchedOptions = (searchedRepresentants.data?.items ?? []).map((item) => ({
-    value: item.id,
-    label: `${item.fullName} - ${formatPhone(item.phoneE164)}`,
-    hint: item.departementName,
-  }));
-  const representantOptions = [
-    ...(createdRep === null ? [] : [createdRep]),
-    ...(repSearch.trim() === '' ? (reference.data?.representants ?? []) : searchedOptions),
-  ].filter(
-    (option, index, options) => options.findIndex((item) => item.value === option.value) === index,
-  );
+  const representantOptions = optionsRepresentants({
+    createdRep,
+    repSearch,
+    connus: reference.data?.representants ?? [],
+    trouves: searchedRepresentants.data?.items ?? [],
+  });
 
   // Le libellé porte « Nom - téléphone » ; sous le formulaire, seul le nom se lit.
   const representantLabel = representantOptions
@@ -175,6 +180,7 @@ export function ProspectCreateForm({
     ?.label.split(' - ')[0];
 
   return (
+    // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- raccourci Ctrl+Entrée du formulaire
     <form
       className="flex w-full flex-col gap-5"
       onSubmit={(event) => {
@@ -190,9 +196,8 @@ export function ProspectCreateForm({
       {representantId === null ? (
         <div className="flex flex-col gap-1.5">
           <FilterCombobox
-            label="Représentant"
+            label="Représentant (facultatif)"
             placeholder="Choisir un représentant"
-            required
             value={repId}
             options={representantOptions}
             onChange={setRepId}
@@ -207,7 +212,6 @@ export function ProspectCreateForm({
               });
             }}
           />
-          <ChoiceError message={errors.representantId} />
         </div>
       ) : null}
 
@@ -220,6 +224,7 @@ export function ProspectCreateForm({
               value={prenom}
               maxLength={120}
               autoComplete="off"
+              // oxlint-disable-next-line jsx-a11y/no-autofocus -- premier champ du formulaire
               autoFocus
               onChange={(event) => {
                 setPrenom(event.target.value);

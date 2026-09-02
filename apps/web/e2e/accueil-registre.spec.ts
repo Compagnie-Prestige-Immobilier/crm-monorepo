@@ -61,9 +61,7 @@ test.afterAll(async () => {
  * posés sur le rendu serveur sont perdus, et l'écran ne bouge jamais.
  */
 async function ouvrirRegistre(url: string): Promise<void> {
-  const chargement = page.waitForResponse((reponse) =>
-    reponse.url().includes('/api/v1/visites?'),
-  );
+  const chargement = page.waitForResponse((reponse) => reponse.url().includes('/api/v1/visites?'));
   // `load` attend toutes les sous-ressources du serveur de développement ; la
   // vraie condition de départ est la réponse du registre, attendue juste après.
   await page.goto(url, { waitUntil: 'domcontentloaded' });
@@ -203,8 +201,10 @@ test('ACC-REG-03 enregistrer une visite, la file d’attente conserve l’entrep
     exact: true,
   });
 
-  await expect(entreprise, 'nom accessible du FilterCombobox requis (E2E.md §8, Q-09)')
-    .toHaveAccessibleName('ENTREPRISE Obligatoire Choisir');
+  await expect(
+    entreprise,
+    'nom accessible du FilterCombobox requis (E2E.md §8, Q-09)',
+  ).toHaveAccessibleName('ENTREPRISE Obligatoire Choisir');
 
   await nom.fill(NOM_PRINCIPAL);
   await formulaire.getByRole('textbox', { name: 'TELEPHONES', exact: true }).fill(TELEPHONE);
@@ -327,9 +327,7 @@ test('ACC-REG-08 le commentaire compte ses caractères et s’arrête à 2000', 
   // Le champ du nom, autofocalisé puis quitté, porte déjà son propre message :
   // ce qui est vérifié ici est que le COMMENTAIRE n'en porte aucun.
   await expect(commentaire).toHaveAttribute('aria-invalid', 'false');
-  await expect(
-    formulaire.getByText('2000 caractères au maximum.', { exact: true }),
-  ).toHaveCount(0);
+  await expect(formulaire.getByText('2000 caractères au maximum.', { exact: true })).toHaveCount(0);
 });
 
 test('ACC-REG-09 les caractères spéciaux et les accents traversent le tour complet', async () => {
@@ -395,8 +393,7 @@ test('ACC-REG-11 une recherche d’un seul caractère n’est pas envoyée', asy
 
   const champ = await ouvrirRecherche();
   const attendue = page.waitForResponse(
-    (reponse) =>
-      reponse.request().method() === 'GET' && reponse.url().includes('/api/v1/visites?'),
+    (reponse) => reponse.request().method() === 'GET' && reponse.url().includes('/api/v1/visites?'),
   );
   await champ.fill('E');
   await expect(page).toHaveURL(/\/accueil\?search=E$/u);

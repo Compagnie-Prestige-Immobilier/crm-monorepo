@@ -30,12 +30,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { BANK_PAGE_SIZE_OPTIONS, countActiveBankFilters } from '@/lib/bank-filters';
+import { BANK_PAGE_SIZE_OPTIONS, bankBasePath, countActiveBankFilters } from '@/lib/bank-filters';
 import { fetchBankCases } from '@/lib/data/bank-cases';
 import { formatDateTime, formatNumber, formatPhone } from '@/lib/format';
 import { formatXof } from '@/lib/money';
 import { queryKeys } from '@/lib/query-keys';
-import { BANK_CASE_SORT_FIELDS, type BankCase, type BankCaseSortField } from '@/lib/types';
+import {
+  BANK_CASE_SORT_FIELDS,
+  type BankCase,
+  type BankCaseSortField,
+  type Projet,
+} from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 const SORTABLE: readonly { id: BankCaseSortField; label: string }[] = [
@@ -49,9 +54,10 @@ function isSortField(id: string): id is BankCaseSortField {
   return (BANK_CASE_SORT_FIELDS as readonly string[]).includes(id);
 }
 
-export function BankCasesView() {
-  const { filters, setFilters } = useBankFilters();
+export function BankCasesView({ projet }: { projet: Projet }) {
+  const { filters, setFilters } = useBankFilters(projet);
   const router = useRouter();
+  const base = bankBasePath(projet);
 
   const { data, isPending, isFetching, isError, error, refetch } = useQuery({
     queryKey: queryKeys.bankCases(filters),
@@ -78,7 +84,7 @@ export function BankCasesView() {
           <BankExportMenu filters={filters} />
           {/* Un LIEN habillé en bouton : la primitive `Button` de Base UI
               poserait `role="button"` sur le `<a>`. */}
-          <Link href="/chues/dossiers/nouveau" className={buttonVariants()}>
+          <Link href={`${base}/dossiers/nouveau`} className={buttonVariants()}>
             <PlusIcon aria-hidden="true" />
             Nouveau dossier
           </Link>
@@ -117,7 +123,7 @@ export function BankCasesView() {
                   }
                   action={
                     countActiveBankFilters(filters) === 0 ? (
-                      <Link href="/chues/dossiers/nouveau" className={buttonVariants()}>
+                      <Link href={`${base}/dossiers/nouveau`} className={buttonVariants()}>
                         <PlusIcon aria-hidden="true" />
                         Nouveau dossier
                       </Link>
@@ -131,7 +137,7 @@ export function BankCasesView() {
                 <ul className={cn('flex flex-col gap-3 lg:hidden', isFetching && 'opacity-80')}>
                   {data.items.map((bankCase) => (
                     <li key={bankCase.id}>
-                      <BankCaseCard bankCase={bankCase} />
+                      <BankCaseCard bankCase={bankCase} base={base} />
                     </li>
                   ))}
                 </ul>
@@ -179,12 +185,12 @@ export function BankCasesView() {
                           className="cursor-pointer focus-within:bg-muted/60"
                           onClick={(event) => {
                             if (isTextSelected() || !isPlainAreaClick(event.target)) return;
-                            router.push(`/chues/dossiers/${bankCase.id}`);
+                            router.push(`${base}/dossiers/${bankCase.id}`);
                           }}
                         >
                           <TableCell>
                             <Link
-                              href={`/chues/dossiers/${bankCase.id}`}
+                              href={`${base}/dossiers/${bankCase.id}`}
                               className="rounded-sm font-[600] tabular-nums hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                             >
                               {bankCase.reference}
@@ -309,7 +315,7 @@ function isTextSelected(): boolean {
   return (window.getSelection()?.toString() ?? '') !== '';
 }
 
-function BankCaseCard({ bankCase }: { bankCase: BankCase }) {
+function BankCaseCard({ bankCase, base }: { bankCase: BankCase; base: string }) {
   const router = useRouter();
 
   return (
@@ -317,14 +323,14 @@ function BankCaseCard({ bankCase }: { bankCase: BankCase }) {
       className="animate-rise cursor-pointer transition-shadow hover:shadow-elev-hover focus-within:shadow-elev-hover focus-within:ring-2 focus-within:ring-ring"
       onClick={(event) => {
         if (isTextSelected() || !isPlainAreaClick(event.target)) return;
-        router.push(`/chues/dossiers/${bankCase.id}`);
+        router.push(`${base}/dossiers/${bankCase.id}`);
       }}
     >
       <CardContent className="flex flex-col gap-3">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <h3 className="min-w-0 font-display text-[1.0625rem] font-[700] tracking-[-0.02em]">
             <Link
-              href={`/chues/dossiers/${bankCase.id}`}
+              href={`${base}/dossiers/${bankCase.id}`}
               className="rounded-sm tabular-nums hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             >
               {bankCase.reference}

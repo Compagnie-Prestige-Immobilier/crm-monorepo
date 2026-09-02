@@ -33,6 +33,18 @@ export function bankCaseConditions(filter: BankCaseFilterDto): Prisma.Sql {
     conditions.push(Prisma.sql`s."type" = ${filter.stageType}::"BankStageType"`);
   }
   if (filter.banqueId) conditions.push(Prisma.sql`c."processingBankId" = ${filter.banqueId}`);
+  // Le PARCOURS, pas le projet d'entrée : un même numéro suit CHUES et Grand
+  // Public à la fois, et `prospects."projet"` ne dit que par où il est arrivé.
+  // Sous-requête plutôt qu'une jointure : `BANK_CASE_FROM` sert aussi aux
+  // agrégats, et y ajouter une table changerait leurs comptages.
+  if (filter.projet) {
+    conditions.push(
+      Prisma.sql`EXISTS (
+        SELECT 1 FROM "prospect_journeys" pj
+        WHERE pj."prospectId" = c."prospectId" AND pj."projet" = ${filter.projet}::"Projet"
+      )`,
+    );
+  }
   if (filter.rejectionReasonId) {
     conditions.push(Prisma.sql`c."rejectionReasonId" = ${filter.rejectionReasonId}`);
   }

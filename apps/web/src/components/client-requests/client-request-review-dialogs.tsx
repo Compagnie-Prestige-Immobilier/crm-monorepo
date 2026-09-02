@@ -70,6 +70,7 @@ function ApproveDialog({
   const [syndicat, setSyndicat] = useState<string | null>(null);
 
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- saisie remise à zéro par demande
     setRepresentant(null);
     setSyndicat(null);
   }, [request?.id]);
@@ -239,6 +240,7 @@ function RejectDialog({
   const [reason, setReason] = useState('');
 
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- saisie remise à zéro par demande
     setReason('');
   }, [request?.id]);
 

@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -51,6 +51,22 @@ export class LotExportDistributionInputDto {
   jours: number = 1;
 }
 
+/**
+ * Les critères d'un lot de prospects, projet EXIGÉ.
+ *
+ * `OmitType` plutôt qu'une redéclaration : l'`@IsOptional()` du filtre de liste
+ * est hérité par class-validator, et le champ resterait facultatif.
+ */
+export class LotExportProspectFilterDto extends OmitType(ProspectFilterDto, ['projet'] as const) {
+  @ApiProperty({
+    enum: Projet,
+    enumName: 'Projet',
+    description: 'Projet du lot. Il est porté par la campagne et ne se devine pas après coup.',
+  })
+  @IsEnum(Projet)
+  projet!: Projet;
+}
+
 export class CreateLotExportDto {
   @ApiProperty({ maxLength: 120 }) @IsString() @MinLength(3) @MaxLength(120) name!: string;
   @ApiProperty({ enum: LotExportCible, enumName: 'LotExportCible' })
@@ -61,11 +77,11 @@ export class CreateLotExportDto {
   @ValidateNested()
   @Type(() => RepresentantExportQueryDto)
   representants?: RepresentantExportQueryDto;
-  @ApiPropertyOptional({ type: () => ProspectFilterDto })
+  @ApiPropertyOptional({ type: () => LotExportProspectFilterDto })
   @IsOptional()
   @ValidateNested()
-  @Type(() => ProspectFilterDto)
-  prospects?: ProspectFilterDto;
+  @Type(() => LotExportProspectFilterDto)
+  prospects?: LotExportProspectFilterDto;
   @ApiProperty({ type: () => LotExportDistributionInputDto })
   @IsDefined()
   @ValidateNested()
@@ -137,7 +153,7 @@ export class LotExportSummaryDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
   @ApiProperty() name!: string;
   @ApiProperty({ enum: LotExportCible, enumName: 'LotExportCible' }) cible!: LotExportCible;
-  @ApiProperty({ enum: Projet, enumName: 'Projet', nullable: true }) projet!: Projet | null;
+  @ApiProperty({ enum: Projet, enumName: 'Projet' }) projet!: Projet;
   @ApiProperty() scopeLabel!: string;
   @ApiProperty() itemCount!: number;
   @ApiProperty({ format: 'uuid' }) createdById!: string;

@@ -139,6 +139,27 @@ enum ProspectType {
   DIASPORA
 }
 
+/// Situation du prospect Grand Public, par `ProspectType` : le contrat pour le
+/// salarie du prive, l'epargne pour l'informel. Tout reste facultatif.
+enum TypeContrat {
+  CDI
+  CDD
+  AUTRE
+}
+
+enum ModeEpargne {
+  TONTINE
+  MOBILE_MONEY
+  BANQUE
+  AUCUN
+}
+
+enum EmployeurType {
+  MINISTERE
+  ENTREPRISE
+  AUTRE
+}
+
 enum GrandPublicConsent {
   NON_DEMANDE
   INTERESSE
@@ -541,7 +562,49 @@ model Profession {
   prospects Prospect[]
 
   @@index([isActive, position])
+  @@index([updatedAt, id])
   @@map("professions")
+}
+
+/// Employeur declare : ministere pour un fonctionnaire, entreprise pour un
+/// salarie du prive. Le texte libre `Prospect.employeur` reste le repli quand
+/// l'employeur n'est pas dans la liste.
+model Employeur {
+  id       String        @id @default(uuid(7))
+  code     String        @unique
+  label    String
+  type     EmployeurType
+  position Int           @default(0)
+  isActive Boolean       @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  prospects Prospect[]
+
+  @@index([isActive, position])
+  @@index([updatedAt, id])
+  @@map("employeurs")
+}
+
+/// Pays de residence d'un prospect de la diaspora. `code` est l'ISO 3166-1
+/// alpha-2, `indicatif` l'indicatif telephonique sans le `+`.
+model Pays {
+  id        String  @id @default(uuid(7))
+  code      String  @unique
+  label     String
+  indicatif String
+  position  Int     @default(0)
+  isActive  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  prospects Prospect[]
+
+  @@index([isActive, position])
+  @@index([updatedAt, id])
+  @@map("pays")
 }
 
 model IncomeBand {
@@ -617,6 +680,34 @@ model Prospect {
 
   incomeBandId String?
   incomeBand   IncomeBand? @relation(fields: [incomeBandId], references: [id], onDelete: Restrict)
+
+  /// Situation du Grand Public. Rien n'est obligatoire ici, et aucun CHECK ne
+  /// lie ces colonnes a `type` : une seule fiche mal renseignee ferait echouer
+  /// la tranche de synchronisation entiere.
+  ///
+  /// Fonctionnaire et secteur prive : l'employeur, en referentiel ou en clair.
+  employeurId String?
+  employeurRef Employeur? @relation(fields: [employeurId], references: [id], onDelete: Restrict)
+  employeur    String?
+
+  typeContrat TypeContrat?
+
+  /// Anciennete chez l'employeur, en mois. Distincte de `dureeSystemeMois`, qui
+  /// est la duree du plan de paiement.
+  ancienneteMois Int?
+
+  /// Informel : ou il travaille, et comment il epargne.
+  lieuActivite String?
+  modeEpargne  ModeEpargne?
+
+  /// Diaspora. `whatsappE164` est souvent le seul numero joignable, et le relais
+  /// est la personne a contacter au Senegal.
+  paysResidenceId String?
+  paysResidence   Pays?   @relation(fields: [paysResidenceId], references: [id], onDelete: Restrict)
+  villeResidence  String?
+  whatsappE164    String?
+  relaisNom       String?
+  relaisPhoneE164 String?
 
   paymentMode PaymentMode?
 
@@ -714,6 +805,8 @@ model Prospect {
   @@index([enrollmentMethod])
   @@index([professionId])
   @@index([incomeBandId])
+  @@index([employeurId])
+  @@index([paysResidenceId])
   // Créés par la migration `20260820160000` et absents d'ici : le prochain
   // `db:migrate` les aurait SUPPRIMÉS, dont celui du filtre par projet que les
   // écrans CHUES appliquent systématiquement.
@@ -2057,7 +2150,9 @@ model LotExport {
   id        String         @id @default(uuid(7))
   name      String
   cible     LotExportCible
-  projet    Projet?
+  /// Un lot appartient TOUJOURS a un projet : un lot de representants est CHUES
+  /// par construction, et un lot de prospects nomme le sien a la creation.
+  projet    Projet
   filters   Json
   itemCount Int
 

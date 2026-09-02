@@ -27,6 +27,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { PROSPECT_TYPES, PROSPECT_TYPE_LABELS } from '@/lib/data/grand-public';
 import {
+  campagnesPath,
   createLotExport,
   fetchTeleconseillers,
   previewLotExport,
@@ -44,33 +45,39 @@ import {
   type BddSegment,
   type Departement,
   type Ief,
+  type Projet,
   type ProspectType,
 } from '@/lib/types';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { cn } from '@/lib/utils';
 
+/** Chaque cible appartient à UNE coque : le dialogue ne propose que celles du projet ouvert. */
 const CIBLES = [
   {
     cle: 'chues',
+    projet: 'CHUES',
     titre: 'Tous les prospects CHUES',
     aide: 'Toutes les fiches du projet CHUES, les quatre segments confondus.',
   },
   {
     cle: 'chues-segment',
+    projet: 'CHUES',
     titre: 'Prospects CHUES d’un segment',
     aide: 'Un seul segment, de BDD1 à BDD4.',
   },
   {
     cle: 'grand-public',
+    projet: 'GRAND_PUBLIC',
     titre: 'Prospects Grand Public',
     aide: 'Les fiches hors CHUES, tous types ou un seul.',
   },
   {
     cle: 'representants',
+    projet: 'CHUES',
     titre: 'Représentants (CHUES)',
     aide: 'Les personnes qui remettent les listes, et non leurs prospects.',
   },
-] as const;
+] as const satisfies readonly { cle: string; projet: Projet; titre: string; aide: string }[];
 
 type CleCible = (typeof CIBLES)[number]['cle'];
 
@@ -91,13 +98,13 @@ interface Choix {
   iefId: string;
 }
 
-const CHOIX_INITIAL: Choix = {
-  cle: 'chues',
+const choixInitial = (cle: CleCible): Choix => ({
+  cle,
   segment: 'BDD1',
   type: TOUS,
   departementId: TOUS,
   iefId: TOUS,
-};
+});
 
 function entierBorne(saisie: string, defaut: number, min: number, max: number): number {
   const valeur = Number.parseInt(saisie, 10);
@@ -188,14 +195,17 @@ function critereDuChoix(
 export function LotCreateDialog({
   open,
   onOpenChange,
+  projet,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  projet: Projet;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
         <FormulaireDeLot
+          projet={projet}
           onCree={() => {
             onOpenChange(false);
           }}
@@ -473,11 +483,20 @@ function ApercuLot({
   );
 }
 
-function FormulaireDeLot({ onCree, onAnnule }: { onCree: () => void; onAnnule: () => void }) {
+function FormulaireDeLot({
+  projet,
+  onCree,
+  onAnnule,
+}: {
+  projet: Projet;
+  onCree: () => void;
+  onAnnule: () => void;
+}) {
   const queryClient = useQueryClient();
   const router = useRouter();
   const groupe = useId();
-  const [choix, setChoix] = useState<Choix>(CHOIX_INITIAL);
+  const cibles = CIBLES.filter((cible) => cible.projet === projet);
+  const [choix, setChoix] = useState<Choix>(() => choixInitial(cibles[0]?.cle ?? 'chues'));
   // On retient les comptes DÉCOCHÉS : la liste arrive après le premier rendu, et
   // tout garder coché par défaut se lit alors sans effet de synchronisation.
   const [decoches, setDecoches] = useState<readonly string[]>([]);
@@ -556,7 +575,7 @@ function FormulaireDeLot({ onCree, onAnnule }: { onCree: () => void; onAnnule: (
       void queryClient.invalidateQueries({ queryKey: queryKeys.lotsExportRoot });
       toast.success(`Campagne créée : ${formatNumber(lot.itemCount)} fiches réparties.`);
       onCree();
-      router.push(`/chues/campagnes/${lot.id}`);
+      router.push(`${campagnesPath(projet)}/${lot.id}`);
     },
   });
 
@@ -570,34 +589,37 @@ function FormulaireDeLot({ onCree, onAnnule }: { onCree: () => void; onAnnule: (
         </DialogDescription>
       </DialogHeader>
 
-      <fieldset className="flex flex-col gap-2">
-        <legend className="mb-2 font-[600]">Que voulez-vous exporter&nbsp;?</legend>
-        {CIBLES.map((cible) => (
-          <label
-            key={cible.cle}
-            className={cn(
-              'grid cursor-pointer grid-cols-[auto_1fr] items-start gap-x-3 rounded-md border p-3',
-              'transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring',
-              choix.cle === cible.cle
-                ? 'border-primary bg-secondary'
-                : 'border-border hover:bg-secondary/60',
-            )}
-          >
-            <input
-              type="radio"
-              name={groupe}
-              value={cible.cle}
-              checked={choix.cle === cible.cle}
-              onChange={() => {
-                setChoix({ ...CHOIX_INITIAL, cle: cible.cle });
-              }}
-              className="row-span-2 mt-1 size-4 shrink-0 accent-primary"
-            />
-            <span className="font-[600]">{cible.titre}</span>
-            <span className="col-start-2 text-[0.75rem] text-muted-foreground">{cible.aide}</span>
-          </label>
-        ))}
-      </fieldset>
+      {/* Une seule cible possible (Grand Public) : rien à choisir, on saute l'étape. */}
+      {cibles.length < 2 ? null : (
+        <fieldset className="flex flex-col gap-2">
+          <legend className="mb-2 font-[600]">Que voulez-vous exporter&nbsp;?</legend>
+          {cibles.map((cible) => (
+            <label
+              key={cible.cle}
+              className={cn(
+                'grid cursor-pointer grid-cols-[auto_1fr] items-start gap-x-3 rounded-md border p-3',
+                'transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring',
+                choix.cle === cible.cle
+                  ? 'border-primary bg-secondary'
+                  : 'border-border hover:bg-secondary/60',
+              )}
+            >
+              <input
+                type="radio"
+                name={groupe}
+                value={cible.cle}
+                checked={choix.cle === cible.cle}
+                onChange={() => {
+                  setChoix(choixInitial(cible.cle));
+                }}
+                className="row-span-2 mt-1 size-4 shrink-0 accent-primary"
+              />
+              <span className="font-[600]">{cible.titre}</span>
+              <span className="col-start-2 text-[0.75rem] text-muted-foreground">{cible.aide}</span>
+            </label>
+          ))}
+        </fieldset>
+      )}
 
       <ChampsCritere
         choix={choix}

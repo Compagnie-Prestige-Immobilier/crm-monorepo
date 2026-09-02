@@ -14,7 +14,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 22;
+  int get schemaVersion => 23;
 
   /// Les colonnes ajoutées à `call_attempts` par la v19. Déclarées ici parce
   /// que TROIS paliers recopient cette table : chacun engendre sa forme
@@ -60,11 +60,33 @@ class AppDatabase extends _$AppDatabase {
       prospects.profession,
       prospects.dureeSystemeMois,
       prospects.canalProvenanceId,
+      ..._situationV23(prospects),
     ],
     columnTransformer: <GeneratedColumn<Object>, Expression<Object>>{
       prospects.projet: const Constant<String>('CHUES'),
     },
   );
+
+  /// Les colonnes ajoutées à `prospects` par la v23 : la tranche de revenus et
+  /// les renseignements propres à la situation du prospect Grand Public.
+  /// Déclarées à part parce que la recopie de table les veut NEUVES et que le
+  /// palier v23, lui, les ajoute une à une.
+  static List<GeneratedColumn<Object>> _situationV23(Prospects prospects) =>
+      <GeneratedColumn<Object>>[
+        prospects.professionId,
+        prospects.incomeBandId,
+        prospects.employeurId,
+        prospects.employeur,
+        prospects.typeContrat,
+        prospects.ancienneteMois,
+        prospects.lieuActivite,
+        prospects.modeEpargne,
+        prospects.paysResidenceId,
+        prospects.villeResidence,
+        prospects.whatsappE164,
+        prospects.relaisNom,
+        prospects.relaisPhoneE164,
+      ];
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -248,6 +270,31 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(representants, representants.syndicat);
         await m.addColumn(representants, representants.connaitUes);
         await m.addColumn(representants, representants.contacte);
+      }
+      if (from < 23 && to >= 23) {
+        await m.createTable(professions);
+        await m.createIndex(professionsActiveIdx);
+        await m.createTable(employeurs);
+        await m.createIndex(employeursActiveIdx);
+        await m.createTable(pays);
+        await m.createIndex(paysActiveIdx);
+        // Venue d'avant la v13, `prospects` y a déjà été recréée dans sa forme
+        // courante : les colonnes y sont, et les rajouter échouerait. Même
+        // garde qu'au palier v15.
+        if (from >= 13) {
+          for (final GeneratedColumn<Object> colonne in _situationV23(
+            prospects,
+          )) {
+            await m.addColumn(prospects, colonne);
+          }
+        }
+        // Comme aux paliers v8 et v21 : le pull est un curseur keyset, et un
+        // appareil déjà mis au miroir ne redemande plus les listes entières.
+        // Sans ce marqueur effacé, les trois listes neuves resteraient vides à
+        // vie et la diaspora n'aurait aucun pays à choisir.
+        await customStatement(
+          'DELETE FROM sync_state WHERE collection = \'referentiels_mirror\'',
+        );
       }
     },
     beforeOpen: (OpeningDetails details) async {

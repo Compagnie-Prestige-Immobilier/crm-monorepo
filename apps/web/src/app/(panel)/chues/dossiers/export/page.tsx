@@ -14,5 +14,5 @@ export default async function ExportDossiersPage() {
     return <PermissionDenied role={guard.user.role} what="L’export des dossiers bancaires" />;
   }
 
-  return <BankExportView />;
+  return <BankExportView projet="CHUES" />;
 }

@@ -75,7 +75,6 @@ beforeAll(async () => {
   confiee = await creerProspect(`Confiee${RUN}`, admin.id, 1);
   orpheline = await creerProspect(`Orpheline${RUN}`, admin.id, 2);
   dOmar = await creerProspect(`DOmar${RUN}`, omar.id, 3);
-
 });
 
 afterAll(async () => {

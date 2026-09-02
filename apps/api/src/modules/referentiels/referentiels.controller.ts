@@ -14,22 +14,22 @@ import { ANY_AUTHENTICATED, Roles } from '../../common/decorators/roles.decorato
 import { ReferentielsService } from './referentiels.service.js';
 import {
   BanqueDto,
-  CreateBanqueDto,
   CanalProvenanceDto,
+  CreateBanqueDto,
   CreateCanalProvenanceDto,
   CreateDepartementDto,
+  CreateEmployeurDto,
+  CreateIncomeBandDto,
+  CreateOfferDto,
+  CreateProfessionDto,
   CreateSyndicatDto,
   DepartementDto,
+  EmployeurDto,
   IefDto,
   IncomeBandDto,
-  CreateIncomeBandDto,
-  UpdateIncomeBandDto,
-  ProfessionDto,
-  CreateProfessionDto,
-  UpdateProfessionDto,
   OfferDto,
-  CreateOfferDto,
-  UpdateOfferDto,
+  PaysDto,
+  ProfessionDto,
   ReferentielQueryDto,
   ReferentielsBundleDto,
   RegionDto,
@@ -38,6 +38,10 @@ import {
   UpdateBanqueDto,
   UpdateCanalProvenanceDto,
   UpdateDepartementDto,
+  UpdateEmployeurDto,
+  UpdateIncomeBandDto,
+  UpdateOfferDto,
+  UpdateProfessionDto,
   UpdateSyndicatDto,
 } from './dto.js';
 
@@ -138,6 +142,45 @@ export class ReferentielsController {
     @Body() body: UpdateIncomeBandDto,
   ): Promise<IncomeBandDto> {
     return this.referentiels.updateIncomeBand(id, body);
+  }
+
+  @Get('employeurs')
+  @Roles(...ANY_AUTHENTICATED)
+  @ApiOperation({
+    operationId: 'listEmployeurs',
+    summary: 'Employeurs : ministères et grandes entreprises.',
+  })
+  @ApiResponse({ status: 200, type: [EmployeurDto] })
+  listEmployeurs(@Query() query: ReferentielQueryDto): Promise<EmployeurDto[]> {
+    return this.referentiels.listEmployeurs(query);
+  }
+
+  @Post('employeurs')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ operationId: 'createEmployeur', summary: 'Ajoute un employeur.' })
+  @ApiResponse({ status: 201, type: EmployeurDto })
+  createEmployeur(@Body() body: CreateEmployeurDto): Promise<EmployeurDto> {
+    return this.referentiels.createEmployeur(body);
+  }
+
+  @Patch('employeurs/:id')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ operationId: 'updateEmployeur', summary: 'Modifie un employeur.' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({ status: 200, type: EmployeurDto })
+  updateEmployeur(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: UpdateEmployeurDto,
+  ): Promise<EmployeurDto> {
+    return this.referentiels.updateEmployeur(id, body);
+  }
+
+  @Get('pays')
+  @Roles(...ANY_AUTHENTICATED)
+  @ApiOperation({ operationId: 'listPays', summary: 'Pays de résidence, avec leur indicatif.' })
+  @ApiResponse({ status: 200, type: [PaysDto] })
+  listPays(@Query() query: ReferentielQueryDto): Promise<PaysDto[]> {
+    return this.referentiels.listPays(query);
   }
 
   @Get('offres')

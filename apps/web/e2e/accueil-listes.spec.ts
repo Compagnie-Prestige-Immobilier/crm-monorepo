@@ -45,9 +45,7 @@ async function enregistrer(
   correspond: (methode: string, url: string) => boolean,
 ): Promise<number> {
   const [reponse] = await Promise.all([
-    page.waitForResponse((candidate) =>
-      correspond(candidate.request().method(), candidate.url()),
-    ),
+    page.waitForResponse((candidate) => correspond(candidate.request().method(), candidate.url())),
     bouton.click(),
   ]);
   return reponse.status();
@@ -77,7 +75,12 @@ test('ACC-LST-01 l’écran ouvre sur les entreprises', async ({ page }) => {
     ),
   ).toBeVisible();
 
-  for (const onglet of ['Entreprises', 'Directions', 'Destinataires', 'Objets de visite'] as const) {
+  for (const onglet of [
+    'Entreprises',
+    'Directions',
+    'Destinataires',
+    'Objets de visite',
+  ] as const) {
     await expect(
       page.getByRole('tab', { name: onglet }),
       `l’onglet « ${onglet} » doit être proposé`,
@@ -124,7 +127,9 @@ for (const onglet of [
   }) => {
     // On part d'un AUTRE onglet : cliquer celui déjà choisi ne prouverait pas
     // que le choix s'écrit dans l'URL.
-    await page.goto(`${ROUTE}?onglet=${onglet.nom === 'Objets de visite' ? 'directions' : 'objets'}`);
+    await page.goto(
+      `${ROUTE}?onglet=${onglet.nom === 'Objets de visite' ? 'directions' : 'objets'}`,
+    );
     await page.getByRole('tab', { name: onglet.nom }).click();
 
     await expect(page, `« ${onglet.nom} » doit écrire son onglet dans l’URL`).toHaveURL(onglet.url);
@@ -295,16 +300,15 @@ test('ACC-LST-09 monter et descendre une entrée au clavier', async ({ page }) =
     .poll(() => libellesDansLOrdre(page), {
       message:
         'l’entrée doit passer devant sa voisine ; observé : POST …/reorder répond 400 ' +
-        '« each value in ids must be a UUID » (dto.ts `@IsUUID(\'4\')` contre des identifiants v7)',
+        "« each value in ids must be a UUID » (dto.ts `@IsUUID('4')` contre des identifiants v7)",
     })
     .toEqual(monte);
 
   await page.reload();
   await expect
-    .poll(
-      () => libellesDansLOrdre(page),
-      { message: 'l’ordre doit être persisté par l’API `reorder`, pas seulement à l’écran' },
-    )
+    .poll(() => libellesDansLOrdre(page), {
+      message: 'l’ordre doit être persisté par l’API `reorder`, pas seulement à l’écran',
+    })
     .toEqual(monte);
 
   await expect(page.getByRole('button', { name: `Monter ${monte[0] ?? ''}` })).toBeDisabled();
@@ -347,11 +351,16 @@ test('ACC-LST-10 désactiver une entrée exige le décompte et le montre', async
   await expect(toast(page, `${LIBELLE_BIS} désactivé.`)).toBeVisible();
   await expect(page.getByRole('button', { name: `Réactiver ${LIBELLE_BIS}` })).toBeVisible();
   await expect(
-    page.getByRole('listitem').filter({ hasText: LIBELLE_BIS }).getByText('Retirée', { exact: true }),
+    page
+      .getByRole('listitem')
+      .filter({ hasText: LIBELLE_BIS })
+      .getByText('Retirée', { exact: true }),
   ).toHaveCount(1);
 });
 
-test('ACC-LST-12 une entrée retirée disparaît de la saisie mais reste lisible', async ({ page }) => {
+test('ACC-LST-12 une entrée retirée disparaît de la saisie mais reste lisible', async ({
+  page,
+}) => {
   await page.goto('/accueil');
   await page.getByRole('button', { name: 'Ajouter une visite' }).click();
 

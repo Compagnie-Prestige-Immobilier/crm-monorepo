@@ -14,5 +14,5 @@ export default async function DossiersPage() {
     return <PermissionDenied role={guard.user.role} what="Le suivi des dossiers bancaires" />;
   }
 
-  return <BankCasesView />;
+  return <BankCasesView projet="CHUES" />;
 }

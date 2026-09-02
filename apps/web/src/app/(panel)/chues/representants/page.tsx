@@ -11,7 +11,7 @@ import { getQueryClient } from '@/lib/query-client';
 import { queryKeys } from '@/lib/query-keys';
 import { parseRepresentantFilters, type RawSearchParams } from '@/lib/representant-filters';
 import { guardRoles } from '@/lib/session';
-import { readsOnly } from '@/lib/types';
+import { canExportRepresentants, readsOnly } from '@/lib/types';
 
 export const metadata: Metadata = { title: 'Représentants' };
 
@@ -46,6 +46,7 @@ export default async function RepresentantsPage({
       <RepresentantsView
         canAdminister={guard.user.role === 'ADMIN'}
         readOnly={readsOnly(guard.user.role)}
+        canExport={canExportRepresentants(guard.user.role)}
       />
     </HydrationBoundary>
   );

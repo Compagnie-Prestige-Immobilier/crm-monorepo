@@ -295,8 +295,8 @@ function KindPanel({
   );
 
   const labelOf = useCallback(
-    (id: string) => allRows.find((entry) => entry.id === id)?.label ?? id,
-    [allRows],
+    (id: string) => (data ?? []).find((entry) => entry.id === id)?.label ?? id,
+    [data],
   );
   const announcements = useMemo(() => frenchAnnouncements(labelOf), [labelOf]);
 

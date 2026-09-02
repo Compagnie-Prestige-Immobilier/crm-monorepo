@@ -129,7 +129,6 @@ const cellAt = (cells: Record<string, string>, index: number): string => {
 const columnAt = (index: number, fallback: string): string =>
   IMPORT_COLUMNS[index]?.header ?? fallback;
 
-
 @Injectable()
 export class RepresentantsImportAdapter implements ImportAdapter<
   RepresentantImportRow,

@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ProspectEditDialog } from '@/components/prospects/prospect-edit-dialog';
 import type * as ProspectsModule from '@/lib/data/prospects';
 import type * as ReferenceModule from '@/lib/data/reference';
+import { prospectFixture } from '@/test/prospect-fixture';
 import { renderWithQuery } from '@/test/render-query';
 import type { ProspectRow } from '@/lib/types';
 
@@ -37,53 +38,27 @@ const SYNDICATS = [
   { id: 'snd-saes', name: 'SAES', sigle: 'SAES', isActive: true, sortOrder: 2 },
 ];
 
-const prospect = (over: Partial<ProspectRow> = {}): ProspectRow => ({
-  id: 'p-1',
-  nom: 'Fall',
-  prenom: 'Moussa',
-  phoneE164: '+221771234567',
-  rev: 3,
-  statut: 'NOUVEAU',
-  banqueId: 'bnq-bhs',
-  banqueName: 'Banque de l’Habitat',
-  syndicatId: 'snd-saes',
-  syndicatSigle: 'SAES',
-  representantId: 'rep-1',
-  representantName: 'Cheikh Ba',
-  representantPhoneE164: '+221770000000',
-  departementId: 'dep-1',
-  departementName: 'Dakar',
-  ownedByCommercialId: 'com-alice',
-  ownedByCommercialName: 'Alice Diop',
-  projet: 'CHUES',
-  type: null,
-  profession: null,
-  professionId: null,
-  professionIsTeaching: null,
-  incomeBandId: null,
-  incomeBandLabel: null,
-  paymentMode: null,
-  journeys: [],
-  dureeSystemeMois: null,
-  canalProvenanceId: null,
-  canalProvenanceLabel: null,
-  segment: 'BDD4',
-  phase2Status: 'PENDING',
-  enrollmentMethod: null,
-  enrollmentCapturedById: null,
-  enrollmentCapturedByName: null,
-  enrollmentCapturedAt: null,
-  lastOutcome: null,
-  lastComment: null,
-  lastAttemptAt: null,
-  origin: null,
-  originLabel: null,
-  clientCreatedAt: '2026-08-01T09:00:00.000Z',
-  createdAt: '2026-08-01T09:00:00.000Z',
-  updatedAt: '2026-08-01T09:00:00.000Z',
-  deletedAt: null,
-  ...over,
-});
+const prospect = (over: Partial<ProspectRow> = {}): ProspectRow =>
+  prospectFixture({
+    id: 'p-1',
+    nom: 'Fall',
+    prenom: 'Moussa',
+    rev: 3,
+    banqueId: 'bnq-bhs',
+    banqueName: 'Banque de l’Habitat',
+    syndicatId: 'snd-saes',
+    syndicatSigle: 'SAES',
+    representantId: 'rep-1',
+    representantName: 'Cheikh Ba',
+    departementId: 'dep-1',
+    ownedByCommercialId: 'com-alice',
+    ownedByCommercialName: 'Alice Diop',
+    segment: 'BDD4',
+    clientCreatedAt: '2026-08-01T09:00:00.000Z',
+    createdAt: '2026-08-01T09:00:00.000Z',
+    updatedAt: '2026-08-01T09:00:00.000Z',
+    ...over,
+  });
 
 function mount(over: Partial<ProspectRow> = {}) {
   reference.mockResolvedValue({

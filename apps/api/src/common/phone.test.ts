@@ -80,13 +80,15 @@ describe('normalizePhone, rejets', () => {
   });
 
   it('expose un code métier exploitable côté client', () => {
+    let leve: unknown;
     try {
       normalizePhone('abc', 'SN');
-      expect.unreachable('normalizePhone aurait dû lever');
     } catch (error) {
-      expect(error).toBeInstanceOf(BadRequestException);
-      expect((error as BadRequestException).getResponse()).toMatchObject({ code: 'PHONE_INVALID' });
+      leve = error;
     }
+
+    expect(leve).toBeInstanceOf(BadRequestException);
+    expect((leve as BadRequestException).getResponse()).toMatchObject({ code: 'PHONE_INVALID' });
   });
 });
 

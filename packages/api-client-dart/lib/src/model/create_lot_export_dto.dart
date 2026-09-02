@@ -5,7 +5,7 @@
 // ignore_for_file: unused_element
 import 'package:crm_api_client/src/model/representant_export_query_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_distribution_input_dto.dart';
-import 'package:crm_api_client/src/model/prospect_filter_dto.dart';
+import 'package:crm_api_client/src/model/lot_export_prospect_filter_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_cible.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
@@ -49,7 +49,7 @@ class CreateLotExportDto {
   final RepresentantExportQueryDto? representants;
 
   @JsonKey(name: r'prospects', required: false, includeIfNull: false)
-  final ProspectFilterDto? prospects;
+  final LotExportProspectFilterDto? prospects;
 
   @JsonKey(name: r'distribution', required: true, includeIfNull: false)
   final LotExportDistributionInputDto distribution;

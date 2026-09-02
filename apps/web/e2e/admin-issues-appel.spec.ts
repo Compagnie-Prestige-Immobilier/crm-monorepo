@@ -239,7 +239,6 @@ test.describe('Issues d’appel', () => {
     await dialogue.getByRole('button', { name: 'Annuler' }).click();
     await expect(ligne(page, CODE_BIS)).toHaveCount(0);
   });
-
 });
 
 /**

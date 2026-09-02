@@ -1,5 +1,7 @@
 library;
 
+import 'package:phone_numbers_parser/phone_numbers_parser.dart';
+
 const String kSenegalCallingCode = '221';
 
 const int kSenegalNationalLength = 9;
@@ -179,5 +181,54 @@ abstract final class Phone {
       out.write(digits[i]);
     }
     return out.toString();
+  }
+}
+
+/// Le numéro d'un pays QUELCONQUE : celui d'un prospect de la diaspora, son
+/// WhatsApp.
+///
+/// [Phone] ne connaît que le plan sénégalais — neuf chiffres, découpage
+/// 2-3-2-2 — et acceptait tout ce qui commençait par « + » sans rien en savoir.
+/// Ici le plan de numérotation vient de `phone_numbers_parser`, ce qui donne la
+/// mise en forme du pays et une validation qui refuse un numéro incomplet.
+abstract final class WorldPhone {
+  /// [callingCode] est l'indicatif SANS le « + », tel que le référentiel `pays`
+  /// le porte. Un texte qui commence par « + » ou « 00 » le remplace : ce que
+  /// l'utilisateur annonce prime sur le pays choisi dans la liste.
+  static PhoneNumber? _parse(String raw, String callingCode) {
+    final String texte = raw.trim();
+    if (texte.isEmpty) return null;
+    final String digits = texte.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) return null;
+    final String sujet = Phone.isInternational(texte)
+        ? '+$digits'
+        : '+$callingCode$digits';
+    try {
+      return PhoneNumber.parse(sujet);
+    } on Object {
+      return null;
+    }
+  }
+
+  /// L'E.164 d'un numéro COMPLET pour son pays, `null` sinon : un numéro tronqué
+  /// est indiscernable d'un numéro juste tant qu'on ne connaît pas le plan.
+  static String? toE164(String raw, {required String callingCode}) {
+    final PhoneNumber? numero = _parse(raw, callingCode);
+    if (numero == null || !numero.isValid()) return null;
+    return numero.international;
+  }
+
+  /// Le découpage du pays, au fil de la frappe.
+  static String group(String digits, {required String callingCode}) {
+    if (digits.isEmpty) return '';
+    final PhoneNumber? numero = _parse(digits, callingCode);
+    if (numero == null) return digits;
+    final String formate = numero.formatNsn();
+    // `formatNsn` peut RÉINTERPRÉTER les premiers chiffres comme un indicatif
+    // (un « 1 » de tête en plan nord-américain) et rendre moins de chiffres
+    // qu'il n'en a reçu : la frappe serait mangée.
+    return formate.replaceAll(RegExp(r'[^0-9]'), '') == digits
+        ? formate
+        : digits;
   }
 }

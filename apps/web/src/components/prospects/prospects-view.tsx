@@ -23,10 +23,12 @@ import { queryKeys } from '@/lib/query-keys';
 
 export function ProspectsView({
   canAdminister,
+  canExport = false,
   readOnly = false,
   simplified = false,
 }: {
   canAdminister: boolean;
+  canExport?: boolean;
   readOnly?: boolean;
   /** Les critères repliés le RESTENT à l'ouverture, même venus d'un lien filtré. */
   simplified?: boolean;
@@ -53,15 +55,15 @@ export function ProspectsView({
           </span>{' '}
           prospect{data !== undefined && data.total > 1 ? 's' : ''}
         </p>
-        {readOnly ? null : (
-          <div className="flex flex-wrap gap-2">
-            <ProspectExportMenu filters={filters} />
+        <div className="flex flex-wrap gap-2">
+          {canExport ? <ProspectExportMenu filters={filters} /> : null}
+          {readOnly ? null : (
             <Button onClick={() => setCreateOpen(true)}>
               <PlusIcon aria-hidden="true" />
               Nouveau prospect
             </Button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <FiltersBar startCollapsed={simplified} />

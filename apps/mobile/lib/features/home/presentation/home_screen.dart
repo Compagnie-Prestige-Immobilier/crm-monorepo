@@ -375,11 +375,20 @@ Future<void> _choisirLeGeste(
       ),
       CpiRow(
         leading: const Icon(
+          PhosphorIconsRegular.identificationCard,
+          size: CpiIconSize.lg,
+        ),
+        title: 'Ajouter un représentant',
+        subtitle: 'Renseignez sa fiche complète.',
+        onTap: () => Navigator.of(sheet).pop('representant'),
+      ),
+      CpiRow(
+        leading: const Icon(
           PhosphorIconsRegular.userPlus,
           size: CpiIconSize.lg,
         ),
         title: 'Ajouter un prospect',
-        subtitle: 'Notez un contact donné par un représentant.',
+        subtitle: 'Renseignez un nouveau prospect.',
         onTap: () => Navigator.of(sheet).pop('prospect'),
       ),
     ]),
@@ -387,6 +396,10 @@ Future<void> _choisirLeGeste(
   if (choix == null || !context.mounted) return;
   if (choix == 'qualifier') {
     onQualifier();
+    return;
+  }
+  if (choix == 'representant') {
+    context.pushOnce(Routes.newRepresentant);
     return;
   }
   context.pushOnce(Routes.representants);

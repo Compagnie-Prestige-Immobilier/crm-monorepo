@@ -7,6 +7,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/router/route_paths.dart';
 import '../../core/theme/cpi_tokens.dart';
+import '../../ui/widgets/cpi_action_bar.dart';
 import '../../ui/widgets/cpi_kit.dart';
 import '../rappels/presentation/rappels_en_retard_banner.dart';
 import 'app_shell.dart';
@@ -15,9 +16,7 @@ import 'workspace_switch.dart';
 
 /// L'écran de travail du Grand Public.
 ///
-/// Rien ne s'y saisit : la base des prospects vient du bureau. Le travail du
-/// téléconseiller, c'est la CONVERSION : appeler la file du jour, tenir les
-/// rappels promis, et retrouver une fiche au besoin.
+/// Créer une fiche, appeler, tenir les rappels promis et retrouver un prospect.
 class GrandPublicScreen extends ConsumerWidget {
   const GrandPublicScreen({super.key});
 
@@ -47,6 +46,13 @@ class GrandPublicScreen extends ConsumerWidget {
         current: CpiProject.grandPublic,
       ),
       banner: const PendingBanner(),
+      footer: CpiActionBar(
+        child: CpiButton(
+          'Nouveau prospect',
+          icon: PhosphorIconsRegular.userPlus,
+          onPressed: () => context.push(Routes.grandPublicNew).ignore(),
+        ),
+      ),
       body: RefreshIndicator(
         onRefresh: () async {
           await HapticFeedback.selectionClick();
@@ -62,12 +68,11 @@ class GrandPublicScreen extends ConsumerWidget {
           ),
           children: <Widget>[
             const RappelsEnRetardBanner(grandPublic: true, padded: false),
-            _GrandeCarte(
-              nombre: 0,
-              loading: false,
-              titre: 'Appels du jour',
+            _Carte(
+              nombre: null,
+              titre: 'Appeler un prospect',
+              detail: 'Chercher par numéro et consigner l’appel',
               icon: PhosphorIconsRegular.phoneCall,
-              vide: 'Rien à appeler aujourd\'hui.',
               onTap: appeler,
             ),
             const SizedBox(height: CpiSpacing.sm),
@@ -103,82 +108,6 @@ class GrandPublicScreen extends ConsumerWidget {
     final DateTime local = at.toUtc();
     return '${l.formatMediumDate(local)} à '
         '${l.formatTimeOfDay(TimeOfDay.fromDateTime(local))}';
-  }
-}
-
-/// La carte du travail du jour : le nombre en très gros, une seule destination.
-class _GrandeCarte extends StatelessWidget {
-  const _GrandeCarte({
-    required this.nombre,
-    required this.loading,
-    required this.titre,
-    required this.icon,
-    required this.vide,
-    required this.onTap,
-  });
-
-  final int nombre;
-  final bool loading;
-  final String titre;
-  final IconData icon;
-  final String vide;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final ColorScheme scheme = theme.colorScheme;
-    return Semantics(
-      button: true,
-      label: loading
-          ? 'Chargement des appels du jour.'
-          : nombre == 0
-          ? '$vide Ouvrir la liste.'
-          : '$nombre $titre. Ouvrir la liste.',
-      child: ExcludeSemantics(
-        child: CpiCard(
-          onTap: onTap,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Row(
-                children: <Widget>[
-                  Icon(icon, size: CpiIconSize.xxl, color: scheme.primary),
-                  const SizedBox(width: CpiSpacing.xs),
-                  Expanded(
-                    child: Text(titre, style: theme.textTheme.titleMedium),
-                  ),
-                  Icon(
-                    PhosphorIconsRegular.caretRight,
-                    size: CpiIconSize.xl,
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ],
-              ),
-              const SizedBox(height: CpiSpacing.xs),
-              if (loading)
-                Text('…', style: theme.textTheme.headlineSmall)
-              else
-                Text(
-                  '$nombre',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    color: scheme.primary,
-                  ),
-                ),
-              Text(
-                nombre == 0 && !loading ? vide : 'À appeler',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
 

@@ -3,7 +3,7 @@ import { unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
 import { flattenPage } from '@/lib/api/query-params';
-import type { Paginated } from '@/lib/types';
+import type { Paginated, Projet } from '@/lib/types';
 
 type Schemas = components['schemas'];
 export type LotExportCible = Schemas['LotExportCible'];
@@ -13,6 +13,11 @@ export type CreateLotExportInput = Schemas['CreateLotExportDto'];
 export type LotExportPreview = Schemas['LotExportPreviewDto'];
 export type CampagnePerformance = Pick<LotExportDetail, 'name' | 'performance'>;
 export type LotExportQuery = NonNullable<operations['listLotsExport']['parameters']['query']>;
+
+/** Une campagne reste dans la coque de son projet ; un lot de représentants porte `CHUES`. */
+export function campagnesPath(projet: Projet): string {
+  return projet === 'GRAND_PUBLIC' ? '/grand-public/campagnes' : '/chues/campagnes';
+}
 
 export async function fetchLotsExport(
   query: LotExportQuery,

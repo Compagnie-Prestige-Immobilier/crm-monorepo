@@ -34,6 +34,10 @@ const DETAIL_PAGE = 500;
 const DATE_FORMAT = 'dd/mm/yyyy hh:mm';
 const TELECONSEILLER_ROLES = [Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION];
 
+type LotExportRow = Prisma.LotExportGetPayload<{
+  include: { createdBy: { select: { fullName: true } } };
+}>;
+
 interface Teleconseiller {
   readonly id: string;
   readonly fullName: string;
@@ -133,10 +137,12 @@ export class LotsExportService {
           data: {
             name: body.name.trim(),
             cible: body.cible,
+            // Un représentant est CHUES par construction ; un lot de prospects
+            // porte le projet exigé à la création.
             projet:
               body.cible === LotExportCible.REPRESENTANTS
                 ? Projet.CHUES
-                : (body.prospects?.projet ?? null),
+                : (body.prospects?.projet ?? Projet.CHUES),
             // La répartition voyage avec les critères : elle n'a pas de colonne,
             // et un téléconseiller à zéro fiche ne laisse aucune ligne derrière lui.
             filters: {
@@ -276,14 +282,13 @@ export class LotsExportService {
       })),
     }));
 
-    return {
-      ...(await this.summary(id, row)),
+    return Object.assign(await this.summary(id, row), {
       callsByTeleconseiller: await this.callsByUser(row.id, row.cible, row.createdAt),
       recentAttempts: await this.recentAttempts(row.id, row.cible, row.createdAt),
       distribution: { fichesParJour, jours },
       repartition,
       performance: await this.performance(row.id, row.cible, row.createdAt),
-    };
+    });
   }
 
   /** Le classeur du lot : la répartition d'abord, la fiche ensuite. */
@@ -540,7 +545,7 @@ export class LotsExportService {
     });
   }
 
-  private async summary(id: string, row?: any): Promise<LotExportSummaryDto> {
+  private async summary(id: string, row?: LotExportRow): Promise<LotExportSummaryDto> {
     const lot =
       row ??
       (await this.prisma.lotExport.findUnique({
@@ -815,13 +820,20 @@ function readDistribution(filters: Prisma.JsonValue): Distribution | null {
   return { teleconseillerIds, fichesParJour, jours };
 }
 
-function scopeLabel(cible: LotExportCible, filters: any): string {
+interface ScopeFilters {
+  relationStatus?: string;
+  segment?: string;
+  type?: string;
+  projet?: string;
+}
+
+function scopeLabel(cible: LotExportCible, filters: unknown): string {
+  const f = (filters ?? {}) as ScopeFilters;
   if (cible === LotExportCible.REPRESENTANTS)
-    return filters.relationStatus
-      ? `Représentants ${filters.relationStatus.toLowerCase()}`
+    return f.relationStatus
+      ? `Représentants ${f.relationStatus.toLowerCase()}`
       : 'Tous les représentants';
-  if (filters.segment) return `${filters.projet ?? 'Tous projets'}, segment ${filters.segment}`;
-  if (filters.type)
-    return `${filters.projet ?? 'Grand Public'}, ${filters.type.toLowerCase().replace('_', ' ')}`;
-  return filters.projet ?? 'Tous projets';
+  if (f.segment) return `${f.projet ?? 'Tous projets'}, segment ${f.segment}`;
+  if (f.type) return `${f.projet ?? 'Grand Public'}, ${f.type.toLowerCase().replace('_', ' ')}`;
+  return f.projet ?? 'Tous projets';
 }

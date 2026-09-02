@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { ApiError } from '@crm/api-client/query';
 import {
   AlertTriangleIcon,
@@ -29,18 +29,88 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { bankBasePath } from '@/lib/bank-filters';
 import { createBankCase, fetchBankCases, searchBankProspects } from '@/lib/data/bank-cases';
 import { fetchBanques } from '@/lib/data/reference';
 import { formatPhone, withRetired } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
-import type { BankProspectSearchItem } from '@/lib/types';
+import type { BankProspectSearchItem, Projet } from '@/lib/types';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { cn } from '@/lib/utils';
 
-export function BankCaseForm() {
+function ResultatsRecherche({
+  results,
+  onSelect,
+  onRequest,
+}: {
+  results: UseQueryResult<BankProspectSearchItem[]>;
+  onSelect: (prospect: BankProspectSearchItem) => void;
+  onRequest: () => void;
+}) {
+  if (results.isPending) {
+    return (
+      <div className="flex flex-col gap-2 p-3" aria-hidden="true">
+        {[0, 1, 2].map((index) => (
+          <Skeleton key={index} className="h-11 w-full" />
+        ))}
+      </div>
+    );
+  }
+
+  if (results.isError) {
+    return (
+      <p className="p-4 text-[0.875rem] text-destructive">La recherche a échoué. Réessayez.</p>
+    );
+  }
+
+  if (results.data.length === 0) {
+    return (
+      <div className="flex flex-col items-start gap-3 p-4">
+        <div>
+          <p className="text-[0.875rem] font-[600]">Aucun client ne correspond.</p>
+          <p className="mt-1 text-[0.8125rem] text-muted-foreground">
+            Si le client existe mais n’est pas encore en base, demandez sa création au siège. Elle
+            vous reviendra approuvée, prête à recevoir ce dossier.
+          </p>
+        </div>
+        <Button type="button" variant="outline" onClick={onRequest}>
+          <UserPlusIcon aria-hidden="true" />
+          Demander la création du client
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <ul className="max-h-72 overflow-y-auto p-1 scrollbar-thin">
+      {results.data.map((prospect) => (
+        <li key={prospect.id}>
+          <button
+            type="button"
+            className="flex min-h-11 w-full items-center gap-3 rounded-sm px-3 py-2 text-left transition-colors hover:bg-secondary focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+            onClick={() => {
+              onSelect(prospect);
+            }}
+          >
+            <UserRoundIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-[600]">{prospect.fullName}</span>
+              <span className="block truncate text-[0.75rem] text-muted-foreground tabular-nums">
+                {formatPhone(prospect.phoneE164)} · {prospect.banqueName}
+              </span>
+            </span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function BankCaseForm({ projet }: { projet: Projet }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const base = bankBasePath(projet);
 
   const searchId = useId();
   const referenceId = useId();
@@ -58,8 +128,8 @@ export function BankCaseForm() {
   const debounced = useDebouncedValue(term.trim());
 
   const results = useQuery({
-    queryKey: ['bank-prospect-search', debounced] as const,
-    queryFn: () => searchBankProspects(debounced),
+    queryKey: ['bank-prospect-search', projet, debounced] as const,
+    queryFn: () => searchBankProspects(debounced, projet),
     enabled: debounced.length >= 2 && selected === null,
     staleTime: 30_000,
   });
@@ -73,22 +143,22 @@ export function BankCaseForm() {
   const checkReference = useMutation({
     mutationFn: (value: string) =>
       fetchBankCases({
-        ...{
-          search: value,
-          stageId: null,
-          stageType: null,
-          banqueId: null,
-          agentId: null,
-          rejectionReasonId: null,
-          dateFrom: null,
-          dateTo: null,
-          amountMin: null,
-          amountMax: null,
-          page: 1,
-          pageSize: 5,
-          sortBy: 'updatedAt' as const,
-          sortDir: 'desc' as const,
-        },
+        // Sans projet : une référence déjà prise par l'autre coque reste un doublon.
+        projet: null,
+        search: value,
+        stageId: null,
+        stageType: null,
+        banqueId: null,
+        agentId: null,
+        rejectionReasonId: null,
+        dateFrom: null,
+        dateTo: null,
+        amountMin: null,
+        amountMax: null,
+        page: 1,
+        pageSize: 5,
+        sortBy: 'updatedAt' as const,
+        sortDir: 'desc' as const,
       }),
     onSuccess: (page, value) => {
       const normalized = value.trim().toLowerCase();
@@ -114,7 +184,7 @@ export function BankCaseForm() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.bankCasesRoot });
       void queryClient.invalidateQueries({ queryKey: queryKeys.bankAnalyticsRoot });
       toast.success(`Dossier ${bankCase.reference} ouvert.`);
-      router.push(`/chues/dossiers/${bankCase.id}`);
+      router.push(`${base}/dossiers/${bankCase.id}`);
     },
     onError: (error) => {
       if (error instanceof ApiError && error.status === 409) {
@@ -169,6 +239,7 @@ export function BankCaseForm() {
             type="search"
             className="h-14 pl-12 text-[1.125rem]"
             autoComplete="off"
+            // oxlint-disable-next-line jsx-a11y/no-autofocus -- recherche première du formulaire
             autoFocus
             value={selected === null ? term : selected.fullName}
             aria-describedby={`${searchId}-aide`}
@@ -198,62 +269,13 @@ export function BankCaseForm() {
 
         {selected === null && debounced.length >= 2 ? (
           <div role="status" className="rounded-md border border-border bg-card">
-            {results.isPending ? (
-              <div className="flex flex-col gap-2 p-3" aria-hidden="true">
-                {[0, 1, 2].map((index) => (
-                  <Skeleton key={index} className="h-11 w-full" />
-                ))}
-              </div>
-            ) : results.isError ? (
-              <p className="p-4 text-[0.875rem] text-destructive">
-                La recherche a échoué. Réessayez.
-              </p>
-            ) : results.data.length === 0 ? (
-              <div className="flex flex-col items-start gap-3 p-4">
-                <div>
-                  <p className="text-[0.875rem] font-[600]">Aucun client ne correspond.</p>
-                  <p className="mt-1 text-[0.8125rem] text-muted-foreground">
-                    Si le client existe mais n’est pas encore en base, demandez sa création au
-                    siège. Elle vous reviendra approuvée, prête à recevoir ce dossier.
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setRequesting(true);
-                  }}
-                >
-                  <UserPlusIcon aria-hidden="true" />
-                  Demander la création du client
-                </Button>
-              </div>
-            ) : (
-              <ul className="max-h-72 overflow-y-auto p-1 scrollbar-thin">
-                {results.data.map((prospect) => (
-                  <li key={prospect.id}>
-                    <button
-                      type="button"
-                      className="flex min-h-11 w-full items-center gap-3 rounded-sm px-3 py-2 text-left transition-colors hover:bg-secondary focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
-                      onClick={() => {
-                        selectProspect(prospect);
-                      }}
-                    >
-                      <UserRoundIcon
-                        className="size-4 shrink-0 text-muted-foreground"
-                        aria-hidden="true"
-                      />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-[600]">{prospect.fullName}</span>
-                        <span className="block truncate text-[0.75rem] text-muted-foreground tabular-nums">
-                          {formatPhone(prospect.phoneE164)} · {prospect.banqueName}
-                        </span>
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <ResultatsRecherche
+              results={results}
+              onSelect={selectProspect}
+              onRequest={() => {
+                setRequesting(true);
+              }}
+            />
           </div>
         ) : null}
       </section>
@@ -325,7 +347,7 @@ export function BankCaseForm() {
               <AlertTriangleIcon className="size-3.5 shrink-0" aria-hidden="true" />
               La référence « {duplicate.reference} » existe déjà.
               <Link
-                href={`/chues/dossiers/${duplicate.id}`}
+                href={`${base}/dossiers/${duplicate.id}`}
                 className="rounded-sm font-[600] underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >
                 Ouvrir ce dossier
@@ -382,7 +404,7 @@ export function BankCaseForm() {
         <div className="mx-auto flex max-w-2xl items-center justify-end gap-3">
           {/* Un LIEN habillé en bouton : la primitive `Button` de Base UI
               poserait `role="button"` sur le `<a>`. */}
-          <Link href="/chues/dossiers" className={buttonVariants({ variant: 'ghost' })}>
+          <Link href={`${base}/dossiers`} className={buttonVariants({ variant: 'ghost' })}>
             Annuler
           </Link>
           <Button type="submit" size="lg" disabled={!canSubmit} className="flex-1 sm:flex-none">

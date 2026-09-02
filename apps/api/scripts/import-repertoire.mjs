@@ -425,7 +425,9 @@ async function chargerComptes(api, jeton) {
   const comptes = new Map();
   const auth = { authorization: `Bearer ${jeton}` };
   for (let page = 1; ; page += 1) {
-    const lot = await appelerApi(`${api}/api/v1/users?page=${page}&pageSize=200`, { headers: auth });
+    const lot = await appelerApi(`${api}/api/v1/users?page=${page}&pageSize=200`, {
+      headers: auth,
+    });
     for (const compte of lot.items) {
       for (const designation of [compte.username, compte.email, compte.fullName]) {
         if (designation) comptes.set(normalise(designation), compte.username);

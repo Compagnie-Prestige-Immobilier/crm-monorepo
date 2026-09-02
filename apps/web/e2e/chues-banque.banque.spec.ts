@@ -20,10 +20,7 @@ const PERIODE_VIDE = '/chues/banque?dateFrom=2031-01-01';
  * `formatNumber` peut poser entre les milliers : fine insécable, insécable et
  * ordinaire, selon la version d'ICU du navigateur.
  */
-const LEGENDE_DOSSIERS = new RegExp(
-  `^[\\d   ]+ à traiter · [\\d   ]+ en cours$`,
-  'u',
-);
+const LEGENDE_DOSSIERS = new RegExp(`^[\\d   ]+ à traiter · [\\d   ]+ en cours$`, 'u');
 
 /**
  * Les titres que `QueryErrorState` peut rendre, plus celui du refus de droits.

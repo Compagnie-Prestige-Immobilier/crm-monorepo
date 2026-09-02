@@ -6,7 +6,7 @@ import {
 import { filtersQueryKey } from '@/lib/filters';
 import { representantFiltersQueryKey, type RepresentantFilters } from '@/lib/representant-filters';
 import { userFiltersQueryKey, type UserFilters } from '@/lib/user-filters';
-import type { ProspectFilters } from '@/lib/types';
+import type { Projet, ProspectFilters } from '@/lib/types';
 
 /** Clés de cache des listes, détails et tableaux de bord associés. */
 export const queryKeys = {
@@ -64,7 +64,7 @@ export const queryKeys = {
   // ─── Banque & Finance ─────────────────────────────────────────────────────
   bankCasesRoot: ['bank-cases'] as const,
   bankCases: (filters: BankCaseFilters) => ['bank-cases', bankFiltersQueryKey(filters)] as const,
-  bankCase: (id: string) => ['bank-cases', 'detail', id] as const,
+  bankCase: (id: string, projet: Projet) => ['bank-cases', 'detail', id, projet] as const,
   bankAnalyticsRoot: ['bank-analytics'] as const,
   bankAnalytics: (filters: BankCaseFilters) =>
     ['bank-analytics', bankFiltersQueryKey(filters)] as const,

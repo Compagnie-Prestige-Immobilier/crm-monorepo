@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import {
   BellIcon,
   BellOffIcon,
@@ -260,167 +260,20 @@ export function NotificationsView({ isAdmin }: { isAdmin: boolean }) {
               ) : null}
             </section>
 
-            {list.isPending ? (
-              <TableSkeleton />
-            ) : list.isError ? (
-              <QueryErrorState
-                error={list.error}
-                onRetry={() => {
-                  void list.refetch();
-                }}
-                fallback="L’historique des notifications n’a pas pu être chargé."
-              />
-            ) : list.data.items.length === 0 ? (
-              <EmptyState
-                icon={BellOffIcon}
-                title={
-                  activeFilterCount === 0
-                    ? 'Aucune notification envoyée'
-                    : 'Aucun envoi ne correspond à ces critères'
-                }
-                description={
-                  activeFilterCount === 0
-                    ? 'Un envoi part en push vers les destinataires choisis, et reste dans leur boîte de réception.'
-                    : 'Changez d’état ou de catégorie.'
-                }
-                action={
-                  activeFilterCount === 0 ? (
-                    <Button
-                      type="button"
-                      className="mt-1"
-                      onClick={() => {
-                        setComposerOpen(true);
-                      }}
-                    >
-                      <PlusIcon aria-hidden="true" />
-                      Composer la première
-                    </Button>
-                  ) : undefined
-                }
-              />
-            ) : (
-              <>
-                <div
-                  className={cn(
-                    'overflow-hidden rounded-lg border border-border bg-card shadow-elev-sm transition-opacity',
-                    list.isFetching && 'opacity-80',
-                  )}
-                >
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="hover:bg-transparent">
-                        <TableHead>Notification</TableHead>
-                        <TableHead>Destinataires</TableHead>
-                        <TableHead>État</TableHead>
-                        <TableHead>Livraison</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>
-                          <span className="sr-only">Actions</span>
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {list.data.items.map((row) => (
-                        <TableRow key={row.id}>
-                          <TableCell className="max-w-xs">
-                            <button
-                              type="button"
-                              className="min-h-11 text-left"
-                              onClick={() => {
-                                setDetailId(row.id);
-                              }}
-                            >
-                              <span className="block font-[600]">{row.title}</span>
-                              <span className="block truncate text-[0.8125rem] text-muted-foreground">
-                                {row.body}
-                              </span>
-                            </button>
-                          </TableCell>
-                          <TableCell>
-                            <span className="block">{describeAudience(row)}</span>
-                            <span className="block text-[0.75rem] text-muted-foreground">
-                              {CATEGORY_LABELS[row.category]}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={STATUS_VARIANT[row.status]}>
-                              {STATUS_LABELS[row.status]}
-                            </Badge>
-                            {row.transportStatus === 'NOT_CONFIGURED' ? (
-                              <Badge variant="warning" className="mt-1 block w-fit">
-                                Aucun push remis
-                              </Badge>
-                            ) : null}
-                          </TableCell>
-                          <TableCell>
-                            <DeliverySummary row={row} />
-                          </TableCell>
-                          <TableCell className="text-[0.8125rem] text-muted-foreground">
-                            {dateTime(row.sentAt ?? row.scheduledFor ?? row.createdAt)}
-                          </TableCell>
-                          <TableCell>
-                            {row.status === 'SCHEDULED' ? (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                disabled={cancel.isPending && cancel.variables === row.id}
-                                onClick={() => {
-                                  setCancelling(row);
-                                }}
-                              >
-                                {cancel.isPending && cancel.variables === row.id ? (
-                                  <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-                                ) : (
-                                  <XIcon aria-hidden="true" />
-                                )}
-                                Annuler l’envoi
-                              </Button>
-                            ) : null}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-
-                {meta === undefined ? null : (
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-[0.8125rem] text-muted-foreground" role="status">
-                      <span className="sr-only">Envois affichés&nbsp;: </span>
-                      {meta.total} envoi{meta.total > 1 ? 's' : ''}
-                    </p>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        aria-label="Page précédente"
-                        disabled={meta.page <= 1}
-                        onClick={() => {
-                          setFilters({ page: meta.page - 1 });
-                        }}
-                      >
-                        <ChevronLeftIcon className="size-4" aria-hidden="true" />
-                      </Button>
-                      <span className="min-w-20 text-center text-[0.8125rem] tabular-nums">
-                        {meta.page} / {Math.max(1, meta.pageCount)}
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        aria-label="Page suivante"
-                        disabled={meta.page >= meta.pageCount}
-                        onClick={() => {
-                          setFilters({ page: meta.page + 1 });
-                        }}
-                      >
-                        <ChevronRightIcon className="size-4" aria-hidden="true" />
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
+            <HistoriqueEnvois
+              list={list}
+              activeFilterCount={activeFilterCount}
+              meta={meta}
+              cancel={cancel}
+              onDetail={setDetailId}
+              onCancelRow={setCancelling}
+              onComposer={() => {
+                setComposerOpen(true);
+              }}
+              onPage={(page) => {
+                setFilters({ page });
+              }}
+            />
           </TabsContent>
         ) : null}
 
@@ -454,6 +307,190 @@ export function NotificationsView({ isAdmin }: { isAdmin: boolean }) {
         }}
       />
     </div>
+  );
+}
+
+interface HistoriqueEnvoisProps {
+  list: UseQueryResult<Awaited<ReturnType<typeof fetchNotifications>>>;
+  activeFilterCount: number;
+  meta: Awaited<ReturnType<typeof fetchNotifications>>['meta'] | undefined;
+  cancel: { isPending: boolean; variables: string | undefined };
+  onDetail: (id: string) => void;
+  onCancelRow: (row: NotificationRow) => void;
+  onComposer: () => void;
+  onPage: (page: number) => void;
+}
+
+function HistoriqueEnvois({
+  list,
+  activeFilterCount,
+  meta,
+  cancel,
+  onDetail,
+  onCancelRow,
+  onComposer,
+  onPage,
+}: HistoriqueEnvoisProps) {
+  if (list.isPending) return <TableSkeleton />;
+
+  if (list.isError) {
+    return (
+      <QueryErrorState
+        error={list.error}
+        onRetry={() => {
+          void list.refetch();
+        }}
+        fallback="L’historique des notifications n’a pas pu être chargé."
+      />
+    );
+  }
+
+  if (list.data.items.length === 0) {
+    return (
+      <EmptyState
+        icon={BellOffIcon}
+        title={
+          activeFilterCount === 0
+            ? 'Aucune notification envoyée'
+            : 'Aucun envoi ne correspond à ces critères'
+        }
+        description={
+          activeFilterCount === 0
+            ? 'Un envoi part en push vers les destinataires choisis, et reste dans leur boîte de réception.'
+            : 'Changez d’état ou de catégorie.'
+        }
+        action={
+          activeFilterCount === 0 ? (
+            <Button type="button" className="mt-1" onClick={onComposer}>
+              <PlusIcon aria-hidden="true" />
+              Composer la première
+            </Button>
+          ) : undefined
+        }
+      />
+    );
+  }
+
+  return (
+    <>
+      <div
+        className={cn(
+          'overflow-hidden rounded-lg border border-border bg-card shadow-elev-sm transition-opacity',
+          list.isFetching && 'opacity-80',
+        )}
+      >
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead>Notification</TableHead>
+              <TableHead>Destinataires</TableHead>
+              <TableHead>État</TableHead>
+              <TableHead>Livraison</TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead>
+                <span className="sr-only">Actions</span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {list.data.items.map((row) => (
+              <TableRow key={row.id}>
+                <TableCell className="max-w-xs">
+                  <button
+                    type="button"
+                    className="min-h-11 text-left"
+                    onClick={() => {
+                      onDetail(row.id);
+                    }}
+                  >
+                    <span className="block font-[600]">{row.title}</span>
+                    <span className="block truncate text-[0.8125rem] text-muted-foreground">
+                      {row.body}
+                    </span>
+                  </button>
+                </TableCell>
+                <TableCell>
+                  <span className="block">{describeAudience(row)}</span>
+                  <span className="block text-[0.75rem] text-muted-foreground">
+                    {CATEGORY_LABELS[row.category]}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  <Badge variant={STATUS_VARIANT[row.status]}>{STATUS_LABELS[row.status]}</Badge>
+                  {row.transportStatus === 'NOT_CONFIGURED' ? (
+                    <Badge variant="warning" className="mt-1 block w-fit">
+                      Aucun push remis
+                    </Badge>
+                  ) : null}
+                </TableCell>
+                <TableCell>
+                  <DeliverySummary row={row} />
+                </TableCell>
+                <TableCell className="text-[0.8125rem] text-muted-foreground">
+                  {dateTime(row.sentAt ?? row.scheduledFor ?? row.createdAt)}
+                </TableCell>
+                <TableCell>
+                  {row.status === 'SCHEDULED' ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={cancel.isPending && cancel.variables === row.id}
+                      onClick={() => {
+                        onCancelRow(row);
+                      }}
+                    >
+                      {cancel.isPending && cancel.variables === row.id ? (
+                        <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+                      ) : (
+                        <XIcon aria-hidden="true" />
+                      )}
+                      Annuler l’envoi
+                    </Button>
+                  ) : null}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      {meta === undefined ? null : (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-[0.8125rem] text-muted-foreground" role="status">
+            <span className="sr-only">Envois affichés&nbsp;: </span>
+            {meta.total} envoi{meta.total > 1 ? 's' : ''}
+          </p>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="Page précédente"
+              disabled={meta.page <= 1}
+              onClick={() => {
+                onPage(meta.page - 1);
+              }}
+            >
+              <ChevronLeftIcon className="size-4" aria-hidden="true" />
+            </Button>
+            <span className="min-w-20 text-center text-[0.8125rem] tabular-nums">
+              {meta.page} / {Math.max(1, meta.pageCount)}
+            </span>
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="Page suivante"
+              disabled={meta.page >= meta.pageCount}
+              onClick={() => {
+                onPage(meta.page + 1);
+              }}
+            >
+              <ChevronRightIcon className="size-4" aria-hidden="true" />
+            </Button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

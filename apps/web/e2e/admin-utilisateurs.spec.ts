@@ -80,10 +80,9 @@ async function nettoyer(api: APIRequestContext): Promise<void> {
   for (const row of comptes.items) {
     if (row.fullName.startsWith(PREFIXE)) {
       const supprime = await api.delete(`/api/v1/users/${row.id}`);
-      expect(
-        supprime.ok(),
-        `Compte ${row.fullName} non supprimé : ${await supprime.text()}`,
-      ).toBe(true);
+      expect(supprime.ok(), `Compte ${row.fullName} non supprimé : ${await supprime.text()}`).toBe(
+        true,
+      );
     }
   }
 }
@@ -155,7 +154,9 @@ async function chercher(page: Page, terme: string): Promise<void> {
  * un sélecteur non borné viole le mode strict dès que la boîte est ouverte.
  */
 async function choisirRoleFiltre(page: Page, libelle: string): Promise<void> {
-  const combo = page.getByRole('region', { name: 'Filtres' }).getByRole('combobox', { name: 'Rôle' });
+  const combo = page
+    .getByRole('region', { name: 'Filtres' })
+    .getByRole('combobox', { name: 'Rôle' });
   await combo.click();
   await page.getByRole('option', { name: libelle, exact: true }).click();
   await expect(combo).toHaveAttribute('aria-expanded', 'false');
@@ -338,9 +339,9 @@ test.describe('Comptes utilisateurs', () => {
 
     await page.reload();
     await expect(page).toHaveURL(new RegExp(`search=${PREFIXE}`));
-    await expect(
-      page.getByRole('table').getByRole('row').filter({ hasText: PREFIXE }),
-    ).toHaveCount(attendues);
+    await expect(page.getByRole('table').getByRole('row').filter({ hasText: PREFIXE })).toHaveCount(
+      attendues,
+    );
     await expect(
       page.getByRole('table').getByRole('row').filter({ hasNotText: PREFIXE }),
     ).toHaveCount(1);
@@ -478,7 +479,9 @@ test.describe('Comptes utilisateurs', () => {
     await dialogue.getByLabel('Nouveau mot de passe').fill(AUTRE_MOT_DE_PASSE);
     await dialogue.getByLabel('Confirmation').fill(`${AUTRE_MOT_DE_PASSE}x`);
     await dialogue.getByRole('button', { name: 'Réinitialiser' }).click();
-    await expect(dialogue.getByText('Les deux mots de passe diffèrent.', { exact: true })).toBeVisible();
+    await expect(
+      dialogue.getByText('Les deux mots de passe diffèrent.', { exact: true }),
+    ).toBeVisible();
 
     await dialogue.getByLabel('Confirmation').fill(AUTRE_MOT_DE_PASSE);
     await dialogue.getByRole('button', { name: 'Réinitialiser' }).click();

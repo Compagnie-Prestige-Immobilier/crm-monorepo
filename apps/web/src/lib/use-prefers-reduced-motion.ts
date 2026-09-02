@@ -11,6 +11,7 @@ export function usePrefersReducedMotion(): boolean {
 
   useEffect(() => {
     const query = window.matchMedia('(prefers-reduced-motion: reduce)');
+    // oxlint-disable-next-line react/set-state-in-effect -- synchronisation avec matchMedia
     setReduced(query.matches);
 
     const onChange = (event: MediaQueryListEvent): void => {

@@ -4,7 +4,15 @@ import { unwrap } from '@crm/api-client/query';
 import { getApiClient } from '@/lib/api/browser';
 import { toFilterQuery } from '@/lib/api/query-params';
 import { EMPTY_FILTERS } from '@/lib/filters';
-import type { Banque, Departement, IncomeBand, Offer, Profession, Syndicat } from '@/lib/types';
+import type {
+  Banque,
+  Departement,
+  Employeur,
+  IncomeBand,
+  Offer,
+  Profession,
+  Syndicat,
+} from '@/lib/types';
 
 export type CreateBanqueInput = components['schemas']['CreateBanqueDto'];
 export type UpdateBanqueInput = components['schemas']['UpdateBanqueDto'];
@@ -43,6 +51,22 @@ export async function saveIncomeBand(
     );
   }
   return unwrap(await client.POST('/api/v1/referentiels/tranches-revenu', { body }));
+}
+
+export async function saveEmployeur(
+  input: components['schemas']['CreateEmployeurDto'] & { id?: string },
+  client: ApiClient = getApiClient(),
+): Promise<Employeur> {
+  const { id, ...body } = input;
+  if (id) {
+    return unwrap(
+      await client.PATCH('/api/v1/referentiels/employeurs/{id}', {
+        params: { path: { id } },
+        body,
+      }),
+    );
+  }
+  return unwrap(await client.POST('/api/v1/referentiels/employeurs', { body }));
 }
 
 export async function saveOffer(

@@ -11,6 +11,8 @@ import {
   GRAND_PUBLIC_IMPORT_COLUMNS,
   GRAND_PUBLIC_IMPORT_HEADERS,
   GRAND_PUBLIC_SHEET_NAME,
+  MODE_EPARGNE_CHOICES,
+  TYPE_CONTRAT_CHOICES,
 } from '../imports/prospects-grand-public-template.js';
 import { ExportService } from './export.service.js';
 import { COLUMNS_BY_POSITION_RULE } from './import-template.workbook.js';
@@ -18,6 +20,8 @@ import { COLUMNS_BY_POSITION_RULE } from './import-template.workbook.js';
 const BANQUES = ['CBAO', 'BHS'];
 const SYNDICATS = ['CHUES', 'SAES'];
 const CANAUX = ['TikTok', 'Bouche à oreille', 'Parrainage'];
+const EMPLOYEURS = ['Ministère de l’Éducation nationale', 'Sonatel'];
+const PAYS = ['Italie', 'France'];
 
 const H = GRAND_PUBLIC_IMPORT_HEADERS;
 
@@ -26,6 +30,8 @@ function makeExports(canaux = CANAUX): { exports: ExportService; prisma: FakePri
     banque: { findMany: vi.fn(() => Promise.resolve(BANQUES.map((shortName) => ({ shortName })))) },
     syndicat: { findMany: vi.fn(() => Promise.resolve(SYNDICATS.map((sigle) => ({ sigle })))) },
     canalProvenance: { findMany: vi.fn(() => Promise.resolve(canaux.map((label) => ({ label })))) },
+    employeur: { findMany: () => Promise.resolve(EMPLOYEURS.map((label) => ({ label }))) },
+    pays: { findMany: () => Promise.resolve(PAYS.map((label) => ({ label }))) },
   };
   return {
     exports: new ExportService(
@@ -41,6 +47,8 @@ interface FakePrisma {
   banque: { findMany: ReturnType<typeof vi.fn> };
   syndicat: { findMany: ReturnType<typeof vi.fn> };
   canalProvenance: { findMany: ReturnType<typeof vi.fn> };
+  employeur: { findMany: () => Promise<{ label: string }[]> };
+  pays: { findMany: () => Promise<{ label: string }[]> };
 }
 
 async function build(canaux = CANAUX): Promise<ExcelJS.Workbook> {
@@ -78,6 +86,10 @@ describe('modèle d’import des prospects Grand Public', () => {
     [H.banque, 'B', BANQUES.length],
     [H.fonctionnaire, 'C', FONCTIONNAIRE_CHOICES.length],
     [H.canal, 'D', CANAUX.length],
+    [H.employeur, 'E', EMPLOYEURS.length],
+    [H.typeContrat, 'F', TYPE_CONTRAT_CHOICES.length],
+    [H.modeEpargne, 'G', MODE_EPARGNE_CHOICES.length],
+    [H.paysResidence, 'H', PAYS.length],
   ])('%s se choisit dans une liste, il ne se tape pas', async (header, letter, count) => {
     const sheet = sheetOf(await build(), GRAND_PUBLIC_SHEET_NAME);
 

@@ -92,8 +92,8 @@ export const COQUES: readonly CoqueEntry[] = [
     id: 'grand-public',
     label: 'Projet Grand Public',
     path: '/grand-public',
-    description: 'Vente hors syndicat, en préparation',
-    roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR', 'COMMERCIAL'],
+    description: 'Prospection, appels et conversion hors CHUES',
+    roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR', 'COMMERCIAL', 'BANQUE_FINANCE'],
   },
   {
     id: 'admin',
@@ -496,6 +496,13 @@ const SECTIONS: readonly NavSection[] = [
     items: [
       // ─── Téléconseiller ───────────────────────────────────────────────────
       {
+        href: '/grand-public',
+        label: 'Grand Public',
+        icon: UsersIcon,
+        description: 'Créer, retrouver et suivre les prospects',
+        roles: ['COMMERCIAL'],
+      },
+      {
         href: '/grand-public/console',
         label: 'Appeler les prospects',
         icon: HeadsetIcon,
@@ -514,13 +521,6 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Noter un prospect',
         icon: PlusCircleIcon,
         description: 'Saisie d’un prospect',
-        roles: ['COMMERCIAL'],
-      },
-      {
-        href: '/grand-public',
-        label: 'Mes prospects',
-        icon: UsersIcon,
-        description: 'Les fiches qu’il a notées',
         roles: ['COMMERCIAL'],
         secondary: true,
       },
@@ -548,10 +548,32 @@ const SECTIONS: readonly NavSection[] = [
         roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR'],
       },
       {
+        href: '/grand-public/supervision',
+        label: 'Mon équipe',
+        icon: ActivityIcon,
+        description: 'Activité et présence des téléconseillers',
+        roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR'],
+      },
+      {
+        href: '/grand-public/dossiers',
+        label: 'Dossiers bancaires',
+        icon: FolderOpenIcon,
+        description: 'Dossiers déposés en banque',
+        roles: ['ADMIN'],
+      },
+      {
         href: '/grand-public/rappels',
         label: 'Rappels',
         icon: ClockIcon,
         description: 'Échéances promises et retards',
+        roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR'],
+        secondary: true,
+      },
+      {
+        href: '/grand-public/campagnes',
+        label: 'Campagnes',
+        icon: MegaphoneIcon,
+        description: 'Fiches exportées pour le terrain',
         roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR'],
         secondary: true,
       },
@@ -569,6 +591,74 @@ const SECTIONS: readonly NavSection[] = [
         icon: PlusCircleIcon,
         description: 'Saisie d’un prospect',
         roles: ['ADMIN'],
+        secondary: true,
+      },
+      {
+        href: '/grand-public/banque',
+        label: 'Vue d’ensemble bancaire',
+        icon: ChartColumnIcon,
+        description: 'Encaissements, rejets et délais',
+        roles: ['ADMIN'],
+        secondary: true,
+      },
+      {
+        href: '/grand-public/dossiers/export',
+        label: 'Exporter les dossiers',
+        icon: FileSpreadsheetIcon,
+        description: 'Classeur Dossiers · Historique · Synthèse',
+        roles: ['ADMIN'],
+        secondary: true,
+      },
+      {
+        href: '/grand-public/dossiers/nouveau',
+        label: 'Nouveau dossier',
+        icon: PlusCircleIcon,
+        description: 'Ouverture de dossier',
+        roles: ['ADMIN'],
+        hidden: true,
+      },
+      {
+        // Le SEUL lien qui sort de la coque : l'écran de dépôt vit chez l'Admin,
+        // et le paramètre y présélectionne le classeur Grand Public.
+        href: '/admin/imports?kind=PROSPECTS_GRAND_PUBLIC',
+        label: 'Importer des prospects',
+        icon: UploadIcon,
+        description: 'Classeur de prospects Grand Public',
+        roles: ['ADMIN'],
+        secondary: true,
+      },
+
+      // ─── Banque & Finance ─────────────────────────────────────────────────
+      // Les mêmes écrans qu'en CHUES, bornés au projet Grand Public. Ni les
+      // étapes du flux ni les demandes de création n'ont ici d'équivalent :
+      // elles ignorent la notion de projet et restent en CHUES.
+      {
+        href: '/grand-public/banque',
+        label: 'Vue d’ensemble',
+        icon: LayoutDashboardIcon,
+        description: 'Encaissements, rejets et délais',
+        roles: ['BANQUE_FINANCE'],
+      },
+      {
+        href: '/grand-public/dossiers',
+        label: 'Dossiers bancaires',
+        icon: FolderOpenIcon,
+        description: 'Dossiers déposés en banque',
+        roles: ['BANQUE_FINANCE'],
+      },
+      {
+        href: '/grand-public/dossiers/nouveau',
+        label: 'Ouvrir un dossier',
+        icon: PlusCircleIcon,
+        description: 'Ouverture de dossier',
+        roles: ['BANQUE_FINANCE'],
+      },
+      {
+        href: '/grand-public/dossiers/export',
+        label: 'Exporter les dossiers',
+        icon: FileSpreadsheetIcon,
+        description: 'Classeur Dossiers · Historique · Synthèse',
+        roles: ['BANQUE_FINANCE'],
         secondary: true,
       },
     ],

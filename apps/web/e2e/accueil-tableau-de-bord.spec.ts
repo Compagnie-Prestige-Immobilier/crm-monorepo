@@ -152,7 +152,10 @@ test('ACC-TDB-03 une plage libre survit au rechargement', async ({ page }) => {
     const declencheur = page.getByRole('button', { name: champ, exact: true });
     await declencheur.click();
     await page.getByRole('button', { name: 'Mois précédent' }).click();
-    await page.getByRole('grid', { name: champ }).getByRole('gridcell', { name: jourLong(cible) }).click();
+    await page
+      .getByRole('grid', { name: champ })
+      .getByRole('gridcell', { name: jourLong(cible) })
+      .click();
     // Le popover est refermé et la valeur posée : sans cette attente, le second
     // calendrier se monte pendant que le premier se démonte.
     await expect(declencheur).toHaveText(jourCourt(cible));
@@ -182,9 +185,7 @@ test('ACC-TDB-04 une plage de plus de 400 jours est refusée avant l’appel', a
   // est le geste qui pose 500 jours sans quinze clics de calendrier.
   await page.goto(`${ROUTE}?periode=libre&du=${iso(du)}&au=${iso(au)}`);
 
-  await expect(
-    page.getByRole('alert').filter({ hasText: 'Cette plage dépasse' }),
-  ).toHaveText(
+  await expect(page.getByRole('alert').filter({ hasText: 'Cette plage dépasse' })).toHaveText(
     'Cette plage dépasse 400 jours (500 jours) : revenez à une période plus courte.',
   );
 
@@ -242,10 +243,9 @@ test('ACC-TDB-07 ajouter un graphique depuis le tiroir des sources', async ({ pa
   const tiroir = page.getByRole('dialog', { name: 'Ajouter un graphique' });
   await expect(tiroir).toBeVisible();
   await expect(
-    tiroir.getByText(
-      'Choisissez ce que vous voulez suivre. L’image montre la forme conseillée.',
-      { exact: true },
-    ),
+    tiroir.getByText('Choisissez ce que vous voulez suivre. L’image montre la forme conseillée.', {
+      exact: true,
+    }),
   ).toBeVisible();
 
   await tiroir.getByRole('button', { name: /^Par heure/ }).click();
@@ -386,7 +386,9 @@ test('ACC-TDB-13 « Proposer par défaut » est réservé à l’administrateur'
 
   // Le geste n'est JAMAIS exécuté (§4.3.4) : on compte, on ne clique pas.
   await expect(page.getByRole('button', { name: 'Proposer par défaut' })).toHaveCount(0);
-  await expect(page.getByRole('dialog', { name: 'Fixer la disposition par défaut' })).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'Fixer la disposition par défaut' })).toHaveCount(
+    0,
+  );
 
   await page.getByRole('button', { name: 'Quitter', exact: true }).click();
   await expect(modeOuvert(page)).toHaveCount(0);

@@ -36,6 +36,37 @@ async function requestUpstream(options: XlsxRelayOptions, accessToken: string): 
   });
 }
 
+type Renouvellement = { ok: true; accessToken: string } | { ok: false; reponse: Response };
+
+async function renouvelerSession(): Promise<Renouvellement> {
+  const refreshToken = await getRefreshToken();
+  const rotation =
+    refreshToken === null || refreshToken === ''
+      ? { ok: false as const, reason: 'invalid' as const }
+      : await rotateRefreshTokenDetailed(serverApiOrigin(), refreshToken);
+
+  if (!rotation.ok && rotation.reason === 'unavailable') {
+    return {
+      ok: false,
+      reponse: NextResponse.json({ error: 'Le serveur CPI est injoignable.' }, { status: 502 }),
+    };
+  }
+
+  if (!rotation.ok) {
+    await clearSessionCookies();
+    return {
+      ok: false,
+      reponse: NextResponse.json(
+        { error: 'Session expirée. Reconnectez-vous.', code: 'SESSION_EXPIRED' },
+        { status: 401 },
+      ),
+    };
+  }
+
+  await setSessionCookies(toAuthTokens(rotation.tokens));
+  return { ok: true, accessToken: rotation.tokens.accessToken };
+}
+
 export async function relayXlsx(options: XlsxRelayOptions): Promise<Response> {
   try {
     serverApiOrigin();
@@ -69,26 +100,9 @@ export async function relayXlsx(options: XlsxRelayOptions): Promise<Response> {
     upstream = await requestUpstream(options, accessToken);
 
     if (upstream.status === 401) {
-      const refreshToken = await getRefreshToken();
-      const rotation =
-        refreshToken === null || refreshToken === ''
-          ? { ok: false as const, reason: 'invalid' as const }
-          : await rotateRefreshTokenDetailed(serverApiOrigin(), refreshToken);
-
-      if (!rotation.ok && rotation.reason === 'unavailable') {
-        return NextResponse.json({ error: 'Le serveur CPI est injoignable.' }, { status: 502 });
-      }
-
-      if (!rotation.ok) {
-        await clearSessionCookies();
-        return NextResponse.json(
-          { error: 'Session expirée. Reconnectez-vous.', code: 'SESSION_EXPIRED' },
-          { status: 401 },
-        );
-      }
-
-      await setSessionCookies(toAuthTokens(rotation.tokens));
-      upstream = await requestUpstream(options, rotation.tokens.accessToken);
+      const renouvelle = await renouvelerSession();
+      if (!renouvelle.ok) return renouvelle.reponse;
+      upstream = await requestUpstream(options, renouvelle.accessToken);
     }
   } catch {
     return NextResponse.json({ error: 'Le serveur CPI est injoignable.' }, { status: 502 });

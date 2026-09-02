@@ -450,6 +450,9 @@ importers:
       date-fns:
         specifier: 'catalog:'
         version: 4.4.0
+      libphonenumber-js:
+        specifier: 'catalog:'
+        version: 1.13.10
       lucide-react:
         specifier: 'catalog:'
         version: 0.550.0(react@19.2.7)

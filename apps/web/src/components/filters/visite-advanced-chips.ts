@@ -19,36 +19,26 @@ const LABELS: Record<VisiteAdvancedFilterKey, string> = {
 
 const UNKNOWN_VALUE = 'Valeur inconnue';
 
+type ListeReferentiel = readonly { readonly id: string; readonly label: string }[];
+
+const LISTES: Record<
+  VisiteAdvancedFilterKey,
+  (referentiels: VisiteReferentiels | undefined) => ListeReferentiel
+> = {
+  entrepriseId: (referentiels) => referentiels?.entreprises ?? [],
+  directionId: (referentiels) => referentiels?.directions ?? [],
+  destinataireId: (referentiels) => referentiels?.destinataires ?? [],
+  objetId: (referentiels) => referentiels?.objets ?? [],
+};
+
 function chipValue(
   key: VisiteAdvancedFilterKey,
   filters: VisiteFilters,
   referentiels: VisiteReferentiels | undefined,
 ): string | null {
-  switch (key) {
-    case 'entrepriseId':
-      return filters.entrepriseId === null
-        ? null
-        : (referentiels?.entreprises.find((item) => item.id === filters.entrepriseId)?.label ??
-            UNKNOWN_VALUE);
-
-    case 'directionId':
-      return filters.directionId === null
-        ? null
-        : (referentiels?.directions.find((item) => item.id === filters.directionId)?.label ??
-            UNKNOWN_VALUE);
-
-    case 'destinataireId':
-      return filters.destinataireId === null
-        ? null
-        : (referentiels?.destinataires.find((item) => item.id === filters.destinataireId)?.label ??
-            UNKNOWN_VALUE);
-
-    case 'objetId':
-      return filters.objetId === null
-        ? null
-        : (referentiels?.objets.find((item) => item.id === filters.objetId)?.label ??
-            UNKNOWN_VALUE);
-  }
+  const id = filters[key];
+  if (id === null) return null;
+  return LISTES[key](referentiels).find((item) => item.id === id)?.label ?? UNKNOWN_VALUE;
 }
 
 export function buildVisiteAdvancedChips(

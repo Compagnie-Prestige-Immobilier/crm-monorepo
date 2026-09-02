@@ -578,8 +578,6 @@ describe('RepScript : l’écran d’appel ne montre que le nom et le numéro', 
       titre: 'Qualifier un représentant',
       href: '/chues/appels-representants',
     });
-    expect(navTitle('COMMERCIAL', '/chues/appels-representants')).toBe(
-      'Qualifier un représentant',
-    );
+    expect(navTitle('COMMERCIAL', '/chues/appels-representants')).toBe('Qualifier un représentant');
   });
 });

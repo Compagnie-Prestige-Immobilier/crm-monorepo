@@ -20,9 +20,7 @@ test('CHU-ET1-14 l’écran est refusé à un agent Banque & Finance', async ({ 
 
   const refus = page.getByRole('alert').filter({ hasText: 'Accès refusé' });
   await expect(refus.getByRole('heading', { level: 2, name: 'Accès refusé' })).toBeVisible();
-  await expect(refus).toContainText(
-    'Les appels aux représentants est réservé à un autre rôle.',
-  );
+  await expect(refus).toContainText('Les appels aux représentants est réservé à un autre rôle.');
   await expect(refus).toContainText('Banque & Finance');
   await expect(refus.getByRole('link', { name: 'Retour à l’accueil' })).toHaveAttribute(
     'href',

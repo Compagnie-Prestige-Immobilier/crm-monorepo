@@ -114,24 +114,32 @@ const attemptCases = outcomes.flatMap((outcome) =>
   ),
 );
 
+const attemptAccepte = (input: (typeof attemptCases)[number]): boolean => {
+  const isMethod = input.outcome === CallOutcome.METHOD_OBTAINED;
+  const isOther = input.outcome === CallOutcome.OTHER;
+  return (
+    (isMethod && input.method !== null) ||
+    (!isMethod && input.method === null && (!isOther || Boolean(input.comment?.trim())))
+  );
+};
+
 describe('tentatives phase 2, matrice issue × méthode × commentaire', () => {
-  it.each(attemptCases)('$outcome avec méthode=$method et commentaire=$comment', (input) => {
-    const isMethod = input.outcome === CallOutcome.METHOD_OBTAINED;
-    const isOther = input.outcome === CallOutcome.OTHER;
-    const valid =
-      (isMethod && input.method !== null) ||
-      (!isMethod && input.method === null && (!isOther || Boolean(input.comment?.trim())));
-
-    if (!valid) {
+  it.each(attemptCases.filter((input) => !attemptAccepte(input)))(
+    '$outcome avec méthode=$method et commentaire=$comment est refusé',
+    (input) => {
       expect(() => normalizeAttempt(input)).toThrow(BadRequestException);
-      return;
-    }
+    },
+  );
 
-    const normalized = normalizeAttempt(input);
-    expect(normalized.outcome).toBe(input.outcome);
-    expect(normalized.method).toBe(input.method);
-    expect(normalized.comment).toBe(input.comment?.trim() || null);
-  });
+  it.each(attemptCases.filter((input) => attemptAccepte(input)))(
+    '$outcome avec méthode=$method et commentaire=$comment est normalisé',
+    (input) => {
+      const normalized = normalizeAttempt(input);
+      expect(normalized.outcome).toBe(input.outcome);
+      expect(normalized.method).toBe(input.method);
+      expect(normalized.comment).toBe(input.comment?.trim() || null);
+    },
+  );
 });
 
 const workflowCases = Array.from({ length: 250 }, (_, offset) => {
@@ -195,12 +203,9 @@ describe('workflow bancaire, transitions successives sur des workflows variables
   it.each(workflowCases)(
     '$caseId applique la transition ouverte ou terminale correcte',
     ({ stages, current, expected }) => {
-      const isLastOpen = expected.type !== BankStageType.OPEN;
-      if (isLastOpen) {
-        expect(nextOpenStage(stages, current)).toBeUndefined();
-      } else {
-        expect(nextOpenStage(stages, current)?.id).toBe(expected.id);
-      }
+      expect(nextOpenStage(stages, current)?.id).toBe(
+        expected.type === BankStageType.OPEN ? expected.id : undefined,
+      );
       expect(() => {
         assertReachable(stages, current, expected);
       }).not.toThrow();

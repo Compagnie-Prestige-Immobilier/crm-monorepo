@@ -4,10 +4,12 @@ import type { Prisma } from '@crm/database';
 import {
   CALL_OUTCOME_LABELS,
   ENROLLMENT_METHOD_LABELS,
+  MODE_EPARGNE_LABELS,
   PHASE2_STATUS_LABELS,
   PROJET_LABELS,
   PROSPECT_STATUT_LABELS,
   PROSPECT_TYPE_LABELS,
+  TYPE_CONTRAT_LABELS,
 } from '../prospects/phase2-labels.js';
 import type { LastAttempt } from '../prospects/last-attempt.js';
 import { toDakarCell } from './dakar.js';
@@ -17,6 +19,8 @@ export const EXPORT_INCLUDE = {
   syndicat: { select: { sigle: true, name: true } },
   canalProvenance: { select: { label: true } },
   professionRef: { select: { label: true } },
+  employeurRef: { select: { label: true } },
+  paysResidence: { select: { label: true } },
   journeys: { select: { projet: true, statut: true }, orderBy: { createdAt: 'asc' } },
   createdBy: { select: { fullName: true } },
   enrollmentCapturedBy: { select: { fullName: true } },
@@ -107,6 +111,36 @@ export const PROSPECT_COLUMNS: readonly ColumnSpec[] = [
     key: 'dureeSystemeMois',
     value: (row) => row.dureeSystemeMois ?? '',
   },
+  {
+    header: 'Employeur',
+    key: 'employeur',
+    value: (row) => row.employeurRef?.label ?? row.employeur ?? '',
+  },
+  {
+    header: 'Type de contrat',
+    key: 'typeContrat',
+    value: (row) => (row.typeContrat ? TYPE_CONTRAT_LABELS[row.typeContrat] : ''),
+  },
+  {
+    header: 'Ancienneté (mois)',
+    key: 'ancienneteMois',
+    value: (row) => row.ancienneteMois ?? '',
+  },
+  { header: 'Lieu d’activité', key: 'lieuActivite', value: (row) => row.lieuActivite ?? '' },
+  {
+    header: 'Mode d’épargne',
+    key: 'modeEpargne',
+    value: (row) => (row.modeEpargne ? MODE_EPARGNE_LABELS[row.modeEpargne] : ''),
+  },
+  {
+    header: 'Pays de résidence',
+    key: 'paysResidence',
+    value: (row) => row.paysResidence?.label ?? '',
+  },
+  { header: 'Ville de résidence', key: 'villeResidence', value: (row) => row.villeResidence ?? '' },
+  { header: 'WhatsApp', key: 'whatsappE164', value: (row) => row.whatsappE164 ?? '' },
+  { header: 'Relais au Sénégal', key: 'relaisNom', value: (row) => row.relaisNom ?? '' },
+  { header: 'Tél. relais', key: 'relaisPhoneE164', value: (row) => row.relaisPhoneE164 ?? '' },
 
   {
     header: 'Segment',

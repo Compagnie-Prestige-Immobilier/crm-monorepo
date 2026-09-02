@@ -7,11 +7,13 @@ import {
   CALL_OUTCOME_REASONS,
   CANAUX_PROVENANCE,
   DEPARTEMENT_COUNT,
+  EMPLOYEURS_SENEGAL,
   PrismaClient,
   PrismaPg,
   IEFS,
   INCOME_BANDS,
   OFFERS,
+  PAYS,
   PROFESSIONS_SENEGAL,
   REGIONS_SENEGAL,
   Role,
@@ -202,6 +204,26 @@ async function seedProspectReferentiels(): Promise<void> {
   );
 }
 
+async function seedSituationGrandPublic(): Promise<void> {
+  for (const employeur of EMPLOYEURS_SENEGAL) {
+    await prisma.employeur.upsert({
+      where: { code: employeur.code },
+      create: employeur,
+      update: { label: employeur.label, type: employeur.type, position: employeur.position },
+    });
+  }
+  for (const pays of PAYS) {
+    await prisma.pays.upsert({
+      where: { code: pays.code },
+      create: pays,
+      update: { label: pays.label, indicatif: pays.indicatif, position: pays.position },
+    });
+  }
+  console.info(
+    `  employeurs : ${String(EMPLOYEURS_SENEGAL.length)} · pays : ${String(PAYS.length)}`,
+  );
+}
+
 async function seedBankWorkflow(): Promise<void> {
   for (const stage of BANK_STAGES) {
     await prisma.bankCaseStage.upsert({
@@ -333,7 +355,21 @@ async function seedAdmin(): Promise<void> {
   console.info(`  admin : ${email} créé`);
 }
 
+/**
+ * Jamais en production : le seed tourne à chaque démarrage du conteneur, et il
+ * réécrivait six comptes avec un mot de passe lisible dans `.env.example`.
+ * Une base qui les porte déjà les voit fermés ; ils ne se suppriment pas, des
+ * fiches peuvent les citer en `createdById`.
+ */
 async function seedFixtureUsers(): Promise<void> {
+  if (process.env.NODE_ENV === 'production') {
+    const { count } = await prisma.user.updateMany({
+      where: { email: { in: FIXTURE_USERS.map((fixture) => fixture.email) }, isActive: true },
+      data: { isActive: false },
+    });
+    console.info(`  fixtures : aucune en production · ${String(count)} compte(s) désactivé(s)`);
+    return;
+  }
   const password = process.env.SEED_FIXTURE_PASSWORD ?? 'ChangeMoi123456';
   if (password.length < 12) {
     throw new Error('SEED_FIXTURE_PASSWORD doit faire au moins 12 caractères.');
@@ -365,6 +401,7 @@ async function main(): Promise<void> {
   await seedSyndicats();
   await seedCanauxProvenance();
   await seedProspectReferentiels();
+  await seedSituationGrandPublic();
   await seedBankWorkflow();
   await seedCallOutcomes();
   await seedVisiteReferentiels();

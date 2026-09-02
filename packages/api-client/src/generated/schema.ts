@@ -355,6 +355,58 @@ export interface paths {
     patch: operations['updateIncomeBand'];
     trace?: never;
   };
+  '/api/v1/referentiels/employeurs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Employeurs : ministères et grandes entreprises. */
+    get: operations['listEmployeurs'];
+    put?: never;
+    /** Ajoute un employeur. */
+    post: operations['createEmployeur'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/referentiels/employeurs/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Modifie un employeur. */
+    patch: operations['updateEmployeur'];
+    trace?: never;
+  };
+  '/api/v1/referentiels/pays': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Pays de résidence, avec leur indicatif. */
+    get: operations['listPays'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/referentiels/offres': {
     parameters: {
       query?: never;
@@ -3047,6 +3099,33 @@ export interface components {
       /** Format: date-time */
       updatedAt: string;
     };
+    /** @enum {string} */
+    EmployeurType: 'MINISTERE' | 'ENTREPRISE' | 'AUTRE';
+    EmployeurDto: {
+      /** Format: uuid */
+      id: string;
+      /** @description Clé stable, jamais réécrite : les fiches la désignent. */
+      code: string;
+      label: string;
+      type: components['schemas']['EmployeurType'];
+      position: number;
+      isActive: boolean;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    PaysDto: {
+      /** Format: uuid */
+      id: string;
+      /** @description ISO 3166-1 alpha-2. */
+      code: string;
+      label: string;
+      /** @description Indicatif téléphonique sans le « + ». */
+      indicatif: string;
+      position: number;
+      isActive: boolean;
+      /** Format: date-time */
+      updatedAt: string;
+    };
     ReferentielsBundleDto: {
       banques: components['schemas']['BanqueDto'][];
       syndicats: components['schemas']['SyndicatDto'][];
@@ -3055,6 +3134,8 @@ export interface components {
       professions: components['schemas']['ProfessionDto'][];
       incomeBands: components['schemas']['IncomeBandDto'][];
       offers: components['schemas']['OfferDto'][];
+      employeurs: components['schemas']['EmployeurDto'][];
+      pays: components['schemas']['PaysDto'][];
     };
     CanalProvenanceDto: {
       /** Format: uuid */
@@ -3099,6 +3180,22 @@ export interface components {
       label?: string;
       minXof?: number;
       maxXof?: number;
+      position?: number;
+      /** @default true */
+      isActive: boolean;
+    };
+    CreateEmployeurDto: {
+      code: string;
+      label: string;
+      type: components['schemas']['EmployeurType'];
+      position?: number;
+      /** @default true */
+      isActive: boolean;
+    };
+    UpdateEmployeurDto: {
+      code?: string;
+      label?: string;
+      type?: components['schemas']['EmployeurType'];
       position?: number;
       /** @default true */
       isActive: boolean;
@@ -3518,6 +3615,10 @@ export interface components {
     /** @enum {string} */
     PaymentMode: 'COMPTANT' | 'ECHELONNE';
     /** @enum {string} */
+    TypeContrat: 'CDI' | 'CDD' | 'AUTRE';
+    /** @enum {string} */
+    ModeEpargne: 'TONTINE' | 'MOBILE_MONEY' | 'BANQUE' | 'AUCUN';
+    /** @enum {string} */
     GrandPublicConsent: 'NON_DEMANDE' | 'INTERESSE' | 'REFUSE';
     ProspectJourneyDto: {
       /** Format: uuid */
@@ -3572,6 +3673,22 @@ export interface components {
       incomeBandId: string | null;
       incomeBandLabel: string | null;
       paymentMode: components['schemas']['PaymentMode'] | null;
+      /** Format: uuid */
+      employeurId: string | null;
+      /** @description Libellé du référentiel, ou l’employeur saisi en clair à défaut. */
+      employeur: string | null;
+      typeContrat: components['schemas']['TypeContrat'] | null;
+      /** @description Ancienneté chez l’employeur, en MOIS. */
+      ancienneteMois: number | null;
+      lieuActivite: string | null;
+      modeEpargne: components['schemas']['ModeEpargne'] | null;
+      /** Format: uuid */
+      paysResidenceId: string | null;
+      paysResidenceLabel: string | null;
+      villeResidence: string | null;
+      whatsappE164: string | null;
+      relaisNom: string | null;
+      relaisPhoneE164: string | null;
       journeys: components['schemas']['ProspectJourneyDto'][];
       /** @description Durée du système de paiement retenue, en MOIS. */
       dureeSystemeMois: number | null;
@@ -3649,6 +3766,33 @@ export interface components {
        * @description Tranche de revenu mensuel déclaré.
        */
       incomeBandId?: string;
+      /**
+       * Format: uuid
+       * @description Employeur du référentiel : ministère (fonctionnaire) ou entreprise (privé).
+       */
+      employeurId?: string;
+      /** @description Employeur en clair, si hors référentiel. */
+      employeur?: string;
+      /** @description Secteur privé : nature du contrat. */
+      typeContrat?: components['schemas']['TypeContrat'];
+      /** @description Ancienneté chez l’employeur, en MOIS. Distincte de `dureeSystemeMois`. */
+      ancienneteMois?: number;
+      /** @description Informel : marché, quartier ou lieu d’activité. */
+      lieuActivite?: string;
+      modeEpargne?: components['schemas']['ModeEpargne'];
+      /**
+       * Format: uuid
+       * @description Diaspora : pays de résidence.
+       */
+      paysResidenceId?: string;
+      /** @description Diaspora : ville de résidence. */
+      villeResidence?: string;
+      /** @description Numéro WhatsApp, souvent international et distinct du numéro principal. Saisie libre, normalisé en E.164 par le serveur. */
+      whatsappE164?: string;
+      /** @description Diaspora : personne relais au Sénégal. */
+      relaisNom?: string;
+      /** @description Téléphone du relais. Saisie libre, normalisé en E.164 par le serveur. */
+      relaisPhoneE164?: string;
       paymentMode?: components['schemas']['PaymentMode'];
       /** @description Durée du système de paiement, en MOIS. */
       dureeSystemeMois?: number;
@@ -3720,40 +3864,44 @@ export interface components {
        */
       phone?: string;
       /** Format: uuid */
-      banqueId?: string;
-      /** Format: uuid */
-      syndicatId?: string;
-      /** Format: uuid */
       representantId?: string;
       /** @description CHUES par défaut. Les deux projets ne se mélangent nulle part. */
       projet?: components['schemas']['Projet'];
       type?: components['schemas']['ProspectType'];
       /** @description Métier déclaré, en clair. */
       profession?: string;
-      /**
-       * Format: uuid
-       * @description Profession choisie dans le référentiel.
-       */
-      professionId?: string;
-      /**
-       * Format: uuid
-       * @description Tranche de revenu mensuel déclaré.
-       */
-      incomeBandId?: string;
       paymentMode?: components['schemas']['PaymentMode'];
       /** @description Durée du système de paiement, en MOIS. */
       dureeSystemeMois?: number;
-      /**
-       * Format: uuid
-       * @description Canal de provenance, choisi dans le référentiel.
-       */
-      canalProvenanceId?: string;
       statut?: components['schemas']['ProspectStatut'];
       /**
        * Format: date-time
        * @description Horodatage de la saisie terrain.
        */
       clientCreatedAt?: string;
+      /** Format: uuid */
+      banqueId?: string | null;
+      /** Format: uuid */
+      syndicatId?: string | null;
+      /** Format: uuid */
+      professionId?: string | null;
+      /** Format: uuid */
+      incomeBandId?: string | null;
+      /** Format: uuid */
+      canalProvenanceId?: string | null;
+      /** Format: uuid */
+      employeurId?: string | null;
+      employeur?: string | null;
+      typeContrat?: components['schemas']['TypeContrat'] | null;
+      ancienneteMois?: number | null;
+      lieuActivite?: string | null;
+      modeEpargne?: components['schemas']['ModeEpargne'] | null;
+      /** Format: uuid */
+      paysResidenceId?: string | null;
+      villeResidence?: string | null;
+      whatsappE164?: string | null;
+      relaisNom?: string | null;
+      relaisPhoneE164?: string | null;
     };
     UpdateGrandPublicConsentDto: {
       consent: components['schemas']['GrandPublicConsent'];
@@ -3890,7 +4038,7 @@ export interface components {
       notes?: string;
       /** @description Représentant : la question du WhatsApp a-t-elle été posée, et avec quelle réponse. */
       whatsappStatus?: components['schemas']['WhatsappStatus'];
-      /** @description Représentant : numéro WhatsApp, seulement si le statut vaut AUTRE_NUMERO. */
+      /** @description Représentant : numéro WhatsApp, seulement si le statut vaut AUTRE_NUMERO. Prospect de la diaspora : numéro WhatsApp, souvent le seul joignable. */
       whatsappE164?: string;
       /** @description Profession déclarée. Sert au représentant comme au prospect. */
       profession?: string;
@@ -3924,6 +4072,37 @@ export interface components {
       incomeBandId?: string;
       /** @description Prospect : mode de paiement. */
       paymentMode?: components['schemas']['PaymentMode'];
+      /**
+       * Format: uuid
+       * @description Prospect : profession choisie dans le référentiel. Le texte libre `profession` reste le repli.
+       */
+      professionId?: string;
+      /**
+       * Format: uuid
+       * @description Prospect : employeur du référentiel. Fonctionnaire (ministère) ou privé.
+       */
+      employeurId?: string;
+      /** @description Prospect : employeur en clair. */
+      employeur?: string;
+      /** @description Prospect du secteur privé : nature du contrat. */
+      typeContrat?: components['schemas']['TypeContrat'];
+      /** @description Prospect : ancienneté chez l’employeur, en MOIS. Distincte de `dureeSystemeMois`. */
+      ancienneteMois?: number;
+      /** @description Prospect informel : lieu d’activité. */
+      lieuActivite?: string;
+      /** @description Prospect informel : comment il épargne. */
+      modeEpargne?: components['schemas']['ModeEpargne'];
+      /**
+       * Format: uuid
+       * @description Prospect diaspora : pays de résidence.
+       */
+      paysResidenceId?: string;
+      /** @description Prospect diaspora : ville de résidence. */
+      villeResidence?: string;
+      /** @description Prospect diaspora : personne relais au Sénégal. */
+      relaisNom?: string;
+      /** @description Prospect diaspora : téléphone du relais, normalisé en E.164 par le serveur. */
+      relaisPhoneE164?: string;
       /**
        * Format: date-time
        * @description Horodatage de la saisie terrain.
@@ -4105,6 +4284,11 @@ export interface components {
       /** @description Tranches de revenu mensuel : la conversion les demande hors réseau. */
       incomeBands: components['schemas']['IncomeBandDto'][];
       canauxProvenance: components['schemas']['CanalProvenanceDto'][];
+      /** @description Professions : sans elles, le mobile ne pouvait qu’écrire du texte libre. */
+      professions: components['schemas']['ProfessionDto'][];
+      /** @description Employeurs : la situation du Grand Public se saisit hors réseau. */
+      employeurs: components['schemas']['EmployeurDto'][];
+      pays: components['schemas']['PaysDto'][];
       /** @description Les quatre listes du registre des visites, réunies : chaque entrée porte sa nature. */
       visiteReferentiels: components['schemas']['SyncVisiteReferentielDto'][];
       representants: components['schemas']['RepresentantDto'][];
@@ -5938,7 +6122,7 @@ export interface components {
       whatsappStatus?: components['schemas']['WhatsappStatus'];
       hasWhatsapp?: boolean;
     };
-    ProspectFilterDto: {
+    LotExportProspectFilterDto: {
       /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
       search?: string;
       /** Format: uuid */
@@ -5954,8 +6138,6 @@ export interface components {
        * @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
        */
       commercialId?: string;
-      /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
-      projet?: components['schemas']['Projet'];
       /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
       type?: components['schemas']['ProspectType'];
       /**
@@ -6000,6 +6182,8 @@ export interface components {
        * @default false
        */
       includeDeleted: boolean;
+      /** @description Projet du lot. Il est porté par la campagne et ne se devine pas après coup. */
+      projet: components['schemas']['Projet'];
     };
     LotExportDistributionInputDto: {
       teleconseillerIds: string[];
@@ -6012,7 +6196,7 @@ export interface components {
       name: string;
       cible: components['schemas']['LotExportCible'];
       representants?: components['schemas']['RepresentantExportQueryDto'];
-      prospects?: components['schemas']['ProspectFilterDto'];
+      prospects?: components['schemas']['LotExportProspectFilterDto'];
       distribution: components['schemas']['LotExportDistributionInputDto'];
     };
     LotExportSummaryDto: {
@@ -6020,7 +6204,7 @@ export interface components {
       id: string;
       name: string;
       cible: components['schemas']['LotExportCible'];
-      projet: components['schemas']['Projet'] | null;
+      projet: components['schemas']['Projet'];
       scopeLabel: string;
       itemCount: number;
       /** Format: uuid */
@@ -6101,7 +6285,7 @@ export interface components {
       id: string;
       name: string;
       cible: components['schemas']['LotExportCible'];
-      projet: components['schemas']['Projet'] | null;
+      projet: components['schemas']['Projet'];
       scopeLabel: string;
       itemCount: number;
       /** Format: uuid */
@@ -7322,6 +7506,206 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['IncomeBandDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listEmployeurs: {
+    parameters: {
+      query?: {
+        /** @description Ne renvoyer que les entrées actives. */
+        activeOnly?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EmployeurDto'][];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  createEmployeur: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateEmployeurDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EmployeurDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  updateEmployeur: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateEmployeurDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EmployeurDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listPays: {
+    parameters: {
+      query?: {
+        /** @description Ne renvoyer que les entrées actives. */
+        activeOnly?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PaysDto'][];
         };
       };
       /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
@@ -11520,6 +11904,8 @@ export interface operations {
         stageType?: components['schemas']['BankStageType'];
         /** @description Banque de traitement du dossier. */
         banqueId?: string;
+        /** @description Parcours suivi par la fiche liée. Sans filtre, les deux projets sortent. Un même numéro peut suivre les deux. */
+        projet?: components['schemas']['Projet'];
         /** @description Agent créateur OU dernier intervenant sur le dossier. */
         agentId?: string;
         rejectionReasonId?: string;
@@ -11656,6 +12042,8 @@ export interface operations {
         stageType?: components['schemas']['BankStageType'];
         /** @description Banque de traitement du dossier. */
         banqueId?: string;
+        /** @description Parcours suivi par la fiche liée. Sans filtre, les deux projets sortent. Un même numéro peut suivre les deux. */
+        projet?: components['schemas']['Projet'];
         /** @description Agent créateur OU dernier intervenant sur le dossier. */
         agentId?: string;
         rejectionReasonId?: string;
@@ -11719,6 +12107,8 @@ export interface operations {
         search: string;
         page?: number;
         pageSize?: number;
+        /** @description Ne propose que les fiches entrées par ce projet. Sans filtre, les deux. */
+        projet?: components['schemas']['Projet'];
       };
       header?: never;
       path?: never;
@@ -11814,7 +12204,10 @@ export interface operations {
   };
   getBankCase: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description Restreint la lecture aux dossiers dont la fiche suit ce parcours. Un dossier hors parcours répond 404, comme un dossier inexistant. */
+        projet?: components['schemas']['Projet'];
+      };
       header?: never;
       path: {
         id: string;
@@ -11858,7 +12251,7 @@ export interface operations {
           'application/json': components['schemas']['ApiErrorDto'];
         };
       };
-      /** @description BANK_CASE_NOT_FOUND. */
+      /** @description BANK_CASE_NOT_FOUND, y compris pour un dossier hors du `projet` demandé. */
       404: {
         headers: {
           [name: string]: unknown;
@@ -12341,6 +12734,8 @@ export interface operations {
         stageType?: components['schemas']['BankStageType'];
         /** @description Banque de traitement du dossier. */
         banqueId?: string;
+        /** @description Parcours suivi par la fiche liée. Sans filtre, les deux projets sortent. Un même numéro peut suivre les deux. */
+        projet?: components['schemas']['Projet'];
         /** @description Agent créateur OU dernier intervenant sur le dossier. */
         agentId?: string;
         rejectionReasonId?: string;

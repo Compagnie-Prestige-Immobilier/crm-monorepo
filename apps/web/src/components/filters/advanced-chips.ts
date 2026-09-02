@@ -35,55 +35,47 @@ function optionLabel(options: readonly { value: string; label: string }[], id: s
   return options.find((option) => option.value === id)?.label ?? UNKNOWN_VALUE;
 }
 
-function chipValue(
-  key: AdvancedFilterKey,
-  filters: ProspectFilters,
-  reference: ReferenceData | undefined,
-): string | null {
-  switch (key) {
-    case 'representantId':
-      return filters.representantId === null
-        ? null
-        : optionLabel(reference?.representants ?? [], filters.representantId);
+type ChipValue = (filters: ProspectFilters, reference: ReferenceData | undefined) => string | null;
 
-    case 'departementId': {
-      if (filters.departementId === null) return null;
-      const item = reference?.departements.find((d) => d.id === filters.departementId);
-      return item === undefined ? UNKNOWN_VALUE : withRetired(item.name, item.isActive);
-    }
+const CHIP_VALUES: Record<AdvancedFilterKey, ChipValue> = {
+  representantId: (filters, reference) =>
+    filters.representantId === null
+      ? null
+      : optionLabel(reference?.representants ?? [], filters.representantId),
 
-    case 'banqueId': {
-      if (filters.banqueId === null) return null;
-      const item = reference?.banques.find((b) => b.id === filters.banqueId);
-      return item === undefined ? UNKNOWN_VALUE : withRetired(item.shortName, item.isActive);
-    }
+  departementId: (filters, reference) => {
+    if (filters.departementId === null) return null;
+    const item = reference?.departements.find((d) => d.id === filters.departementId);
+    return item === undefined ? UNKNOWN_VALUE : withRetired(item.name, item.isActive);
+  },
 
-    case 'syndicatId': {
-      if (filters.syndicatId === null) return null;
-      const item = reference?.syndicats.find((s) => s.id === filters.syndicatId);
-      return item === undefined ? UNKNOWN_VALUE : withRetired(item.sigle, item.isActive);
-    }
+  banqueId: (filters, reference) => {
+    if (filters.banqueId === null) return null;
+    const item = reference?.banques.find((b) => b.id === filters.banqueId);
+    return item === undefined ? UNKNOWN_VALUE : withRetired(item.shortName, item.isActive);
+  },
 
-    case 'statut':
-      return filters.statut === null ? null : PROSPECT_STATUT_LABELS[filters.statut];
+  syndicatId: (filters, reference) => {
+    if (filters.syndicatId === null) return null;
+    const item = reference?.syndicats.find((s) => s.id === filters.syndicatId);
+    return item === undefined ? UNKNOWN_VALUE : withRetired(item.sigle, item.isActive);
+  },
 
-    case 'segment':
-      return filters.segment === null ? null : SEGMENT_LABELS[filters.segment];
+  statut: (filters) => (filters.statut === null ? null : PROSPECT_STATUT_LABELS[filters.statut]),
 
-    case 'phase2Status':
-      return filters.phase2Status === null ? null : PHASE2_STATUS_LABELS[filters.phase2Status];
+  segment: (filters) => (filters.segment === null ? null : SEGMENT_LABELS[filters.segment]),
 
-    case 'enrollmentMethod':
-      return filters.enrollmentMethod === null
-        ? null
-        : ENROLLMENT_METHOD_LABELS[filters.enrollmentMethod];
+  phase2Status: (filters) =>
+    filters.phase2Status === null ? null : PHASE2_STATUS_LABELS[filters.phase2Status],
 
-    case 'enrollmentCapturedById':
-      return filters.enrollmentCapturedById === null
-        ? null
-        : optionLabel(reference?.commerciaux ?? [], filters.enrollmentCapturedById);
-  }
-}
+  enrollmentMethod: (filters) =>
+    filters.enrollmentMethod === null ? null : ENROLLMENT_METHOD_LABELS[filters.enrollmentMethod],
+
+  enrollmentCapturedById: (filters, reference) =>
+    filters.enrollmentCapturedById === null
+      ? null
+      : optionLabel(reference?.commerciaux ?? [], filters.enrollmentCapturedById),
+};
 
 export function buildAdvancedChips(
   filters: ProspectFilters,
@@ -92,7 +84,7 @@ export function buildAdvancedChips(
   const chips: AdvancedChip[] = [];
 
   for (const key of ADVANCED_FILTER_KEYS) {
-    const value = chipValue(key, filters, reference);
+    const value = CHIP_VALUES[key](filters, reference);
     if (value === null) continue;
     chips.push({ key, field: ADVANCED_FILTER_LABELS[key], value });
   }

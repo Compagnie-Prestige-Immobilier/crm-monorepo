@@ -127,7 +127,10 @@ test('CHU-DMC-04 · le refus porte son motif jusqu’à la banque', async ({ pag
   });
   // Deux boutons portent ce nom une fois la demande partie : l'action du pied
   // de page et la croix de l'en-tête.
-  await depot.locator('[data-slot="dialog-footer"]').getByRole('button', { name: 'Fermer' }).click();
+  await depot
+    .locator('[data-slot="dialog-footer"]')
+    .getByRole('button', { name: 'Fermer' })
+    .click();
 
   const adminContext = await browser.newContext({
     baseURL: WEB_URL,
@@ -162,6 +165,8 @@ test('CHU-DMC-04 · le refus porte son motif jusqu’à la banque', async ({ pag
   await expect(suivi).toContainText(`Refusée : ${MOTIF}`, { timeout: 30_000 });
   // L'arbitrage n'est pas le sien : la carte ne lui propose aucun des deux
   // gestes, même sur une demande qu'il a lui-même déposée.
-  await expect(suivi.getByRole('button', { name: 'Approuver et créer le prospect' })).toHaveCount(0);
+  await expect(suivi.getByRole('button', { name: 'Approuver et créer le prospect' })).toHaveCount(
+    0,
+  );
   await expect(suivi.getByRole('button', { name: 'Refuser' })).toHaveCount(0);
 });

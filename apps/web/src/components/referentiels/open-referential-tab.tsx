@@ -25,19 +25,51 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { fetchIncomeBands, fetchOffers, fetchProfessions } from '@/lib/data/reference';
-import { saveIncomeBand, saveOffer, saveProfession } from '@/lib/data/referentiels';
+import {
+  fetchEmployeurs,
+  fetchIncomeBands,
+  fetchOffers,
+  fetchProfessions,
+} from '@/lib/data/reference';
+import { saveEmployeur, saveIncomeBand, saveOffer, saveProfession } from '@/lib/data/referentiels';
 import { toastApiError } from '@/lib/mutation-feedback';
-import type { IncomeBand, Offer, Profession } from '@/lib/types';
+import {
+  EMPLOYEUR_TYPE_LABELS,
+  type Employeur,
+  type EmployeurType,
+  type IncomeBand,
+  type Offer,
+  type Profession,
+} from '@/lib/types';
 
-type Kind = 'professions' | 'incomeBands' | 'offers';
-type Row = Profession | IncomeBand | Offer;
+type Kind = 'professions' | 'incomeBands' | 'offers' | 'employeurs';
+type Row = Profession | IncomeBand | Offer | Employeur;
 
+/** Les intitulés sont écrits, pas fabriqués : « Nouvelle employeur » se lisait. */
 const CONFIG = {
-  professions: { title: 'Professions', singular: 'profession' },
-  incomeBands: { title: 'Tranches de revenu', singular: 'tranche' },
-  offers: { title: 'Offres', singular: 'offre' },
+  professions: {
+    creer: 'Nouvelle profession',
+    modifier: 'Modifier la profession',
+    enregistre: 'Profession enregistrée.',
+  },
+  incomeBands: {
+    creer: 'Nouvelle tranche',
+    modifier: 'Modifier la tranche',
+    enregistre: 'Tranche enregistrée.',
+  },
+  offers: {
+    creer: 'Nouvelle offre',
+    modifier: 'Modifier l’offre',
+    enregistre: 'Offre enregistrée.',
+  },
+  employeurs: {
+    creer: 'Nouvel employeur',
+    modifier: 'Modifier l’employeur',
+    enregistre: 'Employeur enregistré.',
+  },
 } as const;
+
+const EMPLOYEUR_TYPES = Object.keys(EMPLOYEUR_TYPE_LABELS) as EmployeurType[];
 
 interface Draft {
   id?: string;
@@ -48,6 +80,7 @@ interface Draft {
   minXof: string;
   maxXof: string;
   description: string;
+  type: EmployeurType;
 }
 
 const EMPTY: Draft = {
@@ -58,6 +91,7 @@ const EMPTY: Draft = {
   minXof: '',
   maxXof: '',
   description: '',
+  type: 'MINISTERE',
 };
 
 export function OpenReferentialTab({ kind }: { kind: Kind }) {
@@ -71,6 +105,7 @@ export function OpenReferentialTab({ kind }: { kind: Kind }) {
     queryFn: async (): Promise<Row[]> => {
       if (kind === 'professions') return fetchProfessions();
       if (kind === 'incomeBands') return fetchIncomeBands();
+      if (kind === 'employeurs') return fetchEmployeurs();
       return fetchOffers();
     },
   });
@@ -96,6 +131,15 @@ export function OpenReferentialTab({ kind }: { kind: Kind }) {
           isActive: value.isActive,
         });
       }
+      if (kind === 'employeurs') {
+        return saveEmployeur({
+          ...(value.id ? { id: value.id } : {}),
+          code: value.code,
+          label: value.label,
+          type: value.type,
+          isActive: value.isActive,
+        });
+      }
       return saveOffer({
         ...(value.id ? { id: value.id } : {}),
         code: value.code,
@@ -108,7 +152,7 @@ export function OpenReferentialTab({ kind }: { kind: Kind }) {
       void queryClient.invalidateQueries({ queryKey });
       void queryClient.invalidateQueries({ queryKey: ['reference'] });
       setDraft(null);
-      toast.success(`${config.singular[0]?.toUpperCase()}${config.singular.slice(1)} enregistrée.`);
+      toast.success(config.enregistre);
     },
     onError: (error) => {
       toastApiError(error, 'Enregistrement impossible.');
@@ -129,6 +173,7 @@ export function OpenReferentialTab({ kind }: { kind: Kind }) {
       minXof: 'minXof' in row && row.minXof !== null ? String(row.minXof) : '',
       maxXof: 'maxXof' in row && row.maxXof !== null ? String(row.maxXof) : '',
       description: 'description' in row ? (row.description ?? '') : '',
+      type: 'type' in row ? row.type : 'MINISTERE',
     });
   }
 
@@ -146,7 +191,7 @@ export function OpenReferentialTab({ kind }: { kind: Kind }) {
             setDraft({ ...EMPTY });
           }}
         >
-          <PlusIcon aria-hidden="true" /> Nouvelle {config.singular}
+          <PlusIcon aria-hidden="true" /> {config.creer}
         </Button>
       </div>
       <div className="overflow-hidden rounded-lg border border-border bg-card">
@@ -155,6 +200,7 @@ export function OpenReferentialTab({ kind }: { kind: Kind }) {
             <TableRow>
               <TableHead>Code</TableHead>
               <TableHead>Libellé</TableHead>
+              {kind === 'employeurs' ? <TableHead>Type</TableHead> : null}
               <TableHead>État</TableHead>
               <TableHead>
                 <span className="sr-only">Actions</span>
@@ -166,6 +212,9 @@ export function OpenReferentialTab({ kind }: { kind: Kind }) {
               <TableRow key={row.id}>
                 <TableCell className="font-[600]">{row.code}</TableCell>
                 <TableCell>{row.label}</TableCell>
+                {kind === 'employeurs' ? (
+                  <TableCell>{'type' in row ? EMPLOYEUR_TYPE_LABELS[row.type] : ''}</TableCell>
+                ) : null}
                 <TableCell>{row.isActive ? 'Active' : 'Retirée'}</TableCell>
                 <TableCell className="text-right">
                   <Button
@@ -193,9 +242,7 @@ export function OpenReferentialTab({ kind }: { kind: Kind }) {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {draft?.id ? `Modifier la ${config.singular}` : `Nouvelle ${config.singular}`}
-            </DialogTitle>
+            <DialogTitle>{draft?.id ? config.modifier : config.creer}</DialogTitle>
             <DialogDescription>Ces valeurs sont proposées dans les formulaires.</DialogDescription>
           </DialogHeader>
           {draft ? (
@@ -223,6 +270,25 @@ export function OpenReferentialTab({ kind }: { kind: Kind }) {
                   }}
                 />
               </div>
+              {kind === 'employeurs' ? (
+                <div className="grid gap-1.5">
+                  <Label htmlFor="employeur-type">Type</Label>
+                  <select
+                    id="employeur-type"
+                    value={draft.type}
+                    className="h-11 rounded-md border border-input bg-background px-3 text-[0.875rem]"
+                    onChange={(event) => {
+                      setDraft({ ...draft, type: event.target.value as EmployeurType });
+                    }}
+                  >
+                    {EMPLOYEUR_TYPES.map((type) => (
+                      <option key={type} value={type}>
+                        {EMPLOYEUR_TYPE_LABELS[type]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
               {kind === 'professions' ? (
                 <label className="flex items-center gap-2">
                   <input

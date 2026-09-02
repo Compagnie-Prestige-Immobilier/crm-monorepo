@@ -1,4 +1,11 @@
-import { ImportKind, ImportMode, Projet, ProspectType } from '@crm/database';
+import {
+  ImportKind,
+  ImportMode,
+  ModeEpargne,
+  Projet,
+  ProspectType,
+  TypeContrat,
+} from '@crm/database';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import type { ImportRowError, ImportRunContext, ParsedRow } from './import-adapter.js';
@@ -87,6 +94,20 @@ function context(
           { id: 'canal-bouche', code: 'BOUCHE_A_OREILLE', label: 'Bouche à oreille' },
         ]),
     },
+    employeur: {
+      findMany: () =>
+        Promise.resolve([
+          { id: 'emp-education', code: 'MEN', label: 'Ministère de l’Éducation nationale' },
+          { id: 'emp-sonatel', code: 'SONATEL', label: 'Sonatel' },
+        ]),
+    },
+    pays: {
+      findMany: () =>
+        Promise.resolve([
+          { id: 'pays-it', code: 'IT', label: 'Italie' },
+          { id: 'pays-fr', code: 'FR', label: 'France' },
+        ]),
+    },
     prospect: {
       // `projet` est honoré alors que l'adaptateur ne le filtre pas : un jour où
       // il le ferait, l'index unique global cesserait d'être respecté et ce
@@ -158,6 +179,16 @@ function cells(over: Partial<Record<string, string>> = {}): Record<string, strin
     [H.fonctionnaire]: '',
     [H.dureeSysteme]: '',
     [H.canal]: '',
+    [H.employeur]: '',
+    [H.typeContrat]: '',
+    [H.anciennete]: '',
+    [H.lieuActivite]: '',
+    [H.modeEpargne]: '',
+    [H.paysResidence]: '',
+    [H.villeResidence]: '',
+    [H.whatsapp]: '',
+    [H.relaisNom]: '',
+    [H.relaisPhone]: '',
     ...over,
   };
 }
@@ -203,9 +234,9 @@ describe('contrat de l’adaptateur Grand Public', () => {
     expect(obligatoires).toEqual([H.nom, H.phone]);
   });
 
-  it('porte les neuf colonnes du métier, sans intitulé ni synonyme qui se confondent', () => {
+  it('porte les colonnes du métier, sans intitulé ni synonyme qui se confondent', () => {
     expect(adapter.templateColumns).toBe(GRAND_PUBLIC_IMPORT_COLUMNS);
-    expect(adapter.templateColumns).toHaveLength(9);
+    expect(adapter.templateColumns).toHaveLength(19);
 
     const keys = GRAND_PUBLIC_IMPORT_COLUMNS.flatMap((column) =>
       [column.header, ...(column.aliases ?? [])].map((label) =>
@@ -240,6 +271,17 @@ describe('une cellule vide n’est pas une erreur', () => {
       type: null,
       dureeSystemeMois: null,
       canalProvenanceId: null,
+      employeurId: null,
+      employeur: null,
+      typeContrat: null,
+      ancienneteMois: null,
+      lieuActivite: null,
+      modeEpargne: null,
+      paysResidenceId: null,
+      villeResidence: null,
+      whatsappE164: null,
+      relaisNom: null,
+      relaisPhoneE164: null,
     });
   });
 
@@ -276,9 +318,64 @@ describe('une cellule vide n’est pas une erreur', () => {
       canalProvenanceId: 'canal-tiktok',
     });
   });
+
+  it('lit une ligne de situation complète', () => {
+    const row = accepted(
+      adapter.parseRow(
+        cells({
+          [H.employeur]: 'ministere de l’education nationale',
+          [H.typeContrat]: 'cdd',
+          [H.anciennete]: '36 mois',
+          [H.lieuActivite]: 'Marché Sandaga',
+          [H.modeEpargne]: 'mobile money',
+          [H.paysResidence]: 'IT',
+          [H.villeResidence]: 'Milan',
+          [H.whatsapp]: '+39 320 111 22 33',
+          [H.relaisNom]: 'Awa Diop',
+          [H.relaisPhone]: '77 000 00 11',
+        }),
+        3,
+        run,
+      ),
+    );
+
+    expect(row).toMatchObject({
+      employeurId: 'emp-education',
+      employeur: null,
+      typeContrat: TypeContrat.CDD,
+      ancienneteMois: 36,
+      lieuActivite: 'Marché Sandaga',
+      modeEpargne: ModeEpargne.MOBILE_MONEY,
+      paysResidenceId: 'pays-it',
+      villeResidence: 'Milan',
+      // International conservé tel quel, relais recomposé en +221.
+      whatsappE164: '+393201112233',
+      relaisNom: 'Awa Diop',
+      relaisPhoneE164: '+221770000011',
+    });
+  });
+
+  // Le référentiel ne couvrira jamais le secteur informel : le repli en clair
+  // est prévu par la fiche, ce n'est pas un pis-aller.
+  it('garde en clair un employeur hors référentiel', () => {
+    const row = accepted(adapter.parseRow(cells({ [H.employeur]: 'Garage Baye Fall' }), 3, run));
+
+    expect(row.employeurId).toBeNull();
+    expect(row.employeur).toBe('Garage Baye Fall');
+  });
 });
 
 describe('ce qui fait refuser une ligne', () => {
+  // Un pays ne se crée pas à l'import : l'écrire en clair ferait une diaspora
+  // sans indicatif, que rien ne rattraperait ensuite.
+  it('refuse un pays hors référentiel', () => {
+    const error = refusal(adapter.parseRow(cells({ [H.paysResidence]: 'Wakanda' }), 3, run));
+
+    expect(error.code).toBe(GrandPublicImportError.PAYS_INCONNU);
+    expect(error.column).toBe(H.paysResidence);
+    expect(error.message).toContain('Wakanda');
+  });
+
   it('refuse un nom absent', () => {
     const error = refusal(adapter.parseRow(cells({ [H.nom]: '   ' }), 3, run));
 
@@ -387,6 +484,17 @@ describe('écriture d’une tranche', () => {
     type: null,
     dureeSystemeMois: null,
     canalProvenanceId: null,
+    employeurId: null,
+    employeur: null,
+    typeContrat: null,
+    ancienneteMois: null,
+    lieuActivite: null,
+    modeEpargne: null,
+    paysResidenceId: null,
+    villeResidence: null,
+    whatsappE164: null,
+    relaisNom: null,
+    relaisPhoneE164: null,
   });
 
   it('écrit une fiche Grand Public sans représentant et hors démonstration', async () => {

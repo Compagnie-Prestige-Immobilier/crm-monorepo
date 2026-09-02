@@ -44,8 +44,10 @@ describe('formule', () => {
   });
 
   it('refuse une couleur mal orthographiée plutôt que de la lire en noir', () => {
-    expect(() => parseHex('#12345')).toThrow();
-    expect(() => parseHex('rgba(99,2,16,0.12)')).toThrow();
+    expect(() => parseHex('#12345')).toThrow('Couleur hexadécimale invalide : #12345');
+    expect(() => parseHex('rgba(99,2,16,0.12)')).toThrow(
+      'Couleur hexadécimale invalide : rgba(99,2,16,0.12)',
+    );
   });
 });
 
