@@ -332,6 +332,7 @@ export function ImportsView({ initialKind = 'PROSPECTS' }: { initialKind?: Uploa
 
           {/* Le champ de fichier double la zone de dépôt : le glisser-déposer
               n'est pas atteignable au clavier. */}
+          {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- input de fichier associé */}
           <label
             htmlFor={inputId}
             onDragOver={(event) => {

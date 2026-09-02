@@ -14,6 +14,7 @@ import { BankCaseAnalyticsService } from './bank-cases-analytics.service.js';
 import { BankAnalyticsQueryDto, BankCaseAnalyticsDto } from './analytics.dto.js';
 import {
   BankCaseDetailDto,
+  BankCaseDetailQueryDto,
   BankCaseDto,
   BankCaseListDto,
   BankCaseQueryDto,
@@ -116,9 +117,16 @@ export class BankCasesController {
   })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, type: BankCaseDetailDto })
-  @ApiResponse({ status: 404, type: ApiErrorDto, description: 'BANK_CASE_NOT_FOUND.' })
-  get(@Param('id', ParseUUIDPipe) id: string): Promise<BankCaseDetailDto> {
-    return this.cases.get(id);
+  @ApiResponse({
+    status: 404,
+    type: ApiErrorDto,
+    description: 'BANK_CASE_NOT_FOUND, y compris pour un dossier hors du `projet` demandé.',
+  })
+  get(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: BankCaseDetailQueryDto,
+  ): Promise<BankCaseDetailDto> {
+    return this.cases.get(id, query.projet);
   }
 
   @Patch(':id')

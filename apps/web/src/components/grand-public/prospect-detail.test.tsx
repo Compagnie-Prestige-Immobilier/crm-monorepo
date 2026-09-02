@@ -1,4 +1,5 @@
 import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { describe, expect, it } from 'vitest';
 
@@ -222,7 +223,32 @@ describe('les renseignements propres à la situation', () => {
     expect(within(ligne('Pays de résidence')).getByText('Italie')).toBeTruthy();
     expect(within(ligne('Ville de résidence')).getByText('Turin')).toBeTruthy();
     expect(within(ligne('Personne relais')).getByText('Awa Fall')).toBeTruthy();
-    expect(ligne('WhatsApp').textContent).toContain('393331234567');
+    expect(ligne('WhatsApp').textContent).toContain('+39 333 123 4567');
+  });
+});
+
+describe('la modification', () => {
+  it('ouvre le formulaire garni sur « Modifier »', async () => {
+    const user = userEvent.setup();
+    render(<GrandPublicProspectDetail prospect={fiche()} canEdit />);
+
+    await user.click(screen.getByRole('button', { name: 'Modifier' }));
+
+    expect(await screen.findByRole('dialog', { name: /Modifier Moussa Fall/u })).toBeTruthy();
+    expect(screen.getByLabelText<HTMLInputElement>(/Prénom/u).value).toBe('Moussa');
+  });
+
+  it('ne l’offre pas à qui ne peut pas écrire', () => {
+    render(<GrandPublicProspectDetail prospect={fiche()} />);
+
+    expect(screen.queryByRole('button', { name: 'Modifier' })).toBeNull();
+  });
+
+  it('reste ouverte sur une fiche convertie', () => {
+    render(<GrandPublicProspectDetail prospect={fiche({ statut: 'CONVERTI' })} canEdit />);
+
+    expect(screen.getByRole('button', { name: 'Modifier' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Intéressé' })).toBeNull();
   });
 });
 

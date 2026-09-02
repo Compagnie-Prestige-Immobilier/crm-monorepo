@@ -604,6 +604,7 @@ describe('une fiche naît sans banque, sans syndicat et sans représentant', () 
           relaisNom: 'Awa Diop',
           relaisPhoneE164: '77 000 00 11',
           incomeBandId: '0198f000-0000-7000-8000-000000000003',
+          professionId: '0198f000-0000-7000-8000-000000000004',
         }),
       ]),
     );
@@ -611,6 +612,9 @@ describe('une fiche naît sans banque, sans syndicat et sans représentant', () 
     expect(statuses(result.body.results)).toEqual([SyncOpStatus.APPLIED]);
     const row = db.prospects.get(PROSPECT_NU) as unknown as Record<string, unknown>;
     expect(row.incomeBandId).toBe('0198f000-0000-7000-8000-000000000003');
+    // Le référentiel descend désormais dans le pull : le mobile choisit la
+    // profession au lieu de la retaper.
+    expect(row.professionId).toBe('0198f000-0000-7000-8000-000000000004');
     expect(row.employeurId).toBe('0198f000-0000-7000-8000-000000000001');
     expect(row.employeur).toBe('Restaurant Chez Fatou');
     expect(row.typeContrat).toBe('CDD');
@@ -670,10 +674,11 @@ describe('une fiche naît sans banque, sans syndicat et sans représentant', () 
     };
     await sync.push(alice, batch([rejoindre], 'batch-2'));
 
-    expect([...db.prospectJourneys.values()].map((journey) => journey.projet).sort()).toEqual([
-      'CHUES',
-      'GRAND_PUBLIC',
-    ]);
+    expect(
+      [...db.prospectJourneys.values()]
+        .map((journey) => String(journey.projet))
+        .sort((a, b) => a.localeCompare(b)),
+    ).toEqual(['CHUES', 'GRAND_PUBLIC']);
     // La fiche reste entrée par CHUES : le second projet s'ajoute, il ne
     // déménage pas la fiche hors du premier.
     const fiche = db.prospects.get(PROSPECT_NU) as unknown as Record<string, unknown>;
@@ -783,6 +788,9 @@ describe('mode démonstration allumé, la remontée hors ligne reste du travail 
 
   it('un représentant remonté n’est PAS marqué de démonstration', async () => {
     await demoSync.push(alice, batch([createRep(REP_A, '77 123 45 67')]));
+
+    expect(demoDb.representants.get(REP_A)).toBeDefined();
+    expect(demoDb.representants.get(REP_A)).not.toHaveProperty('isDemo');
   });
 
   it('un prospect remonté n’est PAS marqué de démonstration', async () => {
@@ -794,6 +802,9 @@ describe('mode démonstration allumé, la remontée hors ligne reste du travail 
         createProspect(prospectId, REP_A, '78 222 33 44', 1),
       ]),
     );
+
+    expect(demoDb.prospects.get(prospectId)).toBeDefined();
+    expect(demoDb.prospects.get(prospectId)).not.toHaveProperty('isDemo');
   });
 });
 

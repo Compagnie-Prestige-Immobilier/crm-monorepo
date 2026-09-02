@@ -23,16 +23,19 @@ describe('bankCaseConditions', () => {
     expect(rendered(bankCaseConditions({}))).not.toContain('processingBankId');
   });
 
-  it('« projet » restreint au projet de la fiche liée', () => {
+  // Le PARCOURS et non `prospects."projet"` : une fiche entrée en CHUES qui
+  // suit aussi le Grand Public doit sortir sur les deux filtres.
+  it('« projet » restreint au parcours de la fiche liée', () => {
     const sql = rendered(bankCaseConditions({ projet: Projet.GRAND_PUBLIC }));
 
-    expect(sql).toContain('FROM "prospects" p');
-    expect(sql).toContain('p."projet" = "GRAND_PUBLIC"');
+    expect(sql).toContain('FROM "prospect_journeys" pj');
+    expect(sql).toContain('pj."projet" = "GRAND_PUBLIC"');
+    expect(sql).not.toContain('p."projet"');
   });
 
   // Sans filtre, les deux projets sortent : un défaut ferait disparaître la
   // moitié des dossiers du tableau de bord sans que rien ne le dise.
   it('sans « projet », aucune clause de projet n’est posée', () => {
-    expect(rendered(bankCaseConditions({}))).not.toContain('prospects');
+    expect(rendered(bankCaseConditions({}))).not.toContain('prospect_journeys');
   });
 });

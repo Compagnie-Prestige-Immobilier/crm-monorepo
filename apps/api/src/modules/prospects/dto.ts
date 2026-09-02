@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, OmitType, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
 import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
@@ -254,7 +254,130 @@ export class CreateProspectDto {
   clientCreatedAt?: string;
 }
 
-export class UpdateProspectDto extends PartialType(CreateProspectDto) {}
+/** Champs qu'un PATCH peut VIDER. Redéclarés plus bas, `null` compris. */
+const EFFACABLES = [
+  'banqueId',
+  'syndicatId',
+  'professionId',
+  'incomeBandId',
+  'canalProvenanceId',
+  'employeurId',
+  'employeur',
+  'typeContrat',
+  'ancienneteMois',
+  'lieuActivite',
+  'modeEpargne',
+  'paysResidenceId',
+  'villeResidence',
+  'whatsappE164',
+  'relaisNom',
+  'relaisPhoneE164',
+] as const;
+
+/**
+ * Corriger une fiche, c'est aussi effacer ce qu'on y avait mis par erreur.
+ *
+ * Hérités de la création, ces champs ne descendaient qu'en `string` dans les
+ * clients générés : le web ne pouvait pas envoyer le `null` que le service
+ * écrit pourtant déjà. `OmitType` les retire avant de les redéclarer nullables,
+ * sinon la redéclaration ne serait pas assignable au type du parent.
+ */
+export class UpdateProspectDto extends PartialType(OmitType(CreateProspectDto, EFFACABLES)) {
+  @ApiPropertyOptional({ type: String, format: 'uuid', nullable: true })
+  @IsOptional()
+  @IsUUID()
+  banqueId?: string | null;
+
+  @ApiPropertyOptional({ type: String, format: 'uuid', nullable: true })
+  @IsOptional()
+  @IsUUID()
+  syndicatId?: string | null;
+
+  @ApiPropertyOptional({ type: String, format: 'uuid', nullable: true })
+  @IsOptional()
+  @IsUUID()
+  professionId?: string | null;
+
+  @ApiPropertyOptional({ type: String, format: 'uuid', nullable: true })
+  @IsOptional()
+  @IsUUID()
+  incomeBandId?: string | null;
+
+  @ApiPropertyOptional({ type: String, format: 'uuid', nullable: true })
+  @IsOptional()
+  @IsUUID()
+  canalProvenanceId?: string | null;
+
+  @ApiPropertyOptional({ type: String, format: 'uuid', nullable: true })
+  @IsOptional()
+  @IsUUID()
+  employeurId?: string | null;
+
+  @ApiPropertyOptional({ type: String, maxLength: 160, nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  employeur?: string | null;
+
+  @ApiPropertyOptional({ enum: TypeContrat, enumName: 'TypeContrat', nullable: true })
+  @IsOptional()
+  @IsEnum(TypeContrat)
+  typeContrat?: TypeContrat | null;
+
+  @ApiPropertyOptional({
+    type: Number,
+    minimum: 0,
+    maximum: ANCIENNETE_MAX_MOIS,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(ANCIENNETE_MAX_MOIS)
+  ancienneteMois?: number | null;
+
+  @ApiPropertyOptional({ type: String, maxLength: 160, nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  lieuActivite?: string | null;
+
+  @ApiPropertyOptional({ enum: ModeEpargne, enumName: 'ModeEpargne', nullable: true })
+  @IsOptional()
+  @IsEnum(ModeEpargne)
+  modeEpargne?: ModeEpargne | null;
+
+  @ApiPropertyOptional({ type: String, format: 'uuid', nullable: true })
+  @IsOptional()
+  @IsUUID()
+  paysResidenceId?: string | null;
+
+  @ApiPropertyOptional({ type: String, maxLength: 120, nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  villeResidence?: string | null;
+
+  @ApiPropertyOptional({ type: String, maxLength: 40, nullable: true })
+  @IsOptional()
+  @IsString()
+  @MinLength(6)
+  @MaxLength(40)
+  whatsappE164?: string | null;
+
+  @ApiPropertyOptional({ type: String, maxLength: 160, nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  relaisNom?: string | null;
+
+  @ApiPropertyOptional({ type: String, maxLength: 40, nullable: true })
+  @IsOptional()
+  @IsString()
+  @MinLength(6)
+  @MaxLength(40)
+  relaisPhoneE164?: string | null;
+}
 
 export class ProspectDto {
   @ApiProperty({ format: 'uuid' }) id!: string;

@@ -245,7 +245,7 @@ class ExportApi {
   /// * [stageId]
   /// * [stageType]
   /// * [banqueId] - Banque de traitement du dossier.
-  /// * [projet] - Projet d’entrée de la fiche liée. Sans filtre, les deux projets sortent.
+  /// * [projet] - Parcours suivi par la fiche liée. Sans filtre, les deux projets sortent. Un même numéro peut suivre les deux.
   /// * [agentId] - Agent créateur OU dernier intervenant sur le dossier.
   /// * [rejectionReasonId]
   /// * [dateFrom] - Borne basse sur la création, incluse.

@@ -20,9 +20,7 @@ export class NotificationTemplatesService {
 
   async list(includeInactive: boolean): Promise<NotificationTemplateListDto> {
     const rows = await this.prisma.notificationTemplate.findMany({
-      where: {
-        ...(includeInactive ? {} : { isActive: true }),
-      },
+      where: includeInactive ? {} : { isActive: true },
       orderBy: { name: 'asc' },
     });
     return { items: rows.map(toDto) };

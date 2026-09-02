@@ -41,6 +41,7 @@ export function ProspectReassignDialog({
 
   useEffect(() => {
     if (prospect === null) return;
+    // oxlint-disable-next-line react/set-state-in-effect -- saisie recalée sur le prospect
     setRepresentantId(prospect.representantId);
     setCommercialId(prospect.ownedByCommercialId);
   }, [prospect]);

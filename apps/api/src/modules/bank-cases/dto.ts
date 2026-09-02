@@ -301,7 +301,8 @@ export class BankCaseFilterDto {
   @ApiPropertyOptional({
     enum: Projet,
     enumName: 'Projet',
-    description: 'Projet d’entrée de la fiche liée. Sans filtre, les deux projets sortent.',
+    description:
+      'Parcours suivi par la fiche liée. Sans filtre, les deux projets sortent. Un même numéro peut suivre les deux.',
   })
   @IsOptional()
   @IsEnum(Projet)
@@ -374,6 +375,18 @@ export class BankCaseQueryDto extends BankCaseFilterDto {
   @IsOptional()
   @IsEnum(SortOrder)
   sortOrder?: SortOrder;
+}
+
+export class BankCaseDetailQueryDto {
+  @ApiPropertyOptional({
+    enum: Projet,
+    enumName: 'Projet',
+    description:
+      'Restreint la lecture aux dossiers dont la fiche suit ce parcours. Un dossier hors parcours répond 404, comme un dossier inexistant.',
+  })
+  @IsOptional()
+  @IsEnum(Projet)
+  projet?: Projet;
 }
 
 export class ProspectSearchQueryDto {

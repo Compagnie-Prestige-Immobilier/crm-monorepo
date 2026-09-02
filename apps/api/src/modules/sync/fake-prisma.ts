@@ -117,6 +117,7 @@ export interface ProspectRow {
   banqueId: string;
   syndicatId: string;
   representantId: string;
+  professionId?: string | null;
   employeurId?: string | null;
   employeur?: string | null;
   typeContrat?: string | null;

@@ -85,21 +85,27 @@ function defined<T extends Record<string, unknown>>(
   };
 }
 
+/** `null` VIDE la colonne ; `undefined` la laisse. Ni l'un ni l'autre ne se normalise. */
+const trimOrNull = (value: string | null | undefined): string | null | undefined =>
+  value === null || value === undefined ? value : value.trim();
+
+const phoneOrNull = (value: string | null | undefined): string | null | undefined =>
+  value === null || value === undefined ? value : normalizePhone(value);
+
 /** Champs propres à la situation Grand Public, identiques à la création et à la mise à jour. */
 function situationGrandPublic(input: UpdateProspectDto): Record<string, unknown> {
   return defined({
     employeurId: input.employeurId,
-    employeur: input.employeur?.trim(),
+    employeur: trimOrNull(input.employeur),
     typeContrat: input.typeContrat,
     ancienneteMois: input.ancienneteMois,
-    lieuActivite: input.lieuActivite?.trim(),
+    lieuActivite: trimOrNull(input.lieuActivite),
     modeEpargne: input.modeEpargne,
     paysResidenceId: input.paysResidenceId,
-    villeResidence: input.villeResidence?.trim(),
-    whatsappE164: input.whatsappE164 === undefined ? undefined : normalizePhone(input.whatsappE164),
-    relaisNom: input.relaisNom?.trim(),
-    relaisPhoneE164:
-      input.relaisPhoneE164 === undefined ? undefined : normalizePhone(input.relaisPhoneE164),
+    villeResidence: trimOrNull(input.villeResidence),
+    whatsappE164: phoneOrNull(input.whatsappE164),
+    relaisNom: trimOrNull(input.relaisNom),
+    relaisPhoneE164: phoneOrNull(input.relaisPhoneE164),
   });
 }
 

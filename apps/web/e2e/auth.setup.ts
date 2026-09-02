@@ -19,12 +19,36 @@ export const STORAGE_STATE = 'e2e/.auth/admin.json';
 
 export const SESSIONS = {
   admin: { identifier: ADMIN_IDENTIFIER, password: ADMIN_PASSWORD, path: STORAGE_STATE },
-  accueil: { identifier: 'fixture.accueil@cpi.sn', password: FIXTURE_PASSWORD, path: 'e2e/.auth/accueil.json' },
-  superviseur: { identifier: 'fixture.superviseur@cpi.sn', password: FIXTURE_PASSWORD, path: 'e2e/.auth/superviseur.json' },
-  direction: { identifier: 'fixture.direction@cpi.sn', password: FIXTURE_PASSWORD, path: 'e2e/.auth/direction.json' },
-  commercial: { identifier: 'fixture.awa@cpi.sn', password: FIXTURE_PASSWORD, path: 'e2e/.auth/commercial.json' },
-  commercial2: { identifier: 'fixture.fatou@cpi.sn', password: FIXTURE_PASSWORD, path: 'e2e/.auth/commercial2.json' },
-  banque: { identifier: 'fixture.banque@cpi.sn', password: FIXTURE_PASSWORD, path: 'e2e/.auth/banque.json' },
+  accueil: {
+    identifier: 'fixture.accueil@cpi.sn',
+    password: FIXTURE_PASSWORD,
+    path: 'e2e/.auth/accueil.json',
+  },
+  superviseur: {
+    identifier: 'fixture.superviseur@cpi.sn',
+    password: FIXTURE_PASSWORD,
+    path: 'e2e/.auth/superviseur.json',
+  },
+  direction: {
+    identifier: 'fixture.direction@cpi.sn',
+    password: FIXTURE_PASSWORD,
+    path: 'e2e/.auth/direction.json',
+  },
+  commercial: {
+    identifier: 'fixture.awa@cpi.sn',
+    password: FIXTURE_PASSWORD,
+    path: 'e2e/.auth/commercial.json',
+  },
+  commercial2: {
+    identifier: 'fixture.fatou@cpi.sn',
+    password: FIXTURE_PASSWORD,
+    path: 'e2e/.auth/commercial2.json',
+  },
+  banque: {
+    identifier: 'fixture.banque@cpi.sn',
+    password: FIXTURE_PASSWORD,
+    path: 'e2e/.auth/banque.json',
+  },
 } as const;
 
 export type SessionRole = keyof typeof SESSIONS;
@@ -79,7 +103,9 @@ for (const [role, session] of Object.entries(SESSIONS)) {
     await page.getByRole('button', { name: 'Se connecter' }).click();
 
     await page.waitForURL('**/espaces');
-    await expect(page.getByRole('heading', { name: 'Choisissez un espace', level: 1 })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Choisissez un espace', level: 1 }),
+    ).toBeVisible();
 
     await page.context().storageState({ path: session.path });
   });

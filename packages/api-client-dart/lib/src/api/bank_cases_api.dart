@@ -326,6 +326,7 @@ class BankCasesApi {
   ///
   /// Parameters:
   /// * [id]
+  /// * [projet] - Restreint la lecture aux dossiers dont la fiche suit ce parcours. Un dossier hors parcours répond 404, comme un dossier inexistant.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -337,6 +338,7 @@ class BankCasesApi {
   /// Throws [DioException] if API call or serialization fails
   Future<Response<BankCaseDetailDto>> getBankCase({
     required String id,
+    Projet? projet,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -362,9 +364,14 @@ class BankCasesApi {
       validateStatus: validateStatus,
     );
 
+    final _queryParameters = <String, dynamic>{
+      if (projet != null) r'projet': projet,
+    };
+
     final _response = await _dio.request<Object>(
       _path,
       options: _options,
+      queryParameters: _queryParameters,
       cancelToken: cancelToken,
       onSendProgress: onSendProgress,
       onReceiveProgress: onReceiveProgress,
@@ -411,7 +418,7 @@ class BankCasesApi {
   /// * [stageId]
   /// * [stageType]
   /// * [banqueId] - Banque de traitement du dossier.
-  /// * [projet] - Projet d’entrée de la fiche liée. Sans filtre, les deux projets sortent.
+  /// * [projet] - Parcours suivi par la fiche liée. Sans filtre, les deux projets sortent. Un même numéro peut suivre les deux.
   /// * [agentId] - Agent créateur OU dernier intervenant sur le dossier.
   /// * [rejectionReasonId]
   /// * [dateFrom] - Borne basse sur la création, incluse.
@@ -526,7 +533,7 @@ class BankCasesApi {
   /// * [stageId]
   /// * [stageType]
   /// * [banqueId] - Banque de traitement du dossier.
-  /// * [projet] - Projet d’entrée de la fiche liée. Sans filtre, les deux projets sortent.
+  /// * [projet] - Parcours suivi par la fiche liée. Sans filtre, les deux projets sortent. Un même numéro peut suivre les deux.
   /// * [agentId] - Agent créateur OU dernier intervenant sur le dossier.
   /// * [rejectionReasonId]
   /// * [dateFrom] - Borne basse sur la création, incluse.

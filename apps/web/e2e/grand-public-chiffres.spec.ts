@@ -249,7 +249,8 @@ test('GP-39 · « Revenir à l’écran par défaut » efface la disposition du 
   const [reponse] = await Promise.all([
     page.waitForResponse(
       (response) =>
-        response.request().method() === 'DELETE' && new URL(response.url()).pathname === DISPOSITION,
+        response.request().method() === 'DELETE' &&
+        new URL(response.url()).pathname === DISPOSITION,
     ),
     retour.click(),
   ]);

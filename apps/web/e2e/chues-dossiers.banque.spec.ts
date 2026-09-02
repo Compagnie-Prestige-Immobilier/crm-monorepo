@@ -245,9 +245,7 @@ test('CHU-DOSN-01 · seules les fiches « méthode obtenue » sont proposées', 
   await expect(page.getByText('Aucun client ne correspond.')).toBeVisible({ timeout: 30_000 });
   // Le filtre de statut sauté ne se découvrirait qu'à l'encaissement : la fiche
   // EN ATTENTE ne doit apparaître dans AUCUN bouton de résultat.
-  await expect(
-    page.getByRole('button', { name: CLIENT_EN_ATTENTE.phoneAffiche }),
-  ).toHaveCount(0);
+  await expect(page.getByRole('button', { name: CLIENT_EN_ATTENTE.phoneAffiche })).toHaveCount(0);
 });
 
 test('CHU-DOSN-02 · l’ouverture exige une référence bancaire', async ({ page }) => {
@@ -426,7 +424,10 @@ test('CHU-DOSD-05 · un rechargement rend le même état', async ({ page }) => {
 
   // Ouverture, passage en traitement, encaissement : trois entrées, ni plus ni
   // moins, avant comme après le rechargement.
-  const historique = page.getByRole('list').filter({ hasText: 'Ouverture :' }).getByRole('listitem');
+  const historique = page
+    .getByRole('list')
+    .filter({ hasText: 'Ouverture :' })
+    .getByRole('listitem');
   await expect(page.getByText('Encaissé', { exact: true })).toBeVisible({ timeout: 30_000 });
   await expect(historique).toHaveCount(3);
 
@@ -449,9 +450,9 @@ test('CHU-DOSD-06 · un identifiant inconnu ne rend pas une page blanche', async
   await page.goto('/chues/dossiers/00000000-0000-7000-8000-000000000000');
 
   await expect(
-    page.getByRole('heading', { name: 'Introuvable', level: 2 }).or(
-      page.getByRole('heading', { name: 'Page introuvable', level: 1 }),
-    ),
+    page
+      .getByRole('heading', { name: 'Introuvable', level: 2 })
+      .or(page.getByRole('heading', { name: 'Page introuvable', level: 1 })),
   ).toBeVisible({ timeout: 30_000 });
   expect(erreurs, `Erreurs non rattrapées : ${erreurs.join(' | ')}`).toHaveLength(0);
 });
@@ -505,9 +506,9 @@ test('CHU-DOS-02 · un agent bancaire voit la liste', async ({ page }) => {
 
   await expect(page).toHaveTitle('Dossiers bancaires · CPI GO', { timeout: 30_000 });
   await expect(page.getByRole('heading', { name: 'Dossiers bancaires', level: 1 })).toBeVisible();
-  await expect(
-    page.getByRole('status').filter({ hasText: 'Dossiers affichés' }),
-  ).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('status').filter({ hasText: 'Dossiers affichés' })).toBeVisible({
+    timeout: 30_000,
+  });
   await expect(page.getByRole('heading', { name: 'Accès refusé' })).toHaveCount(0);
 });
 
@@ -579,9 +580,9 @@ test('CHU-DOS-06 · la liste tient sur 375 px', async ({ page }) => {
     `/chues/dossiers?search=${PAGINATION_PREFIXE}&pageSize=10&sortBy=reference&sortDir=asc`,
   );
 
-  await expect(
-    page.getByRole('status').filter({ hasText: 'Dossiers affichés' }),
-  ).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('status').filter({ hasText: 'Dossiers affichés' })).toBeVisible({
+    timeout: 30_000,
+  });
   // `.first()` : sous 1024 px le tableau est masqué mais reste dans le document,
   // et la même référence y figure une seconde fois (§1.13 d'`E2E.md`).
   await expect(

@@ -82,7 +82,9 @@ test('ADM-ROOT-01 · /admin mène à la première entrée de la barre Admin', as
 test('ADM-PAR-01 · l’écran compose ses cartes dans l’ordre', async ({ page }) => {
   await ouvrirParametres(page);
   await expect(page).toHaveTitle(/Paramètres/);
-  await expect(page.getByText('Ces actions portent sur les données de tous les utilisateurs.')).toBeVisible();
+  await expect(
+    page.getByText('Ces actions portent sur les données de tous les utilisateurs.'),
+  ).toBeVisible();
 
   const titres = page.locator(TITRES_DE_CARTE);
   // Attente ancrée sur le NOMBRE de cartes : sans elle, l'ordre serait relevé
@@ -123,9 +125,7 @@ test('ADM-PAR-02 · la carte « Espace démo » chiffre son contenu', async ({ p
   const valeurs = await carte.getByRole('definition').allTextContents();
   expect(valeurs).toHaveLength(4);
   for (const valeur of valeurs) {
-    expect(valeur, 'un compteur de l’espace démo doit porter un nombre').toMatch(
-      /^\d[\d ]*$/u,
-    );
+    expect(valeur, 'un compteur de l’espace démo doit porter un nombre').toMatch(/^\d[\d ]*$/u);
   }
 
   // Présent, jamais cliqué : la réinitialisation appartient à un autre fichier.
@@ -210,10 +210,7 @@ for (const role of AUTRES_ROLES) {
         '/espaces',
       );
 
-      expect(
-        servies,
-        `${role.libelle} ne doit charger aucune donnée des paramètres`,
-      ).toEqual([]);
+      expect(servies, `${role.libelle} ne doit charger aucune donnée des paramètres`).toEqual([]);
     });
   });
 }

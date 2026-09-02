@@ -174,9 +174,7 @@ export function SelecteurPeriode({
             }}
           >
             <SelectTrigger aria-label="Comparer à" size="sm" className="w-48">
-              <SelectValue>
-                {(valeur: Comparaison) => LIBELLES_COMPARAISON[valeur]}
-              </SelectValue>
+              <SelectValue>{(valeur: Comparaison) => LIBELLES_COMPARAISON[valeur]}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {Object.entries(LIBELLES_COMPARAISON).map(([valeur, libelle]) => (

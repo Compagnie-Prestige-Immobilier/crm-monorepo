@@ -46,12 +46,29 @@ import { cn } from '@/lib/utils';
 
 const NO_VALUE = '–';
 
+function pagination(
+  data: { total: number; page: number; pageCount: number } | undefined,
+  pageSize: number,
+): { total: number; page: number; pageCount: number; first: number; last: number } {
+  const total = data?.total ?? 0;
+  const page = data?.page ?? 1;
+  return {
+    total,
+    page,
+    pageCount: data?.pageCount ?? 1,
+    first: total === 0 ? 0 : (page - 1) * pageSize + 1,
+    last: Math.min(page * pageSize, total),
+  };
+}
+
 export function RepresentantsView({
   canAdminister,
   readOnly = false,
+  canExport = !readOnly,
 }: {
   canAdminister: boolean;
   readOnly?: boolean;
+  canExport?: boolean;
 }) {
   const { filters, setFilters } = useRepresentantFilters();
   const exporter = useFileDownload();
@@ -79,11 +96,7 @@ export function RepresentantsView({
   const ambassadorCount =
     filters.relationStatus === 'AMBASSADEUR' ? null : (ambassadors.data?.total ?? null);
 
-  const total = data?.total ?? 0;
-  const page = data?.page ?? 1;
-  const pageCount = data?.pageCount ?? 1;
-  const first = total === 0 ? 0 : (page - 1) * filters.pageSize + 1;
-  const last = Math.min(page * filters.pageSize, total);
+  const { total, page, pageCount, first, last } = pagination(data, filters.pageSize);
   const activeFilterCount = countActiveRepresentantFilters(filters);
 
   return (
@@ -122,7 +135,7 @@ export function RepresentantsView({
           {/* L'export part des filtres de l'URL, pas de la page affichée :
               celui qui envoie le fichier doit pouvoir jurer qu'il contient ce
               qu'il avait sous les yeux. */}
-          {readOnly ? null : (
+          {canExport ? (
             <Button
               type="button"
               variant="outline"
@@ -142,7 +155,7 @@ export function RepresentantsView({
               )}
               Exporter
             </Button>
-          )}
+          ) : null}
         </div>
       </div>
 

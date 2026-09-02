@@ -18,13 +18,11 @@ test.describe('session ADMIN', () => {
     await page.goto('/espaces?retour=%2Faccueil%2Flistes');
 
     await expect(page.getByRole('heading', { name: 'Changer d’espace', level: 1 })).toBeVisible();
-    await expect(
-      page.getByRole('heading', { name: 'Choisissez un espace', level: 1 }),
-    ).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Choisissez un espace', level: 1 })).toHaveCount(
+      0,
+    );
 
-    const retour = page
-      .getByRole('button', nomRetour)
-      .or(page.getByRole('link', nomRetour));
+    const retour = page.getByRole('button', nomRetour).or(page.getByRole('link', nomRetour));
     await expect(retour).toHaveAttribute('href', '/accueil/listes');
 
     await retour.click();

@@ -250,6 +250,13 @@ class _Situation extends ConsumerWidget {
           ref.watch(employeursProvider).value,
           (Employeur e) => (e.id, e.label),
         );
+    final String? profession =
+        _libelleDe(
+          data.professionId,
+          ref.watch(professionsProvider).value,
+          (Profession p) => (p.id, p.label),
+        ) ??
+        data.profession;
     final String? pays = _libelleDe(
       data.paysResidenceId,
       ref.watch(paysProvider).value,
@@ -272,10 +279,7 @@ class _Situation extends ConsumerWidget {
         'Ancienneté',
         data.ancienneteMois == null ? null : '${data.ancienneteMois} mois',
       ),
-      _ligne(
-        data.type == 'INFORMEL' ? 'Activité' : 'Profession',
-        data.profession,
-      ),
+      _ligne(data.type == 'INFORMEL' ? 'Activité' : 'Profession', profession),
       _ligne('Lieu d\'activité', data.lieuActivite),
       _ligne('Mode d\'épargne', kModeEpargneLabels[data.modeEpargne ?? '']),
       _ligne('Pays de résidence', pays),

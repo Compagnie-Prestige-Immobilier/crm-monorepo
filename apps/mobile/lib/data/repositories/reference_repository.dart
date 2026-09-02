@@ -112,6 +112,18 @@ class ReferenceRepository {
         .watch();
   }
 
+  Stream<List<Profession>> watchProfessions() {
+    return (_db.select(_db.professions)
+          ..where(
+            (Professions t) => t.isActive.equals(true) & t.deletedAt.isNull(),
+          )
+          ..orderBy(<OrderClauseGenerator<Professions>>[
+            (Professions t) => OrderingTerm.asc(t.sortOrder),
+            (Professions t) => OrderingTerm.asc(t.label),
+          ]))
+        .watch();
+  }
+
   Stream<List<Employeur>> watchEmployeurs() {
     return (_db.select(_db.employeurs)
           ..where(

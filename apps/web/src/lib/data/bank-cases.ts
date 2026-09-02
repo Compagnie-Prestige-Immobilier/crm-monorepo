@@ -25,11 +25,17 @@ export async function fetchBankCases(
   );
 }
 
+/** `projet` borne la lecture à la coque ouverte : un dossier de l'autre parcours répond 404. */
 export async function fetchBankCase(
   id: string,
+  projet: Projet,
   client: ApiClient = getApiClient(),
 ): Promise<BankCaseDetail> {
-  return unwrap(await client.GET('/api/v1/bank-cases/{id}', { params: { path: { id } } }));
+  return unwrap(
+    await client.GET('/api/v1/bank-cases/{id}', {
+      params: { path: { id }, query: { projet } },
+    }),
+  );
 }
 
 export async function fetchBankAnalytics(

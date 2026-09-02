@@ -104,8 +104,7 @@ function compterCreations(page: Page): string[] {
   return envois;
 }
 
-const champRepresentant = (page: Page) =>
-  page.getByRole('combobox', { name: /^Représentant/ });
+const champRepresentant = (page: Page) => page.getByRole('combobox', { name: /^Représentant/ });
 
 const chercherDansMenu = (page: Page) =>
   page.getByPlaceholder('Chercher…').filter({ visible: true });
@@ -176,9 +175,9 @@ test('CHU-ET2-02 un numéro invalide pour le pays choisi est refusé côté écr
   await expect(
     page.getByRole('alert').filter({ hasText: 'Numéro invalide pour le pays choisi.' }),
   ).toBeVisible();
-  await expect(page.getByRole('alert').filter({ hasText: 'Le numéro est obligatoire.' })).toHaveCount(
-    0,
-  );
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'Le numéro est obligatoire.' }),
+  ).toHaveCount(0);
   expect(envois, 'un numéro inexploitable ne doit pas atteindre la base').toEqual([]);
 });
 
@@ -229,7 +228,11 @@ test('CHU-ET2-04 la cascade région resserre les départements, dans le dialogue
   await page.keyboard.press('Escape');
 
   await dialogue.getByRole('combobox', { name: /^Région/ }).click();
-  await page.getByRole('option').filter({ hasText: cascade?.region ?? '' }).first().click();
+  await page
+    .getByRole('option')
+    .filter({ hasText: cascade?.region ?? '' })
+    .first()
+    .click();
 
   await dialogue.getByRole('combobox', { name: /^Département/ }).click();
   const apres = await page.getByRole('option').count();

@@ -209,7 +209,10 @@ test('ACC-IMP-05 l’écran d’impression masque ce qui n’est pas le registre
   };
 
   for (const [quoi, cible] of Object.entries(outillage)) {
-    await expect(cible, `${quoi} doit exister à l’écran avant d’être masqué au papier`).toBeVisible();
+    await expect(
+      cible,
+      `${quoi} doit exister à l’écran avant d’être masqué au papier`,
+    ).toBeVisible();
   }
 
   await page.emulateMedia({ media: 'print' });

@@ -133,7 +133,12 @@ test('ACC-CNX-08 · la racine anonyme mène à la connexion', async ({ page }) =
   await expect(page.getByRole('heading', { name: 'Connexion', level: 1 })).toBeVisible();
 });
 
-for (const route of ['/accueil', '/accueil/tableau-de-bord', '/accueil/listes', '/accueil/import']) {
+for (const route of [
+  '/accueil',
+  '/accueil/tableau-de-bord',
+  '/accueil/listes',
+  '/accueil/import',
+]) {
   test(`ACC-CNX-09 · ${route} est verrouillé aux anonymes`, async ({ page }) => {
     await page.goto(route);
 

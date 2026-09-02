@@ -562,6 +562,7 @@ model Profession {
   prospects Prospect[]
 
   @@index([isActive, position])
+  @@index([updatedAt, id])
   @@map("professions")
 }
 
@@ -2149,7 +2150,9 @@ model LotExport {
   id        String         @id @default(uuid(7))
   name      String
   cible     LotExportCible
-  projet    Projet?
+  /// Un lot appartient TOUJOURS a un projet : un lot de representants est CHUES
+  /// par construction, et un lot de prospects nomme le sien a la creation.
+  projet    Projet
   filters   Json
   itemCount Int
 

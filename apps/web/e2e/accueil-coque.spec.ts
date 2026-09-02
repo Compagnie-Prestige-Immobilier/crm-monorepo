@@ -56,9 +56,10 @@ test.describe('session ADMIN', () => {
     await expect(
       onglets.getByRole('link', { name: 'Tableau de bord', exact: true }),
     ).toHaveAttribute('aria-current', 'page');
-    await expect(
-      onglets.getByRole('link', { name: 'Liste', exact: true }),
-    ).not.toHaveAttribute('aria-current', 'page');
+    await expect(onglets.getByRole('link', { name: 'Liste', exact: true })).not.toHaveAttribute(
+      'aria-current',
+      'page',
+    );
   });
 
   test('ACC-COQ-04 · la section « Plus » se déplie et retient son état', async ({ page }) => {
@@ -89,7 +90,8 @@ test.describe('session ADMIN', () => {
       'le cookie cpi_sidebar_plus doit survivre au rechargement',
     ).toBeVisible();
 
-    await page.getByRole('navigation', { name: 'Navigation principale' })
+    await page
+      .getByRole('navigation', { name: 'Navigation principale' })
       .getByText('Plus', { exact: true })
       .click();
     await page.reload();
@@ -189,7 +191,9 @@ test.describe('session ADMIN', () => {
 
     const erreur = page.getByRole('alert').filter({ hasText: MESSAGE_COUPURE });
     await expect(erreur).toBeVisible();
-    await expect(erreur.getByRole('heading', { name: 'Serveur injoignable', level: 2 })).toBeVisible();
+    await expect(
+      erreur.getByRole('heading', { name: 'Serveur injoignable', level: 2 }),
+    ).toBeVisible();
     await expect(erreur.getByRole('button', { name: 'Réessayer' })).toBeVisible();
   });
 
@@ -218,9 +222,10 @@ test.describe('session ADMIN', () => {
         .first(),
     ).toBeVisible();
     // Un bouton décoratif laisserait le compte d'appels inchangé.
-    expect(appels.length, 'le clic doit avoir déclenché un nouvel appel au registre').toBeGreaterThan(
-      avant,
-    );
+    expect(
+      appels.length,
+      'le clic doit avoir déclenché un nouvel appel au registre',
+    ).toBeGreaterThan(avant);
   });
 });
 

@@ -118,9 +118,9 @@ test('ADM-IMP-01 · l’écran se charge et propose ses quatre entités', async 
   await expect(page.getByRole('main').getByRole('heading', { name: 'Erreur serveur' })).toHaveCount(
     0,
   );
-  await expect(page.getByRole('main').getByRole('alert').filter({ hasText: 'Réessayer' })).toHaveCount(
-    0,
-  );
+  await expect(
+    page.getByRole('main').getByRole('alert').filter({ hasText: 'Réessayer' }),
+  ).toHaveCount(0);
 });
 
 test('ADM-IMP-02 · le sélecteur d’entité change le texte d’aide', async ({ page }) => {

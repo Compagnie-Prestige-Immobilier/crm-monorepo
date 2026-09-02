@@ -48,7 +48,7 @@ describe('qui figure dans l’écran des comptes supervisés', () => {
 
     await service.overview();
 
-    const where = (findMany.mock.calls[0]?.[0] as { where: { role: { in: Role[] } } }).where;
+    const where = (findMany.mock.calls[0] as [{ where: { role: { in: Role[] } } }])[0].where;
     expect(where.role.in).toEqual([Role.COMMERCIAL, Role.BANQUE_FINANCE]);
   });
 
@@ -63,7 +63,7 @@ describe('qui figure dans l’écran des comptes supervisés', () => {
 
     await service.overview();
 
-    const where = (findMany.mock.calls[0]?.[0] as { where: { role: { in: Role[] } } }).where;
+    const where = (findMany.mock.calls[0] as [{ where: { role: { in: Role[] } } }])[0].where;
     expect(where.role.in).not.toContain(Role.SUPERVISEUR);
     expect(where.role.in).not.toContain(Role.ADMIN);
   });

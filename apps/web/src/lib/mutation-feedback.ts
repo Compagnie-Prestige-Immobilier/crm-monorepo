@@ -9,6 +9,19 @@ function serverReason(error: ApiError): string {
   return /^Request failed with status \d+$/u.test(message) ? '' : message;
 }
 
+/** Statuts dont le message du serveur n'apporte rien à qui lit l'écran. */
+const MESSAGE_IMPOSE: Readonly<Record<number, string>> = {
+  401: 'Session expirée. Rechargez la page.',
+  429: 'Trop de requêtes. Patientez quelques secondes.',
+};
+
+/** Repli par statut quand le serveur n'a pas motivé son refus. */
+const REPLI_PAR_STATUT: Readonly<Record<number, string>> = {
+  403: 'Cette action est réservée à un autre rôle.',
+  404: 'Élément introuvable. Rafraîchissez la liste.',
+  409: 'Un enregistrement existe déjà avec ces valeurs.',
+};
+
 export function apiErrorText(error: unknown, fallback: string): string {
   if (error instanceof ApiConfigurationError) return error.message;
 
@@ -19,26 +32,12 @@ export function apiErrorText(error: unknown, fallback: string): string {
   const configuration = configErrorMessage(error.body);
   if (configuration !== null) return configuration;
 
-  const reason = serverReason(error);
+  const impose = MESSAGE_IMPOSE[error.status];
+  if (impose !== undefined) return impose;
+  if (error.status >= 500) return `Erreur serveur (${String(error.status)}). Réessayez.`;
 
-  switch (error.status) {
-    case 400:
-    case 422:
-      return reason === '' ? fallback : reason;
-    case 401:
-      return 'Session expirée. Rechargez la page.';
-    case 403:
-      return reason === '' ? 'Cette action est réservée à un autre rôle.' : reason;
-    case 404:
-      return reason === '' ? 'Élément introuvable. Rafraîchissez la liste.' : reason;
-    case 409:
-      return reason === '' ? 'Un enregistrement existe déjà avec ces valeurs.' : reason;
-    case 429:
-      return 'Trop de requêtes. Patientez quelques secondes.';
-    default:
-      if (error.status >= 500) return `Erreur serveur (${String(error.status)}). Réessayez.`;
-      return reason === '' ? fallback : reason;
-  }
+  const reason = serverReason(error);
+  return reason === '' ? (REPLI_PAR_STATUT[error.status] ?? fallback) : reason;
 }
 
 export function toastApiError(error: unknown, fallback: string): void {

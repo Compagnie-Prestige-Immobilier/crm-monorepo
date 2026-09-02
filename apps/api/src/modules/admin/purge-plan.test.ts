@@ -165,7 +165,9 @@ describe('catalogue des domaines', () => {
 
   it('reconnaît une clé inconnue', () => {
     expect(isPurgeDomainKey('administrateurs')).toBe(false);
-    expect(() => purgeDomain('administrateurs' as PurgeDomainKey)).toThrow();
+    expect(() => purgeDomain('administrateurs' as PurgeDomainKey)).toThrow(
+      'Domaine de purge inconnu : administrateurs',
+    );
   });
 });
 

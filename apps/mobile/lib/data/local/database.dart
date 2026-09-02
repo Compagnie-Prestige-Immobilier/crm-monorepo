@@ -73,6 +73,7 @@ class AppDatabase extends _$AppDatabase {
   /// palier v23, lui, les ajoute une à une.
   static List<GeneratedColumn<Object>> _situationV23(Prospects prospects) =>
       <GeneratedColumn<Object>>[
+        prospects.professionId,
         prospects.incomeBandId,
         prospects.employeurId,
         prospects.employeur,
@@ -271,6 +272,8 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(representants, representants.contacte);
       }
       if (from < 23 && to >= 23) {
+        await m.createTable(professions);
+        await m.createIndex(professionsActiveIdx);
         await m.createTable(employeurs);
         await m.createIndex(employeursActiveIdx);
         await m.createTable(pays);
@@ -287,7 +290,7 @@ class AppDatabase extends _$AppDatabase {
         }
         // Comme aux paliers v8 et v21 : le pull est un curseur keyset, et un
         // appareil déjà mis au miroir ne redemande plus les listes entières.
-        // Sans ce marqueur effacé, `employeurs` et `pays` resteraient vides à
+        // Sans ce marqueur effacé, les trois listes neuves resteraient vides à
         // vie et la diaspora n'aurait aucun pays à choisir.
         await customStatement(
           'DELETE FROM sync_state WHERE collection = \'referentiels_mirror\'',

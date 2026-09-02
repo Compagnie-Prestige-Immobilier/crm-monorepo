@@ -6,7 +6,7 @@ import { type AuthenticatedUser } from '../../common/decorators/current-user.dec
 import { normalizePhone } from '../../common/phone.js';
 import { COMMENT_MAX_LENGTH } from '../phase2/attempt-rules.js';
 import { applyRelationChange } from '../representants/relation-change.js';
-import { resolveWhatsappPatch } from '../representants/whatsapp.js';
+import { resolveWhatsappPatch, type WhatsappPatch } from '../representants/whatsapp.js';
 import { RepresentantsService } from '../representants/representants.service.js';
 import type { RepresentantLookupDto } from '../representants/dto.js';
 import {
@@ -61,23 +61,7 @@ export class RepCampaignsService {
 
     const applied = await this.prisma.$transaction(async (tx) => {
       const inserted = await tx.repCallAttempt.createMany({
-        data: [
-          {
-            id: body.id,
-            representantId: body.representantId,
-            performedById: user.id,
-            outcome: body.outcome,
-            promisedProspects: body.promisedProspects ?? null,
-            comment,
-            callbackAt: body.callbackAt ? new Date(body.callbackAt) : null,
-            etablissementConfirme: body.etablissementConfirme ?? null,
-            numeroConfirme: body.numeroConfirme ?? null,
-            contacte: body.contacte ?? null,
-            connaitUES: body.connaitUES ?? null,
-            syndicat: body.syndicat?.trim() || null,
-            clientCreatedAt: new Date(body.clientCreatedAt),
-          },
-        ],
+        data: [attemptRow(body, user.id, comment)],
         skipDuplicates: true,
       });
       if (inserted.count === 0) return false;
@@ -108,16 +92,7 @@ export class RepCampaignsService {
         if (clash) throw phoneConflict(clash.createdBy.fullName);
       }
 
-      const state = {
-        ...whatsapp,
-        ...(body.syndicat !== undefined ? { syndicat: body.syndicat.trim() || null } : {}),
-        ...(body.connaitUES !== undefined ? { connaitUES: body.connaitUES } : {}),
-        ...(body.contacte !== undefined ? { contacte: body.contacte } : {}),
-        ...(body.etablissementConfirme === false && body.etablissement !== undefined
-          ? { etablissement: body.etablissement.trim() || null }
-          : {}),
-        ...(changesPhone ? { phoneE164: newPhone } : {}),
-      };
+      const state = representantPatch(body, whatsapp, changesPhone ? newPhone : undefined);
       if (Object.keys(state).length > 0) {
         await tx.representant.update({
           where: { id: body.representantId },
@@ -154,6 +129,41 @@ export class RepCampaignsService {
     });
     return { lookup, resolvedRepresentantId: known?.id ?? null };
   }
+}
+
+function attemptRow(body: CreateRepCallAttemptDto, performedById: string, comment: string | null) {
+  return {
+    id: body.id,
+    representantId: body.representantId,
+    performedById,
+    outcome: body.outcome,
+    promisedProspects: body.promisedProspects ?? null,
+    comment,
+    callbackAt: body.callbackAt ? new Date(body.callbackAt) : null,
+    etablissementConfirme: body.etablissementConfirme ?? null,
+    numeroConfirme: body.numeroConfirme ?? null,
+    contacte: body.contacte ?? null,
+    connaitUES: body.connaitUES ?? null,
+    syndicat: body.syndicat?.trim() || null,
+    clientCreatedAt: new Date(body.clientCreatedAt),
+  };
+}
+
+function representantPatch(
+  body: CreateRepCallAttemptDto,
+  whatsapp: WhatsappPatch,
+  newPhone: string | undefined,
+) {
+  return {
+    ...whatsapp,
+    ...(body.syndicat !== undefined ? { syndicat: body.syndicat.trim() || null } : {}),
+    ...(body.connaitUES !== undefined ? { connaitUES: body.connaitUES } : {}),
+    ...(body.contacte !== undefined ? { contacte: body.contacte } : {}),
+    ...(body.etablissementConfirme === false && body.etablissement !== undefined
+      ? { etablissement: body.etablissement.trim() || null }
+      : {}),
+    ...(newPhone !== undefined ? { phoneE164: newPhone } : {}),
+  };
 }
 
 function validatedComment(body: CreateRepCallAttemptDto): string | null {

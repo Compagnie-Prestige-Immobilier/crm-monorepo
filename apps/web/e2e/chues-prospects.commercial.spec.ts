@@ -1,6 +1,13 @@
 import { readFile, stat } from 'node:fs/promises';
 
-import { expect, request, test, type APIRequestContext, type APIResponse, type Page } from '@playwright/test';
+import {
+  expect,
+  request,
+  test,
+  type APIRequestContext,
+  type APIResponse,
+  type Page,
+} from '@playwright/test';
 
 import { adminApi } from './fixtures';
 
@@ -42,8 +49,7 @@ const TERME_SPECIAL = "N'Diaye & Cie / 100 %";
  */
 let temoinGrandPublic = '';
 
-const decompte = (page: Page) =>
-  page.getByRole('status').filter({ hasText: 'Prospects affichés' });
+const decompte = (page: Page) => page.getByRole('status').filter({ hasText: 'Prospects affichés' });
 
 const recherche = (page: Page) => page.getByRole('textbox', { name: 'Recherche', exact: true });
 
@@ -109,8 +115,7 @@ test.beforeAll(async () => {
     );
     const conforme = (fiche: (typeof FICHES)[number]): boolean =>
       miennes.items.some(
-        (row) =>
-          row.phoneE164 === fiche.phone && row.nom === fiche.nom && row.segment === 'BDD1',
+        (row) => row.phoneE164 === fiche.phone && row.nom === fiche.nom && row.segment === 'BDD1',
       );
     const aPoser = FICHES.filter((fiche) => !conforme(fiche));
     if (aPoser.length === 0) return;
@@ -176,9 +181,10 @@ test('CHU-PRO-04 une recherche sans résultat le dit et n’efface pas les filtr
   // La recherche vient de l'URL, comme un lien filtré : mes fiches sont ainsi
   // à l'écran quelle que soit la volumétrie du moment.
   await page.goto(`/chues/prospects?statut=NOUVEAU&search=${encodeURIComponent(PREFIXE.trim())}`);
-  await expect(ligne(page, FICHES[0].nom), 'le filtre de statut doit rendre mes fiches').toHaveCount(
-    1,
-  );
+  await expect(
+    ligne(page, FICHES[0].nom),
+    'le filtre de statut doit rendre mes fiches',
+  ).toHaveCount(1);
 
   await recherche(page).fill(RECHERCHE_INTROUVABLE);
 
@@ -197,18 +203,16 @@ test('CHU-PRO-05 un caractère spécial dans la recherche ne casse pas l’URL',
   await recherche(page).fill(TERME_SPECIAL);
 
   await expect
-    .poll(
-      () => new URL(page.url()).searchParams.get('search'),
-      { message: 'le terme cherché doit voyager encodé dans l’URL' },
-    )
+    .poll(() => new URL(page.url()).searchParams.get('search'), {
+      message: 'le terme cherché doit voyager encodé dans l’URL',
+    })
     .toBe(TERME_SPECIAL);
   expect(page.url(), 'la barre d’adresse porte la valeur ENCODÉE').toContain('%2F');
 
   await page.reload();
-  await expect(
-    recherche(page),
-    'le rechargement doit restituer le terme entier',
-  ).toHaveValue(TERME_SPECIAL);
+  await expect(recherche(page), 'le rechargement doit restituer le terme entier').toHaveValue(
+    TERME_SPECIAL,
+  );
 });
 
 test('CHU-PRO-06 l’export suit le filtre affiché', async ({ page }) => {
@@ -233,10 +237,9 @@ test('CHU-PRO-06 l’export suit le filtre affiché', async ({ page }) => {
   await page.goto('/chues/prospects');
   const complet = await exporter();
 
-  expect(
-    filtre,
-    'un export qui ignore le filtre rendrait deux fois le même classeur',
-  ).not.toBe(complet);
+  expect(filtre, 'un export qui ignore le filtre rendrait deux fois le même classeur').not.toBe(
+    complet,
+  );
 });
 
 test('CHU-PRO-08 le tableau reste utilisable sur 375 px', async ({ page }) => {

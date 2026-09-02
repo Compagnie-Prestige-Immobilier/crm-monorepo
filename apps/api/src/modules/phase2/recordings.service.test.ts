@@ -324,10 +324,7 @@ describe('note vocale, le fichier', () => {
 
 describe('note vocale, entêtes de lecture', () => {
   function controller(service: CallRecordingsService): Phase2Controller {
-    return new Phase2Controller(
-      undefined as never,
-      service,
-    );
+    return new Phase2Controller(undefined as never, service);
   }
 
   it('annonce le type, la longueur et un cache privé', async () => {

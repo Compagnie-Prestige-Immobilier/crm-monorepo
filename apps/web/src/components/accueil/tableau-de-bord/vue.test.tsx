@@ -130,6 +130,7 @@ function setup() {
   fetchDispositionMock.mockResolvedValue(disposition);
   fetchStatsMock.mockResolvedValue(stats);
   saveDispositionMock.mockResolvedValue(disposition);
+  // oxlint-disable-next-line jsx-a11y/aria-role -- prop métier, pas un rôle ARIA
   return renderWithQuery(<DashboardVisitesView role="ACCUEIL" />);
 }
 
@@ -296,6 +297,7 @@ describe('DashboardVisitesView', () => {
       updatedAt: null,
     });
     fetchStatsMock.mockResolvedValue({ ...stats, parObjet: [bucket('o1', 'VERSEMENT', 0)] });
+    // oxlint-disable-next-line jsx-a11y/aria-role -- prop métier, pas un rôle ARIA
     renderWithQuery(<DashboardVisitesView role="ACCUEIL" />);
 
     expect(await screen.findByText('Aucune visite sur la période.')).toBeTruthy();

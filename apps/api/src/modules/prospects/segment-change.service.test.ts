@@ -150,6 +150,9 @@ describe('la fiche et sa trace partent ENSEMBLE', () => {
       reason: 'Fiche de démonstration, bascule montrée à l’écran.',
       expectedRev: 1,
     });
+
+    expect(prisma.segmentChanges).toHaveLength(1);
+    expect(prisma.segmentChanges[0]).not.toHaveProperty('isDemo');
   });
 });
 

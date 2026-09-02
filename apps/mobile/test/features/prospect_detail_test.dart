@@ -179,6 +179,29 @@ void main() {
     await unmount(tester);
   });
 
+  // La fiche porte un IDENTIFIANT de profession : afficher l'identifiant brut
+  // ne dirait rien à personne, c'est le libellé du référentiel qui se lit.
+  testWidgets('la profession du référentiel se lit par son libellé', (
+    WidgetTester tester,
+  ) async {
+    await (db.update(
+      db.prospects,
+    )..where((Prospects t) => t.id.equals('gp-1'))).write(
+      const ProspectsCompanion(
+        profession: Value<String?>(null),
+        professionId: Value<String?>('pro-ens'),
+      ),
+    );
+
+    await open(tester, 'gp-1');
+
+    expect(find.text('Profession'), findsOneWidget);
+    expect(find.text('Instituteur Test'), findsOneWidget);
+    expect(find.text('pro-ens'), findsNothing);
+
+    await unmount(tester);
+  });
+
   testWidgets('la fiche appelle et consigne, elle ne supprime pas', (
     WidgetTester tester,
   ) async {

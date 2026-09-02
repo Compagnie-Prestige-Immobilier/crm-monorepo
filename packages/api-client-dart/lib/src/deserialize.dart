@@ -104,6 +104,7 @@ import 'package:crm_api_client/src/model/lot_export_distribution_input_dto.dart'
 import 'package:crm_api_client/src/model/lot_export_list_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_performance_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_preview_dto.dart';
+import 'package:crm_api_client/src/model/lot_export_prospect_filter_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_repartition_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_repartition_jour_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_summary_dto.dart';
@@ -131,7 +132,6 @@ import 'package:crm_api_client/src/model/profession_dto.dart';
 import 'package:crm_api_client/src/model/prospect_conflict_dto.dart';
 import 'package:crm_api_client/src/model/prospect_conflict_existing_dto.dart';
 import 'package:crm_api_client/src/model/prospect_dto.dart';
-import 'package:crm_api_client/src/model/prospect_filter_dto.dart';
 import 'package:crm_api_client/src/model/prospect_journey_dto.dart';
 import 'package:crm_api_client/src/model/prospect_list_dto.dart';
 import 'package:crm_api_client/src/model/prospect_search_item_dto.dart';
@@ -607,6 +607,9 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'LotExportPreviewDto':
       return LotExportPreviewDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'LotExportProspectFilterDto':
+      return LotExportProspectFilterDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'LotExportRepartitionDto':
       return LotExportRepartitionDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -694,9 +697,6 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'ProspectDto':
       return ProspectDto.fromJson(value as Map<String, dynamic>) as ReturnType;
-    case 'ProspectFilterDto':
-      return ProspectFilterDto.fromJson(value as Map<String, dynamic>)
-          as ReturnType;
     case 'ProspectJourneyDto':
       return ProspectJourneyDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;

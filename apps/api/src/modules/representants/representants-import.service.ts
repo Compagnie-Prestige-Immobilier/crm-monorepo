@@ -244,7 +244,9 @@ export class RepresentantsImportService {
         // appel pointant sur un identifiant absent : la clé étrangère fait
         // alors échouer toute la tranche, y compris les fiches légitimes.
         const appels = avecId.flatMap(({ row, id }) =>
-          row.appel === null ? [] : [{ id, appel: row.appel, performedById: row.ownerId ?? user.id }],
+          row.appel === null
+            ? []
+            : [{ id, appel: row.appel, performedById: row.ownerId ?? user.id }],
         );
         if (appels.length > 0) {
           const presentes = new Set(
@@ -323,7 +325,8 @@ export class RepresentantsImportService {
       await this.prisma.$transaction(
         async (tx) => {
           for (const { id, champs } of slice) {
-            if (Object.keys(champs).length > 0) await tx.representant.update({ where: { id }, data: champs });
+            if (Object.keys(champs).length > 0)
+              await tx.representant.update({ where: { id }, data: champs });
           }
           const appels = slice.flatMap(({ id, appel }) => (appel ? [{ id, appel }] : []));
           if (appels.length > 0) {
@@ -772,4 +775,3 @@ function parseRow(raw: RawRow, referentiels: Referentiels): ParsedRow | ImportRo
     ...complements,
   };
 }
-

@@ -115,7 +115,9 @@ test.describe('Onglets', () => {
       if (onglet.description === undefined) {
         // Les trois listes ouvertes n'ont ni titre de niveau 2 ni description :
         // leur seul repère est le bouton de création.
-        await expect(page.getByRole('button', { name: onglet.creation ?? onglet.nom })).toBeVisible();
+        await expect(
+          page.getByRole('button', { name: onglet.creation ?? onglet.nom }),
+        ).toBeVisible();
       } else {
         await expect(page.getByRole('heading', { name: onglet.nom, level: 2 })).toBeVisible();
         await expect(page.getByText(onglet.description)).toBeVisible();
@@ -200,9 +202,9 @@ test.describe('Listes de référence', () => {
     await page.reload();
     await expect(page).toHaveURL(new RegExp(`recherche=${ABREV_A}`));
     await expect(page.getByLabel('Rechercher')).toHaveValue(ABREV_A);
-    await expect(
-      page.getByRole('table').getByRole('row').filter({ hasText: ABREV_A }),
-    ).toHaveCount(1);
+    await expect(page.getByRole('table').getByRole('row').filter({ hasText: ABREV_A })).toHaveCount(
+      1,
+    );
   });
 
   test('ADM-REF-10 · recherche insensible aux accents', async ({ page }) => {

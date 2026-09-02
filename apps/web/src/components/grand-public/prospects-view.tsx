@@ -137,7 +137,13 @@ const STATUT_OPTIONS = PROSPECT_STATUTS.map((statut) => ({
   label: PROSPECT_STATUT_LABELS[statut],
 }));
 
-export function GrandPublicProspectsView({ canCreate }: { canCreate: boolean }) {
+export function GrandPublicProspectsView({
+  canCreate,
+  canExport = false,
+}: {
+  canCreate: boolean;
+  canExport?: boolean;
+}) {
   const { filters, setFilters, resetFilters } = useUrlFilters(FILTERS_ADAPTER);
   const telechargement = useFileDownload();
 
@@ -188,8 +194,7 @@ export function GrandPublicProspectsView({ canCreate }: { canCreate: boolean }) 
             <ClockIcon aria-hidden="true" />
             Voir les rappels
           </Link>
-          {/* Même règle que la liste CHUES : qui ne peut pas écrire n'exporte pas. */}
-          {canCreate ? (
+          {canExport ? (
             <Button
               variant="outline"
               size="lg"

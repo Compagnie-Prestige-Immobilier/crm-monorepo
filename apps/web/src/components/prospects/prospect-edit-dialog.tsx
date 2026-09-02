@@ -54,6 +54,38 @@ const MIN_REASON_LENGTH = 5;
 const memeChoix = (saisi: string, enregistre: string | null): boolean =>
   (saisi === '' ? null : saisi) === enregistre;
 
+function choixReferentiels(
+  reference: Awaited<ReturnType<typeof fetchReferenceData>> | undefined,
+  banqueId: string,
+  syndicatId: string,
+) {
+  const banques = reference?.banques ?? [];
+  const syndicats = reference?.syndicats ?? [];
+  const banque = banques.find((item) => item.id === banqueId);
+  const syndicat = syndicats.find((item) => item.id === syndicatId);
+  const nextSegment: BddSegment | null =
+    banque === undefined || syndicat === undefined
+      ? null
+      : classifySegment({ syndicatSigle: syndicat.sigle, banqueShortName: banque.shortName });
+
+  return {
+    banqueItems: banques.map((item) => ({
+      value: item.id,
+      label: withRetired(item.shortName, item.isActive),
+    })),
+    syndicatItems: syndicats.map((item) => ({
+      value: item.id,
+      label: withRetired(item.sigle, item.isActive),
+    })),
+    representantItems: reference?.representants ?? [],
+    nextSegment,
+  };
+}
+
+function segmentBascule(prospect: ProspectRow, banqueId: string, syndicatId: string): boolean {
+  return !memeChoix(banqueId, prospect.banqueId) || !memeChoix(syndicatId, prospect.syndicatId);
+}
+
 export function ProspectEditDialog({
   prospect,
   onOpenChange,
@@ -148,36 +180,19 @@ export function ProspectEditDialog({
     },
   });
 
+  // oxlint-disable-next-line react/incompatible-library -- faux positif react-hook-form
   const banqueId = watch('banqueId');
   const syndicatId = watch('syndicatId');
   const representantId = watch('representantId');
   const statut = watch('statut');
 
-  const banqueItems = (reference?.banques ?? []).map((banque) => ({
-    value: banque.id,
-    label: withRetired(banque.shortName, banque.isActive),
-  }));
-  const syndicatItems = (reference?.syndicats ?? []).map((syndicat) => ({
-    value: syndicat.id,
-    label: withRetired(syndicat.sigle, syndicat.isActive),
-  }));
-  const representantItems = reference?.representants ?? [];
-
-  const selectedBanque = (reference?.banques ?? []).find((banque) => banque.id === banqueId);
-  const selectedSyndicat = (reference?.syndicats ?? []).find(
-    (syndicat) => syndicat.id === syndicatId,
+  const { banqueItems, syndicatItems, representantItems, nextSegment } = choixReferentiels(
+    reference,
+    banqueId,
+    syndicatId,
   );
-  const nextSegment: BddSegment | null =
-    selectedBanque === undefined || selectedSyndicat === undefined
-      ? null
-      : classifySegment({
-          syndicatSigle: selectedSyndicat.sigle,
-          banqueShortName: selectedBanque.shortName,
-        });
 
-  const segmentChanged =
-    prospect !== null &&
-    (!memeChoix(banqueId, prospect.banqueId) || !memeChoix(syndicatId, prospect.syndicatId));
+  const segmentChanged = prospect !== null && segmentBascule(prospect, banqueId, syndicatId);
 
   return (
     <Dialog

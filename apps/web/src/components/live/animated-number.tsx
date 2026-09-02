@@ -23,6 +23,7 @@ export function AnimatedNumber({
 
     if (reduced) {
       shownRef.current = value;
+      // oxlint-disable-next-line react/set-state-in-effect -- animation pilotée hors React
       setShown(value);
       return;
     }

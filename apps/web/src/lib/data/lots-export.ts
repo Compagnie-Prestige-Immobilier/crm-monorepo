@@ -14,11 +14,8 @@ export type LotExportPreview = Schemas['LotExportPreviewDto'];
 export type CampagnePerformance = Pick<LotExportDetail, 'name' | 'performance'>;
 export type LotExportQuery = NonNullable<operations['listLotsExport']['parameters']['query']>;
 
-/**
- * Une campagne reste dans la coque de son projet. Un lot de représentants porte
- * `CHUES` ; `null` ne vient que d'un appel d'API sans projet, et retombe là aussi.
- */
-export function campagnesPath(projet: Projet | null): string {
+/** Une campagne reste dans la coque de son projet ; un lot de représentants porte `CHUES`. */
+export function campagnesPath(projet: Projet): string {
   return projet === 'GRAND_PUBLIC' ? '/grand-public/campagnes' : '/chues/campagnes';
 }
 

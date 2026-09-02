@@ -4,18 +4,26 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { GrandPublicProspectForm } from '@/components/grand-public/prospect-form';
 import type * as GrandPublicModule from '@/lib/data/grand-public';
+import type * as ProspectsModule from '@/lib/data/prospects';
 import type * as ReferenceModule from '@/lib/data/reference';
+import { prospectFixture } from '@/test/prospect-fixture';
 import { renderWithQuery } from '@/test/render-query';
 import { routerMock } from '@/test/router-mock';
 import type { ProspectRow } from '@/lib/types';
 
 const create = vi.hoisted(() => vi.fn());
+const update = vi.hoisted(() => vi.fn());
 const canaux = vi.hoisted(() => vi.fn());
 const reference = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/data/grand-public', async () => {
   const actual = await vi.importActual<typeof GrandPublicModule>('@/lib/data/grand-public');
   return { ...actual, createGrandPublicProspect: create, fetchCanauxProvenance: canaux };
+});
+
+vi.mock('@/lib/data/prospects', async () => {
+  const actual = await vi.importActual<typeof ProspectsModule>('@/lib/data/prospects');
+  return { ...actual, updateProspect: update };
 });
 
 vi.mock('@/lib/data/reference', async () => {
@@ -27,6 +35,7 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 beforeEach(() => {
   create.mockReset();
+  update.mockReset();
   canaux.mockReset();
   reference.mockReset();
   canaux.mockResolvedValue([
@@ -338,7 +347,10 @@ describe('les questions propres à chaque situation', () => {
     mount();
     await screen.findByRole('combobox', { name: /Canal de provenance/u });
 
-    await fillIdentity();
+    await user.type(screen.getByLabelText(/Prénom/u), 'Moussa');
+    await user.type(screen.getByLabelText(/^Nom/u), 'Fall');
+    // Un numéro ITALIEN : un 77 sénégalais n'existe pas sous l'indicatif +39.
+    await user.type(screen.getByLabelText(/Téléphone/u), '3331234567');
     await user.click(screen.getByRole('button', { name: 'Diaspora' }));
 
     await choose('Pays de résidence', 'Italie');
@@ -353,7 +365,7 @@ describe('les questions propres à chaque situation', () => {
         prenom: 'Moussa',
         nom: 'Fall',
         // Le pays de résidence a repris l'indicatif du numéro principal.
-        phone: '+39771234567',
+        phone: '+393331234567',
         type: 'DIASPORA',
         paysResidenceId: 'pay-it',
         villeResidence: 'Turin',
@@ -443,6 +455,104 @@ describe('la rafale', () => {
     await waitFor(() => {
       expect(routerMock.push).toHaveBeenCalledWith('/grand-public/p-9');
     });
+  });
+});
+
+describe('la modification d’une fiche', () => {
+  const fiche = (over: Partial<ProspectRow> = {}): ProspectRow =>
+    prospectFixture({
+      id: 'p-7',
+      nom: 'Fall',
+      prenom: 'Moussa',
+      projet: 'GRAND_PUBLIC',
+      phoneE164: '+221771234567',
+      type: 'SECTEUR_PRIVE',
+      employeurId: 'emp-sonatel',
+      employeur: 'Sonatel',
+      ancienneteMois: 30,
+      banqueId: 'bnq-cbao',
+      banqueName: 'CBAO Sénégal',
+      ...over,
+    });
+
+  function monter(prospect: ProspectRow) {
+    return renderWithQuery(<GrandPublicProspectForm embedded initial={prospect} />);
+  }
+
+  it('ouvre le formulaire garni de la fiche', async () => {
+    monter(fiche());
+    await screen.findByRole('combobox', { name: /Canal de provenance/u });
+
+    expect(screen.getByLabelText<HTMLInputElement>(/Prénom/u).value).toBe('Moussa');
+    expect(screen.getByLabelText<HTMLInputElement>(/Téléphone/u).value).toBe('77 123 45 67');
+    expect(screen.getByLabelText<HTMLInputElement>(/Ancienneté/u).value).toBe('30');
+    expect(screen.getByRole('button', { name: 'Secteur privé' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+    await waitFor(() => {
+      expect(screen.getByRole('combobox', { name: /^Employeur/u }).textContent).toContain(
+        'Sonatel',
+      );
+    });
+  });
+
+  it('n’envoie que ce qui a changé', async () => {
+    const user = userEvent.setup();
+    update.mockResolvedValue(fiche({ prenom: 'Mous' }));
+    monter(fiche());
+    await screen.findByRole('combobox', { name: /Canal de provenance/u });
+
+    await user.clear(screen.getByLabelText(/Prénom/u));
+    await user.type(screen.getByLabelText(/Prénom/u), 'Ousmane');
+    await user.click(screen.getByRole('button', { name: 'Enregistrer les modifications' }));
+
+    await waitFor(() => {
+      expect(update).toHaveBeenCalledWith('p-7', { prenom: 'Ousmane' });
+    });
+  });
+
+  it('vide la colonne d’un champ effacé', async () => {
+    const user = userEvent.setup();
+    update.mockResolvedValue(fiche());
+    monter(fiche({ lieuActivite: 'Marché Sandaga', type: 'INFORMEL' }));
+    await screen.findByRole('combobox', { name: /Canal de provenance/u });
+
+    await user.clear(screen.getByLabelText(/Lieu d’activité/u));
+    await user.click(screen.getByRole('button', { name: 'Enregistrer les modifications' }));
+
+    await waitFor(() => {
+      expect(update).toHaveBeenCalledWith('p-7', { lieuActivite: null });
+    });
+  });
+
+  it('efface ce que la situation quittée demandait', async () => {
+    const user = userEvent.setup();
+    update.mockResolvedValue(fiche());
+    monter(fiche());
+    await screen.findByRole('combobox', { name: /Canal de provenance/u });
+
+    await user.click(screen.getByRole('button', { name: 'Informel' }));
+    await user.type(screen.getByLabelText(/Lieu d’activité/u), 'Marché Sandaga');
+    await user.click(screen.getByRole('button', { name: 'Enregistrer les modifications' }));
+
+    await waitFor(() => {
+      expect(update).toHaveBeenCalledWith('p-7', {
+        type: 'INFORMEL',
+        employeurId: null,
+        ancienneteMois: null,
+        banqueId: null,
+        syndicatId: null,
+        lieuActivite: 'Marché Sandaga',
+      });
+    });
+  });
+
+  it('ne propose ni rafale ni ouverture de fiche', async () => {
+    monter(fiche());
+    await screen.findByRole('combobox', { name: /Canal de provenance/u });
+
+    expect(screen.queryByRole('button', { name: 'Enregistrer et suivant' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Enregistrer et ouvrir la fiche' })).toBeNull();
   });
 });
 

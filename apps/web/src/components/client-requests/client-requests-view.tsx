@@ -51,6 +51,14 @@ const STATUS_TABS: readonly { value: string; label: string }[] = [
   { value: ALL_STATUSES, label: 'Toutes' },
 ];
 
+function videDescription(activeFilterCount: number, canReview: boolean): string {
+  if (activeFilterCount > 0) return 'Changez de statut ou retirez un critère.';
+  if (canReview) {
+    return 'Une demande arrivée ici attend votre approbation, ou un refus dont le motif est remonté à la banque.';
+  }
+  return 'Ouvrez un dossier depuis « Nouveau dossier » : si le client est absent de la base, vous pourrez y demander sa création.';
+}
+
 export function ClientRequestsView({ role }: { role: Role }) {
   const canReview = role === 'ADMIN';
   const { filters, setFilters, resetFilters } = useClientRequestFilters();
@@ -189,13 +197,7 @@ export function ClientRequestsView({ role }: { role: Role }) {
                       ? 'Aucune demande en attente'
                       : 'Aucune demande ne correspond à ces filtres'
                   }
-                  description={
-                    activeFilterCount > 0
-                      ? 'Changez de statut ou retirez un critère.'
-                      : canReview
-                        ? 'Une demande arrivée ici attend votre approbation, ou un refus dont le motif est remonté à la banque.'
-                        : 'Ouvrez un dossier depuis « Nouveau dossier » : si le client est absent de la base, vous pourrez y demander sa création.'
-                  }
+                  description={videDescription(activeFilterCount, canReview)}
                 />
               );
             return (

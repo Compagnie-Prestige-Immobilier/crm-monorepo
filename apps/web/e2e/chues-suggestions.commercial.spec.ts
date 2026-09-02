@@ -194,7 +194,9 @@ test('CHU-SUG-04 chaque filtre a son propre état vide', async ({ page, browser 
         { exact: true },
       ),
     ).toBeVisible();
-    await expect(vierge.getByText('Retirez le filtre pour voir les autres numéros.')).toHaveCount(0);
+    await expect(vierge.getByText('Retirez le filtre pour voir les autres numéros.')).toHaveCount(
+      0,
+    );
   } finally {
     await contexte.close();
   }

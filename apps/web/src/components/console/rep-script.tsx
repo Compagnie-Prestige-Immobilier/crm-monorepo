@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { ArrowLeftIcon, CalendarIcon, CopyIcon, PencilIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -191,51 +191,74 @@ export function RepScript() {
         Cherchez qui vous venez d’appeler par nom ou numéro.
       </p>
 
-      {cherche !== '' &&
-        (annuaire.isError ? (
-          <QueryErrorState
-            error={annuaire.error}
-            fallback="L’annuaire n’a pas pu être lu."
-            onRetry={() => {
-              void annuaire.refetch();
-            }}
-          />
-        ) : annuaire.isPending ? (
-          <div className="flex flex-col gap-2">
-            <Skeleton className="h-14" />
-            <Skeleton className="h-14" />
-            <Skeleton className="h-14" />
-          </div>
-        ) : liste.length === 0 ? (
-          <p className="text-[0.9375rem]">Aucun résultat. Vérifiez le nom ou le numéro.</p>
-        ) : (
-          <ol className="flex flex-col gap-2">
-            {liste.map((row) => (
-              <li key={row.id}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    ouvrir(row);
-                  }}
-                  className={cn(
-                    'flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-md border border-border px-3 py-3 text-left',
-                    'hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-                  )}
-                >
-                  <span className="flex min-w-0 flex-col">
-                    <span className="truncate text-[0.9375rem] font-[600]">{row.fullName}</span>
-                    <span className="text-[0.8125rem] text-muted-foreground">
-                      <span className="tabular-nums">{formatPhone(row.phoneE164)}</span>
-                      {row.departementName === null ? '' : ` · ${row.departementName}`}
-                    </span>
-                  </span>
-                  <RelationBadge status={row.relationStatus} />
-                </button>
-              </li>
-            ))}
-          </ol>
-        ))}
+      {cherche === '' ? null : (
+        <ResultatsAnnuaire annuaire={annuaire} liste={liste} onOuvrir={ouvrir} />
+      )}
     </div>
+  );
+}
+
+function ResultatsAnnuaire({
+  annuaire,
+  liste,
+  onOuvrir,
+}: {
+  annuaire: UseQueryResult<Awaited<ReturnType<typeof fetchRepresentants>>>;
+  liste: readonly ScriptedRepresentant[];
+  onOuvrir: (row: ScriptedRepresentant) => void;
+}) {
+  if (annuaire.isError) {
+    return (
+      <QueryErrorState
+        error={annuaire.error}
+        fallback="L’annuaire n’a pas pu être lu."
+        onRetry={() => {
+          void annuaire.refetch();
+        }}
+      />
+    );
+  }
+
+  if (annuaire.isPending) {
+    return (
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-14" />
+        <Skeleton className="h-14" />
+        <Skeleton className="h-14" />
+      </div>
+    );
+  }
+
+  if (liste.length === 0) {
+    return <p className="text-[0.9375rem]">Aucun résultat. Vérifiez le nom ou le numéro.</p>;
+  }
+
+  return (
+    <ol className="flex flex-col gap-2">
+      {liste.map((row) => (
+        <li key={row.id}>
+          <button
+            type="button"
+            onClick={() => {
+              onOuvrir(row);
+            }}
+            className={cn(
+              'flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-md border border-border px-3 py-3 text-left',
+              'hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+            )}
+          >
+            <span className="flex min-w-0 flex-col">
+              <span className="truncate text-[0.9375rem] font-[600]">{row.fullName}</span>
+              <span className="text-[0.8125rem] text-muted-foreground">
+                <span className="tabular-nums">{formatPhone(row.phoneE164)}</span>
+                {row.departementName === null ? '' : ` · ${row.departementName}`}
+              </span>
+            </span>
+            <RelationBadge status={row.relationStatus} />
+          </button>
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -266,6 +289,505 @@ function ChampAnnuaire({ value, onChange }: { value: string; onChange: (value: s
       />
     </div>
   );
+}
+
+const OUI_NON = [
+  { valeur: true, label: 'Oui' },
+  { valeur: false, label: 'Non' },
+];
+
+interface QuestionsJoignableProps {
+  etablissementConfirme: boolean | null;
+  setEtablissementConfirme: (valeur: boolean | null) => void;
+  nouvelEtablissement: string;
+  setNouvelEtablissement: (valeur: string) => void;
+  contacte: boolean | null;
+  setContacte: (valeur: boolean | null) => void;
+  connaitUES: boolean | null;
+  setConnaitUES: (valeur: boolean | null) => void;
+  syndicatId: string | null;
+  setSyndicatId: (valeur: string | null) => void;
+  syndicatOptions: { value: string; label: string; hint: string }[];
+  ambassadeur: boolean | null;
+  setAmbassadeur: (valeur: boolean | null) => void;
+  memeWhatsapp: boolean | null;
+  setMemeWhatsapp: (valeur: boolean | null) => void;
+  whatsapp: string;
+  setWhatsapp: (valeur: string) => void;
+}
+
+/** Les questions qui n'ont de sens que si la personne a décroché. */
+function QuestionsJoignable(props: QuestionsJoignableProps) {
+  return (
+    <>
+      <Question titre="L’établissement de la fiche est-il confirmé ?" anime>
+        <Choix
+          options={OUI_NON}
+          value={props.etablissementConfirme}
+          onChange={(valeur) => {
+            props.setEtablissementConfirme(valeur);
+            if (valeur) props.setNouvelEtablissement('');
+          }}
+        />
+        {props.etablissementConfirme === false ? (
+          <div className={cn('flex max-w-80 flex-col gap-1.5', REVELE)}>
+            <label htmlFor="rep-etablissement" className="text-[0.875rem] font-[600]">
+              Nouvel établissement
+            </label>
+            <Input
+              id="rep-etablissement"
+              autoComplete="off"
+              maxLength={160}
+              value={props.nouvelEtablissement}
+              onChange={(event) => {
+                props.setNouvelEtablissement(event.target.value);
+              }}
+            />
+          </div>
+        ) : null}
+      </Question>
+
+      <Question titre="A-t-il déjà été contacté ?" anime>
+        <Choix options={OUI_NON} value={props.contacte} onChange={props.setContacte} />
+      </Question>
+
+      <Question titre="Connaît-il l’UES ?" anime>
+        <Choix options={OUI_NON} value={props.connaitUES} onChange={props.setConnaitUES} />
+      </Question>
+
+      <Question titre="Sur quel syndicat ? (facultatif)" anime>
+        <FilterCombobox
+          className="max-w-80"
+          label="Syndicat (facultatif)"
+          placeholder="Choisir un syndicat"
+          value={props.syndicatId}
+          options={props.syndicatOptions}
+          onChange={props.setSyndicatId}
+        />
+      </Question>
+
+      <Question titre="Est-il représentant CPI CHUES ?" anime>
+        <Choix
+          options={OUI_NON}
+          value={props.ambassadeur}
+          onChange={(valeur) => {
+            props.setAmbassadeur(valeur);
+            if (!valeur) props.setMemeWhatsapp(null);
+          }}
+        />
+      </Question>
+
+      {props.ambassadeur === true ? (
+        <Question titre="A-t-il WhatsApp sur ce numéro ?" anime>
+          <Choix options={OUI_NON} value={props.memeWhatsapp} onChange={props.setMemeWhatsapp} />
+          {props.memeWhatsapp === false ? (
+            <div className={cn('flex max-w-80 flex-col gap-1.5', REVELE)}>
+              <label htmlFor="rep-whatsapp" className="text-[0.875rem] font-[600]">
+                Numéro WhatsApp
+              </label>
+              <Input
+                id="rep-whatsapp"
+                inputMode="tel"
+                autoComplete="off"
+                placeholder="77 123 45 67"
+                value={props.whatsapp}
+                onChange={(event) => {
+                  props.setWhatsapp(event.target.value);
+                }}
+              />
+            </div>
+          ) : null}
+        </Question>
+      ) : null}
+    </>
+  );
+}
+
+interface SuggestionProps {
+  sugPhone: string;
+  setSugPhone: (valeur: string) => void;
+  sugName: string;
+  setSugName: (valeur: string) => void;
+  sugNote: string;
+  setSugNote: (valeur: string) => void;
+}
+
+function QuestionSuggestion({
+  sugPhone,
+  setSugPhone,
+  sugName,
+  setSugName,
+  sugNote,
+  setSugNote,
+}: SuggestionProps) {
+  return (
+    <Question titre="Il propose quelqu’un d’autre ? (facultatif)" anime>
+      <div className="flex max-w-96 flex-col gap-3">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="rep-sug-phone" className="text-[0.875rem] font-[600]">
+            Son numéro
+          </label>
+          <Input
+            id="rep-sug-phone"
+            inputMode="tel"
+            autoComplete="off"
+            placeholder="77 123 45 67"
+            value={sugPhone}
+            onChange={(event) => {
+              setSugPhone(event.target.value);
+            }}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="rep-sug-name" className="text-[0.875rem] font-[600]">
+            Son nom et prénom
+          </label>
+          <Input
+            id="rep-sug-name"
+            autoComplete="off"
+            maxLength={160}
+            value={sugName}
+            onChange={(event) => {
+              setSugName(event.target.value);
+            }}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="rep-sug-note" className="text-[0.875rem] font-[600]">
+            Sa remarque
+          </label>
+          <Textarea
+            id="rep-sug-note"
+            rows={2}
+            maxLength={2000}
+            value={sugNote}
+            onChange={(event) => {
+              setSugNote(event.target.value);
+            }}
+          />
+        </div>
+      </div>
+    </Question>
+  );
+}
+
+interface EtapeQuestionsProps {
+  resultat: Resultat | null;
+  onResultat: (valeur: Resultat) => void;
+  joignable: boolean;
+  proposeQuelquUn: boolean;
+  questionsJoignable: QuestionsJoignableProps;
+  suggestion: SuggestionProps;
+  rappel: { now: number; value: string | null; onChange: (valeur: string | null) => void };
+  commentaire: string;
+  onCommentaire: (valeur: string) => void;
+  manque: string | null;
+  onContinuer: () => void;
+}
+
+/** La première étape : les questions, dans l'ordre où l'appel les pose. */
+function EtapeQuestions(props: EtapeQuestionsProps) {
+  return (
+    <div className="flex flex-col gap-5">
+      <Question titre="Comment s’est passé l’appel ?">
+        <Choix
+          options={RESULTATS.map(({ valeur, label }) => ({ valeur, label }))}
+          value={props.resultat}
+          onChange={props.onResultat}
+        />
+      </Question>
+
+      {props.joignable ? <QuestionsJoignable {...props.questionsJoignable} /> : null}
+
+      {props.proposeQuelquUn ? <QuestionSuggestion {...props.suggestion} /> : null}
+
+      {props.resultat === 'RAPPEL' ? (
+        <Question titre="Quand rappeler ?" anime>
+          <ChoixEcheance
+            now={props.rappel.now}
+            value={props.rappel.value}
+            onChange={props.rappel.onChange}
+          />
+        </Question>
+      ) : null}
+
+      {props.resultat === null ? null : (
+        <Question titre="Quelque chose à ajouter ? (facultatif)" anime>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="rep-commentaire" className="text-[0.875rem] font-[600]">
+              Commentaire
+            </label>
+            <Textarea
+              id="rep-commentaire"
+              rows={3}
+              maxLength={2000}
+              placeholder="En une phrase"
+              value={props.commentaire}
+              onChange={(event) => {
+                props.onCommentaire(event.target.value);
+              }}
+            />
+          </div>
+        </Question>
+      )}
+
+      <div className="flex flex-col gap-1.5">
+        <Button className="self-start" disabled={props.manque !== null} onClick={props.onContinuer}>
+          Continuer
+        </Button>
+        {props.manque === null ? null : (
+          <p className="text-[0.8125rem] text-muted-foreground">{props.manque}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface RecapAppelProps {
+  representant: ScriptedRepresentant;
+  resultat: Resultat | null;
+  joignable: boolean;
+  etablissementConfirme: boolean | null;
+  nouvelEtablissement: string;
+  contacte: boolean | null;
+  connaitUES: boolean | null;
+  syndicatName: string;
+  ambassadeur: boolean | null;
+  rappelAt: string | null;
+  now: number;
+  personneProposee: string | null;
+  commentaire: string;
+}
+
+function RecapAppel(props: RecapAppelProps) {
+  return (
+    <dl className="flex flex-col gap-1 rounded-lg border border-border bg-card px-4 py-3 text-[0.875rem]">
+      <Recap intitule="Personne appelée" valeur={props.representant.fullName} />
+      <Recap intitule="Téléphone" valeur={formatPhone(props.representant.phoneE164)} />
+      <Recap
+        intitule="Résultat"
+        valeur={RESULTATS.find((item) => item.valeur === props.resultat)?.label ?? null}
+      />
+      {props.joignable ? (
+        <>
+          <Recap
+            intitule="Établissement"
+            valeur={recapEtablissement(props.etablissementConfirme, props.nouvelEtablissement)}
+          />
+          <Recap intitule="Déjà contacté" valeur={recapOuiNon(props.contacte)} />
+          <Recap intitule="Connaît l’UES" valeur={recapOuiNon(props.connaitUES)} />
+          {props.syndicatName === '' ? null : (
+            <Recap intitule="Syndicat" valeur={props.syndicatName} />
+          )}
+          <Recap intitule="Représentant CPI CHUES" valeur={recapOuiNon(props.ambassadeur)} />
+        </>
+      ) : null}
+      {props.rappelAt === null ? null : (
+        <Recap intitule="Rappel" valeur={formatCallbackAt(props.rappelAt, props.now)} />
+      )}
+      {props.personneProposee === null ? null : (
+        <Recap intitule="Personne proposée" valeur={props.personneProposee} />
+      )}
+      {props.commentaire === '' ? null : (
+        <Recap intitule="Commentaire" valeur={props.commentaire} />
+      )}
+    </dl>
+  );
+}
+
+/**
+ * La question passe AVANT tout : ni nom, ni numéro, ni question tant qu'on n'a
+ * pas répondu. C'est la boîte que le mobile ouvre par-dessus l'écran avant
+ * toute saisie. Le titre dit LEQUEL des deux cas on a sous les yeux.
+ */
+function AvertissementTranchee({
+  status,
+  onAbandon,
+  onContinuer,
+}: {
+  status: ScriptedRepresentant['relationStatus'];
+  onAbandon: () => void;
+  onContinuer: () => void;
+}) {
+  return (
+    <Dialog open onOpenChange={onAbandon}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>
+            {status === 'AMBASSADEUR'
+              ? 'Cette personne a déjà accepté d’être représentant CPI CHUES.'
+              : 'Cette personne a déjà refusé.'}
+          </DialogTitle>
+          <DialogDescription>Voulez-vous quand même consigner un nouvel appel ?</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onAbandon}>
+            <ArrowLeftIcon aria-hidden="true" />
+            Revenir à la liste
+          </Button>
+          <Button onClick={onContinuer}>Continuer</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EnTeteRepresentant({ representant }: { representant: ScriptedRepresentant }) {
+  const sousTitre = [representant.prenom, representant.etablissement].filter(Boolean).join(' · ');
+
+  return (
+    <>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-col">
+          <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">
+            {representant.fullName}
+          </h2>
+          {representant.prenom === null && representant.etablissement === null ? null : (
+            <p className="text-[0.8125rem] text-muted-foreground">{sousTitre}</p>
+          )}
+        </div>
+        <RelationBadge status={representant.relationStatus} />
+      </div>
+
+      <div className="flex items-center gap-3">
+        <span className="select-all font-display text-[2rem] font-[700] tracking-[-0.02em] tabular-nums">
+          {formatPhone(representant.phoneE164)}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            copyPhone(representant.phoneE164);
+          }}
+        >
+          <CopyIcon aria-hidden="true" />
+          Copier
+        </Button>
+      </div>
+    </>
+  );
+}
+
+function syndicatsDe(
+  reference: Awaited<ReturnType<typeof fetchReferenceData>> | undefined,
+  syndicatId: string | null,
+): { options: { value: string; label: string; hint: string }[]; name: string } {
+  const syndicats = reference?.syndicats ?? [];
+  return {
+    options: syndicats
+      .filter((syndicat) => syndicat.isActive)
+      .map((syndicat) => ({ value: syndicat.id, label: syndicat.name, hint: syndicat.sigle })),
+    name: syndicats.find((syndicat) => syndicat.id === syndicatId)?.name ?? '',
+  };
+}
+
+interface EtatManque {
+  resultat: Resultat | null;
+  joignable: boolean;
+  etablissementConfirme: boolean | null;
+  nouvelEtablissement: string;
+  contacte: boolean | null;
+  connaitUES: boolean | null;
+  ambassadeur: boolean | null;
+  memeWhatsapp: boolean | null;
+  whatsapp: string;
+  rappelAt: string | null;
+  proposeQuelquUn: boolean;
+  suggestionCommencee: boolean;
+  sugPhone: string;
+}
+
+/** Ce qui empêche encore d'enregistrer, en une phrase, ou rien. */
+function manqueDe(etat: EtatManque): string | null {
+  if (etat.resultat === null) return 'Choisissez d’abord le résultat';
+  if (etat.joignable) {
+    const script = manqueJoignable({
+      etablissementConfirme: etat.etablissementConfirme,
+      nouvelEtablissement: etat.nouvelEtablissement,
+      contacte: etat.contacte,
+      connaitUES: etat.connaitUES,
+      ambassadeur: etat.ambassadeur,
+      memeWhatsapp: etat.memeWhatsapp,
+      whatsapp: etat.whatsapp,
+    });
+    if (script !== null) return script;
+  }
+  if (etat.resultat === 'RAPPEL' && etat.rappelAt === null) return 'Choisissez quand rappeler';
+  // Le serveur jette une suggestion sans numéro : plutôt que d'effacer en
+  // silence ce qui vient d'être dicté, l'enregistrement attend le numéro.
+  if (etat.proposeQuelquUn && etat.suggestionCommencee && digitsOf(etat.sugPhone) < 9) {
+    return 'Écrivez le numéro de la personne proposée';
+  }
+  return null;
+}
+
+interface EtatReponse {
+  resultat: Resultat;
+  joignable: boolean;
+  chuesOui: boolean;
+  etablissementConfirme: boolean | null;
+  nouvelEtablissement: string;
+  contacte: boolean | null;
+  connaitUES: boolean | null;
+  syndicatName: string;
+  memeWhatsapp: boolean | null;
+  whatsapp: string;
+  rappelAt: string | null;
+  proposeQuelquUn: boolean;
+  suggestionCommencee: boolean;
+  sugPhone: string;
+  sugName: string;
+  sugNote: string;
+  commentaire: string;
+}
+
+function outcomeDe(resultat: Resultat, chuesOui: boolean): RepAnswer['outcome'] {
+  if (resultat === 'JOIGNABLE') return chuesOui ? 'REACHED' : 'REFUSED';
+  if (resultat === 'RAPPEL') return 'CALLBACK';
+  return 'UNREACHABLE';
+}
+
+function champsJoignable(etat: EtatReponse): Partial<RepAnswer> {
+  if (!etat.joignable) return {};
+  return {
+    ...etablissementAnswer(etat.etablissementConfirme, etat.nouvelEtablissement),
+    ...(etat.contacte === null ? {} : { contacte: etat.contacte }),
+    ...(etat.connaitUES === null ? {} : { connaitUES: etat.connaitUES }),
+    ...(etat.syndicatName === '' ? {} : { syndicat: etat.syndicatName }),
+  };
+}
+
+function champsWhatsapp(etat: EtatReponse): Partial<RepAnswer> {
+  if (!etat.chuesOui) return {};
+  const meme = etat.memeWhatsapp === true;
+  return {
+    whatsappStatus: meme ? ('MEME_NUMERO' as const) : ('AUTRE_NUMERO' as const),
+    ...(meme ? {} : { whatsappE164: etat.whatsapp.trim() }),
+  };
+}
+
+function champsSuggestion(etat: EtatReponse): Partial<RepAnswer> {
+  if (!etat.proposeQuelquUn || !etat.suggestionCommencee) return {};
+  return {
+    suggestedPhone: etat.sugPhone.trim(),
+    ...(etat.sugName.trim() === '' ? {} : { suggestedName: etat.sugName.trim() }),
+    ...(etat.sugNote.trim() === '' ? {} : { suggestedNote: etat.sugNote.trim() }),
+  };
+}
+
+/** Chaque champ voyage seul : ce que la question n'a pas posé ne part pas. */
+function reponseDe(etat: EtatReponse): RepAnswer {
+  return {
+    outcome: outcomeDe(etat.resultat, etat.chuesOui),
+    ...(etat.resultat === 'JOIGNABLE'
+      ? { relationStatus: etat.chuesOui ? ('AMBASSADEUR' as const) : ('REFUS' as const) }
+      : {}),
+    ...champsJoignable(etat),
+    ...champsWhatsapp(etat),
+    ...(etat.rappelAt === null ? {} : { callbackAt: etat.rappelAt }),
+    ...champsSuggestion(etat),
+    ...(etat.commentaire.trim() === '' ? {} : { comment: etat.commentaire.trim() }),
+  };
 }
 
 /**
@@ -302,18 +824,14 @@ function Qualification({
   // ne se requalifie pas sans qu'on l'ait dit.
   const [avertiTranchee, setAvertiTranchee] = useState(repRelationSettled(representant));
 
-  const now = useMemo(() => Date.now(), []);
+  const [now] = useState(() => Date.now());
 
   const reference = useQuery({
     queryKey: queryKeys.reference,
     queryFn: () => fetchReferenceData(),
     staleTime: 5 * 60_000,
   });
-  const syndicatOptions = (reference.data?.syndicats ?? [])
-    .filter((syndicat) => syndicat.isActive)
-    .map((syndicat) => ({ value: syndicat.id, label: syndicat.name, hint: syndicat.sigle }));
-  const syndicatName =
-    reference.data?.syndicats.find((syndicat) => syndicat.id === syndicatId)?.name ?? '';
+  const { options: syndicatOptions, name: syndicatName } = syndicatsDe(reference.data, syndicatId);
 
   const send = useMutation({
     mutationFn: (answer: RepAnswer) => pushRepCallAttempt(buildRepAttempt(representant.id, answer)),
@@ -332,66 +850,57 @@ function Qualification({
   const suggestionCommencee =
     sugPhone.trim() !== '' || sugName.trim() !== '' || sugNote.trim() !== '';
 
-  const manque = ((): string | null => {
-    if (resultat === null) return 'Choisissez d’abord le résultat';
-    if (joignable) {
-      const script = manqueJoignable({
+  const manque = manqueDe({
+    resultat,
+    joignable,
+    etablissementConfirme,
+    nouvelEtablissement,
+    contacte,
+    connaitUES,
+    ambassadeur,
+    memeWhatsapp,
+    whatsapp,
+    rappelAt,
+    proposeQuelquUn,
+    suggestionCommencee,
+    sugPhone,
+  });
+
+  const enregistrer = (): void => {
+    if (manque !== null || resultat === null || send.isPending) return;
+    send.mutate(
+      reponseDe({
+        resultat,
+        joignable,
+        chuesOui: joignable && ambassadeur === true,
         etablissementConfirme,
         nouvelEtablissement,
         contacte,
         connaitUES,
-        ambassadeur,
+        syndicatName,
         memeWhatsapp,
         whatsapp,
-      });
-      if (script !== null) return script;
-    }
-    if (resultat === 'RAPPEL' && rappelAt === null) return 'Choisissez quand rappeler';
-    // Le serveur jette une suggestion sans numéro : plutôt que d'effacer en
-    // silence ce qui vient d'être dicté, l'enregistrement attend le numéro.
-    if (proposeQuelquUn && suggestionCommencee && digitsOf(sugPhone) < 9) {
-      return 'Écrivez le numéro de la personne proposée';
-    }
-    return null;
-  })();
+        rappelAt,
+        proposeQuelquUn,
+        suggestionCommencee,
+        sugPhone,
+        sugName,
+        sugNote,
+        commentaire,
+      }),
+    );
+  };
 
-  const enregistrer = (): void => {
-    if (manque !== null || resultat === null || send.isPending) return;
-    const chuesOui = joignable && ambassadeur === true;
-
-    send.mutate({
-      outcome:
-        resultat === 'JOIGNABLE'
-          ? chuesOui
-            ? 'REACHED'
-            : 'REFUSED'
-          : resultat === 'RAPPEL'
-            ? 'CALLBACK'
-            : 'UNREACHABLE',
-      ...(resultat === 'JOIGNABLE'
-        ? { relationStatus: chuesOui ? ('AMBASSADEUR' as const) : ('REFUS' as const) }
-        : {}),
-      ...(joignable ? etablissementAnswer(etablissementConfirme, nouvelEtablissement) : {}),
-      ...(joignable && contacte !== null ? { contacte } : {}),
-      ...(joignable && connaitUES !== null ? { connaitUES } : {}),
-      ...(joignable && syndicatName !== '' ? { syndicat: syndicatName } : {}),
-      ...(chuesOui
-        ? {
-            whatsappStatus:
-              memeWhatsapp === true ? ('MEME_NUMERO' as const) : ('AUTRE_NUMERO' as const),
-            ...(memeWhatsapp === true ? {} : { whatsappE164: whatsapp.trim() }),
-          }
-        : {}),
-      ...(rappelAt === null ? {} : { callbackAt: rappelAt }),
-      ...(proposeQuelquUn && suggestionCommencee
-        ? {
-            suggestedPhone: sugPhone.trim(),
-            ...(sugName.trim() === '' ? {} : { suggestedName: sugName.trim() }),
-            ...(sugNote.trim() === '' ? {} : { suggestedNote: sugNote.trim() }),
-          }
-        : {}),
-      ...(commentaire.trim() === '' ? {} : { comment: commentaire.trim() }),
-    });
+  const choisirResultat = (valeur: Resultat): void => {
+    setResultat(valeur);
+    if (valeur !== 'JOIGNABLE') {
+      setEtablissementConfirme(null);
+      setContacte(null);
+      setConnaitUES(null);
+      setAmbassadeur(null);
+      setMemeWhatsapp(null);
+    }
+    if (valeur !== 'RAPPEL') setRappelAt(null);
   };
 
   const reculer = useCallback(() => {
@@ -425,33 +934,13 @@ function Qualification({
   */
   if (avertiTranchee) {
     return (
-      <Dialog open onOpenChange={onAbandon}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>
-              {representant.relationStatus === 'AMBASSADEUR'
-                ? 'Cette personne a déjà accepté d’être représentant CPI CHUES.'
-                : 'Cette personne a déjà refusé.'}
-            </DialogTitle>
-            <DialogDescription>
-              Voulez-vous quand même consigner un nouvel appel ?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="ghost" onClick={onAbandon}>
-              <ArrowLeftIcon aria-hidden="true" />
-              Revenir à la liste
-            </Button>
-            <Button
-              onClick={() => {
-                setAvertiTranchee(false);
-              }}
-            >
-              Continuer
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AvertissementTranchee
+        status={representant.relationStatus}
+        onAbandon={onAbandon}
+        onContinuer={() => {
+          setAvertiTranchee(false);
+        }}
+      />
     );
   }
 
@@ -462,35 +951,7 @@ function Qualification({
         {etape === 1 ? 'Revenir à la liste' : 'Étape précédente'}
       </Button>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 flex-col">
-          <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">
-            {representant.fullName}
-          </h2>
-          {representant.prenom === null && representant.etablissement === null ? null : (
-            <p className="text-[0.8125rem] text-muted-foreground">
-              {[representant.prenom, representant.etablissement].filter(Boolean).join(' · ')}
-            </p>
-          )}
-        </div>
-        <RelationBadge status={representant.relationStatus} />
-      </div>
-
-      <div className="flex items-center gap-3">
-        <span className="select-all font-display text-[2rem] font-[700] tracking-[-0.02em] tabular-nums">
-          {formatPhone(representant.phoneE164)}
-        </span>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            copyPhone(representant.phoneE164);
-          }}
-        >
-          <CopyIcon aria-hidden="true" />
-          Copier
-        </Button>
-      </div>
+      <EnTeteRepresentant representant={representant} />
 
       <p className="text-[0.8125rem] font-[600] text-muted-foreground">
         Étape {etape} sur 2 ·{' '}
@@ -498,267 +959,60 @@ function Qualification({
       </p>
 
       {etape === 1 ? (
-        <div className="flex flex-col gap-5">
-          <Question titre="Comment s’est passé l’appel ?">
-            <Choix
-              options={RESULTATS.map(({ valeur, label }) => ({ valeur, label }))}
-              value={resultat}
-              onChange={(valeur) => {
-                setResultat(valeur);
-                if (valeur !== 'JOIGNABLE') {
-                  setEtablissementConfirme(null);
-                  setContacte(null);
-                  setConnaitUES(null);
-                  setAmbassadeur(null);
-                  setMemeWhatsapp(null);
-                }
-                if (valeur !== 'RAPPEL') setRappelAt(null);
-              }}
-            />
-          </Question>
-
-          {joignable ? (
-            <Question titre="L’établissement de la fiche est-il confirmé ?" anime>
-              <Choix
-                options={[
-                  { valeur: true, label: 'Oui' },
-                  { valeur: false, label: 'Non' },
-                ]}
-                value={etablissementConfirme}
-                onChange={(valeur) => {
-                  setEtablissementConfirme(valeur);
-                  if (valeur) setNouvelEtablissement('');
-                }}
-              />
-              {etablissementConfirme === false ? (
-                <div className={cn('flex max-w-80 flex-col gap-1.5', REVELE)}>
-                  <label htmlFor="rep-etablissement" className="text-[0.875rem] font-[600]">
-                    Nouvel établissement
-                  </label>
-                  <Input
-                    id="rep-etablissement"
-                    autoComplete="off"
-                    maxLength={160}
-                    value={nouvelEtablissement}
-                    onChange={(event) => {
-                      setNouvelEtablissement(event.target.value);
-                    }}
-                  />
-                </div>
-              ) : null}
-            </Question>
-          ) : null}
-
-          {joignable ? (
-            <Question titre="A-t-il déjà été contacté ?" anime>
-              <Choix
-                options={[
-                  { valeur: true, label: 'Oui' },
-                  { valeur: false, label: 'Non' },
-                ]}
-                value={contacte}
-                onChange={setContacte}
-              />
-            </Question>
-          ) : null}
-
-          {joignable ? (
-            <Question titre="Connaît-il l’UES ?" anime>
-              <Choix
-                options={[
-                  { valeur: true, label: 'Oui' },
-                  { valeur: false, label: 'Non' },
-                ]}
-                value={connaitUES}
-                onChange={setConnaitUES}
-              />
-            </Question>
-          ) : null}
-
-          {joignable ? (
-            <Question titre="Sur quel syndicat ? (facultatif)" anime>
-              <FilterCombobox
-                className="max-w-80"
-                label="Syndicat (facultatif)"
-                placeholder="Choisir un syndicat"
-                value={syndicatId}
-                options={syndicatOptions}
-                onChange={setSyndicatId}
-              />
-            </Question>
-          ) : null}
-
-          {joignable ? (
-            <Question titre="Est-il représentant CPI CHUES ?" anime>
-              <Choix
-                options={[
-                  { valeur: true, label: 'Oui' },
-                  { valeur: false, label: 'Non' },
-                ]}
-                value={ambassadeur}
-                onChange={(valeur) => {
-                  setAmbassadeur(valeur);
-                  if (!valeur) setMemeWhatsapp(null);
-                }}
-              />
-            </Question>
-          ) : null}
-
-          {joignable && ambassadeur === true ? (
-            <Question titre="A-t-il WhatsApp sur ce numéro ?" anime>
-              <Choix
-                options={[
-                  { valeur: true, label: 'Oui' },
-                  { valeur: false, label: 'Non' },
-                ]}
-                value={memeWhatsapp}
-                onChange={setMemeWhatsapp}
-              />
-              {memeWhatsapp === false ? (
-                <div className={cn('flex max-w-80 flex-col gap-1.5', REVELE)}>
-                  <label htmlFor="rep-whatsapp" className="text-[0.875rem] font-[600]">
-                    Numéro WhatsApp
-                  </label>
-                  <Input
-                    id="rep-whatsapp"
-                    inputMode="tel"
-                    autoComplete="off"
-                    placeholder="77 123 45 67"
-                    value={whatsapp}
-                    onChange={(event) => {
-                      setWhatsapp(event.target.value);
-                    }}
-                  />
-                </div>
-              ) : null}
-            </Question>
-          ) : null}
-
-          {proposeQuelquUn ? (
-            <Question titre="Il propose quelqu’un d’autre ? (facultatif)" anime>
-              <div className="flex max-w-96 flex-col gap-3">
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="rep-sug-phone" className="text-[0.875rem] font-[600]">
-                    Son numéro
-                  </label>
-                  <Input
-                    id="rep-sug-phone"
-                    inputMode="tel"
-                    autoComplete="off"
-                    placeholder="77 123 45 67"
-                    value={sugPhone}
-                    onChange={(event) => {
-                      setSugPhone(event.target.value);
-                    }}
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="rep-sug-name" className="text-[0.875rem] font-[600]">
-                    Son nom et prénom
-                  </label>
-                  <Input
-                    id="rep-sug-name"
-                    autoComplete="off"
-                    maxLength={160}
-                    value={sugName}
-                    onChange={(event) => {
-                      setSugName(event.target.value);
-                    }}
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="rep-sug-note" className="text-[0.875rem] font-[600]">
-                    Sa remarque
-                  </label>
-                  <Textarea
-                    id="rep-sug-note"
-                    rows={2}
-                    maxLength={2000}
-                    value={sugNote}
-                    onChange={(event) => {
-                      setSugNote(event.target.value);
-                    }}
-                  />
-                </div>
-              </div>
-            </Question>
-          ) : null}
-
-          {resultat === 'RAPPEL' ? (
-            <Question titre="Quand rappeler ?" anime>
-              <ChoixEcheance now={now} value={rappelAt} onChange={setRappelAt} />
-            </Question>
-          ) : null}
-
-          {resultat === null ? null : (
-            <Question titre="Quelque chose à ajouter ? (facultatif)" anime>
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="rep-commentaire" className="text-[0.875rem] font-[600]">
-                  Commentaire
-                </label>
-                <Textarea
-                  id="rep-commentaire"
-                  rows={3}
-                  maxLength={2000}
-                  placeholder="En une phrase"
-                  value={commentaire}
-                  onChange={(event) => {
-                    setCommentaire(event.target.value);
-                  }}
-                />
-              </div>
-            </Question>
-          )}
-
-          <div className="flex flex-col gap-1.5">
-            <Button
-              className="self-start"
-              disabled={manque !== null}
-              onClick={() => {
-                setEtape(2);
-              }}
-            >
-              Continuer
-            </Button>
-            {manque === null ? null : (
-              <p className="text-[0.8125rem] text-muted-foreground">{manque}</p>
-            )}
-          </div>
-        </div>
+        <EtapeQuestions
+          resultat={resultat}
+          onResultat={choisirResultat}
+          joignable={joignable}
+          proposeQuelquUn={proposeQuelquUn}
+          questionsJoignable={{
+            etablissementConfirme,
+            setEtablissementConfirme,
+            nouvelEtablissement,
+            setNouvelEtablissement,
+            contacte,
+            setContacte,
+            connaitUES,
+            setConnaitUES,
+            syndicatId,
+            setSyndicatId,
+            syndicatOptions,
+            ambassadeur,
+            setAmbassadeur,
+            memeWhatsapp,
+            setMemeWhatsapp,
+            whatsapp,
+            setWhatsapp,
+          }}
+          suggestion={{ sugPhone, setSugPhone, sugName, setSugName, sugNote, setSugNote }}
+          rappel={{ now, value: rappelAt, onChange: setRappelAt }}
+          commentaire={commentaire}
+          onCommentaire={setCommentaire}
+          manque={manque}
+          onContinuer={() => {
+            setEtape(2);
+          }}
+        />
       ) : (
         <div className="flex flex-col gap-5">
-          <dl className="flex flex-col gap-1 rounded-lg border border-border bg-card px-4 py-3 text-[0.875rem]">
-            <Recap intitule="Personne appelée" valeur={representant.fullName} />
-            <Recap intitule="Téléphone" valeur={formatPhone(representant.phoneE164)} />
-            <Recap
-              intitule="Résultat"
-              valeur={RESULTATS.find((item) => item.valeur === resultat)?.label ?? null}
-            />
-            {joignable ? (
-              <>
-                <Recap
-                  intitule="Établissement"
-                  valeur={recapEtablissement(etablissementConfirme, nouvelEtablissement)}
-                />
-                <Recap intitule="Déjà contacté" valeur={recapOuiNon(contacte)} />
-                <Recap intitule="Connaît l’UES" valeur={recapOuiNon(connaitUES)} />
-                {syndicatName === '' ? null : <Recap intitule="Syndicat" valeur={syndicatName} />}
-                <Recap intitule="Représentant CPI CHUES" valeur={recapOuiNon(ambassadeur)} />
-              </>
-            ) : null}
-            {rappelAt === null ? null : (
-              <Recap intitule="Rappel" valeur={formatCallbackAt(rappelAt, now)} />
-            )}
-            {proposeQuelquUn && suggestionCommencee ? (
-              <Recap
-                intitule="Personne proposée"
-                valeur={[sugPhone.trim(), sugName.trim()].filter(Boolean).join(' · ')}
-              />
-            ) : null}
-            {commentaire.trim() === '' ? null : (
-              <Recap intitule="Commentaire" valeur={commentaire.trim()} />
-            )}
-          </dl>
+          <RecapAppel
+            representant={representant}
+            resultat={resultat}
+            joignable={joignable}
+            etablissementConfirme={etablissementConfirme}
+            nouvelEtablissement={nouvelEtablissement}
+            contacte={contacte}
+            connaitUES={connaitUES}
+            syndicatName={syndicatName}
+            ambassadeur={ambassadeur}
+            rappelAt={rappelAt}
+            now={now}
+            personneProposee={
+              proposeQuelquUn && suggestionCommencee
+                ? [sugPhone.trim(), sugName.trim()].filter(Boolean).join(' · ')
+                : null
+            }
+            commentaire={commentaire.trim()}
+          />
 
           {/* Un seul retour à l'écran, en tête : deux boutons du même nom
               rendraient le chemin ambigu. */}
@@ -934,11 +1188,13 @@ function ChoixEcheance({
             />
           </div>
 
-          {jour === '' ? null : heures.length === 0 ? (
+          {jour === '' || heures.length > 0 ? null : (
             <p className="text-[0.875rem]">
               Plus d’heure disponible ce jour-là. Choisissez un autre jour.
             </p>
-          ) : (
+          )}
+
+          {jour === '' || heures.length === 0 ? null : (
             <div className="flex flex-col gap-1.5">
               <p className="text-[0.875rem] font-[600]">À quelle heure ?</p>
               <div className="flex max-h-48 flex-wrap gap-2 overflow-y-auto scrollbar-thin">
