@@ -197,30 +197,95 @@ export async function fetchSupervisionActivite(
   );
 }
 
-export type ActivityLine = {
+const COUNT_KEYS = [
+  'repCalls',
+  'repReached',
+  'repCallback',
+  'repQuestioned',
+  'repQualified',
+  'representantsContacted',
+  'calls',
+  'methodObtained',
+  'unreachable',
+  'refused',
+  'callback',
+  'prospectsCreated',
+] as const;
+
+type ActivityCountKey = (typeof COUNT_KEYS)[number];
+type ActivityRateKey = 'repContactRate' | 'repQualificationRate' | 'reachRate';
+export type ActivityKey = ActivityCountKey | ActivityRateKey;
+
+export type ActivityCounts = Record<ActivityCountKey, number> &
+  Record<ActivityRateKey, number | null>;
+export type ActivityLine = ActivityCounts & {
   id: string;
   name: string;
   isActive: boolean;
-  calls: number;
-  methodObtained: number;
-  unreachable: number;
-  wrongNumber: number;
-  refused: number;
-  callback: number;
-  reachRate: number | null;
-  prospectsCreated: number;
-  representantsContacted: number;
   hasActivity: boolean;
 };
+export type ActivityTotals = ActivityCounts & { people: number };
+export type BucketTotals = ActivityCounts & { bucket: string };
 
-export function reachRateOf(counts: {
-  calls: number;
-  unreachable: number;
-  wrongNumber: number;
-}): number | null {
-  if (counts.calls === 0) return null;
-  const reached = counts.calls - counts.unreachable - counts.wrongNumber;
-  return Math.round((reached / counts.calls) * 1000) / 10;
+export interface ActivityColumn {
+  key: ActivityKey;
+  label: string;
+  taux?: boolean;
+}
+
+/**
+ * Le plateau CHUES appelle des représentants : ses appels de prospects sont
+ * ceux de la conversion. Le Grand Public n'appelle que des prospects.
+ */
+export const ACTIVITY_COLUMNS: Record<Schemas['Projet'], ActivityColumn[]> = {
+  CHUES: [
+    { key: 'repCalls', label: 'Appels' },
+    { key: 'repReached', label: 'Joints' },
+    { key: 'repCallback', label: 'Rendez-vous' },
+    { key: 'repContactRate', label: 'Taux de contact', taux: true },
+    { key: 'repQualificationRate', label: 'Qualification', taux: true },
+    { key: 'representantsContacted', label: 'Représentants contactés' },
+    { key: 'calls', label: 'Appels prospects' },
+    { key: 'methodObtained', label: 'Méthodes' },
+    { key: 'prospectsCreated', label: 'Prospects saisis' },
+  ],
+  GRAND_PUBLIC: [
+    { key: 'calls', label: 'Appels' },
+    { key: 'methodObtained', label: 'Méthodes' },
+    { key: 'unreachable', label: 'Injoignables' },
+    { key: 'refused', label: 'Refus' },
+    { key: 'callback', label: 'À rappeler' },
+    { key: 'reachRate', label: 'Joignabilité', taux: true },
+    { key: 'prospectsCreated', label: 'Prospects saisis' },
+  ],
+};
+
+function rate(part: number, whole: number): number | null {
+  if (whole === 0) return null;
+  return Math.round((part / whole) * 1000) / 10;
+}
+
+function compteursVides(): ActivityCounts {
+  const zeros = Object.fromEntries(COUNT_KEYS.map((key) => [key, 0])) as Record<
+    ActivityCountKey,
+    number
+  >;
+  return { ...zeros, repContactRate: null, repQualificationRate: null, reachRate: null };
+}
+
+// Un faux numéro est un appel perdu comme un NRP : une seule colonne.
+// Distincts DANS une période, `representantsContacted` et `repQuestioned`
+// recomptent un représentant rappelé une autre période.
+function cumuler(into: ActivityCounts, row: ActivityRow): void {
+  for (const key of COUNT_KEYS) into[key] += row[key];
+  into.unreachable += row.wrongNumber;
+}
+
+function calculerTaux<T extends ActivityCounts>(counts: T): T {
+  counts.reachRate = rate(counts.calls - counts.unreachable, counts.calls);
+  counts.repContactRate = rate(counts.repReached, counts.repCalls);
+  counts.repQualificationRate = rate(counts.repQualified, counts.repQuestioned);
+  return counts;
 }
 
 /**
@@ -229,160 +294,46 @@ export function reachRateOf(counts: {
  */
 export function activityLines(data: SupervisionActivity): ActivityLine[] {
   const lines = new Map<string, ActivityLine>();
+  const ligne = (id: string, name: string, isActive: boolean): ActivityLine => {
+    const line = lines.get(id) ?? { ...compteursVides(), id, name, isActive, hasActivity: false };
+    lines.set(id, line);
+    return line;
+  };
 
-  for (const person of data.teleconseillers) {
-    lines.set(person.id, {
-      id: person.id,
-      name: person.fullName,
-      isActive: person.isActive,
-      calls: 0,
-      methodObtained: 0,
-      unreachable: 0,
-      wrongNumber: 0,
-      refused: 0,
-      callback: 0,
-      reachRate: null,
-      prospectsCreated: 0,
-      representantsContacted: 0,
-      hasActivity: false,
-    });
-  }
-
+  for (const person of data.teleconseillers) ligne(person.id, person.fullName, person.isActive);
   for (const row of data.items) {
-    let line = lines.get(row.teleconseillerId);
-    if (line === undefined) {
-      line = {
-        id: row.teleconseillerId,
-        name: row.teleconseillerName,
-        isActive: true,
-        calls: 0,
-        methodObtained: 0,
-        unreachable: 0,
-        wrongNumber: 0,
-        refused: 0,
-        callback: 0,
-        reachRate: null,
-        prospectsCreated: 0,
-        representantsContacted: 0,
-        hasActivity: false,
-      };
-      lines.set(line.id, line);
-    }
-    line.calls += row.calls;
-    line.methodObtained += row.methodObtained;
-    line.unreachable += row.unreachable;
-    line.wrongNumber += row.wrongNumber;
-    line.refused += row.refused;
-    line.callback += row.callback;
-    line.prospectsCreated += row.prospectsCreated;
-    // Distinct DANS une période: le cumul recompte un représentant rappelé une autre période.
-    line.representantsContacted += row.representantsContacted;
+    const line = ligne(row.teleconseillerId, row.teleconseillerName, true);
+    cumuler(line, row);
     line.hasActivity = true;
   }
 
-  const result = [...lines.values()];
-  for (const line of result) line.reachRate = reachRateOf(line);
-  return result;
+  return [...lines.values()].map(calculerTaux);
 }
-
-export type ActivityTotals = {
-  people: number;
-  calls: number;
-  methodObtained: number;
-  unreachable: number;
-  wrongNumber: number;
-  refused: number;
-  callback: number;
-  reachRate: number | null;
-  prospectsCreated: number;
-  representantsContacted: number;
-};
 
 export function activityTotals(lines: readonly ActivityLine[]): ActivityTotals {
-  const totals: ActivityTotals = {
-    people: lines.length,
-    calls: 0,
-    methodObtained: 0,
-    unreachable: 0,
-    wrongNumber: 0,
-    refused: 0,
-    callback: 0,
-    reachRate: null,
-    prospectsCreated: 0,
-    representantsContacted: 0,
-  };
-
-  for (const line of lines) {
-    totals.calls += line.calls;
-    totals.methodObtained += line.methodObtained;
-    totals.unreachable += line.unreachable;
-    totals.wrongNumber += line.wrongNumber;
-    totals.refused += line.refused;
-    totals.callback += line.callback;
-    totals.prospectsCreated += line.prospectsCreated;
-    totals.representantsContacted += line.representantsContacted;
-  }
-
-  totals.reachRate = reachRateOf(totals);
-  return totals;
+  const totals: ActivityTotals = { ...compteursVides(), people: lines.length };
+  for (const line of lines) for (const key of COUNT_KEYS) totals[key] += line[key];
+  return calculerTaux(totals);
 }
 
-export function activityAverages(totals: ActivityTotals): Omit<ActivityTotals, 'people'> {
+export function activityAverages(totals: ActivityTotals): ActivityCounts {
   const divisor = totals.people === 0 ? 1 : totals.people;
-  const mean = (value: number): number => Math.round((value / divisor) * 10) / 10;
-  return {
-    calls: mean(totals.calls),
-    methodObtained: mean(totals.methodObtained),
-    unreachable: mean(totals.unreachable),
-    wrongNumber: mean(totals.wrongNumber),
-    refused: mean(totals.refused),
-    callback: mean(totals.callback),
-    reachRate: totals.reachRate,
-    prospectsCreated: mean(totals.prospectsCreated),
-    representantsContacted: mean(totals.representantsContacted),
-  };
+  const averages = { ...totals };
+  for (const key of COUNT_KEYS) averages[key] = Math.round((totals[key] / divisor) * 10) / 10;
+  return averages;
 }
-
-export type BucketTotals = {
-  bucket: string;
-  calls: number;
-  methodObtained: number;
-  unreachable: number;
-  wrongNumber: number;
-  refused: number;
-  callback: number;
-  reachRate: number | null;
-};
 
 export function bucketTotals(rows: readonly ActivityRow[]): BucketTotals[] {
   const buckets = new Map<string, BucketTotals>();
-
   for (const row of rows) {
-    const bucket = buckets.get(row.bucket) ?? {
-      bucket: row.bucket,
-      calls: 0,
-      methodObtained: 0,
-      unreachable: 0,
-      wrongNumber: 0,
-      refused: 0,
-      callback: 0,
-      reachRate: null,
-    };
-    bucket.calls += row.calls;
-    bucket.methodObtained += row.methodObtained;
-    bucket.unreachable += row.unreachable;
-    bucket.wrongNumber += row.wrongNumber;
-    bucket.refused += row.refused;
-    bucket.callback += row.callback;
+    const bucket = buckets.get(row.bucket) ?? { ...compteursVides(), bucket: row.bucket };
+    cumuler(bucket, row);
     buckets.set(bucket.bucket, bucket);
   }
-
-  const result = [...buckets.values()].sort((a, b) => a.bucket.localeCompare(b.bucket));
-  for (const bucket of result) bucket.reachRate = reachRateOf(bucket);
-  return result;
+  return [...buckets.values()].sort((a, b) => a.bucket.localeCompare(b.bucket)).map(calculerTaux);
 }
 
-export type ActivitySortKey = 'name' | Exclude<keyof ActivityTotals, 'people'>;
+export type ActivitySortKey = 'name' | ActivityKey;
 export type SortDirection = 'asc' | 'desc';
 
 export function sortActivityLines(
@@ -404,18 +355,6 @@ export function sortActivityLines(
   });
 }
 
-const CSV_HEADERS = [
-  'Téléconseiller',
-  'Appels',
-  'Méthodes obtenues',
-  'NRP / injoignables',
-  'Faux numéros',
-  'Refus',
-  'À rappeler',
-  'Taux de joignabilité (%)',
-  'Prospects saisis',
-];
-
 const PROJET_LABELS: Record<Schemas['Projet'], string> = {
   CHUES: 'CHUES',
   GRAND_PUBLIC: 'Grand Public',
@@ -428,22 +367,10 @@ export function activityCsv(input: {
   granularity: SupervisionGranularity;
   projet: Schemas['Projet'];
 }): string {
-  // Le Grand Public n'a pas de représentants : la colonne n'y est ni vide, ni à zéro.
-  const avecRepresentants = input.projet !== 'GRAND_PUBLIC';
-  const ligne = (
-    nom: string,
-    valeurs: Omit<ActivityTotals, 'people'>,
-  ): (string | number | null)[] => [
+  const colonnes = ACTIVITY_COLUMNS[input.projet];
+  const ligne = (nom: string, valeurs: ActivityCounts): (string | number | null)[] => [
     nom,
-    valeurs.calls,
-    valeurs.methodObtained,
-    valeurs.unreachable,
-    valeurs.wrongNumber,
-    valeurs.refused,
-    valeurs.callback,
-    valeurs.reachRate,
-    valeurs.prospectsCreated,
-    ...(avecRepresentants ? [valeurs.representantsContacted] : []),
+    ...colonnes.map((colonne) => valeurs[colonne.key]),
   ];
 
   const rows: (string | number | null)[][] = [
@@ -452,7 +379,12 @@ export function activityCsv(input: {
       input.granularity === 'week' ? 'Par semaine' : 'Par jour',
     ],
     [],
-    avecRepresentants ? [...CSV_HEADERS, 'Représentants contactés'] : CSV_HEADERS,
+    [
+      'Téléconseiller',
+      ...colonnes.map((colonne) =>
+        colonne.taux === true ? `${colonne.label} (%)` : colonne.label,
+      ),
+    ],
   ];
 
   for (const line of input.lines) {
