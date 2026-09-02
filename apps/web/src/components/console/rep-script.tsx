@@ -501,8 +501,15 @@ function EtapeQuestions(props: EtapeQuestionsProps) {
 
       {props.proposeQuelquUn ? <QuestionSuggestion {...props.suggestion} /> : null}
 
-      {props.resultat === 'RAPPEL' ? (
-        <Question titre="Quand rappeler ?" anime>
+      {props.resultat === 'RAPPEL' || props.joignable ? (
+        <Question
+          titre={
+            props.resultat === 'RAPPEL'
+              ? 'Quand rappeler ?'
+              : 'Le rappeler plus tard ? (facultatif)'
+          }
+          anime
+        >
           <ChoixEcheance
             now={props.rappel.now}
             value={props.rappel.value}
@@ -900,7 +907,7 @@ function Qualification({
       setAmbassadeur(null);
       setMemeWhatsapp(null);
     }
-    if (valeur !== 'RAPPEL') setRappelAt(null);
+    if (valeur === 'INJOIGNABLE') setRappelAt(null);
   };
 
   const reculer = useCallback(() => {

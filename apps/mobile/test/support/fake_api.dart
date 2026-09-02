@@ -603,6 +603,11 @@ RepresentantDto representantDto({
   String? syndicat,
   bool? connaitUES,
   bool? contacte,
+  RepCallOutcome? lastCallOutcome,
+  DateTime? lastCallAt,
+  String? lastCallById,
+  String? lastCallByName,
+  DateTime? nextCallbackAt,
 }) => RepresentantDto(
   id: id,
   fullName: fullName,
@@ -616,6 +621,11 @@ RepresentantDto representantDto({
   syndicat: syndicat,
   connaitUES: connaitUES,
   contacte: contacte,
+  lastCallOutcome: lastCallOutcome,
+  lastCallAt: lastCallAt,
+  lastCallById: lastCallById,
+  lastCallByName: lastCallByName,
+  nextCallbackAt: nextCallbackAt,
   // Calcule par le SERVEUR: la fabrique reproduit sa regle plutot que d'en
   // inventer une autre.
   whatsappNumber: whatsappStatus == WhatsappStatus.MEME_NUMERO

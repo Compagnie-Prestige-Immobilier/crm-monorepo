@@ -830,10 +830,12 @@ interface ScopeFilters {
 
 function scopeLabel(cible: LotExportCible, filters: unknown): string {
   const f = (filters ?? {}) as ScopeFilters;
-  if (cible === LotExportCible.REPRESENTANTS)
-    return f.relationStatus
-      ? `Représentants ${f.relationStatus.toLowerCase()}`
-      : 'Tous les représentants';
+  if (cible === LotExportCible.REPRESENTANTS) {
+    if (!f.relationStatus) return 'Tous les représentants';
+    return f.relationStatus === 'INCONNU'
+      ? 'Représentants non qualifiés'
+      : `Représentants ${f.relationStatus.toLowerCase()}`;
+  }
   if (f.segment) return `${f.projet ?? 'Tous projets'}, segment ${f.segment}`;
   if (f.type) return `${f.projet ?? 'Grand Public'}, ${f.type.toLowerCase().replace('_', ' ')}`;
   return f.projet ?? 'Tous projets';

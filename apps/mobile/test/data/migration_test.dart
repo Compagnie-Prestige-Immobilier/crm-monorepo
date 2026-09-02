@@ -2234,6 +2234,79 @@ void main() {
     await db.close();
   });
 
+  // Le résumé du dernier appel arrive sur `representants` par le MÊME palier :
+  // la section « Injoignables » se lit dessus, et une colonne absente ferait
+  // échouer chaque lecture de fiche.
+  test('v22 -> v23 ajoute le résumé du dernier appel aux représentants', () async {
+    final schema = await verifier.schemaAt(22);
+
+    final v22schema.DatabaseAtV22 old = v22schema.DatabaseAtV22(
+      schema.newConnection(),
+    );
+    await old.customStatement('PRAGMA foreign_keys = ON;');
+    await old.customStatement(
+      'INSERT INTO departements (id, code, name, region_id, local_updated_at) '
+      'VALUES (?, ?, ?, ?, ?)',
+      <Object?>['dep-1', 'DK', 'Dakar', 'reg-1', _iso],
+    );
+    await old.customStatement(
+      'INSERT INTO representants '
+      '(id, full_name, phone_e164, departement_id, etablissement, '
+      ' created_by_id, client_created_at, local_updated_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      <Object?>[
+        'rep-23',
+        'Ousmane Fall',
+        '+221771234567',
+        'dep-1',
+        'Lycée Blaise Diagne',
+        'me',
+        _iso,
+        _iso,
+      ],
+    );
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
+
+    final QueryRow fiche = await db
+        .customSelect(
+          'SELECT etablissement, last_call_outcome, last_call_at, '
+          '       last_call_by_id, next_callback_at FROM representants',
+        )
+        .getSingle();
+    // La saisie d'hier survit, et les colonnes neuves démarrent NULLES : le
+    // résumé vient du serveur, une migration ne peut pas l'inventer.
+    expect(fiche.read<String?>('etablissement'), 'Lycée Blaise Diagne');
+    for (final String colonne in <String>[
+      'last_call_outcome',
+      'last_call_at',
+      'last_call_by_id',
+      'next_callback_at',
+    ]) {
+      expect(fiche.read<String?>(colonne), isNull, reason: colonne);
+    }
+
+    // Les colonnes s'ÉCRIVENT : « la colonne existe » se vérifierait aussi sur
+    // une colonne au mauvais type. Une issue que ce client ignore passe : aucun
+    // CHECK ne cite le vocabulaire du serveur.
+    await db.customStatement(
+      'UPDATE representants SET last_call_outcome = ?, last_call_at = ?, '
+      '       last_call_by_id = ?, next_callback_at = ? WHERE id = ?',
+      <Object?>['ESCALATED', _iso, 'u-1', _iso, 'rep-23'],
+    );
+    final QueryRow apres = await db
+        .customSelect(
+          'SELECT last_call_outcome, last_call_by_id FROM representants',
+        )
+        .getSingle();
+    expect(apres.read<String?>('last_call_outcome'), 'ESCALATED');
+    expect(apres.read<String?>('last_call_by_id'), 'u-1');
+
+    await db.close();
+  });
+
   test('v11 -> courant traverse sans créer les tables de campagne', () async {
     final schema = await verifier.schemaAt(11);
     final v11.DatabaseAtV11 old = v11.DatabaseAtV11(schema.newConnection());

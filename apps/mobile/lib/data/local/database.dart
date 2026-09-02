@@ -288,6 +288,13 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(prospects, colonne);
           }
         }
+        // Résumé du dernier appel, écrit par le serveur. Comme au palier v22,
+        // `representants` n'a jamais été recréée : les colonnes s'ajoutent sans
+        // condition.
+        await m.addColumn(representants, representants.lastCallOutcome);
+        await m.addColumn(representants, representants.lastCallAt);
+        await m.addColumn(representants, representants.lastCallById);
+        await m.addColumn(representants, representants.nextCallbackAt);
         // Comme aux paliers v8 et v21 : le pull est un curseur keyset, et un
         // appareil déjà mis au miroir ne redemande plus les listes entières.
         // Sans ce marqueur effacé, les trois listes neuves resteraient vides à

@@ -19,6 +19,7 @@ import '../../../ui/widgets/local_typeahead.dart';
 import '../../../ui/widgets/phone_field.dart';
 import '../../permissions/alarme_permission.dart';
 import '../../phase2/presentation/callback_picker.dart';
+import '../../rappels/presentation/rappels_screen.dart' show quandRappeler;
 
 enum _Resultat { joignable, rappel, injoignable }
 
@@ -85,12 +86,9 @@ class _RepresentantQualificationScreenState
   bool get proposeQuelquUn =>
       resultat == _Resultat.joignable && ambassadeur == false;
 
-  /// N'importe lequel des trois champs suffit à ouvrir la suggestion : ce que
-  /// le téléconseiller a tapé ne doit pas disparaître faute de numéro.
-  bool get suggestionCommencee =>
-      suggestionTelephone.text.trim().isNotEmpty ||
-      suggestionNom.text.trim().isNotEmpty ||
-      suggestionNote.text.trim().isNotEmpty;
+  /// Le numéro seul ouvre la suggestion : le nom et la remarque ne se saisissent
+  /// qu'après lui, et le serveur les jette sans numéro.
+  bool get suggestionCommencee => suggestionTelephone.text.trim().isNotEmpty;
 
   /// [context] est pris SOUS la coque : le message passe par son `FToaster`.
   void erreur(BuildContext context, String message) =>
@@ -131,11 +129,7 @@ class _RepresentantQualificationScreenState
     if (proposeQuelquUn &&
         suggestionCommencee &&
         Phone.parse(suggestionTelephone.text) is! PhoneValid) {
-      // Le serveur jette la suggestion sans numéro : mieux vaut retenir
-      // l'enregistrement que perdre le nom déjà écrit.
-      return suggestionTelephone.text.trim().isEmpty
-          ? 'Écrivez le numéro de la personne proposée'
-          : 'Numéro de la personne proposée incomplet';
+      return 'Numéro de la personne proposée incomplet';
     }
     return null;
   }
@@ -180,6 +174,8 @@ class _RepresentantQualificationScreenState
           suggestionNom.text.trim(),
         ].where((String s) => s.isNotEmpty).join(' · '),
       ),
+    if (rappelAt != null)
+      CpiRecapLine('Rappel', quandRappeler(context, rappelAt!, DateTime.now())),
     if (commentaire.text.trim().isNotEmpty)
       CpiRecapLine('Commentaire', commentaire.text.trim()),
   ];
@@ -464,7 +460,12 @@ class _RepresentantQualificationScreenState
         label: questions[0],
         showLabel: false,
         value: resultat,
-        onChanged: (_Resultat choix) => setState(() => resultat = choix),
+        // L'heure repart de zéro : chaque branche a son propre sélecteur, et
+        // celui qu'on quitte laisserait sinon sa date derrière lui.
+        onChanged: (_Resultat choix) => setState(() {
+          resultat = choix;
+          rappelAt = null;
+        }),
         options: const <(_Resultat, String)>[
           (_Resultat.joignable, 'Joignable'),
           (_Resultat.rappel, 'À rappeler'),
@@ -558,6 +559,12 @@ class _RepresentantQualificationScreenState
               onChanged: () => setState(() {}),
             ),
           ),
+        ),
+        const SizedBox(height: CpiSpacing.lg),
+        CallbackPicker(
+          now: DateTime.now(),
+          title: 'Le rappeler plus tard ? (facultatif)',
+          onChanged: (DateTime? at) => setState(() => rappelAt = at),
         ),
       ],
       if (resultat == _Resultat.rappel) ...<Widget>[
@@ -664,23 +671,33 @@ class _PersonneProposee extends StatelessWidget {
         label: 'Son numéro',
         onChanged: (String _) => onChanged(),
       ),
-      const SizedBox(height: CpiSpacing.sm),
-      CpiField(
-        label: 'Son nom et prénom (facultatif)',
-        controller: nom,
-        hint: 'Ex. Fatou Sarr',
-        onChanged: (String _) => onChanged(),
-        textCapitalization: TextCapitalization.words,
-      ),
-      const SizedBox(height: CpiSpacing.sm),
-      CpiField(
-        label: 'Sa remarque (facultatif)',
-        controller: note,
-        hint: 'Ex. Déléguée du personnel',
-        onChanged: (String _) => onChanged(),
-        maxLines: 3,
-        maxLength: 2000,
-        textCapitalization: TextCapitalization.sentences,
+      // Sans numéro, le serveur jette le nom et la remarque : les demander
+      // d'abord faisait saisir pour rien.
+      CpiReveal(
+        visible: telephone.text.trim().isNotEmpty,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            const SizedBox(height: CpiSpacing.sm),
+            CpiField(
+              label: 'Son nom et prénom (facultatif)',
+              controller: nom,
+              hint: 'Ex. Fatou Sarr',
+              onChanged: (String _) => onChanged(),
+              textCapitalization: TextCapitalization.words,
+            ),
+            const SizedBox(height: CpiSpacing.sm),
+            CpiField(
+              label: 'Sa remarque (facultatif)',
+              controller: note,
+              hint: 'Ex. Déléguée du personnel',
+              onChanged: (String _) => onChanged(),
+              maxLines: 3,
+              maxLength: 2000,
+              textCapitalization: TextCapitalization.sentences,
+            ),
+          ],
+        ),
       ),
     ],
   );

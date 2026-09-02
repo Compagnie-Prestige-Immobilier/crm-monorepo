@@ -1408,6 +1408,38 @@ class Representants extends Table with TableInfo {
     requiredDuringInsert: false,
     $customConstraints: 'NULL',
   );
+  late final GeneratedColumn<String> lastCallOutcome = GeneratedColumn<String>(
+    'last_call_outcome',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
+  );
+  late final GeneratedColumn<String> lastCallAt = GeneratedColumn<String>(
+    'last_call_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
+  );
+  late final GeneratedColumn<String> lastCallById = GeneratedColumn<String>(
+    'last_call_by_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
+  );
+  late final GeneratedColumn<String> nextCallbackAt = GeneratedColumn<String>(
+    'next_callback_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
+  );
   late final GeneratedColumn<String> createdById = GeneratedColumn<String>(
     'created_by_id',
     aliasedName,
@@ -1474,6 +1506,10 @@ class Representants extends Table with TableInfo {
     syndicat,
     connaitUes,
     contacte,
+    lastCallOutcome,
+    lastCallAt,
+    lastCallById,
+    nextCallbackAt,
     createdById,
     clientCreatedAt,
     rev,
@@ -2740,6 +2776,10 @@ class RepresentantSyncView extends ViewInfo<RepresentantSyncView, Never>
     syndicat,
     connaitUes,
     contacte,
+    lastCallOutcome,
+    lastCallAt,
+    lastCallById,
+    nextCallbackAt,
     createdById,
     clientCreatedAt,
     rev,
@@ -2853,6 +2893,30 @@ class RepresentantSyncView extends ViewInfo<RepresentantSyncView, Never>
     aliasedName,
     true,
     type: DriftSqlType.int,
+  );
+  late final GeneratedColumn<String> lastCallOutcome = GeneratedColumn<String>(
+    'last_call_outcome',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+  );
+  late final GeneratedColumn<String> lastCallAt = GeneratedColumn<String>(
+    'last_call_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+  );
+  late final GeneratedColumn<String> lastCallById = GeneratedColumn<String>(
+    'last_call_by_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+  );
+  late final GeneratedColumn<String> nextCallbackAt = GeneratedColumn<String>(
+    'next_callback_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
   );
   late final GeneratedColumn<String> createdById = GeneratedColumn<String>(
     'created_by_id',
