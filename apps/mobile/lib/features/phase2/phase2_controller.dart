@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show BooleanExpressionOperators;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -8,7 +9,17 @@ import '../../core/utils/phone.dart';
 import '../../data/local/database.dart';
 import '../../data/repositories/write_repository.dart';
 
-enum Phase2Stage { search, notFound, alreadyClosed, capture, confirmed }
+enum Phase2Stage {
+  search,
+  notFound,
+
+  /// Le numéro existe, mais aucune de mes campagnes ne me l'attribue : le
+  /// serveur refuserait l'appel une fois remonté.
+  horsPerimetre,
+  alreadyClosed,
+  capture,
+  confirmed,
+}
 
 /// Ce que l'étape « Renseignements » a recueilli. Le dossier complet est exigé
 /// avant une adhésion, mais pas avant un appel qui n'a pas abouti : tout y reste
@@ -192,6 +203,16 @@ class Phase2Controller extends Notifier<Phase2State> {
       return;
     }
 
+    if (!await _dansMonPerimetre(found.prospectId)) {
+      state = state.copyWith(
+        stage: Phase2Stage.horsPerimetre,
+        searchedPhone: parsed.e164,
+        clearEntry: true,
+        clearError: true,
+      );
+      return;
+    }
+
     state = state.copyWith(
       stage: found.phase2Status == Phase2Statuses.pending
           ? Phase2Stage.capture
@@ -201,6 +222,24 @@ class Phase2Controller extends Notifier<Phase2State> {
       searchedPhone: parsed.e164,
       clearError: true,
     );
+  }
+
+  /// Le serveur refuse `CALL_ATTEMPT` hors périmètre (`PHASE2_NOT_ASSIGNED`) :
+  /// mieux vaut le dire avant l'appel qu'après la remontée. Tant que le
+  /// marqueur `borne` n'est pas posé, rien n'est filtré.
+  Future<bool> _dansMonPerimetre(String prospectId) async {
+    final AppDatabase db = ref.read(appDatabaseProvider);
+    final List<Attribution> lignes =
+        await (db.select(db.attributions)..where(
+              (Attributions t) =>
+                  t.kind.equals(attributionBorne) |
+                  (t.kind.equals('prospect') & t.id.equals(prospectId)),
+            ))
+            .get();
+    if (!lignes.any((Attribution a) => a.kind == attributionBorne)) return true;
+    if (lignes.any((Attribution a) => a.kind == 'prospect')) return true;
+    final Prospect? fiche = await _localProspect(prospectId);
+    return fiche?.createdById == ref.read(authControllerProvider).userId;
   }
 
   /// La fiche du prospect si le pull l'a descendue sur cet appareil. Une lecture

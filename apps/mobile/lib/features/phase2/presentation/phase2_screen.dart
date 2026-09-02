@@ -134,7 +134,8 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
   Future<void> _runSearch(String e164) async {
     await ref.read(phase2ControllerProvider.notifier).search(e164);
     if (!mounted) return;
-    if (ref.read(phase2ControllerProvider).stage == Phase2Stage.notFound) {
+    final Phase2Stage stage = ref.read(phase2ControllerProvider).stage;
+    if (stage == Phase2Stage.notFound || stage == Phase2Stage.horsPerimetre) {
       await HapticFeedback.heavyImpact();
     }
   }
@@ -677,6 +678,10 @@ class _EtapeQui extends StatelessWidget {
           phone: state.searchedPhone,
           onClear: onClear,
         ),
+        Phase2Stage.horsPerimetre => _HorsPerimetre(
+          phone: state.searchedPhone,
+          onClear: onClear,
+        ),
         Phase2Stage.alreadyClosed => _AlreadyClosed(
           entry: state.entry!,
           onNext: onNext,
@@ -1056,6 +1061,7 @@ class _EtapeUnAction extends ConsumerWidget {
       );
     }
     if (phase2.stage == Phase2Stage.notFound ||
+        phase2.stage == Phase2Stage.horsPerimetre ||
         phase2.stage == Phase2Stage.alreadyClosed) {
       // Pas de barre, mais la place de la barre de gestes : `CpiScaffold` rend
       // le bas du corps au pied dès qu'il en reçoit un.
@@ -1308,6 +1314,41 @@ class _NotFound extends ConsumerWidget {
       ],
     );
   }
+}
+
+/// Le numéro existe, mais aucune campagne ne me l'attribue. Sans cet état,
+/// l'appel se saisissait en entier avant que le serveur ne le refuse
+/// (`PHASE2_NOT_ASSIGNED`), des heures plus tard, dans « À corriger ».
+class _HorsPerimetre extends StatelessWidget {
+  const _HorsPerimetre({required this.phone, required this.onClear});
+
+  final String? phone;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: <Widget>[
+      const _Notice(
+        icon: PhosphorIconsRegular.prohibit,
+        message: 'Ce numéro n\'est pas dans vos campagnes.',
+      ),
+      const SizedBox(height: CpiSpacing.xs),
+      if (phone != null)
+        Text(
+          Phone.format(phone!),
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+      const SizedBox(height: CpiSpacing.md),
+      CpiButton(
+        'Effacer et recommencer',
+        variant: CpiButtonVariant.secondary,
+        icon: PhosphorIconsRegular.eraser,
+        onPressed: onClear,
+      ),
+    ],
+  );
 }
 
 class _AlreadyClosed extends StatelessWidget {

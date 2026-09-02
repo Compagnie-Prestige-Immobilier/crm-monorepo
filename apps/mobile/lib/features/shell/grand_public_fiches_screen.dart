@@ -87,7 +87,10 @@ class GrandPublicFichesScreen extends ConsumerWidget {
               );
             }
             if (rows.isEmpty) {
-              return _Empty(searching: search.trim().isNotEmpty);
+              return _Empty(
+                searching: search.trim().isNotEmpty,
+                borne: ref.watch(perimetreBorneProvider).value ?? false,
+              );
             }
             // Les gouttières de la page valent aussi pour les lignes : une
             // liste collée aux bords de l'écran n'a pas l'air d'appartenir à
@@ -189,18 +192,31 @@ class ProspectTile extends StatelessWidget {
 }
 
 class _Empty extends StatelessWidget {
-  const _Empty({required this.searching});
+  const _Empty({required this.searching, this.borne = false});
 
   final bool searching;
 
+  /// Le compte ne voit que les fiches de ses campagnes.
+  final bool borne;
+
   @override
-  Widget build(BuildContext context) => CpiEmptyState(
-    icon: searching
-        ? PhosphorIconsDuotone.magnifyingGlass
-        : PhosphorIconsDuotone.usersThree,
-    title: searching ? 'Aucun résultat' : 'Aucun prospect',
-    message: searching
-        ? 'Vérifiez le nom ou le numéro, ou effacez la recherche.'
-        : 'Ajoutez le premier prospect depuis le bouton en haut de l’écran.',
-  );
+  Widget build(BuildContext context) {
+    if (borne && !searching) {
+      return const CpiEmptyState(
+        icon: PhosphorIconsDuotone.usersThree,
+        title: 'Aucune fiche dans vos campagnes.',
+        message:
+            'La liste se remplit quand une campagne vous attribue des numéros.',
+      );
+    }
+    return CpiEmptyState(
+      icon: searching
+          ? PhosphorIconsDuotone.magnifyingGlass
+          : PhosphorIconsDuotone.usersThree,
+      title: searching ? 'Aucun résultat' : 'Aucun prospect',
+      message: searching
+          ? 'Vérifiez le nom ou le numéro, ou effacez la recherche.'
+          : 'Ajoutez le premier prospect depuis le bouton en haut de l’écran.',
+    );
+  }
 }

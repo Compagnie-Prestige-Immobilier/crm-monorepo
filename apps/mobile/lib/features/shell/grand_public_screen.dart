@@ -95,6 +95,14 @@ class GrandPublicScreen extends ConsumerWidget {
               // n'y a rien, pas une carte qui refuse le geste.
               onTap: () => context.push(Routes.grandPublicRappels).ignore(),
             ),
+            const SizedBox(height: CpiSpacing.sm),
+            _Carte(
+              nombre: null,
+              titre: 'Mes contacts',
+              detail: 'Les personnes que vous avez appelées',
+              icon: PhosphorIconsRegular.addressBook,
+              onTap: () => context.push(Routes.grandPublicMesContacts).ignore(),
+            ),
           ],
         ),
       ),

@@ -11,6 +11,7 @@ import '../../features/accueil/presentation/registre_screen.dart';
 import '../../features/accueil/presentation/visite_form_screen.dart';
 import '../../features/auth/auth_state.dart';
 import '../../features/auth/presentation/login_screen.dart';
+import '../../features/contacts/presentation/mes_contacts_screen.dart';
 import '../../features/corrections/presentation/corrections_screen.dart';
 import '../../features/historique/presentation/historique_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
@@ -238,6 +239,22 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         name: 'rappels',
         parentNavigatorKey: rootNavigatorKey,
         builder: _chues((GoRouterState state) => const RappelsScreen()),
+      ),
+      GoRoute(
+        path: Routes.grandPublicMesContacts,
+        name: 'grandPublicMesContacts',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) =>
+            const ProjectScope(
+              project: CpiProject.grandPublic,
+              child: MesContactsScreen(grandPublic: true),
+            ),
+      ),
+      GoRoute(
+        path: Routes.mesContacts,
+        name: 'mesContacts',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: _chues((GoRouterState state) => const MesContactsScreen()),
       ),
       GoRoute(
         path: '/grand-public/phase2',
