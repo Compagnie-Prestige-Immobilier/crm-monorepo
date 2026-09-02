@@ -130,6 +130,21 @@ export async function fetchRepresentantsSuivi(
   return flattenPage(unwrap(await client.GET('/api/v1/representants', { params: { query } })));
 }
 
+/** Les représentants dont ce téléconseiller a passé le DERNIER appel, du plus récent au plus ancien. */
+export async function fetchRepresentantsAppeles(
+  lastCallById: string,
+  client: ApiClient = getApiClient(),
+): Promise<Paginated<RepresentantRow>> {
+  const query: RepresentantQuery = {
+    lastCallById,
+    sortBy: 'lastCallAt',
+    sortOrder: 'desc',
+    page: 1,
+    pageSize: SUIVI_PAGE_SIZE,
+  };
+  return flattenPage(unwrap(await client.GET('/api/v1/representants', { params: { query } })));
+}
+
 export async function fetchRepresentant(
   id: string,
   client: ApiClient = getApiClient(),
