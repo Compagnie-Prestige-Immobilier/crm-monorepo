@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/table';
 import {
   ACTIVITY_COLUMNS,
+  FAMILLE_LABELS,
   PERIOD_LABELS,
   activityCsv,
   activityCsvFileName,
@@ -39,12 +40,14 @@ import {
   activityTotals,
   bucketTotals,
   dakarToday,
+  famillesDuProjet,
   fetchSupervisionActivite,
   presetRange,
   sortActivityLines,
   supervisionActivityKey,
   type ActivityColumn,
   type ActivityCounts,
+  type ActivityFamille,
   type ActivityKey,
   type ActivityLine,
   type ActivityRange,
@@ -59,14 +62,14 @@ import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
 import type { Projet } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
-const TUILES: Record<Projet, { key: ActivityKey; icon: LucideIcon }[]> = {
-  CHUES: [
+const TUILES: Record<ActivityFamille, { key: ActivityKey; icon: LucideIcon }[]> = {
+  representants: [
     { key: 'repCalls', icon: PhoneCallIcon },
     { key: 'repContactRate', icon: PhoneOffIcon },
     { key: 'repCallback', icon: TargetIcon },
     { key: 'prospectsCreated', icon: UserPlusIcon },
   ],
-  GRAND_PUBLIC: [
+  prospects: [
     { key: 'calls', icon: PhoneCallIcon },
     { key: 'reachRate', icon: PhoneOffIcon },
     { key: 'methodObtained', icon: TargetIcon },
@@ -77,12 +80,20 @@ const TUILES: Record<Projet, { key: ActivityKey; icon: LucideIcon }[]> = {
 const PRESETS: Exclude<PeriodPreset, 'custom'>[] = ['today', 'week', 'last7'];
 
 export function ActivityView({ projet }: { projet: Projet }) {
-  const colonnes = ACTIVITY_COLUMNS[projet];
+  const familles = famillesDuProjet(projet);
+  const [famille, setFamille] = useState<ActivityFamille>(familles[0] ?? 'prospects');
+  const colonnes = ACTIVITY_COLUMNS[famille];
   const [preset, setPreset] = useState<PeriodPreset>('today');
   const [range, setRange] = useState<ActivityRange>(() => presetRange('today'));
   const [granularity, setGranularity] = useState<SupervisionGranularity>('day');
   const [sortKey, setSortKey] = useState<ActivitySortKey>(colonnes[0]?.key ?? 'name');
   const [sortDir, setSortDir] = useState<SortDirection>('desc');
+
+  function selectFamille(next: ActivityFamille): void {
+    setFamille(next);
+    setSortKey(ACTIVITY_COLUMNS[next][0]?.key ?? 'name');
+    setSortDir('desc');
+  }
 
   const { data, isPending, isError, error, refetch } = useQuery({
     queryKey: supervisionActivityKey(range, granularity, projet),
@@ -134,6 +145,24 @@ export function ActivityView({ projet }: { projet: Projet }) {
         </Button>
 
         <span className="ml-auto flex items-center gap-2">
+          {familles.length > 1 ? (
+            <span className="inline-flex overflow-hidden rounded-md border border-border">
+              {familles.map((value) => (
+                <Button
+                  key={value}
+                  variant={famille === value ? 'default' : 'ghost'}
+                  size="sm"
+                  className="rounded-none"
+                  aria-pressed={famille === value}
+                  onClick={() => {
+                    selectFamille(value);
+                  }}
+                >
+                  {FAMILLE_LABELS[value]}
+                </Button>
+              ))}
+            </span>
+          ) : null}
           <span className="inline-flex overflow-hidden rounded-md border border-border">
             <Button
               variant={granularity === 'day' ? 'default' : 'ghost'}
@@ -166,8 +195,15 @@ export function ActivityView({ projet }: { projet: Projet }) {
               if (data === undefined) return;
               const lines = sortActivityLines(activityLines(data), sortKey, sortDir);
               downloadCsv(
-                activityCsv({ lines, totals: activityTotals(lines), range, granularity, projet }),
-                activityCsvFileName(range, projet),
+                activityCsv({
+                  lines,
+                  totals: activityTotals(lines),
+                  range,
+                  granularity,
+                  projet,
+                  famille,
+                }),
+                activityCsvFileName(range, projet, famille),
               );
             }}
           >
@@ -236,7 +272,7 @@ export function ActivityView({ projet }: { projet: Projet }) {
       {toolbar}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {TUILES[projet].map((tuile, index) => {
+        {TUILES[famille].map((tuile, index) => {
           const colonne = colonnes.find((candidate) => candidate.key === tuile.key);
           if (colonne === undefined) return null;
           return (

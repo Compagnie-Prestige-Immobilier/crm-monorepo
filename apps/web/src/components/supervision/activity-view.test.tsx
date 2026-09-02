@@ -117,9 +117,8 @@ describe('tableau d’activité des téléconseillers', () => {
     });
     const chues = within(rowOf('Alice Diop')).getAllByRole('cell');
     expect(chues[0]?.textContent).toBe('10');
-    expect(chues[3]?.textContent).toBe('60 %');
-    expect(chues[4]?.textContent).toBe('80 %');
-    expect(chues[6]?.textContent).toBe('4');
+    expect(chues[4]?.textContent).toBe('60 %');
+    expect(chues[5]?.textContent).toBe('80 %');
     expect(screen.queryByRole('button', { name: /Faux numéros/u })).toBeNull();
     unmount();
 
@@ -131,6 +130,29 @@ describe('tableau d’activité des téléconseillers', () => {
     expect(gp[0]?.textContent).toBe('4');
     // Un faux numéro compte parmi les injoignables.
     expect(gp[2]?.textContent).toBe('2');
+    expect(screen.queryByRole('button', { name: 'Appels prospects' })).toBeNull();
+  });
+
+  it('bascule en CHUES des appels aux représentants vers ceux aux prospects', async () => {
+    fetchMock.mockResolvedValue(payload());
+
+    renderWithQuery(<ActivityView projet="CHUES" />);
+    await waitFor(() => {
+      expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
+    });
+    expect(within(rowOf('Alice Diop')).getAllByRole('cell')).toHaveLength(8);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Appels prospects' }));
+
+    const cells = within(rowOf('Alice Diop')).getAllByRole('cell');
+    expect(cells).toHaveLength(7);
+    expect(cells[0]?.textContent).toBe('4');
+    expect(screen.queryByRole('button', { name: /Représentants contactés/u })).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Exporter en CSV' }));
+    const csv = downloadMock.mock.calls.at(-1)?.[0] as string;
+    expect(csv).toContain('Appels prospects');
+    expect(downloadMock.mock.calls.at(-1)?.[1]).toContain('chues-prospects');
   });
 
   it('affiche le total d’équipe et la moyenne par téléconseiller', async () => {
@@ -220,7 +242,7 @@ describe('tableau d’activité des téléconseillers', () => {
       expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
     });
     expect(screen.getByRole('button', { name: /Représentants contactés/u })).toBeTruthy();
-    expect(within(rowOf('Alice Diop')).getAllByRole('cell')).toHaveLength(9);
+    expect(within(rowOf('Alice Diop')).getAllByRole('cell')).toHaveLength(8);
 
     await userEvent.click(screen.getByRole('button', { name: 'Exporter en CSV' }));
 
