@@ -4,6 +4,7 @@ import {
   PaymentMode,
   Phase2Status,
   ProspectType,
+  Role,
   ScheduledCallbackStatus,
 } from '@crm/database';
 import { BadRequestException } from '@nestjs/common';
@@ -43,6 +44,7 @@ const prospectRow = (): Record<string, unknown> => ({
   projet: 'CHUES',
   rev: 3,
   updatedAt: new Date('2026-08-01T09:00:00.000Z'),
+  lastCallAt: null,
 });
 
 /** L'état de phase 2 vit sur le parcours, plus sur la fiche. */
@@ -90,8 +92,10 @@ const op = {
   clientCreatedAt: '2026-08-01T10:00:00.000Z',
 };
 
+const ALICE = { id: 'com-1', role: Role.COMMERCIAL };
+
 const apply = (override: Partial<CallAttemptOpDto> = {}): Promise<unknown> =>
-  new Phase2SyncService().applyCallAttempt(tx as unknown as Phase2TransactionClient, 'com-1', {
+  new Phase2SyncService().applyCallAttempt(tx as unknown as Phase2TransactionClient, ALICE, {
     ...op,
     ...override,
   });
@@ -121,6 +125,13 @@ const priseDeRendezVous = {
   rendezVousAt: RENDEZ_VOUS,
 } as const;
 
+/** Le dernier appel que toute tentative appliquée reporte sur la fiche. */
+const DERNIER_APPEL = {
+  lastCallOutcome: CallOutcome.METHOD_OBTAINED,
+  lastCallAt: new Date('2026-08-01T10:00:00.000Z'),
+  lastCallById: 'com-1',
+};
+
 describe('renseignements de conversion', () => {
   beforeEach(() => {
     prepare();
@@ -143,7 +154,9 @@ describe('renseignements de conversion', () => {
     expect(row.dureeEtablissementMois).toBe(84);
     expect(row.comment).toBe('rendez-vous à l’agence');
     expect((row.rendezVousAt as Date).toISOString()).toBe(RENDEZ_VOUS);
-    expect(tx.prospect.update).not.toHaveBeenCalled();
+    // Aucune correction d'identité : la fiche ne reçoit que le dernier appel.
+    const [args] = tx.prospect.update.mock.calls[0] as [{ data: Record<string, unknown> }];
+    expect(args.data).toEqual(DERNIER_APPEL);
   });
 
   it('écrit sur le PROSPECT ce que la fiche porte déjà, et rien d’autre', async () => {
@@ -166,6 +179,7 @@ describe('renseignements de conversion', () => {
       profession: 'Enseignante',
       banqueId: 'b-1',
       syndicatId: 's-1',
+      ...DERNIER_APPEL,
       rev: { increment: 1 },
     });
 
@@ -189,6 +203,7 @@ describe('renseignements de conversion', () => {
       incomeBandId: 'i-1',
       paymentMode: 'ECHELONNE',
       dureeSystemeMois: 24,
+      ...DERNIER_APPEL,
       rev: { increment: 1 },
     });
     expect(writtenRow().incomeBandId).toBeUndefined();
@@ -198,13 +213,15 @@ describe('renseignements de conversion', () => {
     await apply({ ...priseDeRendezVous, prenom: 'Awa' });
 
     const [args] = tx.prospect.update.mock.calls[0] as [{ data: Record<string, unknown> }];
-    expect(args.data).toEqual({ prenom: 'Awa', rev: { increment: 1 } });
+    expect(args.data).toEqual({ prenom: 'Awa', ...DERNIER_APPEL, rev: { increment: 1 } });
   });
 
   it('un nom vidé n’écrase pas celui de la fiche', async () => {
     await apply({ ...priseDeRendezVous, nom: '   ' });
 
-    expect(tx.prospect.update).not.toHaveBeenCalled();
+    const [args] = tx.prospect.update.mock.calls[0] as [{ data: Record<string, unknown> }];
+    expect(args.data).toEqual(DERNIER_APPEL);
+    expect(args.data).not.toHaveProperty('nom');
   });
 
   it('la révision rendue est celle d’APRÈS la correction', async () => {
@@ -478,5 +495,75 @@ describe('la phase 2 est un état du PARCOURS, pas de la fiche', () => {
     });
 
     await expect(apply()).rejects.toMatchObject({ response: { code: 'PHASE2_ALREADY_COMPLETED' } });
+  });
+});
+
+describe('dernier appel porté par la fiche prospect', () => {
+  beforeEach(() => {
+    prepare();
+  });
+
+  const patch = (): Record<string, unknown> =>
+    (tx.prospect.update.mock.calls[0] as [{ data: Record<string, unknown> }])[0].data;
+
+  it('la tentative appliquée reporte son issue, sa date et son auteur', async () => {
+    await apply();
+
+    expect(patch()).toEqual({
+      lastCallOutcome: CallOutcome.UNREACHABLE,
+      lastCallAt: new Date('2026-08-01T10:00:00.000Z'),
+      lastCallById: 'com-1',
+    });
+    expect(patch()).not.toHaveProperty('rev');
+  });
+
+  it('une tentative PLUS RÉCENTE que le dernier appel connu l’honore', async () => {
+    tx.prospect.findFirst.mockResolvedValue({
+      ...prospectRow(),
+      lastCallAt: new Date('2026-07-30T10:00:00.000Z'),
+    });
+
+    await apply({ outcome: CallOutcome.REFUSED });
+
+    expect(patch()).toMatchObject({ lastCallOutcome: CallOutcome.REFUSED });
+  });
+
+  it('une tentative arrivée hors ligne, plus ANCIENNE, ne réécrit pas la fiche', async () => {
+    tx.prospect.findFirst.mockResolvedValue({
+      ...prospectRow(),
+      lastCallAt: new Date('2026-08-02T10:00:00.000Z'),
+    });
+
+    await apply();
+
+    expect(tx.prospect.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('périmètre par campagne', () => {
+  beforeEach(() => {
+    prepare();
+  });
+
+  it('un prospect HORS campagne est refusé, et rien n’est écrit', async () => {
+    tx.prospect.findFirst.mockImplementation((args: { where: { OR?: unknown } }) =>
+      Promise.resolve(args.where.OR ? null : prospectRow()),
+    );
+
+    await expect(apply()).rejects.toMatchObject({ response: { code: 'PHASE2_NOT_ASSIGNED' } });
+    expect(tx.callAttempt.createMany).not.toHaveBeenCalled();
+  });
+
+  it('l’encadrement n’ouvre aucune lecture bornée', async () => {
+    await new Phase2SyncService().applyCallAttempt(
+      tx as unknown as Phase2TransactionClient,
+      { id: 'sup-1', role: Role.SUPERVISEUR },
+      op as CallAttemptOpDto,
+    );
+
+    const wheres = (tx.prospect.findFirst.mock.calls as [{ where: Record<string, unknown> }][]).map(
+      (call) => call[0].where,
+    );
+    expect(wheres.some((where) => 'OR' in where)).toBe(false);
   });
 });

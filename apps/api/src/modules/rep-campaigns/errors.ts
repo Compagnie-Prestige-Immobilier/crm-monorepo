@@ -1,10 +1,21 @@
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 
 const error = (code: string, message: string): BadRequestException =>
   new BadRequestException({ code, message });
 
 export const representantNotFound = (): NotFoundException =>
   new NotFoundException({ code: 'REPRESENTANT_NOT_FOUND', message: 'Représentant introuvable.' });
+
+export const representantNotAssigned = (): ForbiddenException =>
+  new ForbiddenException({
+    code: 'REP_CAMPAIGN_NOT_ASSIGNED',
+    message: 'Ce représentant n’est pas dans vos campagnes.',
+  });
 
 export const phoneConflict = (ownerName: string): ConflictException =>
   new ConflictException({

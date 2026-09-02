@@ -82,11 +82,15 @@ describe('cloisonnement par commercial', () => {
     prisma = makePrisma();
   });
 
+  const PORTEE_ALICE = {
+    OR: [{ createdById: 'com-alice' }, { lotItems: { some: { assigneeId: 'com-alice' } } }],
+  };
+
   it('la liste d’un COMMERCIAL porte SES fiches ET celles qu’on lui a confiées', async () => {
     await service(prisma).list(alice, {});
 
     const where = firstArg(prisma.prospect.findMany).where ?? {};
-    expect(where.AND).toBeUndefined();
+    expect(where.AND).toEqual([PORTEE_ALICE]);
     expect(where.createdById).toBeUndefined();
     expect(firstArg(prisma.prospect.count).where).toEqual(where);
   });
@@ -96,7 +100,7 @@ describe('cloisonnement par commercial', () => {
 
     const where = firstArg(prisma.prospect.findMany).where ?? {};
     expect(where.createdById).toBe('com-bob');
-    expect(where.AND).toBeUndefined();
+    expect(where.AND).toEqual([PORTEE_ALICE]);
   });
 
   it('un ADMIN n’est pas borné', async () => {
@@ -503,7 +507,10 @@ describe('surface de phase 2 dans la liste', () => {
       enrollmentMethod: 'PLATFORM',
       enrollmentCapturedById: 'com-bob',
     });
-    expect(where.AND).toEqual([{ syndicat: { sigle: 'CHUES' }, banque: { shortName: 'CBAO' } }]);
+    expect(where.AND).toEqual([
+      { OR: [{ createdById: 'com-alice' }, { lotItems: { some: { assigneeId: 'com-alice' } } }] },
+      { syndicat: { sigle: 'CHUES' }, banque: { shortName: 'CBAO' } },
+    ]);
     expect(firstArg(prisma.prospect.count).where).toEqual(where);
   });
 });

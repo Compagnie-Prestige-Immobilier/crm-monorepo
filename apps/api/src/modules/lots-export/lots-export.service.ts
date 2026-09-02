@@ -6,6 +6,7 @@ import type { Writable } from 'node:stream';
 import { PassThrough } from 'node:stream';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { buildProspectWhere } from '../../common/prospect-where.js';
+import { readsEveryone } from '../../common/scope.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { RepresentantExportQueryDto } from '../representants/dto.js';
 import { suiviWhere } from '../representants/representants.service.js';
@@ -27,6 +28,7 @@ import {
   LotExportQueryDto,
   LotExportRepartitionDto,
   LotExportSummaryDto,
+  MesAttributionsDto,
 } from './dto.js';
 
 const ADMIN = { id: 'admin', role: Role.ADMIN } as const;
@@ -230,6 +232,36 @@ export class LotsExportService {
         code: 'LOT_EXPORT_NOT_FOUND',
         message: 'Campagne introuvable.',
       });
+  }
+
+  /**
+   * Ce que l'appelant a le droit d'appeler, pour que le téléphone filtre son
+   * propre tirage : le pull reste global, c'est ici que se dit le périmètre.
+   *
+   * Un item ne porte qu'une des deux clés ; le filtre de relation écarte donc
+   * seul les fiches supprimées, sans qu'un `deletedAt` traîne côté item.
+   */
+  async mesAttributions(user: AuthenticatedUser): Promise<MesAttributionsDto> {
+    if (readsEveryone(user)) return { representantIds: [], prospectIds: [], tout: true };
+
+    const [representants, prospects] = await Promise.all([
+      this.prisma.lotExportItem.findMany({
+        where: { assigneeId: user.id, representant: { deletedAt: null } },
+        select: { representantId: true },
+        distinct: ['representantId'],
+      }),
+      this.prisma.lotExportItem.findMany({
+        where: { assigneeId: user.id, prospect: { deletedAt: null } },
+        select: { prospectId: true },
+        distinct: ['prospectId'],
+      }),
+    ]);
+
+    return {
+      representantIds: representants.flatMap((item) => item.representantId ?? []),
+      prospectIds: prospects.flatMap((item) => item.prospectId ?? []),
+      tout: false,
+    };
   }
 
   async get(id: string): Promise<LotExportDetailDto> {

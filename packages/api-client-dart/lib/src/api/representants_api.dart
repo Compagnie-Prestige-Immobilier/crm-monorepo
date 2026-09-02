@@ -757,8 +757,8 @@ class RepresentantsApi {
     );
   }
 
-  /// Liste paginée de l’annuaire, commun à tous les téléconseillers.
-  ///
+  /// Liste paginée de l’annuaire, borné aux campagnes de l’appelant.
+  /// Un COMMERCIAL ne voit que les représentants qu’il a créés ou qui lui sont attribués dans un lot d’export. ADMIN, SUPERVISEUR et DIRECTION voient tout.
   ///
   /// Parameters:
   /// * [search]

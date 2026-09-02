@@ -3215,6 +3215,7 @@
     },
     "/api/v1/representants": {
       "get": {
+        "description": "Un COMMERCIAL ne voit que les représentants qu’il a créés ou qui lui sont attribués dans un lot d’export. ADMIN, SUPERVISEUR et DIRECTION voient tout.",
         "operationId": "listRepresentants",
         "parameters": [
           {
@@ -3412,7 +3413,7 @@
             "bearer": []
           }
         ],
-        "summary": "Liste paginée de l’annuaire, commun à tous les téléconseillers.",
+        "summary": "Liste paginée de l’annuaire, borné aux campagnes de l’appelant.",
         "tags": ["representants"]
       },
       "post": {
@@ -4359,6 +4360,16 @@
             "required": false,
             "in": "query",
             "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "lastCallById",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -11159,6 +11170,16 @@
             }
           },
           {
+            "name": "lastCallById",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "enrollmentCapturedById",
             "required": false,
             "in": "query",
@@ -11394,6 +11415,16 @@
             }
           },
           {
+            "name": "lastCallById",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "enrollmentCapturedById",
             "required": false,
             "in": "query",
@@ -11623,6 +11654,16 @@
             "required": false,
             "in": "query",
             "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "lastCallById",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -11866,6 +11907,16 @@
             "required": false,
             "in": "query",
             "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "lastCallById",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -12118,6 +12169,16 @@
             }
           },
           {
+            "name": "lastCallById",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "enrollmentCapturedById",
             "required": false,
             "in": "query",
@@ -12353,6 +12414,16 @@
             }
           },
           {
+            "name": "lastCallById",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "enrollmentCapturedById",
             "required": false,
             "in": "query",
@@ -12582,6 +12653,16 @@
             "required": false,
             "in": "query",
             "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "lastCallById",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -12824,6 +12905,16 @@
             }
           },
           {
+            "name": "lastCallById",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "enrollmentCapturedById",
             "required": false,
             "in": "query",
@@ -13054,6 +13145,16 @@
             "required": false,
             "in": "query",
             "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "lastCallById",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -13296,6 +13397,16 @@
             }
           },
           {
+            "name": "lastCallById",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "enrollmentCapturedById",
             "required": false,
             "in": "query",
@@ -13525,6 +13636,16 @@
             "required": false,
             "in": "query",
             "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "lastCallById",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -13778,6 +13899,16 @@
             }
           },
           {
+            "name": "lastCallById",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "enrollmentCapturedById",
             "required": false,
             "in": "query",
@@ -14008,6 +14139,16 @@
             "required": false,
             "in": "query",
             "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "lastCallById",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -14250,6 +14391,16 @@
             }
           },
           {
+            "name": "lastCallById",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "enrollmentCapturedById",
             "required": false,
             "in": "query",
@@ -14479,6 +14630,16 @@
             "required": false,
             "in": "query",
             "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "lastCallById",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -14715,6 +14876,16 @@
             "required": false,
             "in": "query",
             "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "lastCallById",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -14980,6 +15151,16 @@
             }
           },
           {
+            "name": "lastCallById",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "enrollmentCapturedById",
             "required": false,
             "in": "query",
@@ -15210,6 +15391,16 @@
             "required": false,
             "in": "query",
             "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "lastCallById",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -15572,6 +15763,16 @@
             "required": false,
             "in": "query",
             "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "lastCallById",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -16088,6 +16289,16 @@
             "required": false,
             "in": "query",
             "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "lastCallById",
+            "required": false,
+            "in": "query",
+            "description": "Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -18001,6 +18212,62 @@
           }
         ],
         "summary": "Télécharge tous les programmes de la campagne.",
+        "tags": ["lots-export"]
+      }
+    },
+    "/api/v1/lots-export/mes-attributions": {
+      "get": {
+        "description": "Sert au mobile à borner son tirage. `tout: true` pour ADMIN, SUPERVISEUR et DIRECTION : les deux listes sont alors vides et aucun filtre ne s’applique.",
+        "operationId": "mesAttributions",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MesAttributionsDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Les fiches attribuées à l’appelant, tous lots confondus.",
         "tags": ["lots-export"]
       }
     },
@@ -20278,7 +20545,7 @@
       },
       "ProspectSortField": {
         "type": "string",
-        "enum": ["createdAt", "clientCreatedAt", "nom", "prenom", "statut"]
+        "enum": ["createdAt", "clientCreatedAt", "nom", "prenom", "statut", "lastCallAt"]
       },
       "PaymentMode": {
         "type": "string",
@@ -20602,6 +20869,28 @@
             "format": "date-time",
             "nullable": true
           },
+          "lastCallOutcome": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CallOutcome"
+              }
+            ]
+          },
+          "lastCallAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastCallById": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "lastCallByName": {
+            "type": "string",
+            "nullable": true
+          },
           "origin": {
             "type": "string",
             "nullable": true,
@@ -20681,6 +20970,10 @@
           "lastOutcome",
           "lastComment",
           "lastAttemptAt",
+          "lastCallOutcome",
+          "lastCallAt",
+          "lastCallById",
+          "lastCallByName",
           "origin",
           "originLabel",
           "clientCreatedAt",
@@ -27272,6 +27565,11 @@
             "format": "uuid",
             "description": "Téléconseiller ayant consigné au moins une tentative sur la fiche."
           },
+          "lastCallById": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique."
+          },
           "enrollmentCapturedById": {
             "type": "string",
             "format": "uuid",
@@ -27457,6 +27755,30 @@
           }
         },
         "required": ["items", "meta"]
+      },
+      "MesAttributionsDto": {
+        "type": "object",
+        "properties": {
+          "representantIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "prospectIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "tout": {
+            "type": "boolean",
+            "description": "Vrai pour l’encadrement : aucun filtre ne s’applique."
+          }
+        },
+        "required": ["representantIds", "prospectIds", "tout"]
       },
       "LotExportAttemptDto": {
         "type": "object",

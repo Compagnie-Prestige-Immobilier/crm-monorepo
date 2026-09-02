@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { RepCallOutcome, Role } from '@crm/database';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -199,5 +199,52 @@ describe('dernier appel porté par la fiche', () => {
     await expect(service.recordAttempt(ALICE, body)).rejects.toMatchObject({
       response: { code: 'REP_CAMPAIGN_CALLBACK_AT_REQUIRED' },
     });
+  });
+});
+
+describe('périmètre par campagne', () => {
+  it('un COMMERCIAL borne sa lecture à ses fiches et à ses attributions', async () => {
+    await service.recordAttempt(ALICE, baseBody());
+
+    const where = (
+      db.representant.findFirst.mock.calls[0] as [{ where: Record<string, unknown> }]
+    )[0].where;
+    expect(where).toMatchObject({
+      OR: [{ createdById: ALICE.id }, { lotItems: { some: { assigneeId: ALICE.id } } }],
+    });
+  });
+
+  it('un représentant HORS campagne est refusé, sans être nié', async () => {
+    // Hors périmètre pour la lecture bornée, présent pour la seconde.
+    db.representant.findFirst.mockImplementation((args: { where: { OR?: unknown } }) =>
+      Promise.resolve(args.where.OR ? null : { id: REP }),
+    );
+
+    await expect(service.recordAttempt(ALICE, baseBody())).rejects.toMatchObject({
+      response: { code: 'REP_CAMPAIGN_NOT_ASSIGNED' },
+    });
+    await expect(service.recordAttempt(ALICE, baseBody())).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('un représentant qui n’existe pas reste un 404', async () => {
+    db.representant.findFirst.mockResolvedValue(null);
+
+    await expect(service.recordAttempt(ALICE, baseBody())).rejects.toMatchObject({
+      response: { code: 'REPRESENTANT_NOT_FOUND' },
+    });
+  });
+
+  it('l’encadrement n’est borné par rien', async () => {
+    const SUP: AuthenticatedUser = { ...ALICE, id: 'sup-1', role: Role.SUPERVISEUR };
+
+    await service.recordAttempt(SUP, baseBody());
+
+    const where = (
+      db.representant.findFirst.mock.calls[0] as [{ where: Record<string, unknown> }]
+    )[0].where;
+    expect(where).not.toHaveProperty('OR');
   });
 });

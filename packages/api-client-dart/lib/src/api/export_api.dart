@@ -363,6 +363,7 @@ class ExportApi {
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
   /// * [appelePar] - Téléconseiller ayant consigné au moins une tentative sur la fiche.
+  /// * [lastCallById] - Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique.
   /// * [enrollmentCapturedById] - Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -393,6 +394,7 @@ class ExportApi {
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
     String? appelePar,
+    String? lastCallById,
     String? enrollmentCapturedById,
     String? origin,
     DateTime? dateFrom,
@@ -435,6 +437,7 @@ class ExportApi {
       if (phase2Status != null) r'phase2Status': phase2Status,
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (appelePar != null) r'appelePar': appelePar,
+      if (lastCallById != null) r'lastCallById': lastCallById,
       if (enrollmentCapturedById != null)
         r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,

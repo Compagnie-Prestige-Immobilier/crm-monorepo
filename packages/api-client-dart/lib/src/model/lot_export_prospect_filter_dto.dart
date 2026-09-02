@@ -51,6 +51,8 @@ class LotExportProspectFilterDto {
 
     this.appelePar,
 
+    this.lastCallById,
+
     this.enrollmentCapturedById,
 
     this.origin,
@@ -136,6 +138,10 @@ class LotExportProspectFilterDto {
   @JsonKey(name: r'appelePar', required: false, includeIfNull: false)
   final String? appelePar;
 
+  /// Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique.
+  @JsonKey(name: r'lastCallById', required: false, includeIfNull: false)
+  final String? lastCallById;
+
   /// Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
   @JsonKey(
     name: r'enrollmentCapturedById',
@@ -199,6 +205,7 @@ class LotExportProspectFilterDto {
                 phase2Status,
                 enrollmentMethod,
                 appelePar,
+                lastCallById,
                 enrollmentCapturedById,
                 origin,
                 dateFrom,
@@ -220,6 +227,7 @@ class LotExportProspectFilterDto {
                 other.phase2Status,
                 other.enrollmentMethod,
                 other.appelePar,
+                other.lastCallById,
                 other.enrollmentCapturedById,
                 other.origin,
                 other.dateFrom,
@@ -247,6 +255,7 @@ class LotExportProspectFilterDto {
         phase2Status,
         enrollmentMethod,
         appelePar,
+        lastCallById,
         enrollmentCapturedById,
         origin,
         dateFrom,

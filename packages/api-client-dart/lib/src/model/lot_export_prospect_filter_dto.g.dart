@@ -35,6 +35,8 @@ abstract class _$LotExportProspectFilterDtoCWProxy {
 
   LotExportProspectFilterDto appelePar(String? appelePar);
 
+  LotExportProspectFilterDto lastCallById(String? lastCallById);
+
   LotExportProspectFilterDto enrollmentCapturedById(
     String? enrollmentCapturedById,
   );
@@ -71,6 +73,7 @@ abstract class _$LotExportProspectFilterDtoCWProxy {
     Phase2Status? phase2Status,
     EnrollmentMethod? enrollmentMethod,
     String? appelePar,
+    String? lastCallById,
     String? enrollmentCapturedById,
     LotExportProspectFilterDtoOriginEnum? origin,
     DateTime? dateFrom,
@@ -139,6 +142,10 @@ class _$LotExportProspectFilterDtoCWProxyImpl
       this(appelePar: appelePar);
 
   @override
+  LotExportProspectFilterDto lastCallById(String? lastCallById) =>
+      this(lastCallById: lastCallById);
+
+  @override
   LotExportProspectFilterDto enrollmentCapturedById(
     String? enrollmentCapturedById,
   ) => this(enrollmentCapturedById: enrollmentCapturedById);
@@ -183,6 +190,7 @@ class _$LotExportProspectFilterDtoCWProxyImpl
     Object? phase2Status = const $CopyWithPlaceholder(),
     Object? enrollmentMethod = const $CopyWithPlaceholder(),
     Object? appelePar = const $CopyWithPlaceholder(),
+    Object? lastCallById = const $CopyWithPlaceholder(),
     Object? enrollmentCapturedById = const $CopyWithPlaceholder(),
     Object? origin = const $CopyWithPlaceholder(),
     Object? dateFrom = const $CopyWithPlaceholder(),
@@ -243,6 +251,10 @@ class _$LotExportProspectFilterDtoCWProxyImpl
           ? _value.appelePar
           // ignore: cast_nullable_to_non_nullable
           : appelePar as String?,
+      lastCallById: lastCallById == const $CopyWithPlaceholder()
+          ? _value.lastCallById
+          // ignore: cast_nullable_to_non_nullable
+          : lastCallById as String?,
       enrollmentCapturedById:
           enrollmentCapturedById == const $CopyWithPlaceholder()
           ? _value.enrollmentCapturedById
@@ -339,6 +351,7 @@ LotExportProspectFilterDto _$LotExportProspectFilterDtoFromJson(
       ),
     ),
     appelePar: $checkedConvert('appelePar', (v) => v as String?),
+    lastCallById: $checkedConvert('lastCallById', (v) => v as String?),
     enrollmentCapturedById: $checkedConvert(
       'enrollmentCapturedById',
       (v) => v as String?,
@@ -395,6 +408,7 @@ Map<String, dynamic> _$LotExportProspectFilterDtoToJson(
   if (_$EnrollmentMethodEnumMap[instance.enrollmentMethod] case final value?)
     'enrollmentMethod': value,
   if (instance.appelePar case final value?) 'appelePar': value,
+  if (instance.lastCallById case final value?) 'lastCallById': value,
   if (instance.enrollmentCapturedById case final value?)
     'enrollmentCapturedById': value,
   if (_$LotExportProspectFilterDtoOriginEnumEnumMap[instance.origin]

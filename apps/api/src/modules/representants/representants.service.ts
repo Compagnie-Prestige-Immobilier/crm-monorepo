@@ -9,7 +9,7 @@ import { v7 as uuidv7 } from 'uuid';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { normalizePhone } from '../../common/phone.js';
-import { assertOwnership, isAdmin } from '../../common/scope.js';
+import { assertOwnership, attributionScope, isAdmin } from '../../common/scope.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { OkDto } from '../../common/dto/ok.dto.js';
 import { RepresentantSortField, RepresentantSuivi } from './dto.js';
@@ -141,6 +141,17 @@ function allowedWhatsappStatuses(query: RepresentantQueryDto): WhatsappStatus[] 
   return allowed;
 }
 
+function rechercheLibre(raw: string | undefined): Prisma.RepresentantWhereInput[] | null {
+  const search = raw?.trim();
+  if (!search) return null;
+  const digits = search.replace(/[^\d+]/g, '');
+  return [
+    { fullName: { contains: search, mode: 'insensitive' } },
+    // Sans chiffres, `contains: ''` rendrait tout l'annuaire.
+    ...(digits.replace(/\D/g, '').length >= 3 ? [{ phoneE164: { contains: digits } }] : []),
+  ];
+}
+
 interface CommentRow {
   id: string;
   representantId: string;
@@ -167,13 +178,15 @@ export function toRepresentantCommentDto(row: CommentRow): RepresentantCommentDt
 export class RepresentantsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(query: RepresentantQueryDto): Promise<RepresentantListDto> {
+  async list(user: AuthenticatedUser, query: RepresentantQueryDto): Promise<RepresentantListDto> {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 25;
 
-    // L'ANNUAIRE est commun : la liste n'est bornée par aucun créateur, comme le
-    // flux de synchronisation. Le cloisonnement demeure sur les PROSPECTS.
+    // Un téléconseiller ne lit que ses campagnes ; l'encadrement lit tout. Le
+    // cloisonnement voyage dans `AND` : `where.OR` porte déjà la recherche libre.
     const where: Prisma.RepresentantWhereInput = { deletedAt: null, ...suiviWhere(query) };
+    const portee = attributionScope(user);
+    if (portee.OR) where.AND = [portee];
     if (query.commercialId) {
       where.createdById = query.commercialId;
     }
@@ -197,15 +210,8 @@ export class RepresentantsService {
     if (query.hasProspects === true) where.prospects = { some: { deletedAt: null } };
     if (query.hasProspects === false) where.prospects = { none: { deletedAt: null } };
 
-    const search = query.search?.trim();
-    if (search) {
-      const digits = search.replace(/[^\d+]/g, '');
-      where.OR = [
-        { fullName: { contains: search, mode: 'insensitive' } },
-        // Sans chiffres, `contains: ''` rendrait tout l'annuaire.
-        ...(digits.replace(/\D/g, '').length >= 3 ? [{ phoneE164: { contains: digits } }] : []),
-      ];
-    }
+    const search = rechercheLibre(query.search);
+    if (search) where.OR = search;
 
     const [total, rows] = await Promise.all([
       this.prisma.representant.count({ where }),
@@ -224,9 +230,10 @@ export class RepresentantsService {
     };
   }
 
-  async get(id: string): Promise<RepresentantDto> {
+  /** Hors périmètre, la fiche est introuvable : le 404 ne dit pas qu'elle existe. */
+  async get(user: AuthenticatedUser, id: string): Promise<RepresentantDto> {
     const row = await this.prisma.representant.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, deletedAt: null, ...attributionScope(user) },
       include: INCLUDE,
     });
     if (!row) {
