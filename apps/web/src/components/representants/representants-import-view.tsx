@@ -153,6 +153,7 @@ export function RepresentantsImportView() {
             `onDrop` fermerait l'écran à qui n'utilise pas la souris. Le `label`
             porte le clic, l'`input` porte le focus et l'annonce.
           */}
+          {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- input de fichier associé */}
           <label
             htmlFor={inputId}
             onDragOver={(event) => {
@@ -223,6 +224,28 @@ export function RepresentantsImportView() {
   );
 }
 
+function ResumeApplique({ created }: { created: number }) {
+  const pluriel = created > 1 ? 's' : '';
+
+  return (
+    <div
+      role="status"
+      className="flex items-start gap-3 rounded-md border border-border bg-secondary p-4"
+    >
+      <CheckCircle2Icon className="mt-0.5 size-5 shrink-0 text-success" aria-hidden="true" />
+      <div className="min-w-0 text-[0.875rem]">
+        <p className="font-[600]">
+          {formatNumber(created)} fiche{pluriel} créée{pluriel}.
+        </p>
+        <p className="mt-1 text-muted-foreground">
+          Les lignes en erreur n’ont pas été écrites. Corrigez-les dans le classeur et redéposez-le
+          : les doublons seront de nouveau écartés.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function ImportReportPanel({
   report,
   applied,
@@ -245,24 +268,7 @@ function ImportReportPanel({
         <Figure label="Doublons" value={report.duplicates} tone="warning" />
       </dl>
 
-      {applied ? (
-        <div
-          role="status"
-          className="flex items-start gap-3 rounded-md border border-border bg-secondary p-4"
-        >
-          <CheckCircle2Icon className="mt-0.5 size-5 shrink-0 text-success" aria-hidden="true" />
-          <div className="min-w-0 text-[0.875rem]">
-            <p className="font-[600]">
-              {formatNumber(report.created)} fiche{report.created > 1 ? 's' : ''} créée
-              {report.created > 1 ? 's' : ''}.
-            </p>
-            <p className="mt-1 text-muted-foreground">
-              Les lignes en erreur n’ont pas été écrites. Corrigez-les dans le classeur et
-              redéposez-le : les doublons seront de nouveau écartés.
-            </p>
-          </div>
-        </div>
-      ) : null}
+      {applied ? <ResumeApplique created={report.created} /> : null}
 
       {report.errors.length > 0 ? (
         <Card>

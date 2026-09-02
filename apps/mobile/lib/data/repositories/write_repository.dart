@@ -515,6 +515,7 @@ class WriteRepository {
     String? profession,
     String? canalProvenanceId,
     String? incomeBandId,
+    String? professionId,
     String? employeurId,
     String? employeur,
     String? typeContrat,
@@ -559,6 +560,7 @@ class WriteRepository {
               canalProvenanceId ?? existing.canalProvenanceId,
             ),
             incomeBandId: Value<String?>(incomeBandId ?? existing.incomeBandId),
+            professionId: Value<String?>(professionId ?? existing.professionId),
             employeurId: Value<String?>(employeurId ?? existing.employeurId),
             employeur: Value<String?>(employeur ?? existing.employeur),
             typeContrat: Value<String?>(typeContrat ?? existing.typeContrat),
@@ -599,6 +601,7 @@ class WriteRepository {
             'canalProvenanceId': ?canalProvenanceId,
             ..._situationPayload(
               incomeBandId: incomeBandId,
+              professionId: professionId,
               employeurId: employeurId,
               employeur: employeur,
               typeContrat: typeContrat,
@@ -635,6 +638,7 @@ class WriteRepository {
               profession: Value<String?>(profession),
               canalProvenanceId: Value<String?>(canalProvenanceId),
               incomeBandId: Value<String?>(incomeBandId),
+              professionId: Value<String?>(professionId),
               employeurId: Value<String?>(employeurId),
               employeur: Value<String?>(employeur),
               typeContrat: Value<String?>(typeContrat),
@@ -676,6 +680,7 @@ class WriteRepository {
           'canalProvenanceId': ?canalProvenanceId,
           ..._situationPayload(
             incomeBandId: incomeBandId,
+            professionId: professionId,
             employeurId: employeurId,
             employeur: employeur,
             typeContrat: typeContrat,
@@ -701,6 +706,7 @@ class WriteRepository {
   /// Une cle absente n'est PAS un vidage : seul ce qui a une valeur voyage.
   static Map<String, Object?> _situationPayload({
     required String? incomeBandId,
+    required String? professionId,
     required String? employeurId,
     required String? employeur,
     required String? typeContrat,
@@ -715,6 +721,7 @@ class WriteRepository {
   }) {
     final Map<String, Object?> payload = <String, Object?>{
       'incomeBandId': ?incomeBandId,
+      'professionId': ?professionId,
       'employeurId': ?employeurId,
       'employeur': ?employeur,
       'typeContrat': ?typeContrat,

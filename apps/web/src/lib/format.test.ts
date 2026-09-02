@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { DAKAR_UTC_OFFSET, dakarLocalToIso, formatDakarDateTime } from '@/lib/format';
+import { DAKAR_UTC_OFFSET, dakarLocalToIso, formatDakarDateTime, formatPhone } from '@/lib/format';
 
 describe('dakarLocalToIso', () => {
   it('lit l’heure saisie comme une heure de DAKAR, jamais du poste', () => {
@@ -36,6 +36,21 @@ describe('dakarLocalToIso', () => {
     expect(DAKAR_UTC_OFFSET).toBe('+00:00');
     expect(dakarLocalToIso('2026-01-15T09:00')).toBe('2026-01-15T09:00:00.000Z');
     expect(dakarLocalToIso('2026-08-15T09:00')).toBe('2026-08-15T09:00:00.000Z');
+  });
+});
+
+describe('formatPhone', () => {
+  it('garde la présentation sénégalaise', () => {
+    expect(formatPhone('+221771234567')).toBe('+221 77 123 45 67');
+  });
+
+  it('groupe aussi un numéro étranger', () => {
+    expect(formatPhone('+393331234567')).toBe('+39 333 123 4567');
+    expect(formatPhone('+33612345678')).toBe('+33 6 12 34 56 78');
+  });
+
+  it('rend tel quel ce qui n’est pas un numéro', () => {
+    expect(formatPhone('inconnu')).toBe('inconnu');
   });
 });
 

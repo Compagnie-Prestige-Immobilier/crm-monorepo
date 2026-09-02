@@ -25,6 +25,7 @@ import {
   type DispositionPresentation,
   type DonneesSource,
   type Forme,
+  type ReglagesHonores,
 } from '@/components/accueil/tableau-de-bord/sources';
 import { ChartCard } from '@/components/dashboard/chart-card';
 import { ChoixGraphique, marqueTexte } from '@/components/dashboard/chart-visual';
@@ -56,6 +57,131 @@ function hauteurDe(
 
 function entreeDe(catalogue: Catalogue, source: string): CatalogueEntree {
   return catalogue[source] ?? { label: source, forme: 'classement' };
+}
+
+function ReglagesPopover({
+  titre,
+  widgetId,
+  honors,
+  triPertinent,
+  presentation,
+  onChangePresentation,
+}: {
+  titre: string;
+  widgetId: string;
+  honors: ReglagesHonores;
+  triPertinent: boolean;
+  presentation: DispositionPresentation;
+  onChangePresentation: (presentation: DispositionPresentation) => void;
+}) {
+  return (
+    <Popover>
+      <PopoverTrigger
+        render={
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label={`Réglages de ${titre}`}
+          />
+        }
+      >
+        <SlidersHorizontalIcon aria-hidden="true" />
+      </PopoverTrigger>
+      <PopoverContent className="flex w-72 flex-col gap-3 p-3" align="end">
+        {honors.palette ? (
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor={`palette-${widgetId}`}>Palette</Label>
+            <Select
+              value={presentation.palette ?? 'serie'}
+              onValueChange={(value) => {
+                if (value === null) return;
+                onChangePresentation({ ...presentation, palette: value });
+              }}
+            >
+              <SelectTrigger id={`palette-${widgetId}`} size="sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="serie">Série CPI</SelectItem>
+                <SelectItem value="neutre">Monochrome bordeaux</SelectItem>
+                <SelectItem value="categorielle">Accent or</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
+
+        {honors.valeurs ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            aria-pressed={presentation.valeurs === true}
+            onClick={() => {
+              onChangePresentation({ ...presentation, valeurs: presentation.valeurs !== true });
+            }}
+          >
+            {presentation.valeurs === true ? 'Valeurs affichées' : 'Afficher les valeurs'}
+          </Button>
+        ) : null}
+
+        {honors.legende ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            aria-pressed={presentation.legende === true}
+            onClick={() => {
+              onChangePresentation({ ...presentation, legende: presentation.legende !== true });
+            }}
+          >
+            {presentation.legende === true ? 'Légende affichée' : 'Afficher la légende'}
+          </Button>
+        ) : null}
+
+        {triPertinent ? (
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor={`tri-${widgetId}`}>Tri du classement</Label>
+            <Select
+              value={presentation.tri ?? 'valeur-desc'}
+              onValueChange={(value) => {
+                if (value === null) return;
+                onChangePresentation({ ...presentation, tri: value });
+              }}
+            >
+              <SelectTrigger id={`tri-${widgetId}`} size="sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="valeur-desc">Valeur décroissante</SelectItem>
+                <SelectItem value="valeur-asc">Valeur croissante</SelectItem>
+                <SelectItem value="alphabetique">Alphabétique</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
+
+        {triPertinent ? (
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor={`autres-${widgetId}`}>Regrouper au-delà de</Label>
+            <Input
+              id={`autres-${widgetId}`}
+              type="number"
+              min={3}
+              max={15}
+              value={presentation.autresApres ?? 5}
+              onChange={(event) => {
+                const valeur = Number(event.target.value);
+                if (Number.isNaN(valeur)) return;
+                const borne = Math.min(15, Math.max(3, valeur));
+                onChangePresentation({ ...presentation, autresApres: borne });
+              }}
+            />
+          </div>
+        ) : null}
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export function CarteWidget({
@@ -189,126 +315,14 @@ export function CarteWidget({
               ) : null}
 
               {reglagesVisibles ? (
-                <Popover>
-                  <PopoverTrigger
-                    render={
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`Réglages de ${titre}`}
-                      />
-                    }
-                  >
-                    <SlidersHorizontalIcon aria-hidden="true" />
-                  </PopoverTrigger>
-                  <PopoverContent className="flex w-72 flex-col gap-3 p-3" align="end">
-                    {honors.palette ? (
-                      <div className="flex flex-col gap-1.5">
-                        <Label htmlFor={`palette-${widget.id}`}>Palette</Label>
-                        <Select
-                          value={presentation.palette ?? 'serie'}
-                          onValueChange={(value) => {
-                            if (value === null) return;
-                            onChangePresentation({
-                              ...presentation,
-                              palette: value,
-                            });
-                          }}
-                        >
-                          <SelectTrigger id={`palette-${widget.id}`} size="sm">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="serie">Série CPI</SelectItem>
-                            <SelectItem value="neutre">Monochrome bordeaux</SelectItem>
-                            <SelectItem value="categorielle">Accent or</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    ) : null}
-
-                    {honors.valeurs ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        aria-pressed={presentation.valeurs === true}
-                        onClick={() => {
-                          onChangePresentation({
-                            ...presentation,
-                            valeurs: presentation.valeurs !== true,
-                          });
-                        }}
-                      >
-                        {presentation.valeurs === true
-                          ? 'Valeurs affichées'
-                          : 'Afficher les valeurs'}
-                      </Button>
-                    ) : null}
-
-                    {honors.legende ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        aria-pressed={presentation.legende === true}
-                        onClick={() => {
-                          onChangePresentation({
-                            ...presentation,
-                            legende: presentation.legende !== true,
-                          });
-                        }}
-                      >
-                        {presentation.legende === true ? 'Légende affichée' : 'Afficher la légende'}
-                      </Button>
-                    ) : null}
-
-                    {triPertinent ? (
-                      <div className="flex flex-col gap-1.5">
-                        <Label htmlFor={`tri-${widget.id}`}>Tri du classement</Label>
-                        <Select
-                          value={presentation.tri ?? 'valeur-desc'}
-                          onValueChange={(value) => {
-                            if (value === null) return;
-                            onChangePresentation({
-                              ...presentation,
-                              tri: value,
-                            });
-                          }}
-                        >
-                          <SelectTrigger id={`tri-${widget.id}`} size="sm">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="valeur-desc">Valeur décroissante</SelectItem>
-                            <SelectItem value="valeur-asc">Valeur croissante</SelectItem>
-                            <SelectItem value="alphabetique">Alphabétique</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    ) : null}
-
-                    {triPertinent ? (
-                      <div className="flex flex-col gap-1.5">
-                        <Label htmlFor={`autres-${widget.id}`}>Regrouper au-delà de</Label>
-                        <Input
-                          id={`autres-${widget.id}`}
-                          type="number"
-                          min={3}
-                          max={15}
-                          value={presentation.autresApres ?? 5}
-                          onChange={(event) => {
-                            const valeur = Number(event.target.value);
-                            if (Number.isNaN(valeur)) return;
-                            const borne = Math.min(15, Math.max(3, valeur));
-                            onChangePresentation({ ...presentation, autresApres: borne });
-                          }}
-                        />
-                      </div>
-                    ) : null}
-                  </PopoverContent>
-                </Popover>
+                <ReglagesPopover
+                  titre={titre}
+                  widgetId={widget.id}
+                  honors={honors}
+                  triPertinent={triPertinent}
+                  presentation={presentation}
+                  onChangePresentation={onChangePresentation}
+                />
               ) : null}
 
               <Button

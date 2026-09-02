@@ -47,7 +47,7 @@ let db: MockDb;
 const service = (): CallbacksService => new CallbacksService(db as unknown as PrismaService);
 
 const whereOf = (call: MockFn): Record<string, unknown> =>
-  (call.mock.calls[0]?.[0] as { where: Record<string, unknown> }).where;
+  (call.mock.calls[0] as [{ where: Record<string, unknown> }])[0].where;
 
 beforeEach(() => {
   vi.useFakeTimers();

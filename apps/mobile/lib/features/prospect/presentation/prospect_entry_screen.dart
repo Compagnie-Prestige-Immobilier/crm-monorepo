@@ -17,6 +17,7 @@ import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/ids.dart';
 import '../../../core/utils/phone.dart';
+import '../../../core/utils/whatsapp.dart';
 import '../../../data/local/database.dart';
 import '../../../data/repositories/draft_repository.dart';
 import '../../../data/repositories/write_repository.dart';
@@ -99,6 +100,7 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
   String? _type;
   String? _canalId;
   String? _incomeBandId;
+  String? _professionId;
   String? _employeurId;
   String? _typeContrat;
   String? _modeEpargne;
@@ -109,7 +111,8 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
   /// ils appellent.
   String _indicatif = kSenegalCallingCode;
 
-  /// Les trois référentiels lus par `build`, relus par les champs de l'étape.
+  /// Les référentiels lus par `build`, relus par les champs de l'étape.
+  List<Profession> _professions = const <Profession>[];
   List<Employeur> _employeurs = const <Employeur>[];
   List<PaysRow> _pays = const <PaysRow>[];
   List<IncomeBand> _tranches = const <IncomeBand>[];
@@ -186,6 +189,7 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
     'representantId': _representantId,
     'type': _type,
     'profession': _profession.text,
+    'professionId': _professionId,
     'anciennete': _anciennete.text,
     'canalId': _canalId,
     'canalLabel': _canal.text,
@@ -274,6 +278,7 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
           _representantId ?? snapshot.values['representantId'] as String?;
       _type = snapshot.values['type'] as String?;
       _profession.text = (snapshot.values['profession'] as String?) ?? '';
+      _professionId = snapshot.values['professionId'] as String?;
       _anciennete.text = (snapshot.values['anciennete'] as String?) ?? '';
       _canalId = snapshot.values['canalId'] as String?;
       _canal.text = (snapshot.values['canalLabel'] as String?) ?? '';
@@ -375,6 +380,17 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
   /// si, la diaspora au Sénégal.
   bool get _avecBanque => !_grandPublic || _type != 'INFORMEL';
 
+  /// Règle du web : seul un fonctionnaire dont la profession est enseignante a
+  /// un syndicat. Une profession écrite en clair n'en désigne aucun. Le CHUES,
+  /// lui, s'adresse aux enseignants et le demande toujours.
+  bool get _avecSyndicat =>
+      !_grandPublic ||
+      (_type == 'FONCTIONNAIRE' && _enseignantePour(_professionId));
+
+  bool _enseignantePour(String? id) =>
+      id != null &&
+      _professions.any((Profession p) => p.id == id && p.isTeaching);
+
   int get _lastStep => _grandPublic ? 3 : 2;
 
   /// La question de l'étape, celle qui tient lieu de titre.
@@ -417,6 +433,7 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
     ]) {
       c.clear();
     }
+    _professionId = null;
     _employeurId = null;
     _typeContrat = null;
     _modeEpargne = null;
@@ -429,7 +446,7 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
       _banqueId = null;
       _banque.clear();
     }
-    if (_type != 'FONCTIONNAIRE') {
+    if (!_avecSyndicat) {
       _syndicatId = null;
       _syndicat.clear();
     }
@@ -455,12 +472,14 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
         _type == 'FONCTIONNAIRE' ? 'Ministère ou structure' : 'Employeur',
         _employeur.text,
       ),
-    if (_grandPublic && _type == 'INFORMEL')
-      CpiRecapLine('Activité', _profession.text),
+    if (_grandPublic && _type != null)
+      CpiRecapLine(
+        _type == 'INFORMEL' ? 'Activité' : 'Profession',
+        _profession.text,
+      ),
     if (_diaspora) CpiRecapLine('Pays de résidence', _paysResidence.text),
     if (_avecBanque) CpiRecapLine('Banque', _banque.text),
-    if (!_grandPublic || _type == 'FONCTIONNAIRE')
-      CpiRecapLine('Syndicat', _syndicat.text),
+    if (_avecSyndicat) CpiRecapLine('Syndicat', _syndicat.text),
   ];
 
   Future<void> _save({required bool andNext}) async {
@@ -493,15 +512,15 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
         prenom: _prenom.text.trim(),
         phoneE164: _phoneE164!,
         banqueId: _avecBanque ? _banqueId : null,
-        syndicatId: !_grandPublic || _type == 'FONCTIONNAIRE'
-            ? _syndicatId
-            : null,
+        syndicatId: _avecSyndicat ? _syndicatId : null,
         representantId: _representantId,
         projet: widget.projet,
         type: _type,
-        // Seul l'informel et la diaspora déclarent un métier : ailleurs c'est
-        // l'employeur qui porte le renseignement.
-        profession: _grandPublic && _salarie ? null : _profession.text.trim(),
+        // Le repli en clair n'a de sens que sans identifiant, comme pour
+        // l'employeur : sinon le serveur reçoit deux fois le même métier, dont
+        // une copie qui vieillira.
+        profession: _professionId == null ? _profession.text.trim() : null,
+        professionId: _professionId,
         canalProvenanceId: _canalId,
         incomeBandId: _grandPublic ? _incomeBandId : null,
         employeurId: _salarie ? _employeurId : null,
@@ -610,6 +629,7 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
     // Lues ici et non dans le champ qui les affiche : un flux ouvert seulement
     // à l'étape 2 sert sa première valeur APRÈS la première image du champ, et
     // la liste s'ouvre vide sur la frappe qui la suit.
+    _professions = ref.watch(professionsProvider).value ?? const <Profession>[];
     _employeurs = ref.watch(employeursProvider).value ?? const <Employeur>[];
     _pays = ref.watch(paysProvider).value ?? const <PaysRow>[];
     _tranches = ref.watch(incomeBandsProvider).value ?? const <IncomeBand>[];
@@ -830,31 +850,20 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
         ],
       ),
       const SizedBox(height: CpiSpacing.md),
-      if (_diaspora)
-        InternationalPhoneField(
-          controller: _phone,
-          focusNode: _noeud(_phone),
-          callingCode: _indicatif,
-          helper: 'Le numéro du pays où il vit.',
-          onChanged: (String _) {
-            markDraftDirty();
-            _scheduleLookup();
-            setState(() {});
-          },
-        )
-      else
-        PhoneField(
-          controller: _phone,
-          focusNode: _noeud(_phone),
-          // Le numéro du représentant vient de sa fiche : le retoucher ici
-          // créerait un prospect que rien ne relie plus à personne.
-          enabled: !_luiMeme,
-          onChanged: (String _) {
-            markDraftDirty();
-            _scheduleLookup();
-            setState(() {});
-          },
-        ),
+      PhoneField(
+        controller: _phone,
+        focusNode: _noeud(_phone),
+        callingCode: _diaspora ? _indicatif : null,
+        helper: _diaspora ? 'Le numéro du pays où il vit.' : null,
+        // Le numéro du représentant vient de sa fiche : le retoucher ici
+        // créerait un prospect que rien ne relie plus à personne.
+        enabled: !_luiMeme,
+        onChanged: (String _) {
+          markDraftDirty();
+          _scheduleLookup();
+          setState(() {});
+        },
+      ),
       if (_duplicateName != null) ...<Widget>[
         const SizedBox(height: CpiSpacing.xs),
         Row(
@@ -894,16 +903,23 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
   }
 
   /// Grand Public : ce que la situation choisie demande, et rien d'autre.
+  ///
+  /// La profession vient EN TÊTE chez le salarié : c'est elle qui décide du
+  /// syndicat proposé à l'étape suivante.
   List<Widget> _champsTravail() => _espaces(switch (_type) {
     'FONCTIONNAIRE' => <Widget>[
+      _champProfession('Profession', 'Ex. Instituteur'),
       _champEmployeur('MINISTERE', 'Ministère ou structure', 'Ex. Éducation'),
       _champAnciennete(),
     ],
     'SECTEUR_PRIVE' => <Widget>[
+      _champProfession('Profession', 'Ex. Comptable'),
       _champEmployeur('ENTREPRISE', 'Employeur', 'Ex. Sonatel'),
       _champTypeContrat(),
       _champAnciennete(),
     ],
+    // L'activité de l'informel reste en clair : aucun référentiel ne la
+    // couvrira jamais.
     'INFORMEL' => <Widget>[
       _champTexte(_profession, 'Activité', 'Ex. Couture'),
       _champTexte(_lieuActivite, 'Lieu d\'activité', 'Ex. Marché Sandaga'),
@@ -912,8 +928,8 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
     'DIASPORA' => <Widget>[
       _champPays(),
       _champTexte(_villeResidence, 'Ville', 'Ex. Milan'),
-      _champTexte(_profession, 'Profession là-bas', 'Ex. Chauffeur'),
-      InternationalPhoneField(
+      _champProfession('Profession là-bas', 'Ex. Chauffeur'),
+      PhoneField(
         controller: _whatsapp,
         focusNode: _noeud(_whatsapp),
         callingCode: _indicatif,
@@ -959,73 +975,120 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
     onChanged: (String _) => markDraftDirty(),
   );
 
-  /// Le référentiel ASSISTE la saisie sans la borner : un employeur absent de
-  /// la liste s'écrit en clair et part tel quel.
-  Widget _champEmployeur(String type, String label, String hint) {
-    return LocalTypeahead(
-      controller: _employeur,
-      focusNode: _noeud(_employeur),
-      label: label,
-      hint: hint,
-      freeText: true,
-      maxLength: 160,
-      selectedId: _employeurId,
-      emptyHint: 'La liste n\'est pas encore arrivée.',
-      options: _employeurs
-          .where((Employeur e) => e.type == type)
-          .map(
-            (Employeur e) => TypeaheadOption(
-              id: e.id,
-              label: e.label,
-              keywords: <String>[e.code],
-            ),
-          )
-          .toList(growable: false),
-      onChanged: (String _) {
-        if (_employeurId != null) setState(() => _employeurId = null);
-        markDraftDirty();
-      },
-      onSelected: (TypeaheadOption o) {
-        setState(() => _employeurId = o.id);
-        markDraftDirty();
-        unawaited(flushDraft());
-      },
-    );
-  }
+  /// Le squelette des six champs à référentiel du formulaire.
+  ///
+  /// Tous font la même chose : la frappe annule le choix posé, le choix pose
+  /// l'identifiant et couche le brouillon. Ce qui les distingue — l'indicatif
+  /// que pose le pays, le syndicat que vide la profession — passe par
+  /// [onSelectedId], appelé avec `null` quand la frappe annule le choix.
+  Widget _typeahead({
+    required TextEditingController controller,
+    required String? selectedId,
+    required ValueChanged<String?> onSelectedId,
+    required List<TypeaheadOption> options,
+    required String label,
+    String? hint,
+    String? description,
+    String? emptyHint,
+    bool freeText = false,
+    int? maxLength,
+    TextInputAction textInputAction = TextInputAction.next,
+  }) => LocalTypeahead(
+    controller: controller,
+    focusNode: _noeud(controller),
+    label: label,
+    hint: hint,
+    description: description,
+    freeText: freeText,
+    maxLength: maxLength,
+    selectedId: selectedId,
+    textInputAction: textInputAction,
+    emptyHint: emptyHint ?? 'La liste n\'est pas encore arrivée.',
+    options: options,
+    onChanged: (String _) {
+      if (selectedId != null) setState(() => onSelectedId(null));
+      markDraftDirty();
+    },
+    onSelected: (TypeaheadOption o) {
+      setState(() => onSelectedId(o.id));
+      markDraftDirty();
+      unawaited(flushDraft());
+    },
+  );
 
-  Widget _champPays() {
-    return LocalTypeahead(
-      controller: _paysResidence,
-      focusNode: _noeud(_paysResidence),
-      label: 'Pays de résidence',
-      hint: 'Ex. Italie',
-      description: 'Il donne l\'indicatif du téléphone.',
-      selectedId: _paysResidenceId,
-      emptyHint: 'La liste n\'est pas encore arrivée.',
-      options: _pays
-          .map(
-            (PaysRow p) => TypeaheadOption(
-              id: p.id,
-              label: p.label,
-              secondary: '+${p.indicatif}',
-              keywords: <String>[p.code, p.indicatif],
-            ),
-          )
-          .toList(growable: false),
-      onChanged: (String _) {
-        if (_paysResidenceId != null) setState(() => _paysResidenceId = null);
-        markDraftDirty();
-      },
-      onSelected: (TypeaheadOption o) {
-        setState(() {
-          _paysResidenceId = o.id;
-          _indicatif = _pays.firstWhere((PaysRow p) => p.id == o.id).indicatif;
-        });
-        markDraftDirty();
-        unawaited(flushDraft());
-      },
-    );
-  }
+  /// Le référentiel ASSISTE la saisie sans la borner : une profession absente
+  /// de la liste s'écrit en clair et part telle quelle. Un métier écrit en
+  /// clair ne désigne AUCUN syndicat : seul `isTeaching` en ouvre un.
+  Widget _champProfession(String label, String hint) => _typeahead(
+    controller: _profession,
+    label: label,
+    hint: hint,
+    freeText: true,
+    maxLength: kProfessionMaxLength,
+    selectedId: _professionId,
+    options: _professions
+        .map(
+          (Profession p) => TypeaheadOption(
+            id: p.id,
+            label: p.label,
+            keywords: <String>[p.code],
+          ),
+        )
+        .toList(growable: false),
+    onSelectedId: (String? id) {
+      _professionId = id;
+      if (_enseignantePour(id)) return;
+      _syndicatId = null;
+      _syndicat.clear();
+    },
+  );
+
+  /// Même contrat : un employeur absent de la liste s'écrit en clair.
+  Widget _champEmployeur(String type, String label, String hint) => _typeahead(
+    controller: _employeur,
+    label: label,
+    hint: hint,
+    freeText: true,
+    maxLength: 160,
+    selectedId: _employeurId,
+    options: _employeurs
+        .where((Employeur e) => e.type == type)
+        .map(
+          (Employeur e) => TypeaheadOption(
+            id: e.id,
+            label: e.label,
+            keywords: <String>[e.code],
+          ),
+        )
+        .toList(growable: false),
+    onSelectedId: (String? id) => _employeurId = id,
+  );
+
+  Widget _champPays() => _typeahead(
+    controller: _paysResidence,
+    label: 'Pays de résidence',
+    hint: 'Ex. Italie',
+    description: 'Il donne l\'indicatif du téléphone.',
+    selectedId: _paysResidenceId,
+    options: _pays
+        .map(
+          (PaysRow p) => TypeaheadOption(
+            id: p.id,
+            label: p.label,
+            secondary: '+${p.indicatif}',
+            keywords: <String>[p.code, p.indicatif],
+          ),
+        )
+        .toList(growable: false),
+    onSelectedId: (String? id) {
+      _paysResidenceId = id;
+      // L'indicatif SURVIT à l'annulation du choix : le numéro déjà écrit est
+      // celui de ce pays, le remettre au Sénégal le rendrait invalide.
+      if (id != null) {
+        _indicatif = _pays.firstWhere((PaysRow p) => p.id == id).indicatif;
+      }
+    },
+  );
 
   Widget _champTypeContrat() => _choix(
     label: 'Type de contrat',
@@ -1066,20 +1129,17 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
     List<CanauxProvenanceData> canaux,
   ) => _espaces(<Widget>[
     if (_avecBanque) _champBanque(banques),
-    if (!_grandPublic || _type == 'FONCTIONNAIRE') _champSyndicat(syndicats),
+    if (_avecSyndicat) _champSyndicat(syndicats),
     if (_grandPublic) ...<Widget>[
       _champTranche(),
-      LocalTypeahead(
+      _typeahead(
         controller: _canal,
-        focusNode: _noeud(_canal),
         label: 'Provenance',
         hint: 'Ex. Parrainage',
         description: 'Comment il nous a connus',
         selectedId: _canalId,
         textInputAction: TextInputAction.done,
-        emptyHint: canaux.isEmpty
-            ? 'La liste n\'est pas encore arrivée.'
-            : 'Aucun résultat',
+        emptyHint: canaux.isEmpty ? null : 'Aucun résultat',
         options: canaux
             .map(
               (CanauxProvenanceData c) => TypeaheadOption(
@@ -1089,57 +1149,34 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
               ),
             )
             .toList(growable: false),
-        onChanged: (String _) {
-          if (_canalId != null) setState(() => _canalId = null);
-          markDraftDirty();
-        },
-        onSelected: (TypeaheadOption o) {
-          setState(() => _canalId = o.id);
-          markDraftDirty();
-          unawaited(flushDraft());
-        },
+        onSelectedId: (String? id) => _canalId = id,
       ),
     ],
   ]);
 
-  Widget _champTranche() {
-    return LocalTypeahead(
-      controller: _tranche,
-      focusNode: _noeud(_tranche),
-      label: 'Tranche de revenus',
-      hint: 'Ex. 100 000 à 200 000',
-      selectedId: _incomeBandId,
-      emptyHint: 'La liste n\'est pas encore arrivée.',
-      options: _tranches
-          .map(
-            (IncomeBand b) => TypeaheadOption(
-              id: b.id,
-              label: b.label,
-              keywords: <String>[b.code],
-            ),
-          )
-          .toList(growable: false),
-      onChanged: (String _) {
-        if (_incomeBandId != null) setState(() => _incomeBandId = null);
-        markDraftDirty();
-      },
-      onSelected: (TypeaheadOption o) {
-        setState(() => _incomeBandId = o.id);
-        markDraftDirty();
-        unawaited(flushDraft());
-      },
-    );
-  }
+  Widget _champTranche() => _typeahead(
+    controller: _tranche,
+    label: 'Tranche de revenus',
+    hint: 'Ex. 100 000 à 200 000',
+    selectedId: _incomeBandId,
+    options: _tranches
+        .map(
+          (IncomeBand b) => TypeaheadOption(
+            id: b.id,
+            label: b.label,
+            keywords: <String>[b.code],
+          ),
+        )
+        .toList(growable: false),
+    onSelectedId: (String? id) => _incomeBandId = id,
+  );
 
-  Widget _champBanque(List<Banque> banques) => LocalTypeahead(
+  Widget _champBanque(List<Banque> banques) => _typeahead(
     controller: _banque,
-    focusNode: _noeud(_banque),
     label: _grandPublic ? 'Banque de domiciliation' : 'Banque',
     hint: 'Ex. BICIS',
     selectedId: _banqueId,
-    emptyHint: banques.isEmpty
-        ? 'La liste n\'est pas encore arrivée.'
-        : 'Aucun résultat',
+    emptyHint: banques.isEmpty ? null : 'Aucun résultat',
     options: banques
         .map(
           (Banque b) => TypeaheadOption(
@@ -1150,27 +1187,16 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
           ),
         )
         .toList(growable: false),
-    onChanged: (String _) {
-      if (_banqueId != null) setState(() => _banqueId = null);
-      markDraftDirty();
-    },
-    onSelected: (TypeaheadOption o) {
-      setState(() => _banqueId = o.id);
-      markDraftDirty();
-      unawaited(flushDraft());
-    },
+    onSelectedId: (String? id) => _banqueId = id,
   );
 
-  Widget _champSyndicat(List<Syndicat> syndicats) => LocalTypeahead(
+  Widget _champSyndicat(List<Syndicat> syndicats) => _typeahead(
     controller: _syndicat,
-    focusNode: _noeud(_syndicat),
     label: 'Syndicat',
     hint: 'Ex. SAEMSS',
     selectedId: _syndicatId,
     textInputAction: TextInputAction.done,
-    emptyHint: syndicats.isEmpty
-        ? 'La liste n\'est pas encore arrivée.'
-        : 'Aucun résultat',
+    emptyHint: syndicats.isEmpty ? null : 'Aucun résultat',
     options: syndicats
         .map(
           (Syndicat s) => TypeaheadOption(
@@ -1181,15 +1207,7 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
           ),
         )
         .toList(growable: false),
-    onChanged: (String _) {
-      if (_syndicatId != null) setState(() => _syndicatId = null);
-      markDraftDirty();
-    },
-    onSelected: (TypeaheadOption o) {
-      setState(() => _syndicatId = o.id);
-      markDraftDirty();
-      unawaited(flushDraft());
-    },
+    onSelectedId: (String? id) => _syndicatId = id,
   );
 }
 

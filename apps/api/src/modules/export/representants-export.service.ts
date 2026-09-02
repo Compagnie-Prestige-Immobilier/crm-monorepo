@@ -219,19 +219,8 @@ export class RepresentantsExportService {
     if (query.hasProspects === true) where.prospects = { some: { deletedAt: null } };
     if (query.hasProspects === false) where.prospects = { none: { deletedAt: null } };
     if (query.relationStatus) where.relationStatus = query.relationStatus;
-    if (query.whatsappStatus || query.hasWhatsapp !== undefined) {
-      const reachable: readonly WhatsappStatus[] = [
-        WhatsappStatus.MEME_NUMERO,
-        WhatsappStatus.AUTRE_NUMERO,
-      ];
-      let statuses = Object.values(WhatsappStatus);
-      if (query.whatsappStatus) statuses = [query.whatsappStatus];
-      if (query.hasWhatsapp === true)
-        statuses = statuses.filter((status) => reachable.includes(status as WhatsappStatus));
-      if (query.hasWhatsapp === false)
-        statuses = statuses.filter((status) => !reachable.includes(status as WhatsappStatus));
-      where.whatsappStatus = { in: statuses };
-    }
+    const whatsapp = whatsappStatuses(query);
+    if (whatsapp) where.whatsappStatus = { in: whatsapp };
     if (ids) where.id = { in: [...ids] };
 
     const search = query.search?.trim();
@@ -244,6 +233,20 @@ export class RepresentantsExportService {
 
     return where;
   }
+}
+
+function whatsappStatuses(query: RepresentantExportQueryDto): WhatsappStatus[] | null {
+  if (!query.whatsappStatus && query.hasWhatsapp === undefined) return null;
+  const reachable: readonly WhatsappStatus[] = [
+    WhatsappStatus.MEME_NUMERO,
+    WhatsappStatus.AUTRE_NUMERO,
+  ];
+  const statuses = query.whatsappStatus ? [query.whatsappStatus] : Object.values(WhatsappStatus);
+  if (query.hasWhatsapp === true)
+    return statuses.filter((status) => reachable.includes(status as WhatsappStatus));
+  if (query.hasWhatsapp === false)
+    return statuses.filter((status) => !reachable.includes(status as WhatsappStatus));
+  return statuses;
 }
 
 /** Champs de tri exposés, réexportés pour que le test de cohérence les compare. */

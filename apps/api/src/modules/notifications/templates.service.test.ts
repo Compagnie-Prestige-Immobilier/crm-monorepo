@@ -40,7 +40,7 @@ const service = (): NotificationTemplatesService =>
   new NotificationTemplatesService(db as unknown as PrismaService);
 
 const whereOf = (fn: MockFn): Record<string, unknown> =>
-  (fn.mock.calls[0]?.[0] as { where?: Record<string, unknown> }).where ?? {};
+  (fn.mock.calls[0] as [{ where?: Record<string, unknown> }])[0].where ?? {};
 
 describe('cloisonnement des lectures', () => {
   it('le filtre de visibilité s’AJOUTE au filtre d’activité, il ne le remplace pas', async () => {

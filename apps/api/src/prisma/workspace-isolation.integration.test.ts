@@ -33,17 +33,17 @@ describe('isolement des espaces', () => {
     await clients.get('demo').appSetting.create({ data: { key: KEY, value: 'demo' } });
 
     expect(await clients.get('public').appSetting.findUnique({ where: { key: KEY } })).toBeNull();
-    expect(
-      (await clients.get('demo').appSetting.findUnique({ where: { key: KEY } }))?.value,
-    ).toBe('demo');
+    expect((await clients.get('demo').appSetting.findUnique({ where: { key: KEY } }))?.value).toBe(
+      'demo',
+    );
 
     await clients.get('public').appSetting.create({ data: { key: KEY, value: 'public' } });
     expect(
       (await clients.get('public').appSetting.findUnique({ where: { key: KEY } }))?.value,
     ).toBe('public');
-    expect(
-      (await clients.get('demo').appSetting.findUnique({ where: { key: KEY } }))?.value,
-    ).toBe('demo');
+    expect((await clients.get('demo').appSetting.findUnique({ where: { key: KEY } }))?.value).toBe(
+      'demo',
+    );
   });
 
   it('le SQL brut sans préfixe suit aussi le schéma du client', async () => {

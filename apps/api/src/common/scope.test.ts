@@ -58,12 +58,15 @@ describe('assertOwnership', () => {
   });
 
   it('expose un code métier stable', () => {
+    let leve: unknown;
     try {
       assertOwnership(alice, { createdById: 'com-bob' });
-      expect.unreachable('assertOwnership aurait dû lever');
     } catch (error) {
-      expect((error as ForbiddenException).getResponse()).toMatchObject({ code: 'NOT_OWNER' });
+      leve = error;
     }
+
+    expect(leve).toBeInstanceOf(ForbiddenException);
+    expect((leve as ForbiddenException).getResponse()).toMatchObject({ code: 'NOT_OWNER' });
   });
 });
 

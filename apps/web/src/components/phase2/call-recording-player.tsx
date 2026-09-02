@@ -98,6 +98,7 @@ export function CallRecordingPlayer({ attemptId }: { attemptId: string }) {
   const progress = duration === 0 ? 0 : position / duration;
   return (
     <div className="w-full rounded-lg border border-border bg-muted/30 p-3">
+      {/* oxlint-disable-next-line jsx-a11y/media-has-caption -- enregistrement d'appel sans transcription */}
       <audio
         ref={audio}
         src={url}

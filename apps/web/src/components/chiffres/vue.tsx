@@ -173,7 +173,7 @@ export function ChiffresView({ ecran, role }: { ecran: DashboardEcran; role: Rol
 
   const [brouillon, setBrouillon] = useState<DashboardWidget[] | null>(null);
   const editing = brouillon !== null;
-  const snapshotRef = useRef<string>('');
+  const [snapshot, setSnapshot] = useState('');
   const pausedByEditionRef = useRef(false);
 
   const saveMutation = useMutation({
@@ -235,7 +235,7 @@ export function ChiffresView({ ecran, role }: { ecran: DashboardEcran; role: Rol
   const enterEdition = (): void => {
     if (dispositionQuery.data === undefined) return;
     const copie = dispositionQuery.data.widgets.map((widget) => ({ ...widget }));
-    snapshotRef.current = JSON.stringify(serializeDisposition(copie));
+    setSnapshot(JSON.stringify(serializeDisposition(copie)));
     setBrouillon(copie);
     if (!live.paused) {
       live.togglePause();
@@ -251,7 +251,7 @@ export function ChiffresView({ ecran, role }: { ecran: DashboardEcran; role: Rol
     }
   };
 
-  const dirty = editing && JSON.stringify(serializeDisposition(brouillon)) !== snapshotRef.current;
+  const dirty = editing && JSON.stringify(serializeDisposition(brouillon)) !== snapshot;
   const placees = new Set(widgets.map((widget) => widget.source));
   const equipe = jeux.activite?.teleconseillers ?? [];
 

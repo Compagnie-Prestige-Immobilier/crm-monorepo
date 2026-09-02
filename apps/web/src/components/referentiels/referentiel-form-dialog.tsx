@@ -331,6 +331,7 @@ export function DepartementFormDialog({
     },
   });
 
+  // oxlint-disable-next-line react/incompatible-library -- faux positif react-hook-form
   const regionId = watch('regionId');
 
   return (

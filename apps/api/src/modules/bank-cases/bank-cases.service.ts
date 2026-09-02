@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { Phase2Status, Prisma } from '@crm/database';
-import type { BankRejectionReason } from '@crm/database';
+import type { BankRejectionReason, Projet } from '@crm/database';
 import { v7 as uuidv7 } from 'uuid';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
@@ -104,8 +104,8 @@ export class BankCasesService {
     };
   }
 
-  async get(id: string): Promise<BankCaseDetailDto> {
-    const row = await this.loadCase(id);
+  async get(id: string, projet?: Projet): Promise<BankCaseDetailDto> {
+    const row = await this.loadCase(id, projet);
     // LECTURE GLOBALE : le cloisonnement s'est joué sur le dossier, déjà
     // résolu ci-dessus. Le rejouer ici rendrait une fiche sans son historique.
     const history = await this.prisma.bankCaseTransition.findMany({
@@ -373,10 +373,14 @@ export class BankCasesService {
       phone = Prisma.sql`OR p."phoneE164" LIKE ${`%${digits}`}`;
     }
 
+    // Le PARCOURS, pas le projet d'entrée : voir `bankCaseConditions`.
     const projet =
       query.projet === undefined
         ? Prisma.sql`TRUE`
-        : Prisma.sql`p."projet" = ${query.projet}::"Projet"`;
+        : Prisma.sql`EXISTS (
+            SELECT 1 FROM "prospect_journeys" pj
+            WHERE pj."prospectId" = p."id" AND pj."projet" = ${query.projet}::"Projet"
+          )`;
     const where = Prisma.sql`
       p."deletedAt" IS NULL
       AND ${projet}
@@ -446,9 +450,15 @@ export class BankCasesService {
     return { items: rows.map(toReasonDto) };
   }
 
-  private async loadCase(id: string): Promise<BankCaseRow> {
+  // Hors projet, le dossier est INTROUVABLE et non interdit : un 403 dirait
+  // qu'il existe, et l'écran CHUES apprendrait l'existence d'un dossier GP.
+  private async loadCase(id: string, projet?: Projet): Promise<BankCaseRow> {
     const row = await this.prisma.bankCase.findFirst({
-      where: { id, deletedAt: null },
+      where: {
+        id,
+        deletedAt: null,
+        ...(projet === undefined ? {} : { prospect: { journeys: { some: { projet } } } }),
+      },
       include: BANK_CASE_INCLUDE,
     });
     if (!row) throw caseNotFound();

@@ -130,6 +130,24 @@ CREATE TABLE income_bands (
 CREATE INDEX income_bands_active_idx
     ON income_bands (is_active, sort_order, label);
 
+-- Le référentiel des professions, administré depuis le web. Sans lui en local,
+-- le mobile ne pouvait qu'écrire la profession en clair pendant que le web la
+-- choisissait dans la liste : deux vérités pour la même fiche.
+CREATE TABLE professions (
+    id TEXT NOT NULL PRIMARY KEY,
+    code TEXT NOT NULL,
+    label TEXT NOT NULL,
+    is_teaching BOOLEAN NOT NULL DEFAULT 0,
+    is_active BOOLEAN NOT NULL DEFAULT 1,
+    sort_order INTEGER NOT NULL DEFAULT 100,
+    local_updated_at DATETIME NOT NULL,
+    server_updated_at DATETIME NULL,
+    deleted_at DATETIME NULL
+);
+
+CREATE INDEX professions_active_idx
+    ON professions (is_active, sort_order, label);
+
 -- Ministères et entreprises, administrés depuis le web. `type` sépare les deux
 -- listes proposées au fonctionnaire et au salarié du privé.
 --
@@ -306,6 +324,9 @@ CREATE TABLE prospects (
     projet TEXT NOT NULL DEFAULT 'CHUES',
     type TEXT,
     profession TEXT,
+    -- La profession choisie au référentiel. `profession` reste le repli en clair
+    -- pour l'informel, que la liste ne couvrira jamais.
+    profession_id TEXT,
     duree_systeme_mois INTEGER,
     -- Pas de REFERENCES : le canal descend du serveur par le pull, et une fiche
     -- saisie hors ligne ne doit pas attendre que son referentiel soit arrive.

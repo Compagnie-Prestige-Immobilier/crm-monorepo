@@ -1471,6 +1471,12 @@ class SyncEngine {
         (IncomeBandDto b) => b.id,
         _upsertIncomeBand,
       );
+      retired += await _mirrorKind<ProfessionDto>(
+        _db.professions,
+        snapshot.professions,
+        (ProfessionDto p) => p.id,
+        _upsertProfession,
+      );
       retired += await _mirrorKind<EmployeurDto>(
         _db.employeurs,
         snapshot.employeurs,
@@ -1506,6 +1512,7 @@ class SyncEngine {
       page.changes.syndicats.isNotEmpty ||
       page.changes.canauxProvenance.isNotEmpty ||
       page.changes.incomeBands.isNotEmpty ||
+      page.changes.professions.isNotEmpty ||
       page.changes.employeurs.isNotEmpty ||
       page.changes.pays.isNotEmpty;
 
@@ -1820,6 +1827,38 @@ class SyncEngine {
         );
   }
 
+  Future<void> _upsertProfession(ProfessionDto p) async {
+    await _db
+        .into(_db.professions)
+        .insert(
+          ProfessionsCompanion.insert(
+            id: p.id,
+            code: p.code,
+            label: p.label,
+            isTeaching: Value<bool>(p.isTeaching),
+            isActive: Value<bool>(p.isActive),
+            sortOrder: Value<int>(p.position.toInt()),
+            localUpdatedAt: _clock.now(),
+            serverUpdatedAt: Value<DateTime?>(p.updatedAt),
+          ),
+          onConflict: DoUpdate<Professions, Profession>(
+            (Professions old) => ProfessionsCompanion.custom(
+              code: const CustomExpression<String>('excluded.code'),
+              label: const CustomExpression<String>('excluded.label'),
+              isTeaching: const CustomExpression<bool>('excluded.is_teaching'),
+              isActive: const CustomExpression<bool>('excluded.is_active'),
+              sortOrder: const CustomExpression<int>('excluded.sort_order'),
+              serverUpdatedAt: const CustomExpression<DateTime>(
+                'excluded.server_updated_at',
+              ),
+              localUpdatedAt: const CustomExpression<DateTime>(
+                'excluded.local_updated_at',
+              ),
+            ),
+          ),
+        );
+  }
+
   Future<void> _upsertEmployeur(EmployeurDto e) async {
     await _db
         .into(_db.employeurs)
@@ -1911,6 +1950,10 @@ class SyncEngine {
       }
       for (final IncomeBandDto b in page.changes.incomeBands) {
         await _upsertIncomeBand(b);
+        count++;
+      }
+      for (final ProfessionDto p in page.changes.professions) {
+        await _upsertProfession(p);
         count++;
       }
       for (final EmployeurDto e in page.changes.employeurs) {
@@ -2055,6 +2098,7 @@ class SyncEngine {
                 ancienneteMois: Value<int?>(p.ancienneteMois?.toInt()),
                 lieuActivite: Value<String?>(p.lieuActivite),
                 modeEpargne: Value<String?>(p.modeEpargne?.value),
+                professionId: Value<String?>(p.professionId),
                 paysResidenceId: Value<String?>(p.paysResidenceId),
                 villeResidence: Value<String?>(p.villeResidence),
                 whatsappE164: Value<String?>(p.whatsappE164),
@@ -2115,6 +2159,9 @@ class SyncEngine {
                   ),
                   modeEpargne: const CustomExpression<String>(
                     'excluded.mode_epargne',
+                  ),
+                  professionId: const CustomExpression<String>(
+                    'excluded.profession_id',
                   ),
                   paysResidenceId: const CustomExpression<String>(
                     'excluded.pays_residence_id',

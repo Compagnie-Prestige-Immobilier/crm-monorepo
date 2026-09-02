@@ -81,6 +81,29 @@ Future<void> seedReferentials(AppDatabase db) async {
           localUpdatedAt: t0,
         ),
       );
+  // Deux professions, et l'écart EST le décor : seule l'enseignante ouvre le
+  // syndicat, l'autre prouve qu'il reste fermé.
+  await db
+      .into(db.professions)
+      .insert(
+        ProfessionsCompanion.insert(
+          id: 'pro-ens',
+          code: 'INSTITUTEUR',
+          label: 'Instituteur Test',
+          isTeaching: const Value<bool>(true),
+          localUpdatedAt: t0,
+        ),
+      );
+  await db
+      .into(db.professions)
+      .insert(
+        ProfessionsCompanion.insert(
+          id: 'pro-autre',
+          code: 'COMPTABLE',
+          label: 'Comptable Test',
+          localUpdatedAt: t0,
+        ),
+      );
   await db
       .into(db.employeurs)
       .insert(

@@ -716,6 +716,119 @@ class IncomeBands extends Table with TableInfo {
   bool get dontWriteConstraints => true;
 }
 
+class Professions extends Table with TableInfo {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  Professions(this.attachedDatabase, [this._alias]);
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL PRIMARY KEY',
+  );
+  late final GeneratedColumn<String> code = GeneratedColumn<String>(
+    'code',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  late final GeneratedColumn<String> label = GeneratedColumn<String>(
+    'label',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  late final GeneratedColumn<int> isTeaching = GeneratedColumn<int>(
+    'is_teaching',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NOT NULL DEFAULT 0',
+    defaultValue: const CustomExpression('0'),
+  );
+  late final GeneratedColumn<int> isActive = GeneratedColumn<int>(
+    'is_active',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NOT NULL DEFAULT 1',
+    defaultValue: const CustomExpression('1'),
+  );
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NOT NULL DEFAULT 100',
+    defaultValue: const CustomExpression('100'),
+  );
+  late final GeneratedColumn<String> localUpdatedAt = GeneratedColumn<String>(
+    'local_updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  late final GeneratedColumn<String> serverUpdatedAt = GeneratedColumn<String>(
+    'server_updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
+  );
+  late final GeneratedColumn<String> deletedAt = GeneratedColumn<String>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    code,
+    label,
+    isTeaching,
+    isActive,
+    sortOrder,
+    localUpdatedAt,
+    serverUpdatedAt,
+    deletedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'professions';
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Never map(Map<String, dynamic> data, {String? tablePrefix}) {
+    throw UnsupportedError('TableInfo.map in schema verification code');
+  }
+
+  @override
+  Professions createAlias(String alias) {
+    return Professions(attachedDatabase, alias);
+  }
+
+  @override
+  bool get dontWriteConstraints => true;
+}
+
 class Employeurs extends Table with TableInfo {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -1484,6 +1597,14 @@ class Prospects extends Table with TableInfo {
     requiredDuringInsert: false,
     $customConstraints: '',
   );
+  late final GeneratedColumn<String> professionId = GeneratedColumn<String>(
+    'profession_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: '',
+  );
   late final GeneratedColumn<int> dureeSystemeMois = GeneratedColumn<int>(
     'duree_systeme_mois',
     aliasedName,
@@ -1660,6 +1781,7 @@ class Prospects extends Table with TableInfo {
     projet,
     type,
     profession,
+    professionId,
     dureeSystemeMois,
     canalProvenanceId,
     incomeBandId,
@@ -2804,6 +2926,7 @@ class ProspectSyncView extends ViewInfo<ProspectSyncView, Never>
     projet,
     type,
     profession,
+    professionId,
     dureeSystemeMois,
     canalProvenanceId,
     incomeBandId,
@@ -2904,6 +3027,12 @@ class ProspectSyncView extends ViewInfo<ProspectSyncView, Never>
   );
   late final GeneratedColumn<String> profession = GeneratedColumn<String>(
     'profession',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+  );
+  late final GeneratedColumn<String> professionId = GeneratedColumn<String>(
+    'profession_id',
     aliasedName,
     true,
     type: DriftSqlType.string,
@@ -3379,6 +3508,11 @@ class DatabaseAtV23 extends GeneratedDatabase {
     'income_bands_active_idx',
     'CREATE INDEX income_bands_active_idx ON income_bands (is_active, sort_order, label)',
   );
+  late final Professions professions = Professions(this);
+  late final Index professionsActiveIdx = Index(
+    'professions_active_idx',
+    'CREATE INDEX professions_active_idx ON professions (is_active, sort_order, label)',
+  );
   late final Employeurs employeurs = Employeurs(this);
   late final Index employeursActiveIdx = Index(
     'employeurs_active_idx',
@@ -3518,6 +3652,8 @@ class DatabaseAtV23 extends GeneratedDatabase {
     canauxProvenanceActiveIdx,
     incomeBands,
     incomeBandsActiveIdx,
+    professions,
+    professionsActiveIdx,
     employeurs,
     employeursActiveIdx,
     pays,

@@ -10,11 +10,7 @@ import { CallRecordingsService } from './recordings.service.js';
 @Module({
   imports: [ReferentielsModule],
   controllers: [Phase2Controller],
-  providers: [
-    Phase2DirectoryService,
-    Phase2SyncService,
-    CallRecordingsService,
-  ],
+  providers: [Phase2DirectoryService, Phase2SyncService, CallRecordingsService],
   exports: [Phase2SyncService, Phase2DirectoryService],
 })
 export class Phase2Module {}

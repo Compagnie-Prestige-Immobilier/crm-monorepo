@@ -42,6 +42,26 @@ interface SaveVariables {
   andNext: boolean;
 }
 
+function optionsRepresentants(source: {
+  createdRep: FilterOption | null;
+  repSearch: string;
+  connus: readonly FilterOption[];
+  trouves: readonly { id: string; fullName: string; phoneE164: string; departementName: string }[];
+}): FilterOption[] {
+  const trouves = source.trouves.map((item) => ({
+    value: item.id,
+    label: `${item.fullName} - ${formatPhone(item.phoneE164)}`,
+    hint: item.departementName,
+  }));
+  const candidats = [
+    ...(source.createdRep === null ? [] : [source.createdRep]),
+    ...(source.repSearch.trim() === '' ? source.connus : trouves),
+  ];
+  return candidats.filter(
+    (option, index, options) => options.findIndex((item) => item.value === option.value) === index,
+  );
+}
+
 export function ProspectCreateForm({
   representantId,
   onSaved,
@@ -147,17 +167,12 @@ export function ProspectCreateForm({
   }
 
   const plural = saved.length > 1 ? 's' : '';
-  const searchedOptions = (searchedRepresentants.data?.items ?? []).map((item) => ({
-    value: item.id,
-    label: `${item.fullName} - ${formatPhone(item.phoneE164)}`,
-    hint: item.departementName,
-  }));
-  const representantOptions = [
-    ...(createdRep === null ? [] : [createdRep]),
-    ...(repSearch.trim() === '' ? (reference.data?.representants ?? []) : searchedOptions),
-  ].filter(
-    (option, index, options) => options.findIndex((item) => item.value === option.value) === index,
-  );
+  const representantOptions = optionsRepresentants({
+    createdRep,
+    repSearch,
+    connus: reference.data?.representants ?? [],
+    trouves: searchedRepresentants.data?.items ?? [],
+  });
 
   // Le libellé porte « Nom - téléphone » ; sous le formulaire, seul le nom se lit.
   const representantLabel = representantOptions
@@ -165,6 +180,7 @@ export function ProspectCreateForm({
     ?.label.split(' - ')[0];
 
   return (
+    // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- raccourci Ctrl+Entrée du formulaire
     <form
       className="flex w-full flex-col gap-5"
       onSubmit={(event) => {
@@ -208,6 +224,7 @@ export function ProspectCreateForm({
               value={prenom}
               maxLength={120}
               autoComplete="off"
+              // oxlint-disable-next-line jsx-a11y/no-autofocus -- premier champ du formulaire
               autoFocus
               onChange={(event) => {
                 setPrenom(event.target.value);

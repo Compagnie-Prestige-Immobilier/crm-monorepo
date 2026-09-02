@@ -34,6 +34,77 @@ import { formatNumber } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 
+function resumeSelection(domaines: number, rows: number): string {
+  if (domaines === 0) return 'Aucun domaine sélectionné.';
+  const pluriel = rows > 1 ? 's' : '';
+  return `${formatNumber(rows)} ligne${pluriel} concernée${pluriel}.`;
+}
+
+function phraseSuppression(rows: number): string {
+  const pluriel = rows > 1 ? 's' : '';
+  return `${formatNumber(rows)} ligne${pluriel} ser${rows > 1 ? 'ont' : 'a'} supprimée${pluriel}.`;
+}
+
+function ChoixDomaines({
+  domains,
+  selected,
+  expanded,
+  disabled,
+  onToggle,
+}: {
+  domains: readonly PurgeDomain[];
+  selected: readonly PurgeDomainKey[];
+  expanded: readonly PurgeDomainKey[];
+  disabled: boolean;
+  onToggle: (key: PurgeDomainKey, checked: boolean) => void;
+}) {
+  return (
+    <fieldset className="grid gap-2 sm:grid-cols-2">
+      <legend className="sr-only">Domaines à supprimer</legend>
+      {domains.map((domain) => {
+        const checked = selected.includes(domain.key);
+        const entrained = !checked && expanded.includes(domain.key);
+        return (
+          <label
+            key={domain.key}
+            className={`flex min-h-11 cursor-pointer items-start gap-3 rounded-md border p-3 text-[0.875rem] transition-colors duration-(--dur-1) ease-(--ease-out-cpi) focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring ${
+              checked || entrained
+                ? 'border-destructive/40 bg-destructive-surface'
+                : 'border-border'
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={checked || entrained}
+              disabled={disabled}
+              className="mt-0.5 size-4 shrink-0 accent-[var(--destructive)]"
+              onChange={(event) => {
+                onToggle(domain.key, event.target.checked);
+              }}
+            />
+            <span className="min-w-0 flex-1">
+              <span className="flex flex-wrap items-baseline justify-between gap-2">
+                <span className="font-[600]">{domain.label}</span>
+                <span className="tabular-nums text-muted-foreground">
+                  {formatNumber(domain.rows)}
+                </span>
+              </span>
+              <span className="mt-0.5 block text-[0.75rem] text-muted-foreground">
+                {domain.hint}
+              </span>
+              {entrained ? (
+                <span className="mt-1 block text-[0.75rem] text-destructive">
+                  Entraîné par un autre domaine sélectionné.
+                </span>
+              ) : null}
+            </span>
+          </label>
+        );
+      })}
+    </fieldset>
+  );
+}
+
 export function PurgeCard() {
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -121,9 +192,7 @@ export function PurgeCard() {
             <>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-[0.8125rem] text-muted-foreground">
-                  {selected.length === 0
-                    ? 'Aucun domaine sélectionné.'
-                    : `${formatNumber(rows)} ligne${rows > 1 ? 's' : ''} concernée${rows > 1 ? 's' : ''}.`}
+                  {resumeSelection(selected.length, rows)}
                 </p>
                 <Button
                   type="button"
@@ -137,49 +206,13 @@ export function PurgeCard() {
                 </Button>
               </div>
 
-              <fieldset className="grid gap-2 sm:grid-cols-2">
-                <legend className="sr-only">Domaines à supprimer</legend>
-                {domains.map((domain) => {
-                  const checked = selected.includes(domain.key);
-                  const entrained = !checked && expanded.includes(domain.key);
-                  return (
-                    <label
-                      key={domain.key}
-                      className={`flex min-h-11 cursor-pointer items-start gap-3 rounded-md border p-3 text-[0.875rem] transition-colors duration-(--dur-1) ease-(--ease-out-cpi) focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring ${
-                        checked || entrained
-                          ? 'border-destructive/40 bg-destructive-surface'
-                          : 'border-border'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked || entrained}
-                        disabled={purge.isPending}
-                        className="mt-0.5 size-4 shrink-0 accent-[var(--destructive)]"
-                        onChange={(event) => {
-                          toggle(domain.key, event.target.checked);
-                        }}
-                      />
-                      <span className="min-w-0 flex-1">
-                        <span className="flex flex-wrap items-baseline justify-between gap-2">
-                          <span className="font-[600]">{domain.label}</span>
-                          <span className="tabular-nums text-muted-foreground">
-                            {formatNumber(domain.rows)}
-                          </span>
-                        </span>
-                        <span className="mt-0.5 block text-[0.75rem] text-muted-foreground">
-                          {domain.hint}
-                        </span>
-                        {entrained ? (
-                          <span className="mt-1 block text-[0.75rem] text-destructive">
-                            Entraîné par un autre domaine sélectionné.
-                          </span>
-                        ) : null}
-                      </span>
-                    </label>
-                  );
-                })}
-              </fieldset>
+              <ChoixDomaines
+                domains={domains}
+                selected={selected}
+                expanded={expanded}
+                disabled={purge.isPending}
+                onToggle={toggle}
+              />
 
               {implied.length > 0 ? (
                 <p
@@ -225,8 +258,7 @@ export function PurgeCard() {
           <DialogHeader>
             <DialogTitle>Supprimer définitivement ?</DialogTitle>
             <DialogDescription>
-              {formatNumber(rows)} ligne{rows > 1 ? 's' : ''} ser{rows > 1 ? 'ont' : 'a'} supprimée
-              {rows > 1 ? 's' : ''}. Aucune restauration n’est possible.
+              {phraseSuppression(rows)} Aucune restauration n’est possible.
             </DialogDescription>
           </DialogHeader>
 

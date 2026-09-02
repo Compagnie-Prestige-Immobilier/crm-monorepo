@@ -15,10 +15,6 @@ abstract class _$UpdateProspectDtoCWProxy {
 
   UpdateProspectDto phone(String? phone);
 
-  UpdateProspectDto banqueId(String? banqueId);
-
-  UpdateProspectDto syndicatId(String? syndicatId);
-
   UpdateProspectDto representantId(String? representantId);
 
   UpdateProspectDto projet(Projet? projet);
@@ -27,9 +23,23 @@ abstract class _$UpdateProspectDtoCWProxy {
 
   UpdateProspectDto profession(String? profession);
 
+  UpdateProspectDto paymentMode(PaymentMode? paymentMode);
+
+  UpdateProspectDto dureeSystemeMois(num? dureeSystemeMois);
+
+  UpdateProspectDto statut(ProspectStatut? statut);
+
+  UpdateProspectDto clientCreatedAt(DateTime? clientCreatedAt);
+
+  UpdateProspectDto banqueId(String? banqueId);
+
+  UpdateProspectDto syndicatId(String? syndicatId);
+
   UpdateProspectDto professionId(String? professionId);
 
   UpdateProspectDto incomeBandId(String? incomeBandId);
+
+  UpdateProspectDto canalProvenanceId(String? canalProvenanceId);
 
   UpdateProspectDto employeurId(String? employeurId);
 
@@ -53,16 +63,6 @@ abstract class _$UpdateProspectDtoCWProxy {
 
   UpdateProspectDto relaisPhoneE164(String? relaisPhoneE164);
 
-  UpdateProspectDto paymentMode(PaymentMode? paymentMode);
-
-  UpdateProspectDto dureeSystemeMois(num? dureeSystemeMois);
-
-  UpdateProspectDto canalProvenanceId(String? canalProvenanceId);
-
-  UpdateProspectDto statut(ProspectStatut? statut);
-
-  UpdateProspectDto clientCreatedAt(DateTime? clientCreatedAt);
-
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `UpdateProspectDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -74,14 +74,19 @@ abstract class _$UpdateProspectDtoCWProxy {
     String? nom,
     String? prenom,
     String? phone,
-    String? banqueId,
-    String? syndicatId,
     String? representantId,
     Projet? projet,
     ProspectType? type,
     String? profession,
+    PaymentMode? paymentMode,
+    num? dureeSystemeMois,
+    ProspectStatut? statut,
+    DateTime? clientCreatedAt,
+    String? banqueId,
+    String? syndicatId,
     String? professionId,
     String? incomeBandId,
+    String? canalProvenanceId,
     String? employeurId,
     String? employeur,
     TypeContrat? typeContrat,
@@ -93,11 +98,6 @@ abstract class _$UpdateProspectDtoCWProxy {
     String? whatsappE164,
     String? relaisNom,
     String? relaisPhoneE164,
-    PaymentMode? paymentMode,
-    num? dureeSystemeMois,
-    String? canalProvenanceId,
-    ProspectStatut? statut,
-    DateTime? clientCreatedAt,
   });
 }
 
@@ -120,13 +120,6 @@ class _$UpdateProspectDtoCWProxyImpl implements _$UpdateProspectDtoCWProxy {
   UpdateProspectDto phone(String? phone) => this(phone: phone);
 
   @override
-  UpdateProspectDto banqueId(String? banqueId) => this(banqueId: banqueId);
-
-  @override
-  UpdateProspectDto syndicatId(String? syndicatId) =>
-      this(syndicatId: syndicatId);
-
-  @override
   UpdateProspectDto representantId(String? representantId) =>
       this(representantId: representantId);
 
@@ -141,12 +134,38 @@ class _$UpdateProspectDtoCWProxyImpl implements _$UpdateProspectDtoCWProxy {
       this(profession: profession);
 
   @override
+  UpdateProspectDto paymentMode(PaymentMode? paymentMode) =>
+      this(paymentMode: paymentMode);
+
+  @override
+  UpdateProspectDto dureeSystemeMois(num? dureeSystemeMois) =>
+      this(dureeSystemeMois: dureeSystemeMois);
+
+  @override
+  UpdateProspectDto statut(ProspectStatut? statut) => this(statut: statut);
+
+  @override
+  UpdateProspectDto clientCreatedAt(DateTime? clientCreatedAt) =>
+      this(clientCreatedAt: clientCreatedAt);
+
+  @override
+  UpdateProspectDto banqueId(String? banqueId) => this(banqueId: banqueId);
+
+  @override
+  UpdateProspectDto syndicatId(String? syndicatId) =>
+      this(syndicatId: syndicatId);
+
+  @override
   UpdateProspectDto professionId(String? professionId) =>
       this(professionId: professionId);
 
   @override
   UpdateProspectDto incomeBandId(String? incomeBandId) =>
       this(incomeBandId: incomeBandId);
+
+  @override
+  UpdateProspectDto canalProvenanceId(String? canalProvenanceId) =>
+      this(canalProvenanceId: canalProvenanceId);
 
   @override
   UpdateProspectDto employeurId(String? employeurId) =>
@@ -191,25 +210,6 @@ class _$UpdateProspectDtoCWProxyImpl implements _$UpdateProspectDtoCWProxy {
       this(relaisPhoneE164: relaisPhoneE164);
 
   @override
-  UpdateProspectDto paymentMode(PaymentMode? paymentMode) =>
-      this(paymentMode: paymentMode);
-
-  @override
-  UpdateProspectDto dureeSystemeMois(num? dureeSystemeMois) =>
-      this(dureeSystemeMois: dureeSystemeMois);
-
-  @override
-  UpdateProspectDto canalProvenanceId(String? canalProvenanceId) =>
-      this(canalProvenanceId: canalProvenanceId);
-
-  @override
-  UpdateProspectDto statut(ProspectStatut? statut) => this(statut: statut);
-
-  @override
-  UpdateProspectDto clientCreatedAt(DateTime? clientCreatedAt) =>
-      this(clientCreatedAt: clientCreatedAt);
-
-  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `UpdateProspectDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -221,14 +221,19 @@ class _$UpdateProspectDtoCWProxyImpl implements _$UpdateProspectDtoCWProxy {
     Object? nom = const $CopyWithPlaceholder(),
     Object? prenom = const $CopyWithPlaceholder(),
     Object? phone = const $CopyWithPlaceholder(),
-    Object? banqueId = const $CopyWithPlaceholder(),
-    Object? syndicatId = const $CopyWithPlaceholder(),
     Object? representantId = const $CopyWithPlaceholder(),
     Object? projet = const $CopyWithPlaceholder(),
     Object? type = const $CopyWithPlaceholder(),
     Object? profession = const $CopyWithPlaceholder(),
+    Object? paymentMode = const $CopyWithPlaceholder(),
+    Object? dureeSystemeMois = const $CopyWithPlaceholder(),
+    Object? statut = const $CopyWithPlaceholder(),
+    Object? clientCreatedAt = const $CopyWithPlaceholder(),
+    Object? banqueId = const $CopyWithPlaceholder(),
+    Object? syndicatId = const $CopyWithPlaceholder(),
     Object? professionId = const $CopyWithPlaceholder(),
     Object? incomeBandId = const $CopyWithPlaceholder(),
+    Object? canalProvenanceId = const $CopyWithPlaceholder(),
     Object? employeurId = const $CopyWithPlaceholder(),
     Object? employeur = const $CopyWithPlaceholder(),
     Object? typeContrat = const $CopyWithPlaceholder(),
@@ -240,11 +245,6 @@ class _$UpdateProspectDtoCWProxyImpl implements _$UpdateProspectDtoCWProxy {
     Object? whatsappE164 = const $CopyWithPlaceholder(),
     Object? relaisNom = const $CopyWithPlaceholder(),
     Object? relaisPhoneE164 = const $CopyWithPlaceholder(),
-    Object? paymentMode = const $CopyWithPlaceholder(),
-    Object? dureeSystemeMois = const $CopyWithPlaceholder(),
-    Object? canalProvenanceId = const $CopyWithPlaceholder(),
-    Object? statut = const $CopyWithPlaceholder(),
-    Object? clientCreatedAt = const $CopyWithPlaceholder(),
   }) {
     return UpdateProspectDto(
       id: id == const $CopyWithPlaceholder()
@@ -263,14 +263,6 @@ class _$UpdateProspectDtoCWProxyImpl implements _$UpdateProspectDtoCWProxy {
           ? _value.phone
           // ignore: cast_nullable_to_non_nullable
           : phone as String?,
-      banqueId: banqueId == const $CopyWithPlaceholder()
-          ? _value.banqueId
-          // ignore: cast_nullable_to_non_nullable
-          : banqueId as String?,
-      syndicatId: syndicatId == const $CopyWithPlaceholder()
-          ? _value.syndicatId
-          // ignore: cast_nullable_to_non_nullable
-          : syndicatId as String?,
       representantId: representantId == const $CopyWithPlaceholder()
           ? _value.representantId
           // ignore: cast_nullable_to_non_nullable
@@ -287,6 +279,30 @@ class _$UpdateProspectDtoCWProxyImpl implements _$UpdateProspectDtoCWProxy {
           ? _value.profession
           // ignore: cast_nullable_to_non_nullable
           : profession as String?,
+      paymentMode: paymentMode == const $CopyWithPlaceholder()
+          ? _value.paymentMode
+          // ignore: cast_nullable_to_non_nullable
+          : paymentMode as PaymentMode?,
+      dureeSystemeMois: dureeSystemeMois == const $CopyWithPlaceholder()
+          ? _value.dureeSystemeMois
+          // ignore: cast_nullable_to_non_nullable
+          : dureeSystemeMois as num?,
+      statut: statut == const $CopyWithPlaceholder()
+          ? _value.statut
+          // ignore: cast_nullable_to_non_nullable
+          : statut as ProspectStatut?,
+      clientCreatedAt: clientCreatedAt == const $CopyWithPlaceholder()
+          ? _value.clientCreatedAt
+          // ignore: cast_nullable_to_non_nullable
+          : clientCreatedAt as DateTime?,
+      banqueId: banqueId == const $CopyWithPlaceholder()
+          ? _value.banqueId
+          // ignore: cast_nullable_to_non_nullable
+          : banqueId as String?,
+      syndicatId: syndicatId == const $CopyWithPlaceholder()
+          ? _value.syndicatId
+          // ignore: cast_nullable_to_non_nullable
+          : syndicatId as String?,
       professionId: professionId == const $CopyWithPlaceholder()
           ? _value.professionId
           // ignore: cast_nullable_to_non_nullable
@@ -295,6 +311,10 @@ class _$UpdateProspectDtoCWProxyImpl implements _$UpdateProspectDtoCWProxy {
           ? _value.incomeBandId
           // ignore: cast_nullable_to_non_nullable
           : incomeBandId as String?,
+      canalProvenanceId: canalProvenanceId == const $CopyWithPlaceholder()
+          ? _value.canalProvenanceId
+          // ignore: cast_nullable_to_non_nullable
+          : canalProvenanceId as String?,
       employeurId: employeurId == const $CopyWithPlaceholder()
           ? _value.employeurId
           // ignore: cast_nullable_to_non_nullable
@@ -339,26 +359,6 @@ class _$UpdateProspectDtoCWProxyImpl implements _$UpdateProspectDtoCWProxy {
           ? _value.relaisPhoneE164
           // ignore: cast_nullable_to_non_nullable
           : relaisPhoneE164 as String?,
-      paymentMode: paymentMode == const $CopyWithPlaceholder()
-          ? _value.paymentMode
-          // ignore: cast_nullable_to_non_nullable
-          : paymentMode as PaymentMode?,
-      dureeSystemeMois: dureeSystemeMois == const $CopyWithPlaceholder()
-          ? _value.dureeSystemeMois
-          // ignore: cast_nullable_to_non_nullable
-          : dureeSystemeMois as num?,
-      canalProvenanceId: canalProvenanceId == const $CopyWithPlaceholder()
-          ? _value.canalProvenanceId
-          // ignore: cast_nullable_to_non_nullable
-          : canalProvenanceId as String?,
-      statut: statut == const $CopyWithPlaceholder()
-          ? _value.statut
-          // ignore: cast_nullable_to_non_nullable
-          : statut as ProspectStatut?,
-      clientCreatedAt: clientCreatedAt == const $CopyWithPlaceholder()
-          ? _value.clientCreatedAt
-          // ignore: cast_nullable_to_non_nullable
-          : clientCreatedAt as DateTime?,
     );
   }
 }
@@ -382,8 +382,6 @@ UpdateProspectDto _$UpdateProspectDtoFromJson(
     nom: $checkedConvert('nom', (v) => v as String?),
     prenom: $checkedConvert('prenom', (v) => v as String?),
     phone: $checkedConvert('phone', (v) => v as String?),
-    banqueId: $checkedConvert('banqueId', (v) => v as String?),
-    syndicatId: $checkedConvert('syndicatId', (v) => v as String?),
     representantId: $checkedConvert('representantId', (v) => v as String?),
     projet: $checkedConvert(
       'projet',
@@ -402,8 +400,35 @@ UpdateProspectDto _$UpdateProspectDtoFromJson(
       ),
     ),
     profession: $checkedConvert('profession', (v) => v as String?),
+    paymentMode: $checkedConvert(
+      'paymentMode',
+      (v) => $enumDecodeNullable(
+        _$PaymentModeEnumMap,
+        v,
+        unknownValue: PaymentMode.unknownDefaultOpenApi,
+      ),
+    ),
+    dureeSystemeMois: $checkedConvert('dureeSystemeMois', (v) => v as num?),
+    statut: $checkedConvert(
+      'statut',
+      (v) => $enumDecodeNullable(
+        _$ProspectStatutEnumMap,
+        v,
+        unknownValue: ProspectStatut.unknownDefaultOpenApi,
+      ),
+    ),
+    clientCreatedAt: $checkedConvert(
+      'clientCreatedAt',
+      (v) => v == null ? null : DateTime.parse(v as String),
+    ),
+    banqueId: $checkedConvert('banqueId', (v) => v as String?),
+    syndicatId: $checkedConvert('syndicatId', (v) => v as String?),
     professionId: $checkedConvert('professionId', (v) => v as String?),
     incomeBandId: $checkedConvert('incomeBandId', (v) => v as String?),
+    canalProvenanceId: $checkedConvert(
+      'canalProvenanceId',
+      (v) => v as String?,
+    ),
     employeurId: $checkedConvert('employeurId', (v) => v as String?),
     employeur: $checkedConvert('employeur', (v) => v as String?),
     typeContrat: $checkedConvert(
@@ -429,31 +454,6 @@ UpdateProspectDto _$UpdateProspectDtoFromJson(
     whatsappE164: $checkedConvert('whatsappE164', (v) => v as String?),
     relaisNom: $checkedConvert('relaisNom', (v) => v as String?),
     relaisPhoneE164: $checkedConvert('relaisPhoneE164', (v) => v as String?),
-    paymentMode: $checkedConvert(
-      'paymentMode',
-      (v) => $enumDecodeNullable(
-        _$PaymentModeEnumMap,
-        v,
-        unknownValue: PaymentMode.unknownDefaultOpenApi,
-      ),
-    ),
-    dureeSystemeMois: $checkedConvert('dureeSystemeMois', (v) => v as num?),
-    canalProvenanceId: $checkedConvert(
-      'canalProvenanceId',
-      (v) => v as String?,
-    ),
-    statut: $checkedConvert(
-      'statut',
-      (v) => $enumDecodeNullable(
-        _$ProspectStatutEnumMap,
-        v,
-        unknownValue: ProspectStatut.unknownDefaultOpenApi,
-      ),
-    ),
-    clientCreatedAt: $checkedConvert(
-      'clientCreatedAt',
-      (v) => v == null ? null : DateTime.parse(v as String),
-    ),
   );
   return val;
 });
@@ -465,14 +465,22 @@ Map<String, dynamic> _$UpdateProspectDtoToJson(
   if (instance.nom case final value?) 'nom': value,
   if (instance.prenom case final value?) 'prenom': value,
   if (instance.phone case final value?) 'phone': value,
-  if (instance.banqueId case final value?) 'banqueId': value,
-  if (instance.syndicatId case final value?) 'syndicatId': value,
   if (instance.representantId case final value?) 'representantId': value,
   if (_$ProjetEnumMap[instance.projet] case final value?) 'projet': value,
   if (_$ProspectTypeEnumMap[instance.type] case final value?) 'type': value,
   if (instance.profession case final value?) 'profession': value,
+  if (_$PaymentModeEnumMap[instance.paymentMode] case final value?)
+    'paymentMode': value,
+  if (instance.dureeSystemeMois case final value?) 'dureeSystemeMois': value,
+  if (_$ProspectStatutEnumMap[instance.statut] case final value?)
+    'statut': value,
+  if (instance.clientCreatedAt?.toIso8601String() case final value?)
+    'clientCreatedAt': value,
+  if (instance.banqueId case final value?) 'banqueId': value,
+  if (instance.syndicatId case final value?) 'syndicatId': value,
   if (instance.professionId case final value?) 'professionId': value,
   if (instance.incomeBandId case final value?) 'incomeBandId': value,
+  if (instance.canalProvenanceId case final value?) 'canalProvenanceId': value,
   if (instance.employeurId case final value?) 'employeurId': value,
   if (instance.employeur case final value?) 'employeur': value,
   if (_$TypeContratEnumMap[instance.typeContrat] case final value?)
@@ -486,14 +494,6 @@ Map<String, dynamic> _$UpdateProspectDtoToJson(
   if (instance.whatsappE164 case final value?) 'whatsappE164': value,
   if (instance.relaisNom case final value?) 'relaisNom': value,
   if (instance.relaisPhoneE164 case final value?) 'relaisPhoneE164': value,
-  if (_$PaymentModeEnumMap[instance.paymentMode] case final value?)
-    'paymentMode': value,
-  if (instance.dureeSystemeMois case final value?) 'dureeSystemeMois': value,
-  if (instance.canalProvenanceId case final value?) 'canalProvenanceId': value,
-  if (_$ProspectStatutEnumMap[instance.statut] case final value?)
-    'statut': value,
-  if (instance.clientCreatedAt?.toIso8601String() case final value?)
-    'clientCreatedAt': value,
 };
 
 const _$ProjetEnumMap = {
@@ -510,6 +510,20 @@ const _$ProspectTypeEnumMap = {
   ProspectType.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 
+const _$PaymentModeEnumMap = {
+  PaymentMode.COMPTANT: 'COMPTANT',
+  PaymentMode.ECHELONNE: 'ECHELONNE',
+  PaymentMode.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$ProspectStatutEnumMap = {
+  ProspectStatut.NOUVEAU: 'NOUVEAU',
+  ProspectStatut.CONTACTE: 'CONTACTE',
+  ProspectStatut.CONVERTI: 'CONVERTI',
+  ProspectStatut.PERDU: 'PERDU',
+  ProspectStatut.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
 const _$TypeContratEnumMap = {
   TypeContrat.CDI: 'CDI',
   TypeContrat.CDD: 'CDD',
@@ -523,18 +537,4 @@ const _$ModeEpargneEnumMap = {
   ModeEpargne.BANQUE: 'BANQUE',
   ModeEpargne.AUCUN: 'AUCUN',
   ModeEpargne.unknownDefaultOpenApi: 'unknown_default_open_api',
-};
-
-const _$PaymentModeEnumMap = {
-  PaymentMode.COMPTANT: 'COMPTANT',
-  PaymentMode.ECHELONNE: 'ECHELONNE',
-  PaymentMode.unknownDefaultOpenApi: 'unknown_default_open_api',
-};
-
-const _$ProspectStatutEnumMap = {
-  ProspectStatut.NOUVEAU: 'NOUVEAU',
-  ProspectStatut.CONTACTE: 'CONTACTE',
-  ProspectStatut.CONVERTI: 'CONVERTI',
-  ProspectStatut.PERDU: 'PERDU',
-  ProspectStatut.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

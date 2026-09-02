@@ -17,9 +17,7 @@ export function prospectConditions(
     conditions.push(Prisma.sql`p."createdById" = ${user.id}`);
   }
   if (filter.commercialId) {
-    conditions.push(
-      Prisma.sql`p."createdById" = ${readableOwnerId(user, filter.commercialId)}`,
-    );
+    conditions.push(Prisma.sql`p."createdById" = ${readableOwnerId(user, filter.commercialId)}`);
   }
 
   if (!(filter.includeDeleted && isAdmin(user))) {

@@ -74,11 +74,11 @@ describe('motifs système', () => {
     (reason) => {
       const rule = outcomeEffectRule(reason.effect);
       expect(rule.closes).toBe(isTerminalOutcome(reason.code));
-      if (rule.closes) {
-        expect(rule.phase2Status).toBe(
-          PHASE2_STATUS_FOR_OUTCOME[reason.code as keyof typeof PHASE2_STATUS_FOR_OUTCOME],
-        );
-      }
+      expect(rule.phase2Status).toBe(
+        rule.closes
+          ? PHASE2_STATUS_FOR_OUTCOME[reason.code as keyof typeof PHASE2_STATUS_FOR_OUTCOME]
+          : null,
+      );
     },
   );
 
@@ -86,20 +86,18 @@ describe('motifs système', () => {
     '$code reproduit l’exigence de méthode compilée dans attempt-rules',
     (reason) => {
       const rule = outcomeEffectRule(reason.effect);
-      const accepted = (): boolean => {
-        try {
-          normalizeAttempt({
-            outcome: reason.code,
-            method: EnrollmentMethod.PLATFORM,
-            comment: 'motif',
-          });
-          return true;
-        } catch (error) {
-          expect(error).toBeInstanceOf(BadRequestException);
-          return false;
-        }
-      };
-      expect(accepted()).toBe(rule.requiresMethod);
+      let refus: unknown = null;
+      try {
+        normalizeAttempt({
+          outcome: reason.code,
+          method: EnrollmentMethod.PLATFORM,
+          comment: 'motif',
+        });
+      } catch (error) {
+        refus = error;
+      }
+
+      expect(refus instanceof BadRequestException).toBe(!rule.requiresMethod);
     },
   );
 
@@ -109,14 +107,14 @@ describe('motifs système', () => {
       const rule = outcomeEffectRule(reason.effect);
       if (rule.requiresMethod) return;
 
-      let refused = false;
+      let refus: unknown = null;
       try {
         normalizeAttempt({ outcome: reason.code, method: null, comment: null });
       } catch (error) {
-        expect(error).toBeInstanceOf(BadRequestException);
-        refused = true;
+        refus = error;
       }
-      expect(refused).toBe(reason.requiresComment);
+
+      expect(refus instanceof BadRequestException).toBe(reason.requiresComment);
     },
   );
 

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ActivityView } from '@/components/supervision/activity-view';
+import type * as CsvModule from '@/lib/csv';
 import type * as AdminModule from '@/lib/data/admin';
 import { renderWithQuery } from '@/test/render-query';
 
@@ -11,7 +12,13 @@ vi.mock('@/lib/data/admin', async () => {
   return { ...actual, fetchSupervisionActivite: fetchMock };
 });
 
+vi.mock('@/lib/csv', async () => {
+  const actual = await vi.importActual<typeof CsvModule>('@/lib/csv');
+  return { ...actual, downloadCsv: downloadMock };
+});
+
 const fetchMock = vi.hoisted(() => vi.fn());
+const downloadMock = vi.hoisted(() => vi.fn());
 
 const ALICE = '11111111-1111-1111-1111-111111111111';
 const BINETA = '22222222-2222-2222-2222-222222222222';
@@ -154,6 +161,52 @@ describe('tableau d’activité des téléconseillers', () => {
         expect.objectContaining({ projet: 'GRAND_PUBLIC' }) as unknown,
       );
     });
+  });
+
+  it('retire la colonne des représentants en Grand Public', async () => {
+    fetchMock.mockResolvedValue(payload());
+
+    renderWithQuery(<ActivityView projet="GRAND_PUBLIC" />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
+    });
+    expect(screen.queryByRole('button', { name: /Représentants contactés/u })).toBeNull();
+    expect(within(rowOf('Alice Diop')).getAllByRole('cell')).toHaveLength(8);
+    expect(within(rowOf('Total équipe')).getAllByRole('cell')).toHaveLength(8);
+  });
+
+  it('la garde en CHUES, et nomme le projet dans le CSV', async () => {
+    fetchMock.mockResolvedValue(payload());
+
+    renderWithQuery(<ActivityView projet="CHUES" />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
+    });
+    expect(screen.getByRole('button', { name: /Représentants contactés/u })).toBeTruthy();
+    expect(within(rowOf('Alice Diop')).getAllByRole('cell')).toHaveLength(9);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Exporter en CSV' }));
+
+    const csv = downloadMock.mock.calls.at(-1)?.[0] as string;
+    expect(csv).toContain('Activité des téléconseillers CHUES');
+    expect(csv).toContain('Représentants contactés');
+  });
+
+  it('exporte un CSV sans colonne représentant en Grand Public', async () => {
+    fetchMock.mockResolvedValue(payload());
+
+    renderWithQuery(<ActivityView projet="GRAND_PUBLIC" />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'Exporter en CSV' }));
+
+    const csv = downloadMock.mock.calls.at(-1)?.[0] as string;
+    expect(csv).toContain('Activité des téléconseillers Grand Public');
+    expect(csv).not.toContain('Représentants contactés');
   });
 
   it('demande la fenêtre du jour, puis celle des sept derniers jours', async () => {

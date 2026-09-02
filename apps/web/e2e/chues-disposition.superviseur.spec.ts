@@ -301,7 +301,12 @@ test('CHU-DSP-12 · la disposition est propre à chaque écran', async ({ page }
   await expect(carte(page, 'Taux de qualification')).toHaveCount(0);
 
   await page.goto('/grand-public/statistiques');
-  for (const titre of ['Taux de joignabilité', 'Prospects notés', 'Adhésions', 'Par téléconseiller']) {
+  for (const titre of [
+    'Taux de joignabilité',
+    'Prospects notés',
+    'Adhésions',
+    'Par téléconseiller',
+  ]) {
     await expect(carte(page, titre), `« ${titre} » d’usine sur l’écran Grand Public`).toBeVisible();
   }
   await expect(carte(page, 'Taux de qualification')).toHaveCount(0);

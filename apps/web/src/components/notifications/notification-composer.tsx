@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangleIcon, CheckIcon, LoaderIcon, SendIcon } from 'lucide-react';
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import { toast } from 'sonner';
 
 import { Field } from '@/components/forms/field';
@@ -77,6 +77,309 @@ const ROLE_ITEMS = ROLES.map((item) => ({ value: item, label: ROLE_LABELS[item] 
 const TITLE_MAX = 120;
 const BODY_MAX = 500;
 
+/** L'échéance se valide à chaque frappe : l'horloge avance pendant la saisie. */
+function echeanceDe(
+  when: When,
+  scheduledFor: string,
+): { iso: string | null; issue: string | null } {
+  if (when !== 'later') return { iso: null, issue: null };
+  const iso = dakarLocalToIso(scheduledFor);
+  if (iso === null || Date.parse(iso) <= Date.now()) {
+    return { iso, issue: 'Choisissez une date et une heure à venir.' };
+  }
+  return { iso, issue: null };
+}
+
+/**
+ * Les bornes portent sur le texte RENDU, pas sur le gabarit : c'est lui qui
+ * part, et une variable substituée rallonge. Un dépassement renvoyait
+ * l'assistant à l'étape 1 sans qu'aucun champ ne soit marqué.
+ */
+function problemeDeTexte(saisi: string, rendu: string, max: number, label: string): string | null {
+  if (saisi.trim() === '') return `${label} est obligatoire.`;
+  if (rendu.length > max) {
+    return `${label} rendu fait ${String(rendu.length)} caractères, ${String(max)} au maximum.`;
+  }
+  return null;
+}
+
+// Une variable non renseignée partait EN CLAIR : le destinataire recevait
+// « Bonjour {{prenom}} ». L'avertissement ne retenait rien.
+function problemeDeVariables(missing: readonly string[]): string | null {
+  if (missing.length === 0) return null;
+  return `Renseignez ${missing.join(', ')} : la notification partirait avec le marqueur en clair.`;
+}
+
+function premierBlocage(issues: readonly (string | null)[]): string | null {
+  return issues.find((issue) => issue !== null) ?? null;
+}
+
+function EnTeteComposer({ step }: { step: Step }) {
+  const redaction = step === 'redaction';
+
+  return (
+    <DialogHeader>
+      <DialogTitle>{redaction ? 'Nouvelle notification' : 'Confirmer l’envoi'}</DialogTitle>
+      <DialogDescription>
+        {redaction ? 'Envoi push aux destinataires choisis.' : 'L’envoi est irréversible.'}
+      </DialogDescription>
+    </DialogHeader>
+  );
+}
+
+function ChampGabarit({
+  items,
+  value,
+  onApply,
+}: {
+  items: readonly { id: string; name: string }[];
+  value: string;
+  onApply: (id: string) => void;
+}) {
+  if (items.length === 0) return null;
+
+  return (
+    <Field label="Gabarit" description="Facultatif.">
+      {(props) => (
+        <Select
+          items={items.map((item) => ({ value: item.id, label: item.name }))}
+          value={value}
+          onValueChange={(chosen) => {
+            if (chosen === null) return;
+            onApply(chosen);
+          }}
+        >
+          <SelectTrigger id={props.id} aria-describedby={props['aria-describedby']}>
+            <SelectValue placeholder="Aucun gabarit" />
+          </SelectTrigger>
+          <SelectContent>
+            {items.map((item) => (
+              <SelectItem key={item.id} value={item.id}>
+                {item.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+    </Field>
+  );
+}
+
+function ChampsVariables({
+  noms,
+  variables,
+  onChange,
+}: {
+  noms: readonly string[];
+  variables: Record<string, string>;
+  onChange: Dispatch<SetStateAction<Record<string, string>>>;
+}) {
+  if (noms.length === 0) return null;
+
+  return (
+    <fieldset className="flex flex-col gap-3 rounded-[var(--radius-md)] border border-border bg-secondary/40 p-3">
+      <legend className="px-1 text-[0.75rem] font-[600]">Variables</legend>
+      {noms.map((name) => (
+        <Field key={name} label={name}>
+          {(props) => (
+            <Input
+              {...props}
+              value={variables[name] ?? ''}
+              onChange={(event) => {
+                onChange((current) => ({ ...current, [name]: event.target.value }));
+              }}
+            />
+          )}
+        </Field>
+      ))}
+    </fieldset>
+  );
+}
+
+function PiedComposer({
+  step,
+  blocking,
+  when,
+  envoiPossible,
+  envoiEnCours,
+  onAnnuler,
+  onEtape,
+  onEnvoyer,
+}: {
+  step: Step;
+  blocking: string | null;
+  when: When;
+  envoiPossible: boolean;
+  envoiEnCours: boolean;
+  onAnnuler: () => void;
+  onEtape: (step: Step) => void;
+  onEnvoyer: () => void;
+}) {
+  if (step === 'redaction') {
+    return (
+      <>
+        <Button type="button" variant="ghost" onClick={onAnnuler}>
+          Annuler
+        </Button>
+        <Button
+          type="button"
+          disabled={blocking !== null}
+          title={blocking ?? undefined}
+          onClick={() => {
+            onEtape('confirmation');
+          }}
+        >
+          <SendIcon aria-hidden="true" />
+          Voir les destinataires
+        </Button>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={() => {
+          onEtape('redaction');
+        }}
+      >
+        Modifier
+      </Button>
+      <Button type="button" disabled={!envoiPossible} onClick={onEnvoyer}>
+        {envoiEnCours ? (
+          <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+        ) : (
+          <CheckIcon aria-hidden="true" />
+        )}
+        {when === 'later' ? 'Programmer' : 'Envoyer maintenant'}
+      </Button>
+    </>
+  );
+}
+
+function ChampsAudience({
+  selection,
+  onChange,
+}: {
+  selection: AudienceSelection;
+  onChange: Dispatch<SetStateAction<AudienceSelection>>;
+}) {
+  if (selection.audience === 'ROLE') {
+    return (
+      <Field label="Rôle" required>
+        {(props) => (
+          <Select
+            items={ROLE_ITEMS}
+            value={selection.audienceRole ?? ''}
+            onValueChange={(value) => {
+              if (value === null) return;
+              onChange((current) => ({ ...current, audienceRole: value as Role }));
+            }}
+          >
+            <SelectTrigger id={props.id}>
+              <SelectValue placeholder="Choisir un rôle" />
+            </SelectTrigger>
+            <SelectContent>
+              {ROLE_ITEMS.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </Field>
+    );
+  }
+
+  if (selection.audience === 'USERS') {
+    return (
+      <Field label="Identifiants des comptes" required description="Un identifiant par ligne.">
+        {(props) => (
+          <Textarea
+            {...props}
+            value={selection.audienceUserIds.join('\n')}
+            onChange={(event) => {
+              onChange((current) => ({
+                ...current,
+                audienceUserIds: event.target.value
+                  .split(/[\s,]+/)
+                  .map((value) => value.trim())
+                  .filter((value) => value !== ''),
+              }));
+            }}
+          />
+        )}
+      </Field>
+    );
+  }
+
+  return null;
+}
+
+function ChampQuand({
+  when,
+  onWhen,
+  scheduledFor,
+  onScheduledFor,
+  scheduleIssue,
+}: {
+  when: When;
+  onWhen: (when: When) => void;
+  scheduledFor: string;
+  onScheduledFor: (value: string) => void;
+  scheduleIssue: string | null;
+}) {
+  return (
+    <fieldset className="flex flex-col gap-2">
+      <legend className="mb-1 text-[0.8125rem] font-[600]">Quand</legend>
+      <div className="flex flex-wrap gap-4">
+        {(['now', 'later'] as const).map((value) => (
+          <label
+            key={value}
+            className="flex min-h-11 cursor-pointer items-center gap-2 text-[0.9375rem]"
+          >
+            <input
+              type="radio"
+              name="cpi-notification-when"
+              className="size-4 accent-[var(--primary)]"
+              checked={when === value}
+              onChange={() => {
+                onWhen(value);
+              }}
+            />
+            {value === 'now' ? 'Envoyer maintenant' : 'Programmer'}
+          </label>
+        ))}
+      </div>
+      {when === 'later' ? (
+        <Field label="Date et heure" required error={scheduleIssue ?? undefined}>
+          {(props) => (
+            <>
+              <Input
+                {...props}
+                type="datetime-local"
+                value={scheduledFor}
+                onChange={(event) => {
+                  onScheduledFor(event.target.value);
+                }}
+              />
+              {/* Le fuseau du CHAMP, dit une fois, sous le champ : l'entrée
+                  `datetime-local` n'en porte aucun, et le navigateur affiche
+                  l'heure du poste sans l'annoncer. */}
+              <p className="mt-1 text-[0.75rem] text-muted-foreground">
+                Heure de Dakar (UTC+0), quel que soit le fuseau de ce poste.
+              </p>
+            </>
+          )}
+        </Field>
+      ) : null}
+    </fieldset>
+  );
+}
+
 export function NotificationComposer({
   open,
   onOpenChange,
@@ -100,6 +403,7 @@ export function NotificationComposer({
 
   useEffect(() => {
     if (open) return;
+    // oxlint-disable-next-line react/set-state-in-effect -- remise à zéro à la fermeture
     setStep('redaction');
   }, [open]);
 
@@ -119,44 +423,20 @@ export function NotificationComposer({
 
   const audienceIssue = audienceProblem(selection);
   const routeIssue = routeProblem(route);
-  const scheduledIso = when === 'later' ? dakarLocalToIso(scheduledFor) : null;
-  const scheduleIssue =
-    when === 'later' && (scheduledIso === null || Date.parse(scheduledIso) <= Date.now())
-      ? 'Choisissez une date et une heure à venir.'
-      : null;
+  const { iso: scheduledIso, issue: scheduleIssue } = echeanceDe(when, scheduledFor);
 
-  /**
-   * Les bornes portent sur le texte RENDU, pas sur le gabarit : c'est lui qui
-   * part, et une variable substituée rallonge. Un dépassement renvoyait
-   * l'assistant à l'étape 1 sans qu'aucun champ ne soit marqué.
-   */
-  const titleIssue = (() => {
-    if (title.trim() === '') return 'Le titre est obligatoire.';
-    return (() => {
-      if (rendered.title.length > TITLE_MAX)
-        return `Le titre rendu fait ${String(rendered.title.length)} caractères, ${String(TITLE_MAX)} au maximum.`;
-      return null;
-    })();
-  })();
+  const titleIssue = problemeDeTexte(title, rendered.title, TITLE_MAX, 'Le titre');
+  const bodyIssue = problemeDeTexte(body, rendered.body, BODY_MAX, 'Le message');
+  const missingIssue = problemeDeVariables(rendered.missing);
 
-  const bodyIssue = (() => {
-    if (body.trim() === '') return 'Le message est obligatoire.';
-    return (() => {
-      if (rendered.body.length > BODY_MAX)
-        return `Le message rendu fait ${String(rendered.body.length)} caractères, ${String(BODY_MAX)} au maximum.`;
-      return null;
-    })();
-  })();
-
-  // Une variable non renseignée partait EN CLAIR : le destinataire recevait
-  // « Bonjour {{prenom}} ». L'avertissement ne retenait rien.
-  const missingIssue =
-    rendered.missing.length > 0
-      ? `Renseignez ${rendered.missing.join(', ')} : la notification partirait avec le marqueur en clair.`
-      : null;
-
-  const blocking =
-    titleIssue ?? bodyIssue ?? missingIssue ?? audienceIssue ?? routeIssue ?? scheduleIssue;
+  const blocking = premierBlocage([
+    titleIssue,
+    bodyIssue,
+    missingIssue,
+    audienceIssue,
+    routeIssue,
+    scheduleIssue,
+  ]);
 
   const previewQuery = audienceQuery(selection);
   const preview = useQuery({
@@ -229,70 +509,22 @@ export function NotificationComposer({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-4xl">
-        <DialogHeader>
-          <DialogTitle>
-            {step === 'redaction' ? 'Nouvelle notification' : 'Confirmer l’envoi'}
-          </DialogTitle>
-          <DialogDescription>
-            {step === 'redaction'
-              ? 'Envoi push aux destinataires choisis.'
-              : 'L’envoi est irréversible.'}
-          </DialogDescription>
-        </DialogHeader>
+        <EnTeteComposer step={step} />
 
         {step === 'redaction' ? (
           <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_18rem]">
             <div className="flex min-w-0 flex-col gap-4">
-              {templates.data && templates.data.items.length > 0 ? (
-                <Field label="Gabarit" description="Facultatif.">
-                  {(props) => (
-                    <Select
-                      items={templates.data.items.map((item) => ({
-                        value: item.id,
-                        label: item.name,
-                      }))}
-                      value={templateId}
-                      onValueChange={(value) => {
-                        if (value === null) return;
-                        applyTemplate(value);
-                      }}
-                    >
-                      <SelectTrigger id={props.id} aria-describedby={props['aria-describedby']}>
-                        <SelectValue placeholder="Aucun gabarit" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {templates.data.items.map((item) => (
-                          <SelectItem key={item.id} value={item.id}>
-                            {item.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </Field>
-              ) : null}
+              <ChampGabarit
+                items={templates.data?.items ?? []}
+                value={templateId}
+                onApply={applyTemplate}
+              />
 
-              {template && template.variables.length > 0 ? (
-                <fieldset className="flex flex-col gap-3 rounded-[var(--radius-md)] border border-border bg-secondary/40 p-3">
-                  <legend className="px-1 text-[0.75rem] font-[600]">Variables</legend>
-                  {template.variables.map((name) => (
-                    <Field key={name} label={name}>
-                      {(props) => (
-                        <Input
-                          {...props}
-                          value={variables[name] ?? ''}
-                          onChange={(event) => {
-                            setVariables((current) => ({
-                              ...current,
-                              [name]: event.target.value,
-                            }));
-                          }}
-                        />
-                      )}
-                    </Field>
-                  ))}
-                </fieldset>
-              ) : null}
+              <ChampsVariables
+                noms={template?.variables ?? []}
+                variables={variables}
+                onChange={setVariables}
+              />
 
               {/* HORS du bloc de gabarit : un marqueur tapé à la main dans le
                   titre bloque l'envoi lui aussi, et rien ne le disait. */}
@@ -415,100 +647,15 @@ export function NotificationComposer({
                 )}
               </Field>
 
-              {selection.audience === 'ROLE' ? (
-                <Field label="Rôle" required>
-                  {(props) => (
-                    <Select
-                      items={ROLE_ITEMS}
-                      value={selection.audienceRole ?? ''}
-                      onValueChange={(value) => {
-                        if (value === null) return;
-                        setSelection((current) => ({ ...current, audienceRole: value as Role }));
-                      }}
-                    >
-                      <SelectTrigger id={props.id}>
-                        <SelectValue placeholder="Choisir un rôle" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ROLE_ITEMS.map((item) => (
-                          <SelectItem key={item.value} value={item.value}>
-                            {item.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </Field>
-              ) : null}
+              <ChampsAudience selection={selection} onChange={setSelection} />
 
-              {selection.audience === 'USERS' ? (
-                <Field
-                  label="Identifiants des comptes"
-                  required
-                  description="Un identifiant par ligne."
-                >
-                  {(props) => (
-                    <Textarea
-                      {...props}
-                      value={selection.audienceUserIds.join('\n')}
-                      onChange={(event) => {
-                        setSelection((current) => ({
-                          ...current,
-                          audienceUserIds: event.target.value
-                            .split(/[\s,]+/)
-                            .map((value) => value.trim())
-                            .filter((value) => value !== ''),
-                        }));
-                      }}
-                    />
-                  )}
-                </Field>
-              ) : null}
-
-              <fieldset className="flex flex-col gap-2">
-                <legend className="mb-1 text-[0.8125rem] font-[600]">Quand</legend>
-                <div className="flex flex-wrap gap-4">
-                  {(['now', 'later'] as const).map((value) => (
-                    <label
-                      key={value}
-                      className="flex min-h-11 cursor-pointer items-center gap-2 text-[0.9375rem]"
-                    >
-                      <input
-                        type="radio"
-                        name="cpi-notification-when"
-                        className="size-4 accent-[var(--primary)]"
-                        checked={when === value}
-                        onChange={() => {
-                          setWhen(value);
-                        }}
-                      />
-                      {value === 'now' ? 'Envoyer maintenant' : 'Programmer'}
-                    </label>
-                  ))}
-                </div>
-                {when === 'later' ? (
-                  <Field label="Date et heure" required error={scheduleIssue ?? undefined}>
-                    {(props) => (
-                      <>
-                        <Input
-                          {...props}
-                          type="datetime-local"
-                          value={scheduledFor}
-                          onChange={(event) => {
-                            setScheduledFor(event.target.value);
-                          }}
-                        />
-                        {/* Le fuseau du CHAMP, dit une fois, sous le champ :
-                            l'entrée `datetime-local` n'en porte aucun, et le
-                            navigateur affiche l'heure du poste sans l'annoncer. */}
-                        <p className="mt-1 text-[0.75rem] text-muted-foreground">
-                          Heure de Dakar (UTC+0), quel que soit le fuseau de ce poste.
-                        </p>
-                      </>
-                    )}
-                  </Field>
-                ) : null}
-              </fieldset>
+              <ChampQuand
+                when={when}
+                onWhen={setWhen}
+                scheduledFor={scheduledFor}
+                onScheduledFor={setScheduledFor}
+                scheduleIssue={scheduleIssue}
+              />
             </div>
 
             {/* L'aperçu est collant : il reste visible pendant qu'on fait
@@ -532,61 +679,25 @@ export function NotificationComposer({
         )}
 
         <DialogFooter>
-          {step === 'redaction' ? (
-            <>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  onOpenChange(false);
-                }}
-              >
-                Annuler
-              </Button>
-              <Button
-                type="button"
-                disabled={blocking !== null}
-                title={blocking ?? undefined}
-                onClick={() => {
-                  setStep('confirmation');
-                }}
-              >
-                <SendIcon aria-hidden="true" />
-                Voir les destinataires
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setStep('redaction');
-                }}
-              >
-                Modifier
-              </Button>
-              <Button
-                type="button"
-                disabled={
-                  send.isPending ||
-                  preview.isPending ||
-                  preview.isError ||
-                  preview.data.recipientCount === 0
-                }
-                onClick={() => {
-                  send.mutate();
-                }}
-              >
-                {send.isPending ? (
-                  <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-                ) : (
-                  <CheckIcon aria-hidden="true" />
-                )}
-                {when === 'later' ? 'Programmer' : 'Envoyer maintenant'}
-              </Button>
-            </>
-          )}
+          <PiedComposer
+            step={step}
+            blocking={blocking}
+            when={when}
+            envoiPossible={
+              !send.isPending &&
+              !preview.isPending &&
+              !preview.isError &&
+              preview.data.recipientCount > 0
+            }
+            envoiEnCours={send.isPending}
+            onAnnuler={() => {
+              onOpenChange(false);
+            }}
+            onEtape={setStep}
+            onEnvoyer={() => {
+              send.mutate();
+            }}
+          />
         </DialogFooter>
 
         <span id={titleId} className="sr-only">

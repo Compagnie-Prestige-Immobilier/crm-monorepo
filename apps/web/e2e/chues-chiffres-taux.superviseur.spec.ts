@@ -155,10 +155,9 @@ async function poserTentatives(
       }),
       `Tentative ${cle} (${tentative.outcome})`,
     );
-    expect(
-      ['applied', 'duplicate'],
-      `Tentative ${cle} : statut ${resultat.status}`,
-    ).toContain(resultat.status);
+    expect(['applied', 'duplicate'], `Tentative ${cle} : statut ${resultat.status}`).toContain(
+      resultat.status,
+    );
   }
 }
 

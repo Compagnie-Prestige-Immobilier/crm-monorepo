@@ -61,8 +61,8 @@ function page(items: ProspectRow[], total = items.length) {
   return { items, total, page: 1, pageSize: 25, pageCount: Math.max(1, Math.ceil(total / 25)) };
 }
 
-function mount(canCreate = true) {
-  return renderWithQuery(<GrandPublicProspectsView canCreate={canCreate} />);
+function mount(canCreate = true, canExport = canCreate) {
+  return renderWithQuery(<GrandPublicProspectsView canCreate={canCreate} canExport={canExport} />);
 }
 
 describe('le segment absent', () => {
@@ -214,6 +214,14 @@ describe('la liste', () => {
     await screen.findByText('Aucun prospect Grand Public n’a encore été saisi.');
     expect(screen.queryByRole('link', { name: /Nouveau prospect/u })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Exporter' })).toBeNull();
+  });
+
+  it('laisse exporter un rôle qui ne saisit pas, comme la DIRECTION', async () => {
+    list.mockResolvedValue(page([]));
+    mount(false, true);
+
+    expect(await screen.findByRole('button', { name: 'Exporter' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Nouveau prospect/u })).toBeNull();
   });
 
   it('exporte la vue filtrée, bornée au Grand Public', async () => {

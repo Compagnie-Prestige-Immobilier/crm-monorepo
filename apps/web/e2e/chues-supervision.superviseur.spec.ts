@@ -264,7 +264,7 @@ test('CHU-SUP-07 le volet Comptes montre la présence', async ({ page }) => {
   await expect(teleconseillers.getByRole('rowheader')).not.toHaveCount(0);
   await expect(finances.getByRole('rowheader')).not.toHaveCount(0);
   await expect(page.getByText('Aucun compte téléconseiller.', { exact: true })).toHaveCount(0);
-  await expect(page.getByText('Aucun compte au pôle Banque & Finance.', { exact: true })).toHaveCount(
-    0,
-  );
+  await expect(
+    page.getByText('Aucun compte au pôle Banque & Finance.', { exact: true }),
+  ).toHaveCount(0);
 });

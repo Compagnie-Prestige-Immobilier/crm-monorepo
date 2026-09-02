@@ -44,6 +44,7 @@ import {
   IefDto,
   IncomeBandDto,
   PaysDto,
+  ProfessionDto,
   SyndicatDto,
 } from '../referentiels/dto.js';
 import {
@@ -332,6 +333,15 @@ export class SyncEntityDataDto {
   @IsOptional()
   @IsEnum(PaymentMode)
   paymentMode?: PaymentMode;
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description:
+      'Prospect : profession choisie dans le référentiel. Le texte libre `profession` reste le repli.',
+  })
+  @IsOptional()
+  @IsUUID()
+  professionId?: string;
 
   @ApiPropertyOptional({
     format: 'uuid',
@@ -857,6 +867,11 @@ export class SyncChangesDto {
   })
   incomeBands!: IncomeBandDto[];
   @ApiProperty({ type: () => [CanalProvenanceDto] }) canauxProvenance!: CanalProvenanceDto[];
+  @ApiProperty({
+    type: () => [ProfessionDto],
+    description: 'Professions : sans elles, le mobile ne pouvait qu’écrire du texte libre.',
+  })
+  professions!: ProfessionDto[];
   @ApiProperty({
     type: () => [EmployeurDto],
     description: 'Employeurs : la situation du Grand Public se saisit hors réseau.',

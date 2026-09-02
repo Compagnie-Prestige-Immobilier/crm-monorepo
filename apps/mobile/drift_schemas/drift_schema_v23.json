@@ -814,6 +814,126 @@
       "references": [],
       "type": "table",
       "data": {
+        "name": "professions",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "id",
+            "getter_name": "id",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL PRIMARY KEY",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              "primary-key"
+            ]
+          },
+          {
+            "name": "code",
+            "getter_name": "code",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "label",
+            "getter_name": "label",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "is_teaching",
+            "getter_name": "isTeaching",
+            "moor_type": "bool",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 0",
+            "default_dart": "const CustomExpression('0')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "is_active",
+            "getter_name": "isActive",
+            "moor_type": "bool",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 1",
+            "default_dart": "const CustomExpression('1')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "sort_order",
+            "getter_name": "sortOrder",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": "NOT NULL DEFAULT 100",
+            "default_dart": "const CustomExpression('100')",
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "local_updated_at",
+            "getter_name": "localUpdatedAt",
+            "moor_type": "dateTime",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "server_updated_at",
+            "getter_name": "serverUpdatedAt",
+            "moor_type": "dateTime",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "deleted_at",
+            "getter_name": "deletedAt",
+            "moor_type": "dateTime",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": []
+      }
+    },
+    {
+      "id": 15,
+      "references": [
+        14
+      ],
+      "type": "index",
+      "data": {
+        "on": 14,
+        "name": "professions_active_idx",
+        "sql": "CREATE INDEX professions_active_idx\n    ON professions (is_active, sort_order, label);",
+        "unique": false,
+        "columns": []
+      }
+    },
+    {
+      "id": 16,
+      "references": [],
+      "type": "table",
+      "data": {
         "name": "employeurs",
         "was_declared_in_moor": true,
         "columns": [
@@ -916,13 +1036,13 @@
       }
     },
     {
-      "id": 15,
+      "id": 17,
       "references": [
-        14
+        16
       ],
       "type": "index",
       "data": {
-        "on": 14,
+        "on": 16,
         "name": "employeurs_active_idx",
         "sql": "CREATE INDEX employeurs_active_idx\n    ON employeurs (type, is_active, sort_order, label);",
         "unique": false,
@@ -930,7 +1050,7 @@
       }
     },
     {
-      "id": 16,
+      "id": 18,
       "references": [],
       "type": "table",
       "data": {
@@ -1036,13 +1156,13 @@
       }
     },
     {
-      "id": 17,
+      "id": 19,
       "references": [
-        16
+        18
       ],
       "type": "index",
       "data": {
-        "on": 16,
+        "on": 18,
         "name": "pays_active_idx",
         "sql": "CREATE INDEX pays_active_idx ON pays (is_active, sort_order, label);",
         "unique": false,
@@ -1050,7 +1170,7 @@
       }
     },
     {
-      "id": 18,
+      "id": 20,
       "references": [],
       "type": "table",
       "data": {
@@ -1146,13 +1266,13 @@
       }
     },
     {
-      "id": 19,
+      "id": 21,
       "references": [
-        18
+        20
       ],
       "type": "index",
       "data": {
-        "on": 18,
+        "on": 20,
         "name": "visite_referentiels_kind_idx",
         "sql": "CREATE INDEX visite_referentiels_kind_idx\n    ON visite_referentiels (kind, is_active, sort_order, label);",
         "unique": false,
@@ -1160,7 +1280,7 @@
       }
     },
     {
-      "id": 20,
+      "id": 22,
       "references": [],
       "type": "table",
       "data": {
@@ -1276,13 +1396,13 @@
       }
     },
     {
-      "id": 21,
+      "id": 23,
       "references": [
-        20
+        22
       ],
       "type": "index",
       "data": {
-        "on": 20,
+        "on": 22,
         "name": "call_outcome_reasons_active_idx",
         "sql": "CREATE INDEX call_outcome_reasons_active_idx\n    ON call_outcome_reasons (is_active, sort_order, label);",
         "unique": false,
@@ -1290,7 +1410,7 @@
       }
     },
     {
-      "id": 22,
+      "id": 24,
       "references": [
         0,
         3
@@ -1543,13 +1663,13 @@
       }
     },
     {
-      "id": 23,
+      "id": 25,
       "references": [
-        22
+        24
       ],
       "type": "index",
       "data": {
-        "on": 22,
+        "on": 24,
         "name": "representants_phone_unique",
         "sql": "CREATE UNIQUE INDEX representants_phone_unique\n    ON representants (phone_e164) WHERE deleted_at IS NULL;",
         "unique": true,
@@ -1557,13 +1677,13 @@
       }
     },
     {
-      "id": 24,
+      "id": 26,
       "references": [
-        22
+        24
       ],
       "type": "index",
       "data": {
-        "on": 22,
+        "on": 24,
         "name": "representants_departement_idx",
         "sql": "CREATE INDEX representants_departement_idx ON representants (departement_id);",
         "unique": false,
@@ -1571,13 +1691,13 @@
       }
     },
     {
-      "id": 25,
+      "id": 27,
       "references": [
-        22
+        24
       ],
       "type": "index",
       "data": {
-        "on": 22,
+        "on": 24,
         "name": "representants_created_idx",
         "sql": "CREATE INDEX representants_created_idx ON representants (client_created_at DESC);",
         "unique": false,
@@ -1585,11 +1705,11 @@
       }
     },
     {
-      "id": 26,
+      "id": 28,
       "references": [
         6,
         8,
-        22
+        24
       ],
       "type": "table",
       "data": {
@@ -1737,6 +1857,16 @@
           {
             "name": "profession",
             "getter_name": "profession",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": "",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "profession_id",
+            "getter_name": "professionId",
             "moor_type": "string",
             "nullable": true,
             "customConstraints": "",
@@ -1951,13 +2081,13 @@
       }
     },
     {
-      "id": 27,
+      "id": 29,
       "references": [
-        26
+        28
       ],
       "type": "index",
       "data": {
-        "on": 26,
+        "on": 28,
         "name": "prospects_phone_unique",
         "sql": "CREATE UNIQUE INDEX prospects_phone_unique\n    ON prospects (phone_e164) WHERE deleted_at IS NULL;",
         "unique": true,
@@ -1965,13 +2095,13 @@
       }
     },
     {
-      "id": 28,
+      "id": 30,
       "references": [
-        26
+        28
       ],
       "type": "index",
       "data": {
-        "on": 26,
+        "on": 28,
         "name": "prospects_representant_idx",
         "sql": "CREATE INDEX prospects_representant_idx ON prospects (representant_id);",
         "unique": false,
@@ -1979,13 +2109,13 @@
       }
     },
     {
-      "id": 29,
+      "id": 31,
       "references": [
-        26
+        28
       ],
       "type": "index",
       "data": {
-        "on": 26,
+        "on": 28,
         "name": "prospects_created_idx",
         "sql": "CREATE INDEX prospects_created_idx ON prospects (client_created_at DESC);",
         "unique": false,
@@ -1993,9 +2123,9 @@
       }
     },
     {
-      "id": 30,
+      "id": 32,
       "references": [
-        26
+        28
       ],
       "type": "table",
       "data": {
@@ -2057,13 +2187,13 @@
       }
     },
     {
-      "id": 31,
+      "id": 33,
       "references": [
-        30
+        32
       ],
       "type": "index",
       "data": {
-        "on": 30,
+        "on": 32,
         "name": "prospect_journeys_projet_idx",
         "sql": "CREATE INDEX prospect_journeys_projet_idx ON prospect_journeys (projet);",
         "unique": false,
@@ -2071,9 +2201,9 @@
       }
     },
     {
-      "id": 32,
+      "id": 34,
       "references": [
-        22
+        24
       ],
       "type": "table",
       "data": {
@@ -2171,13 +2301,13 @@
       }
     },
     {
-      "id": 33,
+      "id": 35,
       "references": [
-        32
+        34
       ],
       "type": "index",
       "data": {
-        "on": 32,
+        "on": 34,
         "name": "representant_comments_representant_idx",
         "sql": "CREATE INDEX representant_comments_representant_idx\n    ON representant_comments (representant_id, client_created_at DESC);",
         "unique": false,
@@ -2185,7 +2315,7 @@
       }
     },
     {
-      "id": 34,
+      "id": 36,
       "references": [],
       "type": "table",
       "data": {
@@ -2393,13 +2523,13 @@
       }
     },
     {
-      "id": 35,
+      "id": 37,
       "references": [
-        34
+        36
       ],
       "type": "index",
       "data": {
-        "on": 34,
+        "on": 36,
         "name": "outbox_ready_idx",
         "sql": "CREATE INDEX outbox_ready_idx\n    ON outbox (status, next_attempt_at, dependency_key, seq);",
         "unique": false,
@@ -2407,13 +2537,13 @@
       }
     },
     {
-      "id": 36,
+      "id": 38,
       "references": [
-        34
+        36
       ],
       "type": "index",
       "data": {
-        "on": 34,
+        "on": 36,
         "name": "outbox_entity_idx",
         "sql": "CREATE INDEX outbox_entity_idx ON outbox (entity_type, entity_id, status);",
         "unique": false,
@@ -2421,7 +2551,7 @@
       }
     },
     {
-      "id": 37,
+      "id": 39,
       "references": [],
       "type": "table",
       "data": {
@@ -2517,13 +2647,13 @@
       }
     },
     {
-      "id": 38,
+      "id": 40,
       "references": [
-        37
+        39
       ],
       "type": "index",
       "data": {
-        "on": 37,
+        "on": 39,
         "name": "form_drafts_key_idx",
         "sql": "CREATE INDEX form_drafts_key_idx ON form_drafts (form_key, updated_at DESC);",
         "unique": false,
@@ -2531,7 +2661,7 @@
       }
     },
     {
-      "id": 39,
+      "id": 41,
       "references": [],
       "type": "table",
       "data": {
@@ -2577,7 +2707,7 @@
       }
     },
     {
-      "id": 40,
+      "id": 42,
       "references": [],
       "type": "table",
       "data": {
@@ -2653,13 +2783,13 @@
       }
     },
     {
-      "id": 41,
+      "id": 43,
       "references": [
-        40
+        42
       ],
       "type": "index",
       "data": {
-        "on": 40,
+        "on": 42,
         "name": "phase2_directory_phone_unique",
         "sql": "CREATE UNIQUE INDEX phase2_directory_phone_unique ON phase2_directory (phone_e164);",
         "unique": true,
@@ -2667,13 +2797,13 @@
       }
     },
     {
-      "id": 42,
+      "id": 44,
       "references": [
-        40
+        42
       ],
       "type": "index",
       "data": {
-        "on": 40,
+        "on": 42,
         "name": "phase2_directory_status_idx",
         "sql": "CREATE INDEX phase2_directory_status_idx ON phase2_directory (phase2_status);",
         "unique": false,
@@ -2681,7 +2811,7 @@
       }
     },
     {
-      "id": 43,
+      "id": 45,
       "references": [],
       "type": "table",
       "data": {
@@ -2864,13 +2994,13 @@
       }
     },
     {
-      "id": 44,
+      "id": 46,
       "references": [
-        43
+        45
       ],
       "type": "index",
       "data": {
-        "on": 43,
+        "on": 45,
         "name": "call_attempts_prospect_idx",
         "sql": "CREATE INDEX call_attempts_prospect_idx\n    ON call_attempts (prospect_id, client_created_at DESC);",
         "unique": false,
@@ -2878,13 +3008,13 @@
       }
     },
     {
-      "id": 45,
+      "id": 47,
       "references": [
-        43
+        45
       ],
       "type": "index",
       "data": {
-        "on": 43,
+        "on": 45,
         "name": "call_attempts_created_idx",
         "sql": "CREATE INDEX call_attempts_created_idx ON call_attempts (client_created_at DESC);",
         "unique": false,
@@ -2892,7 +3022,7 @@
       }
     },
     {
-      "id": 46,
+      "id": 48,
       "references": [],
       "type": "table",
       "data": {
@@ -2998,13 +3128,13 @@
       }
     },
     {
-      "id": 47,
+      "id": 49,
       "references": [
-        46
+        48
       ],
       "type": "index",
       "data": {
-        "on": 46,
+        "on": 48,
         "name": "notifications_created_idx",
         "sql": "CREATE INDEX notifications_created_idx ON notifications (created_at);",
         "unique": false,
@@ -3012,13 +3142,13 @@
       }
     },
     {
-      "id": 48,
+      "id": 50,
       "references": [
-        46
+        48
       ],
       "type": "index",
       "data": {
-        "on": 46,
+        "on": 48,
         "name": "notifications_unread_idx",
         "sql": "CREATE INDEX notifications_unread_idx ON notifications (read_at);",
         "unique": false,
@@ -3026,10 +3156,10 @@
       }
     },
     {
-      "id": 49,
+      "id": 51,
       "references": [
-        22,
-        34
+        24,
+        36
       ],
       "type": "view",
       "data": {
@@ -3269,10 +3399,10 @@
       }
     },
     {
-      "id": 50,
+      "id": 52,
       "references": [
-        26,
-        34
+        28,
+        36
       ],
       "type": "view",
       "data": {
@@ -3383,6 +3513,16 @@
           {
             "name": "profession",
             "getter_name": "profession",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "profession_id",
+            "getter_name": "professionId",
             "moor_type": "string",
             "nullable": true,
             "customConstraints": null,
@@ -3604,7 +3744,7 @@
       }
     },
     {
-      "id": 51,
+      "id": 53,
       "references": [],
       "type": "table",
       "data": {
@@ -3690,13 +3830,13 @@
       }
     },
     {
-      "id": 52,
+      "id": 54,
       "references": [
-        51
+        53
       ],
       "type": "index",
       "data": {
-        "on": 51,
+        "on": 53,
         "name": "rep_callback_reminders_pending_idx",
         "sql": "CREATE INDEX rep_callback_reminders_pending_idx ON rep_callback_reminders (notified_at, scheduled_at);",
         "unique": false,
@@ -3704,7 +3844,7 @@
       }
     },
     {
-      "id": 53,
+      "id": 55,
       "references": [],
       "type": "table",
       "data": {
@@ -3910,13 +4050,13 @@
       }
     },
     {
-      "id": 54,
+      "id": 56,
       "references": [
-        53
+        55
       ],
       "type": "index",
       "data": {
-        "on": 53,
+        "on": 55,
         "name": "visites_date_idx",
         "sql": "CREATE INDEX visites_date_idx ON visites (date, time);",
         "unique": false,
@@ -3924,13 +4064,13 @@
       }
     },
     {
-      "id": 55,
+      "id": 57,
       "references": [
-        53
+        55
       ],
       "type": "index",
       "data": {
-        "on": 53,
+        "on": 55,
         "name": "visites_entreprise_date_idx",
         "sql": "CREATE INDEX visites_entreprise_date_idx ON visites (entreprise_id, date);",
         "unique": false,
@@ -4066,6 +4206,24 @@
       ]
     },
     {
+      "name": "professions",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"professions\" (\"id\" TEXT NOT NULL PRIMARY KEY, \"code\" TEXT NOT NULL, \"label\" TEXT NOT NULL, \"is_teaching\" INTEGER NOT NULL DEFAULT 0, \"is_active\" INTEGER NOT NULL DEFAULT 1, \"sort_order\" INTEGER NOT NULL DEFAULT 100, \"local_updated_at\" TEXT NOT NULL, \"server_updated_at\" TEXT NULL, \"deleted_at\" TEXT NULL);"
+        }
+      ]
+    },
+    {
+      "name": "professions_active_idx",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX professions_active_idx ON professions (is_active, sort_order, label)"
+        }
+      ]
+    },
+    {
       "name": "employeurs",
       "sql": [
         {
@@ -4178,7 +4336,7 @@
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE TABLE IF NOT EXISTS \"prospects\" (\"id\" TEXT NOT NULL PRIMARY KEY, \"nom\" TEXT NOT NULL, \"prenom\" TEXT NOT NULL, \"phone_e164\" TEXT NOT NULL, \"banque_id\" TEXT REFERENCES banques(id)ON UPDATE CASCADE, \"syndicat_id\" TEXT REFERENCES syndicats(id)ON UPDATE CASCADE, \"representant_id\" TEXT REFERENCES representants(id)ON UPDATE CASCADE ON DELETE RESTRICT, \"created_by_id\" TEXT NOT NULL, \"projet\" TEXT NOT NULL DEFAULT 'CHUES', \"type\" TEXT, \"profession\" TEXT, \"duree_systeme_mois\" INTEGER, \"canal_provenance_id\" TEXT, \"income_band_id\" TEXT, \"employeur_id\" TEXT, \"employeur\" TEXT, \"type_contrat\" TEXT, \"anciennete_mois\" INTEGER, \"lieu_activite\" TEXT, \"mode_epargne\" TEXT, \"pays_residence_id\" TEXT, \"ville_residence\" TEXT, \"whatsapp_e164\" TEXT, \"relais_nom\" TEXT, \"relais_phone_e164\" TEXT, \"statut\" TEXT NOT NULL DEFAULT 'NOUVEAU', \"client_created_at\" TEXT NOT NULL, \"rev\" INTEGER NOT NULL DEFAULT 1, \"local_updated_at\" TEXT NOT NULL, \"server_updated_at\" TEXT NULL, \"deleted_at\" TEXT NULL);"
+          "sql": "CREATE TABLE IF NOT EXISTS \"prospects\" (\"id\" TEXT NOT NULL PRIMARY KEY, \"nom\" TEXT NOT NULL, \"prenom\" TEXT NOT NULL, \"phone_e164\" TEXT NOT NULL, \"banque_id\" TEXT REFERENCES banques(id)ON UPDATE CASCADE, \"syndicat_id\" TEXT REFERENCES syndicats(id)ON UPDATE CASCADE, \"representant_id\" TEXT REFERENCES representants(id)ON UPDATE CASCADE ON DELETE RESTRICT, \"created_by_id\" TEXT NOT NULL, \"projet\" TEXT NOT NULL DEFAULT 'CHUES', \"type\" TEXT, \"profession\" TEXT, \"profession_id\" TEXT, \"duree_systeme_mois\" INTEGER, \"canal_provenance_id\" TEXT, \"income_band_id\" TEXT, \"employeur_id\" TEXT, \"employeur\" TEXT, \"type_contrat\" TEXT, \"anciennete_mois\" INTEGER, \"lieu_activite\" TEXT, \"mode_epargne\" TEXT, \"pays_residence_id\" TEXT, \"ville_residence\" TEXT, \"whatsapp_e164\" TEXT, \"relais_nom\" TEXT, \"relais_phone_e164\" TEXT, \"statut\" TEXT NOT NULL DEFAULT 'NOUVEAU', \"client_created_at\" TEXT NOT NULL, \"rev\" INTEGER NOT NULL DEFAULT 1, \"local_updated_at\" TEXT NOT NULL, \"server_updated_at\" TEXT NULL, \"deleted_at\" TEXT NULL);"
         }
       ]
     },

@@ -1,4 +1,5 @@
 import { format, parseISO } from 'date-fns';
+import { parsePhoneNumberFromString } from 'libphonenumber-js/min';
 
 export const DAKAR_UTC_OFFSET = '+00:00';
 
@@ -62,9 +63,7 @@ export function formatShortDate(iso: string): string {
 }
 
 export function formatPhone(e164: string): string {
-  const match = /^\+221(\d{2})(\d{3})(\d{2})(\d{2})$/.exec(e164);
-  if (match === null) return e164;
-  return `+221 ${match[1] ?? ''} ${match[2] ?? ''} ${match[3] ?? ''} ${match[4] ?? ''}`;
+  return parsePhoneNumberFromString(e164)?.formatInternational() ?? e164;
 }
 
 export function initials(fullName: string): string {

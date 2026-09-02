@@ -3,16 +3,17 @@
 //
 
 // ignore_for_file: unused_element
-import 'package:crm_api_client/src/model/departement_dto.dart';
 import 'package:crm_api_client/src/model/pays_dto.dart';
 import 'package:crm_api_client/src/model/representant_dto.dart';
+import 'package:crm_api_client/src/model/sync_visite_dto.dart';
+import 'package:crm_api_client/src/model/departement_dto.dart';
 import 'package:crm_api_client/src/model/prospect_dto.dart';
 import 'package:crm_api_client/src/model/ief_dto.dart';
+import 'package:crm_api_client/src/model/profession_dto.dart';
 import 'package:crm_api_client/src/model/sync_visite_referentiel_dto.dart';
 import 'package:crm_api_client/src/model/income_band_dto.dart';
 import 'package:crm_api_client/src/model/canal_provenance_dto.dart';
 import 'package:crm_api_client/src/model/employeur_dto.dart';
-import 'package:crm_api_client/src/model/sync_visite_dto.dart';
 import 'package:crm_api_client/src/model/syndicat_dto.dart';
 import 'package:crm_api_client/src/model/banque_dto.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
@@ -42,6 +43,8 @@ class SyncChangesDto {
     required this.incomeBands,
 
     required this.canauxProvenance,
+
+    required this.professions,
 
     required this.employeurs,
 
@@ -75,6 +78,10 @@ class SyncChangesDto {
   @JsonKey(name: r'canauxProvenance', required: true, includeIfNull: false)
   final List<CanalProvenanceDto> canauxProvenance;
 
+  /// Professions : sans elles, le mobile ne pouvait qu’écrire du texte libre.
+  @JsonKey(name: r'professions', required: true, includeIfNull: false)
+  final List<ProfessionDto> professions;
+
   /// Employeurs : la situation du Grand Public se saisit hors réseau.
   @JsonKey(name: r'employeurs', required: true, includeIfNull: false)
   final List<EmployeurDto> employeurs;
@@ -107,6 +114,7 @@ class SyncChangesDto {
                 syndicats,
                 incomeBands,
                 canauxProvenance,
+                professions,
                 employeurs,
                 pays,
                 visiteReferentiels,
@@ -121,6 +129,7 @@ class SyncChangesDto {
                 other.syndicats,
                 other.incomeBands,
                 other.canauxProvenance,
+                other.professions,
                 other.employeurs,
                 other.pays,
                 other.visiteReferentiels,
@@ -141,6 +150,7 @@ class SyncChangesDto {
         syndicats,
         incomeBands,
         canauxProvenance,
+        professions,
         employeurs,
         pays,
         visiteReferentiels,

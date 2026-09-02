@@ -1,14 +1,12 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   Param,
   ParseEnumPipe,
   ParseUUIDPipe,
   Patch,
   Post,
-  Put,
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -16,7 +14,6 @@ import { Role } from '@crm/database';
 
 import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
 import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
-import { OkDto } from '../../common/dto/ok.dto.js';
 import { ANY_AUTHENTICATED, Roles } from '../../common/decorators/roles.decorator.js';
 import {
   CurrentUser,

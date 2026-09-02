@@ -10,7 +10,11 @@ import { expect, test } from '@playwright/test';
 
 test.use({ storageState: 'e2e/.auth/banque.json' });
 
-const FAMILLES_DE_L_ECRAN = ['/api/v1/supervision/', '/api/v1/tableaux-de-bord/', '/api/v1/analytics/'];
+const FAMILLES_DE_L_ECRAN = [
+  '/api/v1/supervision/',
+  '/api/v1/tableaux-de-bord/',
+  '/api/v1/analytics/',
+];
 
 test('CHU-CHF-04 · l’écran est refusé à un agent Banque & Finance', async ({ page }) => {
   const chargees: string[] = [];

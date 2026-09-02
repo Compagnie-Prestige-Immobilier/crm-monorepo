@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { ArrowLeftIcon, CopyIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -170,65 +170,94 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
           : 'Choisissez qui vous venez d’appeler.'}
       </p>
 
-      {annuaire.isError ? (
-        <QueryErrorState
-          error={annuaire.error}
-          fallback="L’annuaire n’a pas pu être lu."
-          onRetry={() => {
-            void annuaire.refetch();
-          }}
-        />
-      ) : annuaire.isPending ? (
-        <ListeSkeleton />
-      ) : annuaire.data.items.length === 0 ? (
-        <div className="flex flex-col gap-3">
-          <p className="text-[0.9375rem]">
-            {cherche === ''
-              ? 'Aucun prospect pour l’instant.'
-              : 'Aucun résultat. Vérifiez le nom ou le numéro.'}
-          </p>
-          <Link href={nouveauHref(projet)} className={cn(buttonVariants(), 'self-start')}>
-            Ajouter un prospect
-          </Link>
-        </div>
-      ) : (
-        <ol className="flex flex-col gap-2">
-          {annuaire.data.items.map((row) => (
-            <li key={row.id}>
-              <button
-                type="button"
-                onClick={() => {
-                  setConfirme(null);
-                  setChoisi(row);
-                }}
-                className={cn(
-                  'flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-md border border-border px-3 py-3 text-left',
-                  'hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-                )}
-              >
-                <span className="flex min-w-0 flex-col">
-                  <span className="truncate text-[0.9375rem] font-[600]">
-                    {row.nom} {row.prenom}
-                  </span>
-                  <span className="text-[0.8125rem] text-muted-foreground">
-                    <span className="tabular-nums">{formatPhone(row.phoneE164)}</span>
-                    {row.banqueName === null ? '' : ` · ${row.banqueName}`}
-                    {row.lastAttemptAt === null
-                      ? ' · jamais appelé'
-                      : ` · dernier appel ${formatDateTime(row.lastAttemptAt)}`}
-                  </span>
-                </span>
-                {row.phase2Status === 'PENDING' ? null : (
-                  <span className="rounded-full border border-border px-2 py-0.5 text-[0.75rem] text-muted-foreground">
-                    {PHASE2_STATUS_LABELS[row.phase2Status]}
-                  </span>
-                )}
-              </button>
-            </li>
-          ))}
-        </ol>
-      )}
+      <ListeAnnuaire
+        annuaire={annuaire}
+        cherche={cherche}
+        projet={projet}
+        onChoisir={(row) => {
+          setConfirme(null);
+          setChoisi(row);
+        }}
+      />
     </div>
+  );
+}
+
+function ListeAnnuaire({
+  annuaire,
+  cherche,
+  projet,
+  onChoisir,
+}: {
+  annuaire: UseQueryResult<Awaited<ReturnType<typeof fetchProspects>>>;
+  cherche: string;
+  projet: Projet;
+  onChoisir: (row: ProspectRow) => void;
+}) {
+  if (annuaire.isError) {
+    return (
+      <QueryErrorState
+        error={annuaire.error}
+        fallback="L’annuaire n’a pas pu être lu."
+        onRetry={() => {
+          void annuaire.refetch();
+        }}
+      />
+    );
+  }
+
+  if (annuaire.isPending) return <ListeSkeleton />;
+
+  if (annuaire.data.items.length === 0) {
+    return (
+      <div className="flex flex-col gap-3">
+        <p className="text-[0.9375rem]">
+          {cherche === ''
+            ? 'Aucun prospect pour l’instant.'
+            : 'Aucun résultat. Vérifiez le nom ou le numéro.'}
+        </p>
+        <Link href={nouveauHref(projet)} className={cn(buttonVariants(), 'self-start')}>
+          Ajouter un prospect
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <ol className="flex flex-col gap-2">
+      {annuaire.data.items.map((row) => (
+        <li key={row.id}>
+          <button
+            type="button"
+            onClick={() => {
+              onChoisir(row);
+            }}
+            className={cn(
+              'flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-md border border-border px-3 py-3 text-left',
+              'hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+            )}
+          >
+            <span className="flex min-w-0 flex-col">
+              <span className="truncate text-[0.9375rem] font-[600]">
+                {row.nom} {row.prenom}
+              </span>
+              <span className="text-[0.8125rem] text-muted-foreground">
+                <span className="tabular-nums">{formatPhone(row.phoneE164)}</span>
+                {row.banqueName === null ? '' : ` · ${row.banqueName}`}
+                {row.lastAttemptAt === null
+                  ? ' · jamais appelé'
+                  : ` · dernier appel ${formatDateTime(row.lastAttemptAt)}`}
+              </span>
+            </span>
+            {row.phase2Status === 'PENDING' ? null : (
+              <span className="rounded-full border border-border px-2 py-0.5 text-[0.75rem] text-muted-foreground">
+                {PHASE2_STATUS_LABELS[row.phase2Status]}
+              </span>
+            )}
+          </button>
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -270,6 +299,14 @@ function ListeSkeleton() {
   );
 }
 
+function resumeDernierAppel(prospect: ProspectRow): string {
+  const commentaire = prospect.lastComment === null ? '' : ` · « ${prospect.lastComment} »`;
+  if (prospect.lastAttemptAt === null) return `Jamais appelée.${commentaire}`;
+  const issue =
+    prospect.lastOutcome === null ? '' : ` · ${CALL_OUTCOME_LABELS[prospect.lastOutcome]}`;
+  return `Dernier appel : ${formatDateTime(prospect.lastAttemptAt)}${issue}${commentaire}`;
+}
+
 /**
  * La consignation d'un appel, en deux temps : d'abord si la personne était
  * joignable, puis, si oui, son dossier et la manière dont elle adhère.
@@ -300,7 +337,7 @@ function Consignation({
 
   const nomComplet = `${prospect.nom} ${prospect.prenom}`;
   const closed = prospect.phase2Status !== 'PENDING' || refusee;
-  const now = Date.now();
+  const [now] = useState(() => Date.now());
 
   const send = useMutation({
     mutationFn: (draft: AttemptDraft) => pushCallAttempt(newAttemptInput(prospect.id, draft)),
@@ -498,16 +535,7 @@ function Consignation({
             .join(' · ')}
           {projet === 'CHUES' ? ` · Représentant ${prospect.representantName ?? 'aucun'}` : ''}
         </p>
-        <p className="text-[0.8125rem] text-muted-foreground">
-          {prospect.lastAttemptAt === null
-            ? 'Jamais appelée.'
-            : `Dernier appel : ${formatDateTime(prospect.lastAttemptAt)}${
-                prospect.lastOutcome === null
-                  ? ''
-                  : ` · ${CALL_OUTCOME_LABELS[prospect.lastOutcome]}`
-              }`}
-          {prospect.lastComment === null ? '' : ` · « ${prospect.lastComment} »`}
-        </p>
+        <p className="text-[0.8125rem] text-muted-foreground">{resumeDernierAppel(prospect)}</p>
 
         {closed ? (
           <div
@@ -517,7 +545,9 @@ function Consignation({
             Fiche déjà close ({PHASE2_STATUS_LABELS[prospect.phase2Status].toLowerCase()}). Rien à
             consigner ici.
           </div>
-        ) : conversion !== null ? (
+        ) : null}
+
+        {closed || conversion === null ? null : (
           <>
             <p className="text-[0.8125rem] font-[600] text-muted-foreground">
               Joignable · son dossier, et la manière dont il adhère
@@ -568,7 +598,9 @@ function Consignation({
               </Button>
             </div>
           </>
-        ) : (
+        )}
+
+        {closed || conversion !== null ? null : (
           <>
             {slots !== null ? null : (
               <fieldset className="flex flex-col gap-2" disabled={send.isPending}>

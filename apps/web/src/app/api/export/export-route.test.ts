@@ -74,7 +74,7 @@ describe('export en régime normal', () => {
     expect(response.headers.get('Cache-Control')).toBe('no-store');
 
     const bytes = new Uint8Array(await response.arrayBuffer());
-    expect([...bytes.slice(0, 4)]).toEqual([0x50, 0x4b, 0x03, 0x04]);
+    expect(Array.from(bytes.slice(0, 4))).toEqual([0x50, 0x4b, 0x03, 0x04]);
   });
 
   it('transmet les filtres et écarte pagination et tri', async () => {

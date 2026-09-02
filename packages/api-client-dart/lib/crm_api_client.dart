@@ -163,6 +163,7 @@ export 'package:crm_api_client/src/model/lot_export_distribution_input_dto.dart'
 export 'package:crm_api_client/src/model/lot_export_list_dto.dart';
 export 'package:crm_api_client/src/model/lot_export_performance_dto.dart';
 export 'package:crm_api_client/src/model/lot_export_preview_dto.dart';
+export 'package:crm_api_client/src/model/lot_export_prospect_filter_dto.dart';
 export 'package:crm_api_client/src/model/lot_export_repartition_dto.dart';
 export 'package:crm_api_client/src/model/lot_export_repartition_jour_dto.dart';
 export 'package:crm_api_client/src/model/lot_export_summary_dto.dart';
@@ -199,7 +200,6 @@ export 'package:crm_api_client/src/model/projet.dart';
 export 'package:crm_api_client/src/model/prospect_conflict_dto.dart';
 export 'package:crm_api_client/src/model/prospect_conflict_existing_dto.dart';
 export 'package:crm_api_client/src/model/prospect_dto.dart';
-export 'package:crm_api_client/src/model/prospect_filter_dto.dart';
 export 'package:crm_api_client/src/model/prospect_journey_dto.dart';
 export 'package:crm_api_client/src/model/prospect_list_dto.dart';
 export 'package:crm_api_client/src/model/prospect_search_item_dto.dart';

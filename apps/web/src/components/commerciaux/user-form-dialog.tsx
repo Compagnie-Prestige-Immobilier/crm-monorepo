@@ -128,6 +128,7 @@ export function UserFormDialog({
     },
   });
 
+  // oxlint-disable-next-line react/incompatible-library -- faux positif react-hook-form
   const role = watch('role') as UserFormInput['role'] | undefined;
 
   const roleItems = ROLES.map((value) => ({ value, label: ROLE_LABELS[value] }));

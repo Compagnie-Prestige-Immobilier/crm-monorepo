@@ -28,8 +28,8 @@ export default async function DossierGrandPublicPage({
   const queryClient = getQueryClient();
   try {
     await queryClient.prefetchQuery({
-      queryKey: queryKeys.bankCase(id),
-      queryFn: () => fetchBankCase(id, getServerApiClient()),
+      queryKey: queryKeys.bankCase(id, 'GRAND_PUBLIC'),
+      queryFn: () => fetchBankCase(id, 'GRAND_PUBLIC', getServerApiClient()),
     });
   } catch (error) {
     unstable_rethrow(error);

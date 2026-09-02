@@ -15,14 +15,16 @@ import {
 } from './attempt-rules.js';
 
 function codeOf(run: () => unknown): string {
+  let leve: unknown;
   try {
     run();
   } catch (error) {
-    expect(error).toBeInstanceOf(BadRequestException);
-    const body = (error as BadRequestException).getResponse() as { code?: string };
-    return body.code ?? '';
+    leve = error;
   }
-  throw new Error('aucune exception levée');
+
+  expect(leve).toBeInstanceOf(BadRequestException);
+  const body = (leve as BadRequestException).getResponse() as { code?: string };
+  return body.code ?? '';
 }
 
 describe('isTerminalOutcome', () => {

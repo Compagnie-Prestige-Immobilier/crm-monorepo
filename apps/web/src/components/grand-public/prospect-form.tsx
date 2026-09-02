@@ -12,6 +12,7 @@ import { Field } from '@/components/forms/field';
 import {
   InternationalPhoneField,
   callingCountriesFrom,
+  fromE164,
   toInternationalE164,
 } from '@/components/forms/international-phone-field';
 import { Button } from '@/components/ui/button';
@@ -36,7 +37,11 @@ import {
   type GrandPublicProspectInput,
   type ProspectType,
 } from '@/lib/data/grand-public';
-import { prospectPhoneConflict, type ProspectPhoneConflict } from '@/lib/data/prospects';
+import {
+  prospectPhoneConflict,
+  updateProspect,
+  type ProspectPhoneConflict,
+} from '@/lib/data/prospects';
 import { fetchReferenceData } from '@/lib/data/reference';
 import { formatDateTime } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
@@ -46,8 +51,10 @@ import {
   TYPE_CONTRAT_LABELS,
   type ModeEpargne,
   type PaymentMode,
+  type ProspectRow,
   type ReferenceData,
   type TypeContrat,
+  type UpdateProspectInput,
 } from '@/lib/types';
 
 type Errors = Partial<Record<'prenom' | 'nom' | 'phone', string>>;
@@ -108,6 +115,157 @@ const SITUATION_VIDE: Situation = {
   syndicatId: null,
 };
 
+interface Depart {
+  prenom: string;
+  nom: string;
+  phone: string;
+  callingCode: string;
+  whatsappCode: string;
+  professionId: string | null;
+  incomeBandId: string | null;
+  paymentMode: PaymentMode | null;
+  type: ProspectType | null;
+  situation: Situation;
+  dureeMois: number | null;
+  canalId: string | null;
+}
+
+const DEPART_VIDE: Depart = {
+  prenom: '',
+  nom: '',
+  phone: '',
+  callingCode: '221',
+  whatsappCode: '221',
+  professionId: null,
+  incomeBandId: null,
+  paymentMode: null,
+  type: null,
+  situation: SITUATION_VIDE,
+  dureeMois: null,
+  canalId: null,
+};
+
+function departDepuis(prospect: ProspectRow): Depart {
+  const principal = fromE164(prospect.phoneE164);
+  const whatsapp = prospect.whatsappE164;
+  return {
+    prenom: prospect.prenom,
+    nom: prospect.nom,
+    phone: principal.phone,
+    callingCode: principal.callingCode,
+    whatsappCode: whatsapp === null ? principal.callingCode : fromE164(whatsapp).callingCode,
+    professionId: prospect.professionId,
+    incomeBandId: prospect.incomeBandId,
+    paymentMode: prospect.paymentMode,
+    type: prospect.type,
+    situation: situationDepuis(prospect),
+    dureeMois: prospect.dureeSystemeMois,
+    canalId: prospect.canalProvenanceId,
+  };
+}
+
+function situationDepuis(prospect: ProspectRow): Situation {
+  const whatsapp = prospect.whatsappE164;
+  const relais = prospect.relaisPhoneE164;
+  return {
+    employeurId: prospect.employeurId,
+    // `employeur` porte le libellé du référentiel dès qu'un identifiant est posé :
+    // la saisie libre ne reprend que ce qui n'en vient pas.
+    employeur: prospect.employeurId === null ? (prospect.employeur ?? '') : '',
+    typeContrat: prospect.typeContrat,
+    ancienneteMois: prospect.ancienneteMois === null ? '' : String(prospect.ancienneteMois),
+    lieuActivite: prospect.lieuActivite ?? '',
+    modeEpargne: prospect.modeEpargne,
+    paysResidenceId: prospect.paysResidenceId,
+    villeResidence: prospect.villeResidence ?? '',
+    whatsapp: whatsapp === null ? '' : fromE164(whatsapp).phone,
+    relaisNom: prospect.relaisNom ?? '',
+    relaisPhone: relais === null ? '' : fromE164(relais).phone,
+    banqueId: prospect.banqueId,
+    syndicatId: prospect.syndicatId,
+  };
+}
+
+/** Tout ce que ce formulaire écrit, dans la forme qu'attend l'API. */
+interface Modifiables {
+  nom: string;
+  prenom: string;
+  phone: string;
+  type: ProspectType | null;
+  paymentMode: PaymentMode | null;
+  dureeSystemeMois: number | null;
+  professionId: string | null;
+  incomeBandId: string | null;
+  canalProvenanceId: string | null;
+  banqueId: string | null;
+  syndicatId: string | null;
+  employeurId: string | null;
+  employeur: string | null;
+  typeContrat: TypeContrat | null;
+  ancienneteMois: number | null;
+  lieuActivite: string | null;
+  modeEpargne: ModeEpargne | null;
+  paysResidenceId: string | null;
+  villeResidence: string | null;
+  whatsappE164: string | null;
+  relaisNom: string | null;
+  relaisPhoneE164: string | null;
+}
+
+function modifiablesDepuis(prospect: ProspectRow): Modifiables {
+  return {
+    nom: prospect.nom,
+    prenom: prospect.prenom,
+    phone: prospect.phoneE164,
+    type: prospect.type,
+    paymentMode: prospect.paymentMode,
+    dureeSystemeMois: prospect.dureeSystemeMois,
+    professionId: prospect.professionId,
+    incomeBandId: prospect.incomeBandId,
+    canalProvenanceId: prospect.canalProvenanceId,
+    banqueId: prospect.banqueId,
+    syndicatId: prospect.syndicatId,
+    employeurId: prospect.employeurId,
+    employeur: prospect.employeurId === null ? prospect.employeur : null,
+    typeContrat: prospect.typeContrat,
+    ancienneteMois: prospect.ancienneteMois,
+    lieuActivite: prospect.lieuActivite,
+    modeEpargne: prospect.modeEpargne,
+    paysResidenceId: prospect.paysResidenceId,
+    villeResidence: prospect.villeResidence,
+    whatsappE164: prospect.whatsappE164,
+    relaisNom: prospect.relaisNom,
+    relaisPhoneE164: prospect.relaisPhoneE164,
+  };
+}
+
+/** Ce qui n'a pas été renseigné ne part pas : le serveur pose ses propres défauts. */
+function pourCreation(valeurs: Modifiables): GrandPublicProspectInput {
+  const input: Record<string, unknown> = {};
+  for (const [cle, valeur] of Object.entries(valeurs)) {
+    if (valeur !== null) input[cle] = valeur;
+  }
+  return input as GrandPublicProspectInput;
+}
+
+/** L'API ne sait pas vider ces trois colonnes : un champ repassé à vide n'y touche pas. */
+const NON_EFFACABLES = new Set(['type', 'paymentMode', 'dureeSystemeMois']);
+
+/** `null` VIDE la colonne, l'absence la laisse : seuls les champs changés partent. */
+function pourModification(avant: Modifiables, apres: Modifiables): UpdateProspectInput {
+  const patch: Record<string, unknown> = {};
+  for (const [cle, valeur] of Object.entries(apres)) {
+    if (valeur === avant[cle as keyof Modifiables]) continue;
+    if (valeur === null && NON_EFFACABLES.has(cle)) continue;
+    patch[cle] = valeur;
+  }
+  return patch as UpdateProspectInput;
+}
+
+type Envoi =
+  | { mode: 'creation'; input: GrandPublicProspectInput; andNext: boolean }
+  | { mode: 'modification'; id: string; patch: UpdateProspectInput };
+
 const montre = (type: ProspectType | null, champ: Champ): boolean =>
   type !== null && CHAMPS[type].includes(champ);
 
@@ -136,27 +294,31 @@ const actives = <T extends { isActive: boolean }>(items: readonly T[] | undefine
 
 export function GrandPublicProspectForm({
   embedded = false,
+  initial,
   onSaved,
 }: {
   embedded?: boolean;
-  onSaved?: () => void;
+  /** Présent : le formulaire MODIFIE cette fiche au lieu d'en créer une. */
+  initial?: ProspectRow;
+  onSaved?: (prospect: ProspectRow) => void;
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const prenomRef = useRef<HTMLInputElement>(null);
 
-  const [prenom, setPrenom] = useState('');
-  const [nom, setNom] = useState('');
-  const [phone, setPhone] = useState('');
-  const [callingCode, setCallingCode] = useState('221');
-  const [whatsappCode, setWhatsappCode] = useState('221');
-  const [professionId, setProfessionId] = useState<string | null>(null);
-  const [incomeBandId, setIncomeBandId] = useState<string | null>(null);
-  const [paymentMode, setPaymentMode] = useState<PaymentMode | null>(null);
-  const [type, setType] = useState<ProspectType | null>(null);
-  const [situation, setSituation] = useState<Situation>(SITUATION_VIDE);
-  const [dureeMois, setDureeMois] = useState<number | null>(null);
-  const [canalId, setCanalId] = useState<string | null>(null);
+  const [depart] = useState(() => (initial === undefined ? DEPART_VIDE : departDepuis(initial)));
+  const [prenom, setPrenom] = useState(depart.prenom);
+  const [nom, setNom] = useState(depart.nom);
+  const [phone, setPhone] = useState(depart.phone);
+  const [callingCode, setCallingCode] = useState(depart.callingCode);
+  const [whatsappCode, setWhatsappCode] = useState(depart.whatsappCode);
+  const [professionId, setProfessionId] = useState(depart.professionId);
+  const [incomeBandId, setIncomeBandId] = useState(depart.incomeBandId);
+  const [paymentMode, setPaymentMode] = useState(depart.paymentMode);
+  const [type, setType] = useState(depart.type);
+  const [situation, setSituation] = useState(depart.situation);
+  const [dureeMois, setDureeMois] = useState(depart.dureeMois);
+  const [canalId, setCanalId] = useState(depart.canalId);
   const [errors, setErrors] = useState<Errors>({});
   const [conflict, setConflict] = useState<ProspectPhoneConflict | null>(null);
   const [saved, setSaved] = useState<string[]>([]);
@@ -174,17 +336,29 @@ export function GrandPublicProspectForm({
   });
 
   const save = useMutation({
-    mutationFn: (variables: { input: GrandPublicProspectInput; andNext: boolean }) =>
-      createGrandPublicProspect(variables.input),
+    mutationFn: (variables: Envoi) =>
+      variables.mode === 'creation'
+        ? createGrandPublicProspect(variables.input)
+        : updateProspect(variables.id, variables.patch),
     onSuccess: (prospect, variables) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.prospectsRoot });
       void queryClient.invalidateQueries({ queryKey: queryKeys.dashboardRoot });
+
+      if (variables.mode === 'modification') {
+        toast.success('Fiche modifiée.');
+        // La fiche est rendue par le serveur : sans cela, revenir dessus
+        // afficherait encore l'état d'avant.
+        router.refresh();
+        onSaved?.(prospect);
+        return;
+      }
+
       setSaved((previous) => [...previous, `${prospect.prenom} ${prospect.nom}`]);
       toast.success(`${prospect.prenom} ${prospect.nom} enregistré.`);
 
       if (!variables.andNext) {
         if (onSaved !== undefined) {
-          onSaved();
+          onSaved(prospect);
           return;
         }
         router.push(`/grand-public/${prospect.id}`);
@@ -227,40 +401,45 @@ export function GrandPublicProspectForm({
     if (e164 === null || Object.keys(found).length > 0) return;
 
     setConflict(null);
-    const input: GrandPublicProspectInput = { prenom: prenom.trim(), nom: nom.trim(), phone: e164 };
-    const pose = <K extends keyof GrandPublicProspectInput>(
-      cle: K,
-      valeur: GrandPublicProspectInput[K] | null | undefined,
-    ): void => {
-      if (valeur !== null && valeur !== undefined && valeur !== '') input[cle] = valeur;
+    const vide = (texte: string): string | null => (texte.trim() === '' ? null : texte.trim());
+    const valeurs: Modifiables = {
+      prenom: prenom.trim(),
+      nom: nom.trim(),
+      phone: e164,
+      type,
+      paymentMode,
+      dureeSystemeMois: paymentMode === 'ECHELONNE' ? dureeMois : null,
+      professionId,
+      incomeBandId,
+      canalProvenanceId: canalId,
+      banqueId: situation.banqueId,
+      syndicatId: situation.syndicatId,
+      employeurId: situation.employeurId,
+      employeur: vide(situation.employeur),
+      typeContrat: situation.typeContrat,
+      ancienneteMois: anciennete(situation.ancienneteMois),
+      lieuActivite: vide(situation.lieuActivite),
+      modeEpargne: situation.modeEpargne,
+      paysResidenceId: situation.paysResidenceId,
+      villeResidence: vide(situation.villeResidence),
+      whatsappE164: toInternationalE164(situation.whatsapp, whatsappCode),
+      relaisNom: vide(situation.relaisNom),
+      // Le relais est AU SÉNÉGAL : son numéro ne suit pas le pays de résidence.
+      relaisPhoneE164: toInternationalE164(situation.relaisPhone, '221'),
     };
 
-    pose('professionId', professionId);
-    pose('incomeBandId', incomeBandId);
-    pose('paymentMode', paymentMode);
-    pose('type', type);
-    pose('canalProvenanceId', canalId);
-    pose('dureeSystemeMois', paymentMode === 'ECHELONNE' ? dureeMois : null);
-    pose('banqueId', situation.banqueId);
-    pose('syndicatId', situation.syndicatId);
-    pose('employeurId', situation.employeurId);
-    pose('employeur', situation.employeur.trim());
-    pose('typeContrat', situation.typeContrat);
-    pose('ancienneteMois', anciennete(situation.ancienneteMois));
-    pose('lieuActivite', situation.lieuActivite.trim());
-    pose('modeEpargne', situation.modeEpargne);
-    pose('paysResidenceId', situation.paysResidenceId);
-    pose('villeResidence', situation.villeResidence.trim());
-    pose('whatsappE164', toInternationalE164(situation.whatsapp, whatsappCode));
-    pose('relaisNom', situation.relaisNom.trim());
-    // Le relais est AU SÉNÉGAL : son numéro ne suit pas le pays de résidence.
-    pose('relaisPhoneE164', toInternationalE164(situation.relaisPhone, '221'));
+    if (initial !== undefined) {
+      save.mutate({
+        mode: 'modification',
+        id: initial.id,
+        patch: pourModification(modifiablesDepuis(initial), valeurs),
+      });
+      return;
+    }
 
-    save.mutate({ input, andNext });
+    save.mutate({ mode: 'creation', input: pourCreation(valeurs), andNext });
   }
 
-  const last = saved.at(-1);
-  const plural = saved.length > 1 ? 's' : '';
   const searchHref = `/grand-public?search=${encodeURIComponent(toInternationalE164(phone, callingCode) ?? phone)}`;
   const paysCountries = callingCountriesFrom(reference.data?.pays ?? []);
   const enseignante =
@@ -268,6 +447,7 @@ export function GrandPublicProspectForm({
     true;
 
   return (
+    // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- raccourci Ctrl+Entrée du formulaire
     <form
       className="mx-auto flex w-full max-w-2xl flex-col gap-6"
       onSubmit={(event) => {
@@ -300,6 +480,7 @@ export function GrandPublicProspectForm({
               value={prenom}
               maxLength={120}
               autoComplete="off"
+              // oxlint-disable-next-line jsx-a11y/no-autofocus -- premier champ du formulaire
               autoFocus
               onChange={(event) => {
                 setPrenom(event.target.value);
@@ -489,37 +670,68 @@ export function GrandPublicProspectForm({
         />
       </div>
 
-      <div className="flex flex-wrap items-center justify-end gap-3">
-        <p aria-live="polite" className="mr-auto text-[0.8125rem] text-muted-foreground">
-          {last === undefined
-            ? 'Ctrl + Entrée enregistre et enchaîne. Le canal et la durée restent en place.'
-            : `${String(saved.length)} prospect${plural} enregistré${plural}. Dernier : ${last}.`}
-        </p>
-        <Button
-          type="button"
-          variant="outline"
-          size="lg"
-          disabled={save.isPending}
-          onClick={() => {
-            submit(false);
-          }}
-        >
-          Enregistrer et ouvrir la fiche
-        </Button>
-        <Button type="submit" size="lg" disabled={save.isPending}>
-          {save.isPending ? (
-            <>
-              <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-              Enregistrement…
-            </>
-          ) : (
-            'Enregistrer et suivant'
-          )}
-        </Button>
-      </div>
+      <PiedDeFormulaire
+        modification={initial !== undefined}
+        saved={saved}
+        pending={save.isPending}
+        onOuvrirLaFiche={() => {
+          submit(false);
+        }}
+      />
     </form>
   );
 }
+
+function PiedDeFormulaire({
+  modification,
+  saved,
+  pending,
+  onOuvrirLaFiche,
+}: {
+  modification: boolean;
+  saved: readonly string[];
+  pending: boolean;
+  onOuvrirLaFiche: () => void;
+}) {
+  const last = saved.at(-1);
+  const plural = saved.length > 1 ? 's' : '';
+
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-3">
+      {modification ? null : (
+        <>
+          <p aria-live="polite" className="mr-auto text-[0.8125rem] text-muted-foreground">
+            {last === undefined
+              ? 'Ctrl + Entrée enregistre et enchaîne. Le canal et la durée restent en place.'
+              : `${String(saved.length)} prospect${plural} enregistré${plural}. Dernier : ${last}.`}
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            disabled={pending}
+            onClick={onOuvrirLaFiche}
+          >
+            Enregistrer et ouvrir la fiche
+          </Button>
+        </>
+      )}
+      <Button type="submit" size="lg" disabled={pending}>
+        {pending ? (
+          <>
+            <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+            Enregistrement…
+          </>
+        ) : (
+          libelleEnvoi(modification)
+        )}
+      </Button>
+    </div>
+  );
+}
+
+const libelleEnvoi = (modification: boolean): string =>
+  modification ? 'Enregistrer les modifications' : 'Enregistrer et suivant';
 
 /** Un entier de mois, ou `null` : le serveur refuse tout le reste. */
 function anciennete(saisie: string): number | null {

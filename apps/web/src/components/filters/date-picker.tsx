@@ -45,6 +45,78 @@ const MONTHS = Array.from({ length: 12 }, (_, index) => ({
   label: format(new Date(2024, index, 1), 'LLLL', { locale: fr }),
 }));
 
+interface EtatJour {
+  horsMois: boolean;
+  inRange: boolean;
+  rangeBoundary: boolean;
+  today: boolean;
+  choisi: boolean;
+  disabled: boolean;
+}
+
+function classesJour(etat: EtatJour): string {
+  return cn(
+    'flex h-9 items-center justify-center rounded-md text-sm transition-colors',
+    'hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring',
+    etat.horsMois && 'text-muted-foreground/50',
+    etat.inRange && 'bg-primary/10 text-foreground',
+    etat.rangeBoundary && 'ring-1 ring-primary/40',
+    etat.today && 'font-[700] underline decoration-2 underline-offset-4',
+    etat.choisi && 'bg-primary text-primary-foreground hover:bg-primary/90',
+    etat.disabled && 'pointer-events-none opacity-30',
+  );
+}
+
+function JourCellule({
+  day,
+  month,
+  selected,
+  minDate,
+  maxDate,
+  onPick,
+}: {
+  day: Date;
+  month: Date;
+  selected: Date | null;
+  minDate: Date | null;
+  maxDate: Date | null;
+  onPick: (day: Date) => void;
+}) {
+  const disabled = (minDate !== null && day < minDate) || (maxDate !== null && day > maxDate);
+  const rangeStart = minDate ?? selected;
+  const rangeEnd = maxDate ?? selected;
+  const inRange = rangeStart !== null && rangeEnd !== null && day > rangeStart && day < rangeEnd;
+  const choisi = selected !== null && isSameDay(day, selected);
+  const etat: EtatJour = {
+    horsMois: !isSameMonth(day, month),
+    inRange,
+    rangeBoundary:
+      (minDate !== null && isSameDay(day, minDate)) ||
+      (maxDate !== null && isSameDay(day, maxDate)),
+    today: isToday(day),
+    choisi,
+    disabled,
+  };
+
+  return (
+    <button
+      type="button"
+      role="gridcell"
+      aria-label={format(day, 'dd MMMM yyyy', { locale: fr })}
+      aria-selected={choisi}
+      aria-current={etat.today ? 'date' : undefined}
+      data-in-range={inRange || undefined}
+      disabled={disabled}
+      onClick={() => {
+        onPick(day);
+      }}
+      className={classesJour(etat)}
+    >
+      {format(day, 'd')}
+    </button>
+  );
+}
+
 export function DatePicker({ id, label, value, min, max, onChange }: DatePickerProps) {
   const selected = value ? parseISO(value) : null;
   const [open, setOpen] = useState(false);
@@ -181,47 +253,20 @@ export function DatePicker({ id, label, value, min, max, onChange }: DatePickerP
             </div>
             {weeks.map((week) => (
               <div key={week[0]?.toISOString()} className="grid grid-cols-7 gap-1" role="row">
-                {week.map((day) => {
-                  const disabled = (minDate && day < minDate) || (maxDate && day > maxDate);
-                  const currentMonth = isSameMonth(day, month);
-                  const rangeStart = minDate ?? selected;
-                  const rangeEnd = maxDate ?? selected;
-                  const inRange =
-                    rangeStart !== null && rangeEnd !== null && day > rangeStart && day < rangeEnd;
-                  const rangeBoundary =
-                    (minDate !== null && isSameDay(day, minDate)) ||
-                    (maxDate !== null && isSameDay(day, maxDate));
-                  return (
-                    <button
-                      key={day.toISOString()}
-                      type="button"
-                      role="gridcell"
-                      aria-label={format(day, 'dd MMMM yyyy', { locale: fr })}
-                      aria-selected={selected ? isSameDay(day, selected) : false}
-                      aria-current={isToday(day) ? 'date' : undefined}
-                      data-in-range={inRange || undefined}
-                      disabled={Boolean(disabled)}
-                      onClick={() => {
-                        onChange(format(day, 'yyyy-MM-dd'));
-                        setOpen(false);
-                      }}
-                      className={cn(
-                        'flex h-9 items-center justify-center rounded-md text-sm transition-colors',
-                        'hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring',
-                        !currentMonth && 'text-muted-foreground/50',
-                        inRange && 'bg-primary/10 text-foreground',
-                        rangeBoundary && 'ring-1 ring-primary/40',
-                        isToday(day) && 'font-[700] underline decoration-2 underline-offset-4',
-                        selected &&
-                          isSameDay(day, selected) &&
-                          'bg-primary text-primary-foreground hover:bg-primary/90',
-                        disabled && 'pointer-events-none opacity-30',
-                      )}
-                    >
-                      {format(day, 'd')}
-                    </button>
-                  );
-                })}
+                {week.map((day) => (
+                  <JourCellule
+                    key={day.toISOString()}
+                    day={day}
+                    month={month}
+                    selected={selected}
+                    minDate={minDate}
+                    maxDate={maxDate}
+                    onPick={(picked) => {
+                      onChange(format(picked, 'yyyy-MM-dd'));
+                      setOpen(false);
+                    }}
+                  />
+                ))}
               </div>
             ))}
           </div>

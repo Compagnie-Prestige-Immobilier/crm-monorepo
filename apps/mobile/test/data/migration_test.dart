@@ -2085,10 +2085,10 @@ void main() {
 
   // ── v22 → v23 : les renseignements de situation du Grand Public ────────────
   //
-  // Douze colonnes ajoutées à `prospects` et deux référentiels neufs. Ce qui
+  // Treize colonnes ajoutées à `prospects` et trois référentiels neufs. Ce qui
   // doit être prouvé : la fiche déjà saisie traverse avec ses colonnes d'hier
   // intactes, les neuves démarrent NULLES, et le marqueur de miroir est effacé
-  // — sans quoi `employeurs` et `pays` resteraient vides à vie.
+  // — sans quoi `professions`, `employeurs` et `pays` resteraient vides à vie.
 
   test('v22 -> v23 ajoute la situation sans toucher aux fiches en file', () async {
     final schema = await verifier.schemaAt(22);
@@ -2136,18 +2136,22 @@ void main() {
 
     final QueryRow fiche = await db
         .customSelect(
-          'SELECT profession, duree_systeme_mois, income_band_id, employeur_id, '
+          'SELECT profession, profession_id, duree_systeme_mois, '
+          '       income_band_id, employeur_id, '
           '       employeur, type_contrat, anciennete_mois, lieu_activite, '
           '       mode_epargne, pays_residence_id, ville_residence, '
           '       whatsapp_e164, relais_nom, relais_phone_e164 FROM prospects',
         )
         .getSingle();
+    // Le texte libre d'hier SURVIT : la colonne de référentiel s'ajoute à côté,
+    // elle ne remplace pas ce qui a déjà été saisi.
     expect(fiche.read<String?>('profession'), 'Institutrice');
     // La durée du système de paiement ne DEVIENT pas l'ancienneté : ce sont
     // deux renseignements distincts, et le formulaire écrivait dans la mauvaise.
     expect(fiche.read<int?>('duree_systeme_mois'), 24);
     expect(fiche.read<int?>('anciennete_mois'), isNull);
     for (final String colonne in <String>[
+      'profession_id',
       'income_band_id',
       'employeur_id',
       'employeur',
@@ -2167,12 +2171,21 @@ void main() {
     // une colonne au mauvais type.
     await db.customStatement(
       'UPDATE prospects SET employeur = ?, anciennete_mois = ?, '
-      '       pays_residence_id = ?, whatsapp_e164 = ? WHERE id = ?',
-      <Object?>['Éducation nationale', 36, 'pays-1', '+393331234567', 'pro-22'],
+      '       pays_residence_id = ?, whatsapp_e164 = ?, profession_id = ? '
+      'WHERE id = ?',
+      <Object?>[
+        'Éducation nationale',
+        36,
+        'pays-1',
+        '+393331234567',
+        'pro-1',
+        'pro-22',
+      ],
     );
     final QueryRow apres = await db
         .customSelect(
-          'SELECT employeur, anciennete_mois, pays_residence_id, whatsapp_e164 '
+          'SELECT employeur, anciennete_mois, pays_residence_id, '
+          '       whatsapp_e164, profession_id '
           'FROM prospects WHERE id = \'pro-22\'',
         )
         .getSingle();
@@ -2180,6 +2193,22 @@ void main() {
     expect(apres.read<int?>('anciennete_mois'), 36);
     expect(apres.read<String?>('pays_residence_id'), 'pays-1');
     expect(apres.read<String?>('whatsapp_e164'), '+393331234567');
+    expect(apres.read<String?>('profession_id'), 'pro-1');
+
+    // La table neuve accepte une ligne : « la table existe » se vérifierait
+    // aussi sur une table aux mauvaises colonnes.
+    await db.customStatement(
+      'INSERT INTO professions '
+      '(id, code, label, is_teaching, local_updated_at) VALUES (?, ?, ?, ?, ?)',
+      <Object?>['pro-1', 'INSTITUTEUR', 'Instituteur', 1, _iso],
+    );
+    expect(
+      await db
+          .customSelect('SELECT is_teaching FROM professions')
+          .getSingle()
+          .then((QueryRow row) => row.read<bool>('is_teaching')),
+      isTrue,
+    );
 
     // Le marqueur effacé : le prochain passage relit les listes entières.
     expect(

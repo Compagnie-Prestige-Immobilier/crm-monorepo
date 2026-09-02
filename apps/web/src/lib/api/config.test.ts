@@ -27,14 +27,17 @@ describe('serverApiOrigin', () => {
     delete process.env.API_INTERNAL_URL;
 
     expect(() => serverApiOrigin()).toThrow(ApiConfigurationError);
+
+    let leve: unknown;
     try {
       serverApiOrigin();
-      expect.unreachable('serverApiOrigin aurait dû lever');
     } catch (error) {
-      expect(error).toBeInstanceOf(ApiConfigurationError);
-      expect((error as ApiConfigurationError).variable).toBe('API_URL');
-      expect((error as ApiConfigurationError).message).toContain('API_URL');
+      leve = error;
     }
+
+    expect(leve).toBeInstanceOf(ApiConfigurationError);
+    expect((leve as ApiConfigurationError).variable).toBe('API_URL');
+    expect((leve as ApiConfigurationError).message).toContain('API_URL');
   });
 
   it('traite une chaîne vide comme une variable absente', () => {

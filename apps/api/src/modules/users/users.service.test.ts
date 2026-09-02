@@ -66,7 +66,7 @@ describe('nature du compte créé', () => {
   it('cherche le doublon d’identifiants SANS cloisonner', async () => {
     await service().create(saisie, admin);
 
-    const where = (db.user.findFirst.mock.calls[0]?.[0] as { where: Record<string, unknown> })
+    const where = (db.user.findFirst.mock.calls[0] as [{ where: Record<string, unknown> }])[0]
       .where;
     expect(where.OR).toEqual([{ email: 'awa@cpi.sn' }, { username: 'awa' }]);
   });

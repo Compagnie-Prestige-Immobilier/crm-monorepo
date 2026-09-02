@@ -24,8 +24,8 @@ export default async function DossierPage({ params }: { params: Promise<{ id: st
   const queryClient = getQueryClient();
   try {
     await queryClient.prefetchQuery({
-      queryKey: queryKeys.bankCase(id),
-      queryFn: () => fetchBankCase(id, getServerApiClient()),
+      queryKey: queryKeys.bankCase(id, 'CHUES'),
+      queryFn: () => fetchBankCase(id, 'CHUES', getServerApiClient()),
     });
   } catch (error) {
     unstable_rethrow(error);

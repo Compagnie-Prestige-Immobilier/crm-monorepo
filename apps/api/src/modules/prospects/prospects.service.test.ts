@@ -173,6 +173,10 @@ describe('cloisonnement par commercial', () => {
     });
 
     await service(prisma).reassign(admin, { prospectIds: ['p-1'], representantId: 'r-demo' });
+
+    const data = firstArg(prisma.prospect.updateMany).data ?? {};
+    expect(data.representantId).toBe('r-demo');
+    expect(data).not.toHaveProperty('isDemo');
   });
 
   it('seul un ADMIN peut changer le commercial propriétaire', async () => {
@@ -568,6 +572,46 @@ describe('nature de la fiche créée', () => {
     await new ProspectsService(prisma as unknown as PrismaService).create(alice, saisie);
 
     expect(prisma.representant.findFirst).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Corriger une fiche, c'est aussi retirer ce qu'on y avait mis par erreur :
+// sans `null`, un employeur ou un pays saisi à tort restait pour toujours.
+describe('effacement d’un champ de situation', () => {
+  let prisma: PrismaMock;
+
+  beforeEach(() => {
+    prisma = makePrisma();
+    prisma.prospect.findFirst.mockResolvedValue(prospectRow({ createdById: alice.id }));
+    prisma.prospect.update.mockResolvedValue(prospectRow({ createdById: alice.id }));
+  });
+
+  it('« null » vide la colonne, sans toucher aux champs absents', async () => {
+    await service(prisma).update(alice, 'p-1', {
+      employeurId: null,
+      employeur: null,
+      paysResidenceId: null,
+      whatsappE164: null,
+      relaisPhoneE164: null,
+      banqueId: null,
+    });
+
+    const data = firstArg(prisma.prospect.update).data ?? {};
+    expect(data).toMatchObject({
+      employeurId: null,
+      employeur: null,
+      paysResidenceId: null,
+      whatsappE164: null,
+      relaisPhoneE164: null,
+      banqueId: null,
+    });
+    expect(data).not.toHaveProperty('syndicatId');
+  });
+
+  it('un numéro renseigné est toujours normalisé', async () => {
+    await service(prisma).update(alice, 'p-1', { whatsappE164: '77 123 45 67' });
+
+    expect(firstArg(prisma.prospect.update).data?.whatsappE164).toBe('+221771234567');
   });
 });
 

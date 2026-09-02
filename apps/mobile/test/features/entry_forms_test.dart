@@ -650,8 +650,17 @@ void main() {
       await tester.pumpAndSettle();
 
       const Map<String, List<String>> attendu = <String, List<String>>{
-        'Fonctionnaire': <String>['Ministère ou structure', 'Ancienneté'],
-        'Secteur privé': <String>['Employeur', 'Type de contrat', 'Ancienneté'],
+        'Fonctionnaire': <String>[
+          'Profession',
+          'Ministère ou structure',
+          'Ancienneté',
+        ],
+        'Secteur privé': <String>[
+          'Profession',
+          'Employeur',
+          'Type de contrat',
+          'Ancienneté',
+        ],
         'Informel': <String>['Activité', 'Lieu d\'activité', 'Mode d\'épargne'],
         'Diaspora': <String>[
           'Pays de résidence',
@@ -772,6 +781,136 @@ void main() {
         (await db.select(db.prospectJourneys).get()).single.projet,
         'GRAND_PUBLIC',
       );
+    });
+
+    // Le web choisit la profession au référentiel, le mobile l'écrivait en
+    // clair : deux vérités pour la même fiche, et un export qui ne recoupe
+    // rien. L'identifiant prime, le texte libre reste le repli.
+    formTestWidgets('la profession choisie part par son identifiant', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        host(const ProspectEntryScreen(projet: 'GRAND_PUBLIC')),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(champ('Nom'), 'Ndiaye');
+      await tester.enterText(champ('Téléphone'), '77 000 00 42');
+      await tester.tap(find.text('Secteur privé'));
+      await tester.pumpAndSettle();
+      await tester.tap(bouton('Continuer'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(champ('Profession'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Comptable Test').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(bouton('Continuer'));
+      await tester.pumpAndSettle();
+      await tester.tap(bouton('Enregistrer et suivant'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final Prospect fiche = (await db.select(db.prospects).get()).single;
+      expect(fiche.professionId, 'pro-autre');
+      // Pas de doublon en clair : le serveur recevrait deux fois le même
+      // métier, dont une copie que personne ne corrigera.
+      expect(fiche.profession, isNull);
+
+      final Map<String, Object?> envoi =
+          jsonDecode(
+                (await allOutbox(db))
+                    .firstWhere((OutboxData o) => o.entityType == 'prospect')
+                    .payload,
+              )
+              as Map<String, Object?>;
+      expect(envoi['professionId'], 'pro-autre');
+      expect(envoi.containsKey('profession'), isFalse);
+    });
+
+    // Le référentiel ASSISTE, il ne borne pas : un métier absent de la liste
+    // doit rester saisissable, sinon la fiche est abandonnée sur le terrain.
+    formTestWidgets('une profession hors liste part en clair', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        host(const ProspectEntryScreen(projet: 'GRAND_PUBLIC')),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(champ('Nom'), 'Ndiaye');
+      await tester.enterText(champ('Téléphone'), '77 000 00 42');
+      await tester.tap(find.text('Secteur privé'));
+      await tester.pumpAndSettle();
+      await tester.tap(bouton('Continuer'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(champ('Profession'), 'Soudeur');
+      await tester.pumpAndSettle();
+
+      await tester.tap(bouton('Continuer'));
+      await tester.pumpAndSettle();
+      await tester.tap(bouton('Enregistrer et suivant'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final Prospect fiche = (await db.select(db.prospects).get()).single;
+      expect(fiche.profession, 'Soudeur');
+      expect(fiche.professionId, isNull);
+    });
+
+    // Règle du web : le syndicat ne concerne que les enseignants. Le proposer à
+    // tous les fonctionnaires, c'est une question sans réponse pour la plupart
+    // et un champ vide de plus dans l'export.
+    formTestWidgets('le syndicat ne suit que la profession enseignante', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        host(const ProspectEntryScreen(projet: 'GRAND_PUBLIC')),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(champ('Nom'), 'Ndiaye');
+      await tester.enterText(champ('Téléphone'), '77 000 00 42');
+      await tester.tap(find.text('Fonctionnaire'));
+      await tester.pumpAndSettle();
+      await tester.tap(bouton('Continuer'));
+      await tester.pumpAndSettle();
+
+      // Une profession qui n'enseigne pas : pas de syndicat à l'étape suivante.
+      await tester.tap(champ('Profession'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Comptable Test').last);
+      await tester.pumpAndSettle();
+      await tester.tap(bouton('Continuer'));
+      await tester.pumpAndSettle();
+      // Le champ, pas le libellé : « Syndicat » se lit AUSSI dans le récapitulatif.
+      expect(champ('Syndicat'), findsNothing);
+
+      await etapePrecedente(tester);
+      await tester.tap(champ('Profession'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Instituteur Test').last);
+      await tester.pumpAndSettle();
+      await tester.tap(bouton('Continuer'));
+      await tester.pumpAndSettle();
+      expect(champ('Syndicat'), findsOneWidget);
+
+      // Le texte libre ne désigne aucun syndicat : le champ se referme, et le
+      // choix déjà posé s'en va avec lui.
+      await tester.tap(champ('Syndicat'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Syndicat Test').last);
+      await tester.pumpAndSettle();
+      await etapePrecedente(tester);
+      await tester.enterText(champ('Profession'), 'Soudeur');
+      await tester.pumpAndSettle();
+      await tester.tap(bouton('Continuer'));
+      await tester.pumpAndSettle();
+      expect(champ('Syndicat'), findsNothing);
+
+      await tester.tap(bouton('Enregistrer et suivant'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect((await db.select(db.prospects).get()).single.syndicatId, isNull);
     });
 
     // Le numéro d'un prospect de la diaspora n'est pas sénégalais : le champ
@@ -1767,6 +1906,7 @@ class _SlowWrites extends WriteRepository {
     String? projet,
     String? type,
     String? profession,
+    String? professionId,
     String? canalProvenanceId,
     String? incomeBandId,
     String? employeurId,

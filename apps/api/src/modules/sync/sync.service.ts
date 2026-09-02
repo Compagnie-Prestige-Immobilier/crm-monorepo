@@ -8,9 +8,9 @@ import {
 } from '@nestjs/common';
 import {
   ChangeSource,
+  Prisma,
   GrandPublicConsent,
   OperationResult,
-  Prisma,
   Projet,
   type ProspectStatut,
   Role,
@@ -1051,6 +1051,16 @@ export class SyncService {
     cursor = advance(cursor, 'canauxProvenance', lastPosition(canauxProvenance));
     pageLengths.push(canauxProvenance.length);
 
+    // Sans le référentiel en local, le mobile écrivait la profession en texte
+    // libre pendant que le web choisissait dans la liste : deux vérités.
+    const professions = await this.prisma.profession.findMany({
+      where: keyset(cursor.streams.professions, safeNow),
+      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+    });
+    cursor = advance(cursor, 'professions', lastPosition(professions));
+    pageLengths.push(professions.length);
+
     // Employeurs et pays suivent le canal de provenance : la situation du Grand
     // Public se saisit hors réseau, et sans eux le sélecteur est vide.
     const employeurs = await this.prisma.employeur.findMany({
@@ -1218,6 +1228,15 @@ export class SyncService {
           id: row.id,
           code: row.code,
           label: row.label,
+          position: row.position,
+          isActive: row.isActive,
+          updatedAt: row.updatedAt.toISOString(),
+        })),
+        professions: professions.map((row) => ({
+          id: row.id,
+          code: row.code,
+          label: row.label,
+          isTeaching: row.isTeaching,
           position: row.position,
           isActive: row.isActive,
           updatedAt: row.updatedAt.toISOString(),
@@ -1471,6 +1490,7 @@ function situationGrandPublic(data: SyncEntityDataDto): Record<string, unknown> 
   return definedValues({
     incomeBandId: data.incomeBandId,
     paymentMode: data.paymentMode,
+    professionId: data.professionId,
     employeurId: data.employeurId,
     employeur: data.employeur,
     typeContrat: data.typeContrat,

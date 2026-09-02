@@ -277,6 +277,11 @@ final StreamProvider<List<IncomeBand>> incomeBandsProvider =
       return ref.watch(referenceRepositoryProvider).watchIncomeBands();
     });
 
+final StreamProvider<List<Profession>> professionsProvider =
+    StreamProvider<List<Profession>>((Ref ref) {
+      return ref.watch(referenceRepositoryProvider).watchProfessions();
+    });
+
 final StreamProvider<List<Employeur>> employeursProvider =
     StreamProvider<List<Employeur>>((Ref ref) {
       return ref.watch(referenceRepositoryProvider).watchEmployeurs();

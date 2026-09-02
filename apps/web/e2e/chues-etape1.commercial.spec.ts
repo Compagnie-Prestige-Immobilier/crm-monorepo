@@ -271,7 +271,9 @@ test.describe('qualification', () => {
     expect(await heures.count(), 'aucune demi-heure proposée pour demain').toBeGreaterThan(0);
 
     await heures.first().click();
-    await expect(page.getByRole('button', { name: 'Choisir une date', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Choisir une date', exact: true })).toHaveCount(
+      0,
+    );
     await expect(
       page.getByRole('button', { name: /^(aujourd’hui|demain|le \d{2}\/\d{2}) à \d{2}:\d{2}$/ }),
     ).toBeVisible();

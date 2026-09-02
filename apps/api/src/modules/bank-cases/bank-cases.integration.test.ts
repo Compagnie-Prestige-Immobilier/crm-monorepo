@@ -159,7 +159,10 @@ beforeEach(async () => {
     },
   });
 
+  // Le parcours, et non `projet`, porte le cloisonnement : sans journey, aucune
+  // fiche ne sort d'un filtre par projet.
   const base = {
+    journeys: { create: { projet: Projet.CHUES } },
     banqueId: banqueA,
     syndicatId: modele.syndicatId,
     representantId: representant.id,
@@ -188,6 +191,9 @@ beforeEach(async () => {
         nom: `${TAG}Sarr`,
         prenom: 'Modou',
         phoneE164: '+221770000002',
+        // Le même numéro suit les DEUX parcours : c'est le cas que
+        // `prospects."projet"` ne savait pas dire.
+        journeys: { create: [{ projet: Projet.CHUES }, { projet: Projet.GRAND_PUBLIC }] },
       },
     }),
     prisma.prospect.create({
@@ -337,6 +343,24 @@ describe('liste et filtres, en SQL', () => {
     expect((await service.list({ ...mine, stageType: 'CASHED' })).meta.total).toBe(1);
     expect((await service.list({ ...mine, stageType: 'OPEN' })).meta.total).toBe(2);
     expect((await service.list({ ...mine, banqueId: banqueB })).meta.total).toBe(1);
+  });
+
+  // `${TAG}Sarr` suit CHUES ET Grand Public : son dossier sort des deux
+  // filtres, ce que le projet d'entrée seul ne pouvait pas rendre.
+  it('filtre par PARCOURS, pas par projet d’entrée', async () => {
+    expect((await service.list({ ...mine, projet: Projet.CHUES })).meta.total).toBe(4);
+
+    const gp = await service.list({ ...mine, projet: Projet.GRAND_PUBLIC });
+    expect(gp.meta.total).toBe(1);
+    expect(gp.items[0]?.reference).toBe(`${TAG}-L2`);
+  });
+
+  it('un dossier hors du parcours demandé est INTROUVABLE, pas interdit', async () => {
+    const horsParcours = (await service.list({ search: `${TAG}-L1` })).items[0]?.id ?? '';
+
+    await expect(service.get(horsParcours, Projet.CHUES)).resolves.toBeDefined();
+    const refus = await refusal(() => service.get(horsParcours, Projet.GRAND_PUBLIC));
+    expect(bodyOf(refus).code).toBe(BankCaseError.NOT_FOUND);
   });
 
   it('filtre par agent, créateur OU dernier intervenant', async () => {

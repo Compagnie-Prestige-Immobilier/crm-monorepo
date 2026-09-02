@@ -76,6 +76,63 @@ function exportCsv(stats: VisiteStats, plage: { du: string; au: string }): void 
   downloadCsv(csvRows(rows), `cpi-visites-${plage.du}-${plage.au}.csv`);
 }
 
+type Catalogue = ReturnType<typeof catalogueVisitesDe>;
+
+function donneesDuCatalogue(
+  catalogue: Catalogue,
+  stats: VisiteStats | undefined,
+): Map<string, DonneesSource> {
+  const donnees = new Map<string, DonneesSource>();
+  if (stats === undefined) return donnees;
+  for (const source of Object.keys(catalogue) as VisiteSource[]) {
+    const definition = catalogue[source];
+    if (definition !== undefined) donnees.set(source, definition.extraire(stats));
+  }
+  return donnees;
+}
+
+function donneesDesWidgets(
+  widgets: DashboardWidget[],
+  parSource: Map<string, DonneesSource>,
+): Map<string, DonneesSource> {
+  const donnees = new Map<string, DonneesSource>();
+  for (const widget of widgets) {
+    const donnee = parSource.get(widget.source);
+    if (donnee !== undefined) donnees.set(widget.id, donnee);
+  }
+  return donnees;
+}
+
+type Brouillon = DashboardWidget[] | null;
+
+function reordonner(widgets: Brouillon, fromId: string, toId: string): Brouillon {
+  if (widgets === null) return widgets;
+  const fromIndex = widgets.findIndex((widget) => widget.id === fromId);
+  const toIndex = widgets.findIndex((widget) => widget.id === toId);
+  if (fromIndex === -1 || toIndex === -1) return widgets;
+  const next = [...widgets];
+  const [moved] = next.splice(fromIndex, 1);
+  if (moved === undefined) return widgets;
+  next.splice(toIndex, 0, moved);
+  return next;
+}
+
+function decaler(widgets: Brouillon, id: string, direction: -1 | 1): Brouillon {
+  if (widgets === null) return widgets;
+  const index = widgets.findIndex((widget) => widget.id === id);
+  const target = index + direction;
+  if (index === -1 || target < 0 || target >= widgets.length) return widgets;
+  const next = [...widgets];
+  const [moved] = next.splice(index, 1);
+  if (moved === undefined) return widgets;
+  next.splice(target, 0, moved);
+  return next;
+}
+
+function modifier(widgets: Brouillon, id: string, patch: Partial<DashboardWidget>): Brouillon {
+  return widgets?.map((widget) => (widget.id === id ? { ...widget, ...patch } : widget)) ?? widgets;
+}
+
 export function DashboardVisitesView({ role }: { role: Role }) {
   const { filters, setFilters } = useUrlFilters(dashboardFiltersAdapter);
   const plage = plageDeFiltres(filters);
@@ -110,7 +167,7 @@ export function DashboardVisitesView({ role }: { role: Role }) {
 
   const [brouillon, setBrouillon] = useState<DashboardWidget[] | null>(null);
   const editing = brouillon !== null;
-  const snapshotRef = useRef<string>('');
+  const [snapshot, setSnapshot] = useState('');
   const pausedByEditionRef = useRef(false);
   const dernierAjoutRef = useRef<string | null>(null);
 
@@ -152,18 +209,8 @@ export function DashboardVisitesView({ role }: { role: Role }) {
     (widget) => catalogue[widget.source] !== undefined,
   );
 
-  const donneesParSource = new Map<string, DonneesSource>();
-  if (statsQuery.data !== undefined) {
-    for (const source of Object.keys(catalogue) as VisiteSource[]) {
-      const definition = catalogue[source];
-      if (definition !== undefined) donneesParSource.set(source, definition.extraire(statsQuery.data));
-    }
-  }
-  const donneesParWidget = new Map<string, DonneesSource>();
-  for (const widget of widgets) {
-    const donnee = donneesParSource.get(widget.source);
-    if (donnee !== undefined) donneesParWidget.set(widget.id, donnee);
-  }
+  const donneesParSource = donneesDuCatalogue(catalogue, statsQuery.data);
+  const donneesParWidget = donneesDesWidgets(widgets, donneesParSource);
 
   const hasData = statsQuery.data !== undefined && dispositionQuery.data !== undefined;
   const isRefetching = statsQuery.isFetching && statsQuery.data !== undefined;
@@ -171,7 +218,7 @@ export function DashboardVisitesView({ role }: { role: Role }) {
   const enterEdition = (): void => {
     if (dispositionQuery.data === undefined) return;
     const copie = dispositionQuery.data.widgets.map((widget) => ({ ...widget }));
-    snapshotRef.current = JSON.stringify(serializeDisposition(copie));
+    setSnapshot(JSON.stringify(serializeDisposition(copie)));
     setBrouillon(copie);
     if (!live.paused) {
       live.togglePause();
@@ -187,7 +234,7 @@ export function DashboardVisitesView({ role }: { role: Role }) {
     }
   };
 
-  const dirty = editing && JSON.stringify(serializeDisposition(brouillon)) !== snapshotRef.current;
+  const dirty = editing && JSON.stringify(serializeDisposition(brouillon)) !== snapshot;
 
   const placees = new Set(widgets.map((widget) => widget.source));
 
@@ -305,51 +352,22 @@ export function DashboardVisitesView({ role }: { role: Role }) {
                 editing={editing}
                 catalogue={catalogue}
                 onReorder={(fromId, toId) => {
-                  setBrouillon((current) => {
-                    if (current === null) return current;
-                    const fromIndex = current.findIndex((w) => w.id === fromId);
-                    const toIndex = current.findIndex((w) => w.id === toId);
-                    if (fromIndex === -1 || toIndex === -1) return current;
-                    const next = [...current];
-                    const [moved] = next.splice(fromIndex, 1);
-                    if (moved === undefined) return current;
-                    next.splice(toIndex, 0, moved);
-                    return next;
-                  });
+                  setBrouillon((current) => reordonner(current, fromId, toId));
                 }}
                 onRemove={(id) => {
                   setBrouillon((current) => current?.filter((w) => w.id !== id) ?? current);
                 }}
                 onMove={(id, direction) => {
-                  setBrouillon((current) => {
-                    if (current === null) return current;
-                    const index = current.findIndex((w) => w.id === id);
-                    const target = index + direction;
-                    if (index === -1 || target < 0 || target >= current.length) return current;
-                    const next = [...current];
-                    const [moved] = next.splice(index, 1);
-                    if (moved === undefined) return current;
-                    next.splice(target, 0, moved);
-                    return next;
-                  });
+                  setBrouillon((current) => decaler(current, id, direction));
                 }}
                 onChangeMarque={(id, marque) => {
-                  setBrouillon(
-                    (current) =>
-                      current?.map((w) => (w.id === id ? { ...w, marque } : w)) ?? current,
-                  );
+                  setBrouillon((current) => modifier(current, id, { marque }));
                 }}
                 onChangeTaille={(id, taille) => {
-                  setBrouillon(
-                    (current) =>
-                      current?.map((w) => (w.id === id ? { ...w, taille } : w)) ?? current,
-                  );
+                  setBrouillon((current) => modifier(current, id, { taille }));
                 }}
                 onChangePresentation={(id, presentation) => {
-                  setBrouillon(
-                    (current) =>
-                      current?.map((w) => (w.id === id ? { ...w, presentation } : w)) ?? current,
-                  );
+                  setBrouillon((current) => modifier(current, id, { presentation }));
                 }}
               />
             </div>

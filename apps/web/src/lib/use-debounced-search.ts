@@ -33,6 +33,7 @@ export function useDebouncedSearch(
 
   useEffect(() => {
     cancel();
+    // oxlint-disable-next-line react/set-state-in-effect -- brouillon recalé sur la valeur amont
     setDraft(value);
   }, [cancel, value]);
 

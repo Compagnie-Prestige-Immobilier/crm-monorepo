@@ -1781,6 +1781,7 @@ void main() {
             syndicats: const <SyndicatDto>[],
             canauxProvenance: const <CanalProvenanceDto>[],
             incomeBands: const <IncomeBandDto>[],
+            professions: const <ProfessionDto>[],
             employeurs: const <EmployeurDto>[],
             pays: const <PaysDto>[],
             visiteReferentiels: const <SyncVisiteReferentielDto>[],
@@ -1824,6 +1825,7 @@ void main() {
             syndicats: const <SyndicatDto>[],
             canauxProvenance: const <CanalProvenanceDto>[],
             incomeBands: const <IncomeBandDto>[],
+            professions: const <ProfessionDto>[],
             employeurs: const <EmployeurDto>[],
             pays: const <PaysDto>[],
             visiteReferentiels: const <SyncVisiteReferentielDto>[],
@@ -1878,6 +1880,7 @@ void main() {
             syndicats: const <SyndicatDto>[],
             canauxProvenance: const <CanalProvenanceDto>[],
             incomeBands: const <IncomeBandDto>[],
+            professions: const <ProfessionDto>[],
             employeurs: const <EmployeurDto>[],
             pays: const <PaysDto>[],
             visiteReferentiels: const <SyncVisiteReferentielDto>[],
@@ -1926,6 +1929,7 @@ void main() {
             syndicats: const <SyndicatDto>[],
             canauxProvenance: const <CanalProvenanceDto>[],
             incomeBands: const <IncomeBandDto>[],
+            professions: const <ProfessionDto>[],
             employeurs: const <EmployeurDto>[],
             pays: const <PaysDto>[],
             visiteReferentiels: const <SyncVisiteReferentielDto>[],
@@ -1971,6 +1975,7 @@ void main() {
                 updatedAt: t0,
               ),
             ],
+            professions: const <ProfessionDto>[],
             employeurs: const <EmployeurDto>[],
             pays: const <PaysDto>[],
             visiteReferentiels: const <SyncVisiteReferentielDto>[],
@@ -2014,6 +2019,17 @@ void main() {
             minXof: 500000,
             maxXof: 800000,
             position: 30,
+            isActive: true,
+            updatedAt: t0,
+          ),
+        ],
+        professions: <ProfessionDto>[
+          ProfessionDto(
+            id: 'pro-1',
+            code: 'INSTITUTEUR',
+            label: 'Instituteur',
+            isTeaching: true,
+            position: 10,
             isActive: true,
             updatedAt: t0,
           ),
@@ -2078,12 +2094,17 @@ void main() {
       )..where((IncomeBands t) => t.id.equals('rev-3'))).getSingle();
       expect(band.label, '500 000 à 800 000');
       expect(band.deletedAt, isNull);
-      // Le palier 23 efface le même marqueur : les deux listes neuves arrivent
-      // par ce miroir, sinon la diaspora n'aurait aucun pays à choisir.
+      // Le palier 23 efface le même marqueur : les trois listes neuves arrivent
+      // par ce miroir, sinon la diaspora n'aurait aucun pays à choisir et le
+      // syndicat ne saurait jamais quelle profession enseigne.
       final Employeur employeur = await (db.select(
         db.employeurs,
       )..where((Employeurs t) => t.id.equals('emp-1'))).getSingle();
       expect(employeur.type, 'MINISTERE');
+      final Profession profession = await (db.select(
+        db.professions,
+      )..where((Professions t) => t.id.equals('pro-1'))).getSingle();
+      expect(profession.isTeaching, isTrue);
       final PaysRow pays = await (db.select(
         db.pays,
       )..where((Pays t) => t.id.equals('pays-1'))).getSingle();
@@ -2122,6 +2143,7 @@ void main() {
             syndicats: const <SyndicatDto>[],
             canauxProvenance: const <CanalProvenanceDto>[],
             incomeBands: const <IncomeBandDto>[],
+            professions: const <ProfessionDto>[],
             employeurs: const <EmployeurDto>[],
             pays: const <PaysDto>[],
             visiteReferentiels: const <SyncVisiteReferentielDto>[],
@@ -2152,6 +2174,7 @@ void main() {
               syndicats: const <SyndicatDto>[],
               canauxProvenance: const <CanalProvenanceDto>[],
               incomeBands: const <IncomeBandDto>[],
+              professions: const <ProfessionDto>[],
               employeurs: const <EmployeurDto>[],
               pays: const <PaysDto>[],
               visiteReferentiels: const <SyncVisiteReferentielDto>[],
@@ -2200,6 +2223,7 @@ void main() {
               syndicats: const <SyndicatDto>[],
               canauxProvenance: const <CanalProvenanceDto>[],
               incomeBands: const <IncomeBandDto>[],
+              professions: const <ProfessionDto>[],
               employeurs: const <EmployeurDto>[],
               pays: const <PaysDto>[],
               visiteReferentiels: const <SyncVisiteReferentielDto>[],

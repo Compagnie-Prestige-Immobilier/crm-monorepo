@@ -218,6 +218,9 @@ void main() {
     await ouvrir(tester, Routes.grandPublic);
     expect(find.text('1 Rappels'), findsOneWidget);
 
+    // Troisième carte : sous le pied dans la fenêtre de test de 600 px.
+    await tester.ensureVisible(find.text('1 Rappels'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('1 Rappels'));
     await settle(tester);
 

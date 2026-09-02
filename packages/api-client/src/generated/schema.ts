@@ -3864,67 +3864,44 @@ export interface components {
        */
       phone?: string;
       /** Format: uuid */
-      banqueId?: string;
-      /** Format: uuid */
-      syndicatId?: string;
-      /** Format: uuid */
       representantId?: string;
       /** @description CHUES par défaut. Les deux projets ne se mélangent nulle part. */
       projet?: components['schemas']['Projet'];
       type?: components['schemas']['ProspectType'];
       /** @description Métier déclaré, en clair. */
       profession?: string;
-      /**
-       * Format: uuid
-       * @description Profession choisie dans le référentiel.
-       */
-      professionId?: string;
-      /**
-       * Format: uuid
-       * @description Tranche de revenu mensuel déclaré.
-       */
-      incomeBandId?: string;
-      /**
-       * Format: uuid
-       * @description Employeur du référentiel : ministère (fonctionnaire) ou entreprise (privé).
-       */
-      employeurId?: string;
-      /** @description Employeur en clair, si hors référentiel. */
-      employeur?: string;
-      /** @description Secteur privé : nature du contrat. */
-      typeContrat?: components['schemas']['TypeContrat'];
-      /** @description Ancienneté chez l’employeur, en MOIS. Distincte de `dureeSystemeMois`. */
-      ancienneteMois?: number;
-      /** @description Informel : marché, quartier ou lieu d’activité. */
-      lieuActivite?: string;
-      modeEpargne?: components['schemas']['ModeEpargne'];
-      /**
-       * Format: uuid
-       * @description Diaspora : pays de résidence.
-       */
-      paysResidenceId?: string;
-      /** @description Diaspora : ville de résidence. */
-      villeResidence?: string;
-      /** @description Numéro WhatsApp, souvent international et distinct du numéro principal. Saisie libre, normalisé en E.164 par le serveur. */
-      whatsappE164?: string;
-      /** @description Diaspora : personne relais au Sénégal. */
-      relaisNom?: string;
-      /** @description Téléphone du relais. Saisie libre, normalisé en E.164 par le serveur. */
-      relaisPhoneE164?: string;
       paymentMode?: components['schemas']['PaymentMode'];
       /** @description Durée du système de paiement, en MOIS. */
       dureeSystemeMois?: number;
-      /**
-       * Format: uuid
-       * @description Canal de provenance, choisi dans le référentiel.
-       */
-      canalProvenanceId?: string;
       statut?: components['schemas']['ProspectStatut'];
       /**
        * Format: date-time
        * @description Horodatage de la saisie terrain.
        */
       clientCreatedAt?: string;
+      /** Format: uuid */
+      banqueId?: string | null;
+      /** Format: uuid */
+      syndicatId?: string | null;
+      /** Format: uuid */
+      professionId?: string | null;
+      /** Format: uuid */
+      incomeBandId?: string | null;
+      /** Format: uuid */
+      canalProvenanceId?: string | null;
+      /** Format: uuid */
+      employeurId?: string | null;
+      employeur?: string | null;
+      typeContrat?: components['schemas']['TypeContrat'] | null;
+      ancienneteMois?: number | null;
+      lieuActivite?: string | null;
+      modeEpargne?: components['schemas']['ModeEpargne'] | null;
+      /** Format: uuid */
+      paysResidenceId?: string | null;
+      villeResidence?: string | null;
+      whatsappE164?: string | null;
+      relaisNom?: string | null;
+      relaisPhoneE164?: string | null;
     };
     UpdateGrandPublicConsentDto: {
       consent: components['schemas']['GrandPublicConsent'];
@@ -4095,6 +4072,11 @@ export interface components {
       incomeBandId?: string;
       /** @description Prospect : mode de paiement. */
       paymentMode?: components['schemas']['PaymentMode'];
+      /**
+       * Format: uuid
+       * @description Prospect : profession choisie dans le référentiel. Le texte libre `profession` reste le repli.
+       */
+      professionId?: string;
       /**
        * Format: uuid
        * @description Prospect : employeur du référentiel. Fonctionnaire (ministère) ou privé.
@@ -4302,6 +4284,8 @@ export interface components {
       /** @description Tranches de revenu mensuel : la conversion les demande hors réseau. */
       incomeBands: components['schemas']['IncomeBandDto'][];
       canauxProvenance: components['schemas']['CanalProvenanceDto'][];
+      /** @description Professions : sans elles, le mobile ne pouvait qu’écrire du texte libre. */
+      professions: components['schemas']['ProfessionDto'][];
       /** @description Employeurs : la situation du Grand Public se saisit hors réseau. */
       employeurs: components['schemas']['EmployeurDto'][];
       pays: components['schemas']['PaysDto'][];
@@ -6138,7 +6122,7 @@ export interface components {
       whatsappStatus?: components['schemas']['WhatsappStatus'];
       hasWhatsapp?: boolean;
     };
-    ProspectFilterDto: {
+    LotExportProspectFilterDto: {
       /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
       search?: string;
       /** Format: uuid */
@@ -6154,8 +6138,6 @@ export interface components {
        * @description Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
        */
       commercialId?: string;
-      /** @description Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste. */
-      projet?: components['schemas']['Projet'];
       /** @description Grand Public : fonctionnaire, secteur privé, informel, diaspora. */
       type?: components['schemas']['ProspectType'];
       /**
@@ -6200,6 +6182,8 @@ export interface components {
        * @default false
        */
       includeDeleted: boolean;
+      /** @description Projet du lot. Il est porté par la campagne et ne se devine pas après coup. */
+      projet: components['schemas']['Projet'];
     };
     LotExportDistributionInputDto: {
       teleconseillerIds: string[];
@@ -6212,7 +6196,7 @@ export interface components {
       name: string;
       cible: components['schemas']['LotExportCible'];
       representants?: components['schemas']['RepresentantExportQueryDto'];
-      prospects?: components['schemas']['ProspectFilterDto'];
+      prospects?: components['schemas']['LotExportProspectFilterDto'];
       distribution: components['schemas']['LotExportDistributionInputDto'];
     };
     LotExportSummaryDto: {
@@ -6220,7 +6204,7 @@ export interface components {
       id: string;
       name: string;
       cible: components['schemas']['LotExportCible'];
-      projet: components['schemas']['Projet'] | null;
+      projet: components['schemas']['Projet'];
       scopeLabel: string;
       itemCount: number;
       /** Format: uuid */
@@ -6301,7 +6285,7 @@ export interface components {
       id: string;
       name: string;
       cible: components['schemas']['LotExportCible'];
-      projet: components['schemas']['Projet'] | null;
+      projet: components['schemas']['Projet'];
       scopeLabel: string;
       itemCount: number;
       /** Format: uuid */
@@ -11920,7 +11904,7 @@ export interface operations {
         stageType?: components['schemas']['BankStageType'];
         /** @description Banque de traitement du dossier. */
         banqueId?: string;
-        /** @description Projet d’entrée de la fiche liée. Sans filtre, les deux projets sortent. */
+        /** @description Parcours suivi par la fiche liée. Sans filtre, les deux projets sortent. Un même numéro peut suivre les deux. */
         projet?: components['schemas']['Projet'];
         /** @description Agent créateur OU dernier intervenant sur le dossier. */
         agentId?: string;
@@ -12058,7 +12042,7 @@ export interface operations {
         stageType?: components['schemas']['BankStageType'];
         /** @description Banque de traitement du dossier. */
         banqueId?: string;
-        /** @description Projet d’entrée de la fiche liée. Sans filtre, les deux projets sortent. */
+        /** @description Parcours suivi par la fiche liée. Sans filtre, les deux projets sortent. Un même numéro peut suivre les deux. */
         projet?: components['schemas']['Projet'];
         /** @description Agent créateur OU dernier intervenant sur le dossier. */
         agentId?: string;
@@ -12220,7 +12204,10 @@ export interface operations {
   };
   getBankCase: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description Restreint la lecture aux dossiers dont la fiche suit ce parcours. Un dossier hors parcours répond 404, comme un dossier inexistant. */
+        projet?: components['schemas']['Projet'];
+      };
       header?: never;
       path: {
         id: string;
@@ -12264,7 +12251,7 @@ export interface operations {
           'application/json': components['schemas']['ApiErrorDto'];
         };
       };
-      /** @description BANK_CASE_NOT_FOUND. */
+      /** @description BANK_CASE_NOT_FOUND, y compris pour un dossier hors du `projet` demandé. */
       404: {
         headers: {
           [name: string]: unknown;
@@ -12747,7 +12734,7 @@ export interface operations {
         stageType?: components['schemas']['BankStageType'];
         /** @description Banque de traitement du dossier. */
         banqueId?: string;
-        /** @description Projet d’entrée de la fiche liée. Sans filtre, les deux projets sortent. */
+        /** @description Parcours suivi par la fiche liée. Sans filtre, les deux projets sortent. Un même numéro peut suivre les deux. */
         projet?: components['schemas']['Projet'];
         /** @description Agent créateur OU dernier intervenant sur le dossier. */
         agentId?: string;

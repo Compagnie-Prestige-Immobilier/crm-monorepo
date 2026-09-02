@@ -13,7 +13,7 @@ abstract class _$LotExportSummaryDtoCWProxy {
 
   LotExportSummaryDto cible(LotExportCible cible);
 
-  LotExportSummaryDto projet(Projet? projet);
+  LotExportSummaryDto projet(Projet projet);
 
   LotExportSummaryDto scopeLabel(String scopeLabel);
 
@@ -39,7 +39,7 @@ abstract class _$LotExportSummaryDtoCWProxy {
     String id,
     String name,
     LotExportCible cible,
-    Projet? projet,
+    Projet projet,
     String scopeLabel,
     num itemCount,
     String createdById,
@@ -66,7 +66,7 @@ class _$LotExportSummaryDtoCWProxyImpl implements _$LotExportSummaryDtoCWProxy {
   LotExportSummaryDto cible(LotExportCible cible) => this(cible: cible);
 
   @override
-  LotExportSummaryDto projet(Projet? projet) => this(projet: projet);
+  LotExportSummaryDto projet(Projet projet) => this(projet: projet);
 
   @override
   LotExportSummaryDto scopeLabel(String scopeLabel) =>
@@ -130,7 +130,7 @@ class _$LotExportSummaryDtoCWProxyImpl implements _$LotExportSummaryDtoCWProxy {
       projet: projet == const $CopyWithPlaceholder()
           ? _value.projet
           // ignore: cast_nullable_to_non_nullable
-          : projet as Projet?,
+          : projet as Projet,
       scopeLabel: scopeLabel == const $CopyWithPlaceholder()
           ? _value.scopeLabel
           // ignore: cast_nullable_to_non_nullable
@@ -205,7 +205,7 @@ LotExportSummaryDto _$LotExportSummaryDtoFromJson(Map<String, dynamic> json) =>
         ),
         projet: $checkedConvert(
           'projet',
-          (v) => $enumDecodeNullable(
+          (v) => $enumDecode(
             _$ProjetEnumMap,
             v,
             unknownValue: Projet.unknownDefaultOpenApi,
@@ -228,7 +228,7 @@ Map<String, dynamic> _$LotExportSummaryDtoToJson(
   'id': instance.id,
   'name': instance.name,
   'cible': _$LotExportCibleEnumMap[instance.cible]!,
-  'projet': _$ProjetEnumMap[instance.projet],
+  'projet': _$ProjetEnumMap[instance.projet]!,
   'scopeLabel': instance.scopeLabel,
   'itemCount': instance.itemCount,
   'createdById': instance.createdById,

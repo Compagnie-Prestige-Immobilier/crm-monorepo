@@ -61,6 +61,7 @@ export function SidebarNav({
   // ensuite, comme le repli des filtres avancés.
   const [moreOpen, setMoreOpen] = useState(false);
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- préférence relue après hydratation
     setMoreOpen(repliActif || readMoreOpen());
   }, [repliActif]);
 

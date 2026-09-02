@@ -33,10 +33,6 @@ class UpdateProspectDto {
 
     this.phone,
 
-    this.banqueId,
-
-    this.syndicatId,
-
     this.representantId,
 
     this.projet,
@@ -45,9 +41,23 @@ class UpdateProspectDto {
 
     this.profession,
 
+    this.paymentMode,
+
+    this.dureeSystemeMois,
+
+    this.statut,
+
+    this.clientCreatedAt,
+
+    this.banqueId,
+
+    this.syndicatId,
+
     this.professionId,
 
     this.incomeBandId,
+
+    this.canalProvenanceId,
 
     this.employeurId,
 
@@ -70,16 +80,6 @@ class UpdateProspectDto {
     this.relaisNom,
 
     this.relaisPhoneE164,
-
-    this.paymentMode,
-
-    this.dureeSystemeMois,
-
-    this.canalProvenanceId,
-
-    this.statut,
-
-    this.clientCreatedAt,
   });
 
   /// Identifiant UUID v7 généré par le client. Généré côté serveur s’il est absent.
@@ -95,12 +95,6 @@ class UpdateProspectDto {
   /// Téléphone en saisie libre. Normalisé en E.164 par le serveur.
   @JsonKey(name: r'phone', required: false, includeIfNull: false)
   final String? phone;
-
-  @JsonKey(name: r'banqueId', required: false, includeIfNull: false)
-  final String? banqueId;
-
-  @JsonKey(name: r'syndicatId', required: false, includeIfNull: false)
-  final String? syndicatId;
 
   @JsonKey(name: r'representantId', required: false, includeIfNull: false)
   final String? representantId;
@@ -126,69 +120,6 @@ class UpdateProspectDto {
   @JsonKey(name: r'profession', required: false, includeIfNull: false)
   final String? profession;
 
-  /// Profession choisie dans le référentiel.
-  @JsonKey(name: r'professionId', required: false, includeIfNull: false)
-  final String? professionId;
-
-  /// Tranche de revenu mensuel déclaré.
-  @JsonKey(name: r'incomeBandId', required: false, includeIfNull: false)
-  final String? incomeBandId;
-
-  /// Employeur du référentiel : ministère (fonctionnaire) ou entreprise (privé).
-  @JsonKey(name: r'employeurId', required: false, includeIfNull: false)
-  final String? employeurId;
-
-  /// Employeur en clair, si hors référentiel.
-  @JsonKey(name: r'employeur', required: false, includeIfNull: false)
-  final String? employeur;
-
-  /// Secteur privé : nature du contrat.
-  @JsonKey(
-    name: r'typeContrat',
-    required: false,
-    includeIfNull: false,
-    unknownEnumValue: TypeContrat.unknownDefaultOpenApi,
-  )
-  final TypeContrat? typeContrat;
-
-  /// Ancienneté chez l’employeur, en MOIS. Distincte de `dureeSystemeMois`.
-  // minimum: 0
-  // maximum: 840
-  @JsonKey(name: r'ancienneteMois', required: false, includeIfNull: false)
-  final num? ancienneteMois;
-
-  /// Informel : marché, quartier ou lieu d’activité.
-  @JsonKey(name: r'lieuActivite', required: false, includeIfNull: false)
-  final String? lieuActivite;
-
-  @JsonKey(
-    name: r'modeEpargne',
-    required: false,
-    includeIfNull: false,
-    unknownEnumValue: ModeEpargne.unknownDefaultOpenApi,
-  )
-  final ModeEpargne? modeEpargne;
-
-  /// Diaspora : pays de résidence.
-  @JsonKey(name: r'paysResidenceId', required: false, includeIfNull: false)
-  final String? paysResidenceId;
-
-  /// Diaspora : ville de résidence.
-  @JsonKey(name: r'villeResidence', required: false, includeIfNull: false)
-  final String? villeResidence;
-
-  /// Numéro WhatsApp, souvent international et distinct du numéro principal. Saisie libre, normalisé en E.164 par le serveur.
-  @JsonKey(name: r'whatsappE164', required: false, includeIfNull: false)
-  final String? whatsappE164;
-
-  /// Diaspora : personne relais au Sénégal.
-  @JsonKey(name: r'relaisNom', required: false, includeIfNull: false)
-  final String? relaisNom;
-
-  /// Téléphone du relais. Saisie libre, normalisé en E.164 par le serveur.
-  @JsonKey(name: r'relaisPhoneE164', required: false, includeIfNull: false)
-  final String? relaisPhoneE164;
-
   @JsonKey(
     name: r'paymentMode',
     required: false,
@@ -203,10 +134,6 @@ class UpdateProspectDto {
   @JsonKey(name: r'dureeSystemeMois', required: false, includeIfNull: false)
   final num? dureeSystemeMois;
 
-  /// Canal de provenance, choisi dans le référentiel.
-  @JsonKey(name: r'canalProvenanceId', required: false, includeIfNull: false)
-  final String? canalProvenanceId;
-
   @JsonKey(
     name: r'statut',
     required: false,
@@ -219,6 +146,66 @@ class UpdateProspectDto {
   @JsonKey(name: r'clientCreatedAt', required: false, includeIfNull: false)
   final DateTime? clientCreatedAt;
 
+  @JsonKey(name: r'banqueId', required: false, includeIfNull: false)
+  final String? banqueId;
+
+  @JsonKey(name: r'syndicatId', required: false, includeIfNull: false)
+  final String? syndicatId;
+
+  @JsonKey(name: r'professionId', required: false, includeIfNull: false)
+  final String? professionId;
+
+  @JsonKey(name: r'incomeBandId', required: false, includeIfNull: false)
+  final String? incomeBandId;
+
+  @JsonKey(name: r'canalProvenanceId', required: false, includeIfNull: false)
+  final String? canalProvenanceId;
+
+  @JsonKey(name: r'employeurId', required: false, includeIfNull: false)
+  final String? employeurId;
+
+  @JsonKey(name: r'employeur', required: false, includeIfNull: false)
+  final String? employeur;
+
+  @JsonKey(
+    name: r'typeContrat',
+    required: false,
+    includeIfNull: false,
+    unknownEnumValue: TypeContrat.unknownDefaultOpenApi,
+  )
+  final TypeContrat? typeContrat;
+
+  // minimum: 0
+  // maximum: 840
+  @JsonKey(name: r'ancienneteMois', required: false, includeIfNull: false)
+  final num? ancienneteMois;
+
+  @JsonKey(name: r'lieuActivite', required: false, includeIfNull: false)
+  final String? lieuActivite;
+
+  @JsonKey(
+    name: r'modeEpargne',
+    required: false,
+    includeIfNull: false,
+    unknownEnumValue: ModeEpargne.unknownDefaultOpenApi,
+  )
+  final ModeEpargne? modeEpargne;
+
+  @JsonKey(name: r'paysResidenceId', required: false, includeIfNull: false)
+  final String? paysResidenceId;
+
+  @JsonKey(name: r'villeResidence', required: false, includeIfNull: false)
+  final String? villeResidence;
+
+  @JsonKey(name: r'whatsappE164', required: false, includeIfNull: false)
+  final String? whatsappE164;
+
+  @JsonKey(name: r'relaisNom', required: false, includeIfNull: false)
+  final String? relaisNom;
+
+  @JsonKey(name: r'relaisPhoneE164', required: false, includeIfNull: false)
+  final String? relaisPhoneE164;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is UpdateProspectDto &&
@@ -229,14 +216,19 @@ class UpdateProspectDto {
                 nom,
                 prenom,
                 phone,
-                banqueId,
-                syndicatId,
                 representantId,
                 projet,
                 type,
                 profession,
+                paymentMode,
+                dureeSystemeMois,
+                statut,
+                clientCreatedAt,
+                banqueId,
+                syndicatId,
                 professionId,
                 incomeBandId,
+                canalProvenanceId,
                 employeurId,
                 employeur,
                 typeContrat,
@@ -248,25 +240,25 @@ class UpdateProspectDto {
                 whatsappE164,
                 relaisNom,
                 relaisPhoneE164,
-                paymentMode,
-                dureeSystemeMois,
-                canalProvenanceId,
-                statut,
-                clientCreatedAt,
               ],
               [
                 other.id,
                 other.nom,
                 other.prenom,
                 other.phone,
-                other.banqueId,
-                other.syndicatId,
                 other.representantId,
                 other.projet,
                 other.type,
                 other.profession,
+                other.paymentMode,
+                other.dureeSystemeMois,
+                other.statut,
+                other.clientCreatedAt,
+                other.banqueId,
+                other.syndicatId,
                 other.professionId,
                 other.incomeBandId,
+                other.canalProvenanceId,
                 other.employeurId,
                 other.employeur,
                 other.typeContrat,
@@ -278,11 +270,6 @@ class UpdateProspectDto {
                 other.whatsappE164,
                 other.relaisNom,
                 other.relaisPhoneE164,
-                other.paymentMode,
-                other.dureeSystemeMois,
-                other.canalProvenanceId,
-                other.statut,
-                other.clientCreatedAt,
               ],
             );
   }
@@ -295,14 +282,19 @@ class UpdateProspectDto {
         nom,
         prenom,
         phone,
-        banqueId,
-        syndicatId,
         representantId,
         projet,
         type,
         profession,
+        paymentMode,
+        dureeSystemeMois,
+        statut,
+        clientCreatedAt,
+        banqueId,
+        syndicatId,
         professionId,
         incomeBandId,
+        canalProvenanceId,
         employeurId,
         employeur,
         typeContrat,
@@ -314,11 +306,6 @@ class UpdateProspectDto {
         whatsappE164,
         relaisNom,
         relaisPhoneE164,
-        paymentMode,
-        dureeSystemeMois,
-        canalProvenanceId,
-        statut,
-        clientCreatedAt,
       ]);
 
   factory UpdateProspectDto.fromJson(Map<String, dynamic> json) =>

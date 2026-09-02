@@ -28,6 +28,31 @@
     "sonarjs/cognitive-complexity": ["error", 15],
     "typescript/no-explicit-any": "error",
     "typescript/consistent-type-imports": ["error", { "prefer": "type-imports" }],
-    "import/no-cycle": "error"
+    "import/no-cycle": "error",
+    "jsx-a11y/prefer-tag-over-role": "off",
+    "jsx-a11y/label-has-associated-control": [
+      "error",
+      { "depth": 3, "controlComponents": ["Select"] }
+    ],
+    "jsx-a11y/control-has-associated-label": [
+      "error",
+      {
+        "depth": 5,
+        "ignoreElements": ["audio", "canvas", "embed", "input", "option", "textarea", "tr", "video"]
+      }
+    ],
+    "vitest/expect-expect": [
+      "error",
+      {
+        "assertFunctionNames": [
+          "expect",
+          "expectReadable",
+          "expectFailsAsText",
+          "expectFailsEntirely"
+        ]
+      }
+    ],
+    "vitest/require-mock-type-parameters": "off",
+    "vitest/valid-expect": ["error", { "maxArgs": 2 }]
   }
 }

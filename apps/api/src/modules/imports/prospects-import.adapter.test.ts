@@ -444,7 +444,9 @@ describe('enchaînement', () => {
       ],
     });
 
-    await expect(new ProspectsImportAdapter().prepare(fakeImportContext(ambigu))).rejects.toThrow();
+    await expect(new ProspectsImportAdapter().prepare(fakeImportContext(ambigu))).rejects.toThrow(
+      'deux entrées qui se confondent',
+    );
   });
 });
 

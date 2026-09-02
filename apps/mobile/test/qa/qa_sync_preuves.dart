@@ -503,6 +503,7 @@ SyncChangesDto _changesVides() => SyncChangesDto(
   syndicats: const <SyndicatDto>[],
   canauxProvenance: const <CanalProvenanceDto>[],
   incomeBands: const <IncomeBandDto>[],
+  professions: const <ProfessionDto>[],
   employeurs: const <EmployeurDto>[],
   pays: const <PaysDto>[],
   visiteReferentiels: const <SyncVisiteReferentielDto>[],

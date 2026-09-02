@@ -1,7 +1,7 @@
 'use client';
 
 import { CheckIcon, ChevronsUpDownIcon, PlusIcon, XIcon } from 'lucide-react';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -49,12 +49,12 @@ export function FilterCombobox({
   const labelId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => {
-    if (open) {
-      setSearch('');
-      onSearchChange?.('');
-    }
-  }, [open]);
+  const ouvrir = (next: boolean): void => {
+    setOpen(next);
+    if (!next) return;
+    setSearch('');
+    onSearchChange?.('');
+  };
 
   const selected = options.find((option) => option.value === value);
   const hasValue = value !== null;
@@ -69,13 +69,14 @@ export function FilterCombobox({
       </Label>
 
       <div className="relative">
-        <Popover open={open} onOpenChange={setOpen}>
+        <Popover open={open} onOpenChange={ouvrir}>
           <PopoverTrigger
             render={
               <Button
                 id={triggerId}
                 ref={triggerRef}
                 variant="outline"
+                // oxlint-disable-next-line jsx-a11y/role-has-required-aria-props -- aria posé par Base UI
                 role="combobox"
                 onBlur={onBlur}
                 aria-labelledby={`${labelId} ${triggerId}`}

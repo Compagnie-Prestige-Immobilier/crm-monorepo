@@ -1,5 +1,14 @@
 'use client';
 
+import {
+  AsYouType,
+  getCountries,
+  getCountryCallingCode,
+  isValidPhoneNumber,
+  parsePhoneNumberFromString,
+  type CountryCode,
+} from 'libphonenumber-js/min';
+
 import { Field } from '@/components/forms/field';
 import { Input } from '@/components/ui/input';
 import type { Pays } from '@/lib/types';
@@ -10,7 +19,7 @@ export interface CallingCountry {
 }
 
 const COUNTRIES = [
-  { code: '221', label: '🇸🇳 +221', nationalLength: 9 },
+  { code: '221', label: '🇸🇳 +221' },
   { code: '33', label: '🇫🇷 +33' },
   { code: '225', label: '🇨🇮 +225' },
   { code: '223', label: '🇲🇱 +223' },
@@ -43,21 +52,37 @@ export function callingCountriesFrom(pays: readonly Pays[]): CallingCountry[] {
     }));
 }
 
+const paysDeIndicatif = (callingCode: string): CountryCode | undefined =>
+  getCountries().find((pays) => getCountryCallingCode(pays) === callingCode);
+
+/** Le masque du pays de l'indicatif. Rendu tel quel si le pays est inconnu de la métadonnée. */
+function masquer(saisie: string, callingCode: string): string {
+  const pays = paysDeIndicatif(callingCode);
+  return pays === undefined ? saisie : new AsYouType(pays).input(saisie);
+}
+
+/** L'indicatif d'un côté, le national de l'autre : ce que la saisie attend. */
+export function fromE164(e164: string): { phone: string; callingCode: string } {
+  const parsed = parsePhoneNumberFromString(e164);
+  if (parsed === undefined) return { phone: e164, callingCode: '221' };
+  return {
+    phone: masquer(parsed.nationalNumber, parsed.countryCallingCode),
+    callingCode: parsed.countryCallingCode,
+  };
+}
+
 export function toInternationalE164(raw: string, callingCode: string): string | null {
   if (/\p{Letter}/u.test(raw)) return null;
   const compact = raw.trim().replace(/[\s.\-()]/gu, '');
   const international = compact.startsWith('00') ? `+${compact.slice(2)}` : compact;
-  if (international.startsWith('+')) {
-    const digits = international.slice(1);
-    return /^\d{8,15}$/u.test(digits) ? `+${digits}` : null;
-  }
-
   const digits = international.replace(/\D/gu, '');
-  const country = COUNTRIES.find((entry) => entry.code === callingCode);
-  if (country && 'nationalLength' in country && digits.length !== country.nationalLength)
-    return null;
-  const value = digits.startsWith(callingCode) ? digits : `${callingCode}${digits}`;
-  return /^\d{8,15}$/u.test(value) ? `+${value}` : null;
+  if (digits === '') return null;
+
+  const value =
+    international.startsWith('+') || digits.startsWith(callingCode)
+      ? digits
+      : `${callingCode}${digits}`;
+  return isValidPhoneNumber(`+${value}`) ? `+${value}` : null;
 }
 
 export function InternationalPhoneField({
@@ -117,7 +142,10 @@ export function InternationalPhoneField({
             autoComplete="tel"
             placeholder={placeholder}
             onChange={(event) => {
-              onChange(event.target.value);
+              const saisie = event.target.value;
+              // Le masque ne s'applique qu'à la frappe : reformater une suppression
+              // remettrait le séparateur que le retour arrière vient d'enlever.
+              onChange(saisie.length > value.length ? masquer(saisie, callingCode) : saisie);
             }}
           />
         </div>

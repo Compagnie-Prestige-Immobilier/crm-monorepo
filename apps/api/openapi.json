@@ -8169,7 +8169,7 @@
             "name": "projet",
             "required": false,
             "in": "query",
-            "description": "Projet d’entrée de la fiche liée. Sans filtre, les deux projets sortent.",
+            "description": "Parcours suivi par la fiche liée. Sans filtre, les deux projets sortent. Un même numéro peut suivre les deux.",
             "schema": {
               "$ref": "#/components/schemas/Projet"
             }
@@ -8450,7 +8450,7 @@
             "name": "projet",
             "required": false,
             "in": "query",
-            "description": "Projet d’entrée de la fiche liée. Sans filtre, les deux projets sortent.",
+            "description": "Parcours suivi par la fiche liée. Sans filtre, les deux projets sortent. Un même numéro peut suivre les deux.",
             "schema": {
               "$ref": "#/components/schemas/Projet"
             }
@@ -8748,6 +8748,15 @@
               "format": "uuid",
               "type": "string"
             }
+          },
+          {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Restreint la lecture aux dossiers dont la fiche suit ce parcours. Un dossier hors parcours répond 404, comme un dossier inexistant.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
           }
         ],
         "responses": {
@@ -8792,7 +8801,7 @@
             }
           },
           "404": {
-            "description": "BANK_CASE_NOT_FOUND.",
+            "description": "BANK_CASE_NOT_FOUND, y compris pour un dossier hors du `projet` demandé.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9491,7 +9500,7 @@
             "name": "projet",
             "required": false,
             "in": "query",
-            "description": "Projet d’entrée de la fiche liée. Sans filtre, les deux projets sortent.",
+            "description": "Parcours suivi par la fiche liée. Sans filtre, les deux projets sortent. Un même numéro peut suivre les deux.",
             "schema": {
               "$ref": "#/components/schemas/Projet"
             }
@@ -20861,14 +20870,6 @@
             "description": "Téléphone en saisie libre. Normalisé en E.164 par le serveur.",
             "example": "77 123 45 67"
           },
-          "banqueId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "syndicatId": {
-            "type": "string",
-            "format": "uuid"
-          },
           "representantId": {
             "type": "string",
             "format": "uuid"
@@ -20893,77 +20894,6 @@
             "maxLength": 120,
             "description": "Métier déclaré, en clair."
           },
-          "professionId": {
-            "type": "string",
-            "format": "uuid",
-            "description": "Profession choisie dans le référentiel."
-          },
-          "incomeBandId": {
-            "type": "string",
-            "format": "uuid",
-            "description": "Tranche de revenu mensuel déclaré."
-          },
-          "employeurId": {
-            "type": "string",
-            "format": "uuid",
-            "description": "Employeur du référentiel : ministère (fonctionnaire) ou entreprise (privé)."
-          },
-          "employeur": {
-            "type": "string",
-            "maxLength": 160,
-            "description": "Employeur en clair, si hors référentiel."
-          },
-          "typeContrat": {
-            "description": "Secteur privé : nature du contrat.",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/TypeContrat"
-              }
-            ]
-          },
-          "ancienneteMois": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 840,
-            "description": "Ancienneté chez l’employeur, en MOIS. Distincte de `dureeSystemeMois`."
-          },
-          "lieuActivite": {
-            "type": "string",
-            "maxLength": 160,
-            "description": "Informel : marché, quartier ou lieu d’activité."
-          },
-          "modeEpargne": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/ModeEpargne"
-              }
-            ]
-          },
-          "paysResidenceId": {
-            "type": "string",
-            "format": "uuid",
-            "description": "Diaspora : pays de résidence."
-          },
-          "villeResidence": {
-            "type": "string",
-            "maxLength": 120,
-            "description": "Diaspora : ville de résidence."
-          },
-          "whatsappE164": {
-            "type": "string",
-            "maxLength": 40,
-            "description": "Numéro WhatsApp, souvent international et distinct du numéro principal. Saisie libre, normalisé en E.164 par le serveur."
-          },
-          "relaisNom": {
-            "type": "string",
-            "maxLength": 160,
-            "description": "Diaspora : personne relais au Sénégal."
-          },
-          "relaisPhoneE164": {
-            "type": "string",
-            "maxLength": 40,
-            "description": "Téléphone du relais. Saisie libre, normalisé en E.164 par le serveur."
-          },
           "paymentMode": {
             "allOf": [
               {
@@ -20977,11 +20907,6 @@
             "maximum": 300,
             "description": "Durée du système de paiement, en MOIS."
           },
-          "canalProvenanceId": {
-            "type": "string",
-            "format": "uuid",
-            "description": "Canal de provenance, choisi dans le référentiel."
-          },
           "statut": {
             "allOf": [
               {
@@ -20993,6 +20918,93 @@
             "type": "string",
             "format": "date-time",
             "description": "Horodatage de la saisie terrain."
+          },
+          "banqueId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "syndicatId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "professionId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "incomeBandId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "canalProvenanceId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "employeurId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "employeur": {
+            "type": "string",
+            "maxLength": 160,
+            "nullable": true
+          },
+          "typeContrat": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TypeContrat"
+              }
+            ]
+          },
+          "ancienneteMois": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 840,
+            "nullable": true
+          },
+          "lieuActivite": {
+            "type": "string",
+            "maxLength": 160,
+            "nullable": true
+          },
+          "modeEpargne": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ModeEpargne"
+              }
+            ]
+          },
+          "paysResidenceId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "villeResidence": {
+            "type": "string",
+            "maxLength": 120,
+            "nullable": true
+          },
+          "whatsappE164": {
+            "type": "string",
+            "maxLength": 40,
+            "nullable": true
+          },
+          "relaisNom": {
+            "type": "string",
+            "maxLength": 160,
+            "nullable": true
+          },
+          "relaisPhoneE164": {
+            "type": "string",
+            "maxLength": 40,
+            "nullable": true
           }
         }
       },
@@ -21378,6 +21390,11 @@
                 "$ref": "#/components/schemas/PaymentMode"
               }
             ]
+          },
+          "professionId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Prospect : profession choisie dans le référentiel. Le texte libre `profession` reste le repli."
           },
           "employeurId": {
             "type": "string",
@@ -21875,6 +21892,13 @@
               "$ref": "#/components/schemas/CanalProvenanceDto"
             }
           },
+          "professions": {
+            "description": "Professions : sans elles, le mobile ne pouvait qu’écrire du texte libre.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProfessionDto"
+            }
+          },
           "employeurs": {
             "description": "Employeurs : la situation du Grand Public se saisit hors réseau.",
             "type": "array",
@@ -21921,6 +21945,7 @@
           "syndicats",
           "incomeBands",
           "canauxProvenance",
+          "professions",
           "employeurs",
           "pays",
           "visiteReferentiels",
@@ -27072,7 +27097,7 @@
           }
         }
       },
-      "ProspectFilterDto": {
+      "LotExportProspectFilterDto": {
         "type": "object",
         "properties": {
           "search": {
@@ -27100,14 +27125,6 @@
             "type": "string",
             "format": "uuid",
             "description": "Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes."
-          },
-          "projet": {
-            "description": "Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/Projet"
-              }
-            ]
           },
           "type": {
             "description": "Grand Public : fonctionnaire, secteur privé, informel, diaspora.",
@@ -27182,8 +27199,17 @@
             "type": "boolean",
             "description": "Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.",
             "default": false
+          },
+          "projet": {
+            "description": "Projet du lot. Il est porté par la campagne et ne se devine pas après coup.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Projet"
+              }
+            ]
           }
-        }
+        },
+        "required": ["projet"]
       },
       "LotExportDistributionInputDto": {
         "type": "object",
@@ -27230,7 +27256,7 @@
             "$ref": "#/components/schemas/RepresentantExportQueryDto"
           },
           "prospects": {
-            "$ref": "#/components/schemas/ProspectFilterDto"
+            "$ref": "#/components/schemas/LotExportProspectFilterDto"
           },
           "distribution": {
             "$ref": "#/components/schemas/LotExportDistributionInputDto"
@@ -27256,7 +27282,6 @@
             ]
           },
           "projet": {
-            "nullable": true,
             "allOf": [
               {
                 "$ref": "#/components/schemas/Projet"
@@ -27516,7 +27541,6 @@
             ]
           },
           "projet": {
-            "nullable": true,
             "allOf": [
               {
                 "$ref": "#/components/schemas/Projet"

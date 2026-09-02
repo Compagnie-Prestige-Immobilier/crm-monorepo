@@ -214,7 +214,7 @@ describe('cloisonnement de la route', () => {
 
 describe('filtre par état de relation', () => {
   const whereOf = (): Record<string, unknown> =>
-    (db.representant.findMany.mock.calls[0]?.[0] as { where: Record<string, unknown> }).where;
+    (db.representant.findMany.mock.calls[0] as [{ where: Record<string, unknown> }])[0].where;
 
   it('ne retient que les fiches dans l’état demandé', async () => {
     await service.list({ relationStatus: RepresentantRelation.AMBASSADEUR });
@@ -256,7 +256,7 @@ describe('bascule de relation par le panel', () => {
   });
 
   const historyOf = (): Record<string, unknown> =>
-    (db.representantRelationChange.create.mock.calls[0]?.[0] as { data: Record<string, unknown> })
+    (db.representantRelationChange.create.mock.calls[0] as [{ data: Record<string, unknown> }])[0]
       .data;
 
   it('écrit la transition et son histoire, source WEB', async () => {
@@ -323,6 +323,12 @@ describe('bascule de relation par le panel', () => {
     await new RepresentantsService(db as unknown as PrismaService).update(COMMERCIAL, 'rep-9', {
       relationStatus: RepresentantRelation.CONTACTE,
     });
+
+    expect(historyOf()).toMatchObject({
+      representantId: 'rep-9',
+      toStatus: RepresentantRelation.CONTACTE,
+    });
+    expect(historyOf()).not.toHaveProperty('isDemo');
   });
 
   it('porte le motif jusqu’à l’histoire', async () => {
@@ -471,11 +477,8 @@ describe('fil de commentaires', () => {
   });
 
   const postedData = (call: number): Record<string, unknown> =>
-    (
-      db.representantComment.createMany.mock.calls[call]?.[0] as {
-        data: Record<string, unknown>[];
-      }
-    ).data[0] as Record<string, unknown>;
+    (db.representantComment.createMany.mock.calls[call] as [{ data: Record<string, unknown>[] }])[0]
+      .data[0] as Record<string, unknown>;
 
   it('deux commentaires du même geste COEXISTENT, sans rien à arbitrer', async () => {
     db.representant.findFirst.mockResolvedValue(own());
@@ -521,7 +524,7 @@ describe('fil de commentaires', () => {
 
     expect(rejoue.id).toBe('cmt-1');
     expect(
-      (db.representantComment.createMany.mock.calls[0]?.[0] as { skipDuplicates: boolean })
+      (db.representantComment.createMany.mock.calls[0] as [{ skipDuplicates: boolean }])[0]
         .skipDuplicates,
     ).toBe(true);
   });
@@ -564,6 +567,9 @@ describe('fil de commentaires', () => {
       id: 'cmt-1',
       body: 'Vu sur place',
     });
+
+    expect(postedData(0)).toMatchObject({ representantId: 'rep-9', body: 'Vu sur place' });
+    expect(postedData(0)).not.toHaveProperty('isDemo');
   });
 
   it('rend le fil du plus récent au plus ancien, départagé par l’identifiant', async () => {
@@ -623,9 +629,11 @@ describe('fil de commentaires', () => {
       }))
       .filter((route) => (route.path ?? '').includes('comments'))
       .map((route) => route.verbe)
-      .sort();
+      .sort((a, b) => (a ?? 0) - (b ?? 0));
 
-    expect(verbes).toEqual([RequestMethod.GET, RequestMethod.POST, RequestMethod.DELETE].sort());
+    expect(verbes).toEqual(
+      [RequestMethod.GET, RequestMethod.POST, RequestMethod.DELETE].sort((a, b) => a - b),
+    );
     expect(service).not.toHaveProperty('updateComment');
   });
 });
@@ -640,7 +648,7 @@ describe('lecture du SUPERVISEUR', () => {
   };
 
   const whereOf = (): Record<string, unknown> =>
-    (db.representant.findMany.mock.calls[0]?.[0] as { where: Record<string, unknown> }).where;
+    (db.representant.findMany.mock.calls[0] as [{ where: Record<string, unknown> }])[0].where;
 
   it('liste l’annuaire national', async () => {
     await service.list({});
@@ -700,10 +708,10 @@ describe('WhatsApp et profession sur la fiche', () => {
   });
 
   const whereOf = (): Record<string, unknown> =>
-    (db.representant.findMany.mock.calls[0]?.[0] as { where: Record<string, unknown> }).where;
+    (db.representant.findMany.mock.calls[0] as [{ where: Record<string, unknown> }])[0].where;
 
   const patchOf = (): Record<string, unknown> =>
-    (db.representant.update.mock.calls[0]?.[0] as { data: Record<string, unknown> }).data;
+    (db.representant.update.mock.calls[0] as [{ data: Record<string, unknown> }])[0].data;
 
   it('recompose le numéro joignable pour les trois cas de lecture', async () => {
     db.representant.findFirst.mockResolvedValue(

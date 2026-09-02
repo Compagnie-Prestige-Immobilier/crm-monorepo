@@ -61,6 +61,8 @@ abstract class _$SyncEntityDataDtoCWProxy {
 
   SyncEntityDataDto paymentMode(PaymentMode? paymentMode);
 
+  SyncEntityDataDto professionId(String? professionId);
+
   SyncEntityDataDto employeurId(String? employeurId);
 
   SyncEntityDataDto employeur(String? employeur);
@@ -153,6 +155,7 @@ abstract class _$SyncEntityDataDtoCWProxy {
     String? canalProvenanceId,
     String? incomeBandId,
     PaymentMode? paymentMode,
+    String? professionId,
     String? employeurId,
     String? employeur,
     TypeContrat? typeContrat,
@@ -285,6 +288,10 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
   @override
   SyncEntityDataDto paymentMode(PaymentMode? paymentMode) =>
       this(paymentMode: paymentMode);
+
+  @override
+  SyncEntityDataDto professionId(String? professionId) =>
+      this(professionId: professionId);
 
   @override
   SyncEntityDataDto employeurId(String? employeurId) =>
@@ -428,6 +435,7 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
     Object? canalProvenanceId = const $CopyWithPlaceholder(),
     Object? incomeBandId = const $CopyWithPlaceholder(),
     Object? paymentMode = const $CopyWithPlaceholder(),
+    Object? professionId = const $CopyWithPlaceholder(),
     Object? employeurId = const $CopyWithPlaceholder(),
     Object? employeur = const $CopyWithPlaceholder(),
     Object? typeContrat = const $CopyWithPlaceholder(),
@@ -567,6 +575,10 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
           ? _value.paymentMode
           // ignore: cast_nullable_to_non_nullable
           : paymentMode as PaymentMode?,
+      professionId: professionId == const $CopyWithPlaceholder()
+          ? _value.professionId
+          // ignore: cast_nullable_to_non_nullable
+          : professionId as String?,
       employeurId: employeurId == const $CopyWithPlaceholder()
           ? _value.employeurId
           // ignore: cast_nullable_to_non_nullable
@@ -775,6 +787,7 @@ SyncEntityDataDto _$SyncEntityDataDtoFromJson(
         unknownValue: PaymentMode.unknownDefaultOpenApi,
       ),
     ),
+    professionId: $checkedConvert('professionId', (v) => v as String?),
     employeurId: $checkedConvert('employeurId', (v) => v as String?),
     employeur: $checkedConvert('employeur', (v) => v as String?),
     typeContrat: $checkedConvert(
@@ -882,6 +895,7 @@ Map<String, dynamic> _$SyncEntityDataDtoToJson(
   if (instance.incomeBandId case final value?) 'incomeBandId': value,
   if (_$PaymentModeEnumMap[instance.paymentMode] case final value?)
     'paymentMode': value,
+  if (instance.professionId case final value?) 'professionId': value,
   if (instance.employeurId case final value?) 'employeurId': value,
   if (instance.employeur case final value?) 'employeur': value,
   if (_$TypeContratEnumMap[instance.typeContrat] case final value?)

@@ -83,6 +83,8 @@ class SyncEntityDataDto {
 
     this.paymentMode,
 
+    this.professionId,
+
     this.employeurId,
 
     this.employeur,
@@ -281,6 +283,10 @@ class SyncEntityDataDto {
   )
   final PaymentMode? paymentMode;
 
+  /// Prospect : profession choisie dans le référentiel. Le texte libre `profession` reste le repli.
+  @JsonKey(name: r'professionId', required: false, includeIfNull: false)
+  final String? professionId;
+
   /// Prospect : employeur du référentiel. Fonctionnaire (ministère) ou privé.
   @JsonKey(name: r'employeurId', required: false, includeIfNull: false)
   final String? employeurId;
@@ -457,6 +463,7 @@ class SyncEntityDataDto {
                 canalProvenanceId,
                 incomeBandId,
                 paymentMode,
+                professionId,
                 employeurId,
                 employeur,
                 typeContrat,
@@ -515,6 +522,7 @@ class SyncEntityDataDto {
                 other.canalProvenanceId,
                 other.incomeBandId,
                 other.paymentMode,
+                other.professionId,
                 other.employeurId,
                 other.employeur,
                 other.typeContrat,
@@ -579,6 +587,7 @@ class SyncEntityDataDto {
         canalProvenanceId,
         incomeBandId,
         paymentMode,
+        professionId,
         employeurId,
         employeur,
         typeContrat,

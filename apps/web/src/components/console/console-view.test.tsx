@@ -144,7 +144,7 @@ const lastDraft = (): {
   comment: string;
   callbackAt?: string | null;
   conversion?: ConversionDraft;
-} => (pushCallAttempt.mock.calls.at(-1)?.[0] as AttemptInput).draft;
+} => (pushCallAttempt.mock.calls.at(-1) as [AttemptInput])[0].draft;
 
 const lastFilters = (): ProspectFilters => fetchProspects.mock.calls.at(-1)?.[0] as ProspectFilters;
 

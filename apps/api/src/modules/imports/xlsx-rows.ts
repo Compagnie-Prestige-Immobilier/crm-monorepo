@@ -241,7 +241,7 @@ async function* projectRows(
  * Un classeur tenu à la main gagne des colonnes en cours de route : dans celui
  * de l'accueil, le mois d'août en compte deux de plus que les autres, déclarées
  * en toutes lettres sur sa propre ligne d'en-tête. Une position figée y lirait
- * le téléphone sous « ENTREPRISE » et perdrait le mois entier.
+ * le téléphone sous « ENTREPRISE » et perdrait le mois entier.
  */
 function mapHeaders(
   row: RowLike,

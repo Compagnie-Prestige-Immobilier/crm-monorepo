@@ -65,7 +65,7 @@ export const mapWithConcurrency = async <T, R>(
   limit: number,
   worker: (item: T) => Promise<R>,
 ): Promise<PromiseSettledResult<R>[]> => {
-  const results = new Array<PromiseSettledResult<R>>(items.length);
+  const results: PromiseSettledResult<R>[] = Array.from({ length: items.length });
   let cursor = 0;
 
   const drain = async (): Promise<void> => {

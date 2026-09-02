@@ -96,6 +96,17 @@ export const ROLE_LABELS: Record<Role, string> = {
 export const readsOnly = (role: Role | undefined): boolean =>
   role === 'SUPERVISEUR' || role === 'DIRECTION';
 
+/**
+ * L'export des prospects n'est pas un geste d'écriture : la DIRECTION y a droit
+ * côté API (`@Roles(ADMIN, COMMERCIAL, DIRECTION)`), l'écran le lui laisse.
+ */
+export const canExportProspects = (role: Role | undefined): boolean =>
+  role === 'ADMIN' || role === 'COMMERCIAL' || role === 'DIRECTION';
+
+/** Miroir de `@Roles` sur `GET /export/representants.xlsx`. */
+export const canExportRepresentants = (role: Role | undefined): boolean =>
+  role === 'ADMIN' || role === 'COMMERCIAL' || role === 'SUPERVISEUR' || role === 'DIRECTION';
+
 export const RETIRED_SUFFIX = '(retiré)';
 
 export type PageMeta = Schemas['PageMetaDto'];
