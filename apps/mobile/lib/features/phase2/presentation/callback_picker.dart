@@ -86,10 +86,15 @@ class CallbackPicker extends StatefulWidget {
     required this.now,
     required this.onChanged,
     this.required = false,
+    this.title,
   });
 
   final DateTime now;
   final ValueChanged<DateTime?> onChanged;
+
+  /// Remplace « Quand rappeler ? » quand la question se pose autrement : sur un
+  /// appel abouti, le rappel est une option et non le résultat de l'appel.
+  final String? title;
 
   /// Retire le « (facultatif) » du titre : un appelant qui bloque
   /// l'enregistrement tant qu'aucune date n'est choisie ne doit pas afficher
@@ -135,9 +140,10 @@ class _CallbackPickerState extends State<CallbackPicker> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
-            widget.required
-                ? 'Quand rappeler ?'
-                : 'Quand rappeler ? (facultatif)',
+            widget.title ??
+                (widget.required
+                    ? 'Quand rappeler ?'
+                    : 'Quand rappeler ? (facultatif)'),
             style: theme.textTheme.titleSmall,
           ),
           const SizedBox(height: CpiSpacing.xs),

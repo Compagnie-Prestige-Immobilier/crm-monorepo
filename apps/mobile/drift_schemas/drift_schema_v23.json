@@ -1597,6 +1597,46 @@
             "dsl_features": []
           },
           {
+            "name": "last_call_outcome",
+            "getter_name": "lastCallOutcome",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "last_call_at",
+            "getter_name": "lastCallAt",
+            "moor_type": "dateTime",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "last_call_by_id",
+            "getter_name": "lastCallById",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "next_callback_at",
+            "getter_name": "nextCallbackAt",
+            "moor_type": "dateTime",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
             "name": "created_by_id",
             "getter_name": "createdById",
             "moor_type": "string",
@@ -3326,6 +3366,46 @@
             "dsl_features": []
           },
           {
+            "name": "last_call_outcome",
+            "getter_name": "lastCallOutcome",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "last_call_at",
+            "getter_name": "lastCallAt",
+            "moor_type": "dateTime",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "last_call_by_id",
+            "getter_name": "lastCallById",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "next_callback_at",
+            "getter_name": "nextCallbackAt",
+            "moor_type": "dateTime",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
             "name": "created_by_id",
             "getter_name": "createdById",
             "moor_type": "string",
@@ -4300,7 +4380,7 @@
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE TABLE IF NOT EXISTS \"representants\" (\"id\" TEXT NOT NULL PRIMARY KEY, \"full_name\" TEXT NOT NULL, \"phone_e164\" TEXT NOT NULL, \"notes\" TEXT NULL, \"departement_id\" TEXT NOT NULL REFERENCES departements(id)ON UPDATE CASCADE, \"ief_id\" TEXT NULL REFERENCES iefs(id)ON UPDATE CASCADE, \"relation_status\" TEXT NOT NULL DEFAULT 'INCONNU', \"whatsapp_status\" TEXT NOT NULL DEFAULT 'NON_DEMANDE', \"whatsapp_e164\" TEXT NULL, \"profession\" TEXT NULL, \"prenom\" TEXT NULL, \"etablissement\" TEXT NULL, \"syndicat\" TEXT NULL, \"connait_ues\" INTEGER NULL, \"contacte\" INTEGER NULL, \"created_by_id\" TEXT NOT NULL, \"client_created_at\" TEXT NOT NULL, \"rev\" INTEGER NOT NULL DEFAULT 1, \"local_updated_at\" TEXT NOT NULL, \"server_updated_at\" TEXT NULL, \"deleted_at\" TEXT NULL);"
+          "sql": "CREATE TABLE IF NOT EXISTS \"representants\" (\"id\" TEXT NOT NULL PRIMARY KEY, \"full_name\" TEXT NOT NULL, \"phone_e164\" TEXT NOT NULL, \"notes\" TEXT NULL, \"departement_id\" TEXT NOT NULL REFERENCES departements(id)ON UPDATE CASCADE, \"ief_id\" TEXT NULL REFERENCES iefs(id)ON UPDATE CASCADE, \"relation_status\" TEXT NOT NULL DEFAULT 'INCONNU', \"whatsapp_status\" TEXT NOT NULL DEFAULT 'NON_DEMANDE', \"whatsapp_e164\" TEXT NULL, \"profession\" TEXT NULL, \"prenom\" TEXT NULL, \"etablissement\" TEXT NULL, \"syndicat\" TEXT NULL, \"connait_ues\" INTEGER NULL, \"contacte\" INTEGER NULL, \"last_call_outcome\" TEXT NULL, \"last_call_at\" TEXT NULL, \"last_call_by_id\" TEXT NULL, \"next_callback_at\" TEXT NULL, \"created_by_id\" TEXT NOT NULL, \"client_created_at\" TEXT NOT NULL, \"rev\" INTEGER NOT NULL DEFAULT 1, \"local_updated_at\" TEXT NOT NULL, \"server_updated_at\" TEXT NULL, \"deleted_at\" TEXT NULL);"
         }
       ]
     },

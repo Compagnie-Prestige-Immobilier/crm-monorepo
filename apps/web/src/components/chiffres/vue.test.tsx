@@ -153,13 +153,13 @@ describe('l’écran Chiffres, du squelette aux chiffres', () => {
     renderWithQuery(<ChiffresView ecran="chues" role={SUPERVISEUR} />);
 
     await waitFor(() => {
-      expect(screen.getAllByText('Prospects notés').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Prospects saisis').length).toBeGreaterThan(0);
     });
     window.removeEventListener('error', noter);
 
     expect(abandons).toEqual([]);
     expect(screen.getAllByText('26').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Adhésions').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Méthodes obtenues').length).toBeGreaterThan(0);
     expect(screen.getByText('Awa Sy')).toBeTruthy();
   });
 
@@ -171,7 +171,7 @@ describe('l’écran Chiffres, du squelette aux chiffres', () => {
 
     renderWithQuery(<ChiffresView ecran="chues" role={SUPERVISEUR} />);
 
-    await user.click(await screen.findByRole('button', { name: 'À propos de Prospects notés' }));
+    await user.click(await screen.findByRole('button', { name: 'À propos de Prospects saisis' }));
     expect(
       await screen.findByText('Le nombre de nouvelles fiches saisies pendant la période.'),
     ).toBeTruthy();
@@ -187,7 +187,13 @@ describe('l’écran Chiffres, du squelette aux chiffres', () => {
     renderWithQuery(<ChiffresView ecran="chues" role={SUPERVISEUR} />);
 
     const tableau = await screen.findByRole('table', { name: 'Par téléconseiller' });
-    for (const entete of ['Appels', 'Contact', 'Rendez-vous', 'Qualification', 'Adhésions']) {
+    for (const entete of [
+      'Appels représentants',
+      'Contact',
+      'Rendez-vous',
+      'Qualification',
+      'Méthodes obtenues',
+    ]) {
       expect(within(tableau).getByRole('columnheader', { name: entete })).toBeTruthy();
     }
     const awa = within(tableau).getByRole('row', { name: /Awa Sy/u });
@@ -211,6 +217,7 @@ describe('l’écran Chiffres, du squelette aux chiffres', () => {
     renderWithQuery(<ChiffresView ecran="grand-public" role={SUPERVISEUR} />);
 
     const tableau = await screen.findByRole('table', { name: 'Par téléconseiller' });
+    expect(within(tableau).getByRole('columnheader', { name: 'Appels prospects' })).toBeTruthy();
     expect(within(tableau).getByRole('columnheader', { name: 'Joignabilité' })).toBeTruthy();
     expect(within(tableau).queryByRole('columnheader', { name: 'Qualification' })).toBeNull();
     const awa = within(tableau).getByRole('row', { name: /Awa Sy/u });
@@ -256,7 +263,7 @@ describe('l’écran Chiffres, du squelette aux chiffres', () => {
     renderWithQuery(<ChiffresView ecran="chues" role={SUPERVISEUR} />);
 
     await waitFor(() => {
-      expect(screen.getAllByText('Prospects notés').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Prospects saisis').length).toBeGreaterThan(0);
     });
     expect(screen.queryByText('Encaissé')).toBeNull();
   });
@@ -283,8 +290,28 @@ describe('l’écran Chiffres, du squelette aux chiffres', () => {
     renderWithQuery(<ChiffresView ecran="grand-public" role={SUPERVISEUR} />);
 
     await waitFor(() => {
-      expect(screen.getAllByText('Prospects notés').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Prospects saisis').length).toBeGreaterThan(0);
     });
-    expect(screen.queryByText('Taux de contact')).toBeNull();
+    expect(screen.queryByText('Taux de contact des représentants')).toBeNull();
+  });
+
+  // Deux familles d'appels sur le même écran : le titre de la tuile, et non son
+  // seul info-bulle, doit dire de quels appels elle parle.
+  it('nomme la famille d’appels dans le titre et dans le vide de chaque taux', async () => {
+    setUrl('/chues/statistiques');
+    dispositionMock.mockResolvedValue(disposition(['taux-de-contact', 'taux-de-joignabilite']));
+    activiteMock.mockResolvedValue({
+      ...activite,
+      totals: { ...totaux, calls: 0, reachRate: null },
+    });
+
+    renderWithQuery(<ChiffresView ecran="chues" role={SUPERVISEUR} />);
+
+    expect(
+      (await screen.findAllByText('Taux de contact des représentants')).length,
+    ).toBeGreaterThan(0);
+    expect(screen.getAllByText('Taux de joignabilité des prospects').length).toBeGreaterThan(0);
+    expect(screen.getByText('Sans objet')).toBeTruthy();
+    expect(screen.getByText('Aucun appel à un prospect sur la période')).toBeTruthy();
   });
 });

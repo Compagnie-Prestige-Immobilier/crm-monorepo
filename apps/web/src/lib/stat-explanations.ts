@@ -50,9 +50,9 @@ export const STAT_EXPLANATIONS: Record<StatKey, string> = {
     'Comptes téléconseillers actifs ayant saisi au moins une fiche sur la période.',
   departementsCouverts: 'Départements où au moins un prospect a été enregistré.',
   conversionRate:
-    'Part des prospects ayant livré une méthode d’enrôlement, rapportée au total filtré. Le classement isole les téléconseillers qui obtiennent le plus souvent une suite exploitable.',
-  methodRate:
     'Nombre de prospects déjà passés au statut Converti, avec leur part dans la sélection courante.',
+  methodRate:
+    'Part des prospects ayant livré une méthode d’enrôlement, rapportée au total filtré. Le classement isole ceux qui obtiennent le plus souvent une suite exploitable.',
   dailyAverage:
     'Moyenne de fiches enregistrées par jour sur les 30 derniers jours, filtres compris.',
   weeklyPace:
@@ -87,7 +87,7 @@ export const STAT_EXPLANATIONS: Record<StatKey, string> = {
     'Répartition des motifs de rejet. Elle nomme la cause la plus fréquente de perte d’un dossier.',
 
   dataQuality:
-    'Part de numéros injoignables ou erronés, par représentant ayant apporté les fiches. Elle désigne l’origine d’une base inexploitable.',
+    'Part des appels aux prospects finissant sur un numéro injoignable ou faux, regroupée par représentant ayant apporté les fiches. Elle désigne l’origine d’une base inexploitable.',
 
   delayLegs:
     'Durées médianes des trois tronçons de la chaîne, du prospect saisi au dossier encaissé. La médiane, et non la moyenne, pour qu’un dossier oublié six mois ne déplace pas le chiffre.',

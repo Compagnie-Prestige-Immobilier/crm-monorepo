@@ -275,6 +275,13 @@ CREATE TABLE representants (
     -- `call_attempts.fonctionnaire`.
     connait_ues BOOLEAN NULL,
     contacte BOOLEAN NULL,
+    -- Dernier appel consigné, tel que le SERVEUR le résume. SANS CHECK, même
+    -- raison que `relation_status` : une issue ajoutée côté serveur ferait
+    -- avorter la page de pull entière.
+    last_call_outcome TEXT NULL,
+    last_call_at DATETIME NULL,
+    last_call_by_id TEXT NULL,
+    next_callback_at DATETIME NULL,
     created_by_id TEXT NOT NULL,
     -- Horodatage de la saisie sur le terrain, distinct de l'arrivée en base :
     -- les deux peuvent être séparés de plusieurs jours hors ligne.

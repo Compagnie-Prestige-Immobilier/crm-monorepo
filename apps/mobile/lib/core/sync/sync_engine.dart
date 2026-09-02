@@ -2018,6 +2018,10 @@ class SyncEngine {
                 syndicat: Value<String?>(r.syndicat),
                 connaitUes: Value<bool?>(r.connaitUES),
                 contacte: Value<bool?>(r.contacte),
+                lastCallOutcome: Value<String?>(r.lastCallOutcome?.value),
+                lastCallAt: Value<DateTime?>(r.lastCallAt),
+                lastCallById: Value<String?>(r.lastCallById),
+                nextCallbackAt: Value<DateTime?>(r.nextCallbackAt),
                 createdById: r.createdById,
                 clientCreatedAt: r.clientCreatedAt,
                 rev: Value<int>(r.rev.toInt()),
@@ -2058,6 +2062,18 @@ class SyncEngine {
                     'excluded.connait_ues',
                   ),
                   contacte: const CustomExpression<bool>('excluded.contacte'),
+                  lastCallOutcome: const CustomExpression<String>(
+                    'excluded.last_call_outcome',
+                  ),
+                  lastCallAt: const CustomExpression<DateTime>(
+                    'excluded.last_call_at',
+                  ),
+                  lastCallById: const CustomExpression<String>(
+                    'excluded.last_call_by_id',
+                  ),
+                  nextCallbackAt: const CustomExpression<DateTime>(
+                    'excluded.next_callback_at',
+                  ),
                   rev: const CustomExpression<int>('excluded.rev'),
                   serverUpdatedAt: const CustomExpression<DateTime>(
                     'excluded.server_updated_at',

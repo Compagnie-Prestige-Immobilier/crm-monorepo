@@ -305,16 +305,46 @@ describe('LotCreateDialog, la création', () => {
 
     await waitFor(() => {
       expect(previewLotExport).toHaveBeenLastCalledWith(
-        expect.objectContaining({ cible: 'REPRESENTANTS', representants: {} }),
+        expect.objectContaining({
+          cible: 'REPRESENTANTS',
+          representants: { relationStatus: 'INCONNU' },
+          name: 'Représentants non qualifiés',
+        }),
       );
     });
 
     await creerLeLot(user);
     await waitFor(() => {
       expect(createLotExport).toHaveBeenCalledWith(
-        expect.objectContaining({ cible: 'REPRESENTANTS', representants: {} }),
+        expect.objectContaining({
+          cible: 'REPRESENTANTS',
+          representants: { relationStatus: 'INCONNU' },
+        }),
       );
     });
+  });
+
+  it('laisse décocher l’exclusion des représentants déjà qualifiés', async () => {
+    const user = await ouvrirLaCreation();
+    await user.click(await screen.findByRole('radio', { name: /Représentants/ }));
+    await user.click(
+      await screen.findByRole('checkbox', {
+        name: 'Exclure les représentants déjà qualifiés (ambassadeur ou refus)',
+      }),
+    );
+
+    await waitFor(() => {
+      expect(previewLotExport).toHaveBeenLastCalledWith(
+        expect.objectContaining({ representants: {}, name: 'Représentants' }),
+      );
+    });
+
+    await creerLeLot(user);
+    await waitFor(() => {
+      expect(createLotExport).toHaveBeenCalledWith(expect.objectContaining({ representants: {} }));
+    });
+    const corps = createLotExport.mock.calls[0]?.[0] as { name: string };
+    expect(corps.name.startsWith('Représentants, ')).toBe(true);
   });
 
   it('refuse de créer quand la cible est vide', async () => {

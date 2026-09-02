@@ -2,6 +2,7 @@ import 'package:crm_api_client/crm_api_client.dart';
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart'
     show
+        BooleanExpressionOperators,
         OrderClauseGenerator,
         OrderingTerm,
         QueryRow,
@@ -502,6 +503,43 @@ final StreamProvider<List<Rappel>> representantRappelsProvider =
                 )
                 .toList(growable: false);
           });
+    });
+
+/// Les représentants que MON dernier appel n'a pas joints, du plus récent au
+/// plus ancien. Le résumé du dernier appel est écrit par le SERVEUR : un appel
+/// consigné hors ligne n'entre dans cette liste qu'après sa remontée.
+final StreamProvider<List<Rappel>> representantsInjoignablesProvider =
+    StreamProvider<List<Rappel>>((Ref ref) {
+      final AppDatabase db = ref.watch(appDatabaseProvider);
+      final String? moi = ref.watch(
+        authControllerProvider.select((AuthState s) => s.userId),
+      );
+      if (moi == null) return Stream<List<Rappel>>.value(const <Rappel>[]);
+      return (db.select(db.representants)
+            ..where(
+              (Representants t) =>
+                  t.lastCallOutcome.equals('UNREACHABLE') &
+                  t.lastCallById.equals(moi) &
+                  t.lastCallAt.isNotNull() &
+                  t.deletedAt.isNull(),
+            )
+            ..orderBy(<OrderClauseGenerator<Representants>>[
+              (Representants t) => OrderingTerm.desc(t.lastCallAt),
+            ]))
+          .watch()
+          .map(
+            (List<Representant> rows) => rows
+                .map(
+                  (Representant r) => (
+                    id: r.id,
+                    sujetId: r.id,
+                    nom: r.fullName,
+                    phoneE164: r.phoneE164,
+                    at: r.lastCallAt!,
+                  ),
+                )
+                .toList(growable: false),
+          );
     });
 
 final prospectsForRepresentantProvider =
