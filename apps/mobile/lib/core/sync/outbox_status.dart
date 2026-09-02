@@ -69,5 +69,13 @@ abstract final class ServerErrorCodes {
         'L\'adresse e-mail saisie pendant l\'appel n\'est pas valide.',
     'PHASE2_DUREE_ETABLISSEMENT_INVALID':
         'La durée dans l\'établissement doit aller de 0 à 600 mois.',
+    // Le serveur borne l'appel au périmètre du compte : réessayer ne peut rien
+    // donner tant que la campagne n'attribue pas ce numéro.
+    'PHASE2_NOT_ASSIGNED':
+        'Ce numéro n\'est pas dans vos campagnes : l\'appel n\'a pas été '
+        'enregistré. Demandez à ce qu\'il vous soit attribué.',
+    'REP_CAMPAIGN_NOT_ASSIGNED':
+        'Ce représentant n\'est pas dans vos campagnes : l\'appel n\'a pas été '
+        'enregistré. Demandez à ce qu\'il vous soit attribué.',
   };
 }

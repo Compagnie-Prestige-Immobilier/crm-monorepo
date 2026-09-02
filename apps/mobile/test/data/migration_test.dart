@@ -2307,6 +2307,91 @@ void main() {
     await db.close();
   });
 
+  // Le périmètre d'appel et le résumé du dernier appel du prospect arrivent par
+  // le MÊME palier : « Mes contacts » se lit dessus, et l'annuaire resterait
+  // ouvert en grand sans la table.
+  test(
+    'v22 -> v23 ajoute le périmètre et le dernier appel du prospect',
+    () async {
+      final schema = await verifier.schemaAt(22);
+
+      final v22schema.DatabaseAtV22 old = v22schema.DatabaseAtV22(
+        schema.newConnection(),
+      );
+      await old.customStatement('PRAGMA foreign_keys = ON;');
+      await old.customStatement(
+        'INSERT INTO prospects '
+        '(id, nom, prenom, phone_e164, created_by_id, projet, statut, '
+        ' client_created_at, local_updated_at) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        <Object?>[
+          'pro-23',
+          'Ndiaye',
+          'Fatou',
+          '+221771234567',
+          'me',
+          'CHUES',
+          'NOUVEAU',
+          _iso,
+          _iso,
+        ],
+      );
+      await old.close();
+
+      final AppDatabase db = AppDatabase(schema.newConnection());
+      await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
+
+      final QueryRow fiche = await db
+          .customSelect(
+            'SELECT last_call_outcome, last_call_at, last_call_by_id '
+            'FROM prospects',
+          )
+          .getSingle();
+      for (final String colonne in <String>[
+        'last_call_outcome',
+        'last_call_at',
+        'last_call_by_id',
+      ]) {
+        expect(fiche.read<String?>(colonne), isNull, reason: colonne);
+      }
+
+      await db.customStatement(
+        'UPDATE prospects SET last_call_outcome = ?, last_call_at = ?, '
+        '       last_call_by_id = ? WHERE id = ?',
+        <Object?>['ESCALATED', _iso, 'u-1', 'pro-23'],
+      );
+      expect(
+        await db
+            .customSelect('SELECT last_call_by_id AS v FROM prospects')
+            .getSingle()
+            .then((QueryRow row) => row.read<String?>('v')),
+        'u-1',
+      );
+
+      // La table neuve accepte une ligne, et son CHECK refuse un genre inconnu.
+      await db.customStatement(
+        'INSERT INTO attributions (kind, id) VALUES (?, ?)',
+        <Object?>['prospect', 'pro-23'],
+      );
+      expect(
+        await db
+            .customSelect('SELECT COUNT(*) AS c FROM attributions')
+            .getSingle()
+            .then((QueryRow row) => row.read<int>('c')),
+        1,
+      );
+      await expectLater(
+        db.customStatement(
+          'INSERT INTO attributions (kind, id) VALUES (?, ?)',
+          <Object?>['campagne', 'x'],
+        ),
+        throwsA(anything),
+      );
+
+      await db.close();
+    },
+  );
+
   test('v11 -> courant traverse sans créer les tables de campagne', () async {
     final schema = await verifier.schemaAt(11);
     final v11.DatabaseAtV11 old = v11.DatabaseAtV11(schema.newConnection());

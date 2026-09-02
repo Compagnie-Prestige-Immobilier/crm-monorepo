@@ -359,6 +359,12 @@ CREATE TABLE prospects (
     whatsapp_e164 TEXT,
     relais_nom TEXT,
     relais_phone_e164 TEXT,
+    -- Dernier appel consigné, écrit par le SERVEUR au pull et, hors ligne, par
+    -- la saisie locale. SANS CHECK, même raison que `statut` : une issue ajoutée
+    -- côté serveur ferait avorter la page de pull entière.
+    last_call_outcome TEXT NULL,
+    last_call_at DATETIME NULL,
+    last_call_by_id TEXT NULL,
     statut TEXT NOT NULL DEFAULT 'NOUVEAU',
     client_created_at DATETIME NOT NULL,
     rev INTEGER NOT NULL DEFAULT 1,
@@ -526,6 +532,20 @@ CREATE TABLE sync_state (
     collection TEXT NOT NULL PRIMARY KEY,
     cursor TEXT NULL,
     last_pulled_at DATETIME NULL
+);
+
+-- Le périmètre d'appel du compte connecté, REMPLACÉ en entier à chaque pull.
+--
+-- Le pull de synchronisation est global : c'est le téléphone qui borne ce qu'un
+-- téléconseiller voit et appelle. `kind = 'borne'` est le marqueur du
+-- périmètre : posé seulement quand le serveur répond `tout: false`. Son ABSENCE
+-- vaut « aucun filtre », ce qui couvre à la fois l'encadrement et l'appareil qui
+-- n'a pas encore lu ses attributions : tout cacher avant la première lecture
+-- serait pire que d'en montrer trop.
+CREATE TABLE attributions (
+    kind TEXT NOT NULL CHECK (kind IN ('representant', 'prospect', 'borne')),
+    id TEXT NOT NULL,
+    PRIMARY KEY (kind, id)
 );
 
 -- ─────────────────────────────────────────────────────────────────────────────

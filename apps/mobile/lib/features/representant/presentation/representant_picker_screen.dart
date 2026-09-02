@@ -91,7 +91,10 @@ class _RepresentantPickerScreenState
                 ),
                 data: (List<RepresentantSyncViewData> list) {
                   if (list.isEmpty) {
-                    return _Empty(query: search.trim());
+                    return _Empty(
+                      query: search.trim(),
+                      borne: ref.watch(perimetreBorneProvider).value ?? false,
+                    );
                   }
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -203,9 +206,13 @@ class _RepresentantRow extends StatelessWidget {
 
 /// Aucune création ici : la base des représentants est importée depuis le web.
 class _Empty extends StatelessWidget {
-  const _Empty({required this.query});
+  const _Empty({required this.query, this.borne = false});
 
   final String query;
+
+  /// Le compte ne voit que les fiches de ses campagnes : dire « vérifiez le
+  /// nom » laisserait chercher une fiche que la recherche ne rendra jamais.
+  final bool borne;
 
   @override
   Widget build(BuildContext context) {
@@ -214,6 +221,14 @@ class _Empty extends StatelessWidget {
         icon: PhosphorIconsDuotone.magnifyingGlass,
         title: 'Cherchez un représentant',
         message: 'Tapez son nom ou son numéro.',
+      );
+    }
+    if (borne) {
+      return const CpiEmptyState(
+        icon: PhosphorIconsDuotone.usersThree,
+        title: 'Aucune fiche dans vos campagnes.',
+        message:
+            'La liste se remplit quand une campagne vous attribue des numéros.',
       );
     }
     return const CpiEmptyState(

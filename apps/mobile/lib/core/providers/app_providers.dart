@@ -133,20 +133,31 @@ final NotifierProvider<SyncCoordinator, SyncUiState> syncCoordinatorProvider =
 final StreamProvider<int> representantCountProvider = StreamProvider<int>((
   Ref ref,
 ) {
-  return ref.watch(appDatabaseProvider).countRepresentants().watchSingle();
+  return ref
+      .watch(referenceRepositoryProvider)
+      .watchRepresentantCount(moi: _moi(ref));
 });
 
 final StreamProvider<int> prospectCountProvider = StreamProvider<int>((
   Ref ref,
 ) {
-  return ref.watch(appDatabaseProvider).countProspects().watchSingle();
+  return ref
+      .watch(referenceRepositoryProvider)
+      .watchProspectCount(moi: _moi(ref));
 });
+
+final StreamProvider<int> representantsSansProspectProvider =
+    StreamProvider<int>((Ref ref) {
+      return ref
+          .watch(referenceRepositoryProvider)
+          .watchRepresentantsSansProspect(moi: _moi(ref));
+    });
 
 final StreamProvider<int> grandPublicProspectCountProvider =
     StreamProvider<int>((Ref ref) {
       return ref
           .watch(referenceRepositoryProvider)
-          .watchProspectCount(projet: 'GRAND_PUBLIC');
+          .watchProspectCount(projet: 'GRAND_PUBLIC', moi: _moi(ref));
     });
 
 /// Ce qu'un envoi peut encore faire partir. `countPendingOutbox` comptait aussi
@@ -303,11 +314,32 @@ class HistoriqueSearch extends Notifier<String> {
   void set(String value) => state = value;
 }
 
+/// L'identifiant du compte connecté, ou la chaîne vide : les requêtes qui
+/// bornent au périmètre d'appel s'en servent comme paramètre lié.
+String _moi(Ref ref) =>
+    ref.watch(authControllerProvider.select((AuthState s) => s.userId)) ?? '';
+
+/// Le compte est-il borné à ses campagnes ? Faux pour l'encadrement, et faux
+/// tant que le périmètre n'a jamais été lu. Sert à l'état vide, pas au filtre :
+/// le filtre, lui, vit dans les requêtes.
+final StreamProvider<bool> perimetreBorneProvider = StreamProvider<bool>((
+  Ref ref,
+) {
+  final AppDatabase db = ref.watch(appDatabaseProvider);
+  return (db.select(db.attributions)
+        ..where((Attributions t) => t.kind.equals(attributionBorne)))
+      .watch()
+      .map((List<Attribution> rows) => rows.isNotEmpty);
+});
+
 final StreamProvider<List<RepresentantSyncViewData>> representantListProvider =
     StreamProvider<List<RepresentantSyncViewData>>((Ref ref) {
       return ref
           .watch(referenceRepositoryProvider)
-          .watchRepresentants(search: ref.watch(historiqueSearchProvider));
+          .watchRepresentants(
+            search: ref.watch(historiqueSearchProvider),
+            moi: _moi(ref),
+          );
     });
 
 final StreamProvider<List<ProspectSyncViewData>>
@@ -319,6 +351,7 @@ grandPublicProspectListProvider = StreamProvider<List<ProspectSyncViewData>>((
       .watchAllProspects(
         search: ref.watch(historiqueSearchProvider),
         projet: 'GRAND_PUBLIC',
+        moi: _moi(ref),
       );
 });
 
@@ -342,6 +375,7 @@ representantPickerListProvider = StreamProvider<List<RepresentantSyncViewData>>(
         .watch(referenceRepositoryProvider)
         .watchRepresentants(
           search: ref.watch(representantPickerSearchProvider),
+          moi: _moi(ref),
         );
   },
 );
@@ -541,6 +575,101 @@ final StreamProvider<List<Rappel>> representantsInjoignablesProvider =
                 .toList(growable: false),
           );
     });
+
+/// Une personne que J'AI appelée : ce que la ligne de « Mes contacts » montre.
+/// [issue] et [statut] sont les codes bruts du serveur, traduits à l'écran.
+typedef Contact = ({
+  String id,
+  String nom,
+  String phoneE164,
+  DateTime? at,
+  String? issue,
+  String statut,
+});
+
+/// Les représentants que J'AI appelés, du plus récent au plus ancien.
+final StreamProvider<List<Contact>> mesContactsRepresentantsProvider =
+    StreamProvider<List<Contact>>((Ref ref) {
+      final AppDatabase db = ref.watch(appDatabaseProvider);
+      final String? moi = ref.watch(
+        authControllerProvider.select((AuthState s) => s.userId),
+      );
+      if (moi == null) return Stream<List<Contact>>.value(const <Contact>[]);
+      return (db.select(db.representants)
+            ..where(
+              (Representants t) =>
+                  t.lastCallById.equals(moi) & t.deletedAt.isNull(),
+            )
+            ..orderBy(<OrderClauseGenerator<Representants>>[
+              (Representants t) => OrderingTerm.desc(t.lastCallAt),
+            ]))
+          .watch()
+          .map(
+            (List<Representant> rows) => rows
+                .map(
+                  (Representant r) => (
+                    id: r.id,
+                    nom: r.fullName,
+                    phoneE164: r.phoneE164,
+                    at: r.lastCallAt,
+                    issue: r.lastCallOutcome,
+                    statut: r.relationStatus,
+                  ),
+                )
+                .toList(growable: false),
+          );
+    });
+
+/// Les prospects que J'AI appelés. Au Grand Public, bornés au parcours GP :
+/// la colonne `projet` ne dit que par où la fiche est entrée.
+final mesContactsProspectsProvider = StreamProvider.family<List<Contact>, bool>((
+  Ref ref,
+  bool grandPublic,
+) {
+  final AppDatabase db = ref.watch(appDatabaseProvider);
+  final String? moi = ref.watch(
+    authControllerProvider.select((AuthState s) => s.userId),
+  );
+  if (moi == null) return Stream<List<Contact>>.value(const <Contact>[]);
+  return db
+      .customSelect(
+        'SELECT p.id AS id, p.nom AS nom, p.prenom AS prenom, '
+        '       p.phone_e164 AS phone_e164, p.last_call_at AS at, '
+        '       p.last_call_outcome AS issue, '
+        '       COALESCE(d.phase2_status, \'PENDING\') AS statut '
+        'FROM prospects AS p '
+        'LEFT JOIN phase2_directory AS d ON d.prospect_id = p.id '
+        'WHERE p.last_call_by_id = ?1 AND p.deleted_at IS NULL '
+        '  AND (?2 = 0 OR EXISTS (SELECT 1 FROM prospect_journeys j '
+        '        WHERE j.prospect_id = p.id AND j.projet = \'GRAND_PUBLIC\')) '
+        'ORDER BY p.last_call_at DESC',
+        variables: <Variable<Object>>[
+          Variable<String>(moi),
+          Variable<bool>(grandPublic),
+        ],
+        readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+          db.prospects,
+          db.prospectJourneys,
+          db.phase2Directory,
+        },
+      )
+      .watch()
+      .map(
+        (List<QueryRow> rows) => rows
+            .map(
+              (QueryRow r) => (
+                id: r.read<String>('id'),
+                nom: '${r.read<String>('prenom')} ${r.read<String>('nom')}'
+                    .trim(),
+                phoneE164: r.read<String>('phone_e164'),
+                at: r.read<DateTime?>('at'),
+                issue: r.read<String?>('issue'),
+                statut: r.read<String>('statut'),
+              ),
+            )
+            .toList(growable: false),
+      );
+});
 
 final prospectsForRepresentantProvider =
     StreamProvider.family<List<ProspectSyncViewData>, String>((

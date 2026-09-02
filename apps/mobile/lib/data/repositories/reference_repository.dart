@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 
+import '../../core/sync/api_port.dart' show attributionBorne;
 import '../../core/sync/phase2_directory_sync.dart';
 import '../local/database.dart';
 
@@ -9,6 +10,22 @@ class ReferenceRepository {
   ReferenceRepository(this._db);
 
   final AppDatabase _db;
+
+  /// Le périmètre d'appel, en SQL. Le pull de synchronisation est GLOBAL :
+  /// sans cette clause, un téléconseiller voit et appelle les fiches de toutes
+  /// les campagnes. Tant que le marqueur `borne` n'est pas posé — encadrement,
+  /// ou appareil qui n'a pas encore lu ses attributions — rien n'est filtré.
+  ///
+  /// [moi] se lie en `?1` : `created_by_id` est NON NUL, une chaîne vide ne peut
+  /// donc désigner personne.
+  static String _perimetre(String kind, {String alias = ''}) {
+    final String p = alias.isEmpty ? '' : '$alias.';
+    return 'AND (NOT EXISTS (SELECT 1 FROM attributions '
+        '                    WHERE kind = \'$attributionBorne\') '
+        '     OR ${p}created_by_id = ?1 '
+        '     OR ${p}id IN (SELECT a.id FROM attributions AS a '
+        '                   WHERE a.kind = \'$kind\')) ';
+  }
 
   /// Les régions, dérivées des départements : il n'existe pas de table
   /// `regions` en local, seulement le libellé dénormalisé que porte chaque
@@ -191,7 +208,10 @@ class ReferenceRepository {
     )..where((Departements t) => t.id.equals(id))).getSingleOrNull();
   }
 
-  Stream<List<RepresentantSyncViewData>> watchRepresentants({String? search}) {
+  Stream<List<RepresentantSyncViewData>> watchRepresentants({
+    String? search,
+    String? moi,
+  }) {
     final String terme = (search ?? '').trim();
     // Annuaire de milliers de fiches : tout dérouler laisse croire à un total
     // faux (« il n'y en a que 500 »). L'écran reste vide tant qu'on n'a pas
@@ -208,16 +228,19 @@ class ReferenceRepository {
         .customSelect(
           'SELECT * FROM representant_sync_view '
           'WHERE deleted_at IS NULL '
-          '  AND (lower(full_name) LIKE ?1 OR phone_e164 LIKE ?1 '
-          '       OR (?2 <> \'\' AND phone_e164 LIKE ?2)) '
+          '  AND (lower(full_name) LIKE ?2 OR phone_e164 LIKE ?2 '
+          '       OR (?3 <> \'\' AND phone_e164 LIKE ?3)) '
+          '  ${_perimetre('representant')}'
           'ORDER BY client_created_at DESC',
           variables: <Variable<Object>>[
+            Variable<String>(moi ?? ''),
             Variable<String>(pattern),
             Variable<String>(parNumero),
           ],
           readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
             _db.representants,
             _db.outbox,
+            _db.attributions,
           },
         )
         .map((QueryRow row) => _db.representantSyncView.map(row.data))
@@ -283,6 +306,7 @@ class ReferenceRepository {
   Stream<List<ProspectSyncViewData>> watchAllProspects({
     String? search,
     String? projet,
+    String? moi,
   }) {
     final String pattern = '%${(search ?? '').trim().toLowerCase()}%';
     final String project = projet ?? '';
@@ -290,13 +314,15 @@ class ReferenceRepository {
         .customSelect(
           'SELECT * FROM prospect_sync_view AS v '
           'WHERE deleted_at IS NULL '
-          '  AND (?1 = \'\' OR EXISTS ('
+          '  AND (?2 = \'\' OR EXISTS ('
           '        SELECT 1 FROM prospect_journeys j '
-          '        WHERE j.prospect_id = v.id AND j.projet = ?1)) '
-          '  AND (?2 = \'%%\' OR lower(nom) LIKE ?2 OR lower(prenom) LIKE ?2 '
-          '       OR phone_e164 LIKE ?2) '
+          '        WHERE j.prospect_id = v.id AND j.projet = ?2)) '
+          '  AND (?3 = \'%%\' OR lower(nom) LIKE ?3 OR lower(prenom) LIKE ?3 '
+          '       OR phone_e164 LIKE ?3) '
+          '  ${_perimetre('prospect', alias: 'v')}'
           'ORDER BY client_created_at DESC LIMIT 500',
           variables: <Variable<Object>>[
+            Variable<String>(moi ?? ''),
             Variable<String>(project),
             Variable<String>(pattern),
           ],
@@ -304,23 +330,67 @@ class ReferenceRepository {
             _db.prospects,
             _db.prospectJourneys,
             _db.outbox,
+            _db.attributions,
           },
         )
         .map((QueryRow row) => _db.prospectSyncView.map(row.data))
         .watch();
   }
 
-  Stream<int> watchProspectCount({required String projet}) {
+  /// Sans [projet], toutes les fiches vivantes ; sinon celles du parcours.
+  Stream<int> watchProspectCount({String? projet, String? moi}) {
     return _db
         .customSelect(
           'SELECT COUNT(*) AS c FROM prospects AS p '
-          'WHERE p.deleted_at IS NULL AND EXISTS ('
+          'WHERE p.deleted_at IS NULL AND (?2 = \'\' OR EXISTS ('
           '  SELECT 1 FROM prospect_journeys j '
-          '  WHERE j.prospect_id = p.id AND j.projet = ?1)',
-          variables: <Variable<Object>>[Variable<String>(projet)],
+          '  WHERE j.prospect_id = p.id AND j.projet = ?2)) '
+          '  ${_perimetre('prospect', alias: 'p')}',
+          variables: <Variable<Object>>[
+            Variable<String>(moi ?? ''),
+            Variable<String>(projet ?? ''),
+          ],
           readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
             _db.prospects,
             _db.prospectJourneys,
+            _db.attributions,
+          },
+        )
+        .map((QueryRow row) => row.read<int>('c'))
+        .watchSingle();
+  }
+
+  /// Les compteurs de l'accueil lisent le même périmètre que les listes :
+  /// une carte « 1 234 représentants » face à une liste bornée mentirait.
+  Stream<int> watchRepresentantCount({String? moi}) {
+    return _db
+        .customSelect(
+          'SELECT COUNT(*) AS c FROM representants '
+          'WHERE deleted_at IS NULL ${_perimetre('representant')}',
+          variables: <Variable<Object>>[Variable<String>(moi ?? '')],
+          readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+            _db.representants,
+            _db.attributions,
+          },
+        )
+        .map((QueryRow row) => row.read<int>('c'))
+        .watchSingle();
+  }
+
+  /// Ambassadeurs chez qui personne n'a encore été saisi : le travail de l'étape 2.
+  Stream<int> watchRepresentantsSansProspect({String? moi}) {
+    return _db
+        .customSelect(
+          'SELECT COUNT(*) AS c FROM representants r '
+          'WHERE r.deleted_at IS NULL AND r.relation_status = \'AMBASSADEUR\' '
+          'AND NOT EXISTS (SELECT 1 FROM prospects p '
+          '  WHERE p.representant_id = r.id AND p.deleted_at IS NULL) '
+          '${_perimetre('representant', alias: 'r')}',
+          variables: <Variable<Object>>[Variable<String>(moi ?? '')],
+          readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+            _db.representants,
+            _db.prospects,
+            _db.attributions,
           },
         )
         .map((QueryRow row) => row.read<int>('c'))

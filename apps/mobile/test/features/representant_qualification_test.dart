@@ -438,6 +438,7 @@ void main() {
   ) async {
     final String promis = await writes.recordRepCallAttempt(
       representantId: 'rep-1',
+      createdById: 'u-1',
       outcome: 'CALLBACK',
       callbackAt: t0.add(const Duration(hours: 2)),
     );
@@ -498,6 +499,7 @@ class _WritesEspion extends WriteRepository {
   Future<String> recordRepCallAttempt({
     required String representantId,
     required String outcome,
+    String? createdById,
     String? relationStatus,
     String? whatsappStatus,
     String? whatsappE164,
@@ -524,6 +526,7 @@ class _WritesEspion extends WriteRepository {
     return super.recordRepCallAttempt(
       representantId: representantId,
       outcome: outcome,
+      createdById: createdById,
       relationStatus: relationStatus,
       whatsappStatus: whatsappStatus,
       whatsappE164: whatsappE164,

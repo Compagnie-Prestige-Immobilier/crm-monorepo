@@ -251,6 +251,8 @@ class _RepresentantQualificationScreenState
     final bool joignable = choix == _Resultat.joignable;
     final bool ambassadeurOui = joignable && ambassadeur == true;
 
+    final String? moi = ref.read(authControllerProvider).userId;
+
     String? whatsappE164;
     if (ambassadeurOui && memeNumeroWhatsapp == false) {
       whatsappE164 = (Phone.parse(whatsapp.text) as PhoneValid).e164;
@@ -273,6 +275,7 @@ class _RepresentantQualificationScreenState
           .read(writeRepositoryProvider)
           .recordRepCallAttempt(
             representantId: widget.representantId,
+            createdById: moi,
             outcome: switch (choix) {
               _Resultat.joignable => ambassadeurOui ? 'REACHED' : 'REFUSED',
               _Resultat.rappel => 'CALLBACK',

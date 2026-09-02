@@ -2055,6 +2055,36 @@
             "dsl_features": []
           },
           {
+            "name": "last_call_outcome",
+            "getter_name": "lastCallOutcome",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "last_call_at",
+            "getter_name": "lastCallAt",
+            "moor_type": "dateTime",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "last_call_by_id",
+            "getter_name": "lastCallById",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": "NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
             "name": "statut",
             "getter_name": "statut",
             "moor_type": "string",
@@ -2751,6 +2781,46 @@
       "references": [],
       "type": "table",
       "data": {
+        "name": "attributions",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "kind",
+            "getter_name": "kind",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL CHECK (kind IN ('representant', 'prospect', 'borne'))",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "id",
+            "getter_name": "id",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "NOT NULL",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": [
+          "PRIMARY KEY(kind, id)"
+        ],
+        "explicit_pk": [
+          "kind",
+          "id"
+        ]
+      }
+    },
+    {
+      "id": 43,
+      "references": [],
+      "type": "table",
+      "data": {
         "name": "phase2_directory",
         "was_declared_in_moor": true,
         "columns": [
@@ -2823,13 +2893,13 @@
       }
     },
     {
-      "id": 43,
+      "id": 44,
       "references": [
-        42
+        43
       ],
       "type": "index",
       "data": {
-        "on": 42,
+        "on": 43,
         "name": "phase2_directory_phone_unique",
         "sql": "CREATE UNIQUE INDEX phase2_directory_phone_unique ON phase2_directory (phone_e164);",
         "unique": true,
@@ -2837,13 +2907,13 @@
       }
     },
     {
-      "id": 44,
+      "id": 45,
       "references": [
-        42
+        43
       ],
       "type": "index",
       "data": {
-        "on": 42,
+        "on": 43,
         "name": "phase2_directory_status_idx",
         "sql": "CREATE INDEX phase2_directory_status_idx ON phase2_directory (phase2_status);",
         "unique": false,
@@ -2851,7 +2921,7 @@
       }
     },
     {
-      "id": 45,
+      "id": 46,
       "references": [],
       "type": "table",
       "data": {
@@ -3034,13 +3104,13 @@
       }
     },
     {
-      "id": 46,
+      "id": 47,
       "references": [
-        45
+        46
       ],
       "type": "index",
       "data": {
-        "on": 45,
+        "on": 46,
         "name": "call_attempts_prospect_idx",
         "sql": "CREATE INDEX call_attempts_prospect_idx\n    ON call_attempts (prospect_id, client_created_at DESC);",
         "unique": false,
@@ -3048,13 +3118,13 @@
       }
     },
     {
-      "id": 47,
+      "id": 48,
       "references": [
-        45
+        46
       ],
       "type": "index",
       "data": {
-        "on": 45,
+        "on": 46,
         "name": "call_attempts_created_idx",
         "sql": "CREATE INDEX call_attempts_created_idx ON call_attempts (client_created_at DESC);",
         "unique": false,
@@ -3062,7 +3132,7 @@
       }
     },
     {
-      "id": 48,
+      "id": 49,
       "references": [],
       "type": "table",
       "data": {
@@ -3168,13 +3238,13 @@
       }
     },
     {
-      "id": 49,
+      "id": 50,
       "references": [
-        48
+        49
       ],
       "type": "index",
       "data": {
-        "on": 48,
+        "on": 49,
         "name": "notifications_created_idx",
         "sql": "CREATE INDEX notifications_created_idx ON notifications (created_at);",
         "unique": false,
@@ -3182,13 +3252,13 @@
       }
     },
     {
-      "id": 50,
+      "id": 51,
       "references": [
-        48
+        49
       ],
       "type": "index",
       "data": {
-        "on": 48,
+        "on": 49,
         "name": "notifications_unread_idx",
         "sql": "CREATE INDEX notifications_unread_idx ON notifications (read_at);",
         "unique": false,
@@ -3196,7 +3266,7 @@
       }
     },
     {
-      "id": 51,
+      "id": 52,
       "references": [
         24,
         36
@@ -3479,7 +3549,7 @@
       }
     },
     {
-      "id": 52,
+      "id": 53,
       "references": [
         28,
         36
@@ -3751,6 +3821,36 @@
             "dsl_features": []
           },
           {
+            "name": "last_call_outcome",
+            "getter_name": "lastCallOutcome",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "last_call_at",
+            "getter_name": "lastCallAt",
+            "moor_type": "dateTime",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "last_call_by_id",
+            "getter_name": "lastCallById",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
             "name": "statut",
             "getter_name": "statut",
             "moor_type": "string",
@@ -3824,7 +3924,7 @@
       }
     },
     {
-      "id": 53,
+      "id": 54,
       "references": [],
       "type": "table",
       "data": {
@@ -3910,13 +4010,13 @@
       }
     },
     {
-      "id": 54,
+      "id": 55,
       "references": [
-        53
+        54
       ],
       "type": "index",
       "data": {
-        "on": 53,
+        "on": 54,
         "name": "rep_callback_reminders_pending_idx",
         "sql": "CREATE INDEX rep_callback_reminders_pending_idx ON rep_callback_reminders (notified_at, scheduled_at);",
         "unique": false,
@@ -3924,7 +4024,7 @@
       }
     },
     {
-      "id": 55,
+      "id": 56,
       "references": [],
       "type": "table",
       "data": {
@@ -4130,13 +4230,13 @@
       }
     },
     {
-      "id": 56,
+      "id": 57,
       "references": [
-        55
+        56
       ],
       "type": "index",
       "data": {
-        "on": 55,
+        "on": 56,
         "name": "visites_date_idx",
         "sql": "CREATE INDEX visites_date_idx ON visites (date, time);",
         "unique": false,
@@ -4144,13 +4244,13 @@
       }
     },
     {
-      "id": 57,
+      "id": 58,
       "references": [
-        55
+        56
       ],
       "type": "index",
       "data": {
-        "on": 55,
+        "on": 56,
         "name": "visites_entreprise_date_idx",
         "sql": "CREATE INDEX visites_entreprise_date_idx ON visites (entreprise_id, date);",
         "unique": false,
@@ -4416,7 +4516,7 @@
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE TABLE IF NOT EXISTS \"prospects\" (\"id\" TEXT NOT NULL PRIMARY KEY, \"nom\" TEXT NOT NULL, \"prenom\" TEXT NOT NULL, \"phone_e164\" TEXT NOT NULL, \"banque_id\" TEXT REFERENCES banques(id)ON UPDATE CASCADE, \"syndicat_id\" TEXT REFERENCES syndicats(id)ON UPDATE CASCADE, \"representant_id\" TEXT REFERENCES representants(id)ON UPDATE CASCADE ON DELETE RESTRICT, \"created_by_id\" TEXT NOT NULL, \"projet\" TEXT NOT NULL DEFAULT 'CHUES', \"type\" TEXT, \"profession\" TEXT, \"profession_id\" TEXT, \"duree_systeme_mois\" INTEGER, \"canal_provenance_id\" TEXT, \"income_band_id\" TEXT, \"employeur_id\" TEXT, \"employeur\" TEXT, \"type_contrat\" TEXT, \"anciennete_mois\" INTEGER, \"lieu_activite\" TEXT, \"mode_epargne\" TEXT, \"pays_residence_id\" TEXT, \"ville_residence\" TEXT, \"whatsapp_e164\" TEXT, \"relais_nom\" TEXT, \"relais_phone_e164\" TEXT, \"statut\" TEXT NOT NULL DEFAULT 'NOUVEAU', \"client_created_at\" TEXT NOT NULL, \"rev\" INTEGER NOT NULL DEFAULT 1, \"local_updated_at\" TEXT NOT NULL, \"server_updated_at\" TEXT NULL, \"deleted_at\" TEXT NULL);"
+          "sql": "CREATE TABLE IF NOT EXISTS \"prospects\" (\"id\" TEXT NOT NULL PRIMARY KEY, \"nom\" TEXT NOT NULL, \"prenom\" TEXT NOT NULL, \"phone_e164\" TEXT NOT NULL, \"banque_id\" TEXT REFERENCES banques(id)ON UPDATE CASCADE, \"syndicat_id\" TEXT REFERENCES syndicats(id)ON UPDATE CASCADE, \"representant_id\" TEXT REFERENCES representants(id)ON UPDATE CASCADE ON DELETE RESTRICT, \"created_by_id\" TEXT NOT NULL, \"projet\" TEXT NOT NULL DEFAULT 'CHUES', \"type\" TEXT, \"profession\" TEXT, \"profession_id\" TEXT, \"duree_systeme_mois\" INTEGER, \"canal_provenance_id\" TEXT, \"income_band_id\" TEXT, \"employeur_id\" TEXT, \"employeur\" TEXT, \"type_contrat\" TEXT, \"anciennete_mois\" INTEGER, \"lieu_activite\" TEXT, \"mode_epargne\" TEXT, \"pays_residence_id\" TEXT, \"ville_residence\" TEXT, \"whatsapp_e164\" TEXT, \"relais_nom\" TEXT, \"relais_phone_e164\" TEXT, \"last_call_outcome\" TEXT NULL, \"last_call_at\" TEXT NULL, \"last_call_by_id\" TEXT NULL, \"statut\" TEXT NOT NULL DEFAULT 'NOUVEAU', \"client_created_at\" TEXT NOT NULL, \"rev\" INTEGER NOT NULL DEFAULT 1, \"local_updated_at\" TEXT NOT NULL, \"server_updated_at\" TEXT NULL, \"deleted_at\" TEXT NULL);"
         }
       ]
     },
@@ -4534,6 +4634,15 @@
         {
           "dialect": "sqlite",
           "sql": "CREATE TABLE IF NOT EXISTS \"sync_state\" (\"collection\" TEXT NOT NULL PRIMARY KEY, \"cursor\" TEXT NULL, \"last_pulled_at\" TEXT NULL);"
+        }
+      ]
+    },
+    {
+      "name": "attributions",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"attributions\" (\"kind\" TEXT NOT NULL CHECK (kind IN ('representant', 'prospect', 'borne')), \"id\" TEXT NOT NULL, PRIMARY KEY(kind, id));"
         }
       ]
     },
