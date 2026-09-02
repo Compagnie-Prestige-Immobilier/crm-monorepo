@@ -201,6 +201,7 @@ const COUNT_KEYS = [
   'repCalls',
   'repReached',
   'repCallback',
+  'repUnreachable',
   'repQuestioned',
   'repQualified',
   'representantsContacted',
@@ -234,22 +235,29 @@ export interface ActivityColumn {
 }
 
 /**
- * Le plateau CHUES appelle des représentants : ses appels de prospects sont
- * ceux de la conversion. Le Grand Public n'appelle que des prospects.
+ * Deux familles d'appels, jamais dans le même tableau : le plateau CHUES appelle
+ * des représentants et, en conversion, des prospects ; le Grand Public n'appelle
+ * que des prospects.
  */
-export const ACTIVITY_COLUMNS: Record<Schemas['Projet'], ActivityColumn[]> = {
-  CHUES: [
+export type ActivityFamille = 'representants' | 'prospects';
+
+export const FAMILLE_LABELS: Record<ActivityFamille, string> = {
+  representants: 'Appels représentants',
+  prospects: 'Appels prospects',
+};
+
+export const ACTIVITY_COLUMNS: Record<ActivityFamille, ActivityColumn[]> = {
+  representants: [
     { key: 'repCalls', label: 'Appels' },
     { key: 'repReached', label: 'Joints' },
     { key: 'repCallback', label: 'Rendez-vous' },
+    { key: 'repUnreachable', label: 'Injoignables' },
     { key: 'repContactRate', label: 'Taux de contact', taux: true },
     { key: 'repQualificationRate', label: 'Qualification', taux: true },
     { key: 'representantsContacted', label: 'Représentants contactés' },
-    { key: 'calls', label: 'Appels prospects' },
-    { key: 'methodObtained', label: 'Méthodes' },
     { key: 'prospectsCreated', label: 'Prospects saisis' },
   ],
-  GRAND_PUBLIC: [
+  prospects: [
     { key: 'calls', label: 'Appels' },
     { key: 'methodObtained', label: 'Méthodes' },
     { key: 'unreachable', label: 'Injoignables' },
@@ -259,6 +267,10 @@ export const ACTIVITY_COLUMNS: Record<Schemas['Projet'], ActivityColumn[]> = {
     { key: 'prospectsCreated', label: 'Prospects saisis' },
   ],
 };
+
+export function famillesDuProjet(projet: Schemas['Projet']): ActivityFamille[] {
+  return projet === 'CHUES' ? ['representants', 'prospects'] : ['prospects'];
+}
 
 function rate(part: number, whole: number): number | null {
   if (whole === 0) return null;
@@ -366,8 +378,9 @@ export function activityCsv(input: {
   range: ActivityRange;
   granularity: SupervisionGranularity;
   projet: Schemas['Projet'];
+  famille: ActivityFamille;
 }): string {
-  const colonnes = ACTIVITY_COLUMNS[input.projet];
+  const colonnes = ACTIVITY_COLUMNS[input.famille];
   const ligne = (nom: string, valeurs: ActivityCounts): (string | number | null)[] => [
     nom,
     ...colonnes.map((colonne) => valeurs[colonne.key]),
@@ -376,6 +389,7 @@ export function activityCsv(input: {
   const rows: (string | number | null)[][] = [
     [
       `Activité des téléconseillers ${PROJET_LABELS[input.projet]} du ${input.range.from} au ${input.range.to}`,
+      FAMILLE_LABELS[input.famille],
       input.granularity === 'week' ? 'Par semaine' : 'Par jour',
     ],
     [],
@@ -397,8 +411,12 @@ export function activityCsv(input: {
 }
 
 /** Le projet est dans le nom : les deux coques exportent la même période sur des chiffres différents. */
-export function activityCsvFileName(range: ActivityRange, projet: Schemas['Projet']): string {
+export function activityCsvFileName(
+  range: ActivityRange,
+  projet: Schemas['Projet'],
+  famille: ActivityFamille,
+): string {
   const suffixe = projet === 'GRAND_PUBLIC' ? 'grand-public' : 'chues';
   const periode = range.from === range.to ? range.from : `${range.from}_${range.to}`;
-  return `cpi-supervision-activite-${suffixe}-${periode}.csv`;
+  return `cpi-supervision-activite-${suffixe}-${famille}-${periode}.csv`;
 }
