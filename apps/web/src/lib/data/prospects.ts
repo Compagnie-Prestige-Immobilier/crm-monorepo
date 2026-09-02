@@ -3,9 +3,11 @@ import { ApiError, unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
 import { flattenPage, toProspectQuery } from '@/lib/api/query-params';
+import { SUIVI_PAGE_SIZE } from '@/lib/data/representants';
 import type {
   BddSegment,
   Paginated,
+  Projet,
   ProspectFilters,
   ProspectRow,
   UpdateProspectInput,
@@ -20,6 +22,29 @@ export async function fetchProspects(
 ): Promise<Paginated<ProspectRow>> {
   const payload = unwrap(
     await client.GET('/api/v1/prospects', { params: { query: toProspectQuery(filters) } }),
+  );
+  return flattenPage(payload);
+}
+
+/** Les prospects dont ce téléconseiller a passé le DERNIER appel, du plus récent au plus ancien. */
+export async function fetchProspectsAppeles(
+  lastCallById: string,
+  projet: Projet,
+  client: ApiClient = getApiClient(),
+): Promise<Paginated<ProspectRow>> {
+  const payload = unwrap(
+    await client.GET('/api/v1/prospects', {
+      params: {
+        query: {
+          lastCallById,
+          projet,
+          sortBy: 'lastCallAt',
+          sortOrder: 'desc',
+          page: 1,
+          pageSize: SUIVI_PAGE_SIZE,
+        },
+      },
+    }),
   );
   return flattenPage(payload);
 }

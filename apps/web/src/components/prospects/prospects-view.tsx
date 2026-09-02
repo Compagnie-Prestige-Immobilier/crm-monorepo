@@ -26,12 +26,15 @@ export function ProspectsView({
   canExport = false,
   readOnly = false,
   simplified = false,
+  campaignScoped = false,
 }: {
   canAdminister: boolean;
   canExport?: boolean;
   readOnly?: boolean;
   /** Les critères repliés le RESTENT à l'ouverture, même venus d'un lien filtré. */
   simplified?: boolean;
+  /** Téléconseiller : l'API ne lui rend que ses fiches et celles de ses campagnes. */
+  campaignScoped?: boolean;
 }) {
   const { filters } = useProspectFilters();
   const [createOpen, setCreateOpen] = useState(false);
@@ -67,7 +70,11 @@ export function ProspectsView({
       </div>
 
       <FiltersBar startCollapsed={simplified} />
-      <ProspectsTable canAdminister={canAdminister} readOnly={readOnly} />
+      <ProspectsTable
+        canAdminister={canAdminister}
+        readOnly={readOnly}
+        campaignScoped={campaignScoped}
+      />
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>

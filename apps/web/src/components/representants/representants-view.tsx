@@ -61,14 +61,40 @@ function pagination(
   };
 }
 
+function messageVide(
+  activeFilterCount: number,
+  campaignScoped: boolean,
+): { titre: string; detail: string } {
+  if (activeFilterCount > 0) {
+    return {
+      titre: 'Aucun représentant ne correspond à ces critères.',
+      detail: 'Élargissez la recherche ou retirez un filtre.',
+    };
+  }
+  if (campaignScoped) {
+    return {
+      titre: 'Aucun représentant.',
+      detail: 'Vos campagnes n’en contiennent aucun.',
+    };
+  }
+  return {
+    titre: 'Aucun représentant enregistré.',
+    detail:
+      'Les fiches sont saisies en tournée depuis le mobile, ou créées ici, une par une ou par import d’un classeur.',
+  };
+}
+
 export function RepresentantsView({
   canAdminister,
   readOnly = false,
   canExport = !readOnly,
+  campaignScoped = false,
 }: {
   canAdminister: boolean;
   readOnly?: boolean;
   canExport?: boolean;
+  /** Téléconseiller : l'API ne lui rend que ses fiches et celles de ses campagnes. */
+  campaignScoped?: boolean;
 }) {
   const { filters, setFilters } = useRepresentantFilters();
   const exporter = useFileDownload();
@@ -180,14 +206,10 @@ export function RepresentantsView({
                 <div className="flex flex-col items-center gap-2 rounded-lg border border-border bg-card py-16 text-center shadow-elev-sm">
                   <UsersRoundIcon className="size-8 text-muted-foreground" aria-hidden="true" />
                   <p className="font-[600]">
-                    {activeFilterCount === 0
-                      ? 'Aucun représentant enregistré.'
-                      : 'Aucun représentant ne correspond à ces critères.'}
+                    {messageVide(activeFilterCount, campaignScoped).titre}
                   </p>
                   <p className="max-w-md text-[0.8125rem] text-muted-foreground">
-                    {activeFilterCount === 0
-                      ? 'Les fiches sont saisies en tournée depuis le mobile, ou créées ici, une par une ou par import d’un classeur.'
-                      : 'Élargissez la recherche ou retirez un filtre.'}
+                    {messageVide(activeFilterCount, campaignScoped).detail}
                   </p>
                 </div>
               );

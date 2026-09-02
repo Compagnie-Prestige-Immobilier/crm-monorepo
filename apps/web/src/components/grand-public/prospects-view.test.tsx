@@ -155,6 +155,14 @@ describe('l’état vide', () => {
     expect(await screen.findByText('Aucun prospect ne correspond à ces filtres.')).toBeTruthy();
     expect(screen.queryByText('Aucun prospect Grand Public n’a encore été saisi.')).toBeNull();
   });
+
+  it('dit au téléconseiller que ce sont SES campagnes qui sont vides', async () => {
+    list.mockResolvedValue(page([]));
+    renderWithQuery(<GrandPublicProspectsView canCreate canExport campaignScoped />);
+
+    expect(await screen.findByText('Vos campagnes n’en contiennent aucun.')).toBeTruthy();
+    expect(screen.queryByText(/La première fiche se crée/u)).toBeNull();
+  });
 });
 
 describe('la liste', () => {

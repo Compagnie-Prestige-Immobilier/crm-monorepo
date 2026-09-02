@@ -376,6 +376,7 @@ describe('navigation d’un ADMIN', () => {
       '/chues',
       '/chues/supervision',
       '/chues/rappels',
+      '/chues/mes-contacts',
       '/chues/suggestions',
       '/chues/banque',
       '/chues/demandes-clients',
@@ -421,6 +422,7 @@ describe('navigation d’un téléconseiller', () => {
       '/chues/console',
       '/chues/rappels',
       // Sous « Plus » : utile, pas quotidien.
+      '/chues/mes-contacts',
       '/chues/suggestions',
       '/chues/representants',
       '/chues/prospects',
@@ -431,6 +433,7 @@ describe('navigation d’un téléconseiller', () => {
       'Ajouter un prospect',
       'Convertir un prospect',
       'Rappels promis',
+      'Mes contacts',
       'Contacts recommandés',
       'Représentants',
       'Prospects',
@@ -442,6 +445,7 @@ describe('navigation d’un téléconseiller', () => {
       '/grand-public',
       '/grand-public/console',
       '/grand-public/rappels',
+      '/grand-public/mes-contacts',
       '/grand-public/nouveau',
     ]);
     expect(coqueHomePath('COMMERCIAL', 'grand-public')).toBe('/grand-public');
@@ -763,6 +767,7 @@ describe('navigation d’un SUPERVISEUR', () => {
       '/chues/rappels',
       '/chues/supervision',
       // Sous « Plus ».
+      '/chues/mes-contacts',
       '/chues/suggestions',
       '/chues/representants',
       '/chues/prospects',
@@ -775,6 +780,7 @@ describe('navigation d’un SUPERVISEUR', () => {
       'Convertir un prospect',
       'Rappels promis',
       'Mon équipe',
+      'Mes contacts',
       'Contacts recommandés',
       'Représentants',
       'Prospects',
@@ -922,6 +928,7 @@ describe('navigation de la DIRECTION', () => {
       '/chues/rappels',
       '/chues/supervision',
       // Sous « Plus ».
+      '/chues/mes-contacts',
       '/chues/suggestions',
       '/chues/representants',
       '/chues/prospects',
@@ -936,6 +943,7 @@ describe('navigation de la DIRECTION', () => {
       '/grand-public/supervision',
       // Sous « Plus ».
       '/grand-public/rappels',
+      '/grand-public/mes-contacts',
       '/grand-public/campagnes',
     ]);
   });
@@ -1001,13 +1009,14 @@ describe('navigation du pilotage sur le Grand Public et le registre', () => {
       '/grand-public/supervision',
       // Sous « Plus ».
       '/grand-public/rappels',
+      '/grand-public/mes-contacts',
       '/grand-public/campagnes',
     ]);
     expect(
       navItems('SUPERVISEUR', 'grand-public')
         .filter((item) => item.secondary === true)
         .map((item) => item.href),
-    ).toEqual(['/grand-public/rappels', '/grand-public/campagnes']);
+    ).toEqual(['/grand-public/rappels', '/grand-public/mes-contacts', '/grand-public/campagnes']);
   });
 
   it('suit l’équipe et les campagnes du Grand Public sans passer par CHUES', () => {
@@ -1024,6 +1033,7 @@ describe('navigation du pilotage sur le Grand Public et le registre', () => {
       '/grand-public/dossiers',
       // Sous « Plus ».
       '/grand-public/rappels',
+      '/grand-public/mes-contacts',
       '/grand-public/campagnes',
       '/grand-public/console',
       '/grand-public/nouveau',

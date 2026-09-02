@@ -49,6 +49,7 @@ export default async function GrandPublicPage({
       <GrandPublicProspectsView
         canCreate={!readsOnly(guard.user.role)}
         canExport={canExportProspects(guard.user.role)}
+        campaignScoped={guard.user.role === 'COMMERCIAL'}
       />
     </HydrationBoundary>
   );
