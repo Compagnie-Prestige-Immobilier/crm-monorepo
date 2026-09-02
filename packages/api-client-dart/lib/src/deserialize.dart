@@ -109,6 +109,7 @@ import 'package:crm_api_client/src/model/lot_export_repartition_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_repartition_jour_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_summary_dto.dart';
 import 'package:crm_api_client/src/model/merge_prospects_dto.dart';
+import 'package:crm_api_client/src/model/mes_attributions_dto.dart';
 import 'package:crm_api_client/src/model/named_count_dto.dart';
 import 'package:crm_api_client/src/model/named_count_list_dto.dart';
 import 'package:crm_api_client/src/model/notification_delivery_counts_dto.dart';
@@ -621,6 +622,9 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'MergeProspectsDto':
       return MergeProspectsDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'MesAttributionsDto':
+      return MesAttributionsDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'ModeEpargne':
     case 'NamedCountDto':

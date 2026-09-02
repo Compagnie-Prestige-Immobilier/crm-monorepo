@@ -130,6 +130,14 @@ class ProspectDto {
 
     required this.lastAttemptAt,
 
+    required this.lastCallOutcome,
+
+    required this.lastCallAt,
+
+    required this.lastCallById,
+
+    required this.lastCallByName,
+
     required this.origin,
 
     required this.originLabel,
@@ -358,6 +366,23 @@ class ProspectDto {
   @JsonKey(name: r'lastAttemptAt', required: true, includeIfNull: true)
   final DateTime? lastAttemptAt;
 
+  @JsonKey(
+    name: r'lastCallOutcome',
+    required: true,
+    includeIfNull: true,
+    unknownEnumValue: CallOutcome.unknownDefaultOpenApi,
+  )
+  final CallOutcome? lastCallOutcome;
+
+  @JsonKey(name: r'lastCallAt', required: true, includeIfNull: true)
+  final DateTime? lastCallAt;
+
+  @JsonKey(name: r'lastCallById', required: true, includeIfNull: true)
+  final String? lastCallById;
+
+  @JsonKey(name: r'lastCallByName', required: true, includeIfNull: true)
+  final String? lastCallByName;
+
   /// Clé de provenance. Nulle pour une fiche née d’une tournée terrain.
   @JsonKey(name: r'origin', required: true, includeIfNull: true)
   final String? origin;
@@ -434,6 +459,10 @@ class ProspectDto {
                 lastOutcome,
                 lastComment,
                 lastAttemptAt,
+                lastCallOutcome,
+                lastCallAt,
+                lastCallById,
+                lastCallByName,
                 origin,
                 originLabel,
                 clientCreatedAt,
@@ -492,6 +521,10 @@ class ProspectDto {
                 other.lastOutcome,
                 other.lastComment,
                 other.lastAttemptAt,
+                other.lastCallOutcome,
+                other.lastCallAt,
+                other.lastCallById,
+                other.lastCallByName,
                 other.origin,
                 other.originLabel,
                 other.clientCreatedAt,
@@ -556,6 +589,10 @@ class ProspectDto {
         lastOutcome,
         lastComment,
         lastAttemptAt,
+        lastCallOutcome,
+        lastCallAt,
+        lastCallById,
+        lastCallByName,
         origin,
         originLabel,
         clientCreatedAt,

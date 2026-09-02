@@ -16,6 +16,8 @@ enum ProspectSortField {
   prenom(r'prenom'),
   @JsonValue(r'statut')
   statut(r'statut'),
+  @JsonValue(r'lastCallAt')
+  lastCallAt(r'lastCallAt'),
   @JsonValue(r'unknown_default_open_api')
   unknownDefaultOpenApi(r'unknown_default_open_api');
 

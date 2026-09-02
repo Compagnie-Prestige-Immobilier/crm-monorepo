@@ -168,6 +168,7 @@ export 'package:crm_api_client/src/model/lot_export_repartition_dto.dart';
 export 'package:crm_api_client/src/model/lot_export_repartition_jour_dto.dart';
 export 'package:crm_api_client/src/model/lot_export_summary_dto.dart';
 export 'package:crm_api_client/src/model/merge_prospects_dto.dart';
+export 'package:crm_api_client/src/model/mes_attributions_dto.dart';
 export 'package:crm_api_client/src/model/mode_epargne.dart';
 export 'package:crm_api_client/src/model/named_count_dto.dart';
 export 'package:crm_api_client/src/model/named_count_list_dto.dart';

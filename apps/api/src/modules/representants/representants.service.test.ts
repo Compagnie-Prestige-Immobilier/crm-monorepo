@@ -217,13 +217,13 @@ describe('filtre par état de relation', () => {
     (db.representant.findMany.mock.calls[0] as [{ where: Record<string, unknown> }])[0].where;
 
   it('ne retient que les fiches dans l’état demandé', async () => {
-    await service.list({ relationStatus: RepresentantRelation.AMBASSADEUR });
+    await service.list(ADMIN, { relationStatus: RepresentantRelation.AMBASSADEUR });
 
     expect(whereOf().relationStatus).toBe(RepresentantRelation.AMBASSADEUR);
   });
 
   it('ne filtre sur rien quand l’état n’est pas demandé', async () => {
-    await service.list({});
+    await service.list(ADMIN, {});
 
     expect(whereOf()).not.toHaveProperty('relationStatus');
   });
@@ -234,16 +234,67 @@ describe('filtre par état de relation', () => {
       relationStatus: RepresentantRelation.AMBASSADEUR,
     });
 
-    await expect(service.get('rep-9')).resolves.toMatchObject({
+    await expect(service.get(ADMIN, 'rep-9')).resolves.toMatchObject({
       relationStatus: RepresentantRelation.AMBASSADEUR,
     });
   });
 
-  it('le filtre ne rajoute AUCUN cloisonnement : l’annuaire est commun', async () => {
-    await service.list({ relationStatus: RepresentantRelation.AMBASSADEUR });
+  it('n’ajoute aucun cloisonnement pour l’encadrement', async () => {
+    await service.list(ADMIN, { relationStatus: RepresentantRelation.AMBASSADEUR });
 
     expect(whereOf()).toMatchObject({ relationStatus: RepresentantRelation.AMBASSADEUR });
-    expect(whereOf()).not.toHaveProperty('createdById');
+    expect(whereOf()).not.toHaveProperty('AND');
+  });
+});
+
+describe('périmètre par campagne', () => {
+  const whereOf = (): Record<string, unknown> =>
+    (db.representant.findMany.mock.calls[0] as [{ where: Record<string, unknown> }])[0].where;
+
+  it('un COMMERCIAL ne voit que ses fiches et celles qu’un lot lui confie', async () => {
+    await service.list(COMMERCIAL, {});
+
+    expect(whereOf().AND).toEqual([
+      {
+        OR: [{ createdById: COMMERCIAL.id }, { lotItems: { some: { assigneeId: COMMERCIAL.id } } }],
+      },
+    ]);
+  });
+
+  it('la recherche libre n’écrase pas le périmètre : les deux cohabitent', async () => {
+    await service.list(COMMERCIAL, { search: 'Fatou' });
+
+    expect(whereOf().AND).toBeDefined();
+    expect(whereOf().OR).toEqual([{ fullName: { contains: 'Fatou', mode: 'insensitive' } }]);
+  });
+
+  it('le SUPERVISEUR n’est borné par rien', async () => {
+    await service.list(
+      { ...COMMERCIAL, id: 'sup-1', role: Role.SUPERVISEUR },
+      { relationStatus: RepresentantRelation.AMBASSADEUR },
+    );
+
+    expect(whereOf()).not.toHaveProperty('AND');
+  });
+
+  it('un détail hors périmètre est INTROUVABLE, pas refusé', async () => {
+    db.representant.findFirst.mockResolvedValue(null);
+
+    await expect(service.get(COMMERCIAL, 'rep-9')).rejects.toBeInstanceOf(NotFoundException);
+    expect(
+      (db.representant.findFirst.mock.calls[0] as [{ where: Record<string, unknown> }])[0].where,
+    ).toMatchObject({
+      OR: [{ createdById: COMMERCIAL.id }, { lotItems: { some: { assigneeId: COMMERCIAL.id } } }],
+    });
+  });
+
+  it('le dédoublonnage par téléphone reste GLOBAL : sinon on ressaisit un doublon', async () => {
+    db.representant.findFirst.mockResolvedValue(foreignRow());
+
+    await expect(service.lookup('77 123 45 67')).resolves.toMatchObject({ found: true });
+    expect(
+      (db.representant.findFirst.mock.calls[0] as [{ where: Record<string, unknown> }])[0].where,
+    ).not.toHaveProperty('OR');
   });
 });
 
@@ -651,13 +702,14 @@ describe('lecture du SUPERVISEUR', () => {
     (db.representant.findMany.mock.calls[0] as [{ where: Record<string, unknown> }])[0].where;
 
   it('liste l’annuaire national', async () => {
-    await service.list({});
+    await service.list(SUPERVISEUR, {});
 
     expect(whereOf().createdById).toBeUndefined();
+    expect(whereOf()).not.toHaveProperty('AND');
   });
 
   it('son filtre par téléconseiller RÉPOND, au lieu de rendre zéro ligne', async () => {
-    await service.list({ commercialId: 'com-2' });
+    await service.list(SUPERVISEUR, { commercialId: 'com-2' });
 
     expect(whereOf().createdById).toBe('com-2');
   });
@@ -665,7 +717,7 @@ describe('lecture du SUPERVISEUR', () => {
   it('ouvre la fiche d’autrui, et son historique de relation', async () => {
     db.representant.findFirst.mockResolvedValue(foreignRow());
 
-    await expect(service.get('rep-9')).resolves.toMatchObject({ id: 'rep-9' });
+    await expect(service.get(SUPERVISEUR, 'rep-9')).resolves.toMatchObject({ id: 'rep-9' });
     await expect(service.relationHistory('rep-9')).resolves.toMatchObject({ items: [] });
   });
 
@@ -717,7 +769,7 @@ describe('WhatsApp et profession sur la fiche', () => {
     db.representant.findFirst.mockResolvedValue(
       own({ whatsappStatus: WhatsappStatus.MEME_NUMERO }),
     );
-    await expect(service.get('rep-9')).resolves.toMatchObject({
+    await expect(service.get(COMMERCIAL, 'rep-9')).resolves.toMatchObject({
       whatsappNumber: '+221771234567',
       whatsappE164: null,
     });
@@ -725,12 +777,12 @@ describe('WhatsApp et profession sur la fiche', () => {
     db.representant.findFirst.mockResolvedValue(
       own({ whatsappStatus: WhatsappStatus.AUTRE_NUMERO, whatsappE164: '+221780000001' }),
     );
-    await expect(service.get('rep-9')).resolves.toMatchObject({
+    await expect(service.get(COMMERCIAL, 'rep-9')).resolves.toMatchObject({
       whatsappNumber: '+221780000001',
     });
 
     db.representant.findFirst.mockResolvedValue(own({ whatsappStatus: WhatsappStatus.AUCUN }));
-    await expect(service.get('rep-9')).resolves.toMatchObject({
+    await expect(service.get(COMMERCIAL, 'rep-9')).resolves.toMatchObject({
       whatsappNumber: null,
       whatsappStatus: WhatsappStatus.AUCUN,
     });
@@ -786,32 +838,32 @@ describe('WhatsApp et profession sur la fiche', () => {
   });
 
   it('filtre sur un état WhatsApp précis', async () => {
-    await service.list({ whatsappStatus: WhatsappStatus.NON_DEMANDE });
+    await service.list(ADMIN, { whatsappStatus: WhatsappStatus.NON_DEMANDE });
 
     expect(whereOf().whatsappStatus).toEqual({ in: [WhatsappStatus.NON_DEMANDE] });
   });
 
   it('hasWhatsapp sépare les joignables de tous les autres, question non posée comprise', async () => {
-    await service.list({ hasWhatsapp: true });
+    await service.list(ADMIN, { hasWhatsapp: true });
     expect(whereOf().whatsappStatus).toEqual({
       in: [WhatsappStatus.MEME_NUMERO, WhatsappStatus.AUTRE_NUMERO],
     });
 
     db.representant.findMany.mockClear();
-    await service.list({ hasWhatsapp: false });
+    await service.list(ADMIN, { hasWhatsapp: false });
     expect(whereOf().whatsappStatus).toEqual({
       in: [WhatsappStatus.NON_DEMANDE, WhatsappStatus.AUCUN],
     });
   });
 
   it('les deux filtres se composent par intersection, aucun n’en écrase un autre', async () => {
-    await service.list({ hasWhatsapp: false, whatsappStatus: WhatsappStatus.AUCUN });
+    await service.list(ADMIN, { hasWhatsapp: false, whatsappStatus: WhatsappStatus.AUCUN });
 
     expect(whereOf().whatsappStatus).toEqual({ in: [WhatsappStatus.AUCUN] });
   });
 
   it('ne filtre sur rien quand aucun des deux n’est demandé', async () => {
-    await service.list({});
+    await service.list(ADMIN, {});
 
     expect(whereOf()).not.toHaveProperty('whatsappStatus');
   });

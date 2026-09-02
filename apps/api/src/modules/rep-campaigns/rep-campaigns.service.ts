@@ -4,6 +4,7 @@ import { ChangeSource, RepCallOutcome } from '@crm/database';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { type AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { normalizePhone } from '../../common/phone.js';
+import { attributionScope } from '../../common/scope.js';
 import { COMMENT_MAX_LENGTH } from '../phase2/attempt-rules.js';
 import { applyRelationChange } from '../representants/relation-change.js';
 import { resolveWhatsappPatch, type WhatsappPatch } from '../representants/whatsapp.js';
@@ -19,6 +20,7 @@ import {
   commentRequired,
   phoneConflict,
   promisedNotAllowed,
+  representantNotAssigned,
   representantNotFound,
 } from './errors.js';
 
@@ -42,7 +44,7 @@ export class RepCampaignsService {
     if (existing) return attemptResult(RepCallAttemptApplyStatus.DUPLICATE, existing.id, suggested);
 
     const representant = await this.prisma.representant.findFirst({
-      where: { id: body.representantId, deletedAt: null },
+      where: { id: body.representantId, deletedAt: null, ...attributionScope(user) },
       select: {
         id: true,
         relationStatus: true,
@@ -52,7 +54,7 @@ export class RepCampaignsService {
         lastCallAt: true,
       },
     });
-    if (!representant) throw representantNotFound();
+    if (!representant) throw await this.absent(body.representantId);
     const whatsapp = resolveWhatsappPatch(body, representant);
     // Normalisé hors transaction (opération pure) ; un numéro illisible refuse
     // la tentative entière, comme `suggestedPhone`.
@@ -119,6 +121,15 @@ export class RepCampaignsService {
       body.id,
       suggested,
     );
+  }
+
+  /** Seconde lecture, hors périmètre : « pas à vous » ne se confond pas avec « n'existe pas ». */
+  private async absent(representantId: string): Promise<Error> {
+    const ailleurs = await this.prisma.representant.findFirst({
+      where: { id: representantId, deletedAt: null },
+      select: { id: true },
+    });
+    return ailleurs ? representantNotAssigned() : representantNotFound();
   }
 
   private async resolveSuggested(

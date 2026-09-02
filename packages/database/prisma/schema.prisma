@@ -265,6 +265,7 @@ model User {
 
   repCallAttempts         RepCallAttempt[]         @relation("RepCallAttemptPerformedBy")
   representantsLastCalled Representant[]           @relation("RepresentantLastCallBy")
+  prospectsLastCalled     Prospect[]               @relation("ProspectLastCallBy")
   repSuggestions          RepresentantSuggestion[] @relation("RepresentantSuggestionSuggestedBy")
 
   // Banque & Finance
@@ -777,6 +778,14 @@ model Prospect {
   enrollmentCapturedById String?
   enrollmentCapturedBy   User?             @relation("ProspectEnrollmentCapturedBy", fields: [enrollmentCapturedById], references: [id], onDelete: SetNull)
 
+  /// Le DERNIER appel (par `clientCreatedAt`), recopié depuis `CallAttempt` pour
+  /// que « mes contacts » se filtre sur la fiche. Pas de `nextCallbackAt` ici :
+  /// les rappels prospects vivent dans `scheduled_callbacks`.
+  lastCallOutcome CallOutcome?
+  lastCallAt      DateTime?
+  lastCallById    String?
+  lastCallBy      User?        @relation("ProspectLastCallBy", fields: [lastCallById], references: [id], onDelete: Restrict)
+
   clientCreatedAt DateTime
 
   createdAt DateTime  @default(now())
@@ -825,6 +834,7 @@ model Prospect {
   // écrans CHUES appliquent systématiquement.
   @@index([projet])
   @@index([canalProvenanceId])
+  @@index([lastCallById, lastCallOutcome])
   @@map("prospects")
 }
 

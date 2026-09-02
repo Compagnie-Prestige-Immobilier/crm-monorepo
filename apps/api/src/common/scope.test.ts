@@ -2,7 +2,15 @@ import { ForbiddenException } from '@nestjs/common';
 import { Role } from '@crm/database';
 import { describe, expect, it } from 'vitest';
 
-import { assertOwnership, assertReadable, isAdmin, ownerScope, readScope } from './scope.js';
+import {
+  assertOwnership,
+  assertReadable,
+  attributionScope,
+  isAdmin,
+  ownerScope,
+  prospectSyncScope,
+  readScope,
+} from './scope.js';
 
 const admin = { id: 'admin-1', role: Role.ADMIN };
 const alice = { id: 'com-alice', role: Role.COMMERCIAL };
@@ -35,6 +43,23 @@ describe('readScope', () => {
 
   it('laisse un téléconseiller borné à ses propres lignes', () => {
     expect(readScope(alice)).toEqual({ createdById: 'com-alice' });
+  });
+});
+
+describe('attributionScope', () => {
+  it('borne un COMMERCIAL à ses fiches ET à ses attributions de lot', () => {
+    expect(attributionScope(alice)).toEqual({
+      OR: [{ createdById: 'com-alice' }, { lotItems: { some: { assigneeId: 'com-alice' } } }],
+    });
+  });
+
+  it('n’ajoute rien pour l’encadrement', () => {
+    expect(attributionScope(admin)).toEqual({});
+    expect(attributionScope(superviseur)).toEqual({});
+  });
+
+  it('le tirage mobile reste GLOBAL : c’est le téléphone qui filtre', () => {
+    expect(prospectSyncScope(alice)).toEqual({});
   });
 });
 

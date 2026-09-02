@@ -67,11 +67,16 @@ export class RepresentantsController {
   @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiOperation({
     operationId: 'listRepresentants',
-    summary: 'Liste paginée de l’annuaire, commun à tous les téléconseillers.',
+    summary: 'Liste paginée de l’annuaire, borné aux campagnes de l’appelant.',
+    description:
+      'Un COMMERCIAL ne voit que les représentants qu’il a créés ou qui lui sont attribués dans un lot d’export. ADMIN, SUPERVISEUR et DIRECTION voient tout.',
   })
   @ApiResponse({ status: 200, type: RepresentantListDto })
-  list(@Query() query: RepresentantQueryDto): Promise<RepresentantListDto> {
-    return this.representants.list(query);
+  list(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: RepresentantQueryDto,
+  ): Promise<RepresentantListDto> {
+    return this.representants.list(user, query);
   }
 
   @Get('lookup')
@@ -130,8 +135,11 @@ export class RepresentantsController {
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, type: RepresentantDto })
   @ApiResponse({ status: 404, type: ApiErrorDto, description: 'REPRESENTANT_NOT_FOUND.' })
-  get(@Param('id', ParseUUIDPipe) id: string): Promise<RepresentantDto> {
-    return this.representants.get(id);
+  get(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<RepresentantDto> {
+    return this.representants.get(user, id);
   }
 
   @Post()
