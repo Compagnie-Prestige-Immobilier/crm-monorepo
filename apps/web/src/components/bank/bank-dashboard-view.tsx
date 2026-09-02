@@ -29,17 +29,18 @@ import { EmptyChart } from '@/components/dashboard/empty-chart';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { bankBasePath } from '@/lib/bank-filters';
 import { fetchBankAnalytics } from '@/lib/data/bank-cases';
 import { formatDecimal, formatNumber } from '@/lib/format';
 import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
 import { ExactAmountsToggle, MoneyText } from '@/components/money/exact-amounts';
 import { formatXof } from '@/lib/money';
 import { queryKeys } from '@/lib/query-keys';
-import type { FilterOption } from '@/lib/types';
+import type { FilterOption, Projet } from '@/lib/types';
 
-export function BankDashboardView() {
+export function BankDashboardView({ projet }: { projet: Projet }) {
   const router = useRouter();
-  const { filters, hrefWith } = useBankFilters();
+  const { filters, hrefWith } = useBankFilters(projet);
   const live = useLive();
 
   const { data, isPending, isError, error, refetch, dataUpdatedAt } = useQuery({
@@ -54,7 +55,7 @@ export function BankDashboardView() {
   const drillTo =
     (patch: Parameters<typeof hrefWith>[0]): (() => void) =>
     () => {
-      router.push(hrefWith(patch, '/chues/dossiers'));
+      router.push(hrefWith(patch, `${bankBasePath(projet)}/dossiers`));
     };
 
   const agentOptions: FilterOption[] = (data?.byAgent ?? []).map((agent) => ({

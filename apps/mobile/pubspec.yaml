@@ -71,6 +71,12 @@ dependencies:
   android_intent_plus: ^6.0.0
   uuid: ^4.6.0
   intl: ^0.20.2
+  # Numéros étrangers de la diaspora. Parseur PUR DART (dépend du seul `meta`) :
+  # aucun natif à construire, et rien de Material à mélanger au thème ForUI.
+  # `phone_form_field` livre un widget complet mais Material, incompatible avec
+  # le kit maison ; ce paquet ne fournit que le plan de numérotation, ce qui
+  # manquait à `core/utils/phone.dart`.
+  phone_numbers_parser: ^9.0.26
   path: ^1.9.0
   path_provider: ^2.1.5
   shared_preferences: ^2.5.0

@@ -4,8 +4,10 @@
 
 // ignore_for_file: unused_element
 import 'package:crm_api_client/src/model/departement_dto.dart';
+import 'package:crm_api_client/src/model/pays_dto.dart';
 import 'package:crm_api_client/src/model/profession_dto.dart';
 import 'package:crm_api_client/src/model/income_band_dto.dart';
+import 'package:crm_api_client/src/model/employeur_dto.dart';
 import 'package:crm_api_client/src/model/syndicat_dto.dart';
 import 'package:crm_api_client/src/model/offer_dto.dart';
 import 'package:crm_api_client/src/model/region_dto.dart';
@@ -39,6 +41,10 @@ class ReferentielsBundleDto {
     required this.incomeBands,
 
     required this.offers,
+
+    required this.employeurs,
+
+    required this.pays,
   });
 
   @JsonKey(name: r'banques', required: true, includeIfNull: false)
@@ -62,6 +68,12 @@ class ReferentielsBundleDto {
   @JsonKey(name: r'offers', required: true, includeIfNull: false)
   final List<OfferDto> offers;
 
+  @JsonKey(name: r'employeurs', required: true, includeIfNull: false)
+  final List<EmployeurDto> employeurs;
+
+  @JsonKey(name: r'pays', required: true, includeIfNull: false)
+  final List<PaysDto> pays;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is ReferentielsBundleDto &&
@@ -75,6 +87,8 @@ class ReferentielsBundleDto {
                 professions,
                 incomeBands,
                 offers,
+                employeurs,
+                pays,
               ],
               [
                 other.banques,
@@ -84,6 +98,8 @@ class ReferentielsBundleDto {
                 other.professions,
                 other.incomeBands,
                 other.offers,
+                other.employeurs,
+                other.pays,
               ],
             );
   }
@@ -99,6 +115,8 @@ class ReferentielsBundleDto {
         professions,
         incomeBands,
         offers,
+        employeurs,
+        pays,
       ]);
 
   factory ReferentielsBundleDto.fromJson(Map<String, dynamic> json) =>

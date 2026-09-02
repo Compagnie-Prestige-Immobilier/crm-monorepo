@@ -26,11 +26,13 @@ import { ValidatorConstraint } from 'class-validator';
 import {
   CallOutcome,
   EnrollmentMethod,
+  ModeEpargne,
   PaymentMode,
   Projet,
   ProspectStatut,
   ProspectType,
   RepresentantRelation,
+  TypeContrat,
   WhatsappStatus,
 } from '@crm/database';
 
@@ -38,15 +40,20 @@ import {
   BanqueDto,
   CanalProvenanceDto,
   DepartementDto,
+  EmployeurDto,
   IefDto,
   IncomeBandDto,
+  PaysDto,
   SyndicatDto,
 } from '../referentiels/dto.js';
 import {
   DUREE_ETABLISSEMENT_MAX_MOIS as PHASE2_DUREE_ETABLISSEMENT_MAX_MOIS,
   EMAIL_MAX_LENGTH as PHASE2_EMAIL_MAX_LENGTH,
 } from '../phase2/attempt-rules.js';
-import { ProspectDto } from '../prospects/dto.js';
+import {
+  ANCIENNETE_MAX_MOIS as PROSPECT_ANCIENNETE_MAX_MOIS,
+  ProspectDto,
+} from '../prospects/dto.js';
 import { RepresentantDto } from '../representants/dto.js';
 import {
   DATE_PATTERN as VISITE_DATE_PATTERN,
@@ -196,7 +203,9 @@ export class SyncEntityDataDto {
 
   @ApiPropertyOptional({
     maxLength: 40,
-    description: 'Représentant : numéro WhatsApp, seulement si le statut vaut AUTRE_NUMERO.',
+    description:
+      'Représentant : numéro WhatsApp, seulement si le statut vaut AUTRE_NUMERO. ' +
+      'Prospect de la diaspora : numéro WhatsApp, souvent le seul joignable.',
   })
   @IsOptional()
   @IsString()
@@ -323,6 +332,87 @@ export class SyncEntityDataDto {
   @IsOptional()
   @IsEnum(PaymentMode)
   paymentMode?: PaymentMode;
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Prospect : employeur du référentiel. Fonctionnaire (ministère) ou privé.',
+  })
+  @IsOptional()
+  @IsUUID()
+  employeurId?: string;
+
+  @ApiPropertyOptional({ maxLength: 160, description: 'Prospect : employeur en clair.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  employeur?: string;
+
+  @ApiPropertyOptional({
+    enum: TypeContrat,
+    enumName: 'TypeContrat',
+    description: 'Prospect du secteur privé : nature du contrat.',
+  })
+  @IsOptional()
+  @IsEnum(TypeContrat)
+  typeContrat?: TypeContrat;
+
+  @ApiPropertyOptional({
+    type: Number,
+    minimum: 0,
+    maximum: PROSPECT_ANCIENNETE_MAX_MOIS,
+    description:
+      'Prospect : ancienneté chez l’employeur, en MOIS. Distincte de `dureeSystemeMois`.',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(PROSPECT_ANCIENNETE_MAX_MOIS)
+  ancienneteMois?: number;
+
+  @ApiPropertyOptional({ maxLength: 160, description: 'Prospect informel : lieu d’activité.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  lieuActivite?: string;
+
+  @ApiPropertyOptional({
+    enum: ModeEpargne,
+    enumName: 'ModeEpargne',
+    description: 'Prospect informel : comment il épargne.',
+  })
+  @IsOptional()
+  @IsEnum(ModeEpargne)
+  modeEpargne?: ModeEpargne;
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Prospect diaspora : pays de résidence.' })
+  @IsOptional()
+  @IsUUID()
+  paysResidenceId?: string;
+
+  @ApiPropertyOptional({ maxLength: 120, description: 'Prospect diaspora : ville de résidence.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  villeResidence?: string;
+
+  @ApiPropertyOptional({
+    maxLength: 160,
+    description: 'Prospect diaspora : personne relais au Sénégal.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  relaisNom?: string;
+
+  @ApiPropertyOptional({
+    maxLength: 40,
+    description: 'Prospect diaspora : téléphone du relais, normalisé en E.164 par le serveur.',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(6)
+  @MaxLength(40)
+  relaisPhoneE164?: string;
 
   @ApiPropertyOptional({ format: 'date-time', description: 'Horodatage de la saisie terrain.' })
   @IsOptional()
@@ -767,6 +857,12 @@ export class SyncChangesDto {
   })
   incomeBands!: IncomeBandDto[];
   @ApiProperty({ type: () => [CanalProvenanceDto] }) canauxProvenance!: CanalProvenanceDto[];
+  @ApiProperty({
+    type: () => [EmployeurDto],
+    description: 'Employeurs : la situation du Grand Public se saisit hors réseau.',
+  })
+  employeurs!: EmployeurDto[];
+  @ApiProperty({ type: () => [PaysDto] }) pays!: PaysDto[];
 
   @ApiProperty({
     type: () => [SyncVisiteReferentielDto],

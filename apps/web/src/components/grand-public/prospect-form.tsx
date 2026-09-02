@@ -11,6 +11,7 @@ import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { Field } from '@/components/forms/field';
 import {
   InternationalPhoneField,
+  callingCountriesFrom,
   toInternationalE164,
 } from '@/components/forms/international-phone-field';
 import { Button } from '@/components/ui/button';
@@ -40,9 +41,98 @@ import { fetchReferenceData } from '@/lib/data/reference';
 import { formatDateTime } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
-import type { PaymentMode } from '@/lib/types';
+import {
+  MODE_EPARGNE_LABELS,
+  TYPE_CONTRAT_LABELS,
+  type ModeEpargne,
+  type PaymentMode,
+  type ReferenceData,
+  type TypeContrat,
+} from '@/lib/types';
 
-type Errors = Partial<Record<'prenom' | 'nom' | 'phone' | 'banqueId', string>>;
+type Errors = Partial<Record<'prenom' | 'nom' | 'phone', string>>;
+
+type Champ =
+  | 'employeur'
+  | 'contrat'
+  | 'anciennete'
+  | 'banque'
+  | 'syndicat'
+  | 'lieu'
+  | 'epargne'
+  | 'pays'
+  | 'whatsapp'
+  | 'relais';
+
+/**
+ * Ce que chaque situation demande, en plus de l'identité, de la profession, du
+ * revenu et de la provenance. La MÊME table commande l'affichage et le vidage :
+ * un champ montré ailleurs partirait sinon avec la fiche suivante.
+ */
+const CHAMPS: Record<ProspectType, readonly Champ[]> = {
+  FONCTIONNAIRE: ['employeur', 'syndicat', 'banque', 'anciennete'],
+  SECTEUR_PRIVE: ['employeur', 'contrat', 'banque', 'anciennete'],
+  INFORMEL: ['lieu', 'epargne'],
+  DIASPORA: ['pays', 'whatsapp', 'relais', 'banque'],
+};
+
+interface Situation {
+  employeurId: string | null;
+  employeur: string;
+  typeContrat: TypeContrat | null;
+  ancienneteMois: string;
+  lieuActivite: string;
+  modeEpargne: ModeEpargne | null;
+  paysResidenceId: string | null;
+  villeResidence: string;
+  whatsapp: string;
+  relaisNom: string;
+  relaisPhone: string;
+  banqueId: string | null;
+  syndicatId: string | null;
+}
+
+const SITUATION_VIDE: Situation = {
+  employeurId: null,
+  employeur: '',
+  typeContrat: null,
+  ancienneteMois: '',
+  lieuActivite: '',
+  modeEpargne: null,
+  paysResidenceId: null,
+  villeResidence: '',
+  whatsapp: '',
+  relaisNom: '',
+  relaisPhone: '',
+  banqueId: null,
+  syndicatId: null,
+};
+
+const montre = (type: ProspectType | null, champ: Champ): boolean =>
+  type !== null && CHAMPS[type].includes(champ);
+
+/** Ne garde que ce que la nouvelle situation demande. */
+function pourSituation(type: ProspectType | null, actuel: Situation): Situation {
+  const garde = (champ: Champ): boolean => montre(type, champ);
+  return {
+    employeurId: garde('employeur') ? actuel.employeurId : null,
+    employeur: garde('employeur') ? actuel.employeur : '',
+    typeContrat: garde('contrat') ? actuel.typeContrat : null,
+    ancienneteMois: garde('anciennete') ? actuel.ancienneteMois : '',
+    lieuActivite: garde('lieu') ? actuel.lieuActivite : '',
+    modeEpargne: garde('epargne') ? actuel.modeEpargne : null,
+    paysResidenceId: garde('pays') ? actuel.paysResidenceId : null,
+    villeResidence: garde('pays') ? actuel.villeResidence : '',
+    whatsapp: garde('whatsapp') ? actuel.whatsapp : '',
+    relaisNom: garde('relais') ? actuel.relaisNom : '',
+    relaisPhone: garde('relais') ? actuel.relaisPhone : '',
+    banqueId: garde('banque') ? actuel.banqueId : null,
+    syndicatId: garde('syndicat') ? actuel.syndicatId : null,
+  };
+}
+
+const actives = <T extends { isActive: boolean }>(items: readonly T[] | undefined): T[] =>
+  (items ?? []).filter((item) => item.isActive);
 
 export function GrandPublicProspectForm({
   embedded = false,
@@ -59,12 +149,12 @@ export function GrandPublicProspectForm({
   const [nom, setNom] = useState('');
   const [phone, setPhone] = useState('');
   const [callingCode, setCallingCode] = useState('221');
+  const [whatsappCode, setWhatsappCode] = useState('221');
   const [professionId, setProfessionId] = useState<string | null>(null);
   const [incomeBandId, setIncomeBandId] = useState<string | null>(null);
   const [paymentMode, setPaymentMode] = useState<PaymentMode | null>(null);
   const [type, setType] = useState<ProspectType | null>(null);
-  const [banqueId, setBanqueId] = useState<string | null>(null);
-  const [syndicatId, setSyndicatId] = useState<string | null>(null);
+  const [situation, setSituation] = useState<Situation>(SITUATION_VIDE);
   const [dureeMois, setDureeMois] = useState<number | null>(null);
   const [canalId, setCanalId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Errors>({});
@@ -109,8 +199,7 @@ export function GrandPublicProspectForm({
       setProfessionId(null);
       setIncomeBandId(null);
       setType(null);
-      setBanqueId(null);
-      setSyndicatId(null);
+      setSituation(SITUATION_VIDE);
       setErrors({});
       prenomRef.current?.focus();
     },
@@ -133,25 +222,39 @@ export function GrandPublicProspectForm({
     if (nom.trim() === '') found.nom = 'Le nom est obligatoire.';
     if (phone.trim() === '') found.phone = 'Le numéro est obligatoire.';
     else if (e164 === null) found.phone = 'Numéro invalide pour le pays choisi.';
-    if (type === 'FONCTIONNAIRE' && banqueId === null) {
-      found.banqueId = 'Choisissez la banque de domiciliation.';
-    }
 
     setErrors(found);
     if (e164 === null || Object.keys(found).length > 0) return;
 
     setConflict(null);
     const input: GrandPublicProspectInput = { prenom: prenom.trim(), nom: nom.trim(), phone: e164 };
-    if (professionId !== null) input.professionId = professionId;
-    if (incomeBandId !== null) input.incomeBandId = incomeBandId;
-    if (paymentMode !== null) input.paymentMode = paymentMode;
-    if (type !== null) input.type = type;
-    if ((type === 'FONCTIONNAIRE' || type === 'SECTEUR_PRIVE') && banqueId !== null) {
-      input.banqueId = banqueId;
-    }
-    if (type === 'FONCTIONNAIRE' && syndicatId !== null) input.syndicatId = syndicatId;
-    if (paymentMode === 'ECHELONNE' && dureeMois !== null) input.dureeSystemeMois = dureeMois;
-    if (canalId !== null) input.canalProvenanceId = canalId;
+    const pose = <K extends keyof GrandPublicProspectInput>(
+      cle: K,
+      valeur: GrandPublicProspectInput[K] | null | undefined,
+    ): void => {
+      if (valeur !== null && valeur !== undefined && valeur !== '') input[cle] = valeur;
+    };
+
+    pose('professionId', professionId);
+    pose('incomeBandId', incomeBandId);
+    pose('paymentMode', paymentMode);
+    pose('type', type);
+    pose('canalProvenanceId', canalId);
+    pose('dureeSystemeMois', paymentMode === 'ECHELONNE' ? dureeMois : null);
+    pose('banqueId', situation.banqueId);
+    pose('syndicatId', situation.syndicatId);
+    pose('employeurId', situation.employeurId);
+    pose('employeur', situation.employeur.trim());
+    pose('typeContrat', situation.typeContrat);
+    pose('ancienneteMois', anciennete(situation.ancienneteMois));
+    pose('lieuActivite', situation.lieuActivite.trim());
+    pose('modeEpargne', situation.modeEpargne);
+    pose('paysResidenceId', situation.paysResidenceId);
+    pose('villeResidence', situation.villeResidence.trim());
+    pose('whatsappE164', toInternationalE164(situation.whatsapp, whatsappCode));
+    pose('relaisNom', situation.relaisNom.trim());
+    // Le relais est AU SÉNÉGAL : son numéro ne suit pas le pays de résidence.
+    pose('relaisPhoneE164', toInternationalE164(situation.relaisPhone, '221'));
 
     save.mutate({ input, andNext });
   }
@@ -159,10 +262,10 @@ export function GrandPublicProspectForm({
   const last = saved.at(-1);
   const plural = saved.length > 1 ? 's' : '';
   const searchHref = `/grand-public?search=${encodeURIComponent(toInternationalE164(phone, callingCode) ?? phone)}`;
-  const selectedProfession = reference.data?.professions.find(
-    (profession) => profession.id === professionId,
-  );
-  const salaried = type === 'FONCTIONNAIRE' || type === 'SECTEUR_PRIVE';
+  const paysCountries = callingCountriesFrom(reference.data?.pays ?? []);
+  const enseignante =
+    reference.data?.professions.find((profession) => profession.id === professionId)?.isTeaching ===
+    true;
 
   return (
     <form
@@ -224,6 +327,7 @@ export function GrandPublicProspectForm({
         value={phone}
         callingCode={callingCode}
         error={errors.phone}
+        countries={type === 'DIASPORA' ? paysCountries : undefined}
         onCallingCodeChange={setCallingCode}
         onChange={(value) => {
           setPhone(value);
@@ -273,8 +377,13 @@ export function GrandPublicProspectForm({
                   const next = active ? null : option;
                   setType(next);
                   setErrors({});
-                  if (next !== 'FONCTIONNAIRE' && next !== 'SECTEUR_PRIVE') setBanqueId(null);
-                  if (next !== 'FONCTIONNAIRE') setSyndicatId(null);
+                  setSituation((previous) => pourSituation(next, previous));
+                  // L'indicatif venait du pays de résidence : hors diaspora, il
+                  // repart du Sénégal plutôt que de suivre une fiche abandonnée.
+                  if (type === 'DIASPORA' && next !== 'DIASPORA') {
+                    setCallingCode('221');
+                    setWhatsappCode('221');
+                  }
                 }}
               >
                 {PROSPECT_TYPE_LABELS[option]}
@@ -288,58 +397,45 @@ export function GrandPublicProspectForm({
         label={type === 'INFORMEL' ? 'Activité' : 'Profession'}
         placeholder="Rechercher une profession"
         value={professionId}
-        options={(reference.data?.professions ?? [])
-          .filter((profession) => profession.isActive)
-          .map((profession) => ({ value: profession.id, label: profession.label }))}
+        options={actives(reference.data?.professions).map((profession) => ({
+          value: profession.id,
+          label: profession.label,
+        }))}
         onChange={(value) => {
           setProfessionId(value);
           const profession = reference.data?.professions.find((item) => item.id === value);
-          if (profession?.isTeaching !== true) setSyndicatId(null);
+          if (profession?.isTeaching !== true) {
+            setSituation((previous) => ({ ...previous, syndicatId: null }));
+          }
         }}
       />
 
-      {salaried ? (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <FilterCombobox
-            label="Banque de domiciliation"
-            placeholder="Choisir une banque"
-            value={banqueId}
-            options={(reference.data?.banques ?? [])
-              .filter((banque) => banque.isActive)
-              .map((banque) => ({ value: banque.id, label: banque.name, hint: banque.shortName }))}
-            onChange={setBanqueId}
-          />
-          {errors.banqueId ? (
-            <p role="alert" className="text-[0.75rem] text-destructive">
-              {errors.banqueId}
-            </p>
-          ) : null}
-          {type === 'FONCTIONNAIRE' && selectedProfession?.isTeaching ? (
-            <FilterCombobox
-              label="Syndicat"
-              placeholder="Choisir un syndicat"
-              value={syndicatId}
-              options={(reference.data?.syndicats ?? [])
-                .filter((syndicat) => syndicat.isActive)
-                .map((syndicat) => ({
-                  value: syndicat.id,
-                  label: syndicat.name,
-                  hint: syndicat.sigle,
-                }))}
-              onChange={setSyndicatId}
-            />
-          ) : null}
-        </div>
-      ) : null}
+      <ChampsSituation
+        type={type}
+        valeurs={situation}
+        reference={reference.data}
+        enseignante={enseignante}
+        paysCountries={paysCountries}
+        whatsappCode={whatsappCode}
+        onWhatsappCode={setWhatsappCode}
+        onIndicatifResidence={(indicatif) => {
+          setCallingCode(indicatif);
+          setWhatsappCode(indicatif);
+        }}
+        onPatch={(patch) => {
+          setSituation((previous) => ({ ...previous, ...patch }));
+        }}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <FilterCombobox
           label="Revenu mensuel"
           placeholder="Choisir une tranche"
           value={incomeBandId}
-          options={(reference.data?.incomeBands ?? [])
-            .filter((band) => band.isActive)
-            .map((band) => ({ value: band.id, label: band.label }))}
+          options={actives(reference.data?.incomeBands).map((band) => ({
+            value: band.id,
+            label: band.label,
+          }))}
           onChange={setIncomeBandId}
         />
         <div className="flex min-w-0 flex-col gap-1.5">
@@ -388,9 +484,7 @@ export function GrandPublicProspectForm({
           label="Canal de provenance"
           placeholder="Choisir un canal"
           value={canalId}
-          options={(canaux.data ?? [])
-            .filter((canal) => canal.isActive)
-            .map((canal) => ({ value: canal.id, label: canal.label }))}
+          options={actives(canaux.data).map((canal) => ({ value: canal.id, label: canal.label }))}
           onChange={setCanalId}
         />
       </div>
@@ -424,5 +518,281 @@ export function GrandPublicProspectForm({
         </Button>
       </div>
     </form>
+  );
+}
+
+/** Un entier de mois, ou `null` : le serveur refuse tout le reste. */
+function anciennete(saisie: string): number | null {
+  const valeur = Number(saisie.trim());
+  if (saisie.trim() === '' || !Number.isInteger(valeur) || valeur < 0 || valeur > 840) return null;
+  return valeur;
+}
+
+function ChampsSituation({
+  type,
+  valeurs,
+  reference,
+  enseignante,
+  paysCountries,
+  whatsappCode,
+  onWhatsappCode,
+  onIndicatifResidence,
+  onPatch,
+}: {
+  type: ProspectType | null;
+  valeurs: Situation;
+  reference: ReferenceData | undefined;
+  enseignante: boolean;
+  paysCountries: readonly { code: string; label: string }[];
+  whatsappCode: string;
+  onWhatsappCode: (value: string) => void;
+  onIndicatifResidence: (indicatif: string) => void;
+  onPatch: (patch: Partial<Situation>) => void;
+}) {
+  if (type === null) return null;
+
+  return (
+    <div className="flex flex-col gap-4">
+      {montre(type, 'employeur') ? (
+        <ChampEmployeur type={type} valeurs={valeurs} reference={reference} onPatch={onPatch} />
+      ) : null}
+
+      {montre(type, 'contrat') ? (
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <Label htmlFor="gp-contrat">Type de contrat</Label>
+          <Select
+            value={valeurs.typeContrat ?? ''}
+            onValueChange={(value) => {
+              onPatch({
+                typeContrat: value === '' || value === null ? null : (value as TypeContrat),
+              });
+            }}
+          >
+            <SelectTrigger id="gp-contrat">
+              <SelectValue placeholder="Choisir un contrat" />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(TYPE_CONTRAT_LABELS).map(([valeur, libelle]) => (
+                <SelectItem key={valeur} value={valeur}>
+                  {libelle}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
+
+      {montre(type, 'banque') ? (
+        <FilterCombobox
+          label={type === 'DIASPORA' ? 'Banque au Sénégal' : 'Banque de domiciliation'}
+          placeholder="Choisir une banque"
+          value={valeurs.banqueId}
+          options={actives(reference?.banques).map((banque) => ({
+            value: banque.id,
+            label: banque.name,
+            hint: banque.shortName,
+          }))}
+          onChange={(banqueId) => {
+            onPatch({ banqueId });
+          }}
+        />
+      ) : null}
+
+      {montre(type, 'syndicat') && enseignante ? (
+        <FilterCombobox
+          label="Syndicat"
+          placeholder="Choisir un syndicat"
+          value={valeurs.syndicatId}
+          options={actives(reference?.syndicats).map((syndicat) => ({
+            value: syndicat.id,
+            label: syndicat.name,
+            hint: syndicat.sigle,
+          }))}
+          onChange={(syndicatId) => {
+            onPatch({ syndicatId });
+          }}
+        />
+      ) : null}
+
+      {montre(type, 'anciennete') ? (
+        <Field label="Ancienneté (mois)" description="Chez l’employeur actuel.">
+          {(props) => (
+            <Input
+              {...props}
+              type="number"
+              min="0"
+              max="840"
+              inputMode="numeric"
+              value={valeurs.ancienneteMois}
+              onChange={(event) => {
+                onPatch({ ancienneteMois: event.target.value });
+              }}
+            />
+          )}
+        </Field>
+      ) : null}
+
+      {montre(type, 'lieu') ? (
+        <Field label="Lieu d’activité">
+          {(props) => (
+            <Input
+              {...props}
+              value={valeurs.lieuActivite}
+              maxLength={160}
+              onChange={(event) => {
+                onPatch({ lieuActivite: event.target.value });
+              }}
+            />
+          )}
+        </Field>
+      ) : null}
+
+      {montre(type, 'epargne') ? (
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <Label htmlFor="gp-epargne">Mode d’épargne</Label>
+          <Select
+            value={valeurs.modeEpargne ?? ''}
+            onValueChange={(value) => {
+              onPatch({
+                modeEpargne: value === '' || value === null ? null : (value as ModeEpargne),
+              });
+            }}
+          >
+            <SelectTrigger id="gp-epargne">
+              <SelectValue placeholder="Choisir un mode" />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(MODE_EPARGNE_LABELS).map(([valeur, libelle]) => (
+                <SelectItem key={valeur} value={valeur}>
+                  {libelle}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
+
+      {montre(type, 'pays') ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FilterCombobox
+            label="Pays de résidence"
+            placeholder="Choisir un pays"
+            value={valeurs.paysResidenceId}
+            options={actives(reference?.pays).map((pays) => ({
+              value: pays.id,
+              label: pays.label,
+              hint: `+${pays.indicatif}`,
+            }))}
+            onChange={(paysResidenceId) => {
+              onPatch({ paysResidenceId });
+              const choisi = reference?.pays.find((pays) => pays.id === paysResidenceId);
+              if (choisi !== undefined) onIndicatifResidence(choisi.indicatif);
+            }}
+          />
+          <Field label="Ville de résidence">
+            {(props) => (
+              <Input
+                {...props}
+                value={valeurs.villeResidence}
+                maxLength={120}
+                onChange={(event) => {
+                  onPatch({ villeResidence: event.target.value });
+                }}
+              />
+            )}
+          </Field>
+        </div>
+      ) : null}
+
+      {montre(type, 'whatsapp') ? (
+        <InternationalPhoneField
+          label="WhatsApp"
+          countryLabel="Pays WhatsApp"
+          description="Laissez vide s’il est identique au téléphone."
+          required={false}
+          placeholder="6 12 34 56 78"
+          countries={paysCountries}
+          value={valeurs.whatsapp}
+          callingCode={whatsappCode}
+          onCallingCodeChange={onWhatsappCode}
+          onChange={(whatsapp) => {
+            onPatch({ whatsapp });
+          }}
+        />
+      ) : null}
+
+      {montre(type, 'relais') ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Personne relais au Sénégal">
+            {(props) => (
+              <Input
+                {...props}
+                value={valeurs.relaisNom}
+                maxLength={160}
+                onChange={(event) => {
+                  onPatch({ relaisNom: event.target.value });
+                }}
+              />
+            )}
+          </Field>
+          <Field label="Téléphone du relais">
+            {(props) => (
+              <Input
+                {...props}
+                value={valeurs.relaisPhone}
+                maxLength={40}
+                inputMode="tel"
+                placeholder="77 123 45 67"
+                onChange={(event) => {
+                  onPatch({ relaisPhone: event.target.value });
+                }}
+              />
+            )}
+          </Field>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Référentiel d'abord, saisie libre ensuite : « Créer » retient le texte tapé
+ * dans `employeur`, que le serveur garde tel quel faute d'entrée de référence.
+ */
+function ChampEmployeur({
+  type,
+  valeurs,
+  reference,
+  onPatch,
+}: {
+  type: ProspectType;
+  valeurs: Situation;
+  reference: ReferenceData | undefined;
+  onPatch: (patch: Partial<Situation>) => void;
+}) {
+  const attendu = type === 'FONCTIONNAIRE' ? 'MINISTERE' : 'ENTREPRISE';
+  const options = actives(reference?.employeurs)
+    .filter((employeur) => employeur.type === attendu)
+    .map((employeur) => ({ value: employeur.id, label: employeur.label }));
+
+  const libre = valeurs.employeur.trim() !== '' && valeurs.employeurId === null;
+
+  return (
+    <FilterCombobox
+      label={type === 'FONCTIONNAIRE' ? 'Ministère ou structure' : 'Employeur'}
+      placeholder="Rechercher ou saisir"
+      value={libre ? '__libre__' : valeurs.employeurId}
+      options={
+        libre
+          ? [{ value: '__libre__', label: valeurs.employeur, hint: 'Saisi à la main' }, ...options]
+          : options
+      }
+      onChange={(value) => {
+        onPatch({ employeurId: value === '__libre__' ? null : value, employeur: '' });
+      }}
+      onCreate={(texte) => {
+        onPatch({ employeurId: null, employeur: texte.slice(0, 160) });
+      }}
+    />
   );
 }

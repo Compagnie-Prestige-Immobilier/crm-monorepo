@@ -919,6 +919,7 @@ export class SyncService {
             canalProvenanceId: data.canalProvenanceId,
             statut: data.statut,
           }),
+          ...situationGrandPublic(data),
           clientCreatedAt: clientDate(data.clientCreatedAt, operation.clientUpdatedAt),
         },
         update: {
@@ -936,6 +937,7 @@ export class SyncService {
             canalProvenanceId: data.canalProvenanceId,
             statut: data.statut,
           }),
+          ...situationGrandPublic(data),
           deletedAt: null,
           rev: { increment: 1 },
         },
@@ -978,6 +980,7 @@ export class SyncService {
           canalProvenanceId: data.canalProvenanceId,
           statut: data.statut,
         }),
+        ...situationGrandPublic(data),
         rev: { increment: 1 },
       },
     });
@@ -1047,6 +1050,24 @@ export class SyncService {
     });
     cursor = advance(cursor, 'canauxProvenance', lastPosition(canauxProvenance));
     pageLengths.push(canauxProvenance.length);
+
+    // Employeurs et pays suivent le canal de provenance : la situation du Grand
+    // Public se saisit hors réseau, et sans eux le sélecteur est vide.
+    const employeurs = await this.prisma.employeur.findMany({
+      where: keyset(cursor.streams.employeurs, safeNow),
+      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+    });
+    cursor = advance(cursor, 'employeurs', lastPosition(employeurs));
+    pageLengths.push(employeurs.length);
+
+    const pays = await this.prisma.pays.findMany({
+      where: keyset(cursor.streams.pays, safeNow),
+      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+    });
+    cursor = advance(cursor, 'pays', lastPosition(pays));
+    pageLengths.push(pays.length);
 
     // Les quatre listes du registre. Sans elles en local, l'accueil ne pouvait
     // pas inscrire un visiteur hors réseau : la lecture du registre tenait, sa
@@ -1197,6 +1218,24 @@ export class SyncService {
           id: row.id,
           code: row.code,
           label: row.label,
+          position: row.position,
+          isActive: row.isActive,
+          updatedAt: row.updatedAt.toISOString(),
+        })),
+        employeurs: employeurs.map((row) => ({
+          id: row.id,
+          code: row.code,
+          label: row.label,
+          type: row.type,
+          position: row.position,
+          isActive: row.isActive,
+          updatedAt: row.updatedAt.toISOString(),
+        })),
+        pays: pays.map((row) => ({
+          id: row.id,
+          code: row.code,
+          label: row.label,
+          indicatif: row.indicatif,
           position: row.position,
           isActive: row.isActive,
           updatedAt: row.updatedAt.toISOString(),
@@ -1412,6 +1451,38 @@ function requirePhone(data: SyncEntityDataDto): string {
       `Numéro de téléphone invalide : ${data.phone}`,
     );
   }
+}
+
+function optionalPhone(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  try {
+    return normalizePhone(value);
+  } catch {
+    throw new OperationError(
+      SyncOpStatus.INVALID,
+      'PHONE_INVALID',
+      `Numéro de téléphone invalide : ${value}`,
+    );
+  }
+}
+
+/** Champs de qualification du prospect Grand Public. Tous facultatifs. */
+function situationGrandPublic(data: SyncEntityDataDto): Record<string, unknown> {
+  return definedValues({
+    incomeBandId: data.incomeBandId,
+    paymentMode: data.paymentMode,
+    employeurId: data.employeurId,
+    employeur: data.employeur,
+    typeContrat: data.typeContrat,
+    ancienneteMois: data.ancienneteMois,
+    lieuActivite: data.lieuActivite,
+    modeEpargne: data.modeEpargne,
+    paysResidenceId: data.paysResidenceId,
+    villeResidence: data.villeResidence,
+    whatsappE164: optionalPhone(data.whatsappE164),
+    relaisNom: data.relaisNom,
+    relaisPhoneE164: optionalPhone(data.relaisPhoneE164),
+  });
 }
 
 function requireText(value: string | undefined, field: string): asserts value is string {

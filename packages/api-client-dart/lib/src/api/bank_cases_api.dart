@@ -20,6 +20,7 @@ import 'package:crm_api_client/src/model/bank_stage_type.dart';
 import 'package:crm_api_client/src/model/create_bank_case_correction_dto.dart';
 import 'package:crm_api_client/src/model/create_bank_case_dto.dart';
 import 'package:crm_api_client/src/model/create_bank_case_transition_dto.dart';
+import 'package:crm_api_client/src/model/projet.dart';
 import 'package:crm_api_client/src/model/prospect_search_list_dto.dart';
 import 'package:crm_api_client/src/model/sort_order.dart';
 import 'package:crm_api_client/src/model/time_granularity.dart';
@@ -410,6 +411,7 @@ class BankCasesApi {
   /// * [stageId]
   /// * [stageType]
   /// * [banqueId] - Banque de traitement du dossier.
+  /// * [projet] - Projet d’entrée de la fiche liée. Sans filtre, les deux projets sortent.
   /// * [agentId] - Agent créateur OU dernier intervenant sur le dossier.
   /// * [rejectionReasonId]
   /// * [dateFrom] - Borne basse sur la création, incluse.
@@ -431,6 +433,7 @@ class BankCasesApi {
     String? stageId,
     BankStageType? stageType,
     String? banqueId,
+    Projet? projet,
     String? agentId,
     String? rejectionReasonId,
     DateTime? dateFrom,
@@ -463,6 +466,7 @@ class BankCasesApi {
       if (stageId != null) r'stageId': stageId,
       if (stageType != null) r'stageType': stageType,
       if (banqueId != null) r'banqueId': banqueId,
+      if (projet != null) r'projet': projet,
       if (agentId != null) r'agentId': agentId,
       if (rejectionReasonId != null) r'rejectionReasonId': rejectionReasonId,
       if (dateFrom != null) r'dateFrom': dateFrom,
@@ -522,6 +526,7 @@ class BankCasesApi {
   /// * [stageId]
   /// * [stageType]
   /// * [banqueId] - Banque de traitement du dossier.
+  /// * [projet] - Projet d’entrée de la fiche liée. Sans filtre, les deux projets sortent.
   /// * [agentId] - Agent créateur OU dernier intervenant sur le dossier.
   /// * [rejectionReasonId]
   /// * [dateFrom] - Borne basse sur la création, incluse.
@@ -546,6 +551,7 @@ class BankCasesApi {
     String? stageId,
     BankStageType? stageType,
     String? banqueId,
+    Projet? projet,
     String? agentId,
     String? rejectionReasonId,
     DateTime? dateFrom,
@@ -581,6 +587,7 @@ class BankCasesApi {
       if (stageId != null) r'stageId': stageId,
       if (stageType != null) r'stageType': stageType,
       if (banqueId != null) r'banqueId': banqueId,
+      if (projet != null) r'projet': projet,
       if (agentId != null) r'agentId': agentId,
       if (rejectionReasonId != null) r'rejectionReasonId': rejectionReasonId,
       if (dateFrom != null) r'dateFrom': dateFrom,
@@ -724,6 +731,7 @@ class BankCasesApi {
   /// * [search] - Nom (insensible à la casse et aux accents) ou téléphone sous n’importe quelle forme écrite.
   /// * [page]
   /// * [pageSize]
+  /// * [projet] - Ne propose que les fiches entrées par ce projet. Sans filtre, les deux.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -737,6 +745,7 @@ class BankCasesApi {
     required String search,
     num? page = 1,
     num? pageSize = 20,
+    Projet? projet,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -761,6 +770,7 @@ class BankCasesApi {
       r'search': search,
       if (page != null) r'page': page,
       if (pageSize != null) r'pageSize': pageSize,
+      if (projet != null) r'projet': projet,
     };
 
     final _response = await _dio.request<Object>(

@@ -54,9 +54,11 @@ void main() {
     final ProviderContainer container = ProviderContainer(
       overrides: [
         sharedPreferencesProvider.overrideWithValue(prefs),
-        appUpdateRetryDelaysProvider.overrideWithValue(
-          const <Duration>[Duration.zero, Duration.zero, Duration.zero],
-        ),
+        appUpdateRetryDelaysProvider.overrideWithValue(const <Duration>[
+          Duration.zero,
+          Duration.zero,
+          Duration.zero,
+        ]),
         buildNumberProvider.overrideWithValue(buildNumber),
         clockProvider.overrideWithValue(clock),
         updateInstallerProvider.overrideWithValue(

@@ -11,6 +11,7 @@ import {
   BANK_CASE_SORT_FIELDS,
   type BankCaseSortField,
   type BankStageType,
+  type Projet,
   type SortDirection,
 } from '@/lib/types';
 
@@ -24,7 +25,15 @@ export const BANK_PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 
 const STAGE_TYPES: readonly BankStageType[] = ['OPEN', 'CASHED', 'REJECTED'];
 
+const PROJETS: readonly Projet[] = ['CHUES', 'GRAND_PUBLIC'];
+
+/**
+ * La coque à laquelle appartient un écran bancaire. Elle vient de la PAGE, pas
+ * de la barre de filtres : `null` ne se produit que sur la route d'export, qui
+ * relit le paramètre écrit par `buildBankExportUrl`.
+ */
 export interface BankCaseFilters {
+  projet: Projet | null;
   search: string;
   stageId: string | null;
   stageType: BankStageType | null;
@@ -42,6 +51,7 @@ export interface BankCaseFilters {
 }
 
 export const EMPTY_BANK_FILTERS: BankCaseFilters = {
+  projet: null,
   search: '',
   stageId: null,
   stageType: null,
@@ -70,8 +80,13 @@ export function parseBankFilters(params: RawSearchParams | URLSearchParams): Ban
   const pageSize = readPositiveInt(params, 'pageSize', BANK_DEFAULT_PAGE_SIZE);
   const stageType = readString(params, 'stageType');
   const sortBy = readString(params, 'sortBy');
+  const projet = readString(params, 'projet');
 
   return {
+    projet:
+      projet !== null && (PROJETS as readonly string[]).includes(projet)
+        ? (projet as Projet)
+        : null,
     search: readString(params, 'search') ?? '',
     stageId: readString(params, 'stageId'),
     stageType:
@@ -121,8 +136,16 @@ export function serializeBankFilters(filters: BankCaseFilters): URLSearchParams 
   return params;
 }
 
+/** Le projet EN TÊTE : les deux coques ne doivent jamais partager une entrée de cache. */
 export function bankFiltersQueryKey(filters: BankCaseFilters): string {
-  return serializeBankFilters(filters).toString();
+  const params = serializeBankFilters(filters);
+  if (filters.projet !== null) params.set('projet', filters.projet);
+  return params.toString();
+}
+
+/** Racine de la coque qui porte les écrans bancaires de ce projet. */
+export function bankBasePath(projet: Projet | null): string {
+  return projet === 'GRAND_PUBLIC' ? '/grand-public' : '/chues';
 }
 
 export function countActiveBankFilters(filters: BankCaseFilters): number {
@@ -176,6 +199,7 @@ const endOfDay = (isoDate: string): string => `${isoDate}T23:59:59.999Z`;
 export function toBankFilterQuery(filters: BankCaseFilters): BankAnalyticsQuery {
   const query: BankAnalyticsQuery = {};
 
+  if (filters.projet !== null) query.projet = filters.projet;
   const search = filters.search.trim();
   if (search !== '') query.search = search;
   if (filters.stageId !== null) query.stageId = filters.stageId;

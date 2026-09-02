@@ -6,12 +6,13 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ActivityView } from '@/components/supervision/activity-view';
 import { SupervisionView } from '@/components/supervision/supervision-view';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import type { Projet } from '@/lib/types';
 
 const VOLET_PARAM = 'volet';
 const ACTIVITE = 'activite';
 const COMPTES = 'comptes';
 
-export function SupervisionTabs() {
+export function SupervisionTabs({ projet }: { projet: Projet }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -41,7 +42,9 @@ export function SupervisionTabs() {
 
       {/* Chaque volet n'est monté que lorsqu'il est affiché : le volet Comptes
           se rafraîchit en boucle, et il le ferait derrière l'onglet Activité. */}
-      <TabsContent value={ACTIVITE}>{current === ACTIVITE ? <ActivityView /> : null}</TabsContent>
+      <TabsContent value={ACTIVITE}>
+        {current === ACTIVITE ? <ActivityView projet={projet} /> : null}
+      </TabsContent>
       <TabsContent value={COMPTES}>{current === COMPTES ? <SupervisionView /> : null}</TabsContent>
     </Tabs>
   );

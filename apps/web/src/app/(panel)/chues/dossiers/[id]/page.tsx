@@ -33,7 +33,7 @@ export default async function DossierPage({ params }: { params: Promise<{ id: st
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <BankCaseDetailView caseId={id} role={guard.user.role} />
+      <BankCaseDetailView caseId={id} role={guard.user.role} projet="CHUES" />
     </HydrationBoundary>
   );
 }

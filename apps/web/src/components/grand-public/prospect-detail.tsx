@@ -38,8 +38,10 @@ import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import {
   CALL_OUTCOME_LABELS,
+  MODE_EPARGNE_LABELS,
   PROSPECT_STATUT_LABELS,
   SEGMENT_LABELS,
+  TYPE_CONTRAT_LABELS,
   type ProspectRow,
   type ProspectStatut,
   type Offer,
@@ -68,6 +70,63 @@ function Ligne({ label, children }: { label: string; children: ReactNode }) {
 function Texte({ value, absent }: { value: string | null; absent: string }) {
   if (value === null || value === '') return <Absent>{absent}</Absent>;
   return <span>{value}</span>;
+}
+
+/**
+ * Un renseignement propre à une situation. Absent, la ligne DISPARAÎT : une
+ * fiche d'informel n'a pas à porter « Type de contrat : non renseigné ».
+ */
+function LigneSi({ label, value }: { label: string; value: string | null }) {
+  if (value === null || value === '') return null;
+  return (
+    <Ligne label={label}>
+      <span>{value}</span>
+    </Ligne>
+  );
+}
+
+function formatAnciennete(mois: number): string {
+  if (mois < 12) return `${String(mois)} mois`;
+  const ans = Math.floor(mois / 12);
+  const reste = mois % 12;
+  const debut = `${String(ans)} an${ans > 1 ? 's' : ''}`;
+  return reste === 0 ? debut : `${debut} et ${String(reste)} mois`;
+}
+
+const libelleMetier = (type: ProspectRow['type']): string =>
+  type === 'INFORMEL' ? 'Activité' : 'Profession';
+
+/** Les renseignements propres à la situation : chacun paraît s'il a été noté. */
+function LignesSituation({ prospect }: { prospect: ProspectRow }) {
+  const contrat = prospect.typeContrat;
+  const epargne = prospect.modeEpargne;
+  const anciennete = prospect.ancienneteMois;
+  const whatsapp = prospect.whatsappE164;
+  const relais = prospect.relaisPhoneE164;
+
+  return (
+    <>
+      <LigneSi label="Employeur" value={prospect.employeur} />
+      <LigneSi
+        label="Type de contrat"
+        value={contrat === null ? null : TYPE_CONTRAT_LABELS[contrat]}
+      />
+      <LigneSi
+        label="Ancienneté"
+        value={anciennete === null ? null : formatAnciennete(anciennete)}
+      />
+      <LigneSi label="Lieu d’activité" value={prospect.lieuActivite} />
+      <LigneSi
+        label="Mode d’épargne"
+        value={epargne === null ? null : MODE_EPARGNE_LABELS[epargne]}
+      />
+      <LigneSi label="Pays de résidence" value={prospect.paysResidenceLabel} />
+      <LigneSi label="Ville de résidence" value={prospect.villeResidence} />
+      <LigneSi label="WhatsApp" value={whatsapp === null ? null : formatPhone(whatsapp)} />
+      <LigneSi label="Personne relais" value={prospect.relaisNom} />
+      <LigneSi label="Téléphone du relais" value={relais === null ? null : formatPhone(relais)} />
+    </>
+  );
 }
 
 /**
@@ -219,9 +278,10 @@ export function GrandPublicProspectDetail({
                 PROSPECT_TYPE_LABELS[prospect.type]
               )}
             </Ligne>
-            <Ligne label="Profession">
+            <Ligne label={libelleMetier(prospect.type)}>
               <Texte value={prospect.profession} absent="Non renseignée" />
             </Ligne>
+            <LignesSituation prospect={prospect} />
             <Ligne label="Canal de provenance">
               <Texte value={prospect.canalProvenanceLabel} absent="Non renseigné" />
             </Ligne>

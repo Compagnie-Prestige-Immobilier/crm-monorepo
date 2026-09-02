@@ -627,9 +627,7 @@ class _RepresentantQualificationScreenState
       CpiSpacing.md,
       CpiSpacing.md,
     ),
-    children: <Widget>[
-      CpiRecap(lines: recapDe(representant)),
-    ],
+    children: <Widget>[CpiRecap(lines: recapDe(representant))],
   );
 }
 

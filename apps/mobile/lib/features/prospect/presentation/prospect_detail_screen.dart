@@ -25,6 +25,7 @@ import '../../../ui/widgets/error_state.dart';
 import '../../../ui/widgets/sync_status_icon.dart';
 import '../../phase2/phase2_controller.dart';
 import '../../shell/projects.dart';
+import '../situation_labels.dart';
 
 /// La fiche d'un prospect, en LECTURE, pour préparer et consigner un appel.
 ///
@@ -227,8 +228,89 @@ class _Fiche extends ConsumerWidget {
           const SizedBox(height: CpiSpacing.md),
           CpiCard.rows(faits),
         ],
+        _Situation(data: data),
       ],
     );
+  }
+}
+
+/// Ce que la situation du prospect a fait renseigner. Un champ vide ne se dit
+/// pas : la fiche montre ce qu'on sait, pas la liste des questions.
+class _Situation extends ConsumerWidget {
+  const _Situation({required this.data});
+
+  final ProspectSyncViewData data;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final String? employeur =
+        data.employeur ??
+        _libelleDe(
+          data.employeurId,
+          ref.watch(employeursProvider).value,
+          (Employeur e) => (e.id, e.label),
+        );
+    final String? pays = _libelleDe(
+      data.paysResidenceId,
+      ref.watch(paysProvider).value,
+      (PaysRow p) => (p.id, p.label),
+    );
+    final String? tranche = _libelleDe(
+      data.incomeBandId,
+      ref.watch(incomeBandsProvider).value,
+      (IncomeBand b) => (b.id, b.label),
+    );
+
+    final List<CpiRow> lignes = <CpiRow?>[
+      _ligne('Situation', kSituationLabels[data.type ?? '']),
+      _ligne(
+        data.type == 'FONCTIONNAIRE' ? 'Ministère ou structure' : 'Employeur',
+        employeur,
+      ),
+      _ligne('Type de contrat', kTypeContratLabels[data.typeContrat ?? '']),
+      _ligne(
+        'Ancienneté',
+        data.ancienneteMois == null ? null : '${data.ancienneteMois} mois',
+      ),
+      _ligne(
+        data.type == 'INFORMEL' ? 'Activité' : 'Profession',
+        data.profession,
+      ),
+      _ligne('Lieu d\'activité', data.lieuActivite),
+      _ligne('Mode d\'épargne', kModeEpargneLabels[data.modeEpargne ?? '']),
+      _ligne('Pays de résidence', pays),
+      _ligne('Ville', data.villeResidence),
+      _ligne('WhatsApp', data.whatsappE164),
+      _ligne('Personne relais', data.relaisNom),
+      _ligne('Téléphone du relais', data.relaisPhoneE164),
+      _ligne('Tranche de revenus', tranche),
+    ].nonNulls.toList(growable: false);
+
+    if (lignes.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: CpiSpacing.md),
+      child: CpiCard.rows(lignes),
+    );
+  }
+
+  static CpiRow? _ligne(String titre, String? valeur) =>
+      valeur == null || valeur.trim().isEmpty
+      ? null
+      : CpiRow(title: titre, subtitle: valeur.trim());
+
+  /// Le libellé du référentiel local, `null` tant qu'il n'est pas descendu :
+  /// afficher l'identifiant brut ne dirait rien à personne.
+  static String? _libelleDe<T>(
+    String? id,
+    List<T>? rows,
+    (String, String) Function(T) champs,
+  ) {
+    if (id == null || rows == null) return null;
+    for (final T row in rows) {
+      final (String rowId, String label) = champs(row);
+      if (rowId == id) return label;
+    }
+    return null;
   }
 }
 

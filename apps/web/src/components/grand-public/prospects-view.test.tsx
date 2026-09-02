@@ -10,15 +10,22 @@ import type { ProspectRow } from '@/lib/types';
 
 const list = vi.hoisted(() => vi.fn());
 const canaux = vi.hoisted(() => vi.fn());
+const download = vi.hoisted(() => vi.fn<(input: unknown) => Promise<void>>());
 
 vi.mock('@/lib/data/grand-public', async () => {
   const actual = await vi.importActual<typeof GrandPublicModule>('@/lib/data/grand-public');
   return { ...actual, fetchGrandPublicProspects: list, fetchCanauxProvenance: canaux };
 });
 
+vi.mock('@/components/exports/download-button', () => ({
+  useFileDownload: () => ({ pending: false, download }),
+}));
+
 beforeEach(() => {
   list.mockReset();
   canaux.mockReset();
+  download.mockReset();
+  download.mockResolvedValue(undefined);
   canaux.mockResolvedValue([
     { id: 'c-tiktok', code: 'TIKTOK', label: 'TikTok', position: 1, isActive: true, updatedAt: '' },
   ]);
@@ -206,6 +213,24 @@ describe('la liste', () => {
 
     await screen.findByText('Aucun prospect Grand Public n’a encore été saisi.');
     expect(screen.queryByRole('link', { name: /Nouveau prospect/u })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Exporter' })).toBeNull();
+  });
+
+  it('exporte la vue filtrée, bornée au Grand Public', async () => {
+    const user = userEvent.setup();
+    setUrl('/grand-public?type=DIASPORA');
+    list.mockResolvedValue(page([]));
+    mount();
+
+    await user.click(await screen.findByRole('button', { name: 'Exporter' }));
+
+    await waitFor(() => {
+      expect(download).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: '/api/export/prospects?type=DIASPORA&projet=GRAND_PUBLIC',
+        }),
+      );
+    });
   });
 });
 

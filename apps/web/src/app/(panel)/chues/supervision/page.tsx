@@ -18,7 +18,7 @@ export default async function SupervisionPage() {
 
   return (
     <Suspense fallback={<SupervisionSkeleton />}>
-      <SupervisionTabs />
+      <SupervisionTabs projet="CHUES" />
     </Suspense>
   );
 }

@@ -4,7 +4,14 @@ process.env.JWT_ACCESS_SECRET ??= 'integration-access-secret-32-characters';
 process.env.JWT_REFRESH_SECRET ??= 'integration-refresh-secret-32-characters';
 process.env.PHONE_DEFAULT_REGION ??= 'SN';
 
-import { EnrollmentMethod, PrismaClient, PrismaPg, Phase2Status, Role } from '@crm/database';
+import {
+  EnrollmentMethod,
+  PrismaClient,
+  PrismaPg,
+  Phase2Status,
+  Projet,
+  Role,
+} from '@crm/database';
 import { v7 as uuidv7 } from 'uuid';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -478,6 +485,15 @@ describe('autocomplétion des prospects', () => {
     expect((await service.prospectSearch({ search: `Aissatou ${TAG}Ndiaye` })).items).toHaveLength(
       1,
     );
+  });
+
+  it('ne propose que les fiches du projet demandé', async () => {
+    expect(
+      (await service.prospectSearch({ search: 'Aissatou', projet: Projet.CHUES })).items,
+    ).toHaveLength(1);
+    expect(
+      (await service.prospectSearch({ search: 'Aissatou', projet: Projet.GRAND_PUBLIC })).items,
+    ).toHaveLength(0);
   });
 
   it('retrouve le MÊME abonné sous quatre écritures du numéro', async () => {

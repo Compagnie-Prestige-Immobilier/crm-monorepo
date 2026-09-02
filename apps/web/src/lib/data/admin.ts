@@ -169,12 +169,18 @@ export function presetRange(
 export function supervisionActivityKey(
   range: ActivityRange,
   granularity: SupervisionGranularity,
+  projet: Schemas['Projet'],
 ): readonly unknown[] {
-  return ['supervision', 'activite', range.from, range.to, granularity];
+  return ['supervision', 'activite', range.from, range.to, granularity, projet];
 }
 
+/** `projet` est obligatoire : omis, l'API compte les deux projets dans les mêmes chiffres. */
 export async function fetchSupervisionActivite(
-  input: { range: ActivityRange; granularity: SupervisionGranularity },
+  input: {
+    range: ActivityRange;
+    granularity: SupervisionGranularity;
+    projet: Schemas['Projet'];
+  },
   client: ApiClient = getApiClient(),
 ): Promise<SupervisionActivity> {
   return unwrap(
@@ -184,6 +190,7 @@ export async function fetchSupervisionActivite(
           actFrom: `${input.range.from}T00:00:00.000Z`,
           actTo: `${input.range.to}T23:59:59.999Z`,
           granularity: input.granularity,
+          projet: input.projet,
         },
       },
     }),
@@ -469,8 +476,9 @@ export function activityCsv(input: {
   return csvRows(rows);
 }
 
-export function activityCsvFileName(range: ActivityRange): string {
-  return range.from === range.to
-    ? `cpi-supervision-activite-${range.from}.csv`
-    : `cpi-supervision-activite-${range.from}_${range.to}.csv`;
+/** Le projet est dans le nom : les deux coques exportent la même période sur des chiffres différents. */
+export function activityCsvFileName(range: ActivityRange, projet: Schemas['Projet']): string {
+  const suffixe = projet === 'GRAND_PUBLIC' ? 'grand-public' : 'chues';
+  const periode = range.from === range.to ? range.from : `${range.from}_${range.to}`;
+  return `cpi-supervision-activite-${suffixe}-${periode}.csv`;
 }

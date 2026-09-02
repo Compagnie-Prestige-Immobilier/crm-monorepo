@@ -124,6 +124,29 @@ describe('export en régime normal', () => {
     expect(response.headers.get('Content-Disposition')).not.toContain('DEMONSTRATION');
   });
 
+  it('transmet les critères propres au Grand Public, et refuse un canal qui n’est pas un identifiant', async () => {
+    fetchMock.mockResolvedValueOnce(json(SESSION_USER)).mockResolvedValueOnce(xlsx());
+    const { GET } = await import('@/app/api/export/prospects/route');
+
+    await GET(
+      exportRequest(
+        '?projet=GRAND_PUBLIC&type=DIASPORA&canalProvenanceId=11111111-1111-1111-1111-111111111111',
+      ),
+    );
+    const upstream = new URL(urlOf(fetchMock.mock.calls[1]));
+    expect(upstream.searchParams.get('projet')).toBe('GRAND_PUBLIC');
+    expect(upstream.searchParams.get('type')).toBe('DIASPORA');
+    expect(upstream.searchParams.get('canalProvenanceId')).toBe(
+      '11111111-1111-1111-1111-111111111111',
+    );
+
+    fetchMock.mockResolvedValueOnce(json(SESSION_USER)).mockResolvedValueOnce(xlsx());
+    await GET(exportRequest('?type=INVENTE&canalProvenanceId=tout-sauf-un-uuid'));
+    const second = new URL(urlOf(fetchMock.mock.calls[3]));
+    expect(second.searchParams.has('type')).toBe(false);
+    expect(second.searchParams.has('canalProvenanceId')).toBe(false);
+  });
+
   it('n’envoie pas à l’API un paramètre inventé dans l’URL', async () => {
     fetchMock.mockResolvedValueOnce(json(SESSION_USER)).mockResolvedValueOnce(xlsx());
     const { GET } = await import('@/app/api/export/prospects/route');

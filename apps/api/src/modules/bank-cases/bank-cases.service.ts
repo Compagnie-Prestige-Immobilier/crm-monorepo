@@ -373,9 +373,13 @@ export class BankCasesService {
       phone = Prisma.sql`OR p."phoneE164" LIKE ${`%${digits}`}`;
     }
 
+    const projet =
+      query.projet === undefined
+        ? Prisma.sql`TRUE`
+        : Prisma.sql`p."projet" = ${query.projet}::"Projet"`;
     const where = Prisma.sql`
       p."deletedAt" IS NULL
-      AND ${Prisma.sql`TRUE`}
+      AND ${projet}
       AND p."phase2Status" = 'METHOD_OBTAINED'::"Phase2Status"
       AND (
         -- UNE seule forme, celle que prospects_nom_prenom_unaccent_trgm indexe

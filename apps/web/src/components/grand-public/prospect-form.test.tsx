@@ -63,6 +63,37 @@ beforeEach(() => {
       { id: 'bnq-cbao', name: 'CBAO Sénégal', shortName: 'CBAO', isActive: true, sortOrder: 1 },
     ],
     syndicats: [{ id: 'snd-saes', name: 'SAES', sigle: 'SAES', isActive: true, sortOrder: 1 }],
+    employeurs: [
+      {
+        id: 'emp-sante',
+        code: 'MIN_SANTE',
+        label: 'Ministère de la Santé',
+        type: 'MINISTERE',
+        position: 1,
+        isActive: true,
+        updatedAt: '',
+      },
+      {
+        id: 'emp-sonatel',
+        code: 'SONATEL',
+        label: 'Sonatel',
+        type: 'ENTREPRISE',
+        position: 2,
+        isActive: true,
+        updatedAt: '',
+      },
+    ],
+    pays: [
+      {
+        id: 'pay-it',
+        code: 'IT',
+        label: 'Italie',
+        indicatif: '39',
+        position: 1,
+        isActive: true,
+        updatedAt: '',
+      },
+    ],
   });
 });
 
@@ -192,6 +223,190 @@ describe('les champs facultatifs', () => {
 
     expect(await screen.findByRole('option', { name: /TikTok/u })).toBeTruthy();
     expect(screen.queryByRole('option', { name: /Fax/u })).toBeNull();
+  });
+});
+
+describe('les questions propres à chaque situation', () => {
+  it('demande au fonctionnaire son ministère, sa banque et son ancienneté, sans les exiger', async () => {
+    const user = userEvent.setup();
+    create.mockResolvedValue(created());
+    mount();
+    await screen.findByRole('combobox', { name: /Canal de provenance/u });
+
+    await fillIdentity();
+    await user.click(screen.getByRole('button', { name: 'Fonctionnaire' }));
+
+    expect(screen.getByRole('combobox', { name: /Ministère ou structure/u })).toBeTruthy();
+    expect(screen.getByLabelText(/Ancienneté/u)).toBeTruthy();
+    expect(screen.queryByLabelText(/Lieu d’activité/u)).toBeNull();
+    expect(screen.queryByLabelText(/Type de contrat/u)).toBeNull();
+
+    await choose('Ministère ou structure', 'Ministère de la Santé');
+    await user.type(screen.getByLabelText(/Ancienneté/u), '30');
+    await user.click(screen.getByRole('button', { name: 'Enregistrer et suivant' }));
+
+    await waitFor(() => {
+      expect(create).toHaveBeenCalledWith({
+        prenom: 'Moussa',
+        nom: 'Fall',
+        phone: '+221771234567',
+        type: 'FONCTIONNAIRE',
+        employeurId: 'emp-sante',
+        ancienneteMois: 30,
+      });
+    });
+  });
+
+  it('propose au privé son entreprise et son type de contrat', async () => {
+    const user = userEvent.setup();
+    create.mockResolvedValue(created());
+    mount();
+    await screen.findByRole('combobox', { name: /Canal de provenance/u });
+
+    await fillIdentity();
+    await user.click(screen.getByRole('button', { name: 'Secteur privé' }));
+
+    expect(screen.getByRole('combobox', { name: /^Employeur/u })).toBeTruthy();
+    await choose('Employeur', 'Sonatel');
+    await user.click(screen.getByRole('button', { name: 'Enregistrer et suivant' }));
+
+    await waitFor(() => {
+      expect(create).toHaveBeenCalledWith({
+        prenom: 'Moussa',
+        nom: 'Fall',
+        phone: '+221771234567',
+        type: 'SECTEUR_PRIVE',
+        employeurId: 'emp-sonatel',
+      });
+    });
+  });
+
+  it('retient l’employeur tapé à la main quand il n’est pas dans la liste', async () => {
+    const user = userEvent.setup();
+    create.mockResolvedValue(created());
+    mount();
+    await screen.findByRole('combobox', { name: /Canal de provenance/u });
+
+    await fillIdentity();
+    await user.click(screen.getByRole('button', { name: 'Secteur privé' }));
+    await user.click(screen.getByRole('combobox', { name: /^Employeur/u }));
+    await user.type(screen.getByPlaceholderText('Chercher…'), 'Garage Diop');
+    await user.click(await screen.findByRole('option', { name: /Créer « Garage Diop »/u }));
+    await user.click(screen.getByRole('button', { name: 'Enregistrer et suivant' }));
+
+    await waitFor(() => {
+      expect(create).toHaveBeenCalledWith({
+        prenom: 'Moussa',
+        nom: 'Fall',
+        phone: '+221771234567',
+        type: 'SECTEUR_PRIVE',
+        employeur: 'Garage Diop',
+      });
+    });
+  });
+
+  it('demande à l’informel son lieu et son épargne, jamais sa banque', async () => {
+    const user = userEvent.setup();
+    create.mockResolvedValue(created());
+    mount();
+    await screen.findByRole('combobox', { name: /Canal de provenance/u });
+
+    await fillIdentity();
+    await user.click(screen.getByRole('button', { name: 'Informel' }));
+
+    expect(screen.getByRole('combobox', { name: 'Activité' })).toBeTruthy();
+    expect(screen.getByLabelText(/Lieu d’activité/u)).toBeTruthy();
+    expect(screen.queryByRole('combobox', { name: /Banque/u })).toBeNull();
+
+    await user.type(screen.getByLabelText(/Lieu d’activité/u), 'Marché Sandaga');
+    await user.click(screen.getByRole('button', { name: 'Enregistrer et suivant' }));
+
+    await waitFor(() => {
+      expect(create).toHaveBeenCalledWith({
+        prenom: 'Moussa',
+        nom: 'Fall',
+        phone: '+221771234567',
+        type: 'INFORMEL',
+        lieuActivite: 'Marché Sandaga',
+      });
+    });
+  });
+
+  it('demande à la diaspora son pays, sa ville, son WhatsApp et son relais', async () => {
+    const user = userEvent.setup();
+    create.mockResolvedValue(created());
+    mount();
+    await screen.findByRole('combobox', { name: /Canal de provenance/u });
+
+    await fillIdentity();
+    await user.click(screen.getByRole('button', { name: 'Diaspora' }));
+
+    await choose('Pays de résidence', 'Italie');
+    await user.type(screen.getByLabelText(/Ville de résidence/u), 'Turin');
+    await user.type(screen.getByLabelText(/^WhatsApp/u), '3331234567');
+    await user.type(screen.getByLabelText(/Personne relais/u), 'Awa Fall');
+    await user.type(screen.getByLabelText(/Téléphone du relais/u), '77 555 44 33');
+    await user.click(screen.getByRole('button', { name: 'Enregistrer et suivant' }));
+
+    await waitFor(() => {
+      expect(create).toHaveBeenCalledWith({
+        prenom: 'Moussa',
+        nom: 'Fall',
+        // Le pays de résidence a repris l'indicatif du numéro principal.
+        phone: '+39771234567',
+        type: 'DIASPORA',
+        paysResidenceId: 'pay-it',
+        villeResidence: 'Turin',
+        whatsappE164: '+393331234567',
+        relaisNom: 'Awa Fall',
+        relaisPhoneE164: '+221775554433',
+      });
+    });
+  });
+
+  it('vide ce que la situation quittée demandait, et rien d’autre', async () => {
+    const user = userEvent.setup();
+    create.mockResolvedValue(created());
+    mount();
+    await screen.findByRole('combobox', { name: /Canal de provenance/u });
+
+    await fillIdentity();
+    await user.click(screen.getByRole('button', { name: 'Informel' }));
+    await user.type(screen.getByLabelText(/Lieu d’activité/u), 'Marché Sandaga');
+    await user.click(screen.getByRole('button', { name: 'Fonctionnaire' }));
+    await choose('Banque de domiciliation', 'CBAO');
+    await user.click(screen.getByRole('button', { name: 'Enregistrer et suivant' }));
+
+    await waitFor(() => {
+      expect(create).toHaveBeenCalledWith({
+        prenom: 'Moussa',
+        nom: 'Fall',
+        phone: '+221771234567',
+        type: 'FONCTIONNAIRE',
+        banqueId: 'bnq-cbao',
+      });
+    });
+  });
+
+  it('n’exige pas la banque d’un fonctionnaire', async () => {
+    const user = userEvent.setup();
+    create.mockResolvedValue(created());
+    mount();
+    await screen.findByRole('combobox', { name: /Canal de provenance/u });
+
+    await fillIdentity();
+    await user.click(screen.getByRole('button', { name: 'Fonctionnaire' }));
+    await user.click(screen.getByRole('button', { name: 'Enregistrer et suivant' }));
+
+    await waitFor(() => {
+      expect(create).toHaveBeenCalledWith({
+        prenom: 'Moussa',
+        nom: 'Fall',
+        phone: '+221771234567',
+        type: 'FONCTIONNAIRE',
+      });
+    });
+    expect(screen.queryByText(/Choisissez la banque/u)).toBeNull();
   });
 });
 

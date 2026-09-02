@@ -13,6 +13,7 @@ import type {
   BankRejectionReason,
   CreateBankCaseInput,
   Paginated,
+  Projet,
 } from '@/lib/types';
 
 export async function fetchBankCases(
@@ -63,13 +64,14 @@ export async function fetchRejectionReasons(
 
 export async function searchBankProspects(
   q: string,
+  projet: Projet,
   client: ApiClient = getApiClient(),
 ): Promise<BankProspectSearchItem[]> {
   const term = q.trim();
   if (term.length < 2) return [];
   return unwrap(
     await client.GET('/api/v1/bank-cases/prospect-search', {
-      params: { query: { search: term, pageSize: 20 } },
+      params: { query: { search: term, pageSize: 20, projet } },
     }),
   ).items;
 }

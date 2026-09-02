@@ -55,6 +55,7 @@ const TABS = [
   'syndicats',
   'departements',
   'professions',
+  'employeurs',
   'incomeBands',
   'offers',
 ] as const;
@@ -104,6 +105,7 @@ export function ReferentielsView() {
           <TabsTrigger value="syndicats">Syndicats</TabsTrigger>
           <TabsTrigger value="departements">Départements</TabsTrigger>
           <TabsTrigger value="professions">Professions</TabsTrigger>
+          <TabsTrigger value="employeurs">Employeurs</TabsTrigger>
           <TabsTrigger value="incomeBands">Revenus</TabsTrigger>
           <TabsTrigger value="offers">Offres</TabsTrigger>
         </TabsList>
@@ -134,6 +136,9 @@ export function ReferentielsView() {
         </TabsContent>
         <TabsContent value="professions">
           <OpenReferentialTab kind="professions" />
+        </TabsContent>
+        <TabsContent value="employeurs">
+          <OpenReferentialTab kind="employeurs" />
         </TabsContent>
         <TabsContent value="incomeBands">
           <OpenReferentialTab kind="incomeBands" />

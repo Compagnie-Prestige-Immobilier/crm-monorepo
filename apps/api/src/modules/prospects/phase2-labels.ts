@@ -1,10 +1,12 @@
 import {
   CallOutcome,
   EnrollmentMethod,
+  ModeEpargne,
   Phase2Status,
   Projet,
   ProspectStatut,
   ProspectType,
+  TypeContrat,
 } from '@crm/database';
 
 export const PROJET_LABELS: Readonly<Record<Projet, string>> = {
@@ -24,6 +26,19 @@ export const PROSPECT_TYPE_LABELS: Readonly<Record<ProspectType, string>> = {
   [ProspectType.SECTEUR_PRIVE]: 'Secteur privé',
   [ProspectType.INFORMEL]: 'Informel',
   [ProspectType.DIASPORA]: 'Diaspora',
+};
+
+export const TYPE_CONTRAT_LABELS: Readonly<Record<TypeContrat, string>> = {
+  [TypeContrat.CDI]: 'CDI',
+  [TypeContrat.CDD]: 'CDD',
+  [TypeContrat.AUTRE]: 'Autre',
+};
+
+export const MODE_EPARGNE_LABELS: Readonly<Record<ModeEpargne, string>> = {
+  [ModeEpargne.TONTINE]: 'Tontine',
+  [ModeEpargne.MOBILE_MONEY]: 'Mobile money',
+  [ModeEpargne.BANQUE]: 'Banque',
+  [ModeEpargne.AUCUN]: 'Aucun',
 };
 
 export const PHASE2_STATUS_LABELS: Readonly<Record<Phase2Status, string>> = {

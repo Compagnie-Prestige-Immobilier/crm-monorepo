@@ -498,6 +498,10 @@ class WriteRepository {
 
   /// Banque, syndicat et representant sont FACULTATIFS : un teleconseiller ne
   /// les obtient pas toujours, et une fiche Grand Public n'en a aucun.
+  ///
+  /// Les renseignements de situation ([employeurId] a [relaisPhoneE164]) sont
+  /// eux aussi facultatifs : chaque situation Grand Public n'en remplit qu'une
+  /// part, et rien de neuf ne rend une saisie de terrain impossible.
   Future<String> createProspect({
     required String nom,
     required String prenom,
@@ -509,8 +513,19 @@ class WriteRepository {
     String? projet,
     String? type,
     String? profession,
-    int? dureeSystemeMois,
     String? canalProvenanceId,
+    String? incomeBandId,
+    String? employeurId,
+    String? employeur,
+    String? typeContrat,
+    int? ancienneteMois,
+    String? lieuActivite,
+    String? modeEpargne,
+    String? paysResidenceId,
+    String? villeResidence,
+    String? whatsappE164,
+    String? relaisNom,
+    String? relaisPhoneE164,
     String? id,
     String? draftId,
   }) async {
@@ -540,11 +555,28 @@ class WriteRepository {
           ProspectsCompanion(
             type: Value<String?>(type ?? existing.type),
             profession: Value<String?>(profession ?? existing.profession),
-            dureeSystemeMois: Value<int?>(
-              dureeSystemeMois ?? existing.dureeSystemeMois,
-            ),
             canalProvenanceId: Value<String?>(
               canalProvenanceId ?? existing.canalProvenanceId,
+            ),
+            incomeBandId: Value<String?>(incomeBandId ?? existing.incomeBandId),
+            employeurId: Value<String?>(employeurId ?? existing.employeurId),
+            employeur: Value<String?>(employeur ?? existing.employeur),
+            typeContrat: Value<String?>(typeContrat ?? existing.typeContrat),
+            ancienneteMois: Value<int?>(
+              ancienneteMois ?? existing.ancienneteMois,
+            ),
+            lieuActivite: Value<String?>(lieuActivite ?? existing.lieuActivite),
+            modeEpargne: Value<String?>(modeEpargne ?? existing.modeEpargne),
+            paysResidenceId: Value<String?>(
+              paysResidenceId ?? existing.paysResidenceId,
+            ),
+            villeResidence: Value<String?>(
+              villeResidence ?? existing.villeResidence,
+            ),
+            whatsappE164: Value<String?>(whatsappE164 ?? existing.whatsappE164),
+            relaisNom: Value<String?>(relaisNom ?? existing.relaisNom),
+            relaisPhoneE164: Value<String?>(
+              relaisPhoneE164 ?? existing.relaisPhoneE164,
             ),
             localUpdatedAt: Value<DateTime>(now),
           ),
@@ -564,8 +596,21 @@ class WriteRepository {
             'type': ?type,
             if (profession != null && profession.isNotEmpty)
               'profession': profession,
-            'dureeSystemeMois': ?dureeSystemeMois,
             'canalProvenanceId': ?canalProvenanceId,
+            ..._situationPayload(
+              incomeBandId: incomeBandId,
+              employeurId: employeurId,
+              employeur: employeur,
+              typeContrat: typeContrat,
+              ancienneteMois: ancienneteMois,
+              lieuActivite: lieuActivite,
+              modeEpargne: modeEpargne,
+              paysResidenceId: paysResidenceId,
+              villeResidence: villeResidence,
+              whatsappE164: whatsappE164,
+              relaisNom: relaisNom,
+              relaisPhoneE164: relaisPhoneE164,
+            ),
           },
           now: now,
         );
@@ -588,8 +633,19 @@ class WriteRepository {
                   : Value<String>(projet),
               type: Value<String?>(type),
               profession: Value<String?>(profession),
-              dureeSystemeMois: Value<int?>(dureeSystemeMois),
               canalProvenanceId: Value<String?>(canalProvenanceId),
+              incomeBandId: Value<String?>(incomeBandId),
+              employeurId: Value<String?>(employeurId),
+              employeur: Value<String?>(employeur),
+              typeContrat: Value<String?>(typeContrat),
+              ancienneteMois: Value<int?>(ancienneteMois),
+              lieuActivite: Value<String?>(lieuActivite),
+              modeEpargne: Value<String?>(modeEpargne),
+              paysResidenceId: Value<String?>(paysResidenceId),
+              villeResidence: Value<String?>(villeResidence),
+              whatsappE164: Value<String?>(whatsappE164),
+              relaisNom: Value<String?>(relaisNom),
+              relaisPhoneE164: Value<String?>(relaisPhoneE164),
               createdById: createdById,
               clientCreatedAt: now,
               localUpdatedAt: now,
@@ -617,8 +673,21 @@ class WriteRepository {
           'type': ?type,
           if (profession != null && profession.isNotEmpty)
             'profession': profession,
-          'dureeSystemeMois': ?dureeSystemeMois,
           'canalProvenanceId': ?canalProvenanceId,
+          ..._situationPayload(
+            incomeBandId: incomeBandId,
+            employeurId: employeurId,
+            employeur: employeur,
+            typeContrat: typeContrat,
+            ancienneteMois: ancienneteMois,
+            lieuActivite: lieuActivite,
+            modeEpargne: modeEpargne,
+            paysResidenceId: paysResidenceId,
+            villeResidence: villeResidence,
+            whatsappE164: whatsappE164,
+            relaisNom: relaisNom,
+            relaisPhoneE164: relaisPhoneE164,
+          ),
           'clientCreatedAt': now.toUtc().toIso8601String(),
         },
         now: now,
@@ -626,6 +695,42 @@ class WriteRepository {
       await _dropDraft(draftId);
       return entityId;
     });
+  }
+
+  /// Les renseignements de situation, sous les noms exacts du contrat de sync.
+  /// Une cle absente n'est PAS un vidage : seul ce qui a une valeur voyage.
+  static Map<String, Object?> _situationPayload({
+    required String? incomeBandId,
+    required String? employeurId,
+    required String? employeur,
+    required String? typeContrat,
+    required int? ancienneteMois,
+    required String? lieuActivite,
+    required String? modeEpargne,
+    required String? paysResidenceId,
+    required String? villeResidence,
+    required String? whatsappE164,
+    required String? relaisNom,
+    required String? relaisPhoneE164,
+  }) {
+    final Map<String, Object?> payload = <String, Object?>{
+      'incomeBandId': ?incomeBandId,
+      'employeurId': ?employeurId,
+      'employeur': ?employeur,
+      'typeContrat': ?typeContrat,
+      'ancienneteMois': ?ancienneteMois,
+      'lieuActivite': ?lieuActivite,
+      'modeEpargne': ?modeEpargne,
+      'paysResidenceId': ?paysResidenceId,
+      'villeResidence': ?villeResidence,
+      'whatsappE164': ?whatsappE164,
+      'relaisNom': ?relaisNom,
+      'relaisPhoneE164': ?relaisPhoneE164,
+    };
+    // Une chaine vide est refusee par le serveur sur les champs bornes, et le
+    // lot ENTIER repart alors en `invalid` : elle vaut « non renseigne ».
+    payload.removeWhere((String _, Object? v) => v is String && v.isEmpty);
+    return payload;
   }
 
   /// Le parcours s'ecrit des la saisie, sans attendre le serveur : hors ligne,

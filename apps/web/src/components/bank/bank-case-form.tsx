@@ -29,18 +29,20 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { bankBasePath } from '@/lib/bank-filters';
 import { createBankCase, fetchBankCases, searchBankProspects } from '@/lib/data/bank-cases';
 import { fetchBanques } from '@/lib/data/reference';
 import { formatPhone, withRetired } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
-import type { BankProspectSearchItem } from '@/lib/types';
+import type { BankProspectSearchItem, Projet } from '@/lib/types';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { cn } from '@/lib/utils';
 
-export function BankCaseForm() {
+export function BankCaseForm({ projet }: { projet: Projet }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const base = bankBasePath(projet);
 
   const searchId = useId();
   const referenceId = useId();
@@ -58,8 +60,8 @@ export function BankCaseForm() {
   const debounced = useDebouncedValue(term.trim());
 
   const results = useQuery({
-    queryKey: ['bank-prospect-search', debounced] as const,
-    queryFn: () => searchBankProspects(debounced),
+    queryKey: ['bank-prospect-search', projet, debounced] as const,
+    queryFn: () => searchBankProspects(debounced, projet),
     enabled: debounced.length >= 2 && selected === null,
     staleTime: 30_000,
   });
@@ -74,6 +76,8 @@ export function BankCaseForm() {
     mutationFn: (value: string) =>
       fetchBankCases({
         ...{
+          // Sans projet : une référence déjà prise par l'autre coque reste un doublon.
+          projet: null,
           search: value,
           stageId: null,
           stageType: null,
@@ -114,7 +118,7 @@ export function BankCaseForm() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.bankCasesRoot });
       void queryClient.invalidateQueries({ queryKey: queryKeys.bankAnalyticsRoot });
       toast.success(`Dossier ${bankCase.reference} ouvert.`);
-      router.push(`/chues/dossiers/${bankCase.id}`);
+      router.push(`${base}/dossiers/${bankCase.id}`);
     },
     onError: (error) => {
       if (error instanceof ApiError && error.status === 409) {
@@ -325,7 +329,7 @@ export function BankCaseForm() {
               <AlertTriangleIcon className="size-3.5 shrink-0" aria-hidden="true" />
               La référence « {duplicate.reference} » existe déjà.
               <Link
-                href={`/chues/dossiers/${duplicate.id}`}
+                href={`${base}/dossiers/${duplicate.id}`}
                 className="rounded-sm font-[600] underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >
                 Ouvrir ce dossier
@@ -382,7 +386,7 @@ export function BankCaseForm() {
         <div className="mx-auto flex max-w-2xl items-center justify-end gap-3">
           {/* Un LIEN habillé en bouton : la primitive `Button` de Base UI
               poserait `role="button"` sur le `<a>`. */}
-          <Link href="/chues/dossiers" className={buttonVariants({ variant: 'ghost' })}>
+          <Link href={`${base}/dossiers`} className={buttonVariants({ variant: 'ghost' })}>
             Annuler
           </Link>
           <Button type="submit" size="lg" disabled={!canSubmit} className="flex-1 sm:flex-none">

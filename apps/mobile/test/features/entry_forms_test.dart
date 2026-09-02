@@ -93,6 +93,17 @@ Future<void> jusquAuContact(WidgetTester tester) async {
 /// La saisie d'un prospect CHUES se fait en DEUX étapes : qui est-ce, puis sa
 /// banque et son syndicat. Un test qui vise la banque doit franchir la
 /// première, comme le téléconseiller.
+/// Le retour d'étape passe par l'action d'en-tête du kit, pas par le bouton
+/// Cupertino que cherche `pageBack` : l'écran n'a pas d'`AppBar` Material.
+Future<void> etapePrecedente(WidgetTester tester) async {
+  await tester.tap(
+    find.byWidgetPredicate(
+      (Widget w) => w is CpiHeaderAction && w.label == 'Étape précédente',
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
 Future<void> etapeProspectQui(
   WidgetTester tester, {
   String prenom = 'Awa',
@@ -624,6 +635,56 @@ void main() {
       );
     });
 
+    // Une situation ne pose QUE ses questions. Les poser toutes aux quatre,
+    // c'est une saisie de terrain trois fois trop longue et des champs vides
+    // qui ne veulent rien dire dans l'export.
+    formTestWidgets('chaque situation pose ses propres questions', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        host(const ProspectEntryScreen(projet: 'GRAND_PUBLIC')),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(champ('Nom'), 'Ndiaye');
+      await tester.enterText(champ('Téléphone'), '77 000 00 42');
+      await tester.pumpAndSettle();
+
+      const Map<String, List<String>> attendu = <String, List<String>>{
+        'Fonctionnaire': <String>['Ministère ou structure', 'Ancienneté'],
+        'Secteur privé': <String>['Employeur', 'Type de contrat', 'Ancienneté'],
+        'Informel': <String>['Activité', 'Lieu d\'activité', 'Mode d\'épargne'],
+        'Diaspora': <String>[
+          'Pays de résidence',
+          'Ville',
+          'Profession là-bas',
+          'Numéro WhatsApp',
+          'Personne relais au Sénégal',
+        ],
+      };
+
+      for (final MapEntry<String, List<String>> cas in attendu.entries) {
+        await tester.tap(find.text(cas.key));
+        await tester.pumpAndSettle();
+        await tester.tap(bouton('Continuer'));
+        await tester.pumpAndSettle();
+        for (final String label in cas.value) {
+          expect(find.text(label), findsOneWidget, reason: '${cas.key}/$label');
+        }
+        for (final MapEntry<String, List<String>> autre in attendu.entries) {
+          if (autre.key == cas.key) continue;
+          for (final String label in autre.value) {
+            if (cas.value.contains(label)) continue;
+            expect(
+              find.text(label),
+              findsNothing,
+              reason: '${cas.key} ne demande pas $label',
+            );
+          }
+        }
+        await etapePrecedente(tester);
+      }
+    });
+
     formTestWidgets('la fiche Grand Public emporte ses champs propres', (
       WidgetTester tester,
     ) async {
@@ -639,7 +700,10 @@ void main() {
       // Le travail est à l'étape 2, la banque et la provenance à l'étape 3.
       await tester.tap(bouton('Continuer'));
       await tester.pumpAndSettle();
-      await tester.enterText(champ('Profession'), 'Instituteur');
+      await tester.tap(champ('Ministère ou structure'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Ministère Test').last);
+      await tester.pumpAndSettle();
       await tester.enterText(champ('Ancienneté'), '24');
       await tester.pumpAndSettle();
       await tester.tap(bouton('Continuer'));
@@ -648,6 +712,16 @@ void main() {
       // font 48 dp au plancher : le formulaire est plus haut qu'avec les
       // étiquettes flottantes de Material, et la `ListView` ne construit même
       // plus le dernier champ tant qu'on ne l'a pas amené à l'image.
+      await tester.scrollUntilVisible(
+        find.text('Tranche de revenus'),
+        160,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(champ('Tranche de revenus'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Revenu Test').last);
+      await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
         find.text('Provenance'),
         160,
@@ -669,15 +743,99 @@ void main() {
       final Prospect fiche = (await db.select(db.prospects).get()).single;
       expect(fiche.projet, 'GRAND_PUBLIC');
       expect(fiche.type, 'FONCTIONNAIRE');
-      expect(fiche.profession, 'Instituteur');
-      expect(fiche.dureeSystemeMois, 24);
+      expect(fiche.employeurId, 'emp-min');
+      expect(fiche.ancienneteMois, 24);
+      // L'ancienneté du prospect n'est PAS la durée de son plan de paiement :
+      // le formulaire écrivait dans la seconde.
+      expect(fiche.dureeSystemeMois, isNull);
+      expect(fiche.incomeBandId, 'rev-1');
       expect(fiche.canalProvenanceId, 'cn-1');
+
+      final Map<String, Object?> envoi =
+          jsonDecode(
+                (await allOutbox(db))
+                    .firstWhere((OutboxData o) => o.entityType == 'prospect')
+                    .payload,
+              )
+              as Map<String, Object?>;
+      expect(envoi['employeurId'], 'emp-min');
+      expect(envoi['ancienneteMois'], 24);
+      expect(envoi['incomeBandId'], 'rev-1');
+      expect(envoi.containsKey('dureeSystemeMois'), isFalse);
+      // L'employeur du référentiel est cité par son identifiant : le doubler en
+      // clair ferait vieillir une copie que personne ne corrigera.
+      expect(envoi.containsKey('employeur'), isFalse);
+
       // Le parcours s'ouvre à la saisie : sans lui la fiche n'apparaîtrait dans
       // aucune liste de projet tant que le serveur ne l'a pas rendue.
       expect(
         (await db.select(db.prospectJourneys).get()).single.projet,
         'GRAND_PUBLIC',
       );
+    });
+
+    // Le numéro d'un prospect de la diaspora n'est pas sénégalais : le champ
+    // strict lui coupait ses chiffres au neuvième et enregistrait un AUTRE
+    // numéro.
+    formTestWidgets('la diaspora enregistre un numéro de son pays', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        host(const ProspectEntryScreen(projet: 'GRAND_PUBLIC')),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(champ('Nom'), 'Ba');
+      await tester.tap(find.text('Diaspora'));
+      await tester.pumpAndSettle();
+
+      // Le pays se choisit à l'étape 2 : tant qu'il n'est pas dit, l'indicatif
+      // du champ reste sénégalais et le numéro italien n'est pas complet.
+      await tester.enterText(champ('Téléphone'), '333 123 4567');
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<CpiButton>(bouton('Continuer')).subtitle,
+        'Écrivez le numéro complet',
+      );
+
+      await tester.enterText(champ('Téléphone'), '77 000 00 42');
+      await tester.pumpAndSettle();
+      await tester.tap(bouton('Continuer'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(champ('Pays de résidence'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Italie').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(champ('Ville'), 'Milan');
+      await tester.enterText(champ('Numéro WhatsApp'), '3331234567');
+      await tester.pumpAndSettle();
+      // L'indicatif choisi met le numéro en forme au fil de la frappe.
+      expect(
+        tester.widget<TextField>(champ('Numéro WhatsApp')).controller!.text,
+        '333 123 4567',
+      );
+
+      await etapePrecedente(tester);
+      await tester.enterText(champ('Téléphone'), '333 123 4567');
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<CpiButton>(bouton('Continuer')).onPressed,
+        isNotNull,
+      );
+      await tester.tap(bouton('Continuer'));
+      await tester.pumpAndSettle();
+      await tester.tap(bouton('Continuer'));
+      await tester.pumpAndSettle();
+      await tester.tap(bouton('Enregistrer et suivant'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final Prospect fiche = (await db.select(db.prospects).get()).single;
+      expect(fiche.phoneE164, '+393331234567');
+      expect(fiche.whatsappE164, '+393331234567');
+      expect(fiche.paysResidenceId, 'pays-it');
+      expect(fiche.villeResidence, 'Milan');
     });
 
     formTestWidgets('un brouillon d\'un AUTRE représentant n\'est pas repris', (
@@ -1609,8 +1767,19 @@ class _SlowWrites extends WriteRepository {
     String? projet,
     String? type,
     String? profession,
-    int? dureeSystemeMois,
     String? canalProvenanceId,
+    String? incomeBandId,
+    String? employeurId,
+    String? employeur,
+    String? typeContrat,
+    int? ancienneteMois,
+    String? lieuActivite,
+    String? modeEpargne,
+    String? paysResidenceId,
+    String? villeResidence,
+    String? whatsappE164,
+    String? relaisNom,
+    String? relaisPhoneE164,
     String? id,
     String? draftId,
   }) async {

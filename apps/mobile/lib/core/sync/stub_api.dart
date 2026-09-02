@@ -71,6 +71,8 @@ class StubApi implements ApiPort {
         syndicats: const <SyndicatDto>[],
         canauxProvenance: const <CanalProvenanceDto>[],
         incomeBands: const <IncomeBandDto>[],
+        employeurs: const <EmployeurDto>[],
+        pays: const <PaysDto>[],
         visiteReferentiels: const <SyncVisiteReferentielDto>[],
         representants: const <RepresentantDto>[],
         prospects: const <ProspectDto>[],
