@@ -13,7 +13,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { ChangeSource, RepresentantRelation, WhatsappStatus } from '@crm/database';
+import { ChangeSource, RepCallOutcome, RepresentantRelation, WhatsappStatus } from '@crm/database';
 
 import { PageMetaDto, SortOrder } from '../../common/dto/prospect-filter.dto.js';
 import { queryBoolean } from '../../common/dto/query-boolean.js';
@@ -225,6 +225,24 @@ export class RepresentantDto {
   @ApiProperty({ type: String, nullable: true }) syndicat!: string | null;
   @ApiProperty({ type: Boolean, nullable: true }) connaitUES!: boolean | null;
   @ApiProperty({ type: Boolean, nullable: true }) contacte!: boolean | null;
+
+  @ApiProperty({
+    enum: RepCallOutcome,
+    enumName: 'RepCallOutcome',
+    nullable: true,
+    description: 'Issue du dernier appel. Nul : jamais appelé.',
+  })
+  lastCallOutcome!: RepCallOutcome | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) lastCallAt!: string | null;
+  @ApiProperty({ type: String, format: 'uuid', nullable: true }) lastCallById!: string | null;
+  @ApiProperty({ type: String, nullable: true }) lastCallByName!: string | null;
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description: 'Rappel promis par le dernier appel, tant qu’aucun appel ne l’a honoré.',
+  })
+  nextCallbackAt!: string | null;
 }
 
 export class RepresentantListDto {
@@ -237,6 +255,14 @@ export enum RepresentantSortField {
   CREATED_AT = 'createdAt',
   FULL_NAME = 'fullName',
   PROSPECTS = 'prospects',
+  LAST_CALL_AT = 'lastCallAt',
+  NEXT_CALLBACK_AT = 'nextCallbackAt',
+}
+
+/** Ce que le dernier appel laisse à faire. */
+export enum RepresentantSuivi {
+  A_RAPPELER = 'A_RAPPELER',
+  INJOIGNABLE = 'INJOIGNABLE',
 }
 
 export class RepresentantExportQueryDto {
@@ -301,6 +327,24 @@ export class RepresentantExportQueryDto {
   @Transform(queryBoolean)
   @IsBoolean()
   hasWhatsapp?: boolean;
+
+  @ApiPropertyOptional({
+    enum: RepresentantSuivi,
+    enumName: 'RepresentantSuivi',
+    description:
+      'A_RAPPELER : un rappel promis reste dû (`nextCallbackAt`), tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien.',
+  })
+  @IsOptional()
+  @IsEnum(RepresentantSuivi)
+  suivi?: RepresentantSuivi;
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Qui a passé le dernier appel. Un téléconseiller y met son propre identifiant.',
+  })
+  @IsOptional()
+  @IsUUID()
+  lastCallById?: string;
 }
 
 export class RepresentantQueryDto extends RepresentantExportQueryDto {

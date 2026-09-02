@@ -55,7 +55,13 @@ class RappelsScreen extends ConsumerWidget {
             ),
           ),
           data: (List<Rappel> rows) {
-            if (rows.isEmpty) return const _Vide();
+            // Ceux que mon dernier appel n'a pas joints : ils n'ont pas de
+            // rappel promis, et sans cette section rien ne les ramène.
+            final List<Rappel> injoignables = grandPublic
+                ? const <Rappel>[]
+                : (ref.watch(representantsInjoignablesProvider).value ??
+                      const <Rappel>[]);
+            if (rows.isEmpty && injoignables.isEmpty) return const _Vide();
             return ListView.builder(
               padding: const EdgeInsets.fromLTRB(
                 CpiSpacing.md,
@@ -63,18 +69,28 @@ class RappelsScreen extends ConsumerWidget {
                 CpiSpacing.md,
                 CpiSpacing.xxl,
               ),
-              itemCount: rows.length,
-              itemBuilder: (BuildContext context, int index) => Padding(
-                padding: const EdgeInsets.only(bottom: CpiSpacing.xs),
-                child: _RappelTile(
-                  key: ValueKey<String>(rows[index].id),
-                  rappel: rows[index],
-                  maintenant: maintenant,
-                  destination: grandPublic
-                      ? Routes.prospectDetailFor(rows[index].sujetId)
-                      : Routes.representantDetailFor(rows[index].sujetId),
-                ),
-              ),
+              itemCount:
+                  rows.length +
+                  (injoignables.isEmpty ? 0 : injoignables.length + 1),
+              itemBuilder: (BuildContext context, int index) {
+                if (index == rows.length) return const _TitreInjoignables();
+                final bool injoignable = index > rows.length;
+                final Rappel rappel = injoignable
+                    ? injoignables[index - rows.length - 1]
+                    : rows[index];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: CpiSpacing.xs),
+                  child: _RappelTile(
+                    key: ValueKey<String>(rappel.id),
+                    rappel: rappel,
+                    maintenant: maintenant,
+                    injoignable: injoignable,
+                    destination: grandPublic
+                        ? Routes.prospectDetailFor(rappel.sujetId)
+                        : Routes.representantDetailFor(rappel.sujetId),
+                  ),
+                );
+              },
             );
           },
         ),
@@ -91,19 +107,25 @@ class _RappelTile extends StatelessWidget {
     required this.rappel,
     required this.maintenant,
     required this.destination,
+    this.injoignable = false,
   });
 
   final Rappel rappel;
   final DateTime maintenant;
   final String destination;
 
+  /// Aucun rappel n'a été promis : la date est celle du dernier appel, et rien
+  /// n'est en retard.
+  final bool injoignable;
+
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final ColorScheme scheme = theme.colorScheme;
-    final String heure = quandRappeler(context, rappel.at, maintenant);
+    final String quand = quandRappeler(context, rappel.at, maintenant);
+    final String heure = injoignable ? 'Dernier appel : $quand' : quand;
     final String phone = Phone.format(rappel.phoneE164);
-    final bool enRetard = rappel.at.isBefore(maintenant);
+    final bool enRetard = !injoignable && rappel.at.isBefore(maintenant);
 
     void ouvrir() {
       HapticFeedback.selectionClick().ignore();
@@ -177,6 +199,22 @@ String quandRappeler(BuildContext context, DateTime at, DateTime maintenant) {
   final String heure = l.formatTimeOfDay(TimeOfDay.fromDateTime(local));
   if (DateUtils.isSameDay(local, maintenant.toUtc())) return heure;
   return '${l.formatMediumDate(local)} à $heure';
+}
+
+class _TitreInjoignables extends StatelessWidget {
+  const _TitreInjoignables();
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: CpiSpacing.md, bottom: CpiSpacing.sm),
+    child: Semantics(
+      header: true,
+      child: Text(
+        'Injoignables',
+        style: Theme.of(context).textTheme.titleSmall,
+      ),
+    ),
+  );
 }
 
 class _Vide extends StatelessWidget {

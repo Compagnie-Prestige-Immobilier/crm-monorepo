@@ -91,6 +91,14 @@ describe('RepresentantsView, état vide', () => {
     expect(screen.queryByText('Aucun représentant enregistré.')).toBeNull();
   });
 
+  it('dit au téléconseiller que ce sont SES campagnes qui sont vides', async () => {
+    setUrl('/chues/representants');
+    renderWithQuery(<RepresentantsView canAdminister={false} campaignScoped />);
+
+    expect(await screen.findByText('Vos campagnes n’en contiennent aucun.')).toBeTruthy();
+    expect(screen.queryByText(/saisies en tournée depuis le mobile/)).toBeNull();
+  });
+
   it('ne propose l’import Excel qu’aux administrateurs', async () => {
     setUrl('/chues/representants');
     renderWithQuery(<RepresentantsView canAdminister={false} />);

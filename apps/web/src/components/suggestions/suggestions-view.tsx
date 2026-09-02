@@ -38,7 +38,7 @@ const STATUS_VARIANTS = {
   ABANDONNE: 'outline',
 } as const;
 
-export function SuggestionsView({ readOnly = false }: { readOnly?: boolean }) {
+export function SuggestionsView() {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<SuggestionStatus | null>(null);
   const [creatingFrom, setCreatingFrom] = useState<Suggestion | null>(null);
@@ -145,7 +145,6 @@ export function SuggestionsView({ readOnly = false }: { readOnly?: boolean }) {
                       <SuggestionCard
                         suggestion={suggestion}
                         sameNumberCount={counts.get(suggestion.suggestedPhoneE164) ?? 1}
-                        readOnly={readOnly}
                         pending={decide.isPending}
                         onDecide={(next) => {
                           decide.mutate({ id: suggestion.id, status: next });
@@ -178,14 +177,12 @@ export function SuggestionsView({ readOnly = false }: { readOnly?: boolean }) {
 function SuggestionCard({
   suggestion,
   sameNumberCount,
-  readOnly,
   pending,
   onDecide,
   onCreate,
 }: {
   suggestion: Suggestion;
   sameNumberCount: number;
-  readOnly: boolean;
   pending: boolean;
   onDecide: (status: SuggestionStatus) => void;
   onCreate: () => void;
@@ -232,52 +229,50 @@ function SuggestionCard({
         </time>
       </p>
 
-      {readOnly ? null : (
-        <div className="flex flex-wrap gap-2">
-          {suggestion.status === 'A_APPELER' ? (
-            <>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={pending}
-                onClick={() => {
-                  onDecide('APPELE');
-                }}
-              >
-                <CheckIcon aria-hidden="true" />
-                Marquer appelé
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                disabled={pending}
-                onClick={() => {
-                  onDecide('ABANDONNE');
-                }}
-              >
-                <XIcon aria-hidden="true" />
-                Abandonner
-              </Button>
-            </>
-          ) : null}
-
-          {known === null ? (
-            <Button type="button" size="sm" variant="outline" onClick={onCreate}>
-              <UserPlusIcon aria-hidden="true" />
-              Créer la fiche
-            </Button>
-          ) : (
-            <Link
-              href={`/chues/representants/${known}`}
-              className="self-center text-[0.8125rem] underline underline-offset-4"
+      <div className="flex flex-wrap gap-2">
+        {suggestion.status === 'A_APPELER' ? (
+          <>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={pending}
+              onClick={() => {
+                onDecide('APPELE');
+              }}
             >
-              Ouvrir la fiche existante
-            </Link>
-          )}
-        </div>
-      )}
+              <CheckIcon aria-hidden="true" />
+              Marquer appelé
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={pending}
+              onClick={() => {
+                onDecide('ABANDONNE');
+              }}
+            >
+              <XIcon aria-hidden="true" />
+              Abandonner
+            </Button>
+          </>
+        ) : null}
+
+        {known === null ? (
+          <Button type="button" size="sm" variant="outline" onClick={onCreate}>
+            <UserPlusIcon aria-hidden="true" />
+            Créer la fiche
+          </Button>
+        ) : (
+          <Link
+            href={`/chues/representants/${known}`}
+            className="self-center text-[0.8125rem] underline underline-offset-4"
+          >
+            Ouvrir la fiche existante
+          </Link>
+        )}
+      </div>
     </article>
   );
 }

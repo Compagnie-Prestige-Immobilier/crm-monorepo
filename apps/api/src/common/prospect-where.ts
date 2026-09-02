@@ -51,6 +51,7 @@ function applyDirectFilters(
         phase2Status: filter.phase2Status,
         enrollmentMethod: filter.enrollmentMethod,
         enrollmentCapturedById: filter.enrollmentCapturedById,
+        lastCallById: filter.lastCallById,
       }).filter(([, value]) => value !== undefined),
     ),
   );

@@ -47,6 +47,7 @@ export default async function RepresentantsPage({
         canAdminister={guard.user.role === 'ADMIN'}
         readOnly={readsOnly(guard.user.role)}
         canExport={canExportRepresentants(guard.user.role)}
+        campaignScoped={guard.user.role === 'COMMERCIAL'}
       />
     </HydrationBoundary>
   );

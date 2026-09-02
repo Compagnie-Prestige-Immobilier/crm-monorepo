@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -12,6 +13,8 @@ import {
   type Projet,
 } from '@crm/database';
 
+import { attributionScope } from '../../common/scope.js';
+import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { normalizeAttempt, systemReasonFor, type AttemptReason } from './attempt-rules.js';
 import {
   CallAttemptApplyStatus,
@@ -27,6 +30,7 @@ interface ProspectState {
   projet: Projet;
   rev: number;
   updatedAt: Date;
+  lastCallAt: Date | null;
 }
 
 /** L'état de phase 2 vit sur le PARCOURS ; la fiche ne porte plus que sa révision. */
@@ -43,6 +47,7 @@ const PROSPECT_STATE_SELECT = {
   projet: true,
   rev: true,
   updatedAt: true,
+  lastCallAt: true,
 } satisfies Prisma.ProspectSelect;
 
 const JOURNEY_STATE_SELECT = {
@@ -77,6 +82,12 @@ export const PHASE2_REASON_UNKNOWN = 'PHASE2_REASON_UNKNOWN';
 export const PHASE2_REASON_INACTIVE = 'PHASE2_REASON_INACTIVE';
 export const PHASE2_REASON_OUTCOME_MISMATCH = 'PHASE2_REASON_OUTCOME_MISMATCH';
 
+const notAssigned = (): ForbiddenException =>
+  new ForbiddenException({
+    code: 'PHASE2_NOT_ASSIGNED',
+    message: 'Ce prospect n’est pas dans vos campagnes.',
+  });
+
 const alreadyCompleted = (state: ProspectPhase2StateDto): ConflictException =>
   new ConflictException({
     code: 'PHASE2_ALREADY_COMPLETED',
@@ -85,11 +96,19 @@ const alreadyCompleted = (state: ProspectPhase2StateDto): ConflictException =>
     state,
   });
 
+// Une tentative arrivée hors ligne peut être plus ancienne que le dernier appel
+// connu : elle ne réécrit pas la fiche.
+function dernierAppel(op: CallAttemptOpDto, userId: string, lastCallAt: Date | null) {
+  const at = new Date(op.clientCreatedAt);
+  if (lastCallAt !== null && at < lastCallAt) return {};
+  return { lastCallOutcome: op.outcome, lastCallAt: at, lastCallById: userId };
+}
+
 @Injectable()
 export class Phase2SyncService {
   async applyCallAttempt(
     tx: Phase2TransactionClient,
-    userId: string,
+    user: Pick<AuthenticatedUser, 'id' | 'role'>,
     op: CallAttemptOpDto,
   ): Promise<CallAttemptResultDto> {
     const attempt = normalizeAttempt(op, await this.resolveReason(tx, op));
@@ -99,11 +118,14 @@ export class Phase2SyncService {
       select: { id: true },
     });
 
+    // Le rejeu n'est PAS revérifié : une réattribution ne doit pas condamner la
+    // file d'un téléphone qui redemande le verdict d'une tentative déjà admise.
     if (known) {
       return this.duplicateResult(tx, op, known.id);
     }
 
     const prospect = await this.loadProspect(tx, op.prospectId);
+    await this.assertAssigned(tx, user, op.prospectId);
     const projet = op.projet ?? prospect.projet;
     const journey = await this.loadJourney(tx, op.prospectId, projet);
     if (journey.phase2Status !== Phase2Status.PENDING) {
@@ -115,7 +137,7 @@ export class Phase2SyncService {
         {
           id: op.id,
           prospectId: op.prospectId,
-          performedById: userId,
+          performedById: user.id,
           outcome: attempt.outcome,
           reasonId: attempt.reasonId,
           method: attempt.method,
@@ -135,8 +157,8 @@ export class Phase2SyncService {
       return this.duplicateResult(tx, op, op.id, projet);
     }
 
-    const corrige = await this.correctProspect(tx, op, prospect);
-    await this.scheduleCallback(tx, userId, op, attempt);
+    const corrige = await this.correctProspect(tx, user.id, op, prospect);
+    await this.scheduleCallback(tx, user.id, op, attempt);
 
     if (!attempt.terminal || attempt.phase2Status === null) {
       return {
@@ -146,7 +168,7 @@ export class Phase2SyncService {
       };
     }
 
-    return this.completeAttempt(tx, userId, op, attempt, corrige, journey, projet);
+    return this.completeAttempt(tx, user.id, op, attempt, corrige, journey, projet);
   }
 
   private async duplicateResult(
@@ -175,6 +197,7 @@ export class Phase2SyncService {
    */
   private async correctProspect(
     tx: Phase2TransactionClient,
+    userId: string,
     op: CallAttemptOpDto,
     current: ProspectState,
   ): Promise<ProspectState> {
@@ -192,14 +215,40 @@ export class Phase2SyncService {
       ...(op.paymentMode === undefined ? {} : { paymentMode: op.paymentMode }),
       ...(op.dureeSystemeMois === undefined ? {} : { dureeSystemeMois: op.dureeSystemeMois }),
     };
-    if (Object.keys(data).length === 0) return current;
+    const dernier = dernierAppel(op, userId, current.lastCallAt);
+    if (Object.keys(data).length === 0 && Object.keys(dernier).length === 0) return current;
 
+    // Le report du dernier appel ne fait PAS avancer `rev` : c'est la révision
+    // que le mobile compare avant d'écrire, et la bousculer à chaque tentative
+    // ferait rejeter en conflit la mise à jour suivante de la même fiche.
     const row = await tx.prospect.update({
       where: { id: current.id },
-      data: { ...data, rev: { increment: 1 } },
+      data: {
+        ...data,
+        ...dernier,
+        ...(Object.keys(data).length === 0 ? {} : { rev: { increment: 1 } }),
+      },
       select: PROSPECT_STATE_SELECT,
     });
     return row;
+  }
+
+  /**
+   * Un téléconseiller n'appelle que ses campagnes. L'encadrement n'est pas borné :
+   * `attributionScope` rend alors une clause vide et la lecture est évitée.
+   */
+  private async assertAssigned(
+    tx: Phase2TransactionClient,
+    user: Pick<AuthenticatedUser, 'id' | 'role'>,
+    prospectId: string,
+  ): Promise<void> {
+    const portee = attributionScope(user);
+    if (!portee.OR) return;
+    const mien = await tx.prospect.findFirst({
+      where: { id: prospectId, ...portee },
+      select: { id: true },
+    });
+    if (!mien) throw notAssigned();
   }
 
   private async scheduleCallback(

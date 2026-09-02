@@ -8,7 +8,6 @@ import { getServerApiClient } from '@/lib/api/server';
 import { fetchSuggestions, suggestionsQueryKey } from '@/lib/data/suggestions';
 import { getQueryClient } from '@/lib/query-client';
 import { guardRoles } from '@/lib/session';
-import { readsOnly } from '@/lib/types';
 
 export const metadata: Metadata = { title: 'Numéros suggérés' };
 
@@ -32,7 +31,7 @@ export default async function SuggestionsPage() {
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <SuggestionsView readOnly={readsOnly(guard.user.role)} />
+      <SuggestionsView />
     </HydrationBoundary>
   );
 }

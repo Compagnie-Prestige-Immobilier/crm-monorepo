@@ -194,22 +194,13 @@ void main() {
     // Ni numéro ni WhatsApp ne sont demandés à un non-ambassadeur.
     expect(find.text('Confirmer le numéro ?'), findsNothing);
     expect(find.text('A-t-il WhatsApp sur ce numéro ?'), findsNothing);
-    expect(
-      tester.widget<TextField>(champ('Son nom et prénom (facultatif)')).enabled,
-      isTrue,
-    );
 
+    await tester.enterText(champ('Son numéro'), '77 123 45 67');
+    await tester.pump();
     await tester.enterText(
       champ('Son nom et prénom (facultatif)'),
       'Fatou Sarr',
     );
-    await tester.pump();
-    expect(
-      continuer(tester).subtitle,
-      'Écrivez le numéro de la personne proposée',
-    );
-
-    await tester.enterText(champ('Son numéro'), '77 123 45 67');
     await tester.pump();
     await tester.enterText(
       champ('Sa remarque (facultatif)'),
@@ -227,6 +218,107 @@ void main() {
     expect(writes.suggestedNote, 'Elle est déléguée du personnel.');
     expect(writes.outcome, 'REFUSED');
     expect(writes.relationStatus, 'REFUS');
+
+    await demonter(tester);
+  });
+
+  // Le serveur jette le nom et la remarque sans numéro : les demander avant lui
+  // faisait saisir pour rien.
+  testWidgets('le nom et la remarque n\'arrivent qu\'après le numéro', (
+    WidgetTester tester,
+  ) async {
+    await ouvrir(tester);
+
+    await taper(tester, find.text('Joignable'));
+    await renseignements(tester);
+    await taper(tester, tuile('Ambassadeur ?', 'Non'));
+
+    expect(find.text('Son numéro'), findsOneWidget);
+    expect(find.text('Son nom et prénom (facultatif)'), findsNothing);
+    expect(find.text('Sa remarque (facultatif)'), findsNothing);
+
+    await tester.enterText(champ('Son numéro'), '77 123 45 67');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Son nom et prénom (facultatif)'), findsOneWidget);
+    expect(find.text('Sa remarque (facultatif)'), findsOneWidget);
+
+    await demonter(tester);
+  });
+
+  // Joignable ne veut pas dire disponible : il répond, il donne ses réponses,
+  // et il demande à être rappelé plus tard. L'écran ne le permettait pas.
+  testWidgets('un appel abouti peut porter un rappel facultatif', (
+    WidgetTester tester,
+  ) async {
+    await ouvrir(tester);
+
+    await taper(tester, find.text('Joignable'));
+    await renseignements(tester);
+    await taper(tester, tuile('Ambassadeur ?', 'Oui'));
+    await taper(tester, tuile('A-t-il WhatsApp sur ce numéro ?', 'Oui'));
+
+    expect(find.text('Le rappeler plus tard ? (facultatif)'), findsOneWidget);
+    await taper(tester, find.text('Demain 9 h'));
+
+    await versLesDetails(tester);
+    expect(find.text('Rappel'), findsOneWidget);
+
+    await tester.tap(find.text('Enregistrer'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    // L'issue reste celle de l'appel : le rappel s'y ajoute, il ne la remplace
+    // pas. Le serveur accepte désormais `callbackAt` sur toute issue.
+    expect(writes.outcome, 'REACHED');
+    expect(writes.callbackAt, isNotNull);
+    expect(alarmes.posees.single.at.hour, 9);
+
+    await demonter(tester);
+  });
+
+  testWidgets('un refus peut lui aussi porter un rappel facultatif', (
+    WidgetTester tester,
+  ) async {
+    await ouvrir(tester);
+
+    await taper(tester, find.text('Joignable'));
+    await renseignements(tester);
+    await taper(tester, tuile('Ambassadeur ?', 'Non'));
+    await taper(tester, find.text('Demain 9 h'));
+
+    await versLesDetails(tester);
+    await tester.tap(find.text('Enregistrer'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(writes.outcome, 'REFUSED');
+    expect(writes.callbackAt, isNotNull);
+
+    await demonter(tester);
+  });
+
+  // Le sélecteur qu'on quitte laissait sa date derrière lui : un « injoignable »
+  // repartait avec l'heure choisie sur la branche précédente.
+  testWidgets('changer de résultat efface l\'heure déjà choisie', (
+    WidgetTester tester,
+  ) async {
+    await ouvrir(tester);
+
+    await taper(tester, find.text('À rappeler'));
+    await taper(tester, find.text('Demain 9 h'));
+    await taper(tester, find.text('Injoignable'));
+
+    await versLesDetails(tester);
+    expect(find.text('Rappel'), findsNothing);
+
+    await tester.tap(find.text('Enregistrer'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(writes.outcome, 'UNREACHABLE');
+    expect(writes.callbackAt, isNull);
 
     await demonter(tester);
   });
@@ -346,6 +438,7 @@ void main() {
   ) async {
     final String promis = await writes.recordRepCallAttempt(
       representantId: 'rep-1',
+      createdById: 'u-1',
       outcome: 'CALLBACK',
       callbackAt: t0.add(const Duration(hours: 2)),
     );
@@ -400,11 +493,13 @@ class _WritesEspion extends WriteRepository {
   String? suggestedPhone;
   String? suggestedName;
   String? suggestedNote;
+  DateTime? callbackAt;
 
   @override
   Future<String> recordRepCallAttempt({
     required String representantId,
     required String outcome,
+    String? createdById,
     String? relationStatus,
     String? whatsappStatus,
     String? whatsappE164,
@@ -424,12 +519,14 @@ class _WritesEspion extends WriteRepository {
   }) async {
     this.outcome = outcome;
     this.relationStatus = relationStatus;
+    this.callbackAt = callbackAt;
     this.suggestedPhone = suggestedPhone;
     this.suggestedName = suggestedName;
     this.suggestedNote = suggestedNote;
     return super.recordRepCallAttempt(
       representantId: representantId,
       outcome: outcome,
+      createdById: createdById,
       relationStatus: relationStatus,
       whatsappStatus: whatsappStatus,
       whatsappE164: whatsappE164,

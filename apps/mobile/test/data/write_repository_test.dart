@@ -705,29 +705,72 @@ void main() {
   });
 
   group('payload', () {
-    test(
-      'qualifier un représentant met à jour la fiche',
-      () async {
-        await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+    test('qualifier un représentant met à jour la fiche', () async {
+      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
 
-        await repo.recordRepCallAttempt(
-          representantId: 'repA',
-          outcome: 'REACHED',
-          relationStatus: 'AMBASSADEUR',
-          whatsappStatus: 'MEME_NUMERO',
-          comment: 'Disponible.',
-        );
+      await repo.recordRepCallAttempt(
+        representantId: 'repA',
+        createdById: 'u-1',
+        outcome: 'REACHED',
+        relationStatus: 'AMBASSADEUR',
+        whatsappStatus: 'MEME_NUMERO',
+        comment: 'Disponible.',
+      );
 
-        final Representant rep = await (db.select(
-          db.representants,
-        )..where((Representants row) => row.id.equals('repA'))).getSingle();
-        expect(rep.relationStatus, 'AMBASSADEUR');
-        expect(rep.whatsappStatus, 'MEME_NUMERO');
-        final OutboxData op = (await allOutbox(db)).single;
-        expect(op.entityType, repCallAttemptEntity);
-        expect(jsonDecode(op.payload), containsPair('comment', 'Disponible.'));
-      },
-    );
+      final Representant rep = await (db.select(
+        db.representants,
+      )..where((Representants row) => row.id.equals('repA'))).getSingle();
+      expect(rep.relationStatus, 'AMBASSADEUR');
+      expect(rep.whatsappStatus, 'MEME_NUMERO');
+      final OutboxData op = (await allOutbox(db)).single;
+      expect(op.entityType, repCallAttemptEntity);
+      expect(jsonDecode(op.payload), containsPair('comment', 'Disponible.'));
+    });
+
+    // Sans écriture locale, « Mes contacts » et « Injoignables » attendaient la
+    // remontée pour voir un appel consigné hors ligne.
+    test('le résumé du dernier appel s\'écrit tout de suite', () async {
+      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+      final DateTime rappelAt = t0.add(const Duration(hours: 2));
+
+      await repo.recordRepCallAttempt(
+        representantId: 'repA',
+        createdById: 'u-1',
+        outcome: 'CALLBACK',
+        callbackAt: rappelAt,
+      );
+
+      final Representant rep = await (db.select(
+        db.representants,
+      )..where((Representants row) => row.id.equals('repA'))).getSingle();
+      expect(rep.lastCallOutcome, 'CALLBACK');
+      expect(rep.lastCallAt, t0);
+      expect(rep.lastCallById, 'u-1');
+      expect(rep.nextCallbackAt, rappelAt);
+    });
+
+    test('un appel de prospect écrit aussi son résumé local', () async {
+      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+      await insertProspect(
+        db,
+        id: 'proA',
+        representantId: 'repA',
+        phone: '+221780000001',
+      );
+
+      await repo.recordCallAttempt(
+        prospectId: 'proA',
+        outcome: CallOutcomes.unreachable,
+        createdById: 'u-1',
+      );
+
+      final Prospect fiche = await (db.select(
+        db.prospects,
+      )..where((Prospects row) => row.id.equals('proA'))).getSingle();
+      expect(fiche.lastCallOutcome, 'UNREACHABLE');
+      expect(fiche.lastCallAt, t0);
+      expect(fiche.lastCallById, 'u-1');
+    });
 
     test(
       'un rappel pose un rappel local et le porte dans le payload',
@@ -742,6 +785,7 @@ void main() {
 
         final String attemptId = await repo.recordRepCallAttempt(
           representantId: 'repA',
+          createdById: 'u-1',
           outcome: 'CALLBACK',
           callbackAt: rappelAt,
         );
@@ -771,12 +815,14 @@ void main() {
       await insertRepresentant(db, id: 'repA', phone: '+221770000001');
       final String promis = await repo.recordRepCallAttempt(
         representantId: 'repA',
+        createdById: 'u-1',
         outcome: 'CALLBACK',
         callbackAt: t0.add(const Duration(hours: 2)),
       );
 
       final String tenu = await repo.recordRepCallAttempt(
         representantId: 'repA',
+        createdById: 'u-1',
         outcome: 'REACHED',
         relationStatus: 'AMBASSADEUR',
         whatsappStatus: 'MEME_NUMERO',
@@ -796,6 +842,7 @@ void main() {
       await insertRepresentant(db, id: 'repA', phone: '+221770000001');
       final String promis = await repo.recordRepCallAttempt(
         representantId: 'repA',
+        createdById: 'u-1',
         outcome: 'CALLBACK',
         callbackAt: t0.add(const Duration(hours: 2)),
       );
@@ -814,6 +861,7 @@ void main() {
 
       await repo.recordRepCallAttempt(
         representantId: 'repA',
+        createdById: 'u-1',
         outcome: 'REFUSED',
         relationStatus: 'REFUS',
         suggestedPhone: '+221771234567',
@@ -834,6 +882,7 @@ void main() {
 
       await repo.recordRepCallAttempt(
         representantId: 'repA',
+        createdById: 'u-1',
         outcome: 'REFUSED',
         suggestedPhone: '   ',
         suggestedName: 'Fatou Sarr',

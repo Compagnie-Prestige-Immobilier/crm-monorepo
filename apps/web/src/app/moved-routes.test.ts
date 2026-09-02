@@ -9,7 +9,7 @@ import { PANEL_ROLES } from '@/lib/data/auth';
  * ne porte une adresse d'avant pour eux : leur donner une redirection
  * héritée n'aurait rien à ramener.
  */
-const NES_APRES = new Set(['/chues', '/chues/appels-representants']);
+const NES_APRES = new Set(['/chues', '/chues/appels-representants', '/chues/mes-contacts']);
 
 describe('anciennes adresses, d’avant le découpage en coques', () => {
   // Les notifications déjà envoyées portent l'adresse d'AVANT : aucun écran

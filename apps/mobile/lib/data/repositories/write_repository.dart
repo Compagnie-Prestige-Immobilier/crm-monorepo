@@ -925,6 +925,18 @@ class WriteRepository {
               createdById: createdById,
             ),
           );
+      // Le résumé du dernier appel vient du serveur au pull. L'écrire AUSSI ici
+      // est ce qui fait apparaître la fiche dans « Mes contacts » hors ligne,
+      // sans attendre la remontée.
+      await (_db.update(
+        _db.prospects,
+      )..where((Prospects t) => t.id.equals(prospectId))).write(
+        ProspectsCompanion(
+          lastCallOutcome: Value<String?>(reason.outcome),
+          lastCallAt: Value<DateTime?>(now),
+          lastCallById: Value<String?>(createdById),
+        ),
+      );
       await _enqueue(
         dependencyKey: 'phase2:$prospectId',
         entityType: callAttemptEntity,
@@ -975,9 +987,13 @@ class WriteRepository {
     return entityId;
   }
 
+  /// [createdById] ne sert qu'au résumé local du dernier appel. Nul quand la
+  /// session n'est pas lisible : l'appel se consigne quand même, et le pull
+  /// remettra l'auteur que le serveur a retenu.
   Future<String> recordRepCallAttempt({
     required String representantId,
     required String outcome,
+    String? createdById,
     String? relationStatus,
     String? whatsappStatus,
     String? whatsappE164,
@@ -1056,6 +1072,13 @@ class WriteRepository {
           contacte: contacte == null
               ? const Value<bool?>.absent()
               : Value<bool?>(contacte),
+          // Le résumé du dernier appel vient du serveur au pull. L'écrire AUSSI
+          // ici est ce qui fait apparaître la fiche dans « Mes contacts » et
+          // « Injoignables » hors ligne, sans attendre la remontée.
+          lastCallOutcome: Value<String?>(outcome),
+          lastCallAt: Value<DateTime?>(now),
+          lastCallById: Value<String?>(createdById),
+          nextCallbackAt: Value<DateTime?>(callbackAt),
           localUpdatedAt: Value<DateTime>(now),
         ),
       );

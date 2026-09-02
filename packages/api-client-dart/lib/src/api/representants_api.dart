@@ -22,6 +22,7 @@ import 'package:crm_api_client/src/model/representant_lookup_dto.dart';
 import 'package:crm_api_client/src/model/representant_relation.dart';
 import 'package:crm_api_client/src/model/representant_relation_change_list_dto.dart';
 import 'package:crm_api_client/src/model/representant_sort_field.dart';
+import 'package:crm_api_client/src/model/representant_suivi.dart';
 import 'package:crm_api_client/src/model/sort_order.dart';
 import 'package:crm_api_client/src/model/update_representant_dto.dart';
 import 'package:crm_api_client/src/model/whatsapp_status.dart';
@@ -756,8 +757,8 @@ class RepresentantsApi {
     );
   }
 
-  /// Liste paginée de l’annuaire, commun à tous les téléconseillers.
-  ///
+  /// Liste paginée de l’annuaire, borné aux campagnes de l’appelant.
+  /// Un COMMERCIAL ne voit que les représentants qu’il a créés ou qui lui sont attribués dans un lot d’export. ADMIN, SUPERVISEUR et DIRECTION voient tout.
   ///
   /// Parameters:
   /// * [search]
@@ -770,6 +771,8 @@ class RepresentantsApi {
   /// * [relationStatus]
   /// * [whatsappStatus]
   /// * [hasWhatsapp]
+  /// * [suivi] - A_RAPPELER : un rappel promis reste dû (`nextCallbackAt`), tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien.
+  /// * [lastCallById] - Qui a passé le dernier appel. Un téléconseiller y met son propre identifiant.
   /// * [sortBy]
   /// * [sortOrder]
   /// * [page]
@@ -794,6 +797,8 @@ class RepresentantsApi {
     RepresentantRelation? relationStatus,
     WhatsappStatus? whatsappStatus,
     bool? hasWhatsapp,
+    RepresentantSuivi? suivi,
+    String? lastCallById,
     RepresentantSortField? sortBy,
     SortOrder? sortOrder,
     num? page = 1,
@@ -829,6 +834,8 @@ class RepresentantsApi {
       if (relationStatus != null) r'relationStatus': relationStatus,
       if (whatsappStatus != null) r'whatsappStatus': whatsappStatus,
       if (hasWhatsapp != null) r'hasWhatsapp': hasWhatsapp,
+      if (suivi != null) r'suivi': suivi,
+      if (lastCallById != null) r'lastCallById': lastCallById,
       if (sortBy != null) r'sortBy': sortBy,
       if (sortOrder != null) r'sortOrder': sortOrder,
       if (page != null) r'page': page,

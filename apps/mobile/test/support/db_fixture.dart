@@ -180,6 +180,9 @@ Future<void> insertRepresentant(
   int rev = 1,
   DateTime? serverUpdatedAt,
   DateTime? deletedAt,
+  String? lastCallOutcome,
+  DateTime? lastCallAt,
+  String? lastCallById,
 }) {
   return db
       .into(db.representants)
@@ -200,6 +203,9 @@ Future<void> insertRepresentant(
           localUpdatedAt: t0,
           serverUpdatedAt: Value<DateTime?>(serverUpdatedAt),
           deletedAt: Value<DateTime?>(deletedAt),
+          lastCallOutcome: Value<String?>(lastCallOutcome),
+          lastCallAt: Value<DateTime?>(lastCallAt),
+          lastCallById: Value<String?>(lastCallById),
         ),
       );
 }

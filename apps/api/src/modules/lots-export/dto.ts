@@ -197,6 +197,16 @@ export class LotExportDetailDto extends LotExportSummaryDto {
   @ApiProperty({ type: () => [LotExportPerformanceDto] })
   performance!: LotExportPerformanceDto[];
 }
+/** Le périmètre d'appel de l'appelant, tous lots et tous jours confondus. */
+export class MesAttributionsDto {
+  @ApiProperty({ type: [String], format: 'uuid' }) representantIds!: string[];
+  @ApiProperty({ type: [String], format: 'uuid' }) prospectIds!: string[];
+  @ApiProperty({
+    type: Boolean,
+    description: 'Vrai pour l’encadrement : aucun filtre ne s’applique.',
+  })
+  tout!: boolean;
+}
 export class LotExportPreviewDto {
   @ApiProperty() eligible!: number;
   @ApiProperty() scopeLabel!: string;

@@ -29,6 +29,10 @@ abstract class _$RepresentantExportQueryDtoCWProxy {
 
   RepresentantExportQueryDto hasWhatsapp(bool? hasWhatsapp);
 
+  RepresentantExportQueryDto suivi(RepresentantSuivi? suivi);
+
+  RepresentantExportQueryDto lastCallById(String? lastCallById);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `RepresentantExportQueryDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -46,6 +50,8 @@ abstract class _$RepresentantExportQueryDtoCWProxy {
     RepresentantRelation? relationStatus,
     WhatsappStatus? whatsappStatus,
     bool? hasWhatsapp,
+    RepresentantSuivi? suivi,
+    String? lastCallById,
   });
 }
 
@@ -95,6 +101,14 @@ class _$RepresentantExportQueryDtoCWProxyImpl
       this(hasWhatsapp: hasWhatsapp);
 
   @override
+  RepresentantExportQueryDto suivi(RepresentantSuivi? suivi) =>
+      this(suivi: suivi);
+
+  @override
+  RepresentantExportQueryDto lastCallById(String? lastCallById) =>
+      this(lastCallById: lastCallById);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `RepresentantExportQueryDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -112,6 +126,8 @@ class _$RepresentantExportQueryDtoCWProxyImpl
     Object? relationStatus = const $CopyWithPlaceholder(),
     Object? whatsappStatus = const $CopyWithPlaceholder(),
     Object? hasWhatsapp = const $CopyWithPlaceholder(),
+    Object? suivi = const $CopyWithPlaceholder(),
+    Object? lastCallById = const $CopyWithPlaceholder(),
   }) {
     return RepresentantExportQueryDto(
       search: search == const $CopyWithPlaceholder()
@@ -154,6 +170,14 @@ class _$RepresentantExportQueryDtoCWProxyImpl
           ? _value.hasWhatsapp
           // ignore: cast_nullable_to_non_nullable
           : hasWhatsapp as bool?,
+      suivi: suivi == const $CopyWithPlaceholder()
+          ? _value.suivi
+          // ignore: cast_nullable_to_non_nullable
+          : suivi as RepresentantSuivi?,
+      lastCallById: lastCallById == const $CopyWithPlaceholder()
+          ? _value.lastCallById
+          // ignore: cast_nullable_to_non_nullable
+          : lastCallById as String?,
     );
   }
 }
@@ -203,6 +227,15 @@ RepresentantExportQueryDto _$RepresentantExportQueryDtoFromJson(
       ),
     ),
     hasWhatsapp: $checkedConvert('hasWhatsapp', (v) => v as bool?),
+    suivi: $checkedConvert(
+      'suivi',
+      (v) => $enumDecodeNullable(
+        _$RepresentantSuiviEnumMap,
+        v,
+        unknownValue: RepresentantSuivi.unknownDefaultOpenApi,
+      ),
+    ),
+    lastCallById: $checkedConvert('lastCallById', (v) => v as String?),
   );
   return val;
 });
@@ -222,6 +255,9 @@ Map<String, dynamic> _$RepresentantExportQueryDtoToJson(
   if (_$WhatsappStatusEnumMap[instance.whatsappStatus] case final value?)
     'whatsappStatus': value,
   if (instance.hasWhatsapp case final value?) 'hasWhatsapp': value,
+  if (_$RepresentantSuiviEnumMap[instance.suivi] case final value?)
+    'suivi': value,
+  if (instance.lastCallById case final value?) 'lastCallById': value,
 };
 
 const _$RepresentantRelationEnumMap = {
@@ -238,4 +274,10 @@ const _$WhatsappStatusEnumMap = {
   WhatsappStatus.AUTRE_NUMERO: 'AUTRE_NUMERO',
   WhatsappStatus.AUCUN: 'AUCUN',
   WhatsappStatus.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$RepresentantSuiviEnumMap = {
+  RepresentantSuivi.A_RAPPELER: 'A_RAPPELER',
+  RepresentantSuivi.INJOIGNABLE: 'INJOIGNABLE',
+  RepresentantSuivi.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

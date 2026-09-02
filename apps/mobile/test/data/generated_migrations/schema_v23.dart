@@ -1408,6 +1408,38 @@ class Representants extends Table with TableInfo {
     requiredDuringInsert: false,
     $customConstraints: 'NULL',
   );
+  late final GeneratedColumn<String> lastCallOutcome = GeneratedColumn<String>(
+    'last_call_outcome',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
+  );
+  late final GeneratedColumn<String> lastCallAt = GeneratedColumn<String>(
+    'last_call_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
+  );
+  late final GeneratedColumn<String> lastCallById = GeneratedColumn<String>(
+    'last_call_by_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
+  );
+  late final GeneratedColumn<String> nextCallbackAt = GeneratedColumn<String>(
+    'next_callback_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
+  );
   late final GeneratedColumn<String> createdById = GeneratedColumn<String>(
     'created_by_id',
     aliasedName,
@@ -1474,6 +1506,10 @@ class Representants extends Table with TableInfo {
     syndicat,
     connaitUes,
     contacte,
+    lastCallOutcome,
+    lastCallAt,
+    lastCallById,
+    nextCallbackAt,
     createdById,
     clientCreatedAt,
     rev,
@@ -1718,6 +1754,30 @@ class Prospects extends Table with TableInfo {
     requiredDuringInsert: false,
     $customConstraints: '',
   );
+  late final GeneratedColumn<String> lastCallOutcome = GeneratedColumn<String>(
+    'last_call_outcome',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
+  );
+  late final GeneratedColumn<String> lastCallAt = GeneratedColumn<String>(
+    'last_call_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
+  );
+  late final GeneratedColumn<String> lastCallById = GeneratedColumn<String>(
+    'last_call_by_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
+  );
   late final GeneratedColumn<String> statut = GeneratedColumn<String>(
     'statut',
     aliasedName,
@@ -1796,6 +1856,9 @@ class Prospects extends Table with TableInfo {
     whatsappE164,
     relaisNom,
     relaisPhoneE164,
+    lastCallOutcome,
+    lastCallAt,
+    lastCallById,
     statut,
     clientCreatedAt,
     rev,
@@ -2337,6 +2400,53 @@ class SyncState extends Table with TableInfo {
   bool get dontWriteConstraints => true;
 }
 
+class Attributions extends Table with TableInfo {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  Attributions(this.attachedDatabase, [this._alias]);
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints:
+        'NOT NULL CHECK (kind IN (\'representant\', \'prospect\', \'borne\'))',
+  );
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [kind, id];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'attributions';
+  @override
+  Set<GeneratedColumn> get $primaryKey => {kind, id};
+  @override
+  Never map(Map<String, dynamic> data, {String? tablePrefix}) {
+    throw UnsupportedError('TableInfo.map in schema verification code');
+  }
+
+  @override
+  Attributions createAlias(String alias) {
+    return Attributions(attachedDatabase, alias);
+  }
+
+  @override
+  List<String> get customConstraints => const ['PRIMARY KEY(kind, id)'];
+  @override
+  bool get dontWriteConstraints => true;
+}
+
 class Phase2Directory extends Table with TableInfo {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -2740,6 +2850,10 @@ class RepresentantSyncView extends ViewInfo<RepresentantSyncView, Never>
     syndicat,
     connaitUes,
     contacte,
+    lastCallOutcome,
+    lastCallAt,
+    lastCallById,
+    nextCallbackAt,
     createdById,
     clientCreatedAt,
     rev,
@@ -2854,6 +2968,30 @@ class RepresentantSyncView extends ViewInfo<RepresentantSyncView, Never>
     true,
     type: DriftSqlType.int,
   );
+  late final GeneratedColumn<String> lastCallOutcome = GeneratedColumn<String>(
+    'last_call_outcome',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+  );
+  late final GeneratedColumn<String> lastCallAt = GeneratedColumn<String>(
+    'last_call_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+  );
+  late final GeneratedColumn<String> lastCallById = GeneratedColumn<String>(
+    'last_call_by_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+  );
+  late final GeneratedColumn<String> nextCallbackAt = GeneratedColumn<String>(
+    'next_callback_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+  );
   late final GeneratedColumn<String> createdById = GeneratedColumn<String>(
     'created_by_id',
     aliasedName,
@@ -2941,6 +3079,9 @@ class ProspectSyncView extends ViewInfo<ProspectSyncView, Never>
     whatsappE164,
     relaisNom,
     relaisPhoneE164,
+    lastCallOutcome,
+    lastCallAt,
+    lastCallById,
     statut,
     clientCreatedAt,
     rev,
@@ -3118,6 +3259,24 @@ class ProspectSyncView extends ViewInfo<ProspectSyncView, Never>
   );
   late final GeneratedColumn<String> relaisPhoneE164 = GeneratedColumn<String>(
     'relais_phone_e164',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+  );
+  late final GeneratedColumn<String> lastCallOutcome = GeneratedColumn<String>(
+    'last_call_outcome',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+  );
+  late final GeneratedColumn<String> lastCallAt = GeneratedColumn<String>(
+    'last_call_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+  );
+  late final GeneratedColumn<String> lastCallById = GeneratedColumn<String>(
+    'last_call_by_id',
     aliasedName,
     true,
     type: DriftSqlType.string,
@@ -3586,6 +3745,7 @@ class DatabaseAtV23 extends GeneratedDatabase {
     'CREATE INDEX form_drafts_key_idx ON form_drafts (form_key, updated_at DESC)',
   );
   late final SyncState syncState = SyncState(this);
+  late final Attributions attributions = Attributions(this);
   late final Phase2Directory phase2Directory = Phase2Directory(this);
   late final Index phase2DirectoryPhoneUnique = Index(
     'phase2_directory_phone_unique',
@@ -3680,6 +3840,7 @@ class DatabaseAtV23 extends GeneratedDatabase {
     formDrafts,
     formDraftsKeyIdx,
     syncState,
+    attributions,
     phase2Directory,
     phase2DirectoryPhoneUnique,
     phase2DirectoryStatusIdx,

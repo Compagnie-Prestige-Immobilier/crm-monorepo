@@ -73,6 +73,11 @@ function rep(over: Partial<ScriptedRepresentant> & { id: string }): ScriptedRepr
     syndicat: null,
     connaitUES: null,
     contacte: null,
+    lastCallOutcome: null,
+    lastCallAt: null,
+    lastCallById: null,
+    lastCallByName: null,
+    nextCallbackAt: null,
     ...over,
   };
 }
@@ -420,6 +425,48 @@ describe('RepScript : « À rappeler » propose un calendrier', () => {
     });
     expect(dernierEnvoi()).toMatchObject({ outcome: 'CALLBACK' });
     expect(typeof dernierEnvoi()['callbackAt']).toBe('string');
+  });
+});
+
+/** Il a décroché, il a répondu, et il demande quand même à être rappelé. */
+describe('RepScript : le rappel facultatif d’un joignable', () => {
+  it('propose une échéance sans jamais l’exiger', async () => {
+    await renderListe();
+    await choisir(/Aminata Ndiaye/u);
+
+    await parcoursJoignable('Oui');
+    await repondreA('A-t-il WhatsApp sur ce numéro ?', 'Oui');
+
+    expect(screen.getByText('Le rappeler plus tard ? (facultatif)')).toBeTruthy();
+    expect(screen.queryByText('Choisissez quand rappeler')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Continuer' }).hasAttribute('disabled')).toBe(false);
+  });
+
+  it('envoie l’échéance avec l’issue REACHED, pas CALLBACK', async () => {
+    await renderListe();
+    await choisir(/Aminata Ndiaye/u);
+
+    await parcoursJoignable('Oui');
+    await repondreA('A-t-il WhatsApp sur ce numéro ?', 'Oui');
+    await repondre('Demain 9 h');
+    await userEvent.click(screen.getByRole('button', { name: 'Continuer' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(() => {
+      expect(pushRepCallAttempt).toHaveBeenCalledTimes(1);
+    });
+    expect(dernierEnvoi()).toMatchObject({ outcome: 'REACHED', relationStatus: 'AMBASSADEUR' });
+    expect(typeof dernierEnvoi()['callbackAt']).toBe('string');
+  });
+
+  it('ne propose rien après un injoignable', async () => {
+    await renderListe();
+    await choisir(/Aminata Ndiaye/u);
+
+    await repondre('Injoignable');
+
+    expect(screen.queryByText(/Le rappeler plus tard/u)).toBeNull();
+    expect(screen.queryByText('Quand rappeler ?')).toBeNull();
   });
 });
 

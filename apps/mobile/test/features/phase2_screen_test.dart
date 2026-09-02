@@ -809,6 +809,41 @@ void main() {
     },
   );
 
+  // Le serveur refuse l'appel hors périmètre (`PHASE2_NOT_ASSIGNED`) : le dire
+  // avant l'appel, pas des heures plus tard dans « À corriger ».
+  phase2TestWidgets('un numéro hors de mes campagnes est refusé d\'emblée', (
+    WidgetTester tester,
+  ) async {
+    await db
+        .into(db.attributions)
+        .insert(AttributionsCompanion.insert(kind: attributionBorne, id: '1'));
+
+    await tester.pumpWidget(host());
+    await type(tester, '771234567');
+
+    expect(
+      find.textContaining('Ce numéro n\'est pas dans vos campagnes'),
+      findsOneWidget,
+    );
+    expect(find.text('Continuer'), findsNothing);
+  });
+
+  phase2TestWidgets('une attribution rouvre le même numéro', (
+    WidgetTester tester,
+  ) async {
+    await db
+        .into(db.attributions)
+        .insert(AttributionsCompanion.insert(kind: attributionBorne, id: '1'));
+    await db
+        .into(db.attributions)
+        .insert(AttributionsCompanion.insert(kind: 'prospect', id: 'pros-1'));
+
+    await tester.pumpWidget(host());
+    await type(tester, '771234567');
+
+    expect(find.textContaining('Ce numéro n\'est pas dans'), findsNothing);
+  });
+
   phase2TestWidgets('un numéro inconnu de la liste est signalé sans blocage', (
     WidgetTester tester,
   ) async {

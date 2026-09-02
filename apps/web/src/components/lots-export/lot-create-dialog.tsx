@@ -96,6 +96,7 @@ interface Choix {
   type: ProspectType | typeof TOUS;
   departementId: string;
   iefId: string;
+  nonQualifies: boolean;
 }
 
 const choixInitial = (cle: CleCible): Choix => ({
@@ -104,6 +105,7 @@ const choixInitial = (cle: CleCible): Choix => ({
   type: TOUS,
   departementId: TOUS,
   iefId: TOUS,
+  nonQualifies: true,
 });
 
 function entierBorne(saisie: string, defaut: number, min: number, max: number): number {
@@ -128,6 +130,31 @@ function texteApercu(apercu: LotExportPreview, jours: number): string {
   return `${disponibles} pour ${formatNumber(places)} places : ${reparties} ; ${formatNumber(eligible - retenues)} attendront une prochaine campagne.`;
 }
 
+type Critere = { corps: Omit<CreateLotExportInput, 'name' | 'distribution'>; etiquette: string };
+
+function critereRepresentants(
+  choix: Choix,
+  nomDepartement: string | null,
+  nomIef: string | null,
+): Critere {
+  const lieu = [
+    nomDepartement === null ? null : `département de ${nomDepartement}`,
+    nomIef === null ? null : `IEF ${nomIef}`,
+  ].filter((part) => part !== null);
+  const tete = choix.nonQualifies ? 'Représentants non qualifiés' : 'Représentants';
+  return {
+    corps: {
+      cible: 'REPRESENTANTS',
+      representants: {
+        ...(choix.departementId === TOUS ? {} : { departementId: choix.departementId }),
+        ...(choix.iefId === TOUS ? {} : { iefId: choix.iefId }),
+        ...(choix.nonQualifies ? { relationStatus: 'INCONNU' as const } : {}),
+      },
+    },
+    etiquette: [tete, ...lieu].join(', '),
+  };
+}
+
 /**
  * Les critères envoyés à l'API, et l'étiquette qui les dit en français. Cette
  * étiquette devient le nom du lot : le formulaire n'en demande aucun.
@@ -136,23 +163,8 @@ function critereDuChoix(
   choix: Choix,
   nomDepartement: string | null,
   nomIef: string | null,
-): { corps: Omit<CreateLotExportInput, 'name' | 'distribution'>; etiquette: string } {
-  if (choix.cle === 'representants') {
-    const lieu = [
-      nomDepartement === null ? null : `département de ${nomDepartement}`,
-      nomIef === null ? null : `IEF ${nomIef}`,
-    ].filter((part) => part !== null);
-    return {
-      corps: {
-        cible: 'REPRESENTANTS',
-        representants: {
-          ...(choix.departementId === TOUS ? {} : { departementId: choix.departementId }),
-          ...(choix.iefId === TOUS ? {} : { iefId: choix.iefId }),
-        },
-      },
-      etiquette: ['Représentants', ...lieu].join(', '),
-    };
-  }
+): Critere {
+  if (choix.cle === 'representants') return critereRepresentants(choix, nomDepartement, nomIef);
 
   if (choix.cle === 'grand-public') {
     return {
@@ -298,61 +310,75 @@ function ChampsCritere({
   );
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
-      <Field label="Département">
-        {(props) => (
-          <Select
-            items={[
-              { value: TOUS, label: 'Tous les départements' },
-              ...departements.map((row) => ({ value: row.id, label: row.name })),
-            ]}
-            value={choix.departementId}
-            onValueChange={(value) => {
-              if (value === null) return;
-              onChange({ ...choix, departementId: value, iefId: TOUS });
-            }}
-          >
-            <SelectTrigger id={props.id}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={TOUS}>Tous les départements</SelectItem>
-              {departements.map((row) => (
-                <SelectItem key={row.id} value={row.id}>
-                  {row.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-      </Field>
-      <Field label="IEF">
-        {(props) => (
-          <Select
-            items={[
-              { value: TOUS, label: 'Toutes les IEF' },
-              ...iefsDuDepartement.map((row) => ({ value: row.id, label: row.name })),
-            ]}
-            value={choix.iefId}
-            onValueChange={(value) => {
-              if (value === null) return;
-              onChange({ ...choix, iefId: value });
-            }}
-          >
-            <SelectTrigger id={props.id}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={TOUS}>Toutes les IEF</SelectItem>
-              {iefsDuDepartement.map((row) => (
-                <SelectItem key={row.id} value={row.id}>
-                  {row.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-      </Field>
+    <div className="flex flex-col gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Département">
+          {(props) => (
+            <Select
+              items={[
+                { value: TOUS, label: 'Tous les départements' },
+                ...departements.map((row) => ({ value: row.id, label: row.name })),
+              ]}
+              value={choix.departementId}
+              onValueChange={(value) => {
+                if (value === null) return;
+                onChange({ ...choix, departementId: value, iefId: TOUS });
+              }}
+            >
+              <SelectTrigger id={props.id}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TOUS}>Tous les départements</SelectItem>
+                {departements.map((row) => (
+                  <SelectItem key={row.id} value={row.id}>
+                    {row.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </Field>
+        <Field label="IEF">
+          {(props) => (
+            <Select
+              items={[
+                { value: TOUS, label: 'Toutes les IEF' },
+                ...iefsDuDepartement.map((row) => ({ value: row.id, label: row.name })),
+              ]}
+              value={choix.iefId}
+              onValueChange={(value) => {
+                if (value === null) return;
+                onChange({ ...choix, iefId: value });
+              }}
+            >
+              <SelectTrigger id={props.id}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={TOUS}>Toutes les IEF</SelectItem>
+                {iefsDuDepartement.map((row) => (
+                  <SelectItem key={row.id} value={row.id}>
+                    {row.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </Field>
+      </div>
+
+      <label className="flex cursor-pointer items-start gap-3 text-[0.875rem]">
+        <input
+          type="checkbox"
+          checked={choix.nonQualifies}
+          className="mt-0.5 size-4 shrink-0 accent-primary"
+          onChange={(event) => {
+            onChange({ ...choix, nonQualifies: event.target.checked });
+          }}
+        />
+        Exclure les représentants déjà qualifiés (ambassadeur ou refus)
+      </label>
     </div>
   );
 }
@@ -546,6 +572,7 @@ function FormulaireDeLot({
     choix.type,
     choix.departementId,
     choix.iefId,
+    String(choix.nonQualifies),
     distribution.teleconseillerIds.join(','),
     fichesParJour,
     jours,

@@ -178,6 +178,28 @@ class FakeApi implements ApiPort {
     return snapshot;
   }
 
+  /// Le périmètre d'appel servi par ce faux serveur. `null` ⇒ personne ne l'a
+  /// demandé dans ce test : la lecture échoue comme hors ligne, et le périmètre
+  /// local reste tel quel.
+  MesAttributionsDto? attributions;
+
+  /// Chaque lecture complète du périmètre d'appel.
+  int attributionsPulls = 0;
+
+  @override
+  Future<MesAttributionsDto> pullMesAttributions() async {
+    attributionsPulls++;
+    final MesAttributionsDto? scope = attributions;
+    if (scope == null) {
+      throw const ApiException(
+        'NETWORK',
+        message: 'Aucun périmètre servi par ce faux serveur.',
+        kind: FailureKind.unreachable,
+      );
+    }
+    return scope;
+  }
+
   /// Chaque correction de visite reçue, dans l'ordre.
   final List<VisiteCorrigee> visitesCorrigees = <VisiteCorrigee>[];
 
@@ -439,6 +461,9 @@ ProspectDto prospectDto({
   String? employeur,
   int? ancienneteMois,
   ModeEpargne? modeEpargne,
+  CallOutcome? lastCallOutcome,
+  DateTime? lastCallAt,
+  String? lastCallById,
 }) => ProspectDto(
   id: id,
   nom: 'Diop',
@@ -501,6 +526,10 @@ ProspectDto prospectDto({
   lastOutcome: null,
   lastComment: null,
   lastAttemptAt: null,
+  lastCallOutcome: lastCallOutcome,
+  lastCallAt: lastCallAt,
+  lastCallById: lastCallById,
+  lastCallByName: null,
   origin: null,
   originLabel: null,
   clientCreatedAt: DateTime.utc(2026, 8, 12, 10),
@@ -603,6 +632,11 @@ RepresentantDto representantDto({
   String? syndicat,
   bool? connaitUES,
   bool? contacte,
+  RepCallOutcome? lastCallOutcome,
+  DateTime? lastCallAt,
+  String? lastCallById,
+  String? lastCallByName,
+  DateTime? nextCallbackAt,
 }) => RepresentantDto(
   id: id,
   fullName: fullName,
@@ -616,6 +650,11 @@ RepresentantDto representantDto({
   syndicat: syndicat,
   connaitUES: connaitUES,
   contacte: contacte,
+  lastCallOutcome: lastCallOutcome,
+  lastCallAt: lastCallAt,
+  lastCallById: lastCallById,
+  lastCallByName: lastCallByName,
+  nextCallbackAt: nextCallbackAt,
   // Calcule par le SERVEUR: la fabrique reproduit sa regle plutot que d'en
   // inventer une autre.
   whatsappNumber: whatsappStatus == WhatsappStatus.MEME_NUMERO
@@ -712,6 +751,9 @@ class ExplodingApi implements ApiPort {
 
   @override
   Future<ReferentielsSnapshot> pullReferentiels() => _boom();
+
+  @override
+  Future<MesAttributionsDto> pullMesAttributions() => _boom();
 
   @override
   Future<void> uploadCallRecording({

@@ -670,7 +670,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Liste paginée de l’annuaire, commun à tous les téléconseillers. */
+    /**
+     * Liste paginée de l’annuaire, borné aux campagnes de l’appelant.
+     * @description Un COMMERCIAL ne voit que les représentants qu’il a créés ou qui lui sont attribués dans un lot d’export. ADMIN, SUPERVISEUR et DIRECTION voient tout.
+     */
     get: operations['listRepresentants'];
     put?: never;
     /** Crée un représentant. L’identifiant peut être fourni par le client. */
@@ -2851,6 +2854,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/lots-export/mes-attributions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Les fiches attribuées à l’appelant, tous lots confondus.
+     * @description Sert au mobile à borner son tirage. `tout: true` pour ADMIN, SUPERVISEUR et DIRECTION : les deux listes sont alors vides et aucun filtre ne s’applique.
+     */
+    get: operations['mesAttributions'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/lots-export/{id}': {
     parameters: {
       query?: never;
@@ -3361,9 +3384,24 @@ export interface components {
     /** @enum {string} */
     WhatsappStatus: 'NON_DEMANDE' | 'MEME_NUMERO' | 'AUTRE_NUMERO' | 'AUCUN';
     /** @enum {string} */
-    RepresentantSortField: 'clientCreatedAt' | 'createdAt' | 'fullName' | 'prospects';
+    RepresentantSuivi: 'A_RAPPELER' | 'INJOIGNABLE';
+    /** @enum {string} */
+    RepresentantSortField:
+      'clientCreatedAt' | 'createdAt' | 'fullName' | 'prospects' | 'lastCallAt' | 'nextCallbackAt';
     /** @enum {string} */
     SortOrder: 'asc' | 'desc';
+    /**
+     * @description Issue du dernier appel. Nul : jamais appelé.
+     * @enum {string}
+     */
+    RepCallOutcome:
+      | 'REACHED'
+      | 'PROSPECTS_PROMISED'
+      | 'UNREACHABLE'
+      | 'CALLBACK'
+      | 'REFUSED'
+      | 'WRONG_NUMBER'
+      | 'OTHER';
     RepresentantDto: {
       /** Format: uuid */
       id: string;
@@ -3401,6 +3439,18 @@ export interface components {
       syndicat: string | null;
       connaitUES: boolean | null;
       contacte: boolean | null;
+      /** @description Issue du dernier appel. Nul : jamais appelé. */
+      lastCallOutcome: components['schemas']['RepCallOutcome'] | null;
+      /** Format: date-time */
+      lastCallAt: string | null;
+      /** Format: uuid */
+      lastCallById: string | null;
+      lastCallByName: string | null;
+      /**
+       * Format: date-time
+       * @description Rappel promis par le dernier appel, tant qu’aucun appel ne l’a honoré.
+       */
+      nextCallbackAt: string | null;
     };
     RepresentantListDto: {
       items: components['schemas']['RepresentantDto'][];
@@ -3611,7 +3661,7 @@ export interface components {
     /** @enum {string} */
     EnrollmentMethod: 'PLATFORM' | 'PHYSICAL' | 'VOICE_OR_ELECTRONIC_MESSAGING' | 'APPOINTMENT';
     /** @enum {string} */
-    ProspectSortField: 'createdAt' | 'clientCreatedAt' | 'nom' | 'prenom' | 'statut';
+    ProspectSortField: 'createdAt' | 'clientCreatedAt' | 'nom' | 'prenom' | 'statut' | 'lastCallAt';
     /** @enum {string} */
     PaymentMode: 'COMPTANT' | 'ECHELONNE';
     /** @enum {string} */
@@ -3715,6 +3765,12 @@ export interface components {
       lastComment: string | null;
       /** Format: date-time */
       lastAttemptAt: string | null;
+      lastCallOutcome: components['schemas']['CallOutcome'] | null;
+      /** Format: date-time */
+      lastCallAt: string | null;
+      /** Format: uuid */
+      lastCallById: string | null;
+      lastCallByName: string | null;
       /** @description Clé de provenance. Nulle pour une fiche née d’une tournée terrain. */
       origin: string | null;
       /** @description Détail conservé à la création (nom de la banque demandeuse, par exemple). */
@@ -4714,15 +4770,6 @@ export interface components {
        */
       serverTime: string;
     };
-    /** @enum {string} */
-    RepCallOutcome:
-      | 'REACHED'
-      | 'PROSPECTS_PROMISED'
-      | 'UNREACHABLE'
-      | 'CALLBACK'
-      | 'REFUSED'
-      | 'WRONG_NUMBER'
-      | 'OTHER';
     CreateRepCallAttemptDto: {
       /**
        * Format: uuid
@@ -4771,7 +4818,7 @@ export interface components {
       clientCreatedAt: string;
       /**
        * Format: date-time
-       * @description Date du rappel promis. Obligatoire si et seulement si l’issue vaut CALLBACK : c’est elle qui arme la notification côté mobile.
+       * @description Date du rappel promis. Obligatoire pour l’issue CALLBACK, admise avec toute autre : un représentant joint peut demander à être rappelé. C’est elle qui arme la notification côté mobile.
        */
       callbackAt?: string;
     };
@@ -6121,6 +6168,13 @@ export interface components {
       relationStatus?: components['schemas']['RepresentantRelation'];
       whatsappStatus?: components['schemas']['WhatsappStatus'];
       hasWhatsapp?: boolean;
+      /** @description A_RAPPELER : un rappel promis reste dû (`nextCallbackAt`), tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien. */
+      suivi?: components['schemas']['RepresentantSuivi'];
+      /**
+       * Format: uuid
+       * @description Qui a passé le dernier appel. Un téléconseiller y met son propre identifiant.
+       */
+      lastCallById?: string;
     };
     LotExportProspectFilterDto: {
       /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
@@ -6157,6 +6211,11 @@ export interface components {
        * @description Téléconseiller ayant consigné au moins une tentative sur la fiche.
        */
       appelePar?: string;
+      /**
+       * Format: uuid
+       * @description Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique.
+       */
+      lastCallById?: string;
       /**
        * Format: uuid
        * @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1.
@@ -6224,6 +6283,12 @@ export interface components {
     LotExportListDto: {
       items: components['schemas']['LotExportSummaryDto'][];
       meta: components['schemas']['PageMetaDto'];
+    };
+    MesAttributionsDto: {
+      representantIds: string[];
+      prospectIds: string[];
+      /** @description Vrai pour l’encadrement : aucun filtre ne s’applique. */
+      tout: boolean;
     };
     LotExportAttemptDto: {
       /** Format: uuid */
@@ -8643,6 +8708,10 @@ export interface operations {
         relationStatus?: components['schemas']['RepresentantRelation'];
         whatsappStatus?: components['schemas']['WhatsappStatus'];
         hasWhatsapp?: boolean;
+        /** @description A_RAPPELER : un rappel promis reste dû (`nextCallbackAt`), tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien. */
+        suivi?: components['schemas']['RepresentantSuivi'];
+        /** @description Qui a passé le dernier appel. Un téléconseiller y met son propre identifiant. */
+        lastCallById?: string;
         sortBy?: components['schemas']['RepresentantSortField'];
         sortOrder?: components['schemas']['SortOrder'];
         page?: number;
@@ -9297,6 +9366,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
         appelePar?: string;
+        /** @description Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique. */
+        lastCallById?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -13789,6 +13860,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
         appelePar?: string;
+        /** @description Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique. */
+        lastCallById?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -13869,6 +13942,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
         appelePar?: string;
+        /** @description Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique. */
+        lastCallById?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -13949,6 +14024,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
         appelePar?: string;
+        /** @description Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique. */
+        lastCallById?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -14030,6 +14107,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
         appelePar?: string;
+        /** @description Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique. */
+        lastCallById?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -14111,6 +14190,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
         appelePar?: string;
+        /** @description Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique. */
+        lastCallById?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -14191,6 +14272,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
         appelePar?: string;
+        /** @description Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique. */
+        lastCallById?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -14271,6 +14354,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
         appelePar?: string;
+        /** @description Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique. */
+        lastCallById?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -14351,6 +14436,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
         appelePar?: string;
+        /** @description Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique. */
+        lastCallById?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -14431,6 +14518,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
         appelePar?: string;
+        /** @description Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique. */
+        lastCallById?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -14511,6 +14600,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
         appelePar?: string;
+        /** @description Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique. */
+        lastCallById?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -14591,6 +14682,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
         appelePar?: string;
+        /** @description Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique. */
+        lastCallById?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -14672,6 +14765,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
         appelePar?: string;
+        /** @description Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique. */
+        lastCallById?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -14752,6 +14847,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
         appelePar?: string;
+        /** @description Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique. */
+        lastCallById?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -14832,6 +14929,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
         appelePar?: string;
+        /** @description Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique. */
+        lastCallById?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -14912,6 +15011,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
         appelePar?: string;
+        /** @description Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique. */
+        lastCallById?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -14992,6 +15093,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
         appelePar?: string;
+        /** @description Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique. */
+        lastCallById?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -15075,6 +15178,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
         appelePar?: string;
+        /** @description Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique. */
+        lastCallById?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -15155,6 +15260,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
         appelePar?: string;
+        /** @description Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique. */
+        lastCallById?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -15294,6 +15401,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
         appelePar?: string;
+        /** @description Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique. */
+        lastCallById?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -15572,6 +15681,8 @@ export interface operations {
         enrollmentMethod?: components['schemas']['EnrollmentMethod'];
         /** @description Téléconseiller ayant consigné au moins une tentative sur la fiche. */
         appelePar?: string;
+        /** @description Téléconseiller du DERNIER appel porté par la fiche. À ne pas confondre avec `appelePar`, qui accepte n’importe quelle tentative de l’historique. */
+        lastCallById?: string;
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
@@ -15790,6 +15901,10 @@ export interface operations {
         relationStatus?: components['schemas']['RepresentantRelation'];
         whatsappStatus?: components['schemas']['WhatsappStatus'];
         hasWhatsapp?: boolean;
+        /** @description A_RAPPELER : un rappel promis reste dû (`nextCallbackAt`), tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien. */
+        suivi?: components['schemas']['RepresentantSuivi'];
+        /** @description Qui a passé le dernier appel. Un téléconseiller y met son propre identifiant. */
+        lastCallById?: string;
       };
       header?: never;
       path?: never;
@@ -16812,6 +16927,52 @@ export interface operations {
         };
         content: {
           'application/zip': string;
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  mesAttributions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['MesAttributionsDto'];
         };
       };
       /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */

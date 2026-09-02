@@ -327,6 +327,16 @@ class DioApi implements ApiPort {
   }
 
   @override
+  Future<MesAttributionsDto> pullMesAttributions() async {
+    return _guard('mesAttributions', () async {
+      final Response<MesAttributionsDto> response = await _client
+          .getLotsExportApi()
+          .mesAttributions(extra: TimeoutProfile.read.extra);
+      return _body('mesAttributions', response);
+    });
+  }
+
+  @override
   Future<RepresentantLookup> lookupRepresentantByPhone(String phone) async {
     return _guard('lookup', () async {
       final Response<RepresentantLookupDto> response = await _representants

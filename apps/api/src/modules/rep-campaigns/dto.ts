@@ -212,7 +212,7 @@ export class CreateRepCallAttemptDto {
     type: String,
     format: 'date-time',
     description:
-      'Date du rappel promis. Obligatoire si et seulement si l’issue vaut CALLBACK : c’est elle qui arme la notification côté mobile.',
+      'Date du rappel promis. Obligatoire pour l’issue CALLBACK, admise avec toute autre : un représentant joint peut demander à être rappelé. C’est elle qui arme la notification côté mobile.',
   })
   @IsOptional()
   @IsISO8601()

@@ -53,9 +53,12 @@ function isSortField(id: string): id is ProspectSortField {
 export function ProspectsTable({
   canAdminister,
   readOnly = false,
+  campaignScoped = false,
 }: {
   canAdminister: boolean;
   readOnly?: boolean;
+  /** Téléconseiller : l'API ne lui rend que ses fiches et celles de ses campagnes. */
+  campaignScoped?: boolean;
 }) {
   const { filters, setFilters } = useProspectFilters();
   const queryClient = useQueryClient();
@@ -178,7 +181,9 @@ export function ProspectsTable({
                     <InboxIcon className="size-8 text-muted-foreground" aria-hidden="true" />
                     <p className="font-[600]">Aucun prospect ne correspond à ces filtres.</p>
                     <p className="text-[0.8125rem] text-muted-foreground">
-                      Élargissez la période ou retirez un critère.
+                      {campaignScoped
+                        ? 'Vos campagnes n’en contiennent aucun.'
+                        : 'Élargissez la période ou retirez un critère.'}
                     </p>
                   </div>
                 </TableCell>

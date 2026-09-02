@@ -140,9 +140,12 @@ const STATUT_OPTIONS = PROSPECT_STATUTS.map((statut) => ({
 export function GrandPublicProspectsView({
   canCreate,
   canExport = false,
+  campaignScoped = false,
 }: {
   canCreate: boolean;
   canExport?: boolean;
+  /** Téléconseiller : l'API ne lui rend que ses fiches et celles de ses campagnes. */
+  campaignScoped?: boolean;
 }) {
   const { filters, setFilters, resetFilters } = useUrlFilters(FILTERS_ADAPTER);
   const telechargement = useFileDownload();
@@ -337,6 +340,7 @@ export function GrandPublicProspectsView({
         setFilters={setFilters}
         hasFilters={activeCount > 0}
         canCreate={canCreate}
+        campaignScoped={campaignScoped}
         onCreate={() => setCreateOpen(true)}
       />
 
@@ -359,6 +363,7 @@ function ProspectsTable({
   setFilters,
   hasFilters,
   canCreate,
+  campaignScoped,
   onCreate,
 }: {
   list: UseQueryResult<Paginated<ProspectRow>>;
@@ -366,6 +371,7 @@ function ProspectsTable({
   setFilters: (patch: Partial<GrandPublicFilters>) => void;
   hasFilters: boolean;
   canCreate: boolean;
+  campaignScoped: boolean;
   onCreate: () => void;
 }) {
   if (list.isPending) return <GrandPublicTableSkeleton />;
@@ -412,7 +418,12 @@ function ProspectsTable({
             {items.length === 0 ? (
               <TableRow className="hover:bg-transparent">
                 <TableCell colSpan={9} className="py-16">
-                  <EmptyState hasFilters={hasFilters} canCreate={canCreate} onCreate={onCreate} />
+                  <EmptyState
+                    hasFilters={hasFilters}
+                    canCreate={canCreate}
+                    campaignScoped={campaignScoped}
+                    onCreate={onCreate}
+                  />
                 </TableCell>
               </TableRow>
             ) : (
@@ -486,13 +497,21 @@ function ProspectsTable({
   );
 }
 
+function detailVide(hasFilters: boolean, campaignScoped: boolean): string {
+  if (hasFilters) return 'Élargissez la période ou retirez un critère.';
+  if (campaignScoped) return 'Vos campagnes n’en contiennent aucun.';
+  return 'La première fiche se crée depuis « Nouveau prospect ».';
+}
+
 function EmptyState({
   hasFilters,
   canCreate,
+  campaignScoped,
   onCreate,
 }: {
   hasFilters: boolean;
   canCreate: boolean;
+  campaignScoped: boolean;
   onCreate: () => void;
 }) {
   return (
@@ -504,9 +523,7 @@ function EmptyState({
           : 'Aucun prospect Grand Public n’a encore été saisi.'}
       </p>
       <p className="text-[0.8125rem] text-muted-foreground">
-        {hasFilters
-          ? 'Élargissez la période ou retirez un critère.'
-          : 'La première fiche se crée depuis « Nouveau prospect ».'}
+        {detailVide(hasFilters, campaignScoped)}
       </p>
       {!hasFilters && canCreate ? (
         <Button className="mt-2" onClick={onCreate}>

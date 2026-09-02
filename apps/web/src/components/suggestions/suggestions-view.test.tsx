@@ -144,13 +144,13 @@ describe('SuggestionsView', () => {
     expect(setStatus).toHaveBeenCalledWith('s-1', 'APPELE');
   });
 
-  it('n’offre aucun geste à un rôle en lecture seule', async () => {
-    renderWithQuery(<SuggestionsView readOnly />);
+  it('laisse l’encadrement trancher, l’écran n’a plus de lecture seule', async () => {
+    renderWithQuery(<SuggestionsView />);
     await screen.findByText('K4M2P7');
 
-    expect(screen.queryByRole('button', { name: /Marquer appelé/u })).toBeNull();
-    expect(screen.queryByRole('button', { name: /Abandonner/u })).toBeNull();
-    expect(screen.queryByRole('button', { name: /Créer la fiche/u })).toBeNull();
+    expect(screen.getByRole('button', { name: /Marquer appelé/u })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Abandonner$/u })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Créer la fiche/u })).toBeTruthy();
   });
 
   it('dit quoi attendre quand aucun numéro n’a été suggéré', async () => {

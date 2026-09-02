@@ -92,11 +92,18 @@ const TROIS_ETAPES: readonly string[] = [
 
   'RepCampaignsController.recordAttempt',
 
+  // Le périmètre d'appel de l'appelant : le téléphone en a besoin pour borner
+  // son tirage, quel que soit le rôle qui mène les trois étapes.
+  'LotsExportController.mesAttributions',
+
   'RepresentantsController.addComment',
   'RepresentantsController.create',
   'RepresentantsController.lookup',
   'RepresentantsController.remove',
   'RepresentantsController.update',
+
+  // L'encadrement tranche les numéros suggérés comme le téléconseiller.
+  'SuggestionsController.setStatus',
 ];
 
 /**
@@ -359,7 +366,7 @@ describe('ce qu’un SUPERVISEUR atteint, route par route', () => {
     for (const method of ['import', 'removeComment']) {
       expect(allows(RepresentantsController, method), `representants.${method}`).toBe(false);
     }
-    expect(allows(SuggestionsController, 'setStatus')).toBe(false);
+    expect(allows(SuggestionsController, 'setStatus')).toBe(true);
     for (const method of routesOf(NotificationTemplatesController)) {
       expect(allows(NotificationTemplatesController, method), `gabarits.${method}`).toBe(false);
     }

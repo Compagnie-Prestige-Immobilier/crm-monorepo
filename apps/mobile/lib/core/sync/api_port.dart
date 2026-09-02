@@ -161,6 +161,11 @@ enum FailureKind {
 /// actuel ne correspond pas.
 const String invalidCurrentPasswordCode = 'INVALID_CURRENT_PASSWORD';
 
+/// Marqueur du périmètre d'appel dans `attributions` : posé au pull, et
+/// seulement quand le serveur borne le compte. Son ABSENCE vaut « aucun
+/// filtre », ce qui couvre l'encadrement comme l'appareil jamais synchronisé.
+const String attributionBorne = 'borne';
+
 class ApiException implements Exception {
   const ApiException(
     this.code, {
@@ -243,6 +248,14 @@ abstract interface class ApiPort {
 
   /// Les référentiels de saisie, ENTIERS. Voir [ReferentielsSnapshot].
   Future<ReferentielsSnapshot> pullReferentiels();
+
+  /// Le périmètre d'appel du compte connecté, ENTIER.
+  ///
+  /// Le pull de synchronisation est GLOBAL : sans cette lecture, un
+  /// téléconseiller verrait et appellerait les fiches de toutes les campagnes.
+  /// `tout: true` pour l'encadrement : les deux listes sont alors vides et
+  /// aucun filtre ne s'applique.
+  Future<MesAttributionsDto> pullMesAttributions();
 
   Future<RepresentantLookup> lookupRepresentantByPhone(String phone);
 

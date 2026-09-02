@@ -112,6 +112,39 @@ export async function fetchRepresentants(
   );
 }
 
+export type RepresentantSuivi = components['schemas']['RepresentantSuivi'];
+
+export const SUIVI_PAGE_SIZE = 100;
+
+/**
+ * Le suivi d'appels ne passe pas par `RepresentantFilters` : il n'a ni URL, ni
+ * tri choisi — le serveur trie déjà chaque suivi par son échéance.
+ */
+export async function fetchRepresentantsSuivi(
+  suivi: RepresentantSuivi,
+  lastCallById: string | null,
+  client: ApiClient = getApiClient(),
+): Promise<Paginated<RepresentantRow>> {
+  const query: RepresentantQuery = { suivi, page: 1, pageSize: SUIVI_PAGE_SIZE };
+  if (lastCallById !== null) query.lastCallById = lastCallById;
+  return flattenPage(unwrap(await client.GET('/api/v1/representants', { params: { query } })));
+}
+
+/** Les représentants dont ce téléconseiller a passé le DERNIER appel, du plus récent au plus ancien. */
+export async function fetchRepresentantsAppeles(
+  lastCallById: string,
+  client: ApiClient = getApiClient(),
+): Promise<Paginated<RepresentantRow>> {
+  const query: RepresentantQuery = {
+    lastCallById,
+    sortBy: 'lastCallAt',
+    sortOrder: 'desc',
+    page: 1,
+    pageSize: SUIVI_PAGE_SIZE,
+  };
+  return flattenPage(unwrap(await client.GET('/api/v1/representants', { params: { query } })));
+}
+
 export async function fetchRepresentant(
   id: string,
   client: ApiClient = getApiClient(),
