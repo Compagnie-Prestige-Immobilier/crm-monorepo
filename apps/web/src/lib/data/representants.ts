@@ -3,7 +3,11 @@ import { unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
 import { flattenPage } from '@/lib/api/query-params';
-import { EMPTY_REPRESENTANT_FILTERS, type RepresentantFilters } from '@/lib/representant-filters';
+import {
+  EMPTY_REPRESENTANT_FILTERS,
+  type RepresentantFilters,
+  type RepresentantRelation,
+} from '@/lib/representant-filters';
 import type { Paginated, RepresentantRow, UpdateRepresentantInput } from '@/lib/types';
 
 type RepresentantQuery = NonNullable<operations['listRepresentants']['parameters']['query']>;
@@ -139,17 +143,20 @@ export async function fetchRepresentantsSuivi(
  * n'est pas un critère que l'utilisateur pose, c'est la portée de l'écran, et
  * elle vaut pour tous les rôles, encadrement compris.
  */
+const A_QUALIFIER_PAGE_SIZE = 10;
+
 export async function fetchRepresentantsAQualifier(
-  search: string,
+  criteres: { search: string; relationStatus: RepresentantRelation | null; page: number },
   client: ApiClient = getApiClient(),
 ): Promise<Paginated<RepresentantRow>> {
   const query: RepresentantQuery = {
     mesFiches: true,
-    search,
+    search: criteres.search,
+    ...(criteres.relationStatus === null ? {} : { relationStatus: criteres.relationStatus }),
     sortBy: 'fullName',
     sortOrder: 'asc',
-    page: 1,
-    pageSize: 20,
+    page: criteres.page,
+    pageSize: A_QUALIFIER_PAGE_SIZE,
   };
   return flattenPage(unwrap(await client.GET('/api/v1/representants', { params: { query } })));
 }

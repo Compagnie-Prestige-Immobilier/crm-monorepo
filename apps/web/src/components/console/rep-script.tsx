@@ -1,8 +1,15 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { ArrowLeftIcon, CalendarIcon, CopyIcon, PencilIcon } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ArrowLeftIcon,
+  CalendarIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CopyIcon,
+  PencilIcon,
+} from 'lucide-react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { copyPhone } from '@/components/console/console-ui';
@@ -50,6 +57,11 @@ import {
 import { formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
+import {
+  REPRESENTANT_RELATION_LABELS,
+  REPRESENTANT_RELATIONS,
+  type RepresentantRelation,
+} from '@/lib/representant-filters';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { cn } from '@/lib/utils';
 
@@ -130,6 +142,14 @@ function etablissementAnswer(confirme: boolean | null, nouvel: string): Partial<
 /** Apparition d'une question qui n'était pas là : douce, et coupée si l'on préfère. */
 const REVELE = 'animate-in fade-in-0 slide-in-from-top-1 duration-200 motion-reduce:animate-none';
 
+const RELATION_ITEMS = [
+  { value: 'tous', label: 'Tous' },
+  ...REPRESENTANT_RELATIONS.map((relation) => ({
+    value: relation,
+    label: REPRESENTANT_RELATION_LABELS[relation],
+  })),
+];
+
 /**
  * L'annuaire, cherché par le SERVEUR : il compare le nom et le numéro réduit à
  * ses chiffres, donc « 77 123 45 67 » trouve la même fiche que « 771234567 ».
@@ -138,8 +158,7 @@ const REVELE = 'animate-in fade-in-0 slide-in-from-top-1 duration-200 motion-red
  * Étape 1 : qualifier un représentant, dans l'ordre et les mots de
  * l'application mobile.
  *
- * Rien n'est choisi d'office : l'écran ouvre sur la barre de recherche. La
- * qualification ne part au serveur qu'à « Enregistrer », en UNE tentative —
+ * La qualification ne part au serveur qu'à « Enregistrer », en UNE tentative,
  * c'est ce qui permet de revenir sur chaque réponse jusqu'au bout.
  */
 export function RepScript() {
@@ -147,20 +166,21 @@ export function RepScript() {
 
   const [choisi, setChoisi] = useState<ScriptedRepresentant | null>(null);
   const [search, setSearch] = useState('');
+  const [relation, setRelation] = useState<RepresentantRelation | null>(null);
+  const [page, setPage] = useState(1);
   const [confirme, setConfirme] = useState<string | null>(null);
   const cherche = useDebouncedValue(search).trim();
 
-  // Aucune liste par défaut : l'annuaire tient des milliers de fiches, tout
-  // dérouler laisse croire à un total faux. Rien ne s'affiche tant qu'on n'a
-  // pas cherché.
   const annuaire = useQuery({
-    queryKey: [...queryKeys.representantsRoot, 'a-qualifier', cherche] as const,
-    queryFn: () => fetchRepresentantsAQualifier(cherche),
-    enabled: choisi === null && cherche !== '',
+    queryKey: [...queryKeys.representantsRoot, 'a-qualifier', cherche, relation, page] as const,
+    queryFn: () =>
+      fetchRepresentantsAQualifier({ search: cherche, relationStatus: relation, page }),
+    enabled: choisi === null,
     placeholderData: (previous) => previous,
   });
 
-  const liste = cherche === '' ? [] : (annuaire.data?.items ?? []);
+  const liste = annuaire.data?.items ?? [];
+  const pageCount = annuaire.data?.pageCount ?? 1;
 
   const ouvrir = useCallback((row: ScriptedRepresentant) => {
     setConfirme(null);
@@ -196,15 +216,33 @@ export function RepScript() {
         </p>
       )}
 
-      <ChampAnnuaire value={search} onChange={setSearch} />
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="min-w-[16rem] flex-1">
+          <ChampAnnuaire
+            value={search}
+            onChange={(valeur) => {
+              setSearch(valeur);
+              setPage(1);
+            }}
+          />
+        </div>
+        <FiltreRelation
+          value={relation}
+          onChange={(valeur) => {
+            setRelation(valeur);
+            setPage(1);
+          }}
+        />
+      </div>
 
-      <p className="text-[0.8125rem] text-muted-foreground">
-        Cherchez qui vous venez d’appeler par nom ou numéro.
-      </p>
+      <ResultatsAnnuaire
+        annuaire={annuaire}
+        liste={liste}
+        critereEnCours={cherche !== '' || relation !== null}
+        onOuvrir={ouvrir}
+      />
 
-      {cherche === '' ? null : (
-        <ResultatsAnnuaire annuaire={annuaire} liste={liste} onOuvrir={ouvrir} />
-      )}
+      {pageCount > 1 ? <Pages page={page} pageCount={pageCount} onPage={setPage} /> : null}
     </div>
   );
 }
@@ -212,10 +250,12 @@ export function RepScript() {
 function ResultatsAnnuaire({
   annuaire,
   liste,
+  critereEnCours,
   onOuvrir,
 }: {
   annuaire: UseQueryResult<Awaited<ReturnType<typeof fetchRepresentantsAQualifier>>>;
   liste: readonly ScriptedRepresentant[];
+  critereEnCours: boolean;
   onOuvrir: (row: ScriptedRepresentant) => void;
 }) {
   if (annuaire.isError) {
@@ -243,7 +283,9 @@ function ResultatsAnnuaire({
   if (liste.length === 0) {
     return (
       <p className="text-[0.9375rem]">
-        Aucun résultat parmi vos fiches. Vérifiez le nom ou le numéro, ou demandez une campagne.
+        {critereEnCours
+          ? 'Aucun résultat parmi vos fiches. Vérifiez le nom ou le numéro, ou demandez une campagne.'
+          : 'Aucune fiche ne vous est attribuée. Demandez une campagne.'}
       </p>
     );
   }
@@ -274,6 +316,85 @@ function ResultatsAnnuaire({
         </li>
       ))}
     </ol>
+  );
+}
+
+function FiltreRelation({
+  value,
+  onChange,
+}: {
+  value: RepresentantRelation | null;
+  onChange: (valeur: RepresentantRelation | null) => void;
+}) {
+  const id = useId();
+
+  return (
+    <div className="flex min-w-[12rem] flex-col gap-1.5">
+      <label htmlFor={id} className="text-[0.875rem] font-[600]">
+        Relation
+      </label>
+      {/* `items` n'est pas décoratif : sans lui, le déclencheur affiche la
+          VALEUR au lieu du libellé de la ligne choisie. */}
+      <Select
+        items={RELATION_ITEMS}
+        value={value ?? 'tous'}
+        onValueChange={(valeur) => {
+          if (valeur === null) return;
+          onChange(valeur === 'tous' ? null : (valeur as RepresentantRelation));
+        }}
+      >
+        <SelectTrigger id={id} className="h-12">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {RELATION_ITEMS.map((item) => (
+            <SelectItem key={item.value} value={item.value}>
+              {item.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+function Pages({
+  page,
+  pageCount,
+  onPage,
+}: {
+  page: number;
+  pageCount: number;
+  onPage: (page: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <Button
+        type="button"
+        variant="outline"
+        disabled={page <= 1}
+        onClick={() => {
+          onPage(page - 1);
+        }}
+      >
+        <ChevronLeftIcon aria-hidden="true" />
+        Page précédente
+      </Button>
+      <span className="min-w-20 text-center text-[0.9375rem] tabular-nums">
+        {page} / {pageCount}
+      </span>
+      <Button
+        type="button"
+        variant="outline"
+        disabled={page >= pageCount}
+        onClick={() => {
+          onPage(page + 1);
+        }}
+      >
+        Page suivante
+        <ChevronRightIcon aria-hidden="true" />
+      </Button>
+    </div>
   );
 }
 

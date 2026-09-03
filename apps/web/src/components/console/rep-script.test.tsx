@@ -1,3 +1,4 @@
+import type { ApiClient } from '@crm/api-client';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -148,27 +149,41 @@ const SECOND = rep({
 /** Une fiche que personne n'a confiée : elle ne s'atteint que par l'annuaire. */
 const HORS_LISTE = rep({ id: 'r-9', fullName: 'Bineta Diop', phoneE164: '+221779876543' });
 
-const page = (items: readonly ScriptedRepresentant[]) => ({
+type PageMeta = Partial<{ total: number; page: number; pageCount: number }>;
+
+const page = (items: readonly ScriptedRepresentant[], meta: PageMeta = {}) => ({
   items: [...items],
   total: items.length,
   page: 1,
-  pageSize: 20,
+  pageSize: 10,
   pageCount: 1,
+  ...meta,
 });
 
-async function renderListe(file: readonly ScriptedRepresentant[] = [PREMIER, SECOND]) {
-  fetchRepresentants.mockResolvedValue(page(file));
-  fetchRepresentantsAQualifier.mockResolvedValue(page(file));
+async function renderListe(
+  file: readonly ScriptedRepresentant[] = [PREMIER, SECOND],
+  meta: PageMeta = {},
+) {
+  fetchRepresentants.mockResolvedValue(page(file, meta));
+  fetchRepresentantsAQualifier.mockResolvedValue(page(file, meta));
   const view = renderWithQuery(<RepScript />);
   await screen.findByLabelText('Qui avez-vous appelé ?');
   return view;
 }
 
-/** Ouvre la qualification de quelqu'un : la liste n'apparaît qu'à la recherche. */
+/** Ouvre la qualification de quelqu'un : la liste est là dès l'ouverture. */
 async function choisir(nom: RegExp): Promise<void> {
-  await userEvent.type(screen.getByLabelText('Qui avez-vous appelé ?'), 'a');
   await userEvent.click(await screen.findByRole('button', { name: nom }));
 }
+
+const relationDemandee = (): unknown =>
+  (fetchRepresentantsAQualifier.mock.calls.at(-1)?.[0] as Record<string, unknown> | undefined)
+    ?.relationStatus;
+
+const choisirRelation = async (label: string): Promise<void> => {
+  await userEvent.click(screen.getByRole('combobox', { name: 'Relation' }));
+  await userEvent.click(await screen.findByRole('option', { name: label }));
+};
 
 const repondre = async (label: string): Promise<void> => {
   await userEvent.click(screen.getByRole('button', { name: label }));
@@ -230,14 +245,14 @@ beforeEach(() => {
 });
 
 describe('RepScript : rien n’est choisi d’office', () => {
-  it('ouvre sur la seule barre de recherche, sans liste ni fiche', async () => {
+  it('ouvre sur ses fiches, sans rien avoir cherché ni ouvert', async () => {
     await renderListe();
 
     expect(screen.getByLabelText('Qui avez-vous appelé ?')).toBeTruthy();
     expect(screen.queryByRole('heading', { level: 2 })).toBeNull();
     expect(screen.queryByText(/Comment s’est passé l’appel/u)).toBeNull();
-    // Aucune liste tant qu'on n'a pas cherché.
-    expect(screen.queryByRole('button', { name: /Aminata Ndiaye/u })).toBeNull();
+    expect(await screen.findByRole('button', { name: /Aminata Ndiaye/u })).toBeTruthy();
+    expect(fetchRepresentantsAQualifier.mock.calls.at(-1)?.[0]).toMatchObject({ search: '' });
   });
 
   it('n’ouvre la fiche et les questions qu’après un choix', async () => {
@@ -249,14 +264,20 @@ describe('RepScript : rien n’est choisi d’office', () => {
     expect(screen.getByText('Comment s’est passé l’appel ?')).toBeTruthy();
   });
 
-  it('ne montre des résultats qu’une fois une recherche saisie', async () => {
+  it('porte la recherche saisie jusqu’au serveur', async () => {
     await renderListe([HORS_LISTE]);
-
-    expect(screen.queryByRole('button', { name: /Bineta Diop/u })).toBeNull();
 
     await userEvent.type(screen.getByLabelText('Qui avez-vous appelé ?'), 'Bineta');
 
     expect(await screen.findByRole('button', { name: /Bineta Diop/u })).toBeTruthy();
+    await waitFor(
+      () => {
+        expect(fetchRepresentantsAQualifier.mock.calls.at(-1)?.[0]).toMatchObject({
+          search: 'Bineta',
+        });
+      },
+      { timeout: 3000 },
+    );
   });
 
   it('cherche par numéro, espaces compris, et laisse le serveur comparer', async () => {
@@ -266,7 +287,9 @@ describe('RepScript : rien n’est choisi d’office', () => {
 
     await waitFor(
       () => {
-        expect(fetchRepresentantsAQualifier.mock.calls.at(-1)?.[0]).toBe('77 987 65 43');
+        expect(fetchRepresentantsAQualifier.mock.calls.at(-1)?.[0]).toMatchObject({
+          search: '77 987 65 43',
+        });
       },
       { timeout: 3000 },
     );
@@ -763,5 +786,98 @@ describe('RepScript : ce que l’écran d’appel a le droit d’appeler', () =>
     await userEvent.type(screen.getByLabelText('Qui avez-vous appelé ?'), 'Personne');
 
     expect(await screen.findByText(/vos fiches/u)).toBeTruthy();
+  });
+});
+
+describe('RepScript : filtrer et parcourir ses fiches', () => {
+  const DIX = Array.from({ length: 10 }, (_, rang) =>
+    rep({ id: `r-p${rang}`, fullName: `Fiche ${rang}` }),
+  );
+
+  it('demande au serveur le statut de relation choisi, et en montre le libellé', async () => {
+    await renderListe();
+
+    await choisirRelation('Refus');
+
+    expect(screen.getByRole('combobox', { name: 'Relation' }).textContent).toContain('Refus');
+    await waitFor(() => {
+      expect(relationDemandee()).toBe('REFUS');
+    });
+  });
+
+  it('revient à « Tous » sans statut demandé', async () => {
+    await renderListe();
+
+    await choisirRelation('Refus');
+    await choisirRelation('Tous');
+
+    await waitFor(() => {
+      expect(relationDemandee()).toBeNull();
+    });
+  });
+
+  it('demande la page suivante au serveur, sans découper la liste ici', async () => {
+    await renderListe(DIX, { total: 24, pageCount: 3 });
+
+    expect(await screen.findByText('1 / 3')).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: /^Fiche \d/u })).toHaveLength(10);
+
+    await userEvent.click(screen.getByRole('button', { name: /Page suivante/u }));
+
+    expect(screen.getByText('2 / 3')).toBeTruthy();
+    await waitFor(() => {
+      expect(fetchRepresentantsAQualifier.mock.calls.at(-1)?.[0]).toMatchObject({ page: 2 });
+    });
+  });
+
+  it('revient à la première page quand la recherche change', async () => {
+    await renderListe(DIX, { total: 24, pageCount: 3 });
+    await userEvent.click(await screen.findByRole('button', { name: /Page suivante/u }));
+
+    await userEvent.type(screen.getByLabelText('Qui avez-vous appelé ?'), 'Ndiaye');
+
+    expect(screen.getByText('1 / 3')).toBeTruthy();
+    await waitFor(
+      () => {
+        expect(fetchRepresentantsAQualifier.mock.calls.at(-1)?.[0]).toMatchObject({
+          search: 'Ndiaye',
+          page: 1,
+        });
+      },
+      { timeout: 3000 },
+    );
+  });
+
+  it('revient à la première page quand le statut change', async () => {
+    await renderListe(DIX, { total: 24, pageCount: 3 });
+    await userEvent.click(await screen.findByRole('button', { name: /Page suivante/u }));
+
+    await choisirRelation('Refus');
+
+    expect(screen.getByText('1 / 3')).toBeTruthy();
+    await waitFor(() => {
+      expect(fetchRepresentantsAQualifier.mock.calls.at(-1)?.[0]).toMatchObject({
+        relationStatus: 'REFUS',
+        page: 1,
+      });
+    });
+  });
+
+  it('demande dix lignes de ses propres fiches, page et statut compris', async () => {
+    const actual = await vi.importActual<typeof RepresentantsData>('@/lib/data/representants');
+    const GET = vi.fn().mockResolvedValue({
+      data: { items: [], meta: { total: 0, page: 2, pageSize: 10, pageCount: 3 } },
+      response: new Response(null, { status: 200 }),
+    });
+
+    await actual.fetchRepresentantsAQualifier({ search: 'a', relationStatus: 'REFUS', page: 2 }, {
+      GET,
+    } as unknown as ApiClient);
+
+    expect(GET.mock.calls[0]?.[1]).toMatchObject({
+      params: {
+        query: { mesFiches: true, search: 'a', relationStatus: 'REFUS', page: 2, pageSize: 10 },
+      },
+    });
   });
 });
