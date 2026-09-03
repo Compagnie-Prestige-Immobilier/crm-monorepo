@@ -1009,6 +1009,7 @@ class WriteRepository {
     String? syndicat,
     bool? numeroConfirme,
     String? numeroSaisi,
+    String? statutQualificationId,
     String? id,
   }) async {
     final String entityId = id ?? Ids.newId();
@@ -1123,6 +1124,7 @@ class WriteRepository {
           'syndicat': ?normalizedSyndicat,
           'numeroConfirme': ?numeroConfirme,
           'phone': ?nouveauNumero,
+          'statutQualificationId': ?statutQualificationId,
           'clientCreatedAt': now.toUtc().toIso8601String(),
         },
         now: now,

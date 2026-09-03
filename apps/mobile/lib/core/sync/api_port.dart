@@ -246,6 +246,13 @@ abstract interface class ApiPort {
     required int payloadVersion,
   });
 
+  /// Le vocabulaire de qualification d'un représentant, ENTIER et dans l'ordre
+  /// servi. Même route dédiée que les motifs, et même filtrage sur
+  /// [payloadVersion].
+  Future<List<StatutQualificationDto>> pullStatutsQualification({
+    required int payloadVersion,
+  });
+
   /// Les référentiels de saisie, ENTIERS. Voir [ReferentielsSnapshot].
   Future<ReferentielsSnapshot> pullReferentiels();
 

@@ -58,6 +58,7 @@ class DioApi implements ApiPort {
   RepCampaignsApi get _repCampaigns => _client.getRepCampaignsApi();
   RepresentantsApi get _representants => _client.getRepresentantsApi();
   CallOutcomeReasonsApi get _reasons => _client.getCallOutcomeReasonsApi();
+  StatutsQualificationApi get _statuts => _client.getStatutsQualificationApi();
   VisitesApi get _visites => _client.getVisitesApi();
 
   @override
@@ -281,6 +282,20 @@ class DioApi implements ApiPort {
             extra: TimeoutProfile.read.extra,
           );
       return _body('callOutcomeReasons', response).items;
+    });
+  }
+
+  @override
+  Future<List<StatutQualificationDto>> pullStatutsQualification({
+    required int payloadVersion,
+  }) async {
+    return _guard('statutsQualification', () async {
+      final Response<StatutQualificationListDto> response = await _statuts
+          .listStatutsQualification(
+            payloadVersion: payloadVersion,
+            extra: TimeoutProfile.read.extra,
+          );
+      return _body('statutsQualification', response).items;
     });
   }
 

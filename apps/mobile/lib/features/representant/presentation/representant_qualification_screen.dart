@@ -21,7 +21,40 @@ import '../../permissions/alarme_permission.dart';
 import '../../phase2/presentation/callback_picker.dart';
 import '../../rappels/presentation/rappels_screen.dart' show quandRappeler;
 
-enum _Resultat { joignable, rappel, injoignable }
+/// L'appel a abouti, ou non. Ce qu'il a donné se dit ensuite, au statut.
+enum _Resultat { joignable, injoignable }
+
+/// Les effets proposés par branche. `SCHEDULE_CALLBACK` est dans les DEUX : on
+/// rappelle aussi qui on n'a pas joint.
+const Set<String> _effetsJoignable = <String>{
+  'REACHED',
+  'REFUSED',
+  'SCHEDULE_CALLBACK',
+};
+
+const Set<String> _effetsInjoignable = <String>{
+  'UNREACHABLE',
+  'WRONG_NUMBER',
+  'SCHEDULE_CALLBACK',
+};
+
+/// L'issue que porte un statut. Le serveur fait la MÊME dérivation et refuse
+/// une issue qui la contredit (`REP_OUTCOME_STATUT_MISMATCH`) : les deux
+/// calculs doivent coïncider exactement.
+String? issueDuStatut(String effet) => const <String, String>{
+  'REACHED': 'REACHED',
+  'REFUSED': 'REFUSED',
+  'SCHEDULE_CALLBACK': 'CALLBACK',
+  'UNREACHABLE': 'UNREACHABLE',
+  'WRONG_NUMBER': 'WRONG_NUMBER',
+}[effet];
+
+/// L'issue d'un appareil dont le référentiel n'est pas descendu : ce que ce
+/// script tirait de ses questions avant que le statut existe.
+String _issueSansStatut({required bool joignable, required bool ambassadeur}) {
+  if (!joignable) return 'UNREACHABLE';
+  return ambassadeur ? 'REACHED' : 'REFUSED';
+}
 
 class RepresentantQualificationScreen extends ConsumerStatefulWidget {
   const RepresentantQualificationScreen({
@@ -47,6 +80,7 @@ class _RepresentantQualificationScreenState
   final TextEditingController syndicatNom = TextEditingController();
   final FocusNode syndicatFocus = FocusNode();
   _Resultat? resultat;
+  StatutQualificationRow? statutChoisi;
   bool? etablissementConfirme;
   bool? aEteContacte;
   bool? connaitUES;
@@ -86,6 +120,23 @@ class _RepresentantQualificationScreenState
   bool get proposeQuelquUn =>
       resultat == _Resultat.joignable && ambassadeur == false;
 
+  /// Les statuts que la branche choisie propose, dans l'ordre servi. Lu SOUS
+  /// `build` : `ref.watch` est ce qui fait reparaître la liste quand la
+  /// synchronisation la ramène.
+  List<StatutQualificationRow> get statutsProposes {
+    final _Resultat? choix = resultat;
+    if (choix == null) return const <StatutQualificationRow>[];
+    final Set<String> admis = choix == _Resultat.joignable
+        ? _effetsJoignable
+        : _effetsInjoignable;
+    final List<StatutQualificationRow> tous =
+        ref.watch(statutsQualificationProvider).value ??
+        const <StatutQualificationRow>[];
+    return tous
+        .where((StatutQualificationRow s) => admis.contains(s.effect))
+        .toList(growable: false);
+  }
+
   /// Le numéro seul ouvre la suggestion : le nom et la remarque ne se saisissent
   /// qu'après lui, et le serveur les jette sans numéro.
   bool get suggestionCommencee => suggestionTelephone.text.trim().isNotEmpty;
@@ -100,11 +151,24 @@ class _RepresentantQualificationScreenState
   String? get manqueResultat {
     final _Resultat? choix = resultat;
     if (choix == null) return 'Choisissez d\'abord le résultat';
-    if (choix == _Resultat.rappel && rappelAt == null) {
+    if (choix == _Resultat.joignable) {
+      final String? manquant = manqueJoignable;
+      if (manquant != null) return manquant;
+    }
+    final StatutQualificationRow? statut = statutChoisi;
+    // Le référentiel n'est pas encore descendu : la qualification reste
+    // possible sans lui, comme sur un appareil qui ne le connaît pas.
+    if (statut == null) {
+      return statutsProposes.isEmpty ? null : 'Choisissez un statut';
+    }
+    if (statut.requiresCallback && rappelAt == null) {
       return 'Choisissez quand rappeler';
     }
-    if (choix != _Resultat.joignable) return null;
+    return null;
+  }
 
+  /// Les six questions de la branche joignable, dans l'ordre du script.
+  String? get manqueJoignable {
     if (etablissementConfirme == null) {
       return 'Confirmez l\'établissement';
     }
@@ -151,7 +215,6 @@ class _RepresentantQualificationScreenState
     ),
     CpiRecapLine('Résultat', switch (resultat) {
       _Resultat.joignable => 'Joignable',
-      _Resultat.rappel => 'À rappeler',
       _Resultat.injoignable => 'Injoignable',
       null => null,
     }),
@@ -174,6 +237,7 @@ class _RepresentantQualificationScreenState
           suggestionNom.text.trim(),
         ].where((String s) => s.isNotEmpty).join(' · '),
       ),
+    CpiRecapLine('Statut', statutChoisi?.label),
     if (rappelAt != null)
       CpiRecapLine('Rappel', quandRappeler(context, rappelAt!, DateTime.now())),
     if (commentaire.text.trim().isNotEmpty)
@@ -234,6 +298,9 @@ class _RepresentantQualificationScreenState
   }
 
   Future<void> enregistrer(BuildContext context) async {
+    // Deux appuis rapprochés consignaient deux appels : l'attente
+    // d'autorisation d'alarme laissait le bouton vivant entre les deux.
+    if (saving) return;
     final _Resultat? choix = resultat;
     if (choix == null) {
       erreur(context, 'Choisissez le résultat de l’appel.');
@@ -247,9 +314,15 @@ class _RepresentantQualificationScreenState
       erreur(context, manquant);
       return;
     }
-
     final bool joignable = choix == _Resultat.joignable;
     final bool ambassadeurOui = joignable && ambassadeur == true;
+
+    // Sans statut, l'issue reste celle que ce script tirait de ses questions :
+    // c'est ce que consigne un appareil dont le référentiel n'est pas descendu.
+    final StatutQualificationRow? statut = statutChoisi;
+    final String issue =
+        (statut == null ? null : issueDuStatut(statut.effect)) ??
+        _issueSansStatut(joignable: joignable, ambassadeur: ambassadeurOui);
 
     final String? moi = ref.read(authControllerProvider).userId;
 
@@ -258,6 +331,10 @@ class _RepresentantQualificationScreenState
       whatsappE164 = (Phone.parse(whatsapp.text) as PhoneValid).e164;
     }
 
+    setState(() {
+      saving = true;
+      echec = null;
+    });
     // Avant l'écriture, et seulement quand un rappel est promis : c'est le
     // seul moment où la demande d'autorisation s'explique d'elle-même. Un
     // refus n'empêche jamais de consigner l'appel.
@@ -266,21 +343,14 @@ class _RepresentantQualificationScreenState
       if (!context.mounted) return;
     }
 
-    setState(() {
-      saving = true;
-      echec = null;
-    });
     try {
       final String attemptId = await ref
           .read(writeRepositoryProvider)
           .recordRepCallAttempt(
             representantId: widget.representantId,
             createdById: moi,
-            outcome: switch (choix) {
-              _Resultat.joignable => ambassadeurOui ? 'REACHED' : 'REFUSED',
-              _Resultat.rappel => 'CALLBACK',
-              _Resultat.injoignable => 'UNREACHABLE',
-            },
+            outcome: issue,
+            statutQualificationId: statut?.id,
             relationStatus: switch (choix) {
               _Resultat.joignable => ambassadeurOui ? 'AMBASSADEUR' : 'REFUS',
               _ => null,
@@ -348,6 +418,9 @@ class _RepresentantQualificationScreenState
 
   @override
   Widget build(BuildContext context) {
+    // L'abonnement au référentiel se prend ici : `statutsProposes` le relit
+    // aussi depuis un geste, où `ref.watch` n'a pas cours.
+    ref.watch(statutsQualificationProvider);
     final ThemeData theme = Theme.of(context);
     final RepresentantSyncViewData? representant = ref
         .watch(representantDetailProvider(widget.representantId))
@@ -463,15 +536,16 @@ class _RepresentantQualificationScreenState
         label: questions[0],
         showLabel: false,
         value: resultat,
-        // L'heure repart de zéro : chaque branche a son propre sélecteur, et
-        // celui qu'on quitte laisserait sinon sa date derrière lui.
+        // Le statut et son heure repartent de zéro : les deux branches ne
+        // proposent pas les mêmes, et celui qu'on quitte laisserait sinon sa
+        // date derrière lui.
         onChanged: (_Resultat choix) => setState(() {
           resultat = choix;
+          statutChoisi = null;
           rappelAt = null;
         }),
         options: const <(_Resultat, String)>[
           (_Resultat.joignable, 'Joignable'),
-          (_Resultat.rappel, 'À rappeler'),
           (_Resultat.injoignable, 'Injoignable'),
         ],
       ),
@@ -563,14 +637,26 @@ class _RepresentantQualificationScreenState
             ),
           ),
         ),
+      ],
+      // Le statut se pose EN DERNIER : il résume l'appel, et il ne se choisit
+      // bien qu'une fois les questions posées. Rien à montrer tant que le
+      // référentiel n'est pas descendu.
+      if (statutsProposes.isNotEmpty) ...<Widget>[
         const SizedBox(height: CpiSpacing.lg),
-        CallbackPicker(
-          now: DateTime.now(),
-          title: 'Le rappeler plus tard ? (facultatif)',
-          onChanged: (DateTime? at) => setState(() => rappelAt = at),
+        _ChoixUnique<StatutQualificationRow>(
+          label: 'Statut de qualification',
+          value: statutChoisi,
+          onChanged: (StatutQualificationRow statut) => setState(() {
+            statutChoisi = statut;
+            rappelAt = null;
+          }),
+          options: <(StatutQualificationRow, String)>[
+            for (final StatutQualificationRow s in statutsProposes)
+              (s, s.label),
+          ],
         ),
       ],
-      if (resultat == _Resultat.rappel) ...<Widget>[
+      if (statutChoisi?.requiresCallback ?? false) ...<Widget>[
         const SizedBox(height: CpiSpacing.lg),
         CallbackPicker(
           now: DateTime.now(),

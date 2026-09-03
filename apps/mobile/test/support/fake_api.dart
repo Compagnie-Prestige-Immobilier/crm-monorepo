@@ -291,6 +291,28 @@ class FakeApi implements ApiPort {
     return callOutcomeReasons;
   }
 
+  /// Le référentiel des statuts de qualification à servir. Vide par défaut.
+  final List<StatutQualificationDto> statutsQualification =
+      <StatutQualificationDto>[];
+
+  /// Chaque appel à [pullStatutsQualification], avec la version reçue.
+  final List<int> statutCalls = <int>[];
+
+  ApiException? failNextStatutsPull;
+
+  @override
+  Future<List<StatutQualificationDto>> pullStatutsQualification({
+    required int payloadVersion,
+  }) async {
+    statutCalls.add(payloadVersion);
+    final ApiException? boom = failNextStatutsPull;
+    if (boom != null) {
+      failNextStatutsPull = null;
+      throw boom;
+    }
+    return statutsQualification;
+  }
+
   @override
   Future<PushResult> push({
     required String batchId,
@@ -728,6 +750,11 @@ class ExplodingApi implements ApiPort {
 
   @override
   Future<List<CallOutcomeReasonDto>> pullCallOutcomeReasons({
+    required int payloadVersion,
+  }) => _boom();
+
+  @override
+  Future<List<StatutQualificationDto>> pullStatutsQualification({
     required int payloadVersion,
   }) => _boom();
 

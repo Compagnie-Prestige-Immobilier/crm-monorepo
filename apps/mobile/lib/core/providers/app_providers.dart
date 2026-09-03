@@ -299,6 +299,13 @@ final StreamProvider<List<Employeur>> employeursProvider =
       return ref.watch(referenceRepositoryProvider).watchEmployeurs();
     });
 
+final StreamProvider<List<StatutQualificationRow>>
+statutsQualificationProvider = StreamProvider<List<StatutQualificationRow>>((
+  Ref ref,
+) {
+  return ref.watch(referenceRepositoryProvider).watchStatutsQualification();
+});
+
 final StreamProvider<List<PaysRow>> paysProvider =
     StreamProvider<List<PaysRow>>((Ref ref) {
       return ref.watch(referenceRepositoryProvider).watchPays();
