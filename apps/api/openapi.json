@@ -4363,6 +4363,81 @@
         "tags": ["representants"]
       }
     },
+    "/api/v1/representants/{id}/call-attempts": {
+      "get": {
+        "operationId": "listRepresentantCallAttempts",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepresentantCallAttemptListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "REPRESENTANT_NOT_FOUND.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Les appels consignés sur une fiche, du plus récent au plus ancien.",
+        "tags": ["representants"]
+      }
+    },
     "/api/v1/representants/{id}/comments": {
       "get": {
         "operationId": "listRepresentantComments",
@@ -5191,6 +5266,81 @@
           }
         ],
         "summary": "Supprime logiquement un prospect ; le numéro redevient ressaisissable.",
+        "tags": ["prospects"]
+      }
+    },
+    "/api/v1/prospects/{id}/call-attempts": {
+      "get": {
+        "operationId": "listProspectCallAttempts",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProspectCallAttemptListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "PROSPECT_NOT_FOUND · fiche absente ou supprimée.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Les tentatives d’appel consignées sur une fiche, de la plus récente à la plus ancienne.",
         "tags": ["prospects"]
       }
     },
@@ -18761,7 +18911,7 @@
     },
     "/api/v1/lots-export/mes-attributions": {
       "get": {
-        "description": "Sert au mobile à borner son tirage. `tout: true` pour ADMIN, SUPERVISEUR et DIRECTION : les deux listes sont alors vides et aucun filtre ne s’applique.",
+        "description": "Sert au mobile à borner son tirage. `tout: true` pour ADMIN seulement : les deux listes sont alors vides et aucun filtre ne s’applique. Supervision et direction ne voient sur le téléphone que les fiches qu’une campagne leur a confiées.",
         "operationId": "mesAttributions",
         "parameters": [],
         "responses": {
@@ -20637,6 +20787,16 @@
               }
             ]
           },
+          "statutQualificationId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "statutQualificationLabel": {
+            "type": "string",
+            "nullable": true,
+            "description": "Libellé du statut de qualification, affiché à la place de `relationStatus`. Nul sur une fiche jamais qualifiée."
+          },
           "whatsappStatus": {
             "allOf": [
               {
@@ -20692,6 +20852,10 @@
             "format": "date-time",
             "nullable": true
           },
+          "callAttemptCount": {
+            "type": "number",
+            "description": "Nombre d’appels consignés sur cette fiche."
+          },
           "lastCallById": {
             "type": "string",
             "format": "uuid",
@@ -20725,6 +20889,8 @@
           "updatedAt",
           "prospectCount",
           "relationStatus",
+          "statutQualificationId",
+          "statutQualificationLabel",
           "whatsappStatus",
           "whatsappE164",
           "whatsappNumber",
@@ -20736,6 +20902,7 @@
           "contacte",
           "lastCallOutcome",
           "lastCallAt",
+          "callAttemptCount",
           "lastCallById",
           "lastCallByName",
           "nextCallbackAt"
@@ -21158,6 +21325,120 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/RepresentantRelationChangeDto"
+            }
+          }
+        },
+        "required": ["items"]
+      },
+      "RepresentantCallAttemptDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "outcome": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RepCallOutcome"
+              }
+            ]
+          },
+          "statutQualificationId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "statutQualificationLabel": {
+            "type": "string",
+            "nullable": true
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "callbackAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "promisedProspects": {
+            "type": "number",
+            "nullable": true
+          },
+          "etablissementConfirme": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "numeroConfirme": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "contacte": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "connaitUES": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "syndicat": {
+            "type": "string",
+            "nullable": true
+          },
+          "suggestedName": {
+            "type": "string",
+            "nullable": true
+          },
+          "suggestedPhoneE164": {
+            "type": "string",
+            "nullable": true
+          },
+          "suggestedNote": {
+            "type": "string",
+            "nullable": true
+          },
+          "performedById": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "performedByName": {
+            "type": "string"
+          },
+          "clientCreatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "outcome",
+          "statutQualificationId",
+          "statutQualificationLabel",
+          "comment",
+          "callbackAt",
+          "promisedProspects",
+          "etablissementConfirme",
+          "numeroConfirme",
+          "contacte",
+          "connaitUES",
+          "syndicat",
+          "suggestedName",
+          "suggestedPhoneE164",
+          "suggestedNote",
+          "performedById",
+          "performedByName",
+          "clientCreatedAt"
+        ]
+      },
+      "RepresentantCallAttemptListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "Du plus récent au plus ancien.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RepresentantCallAttemptDto"
             }
           }
         },
@@ -21589,6 +21870,10 @@
             "format": "date-time",
             "nullable": true
           },
+          "callAttemptCount": {
+            "type": "number",
+            "description": "Nombre de tentatives d’appel consignées."
+          },
           "lastCallOutcome": {
             "nullable": true,
             "allOf": [
@@ -21690,6 +21975,7 @@
           "lastOutcome",
           "lastComment",
           "lastAttemptAt",
+          "callAttemptCount",
           "lastCallOutcome",
           "lastCallAt",
           "lastCallById",
@@ -21716,6 +22002,99 @@
           }
         },
         "required": ["items", "meta"]
+      },
+      "ProspectCallAttemptDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "outcome": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CallOutcome"
+              }
+            ]
+          },
+          "reasonLabel": {
+            "type": "string",
+            "nullable": true,
+            "description": "Libellé du motif choisi."
+          },
+          "method": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EnrollmentMethod"
+              }
+            ]
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "fonctionnaire": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "engagementEnCours": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "dureeEtablissementMois": {
+            "type": "number",
+            "nullable": true
+          },
+          "rendezVousAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "performedById": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "performedByName": {
+            "type": "string"
+          },
+          "clientCreatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "outcome",
+          "reasonLabel",
+          "method",
+          "comment",
+          "email",
+          "fonctionnaire",
+          "engagementEnCours",
+          "dureeEtablissementMois",
+          "rendezVousAt",
+          "performedById",
+          "performedByName",
+          "clientCreatedAt"
+        ]
+      },
+      "ProspectCallAttemptListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "Du plus récent au plus ancien.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProspectCallAttemptDto"
+            }
+          }
+        },
+        "required": ["items"]
       },
       "CreateProspectDto": {
         "type": "object",

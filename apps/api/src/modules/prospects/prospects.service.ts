@@ -30,6 +30,7 @@ import type {
   CreateProspectDto,
   ConfirmGrandPublicConversionDto,
   MergeProspectsDto,
+  ProspectCallAttemptListDto,
   ProspectDto,
   ProspectListDto,
   ReassignProspectsDto,
@@ -216,7 +217,7 @@ export function toProspectDto(row: ProspectRow, lastAttempt?: LastAttempt): Pros
   const incomeBand = row.incomeBand ?? { label: null };
   const provenance = row.canalProvenance ?? { label: null };
   const enrollmentAuthor = row.enrollmentCapturedBy ?? { fullName: null };
-  const attempt = lastAttempt ?? { outcome: null, comment: null, at: null };
+  const attempt = lastAttempt ?? { outcome: null, comment: null, at: null, count: 0 };
 
   return {
     id: row.id,
@@ -280,6 +281,7 @@ export function toProspectDto(row: ProspectRow, lastAttempt?: LastAttempt): Pros
     lastOutcome: attempt.outcome,
     lastComment: attempt.comment,
     lastAttemptAt: isoOrNull(attempt.at),
+    callAttemptCount: attempt.count,
     lastCallOutcome: row.lastCallOutcome,
     lastCallAt: isoOrNull(row.lastCallAt),
     lastCallById: row.lastCallById,
@@ -355,6 +357,36 @@ export class ProspectsService {
     }
     const attempts = await lastAttemptsByProspect(this.prisma, [row.id]);
     return toProspectDto(row, attempts.get(row.id));
+  }
+
+  /** Même portée que `get` : qui peut lire la fiche peut relire ses appels. */
+  async callHistory(user: AuthenticatedUser, id: string): Promise<ProspectCallAttemptListDto> {
+    await this.get(user, id);
+    const rows = await this.prisma.callAttempt.findMany({
+      where: { prospectId: id },
+      include: {
+        performedBy: { select: { fullName: true } },
+        reason: { select: { label: true } },
+      },
+      orderBy: [{ clientCreatedAt: 'desc' }, { id: 'desc' }],
+    });
+    return {
+      items: rows.map((row) => ({
+        id: row.id,
+        outcome: row.outcome,
+        reasonLabel: row.reason?.label ?? null,
+        method: row.method,
+        comment: row.comment,
+        email: row.email,
+        fonctionnaire: row.fonctionnaire,
+        engagementEnCours: row.engagementEnCours,
+        dureeEtablissementMois: row.dureeEtablissementMois,
+        rendezVousAt: isoOrNull(row.rendezVousAt),
+        performedById: row.performedById,
+        performedByName: row.performedBy.fullName,
+        clientCreatedAt: row.clientCreatedAt.toISOString(),
+      })),
+    };
   }
 
   async create(user: AuthenticatedUser, input: CreateProspectDto): Promise<ProspectDto> {

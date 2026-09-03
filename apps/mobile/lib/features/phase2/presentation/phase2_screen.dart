@@ -686,7 +686,10 @@ class _EtapeQui extends StatelessWidget {
           entry: state.entry!,
           onNext: onNext,
         ),
-        Phase2Stage.capture => _Trouve(entry: state.entry!),
+        Phase2Stage.capture => _Trouve(
+          entry: state.entry!,
+          prospect: state.prospect,
+        ),
         _ => _SearchHint(message: state.errorMessage),
       },
       const SizedBox(height: CpiSpacing.lg),
@@ -1222,51 +1225,101 @@ class _SearchHint extends StatelessWidget {
 
 /// Le numéro est dans la liste et le dossier est ouvert : l'étape 1 le confirme
 /// avant de laisser passer à l'étape 2.
+/// La fiche telle qu'elle est, avant de dérouler le script : qui c'est, ce que
+/// le dernier appel a donné, combien de fois on a déjà essayé.
 class _Trouve extends StatelessWidget {
-  const _Trouve({required this.entry});
+  const _Trouve({required this.entry, this.prospect});
 
   final Phase2DirectoryData entry;
+
+  /// Nulle si le pull n'a pas encore descendu la fiche : l'annuaire seul ne
+  /// porte qu'un numéro et un état.
+  final Prospect? prospect;
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final CpiColors cpi = context.cpi;
-    return Semantics(
-      label:
-          'Numéro trouvé : ${Phone.format(entry.phoneE164)}. '
-          'Dossier à traiter.',
-      child: ExcludeSemantics(
-        child: CpiCard(
-          child: Row(
-            spacing: CpiSpacing.sm,
-            children: <Widget>[
-              Icon(
-                PhosphorIconsFill.checkCircle,
-                size: CpiIconSize.xl,
-                color: cpi.success,
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    Text(
-                      Phone.format(entry.phoneE164),
-                      style: theme.textTheme.titleMedium,
+    final Prospect? fiche = prospect;
+    final String nom = fiche == null
+        ? ''
+        : '${fiche.prenom} ${fiche.nom}'.trim();
+    final DateTime? dernier = fiche?.lastCallAt;
+    final String? issue = fiche?.lastCallOutcome;
+    final int tentatives = fiche?.callAttemptCount ?? 0;
+    final String statut = Phase2Controller.labelForStatus(entry.phase2Status);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Semantics(
+          label:
+              'Numéro trouvé : ${Phone.format(entry.phoneE164)}. '
+              '${nom.isEmpty ? '' : '$nom. '}Statut : $statut.',
+          child: ExcludeSemantics(
+            child: CpiCard(
+              child: Row(
+                spacing: CpiSpacing.sm,
+                children: <Widget>[
+                  Icon(
+                    PhosphorIconsFill.checkCircle,
+                    size: CpiIconSize.xl,
+                    color: cpi.success,
+                  ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Text(
+                          nom.isEmpty ? Phone.format(entry.phoneE164) : nom,
+                          style: theme.textTheme.titleMedium,
+                        ),
+                        Text(
+                          nom.isEmpty
+                              ? 'Numéro trouvé.'
+                              : Phone.format(entry.phoneE164),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
                     ),
-                    Text(
-                      'Numéro trouvé. Le dossier est à traiter.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                  CpiTag(statut),
+                ],
               ),
-            ],
+            ),
           ),
         ),
-      ),
+        const SizedBox(height: CpiSpacing.sm),
+        CpiCard.rows(<CpiRow>[
+          if (fiche?.whatsappE164 != null)
+            CpiRow(
+              title: 'WhatsApp',
+              subtitle: Phone.format(fiche!.whatsappE164!),
+            ),
+          if ((fiche?.profession ?? '').trim().isNotEmpty)
+            CpiRow(title: 'Profession', subtitle: fiche!.profession!.trim()),
+          CpiRow(
+            title: 'Dernière interaction',
+            subtitle: dernier == null ? 'Jamais appelé' : relativeTime(dernier),
+          ),
+          if (issue != null)
+            CpiRow(
+              title: 'Résultat',
+              subtitle: SystemCallReasons.byCode[issue]?.label ?? issue,
+            ),
+          CpiRow(
+            title: 'Tentatives',
+            subtitle: switch (tentatives) {
+              0 => 'Aucun appel',
+              1 => '1 appel',
+              _ => '$tentatives appels',
+            },
+          ),
+        ]),
+      ],
     );
   }
 }

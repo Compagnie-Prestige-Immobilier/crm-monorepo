@@ -25,6 +25,8 @@ import 'generated_migrations/schema_v20.dart' as v20;
 import 'generated_migrations/schema_v21.dart' as v21schema;
 import 'generated_migrations/schema_v22.dart' as v22schema;
 import 'generated_migrations/schema_v23.dart' as v23schema;
+import 'generated_migrations/schema_v24.dart' as v24schema;
+import 'generated_migrations/schema_v25.dart' as v25schema;
 
 /// Test doré de migration.
 ///
@@ -1925,7 +1927,7 @@ void main() {
       await old.close();
 
       final AppDatabase db = AppDatabase(schema.newConnection());
-      await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
+      await verifier.migrateAndValidate(db, 21);
       await db.customStatement(
         'INSERT INTO income_bands '
         '(id, code, label, min_xof, max_xof, sort_order, local_updated_at) '
@@ -2441,6 +2443,126 @@ void main() {
           .then((QueryRow row) => row.read<String>('id')),
       'op-v23',
     );
+    await db.close();
+  });
+
+  test(
+    'v24 -> v25 donne aux fiches leur statut, et la vue son libellé',
+    () async {
+      final schema = await verifier.schemaAt(24);
+      final v24schema.DatabaseAtV24 old = v24schema.DatabaseAtV24(
+        schema.newConnection(),
+      );
+      await old.customStatement(
+        'INSERT INTO representants '
+        '(id, full_name, phone_e164, departement_id, created_by_id, '
+        ' relation_status, client_created_at, local_updated_at) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        <Object?>[
+          'rep-24',
+          'Fiche d’avant',
+          '+221771234567',
+          'dep-1',
+          'me',
+          'AMBASSADEUR',
+          _iso,
+          _iso,
+        ],
+      );
+      await old.customStatement(
+        'INSERT INTO sync_state (collection, cursor, last_pulled_at) '
+        'VALUES (?, ?, ?)',
+        <Object?>['all', 'eyJ1cGRhdGVkQXQiOiIyMDI2LTA4LTAxIn0=', _iso],
+      );
+      await old.customStatement(
+        'INSERT INTO sync_state (collection, last_pulled_at) VALUES (?, ?)',
+        <Object?>['@lock:auth.refresh', _iso],
+      );
+      await old.close();
+
+      final AppDatabase db = AppDatabase(schema.newConnection());
+      await verifier.migrateAndValidate(db, 25);
+
+      // Le curseur de pull est effacé, et lui seul : les fiches déjà en base
+      // redescendent avec leur statut au prochain pull.
+      final List<QueryRow> cursors = await db
+          .customSelect('SELECT collection FROM sync_state')
+          .get();
+      expect(
+        cursors.map((QueryRow r) => r.read<String>('collection')),
+        <String>['@lock:auth.refresh'],
+      );
+
+      // La fiche d'avant garde sa relation et n'invente pas de statut : elle
+      // s'affichera sous « A accepté » tant qu'un appel ne l'aura pas qualifiée.
+      final QueryRow avant = await db
+          .customSelect(
+            'SELECT relation_status, statut_qualification_id, '
+            'statut_qualification_label FROM representant_sync_view',
+          )
+          .getSingle();
+      expect(avant.read<String>('relation_status'), 'AMBASSADEUR');
+      expect(avant.read<String?>('statut_qualification_id'), isNull);
+      expect(avant.read<String?>('statut_qualification_label'), isNull);
+
+      await db.customStatement(
+        'INSERT INTO statuts_qualification (code, id, label, effect) '
+        'VALUES (?, ?, ?, ?)',
+        <Object?>['TRES_INTERESSE', 'sq-1', 'Très intéressé', 'REACHED'],
+      );
+      await db.customStatement(
+        'UPDATE representants SET statut_qualification_id = ? WHERE id = ?',
+        <Object?>['sq-1', 'rep-24'],
+      );
+      final QueryRow apres = await db
+          .customSelect(
+            'SELECT statut_qualification_label FROM representant_sync_view',
+          )
+          .getSingle();
+      expect(
+        apres.read<String?>('statut_qualification_label'),
+        'Très intéressé',
+      );
+      await db.close();
+    },
+  );
+
+  test('v25 -> v26 compte les appels à zéro et rouvre le curseur', () async {
+    final schema = await verifier.schemaAt(25);
+    final v25schema.DatabaseAtV25 old = v25schema.DatabaseAtV25(
+      schema.newConnection(),
+    );
+    await old.customStatement(
+      'INSERT INTO representants '
+      '(id, full_name, phone_e164, departement_id, created_by_id, '
+      ' relation_status, client_created_at, local_updated_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      <Object?>[
+        'rep-25',
+        'Fiche d’avant',
+        '+221771234567',
+        'dep-1',
+        'me',
+        'INCONNU',
+        _iso,
+        _iso,
+      ],
+    );
+    await old.customStatement(
+      'INSERT INTO sync_state (collection, cursor, last_pulled_at) '
+      'VALUES (?, ?, ?)',
+      <Object?>['all', 'eyJ1cGRhdGVkQXQiOiIyMDI2LTA4LTAxIn0=', _iso],
+    );
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 26);
+
+    expect(await db.customSelect('SELECT 1 FROM sync_state').get(), isEmpty);
+    final QueryRow fiche = await db
+        .customSelect('SELECT call_attempt_count FROM representant_sync_view')
+        .getSingle();
+    expect(fiche.read<int>('call_attempt_count'), 0);
     await db.close();
   });
 

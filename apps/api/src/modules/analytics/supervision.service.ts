@@ -248,12 +248,12 @@ export class SupervisionActivityService {
           SELECT
             rca."performedById"                             AS "userId",
             date_trunc(${unit}, rca."clientCreatedAt")      AS bucket,
-            (rca."outcome" IN ${REP_LIVE_OUTCOMES} OR rca."outcome" = 'WRONG_NUMBER')::int AS appel,
+            (rca."outcome" IN ${REP_LIVE_OUTCOMES})::int AS appel,
             (rca."outcome" = 'WRONG_NUMBER')::int             AS faux,
             (rca."outcome" IN ${REP_ANSWERED_OUTCOMES})::int  AS joint,
             (rca."outcome" = 'CALLBACK')::int                AS rappel,
             (rca."outcome" = 'UNREACHABLE')::int             AS injoignable,
-            (rca."outcome" NOT IN ${REP_LIVE_OUTCOMES} AND rca."outcome" != 'WRONG_NUMBER')::int AS autre
+            (rca."outcome" NOT IN ${REP_LIVE_OUTCOMES})::int AS autre
           FROM "rep_call_attempts" rca
           WHERE ${repScope} AND ${repWindow}
     `;
@@ -547,46 +547,42 @@ export class SupervisionActivityService {
     // actifs apparaissent même à zéro ; les statuts désactivés n'apparaissent
     // que s'ils sont réellement présents.
     const estGrandPublic = query.projet === Projet.GRAND_PUBLIC;
-    const tcFilter = query.commercialId
-      ? Prisma.sql`AND rca."performedById" = ${query.commercialId}`
-      : Prisma.sql``;
     let repQualificationStatuses: SupervisionRepStatutsDto | null = null;
     if (!estGrandPublic) {
-      try {
-        const repStatuts = await this.prisma.$queryRaw<{ id: string; code: string; label: string; isActive: boolean; count: number }[]>`
-          WITH last_calls AS (
-            SELECT DISTINCT ON (rca."representantId")
-              rca."representantId" AS "repId",
-              rca."statutQualificationId" AS "sid"
-            FROM "rep_call_attempts" rca
-            WHERE rca."statutQualificationId" IS NOT NULL
-              AND ${repWindow} ${tcFilter}
-            ORDER BY rca."representantId", rca."clientCreatedAt" DESC, rca."id" DESC
-          ),
-          counts AS (
-            SELECT "sid", COUNT(*)::int AS count
-            FROM last_calls
-            GROUP BY "sid"
-          )
-          SELECT sq.id, sq.code, sq.label, sq."isActive", COALESCE(c.count, 0)::int AS count
-          FROM "statuts_qualification" sq
-          LEFT JOIN counts c ON c."sid" = sq.id
-          WHERE sq."isActive" = TRUE OR c.count > 0
-          ORDER BY sq."sortOrder" ASC, sq."label" ASC
-        `;
-        repQualificationStatuses = {
-          total: repStatuts.reduce((sum, row) => sum + row.count, 0),
-          items: repStatuts.map((row): SupervisionRepStatutDto => ({
-            id: row.id,
-            code: row.code,
-            label: row.label,
-            isActive: row.isActive,
-            count: row.count,
-          })),
-        };
-      } catch (error: unknown) {
-        this.logger.warn(`répartition des statuts indisponible: ${String(error)}`);
-      }
+      const repStatuts = await this.prisma.$queryRaw<
+        { id: string; code: string; label: string; isActive: boolean; count: number }[]
+      >`
+        WITH last_calls AS (
+          SELECT DISTINCT ON (rca."representantId")
+            rca."performedById" AS "userId",
+            rca."statutQualificationId" AS "sid"
+          FROM "rep_call_attempts" rca
+          WHERE rca."statutQualificationId" IS NOT NULL
+            AND ${repWindow}
+          ORDER BY rca."representantId", rca."clientCreatedAt" DESC, rca."id" DESC
+        ),
+        counts AS (
+          SELECT "sid", COUNT(*)::int AS count
+          FROM last_calls
+          WHERE ${membreEquipe(Prisma.sql`"userId"`)}
+          GROUP BY "sid"
+        )
+        SELECT sq.id, sq.code, sq.label, sq."isActive", COALESCE(c.count, 0)::int AS count
+        FROM "statuts_qualification" sq
+        LEFT JOIN counts c ON c."sid" = sq.id
+        WHERE sq."isActive" = TRUE OR c.count > 0
+        ORDER BY sq."sortOrder" ASC, sq."label" ASC
+      `;
+      repQualificationStatuses = {
+        total: repStatuts.reduce((sum, row) => sum + row.count, 0),
+        items: repStatuts.map((row): SupervisionRepStatutDto => ({
+          id: row.id,
+          code: row.code,
+          label: row.label,
+          isActive: row.isActive,
+          count: row.count,
+        })),
+      };
     }
 
     return {
@@ -668,7 +664,6 @@ function notes(
 }
 
 function chiffres(base: TotalRow, rep: RepTotalRow): SupervisionActivityCountsDto {
-  const repLiveCalls = rep.appels - rep.faux;
   return {
     calls: base.appels,
     unreachable: base.injoignables,
@@ -686,8 +681,8 @@ function chiffres(base: TotalRow, rep: RepTotalRow): SupervisionActivityCountsDt
     repCallback: rep.rappels,
     repUnreachable: rep.injoignables,
     repOther: rep.autres,
-    repContactRate: rate(rep.joints, repLiveCalls),
-    repCallbackRate: rate(rep.rappels, repLiveCalls),
+    repContactRate: rate(rep.joints, rep.appels),
+    repCallbackRate: rate(rep.rappels, rep.appels),
     repQuestioned: rep.interroges,
     repQualified: rep.qualifies,
     repQualificationRate: rate(rep.qualifies, rep.interroges),

@@ -200,6 +200,16 @@ export class RepresentantDto {
   @ApiProperty({ enum: RepresentantRelation, enumName: 'RepresentantRelation' })
   relationStatus!: RepresentantRelation;
 
+  @ApiProperty({ type: String, format: 'uuid', nullable: true })
+  statutQualificationId!: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'Libellé du statut de qualification, affiché à la place de `relationStatus`. Nul sur une fiche jamais qualifiée.',
+  })
+  statutQualificationLabel!: string | null;
+
   @ApiProperty({ enum: WhatsappStatus, enumName: 'WhatsappStatus' })
   whatsappStatus!: WhatsappStatus;
 
@@ -234,6 +244,8 @@ export class RepresentantDto {
   })
   lastCallOutcome!: RepCallOutcome | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) lastCallAt!: string | null;
+  @ApiProperty({ type: Number, description: 'Nombre d’appels consignés sur cette fiche.' })
+  callAttemptCount!: number;
   @ApiProperty({ type: String, format: 'uuid', nullable: true }) lastCallById!: string | null;
   @ApiProperty({ type: String, nullable: true }) lastCallByName!: string | null;
   @ApiProperty({
@@ -597,6 +609,37 @@ export class RepresentantRelationChangeDto {
   source!: ChangeSource;
 
   @ApiProperty({ type: String, format: 'date-time' }) changedAt!: string;
+}
+
+/** Un appel consigné, avec les réponses du script telles qu'elles ont été dites ce jour-là. */
+export class RepresentantCallAttemptDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ enum: RepCallOutcome, enumName: 'RepCallOutcome' }) outcome!: RepCallOutcome;
+  @ApiProperty({ type: String, format: 'uuid', nullable: true })
+  statutQualificationId!: string | null;
+  @ApiProperty({ type: String, nullable: true }) statutQualificationLabel!: string | null;
+  @ApiProperty({ type: String, nullable: true }) comment!: string | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) callbackAt!: string | null;
+  @ApiProperty({ type: Number, nullable: true }) promisedProspects!: number | null;
+  @ApiProperty({ type: Boolean, nullable: true }) etablissementConfirme!: boolean | null;
+  @ApiProperty({ type: Boolean, nullable: true }) numeroConfirme!: boolean | null;
+  @ApiProperty({ type: Boolean, nullable: true }) contacte!: boolean | null;
+  @ApiProperty({ type: Boolean, nullable: true }) connaitUES!: boolean | null;
+  @ApiProperty({ type: String, nullable: true }) syndicat!: string | null;
+  @ApiProperty({ type: String, nullable: true }) suggestedName!: string | null;
+  @ApiProperty({ type: String, nullable: true }) suggestedPhoneE164!: string | null;
+  @ApiProperty({ type: String, nullable: true }) suggestedNote!: string | null;
+  @ApiProperty({ format: 'uuid' }) performedById!: string;
+  @ApiProperty() performedByName!: string;
+  @ApiProperty({ type: String, format: 'date-time' }) clientCreatedAt!: string;
+}
+
+export class RepresentantCallAttemptListDto {
+  @ApiProperty({
+    type: () => [RepresentantCallAttemptDto],
+    description: 'Du plus récent au plus ancien.',
+  })
+  items!: RepresentantCallAttemptDto[];
 }
 
 export class RepresentantRelationChangeListDto {

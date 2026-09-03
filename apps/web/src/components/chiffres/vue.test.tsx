@@ -316,4 +316,16 @@ describe('l’écran Chiffres, du squelette aux chiffres', () => {
     expect(screen.getByText('Sans objet')).toBeTruthy();
     expect(screen.getByText('Aucun appel à un prospect sur la période')).toBeTruthy();
   });
+
+  it('une tuile de taux met le nombre en grand et le pourcentage en dessous', async () => {
+    setUrl('/chues/statistiques');
+    dispositionMock.mockResolvedValue(disposition(['taux-de-contact']));
+    activiteMock.mockResolvedValue(activite);
+
+    renderWithQuery(<ChiffresView ecran="chues" role={SUPERVISEUR} />);
+
+    expect((await screen.findAllByText('21')).length).toBeGreaterThan(0);
+    expect(screen.getByText('70,0 % · 21 joints sur 30 appels')).toBeTruthy();
+    expect(screen.queryByText('70,0 %')).toBeNull();
+  });
 });

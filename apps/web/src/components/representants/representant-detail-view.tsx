@@ -14,14 +14,16 @@ import { formatDate, formatDateTime, formatNumber, formatPhone } from '@/lib/for
 import { fetchProspects } from '@/lib/data/prospects';
 import {
   fetchRepresentant,
+  fetchRepresentantCallAttempts,
   fetchRepresentantRelationHistory,
   scriptOf,
   whatsappLabel,
+  type RepresentantCallAttempt,
   type RepresentantRelationChange,
 } from '@/lib/data/representants';
 import { queryKeys } from '@/lib/query-keys';
 import { REPRESENTANT_RELATION_LABELS } from '@/lib/representant-filters';
-import { PROSPECT_STATUT_LABELS } from '@/lib/types';
+import { PROSPECT_STATUT_LABELS, REP_CALL_OUTCOME_LABELS } from '@/lib/types';
 
 const NO_VALUE = '–';
 
@@ -51,6 +53,11 @@ export function RepresentantDetailView({
   const history = useQuery({
     queryKey: [...queryKeys.representant(representantId), 'relation-history'],
     queryFn: () => fetchRepresentantRelationHistory(representantId),
+  });
+
+  const appels = useQuery({
+    queryKey: [...queryKeys.representant(representantId), 'call-attempts'],
+    queryFn: () => fetchRepresentantCallAttempts(representantId),
   });
 
   const prospectFilters = { ...EMPTY_FILTERS, representantId };
@@ -108,7 +115,10 @@ export function RepresentantDetailView({
               </p>
             </div>
             <div className="flex flex-col items-end gap-2">
-              <RelationBadge status={representant.relationStatus} />
+              <RelationBadge
+                status={representant.relationStatus}
+                label={representant.statutQualificationLabel}
+              />
               <p className="text-right">
                 <span className="block font-display text-[1.5rem] font-[800] leading-none tabular-nums">
                   {formatNumber(representant.prospectCount)}
@@ -166,6 +176,22 @@ export function RepresentantDetailView({
               <dt className="text-muted-foreground">Connaît l’UES</dt>
               <dd className="truncate font-[600]">{ouiNonNsp(representant.connaitUES)}</dd>
             </div>
+            <div className="min-w-0">
+              <dt className="text-muted-foreground">Dernier appel</dt>
+              <dd className="truncate font-[600]">
+                {representant.lastCallOutcome == null
+                  ? 'Jamais appelé'
+                  : REP_CALL_OUTCOME_LABELS[representant.lastCallOutcome]}
+              </dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-muted-foreground">Appelé le</dt>
+              <dd className="truncate font-[600]">
+                {representant.lastCallAt == null
+                  ? NO_VALUE
+                  : formatDateTime(representant.lastCallAt)}
+              </dd>
+            </div>
           </dl>
 
           {/* La note EST un champ de la fiche : elle reste dans la fiche, sous
@@ -190,6 +216,25 @@ export function RepresentantDetailView({
             canAdminister={canAdminister}
             readOnly={readOnly}
           />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Appels</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {appels.isPending ? <Skeleton className="h-24 w-full" /> : null}
+          {appels.isError ? (
+            <QueryErrorState
+              error={appels.error}
+              onRetry={() => {
+                void appels.refetch();
+              }}
+              fallback="Les appels n’ont pas pu être chargés."
+            />
+          ) : null}
+          {appels.isSuccess ? <Appels items={appels.data} /> : null}
         </CardContent>
       </Card>
 
@@ -269,6 +314,64 @@ export function RepresentantDetailView({
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+/** Chaque appel avec les réponses du script telles qu'elles ont été dites ce jour-là. */
+function Appels({ items }: { items: readonly RepresentantCallAttempt[] }) {
+  if (items.length === 0) {
+    return (
+      <p className="text-[0.875rem] text-muted-foreground">
+        Aucun appel consigné. Le premier se note depuis la console ou le téléphone.
+      </p>
+    );
+  }
+  return (
+    <ol aria-label="Appels" className="flex flex-col divide-y divide-border">
+      {items.map((appel) => {
+        const reponses = [
+          appel.etablissementConfirme === null
+            ? null
+            : `Établissement confirmé : ${ouiNonNsp(appel.etablissementConfirme)}`,
+          appel.contacte === null ? null : `Contacté : ${ouiNonNsp(appel.contacte)}`,
+          appel.connaitUES === null ? null : `Connaît l’UES : ${ouiNonNsp(appel.connaitUES)}`,
+          appel.syndicat === null || appel.syndicat === '' ? null : `Syndicat : ${appel.syndicat}`,
+        ].filter((ligne) => ligne !== null);
+        return (
+          <li key={appel.id} className="flex flex-col gap-1 py-3 first:pt-0 last:pb-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline">
+                {appel.statutQualificationLabel ?? REP_CALL_OUTCOME_LABELS[appel.outcome]}
+              </Badge>
+              {appel.callbackAt === null ? null : (
+                <span className="text-[0.8125rem]">Rappel le {formatDateTime(appel.callbackAt)}</span>
+              )}
+            </div>
+            <p className="text-[0.75rem] text-muted-foreground">
+              <time dateTime={appel.clientCreatedAt} className="tabular-nums">
+                {formatDateTime(appel.clientCreatedAt)}
+              </time>{' '}
+              · {appel.performedByName}
+            </p>
+            {reponses.length === 0 ? null : (
+              <p className="text-[0.8125rem] text-muted-foreground">{reponses.join(' · ')}</p>
+            )}
+            {appel.suggestedPhoneE164 === null ? null : (
+              <p className="text-[0.8125rem]">
+                Personne proposée : {appel.suggestedName ?? 'sans nom'},{' '}
+                {formatPhone(appel.suggestedPhoneE164)}
+                {appel.suggestedNote === null || appel.suggestedNote === ''
+                  ? ''
+                  : ` · ${appel.suggestedNote}`}
+              </p>
+            )}
+            {appel.comment === null || appel.comment === '' ? null : (
+              <p className="max-w-prose text-[0.875rem]">{appel.comment}</p>
+            )}
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 

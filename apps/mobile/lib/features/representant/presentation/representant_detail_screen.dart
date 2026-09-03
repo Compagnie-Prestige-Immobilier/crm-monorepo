@@ -12,6 +12,7 @@ import '../../../core/providers/sync_coordinator.dart';
 import '../../../core/router/back_navigation.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/router/single_push.dart';
+import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/phone.dart';
 import '../../../core/utils/relative_time.dart';
@@ -65,12 +66,72 @@ class RepresentantDetailScreen extends ConsumerWidget {
 /// mobile pour la relation. Une valeur ajoutée côté serveur s'affiche telle
 /// quelle plutôt que de disparaître.
 String relationLabel(String status) => switch (status) {
-  'INCONNU' => 'Inconnue',
+  'INCONNU' => 'Pas encore contacté',
   'CONTACTE' => 'Contacté',
-  'AMBASSADEUR' => 'Ambassadeur',
+  'AMBASSADEUR' => 'A accepté',
   'REFUS' => 'Refus',
   _ => status,
 };
+
+String libelleIssueRepresentant(String code) => switch (code) {
+  'REACHED' => 'Joint',
+  'PROSPECTS_PROMISED' => 'Fiches promises',
+  'UNREACHABLE' => 'Injoignable',
+  'CALLBACK' => 'À rappeler',
+  'REFUSED' => 'Refus',
+  'WRONG_NUMBER' => 'Faux numéro',
+  'OTHER' => 'Autre',
+  _ => code,
+};
+
+/// Même pastille que le web : le statut de qualification est le libellé,
+/// la relation ne décide que de la couleur et de l'étoile. Une fiche jamais
+/// qualifiée retombe sur le libellé de la relation.
+class StatutTag extends StatelessWidget {
+  const StatutTag({
+    required this.relationStatus,
+    required this.statutLabel,
+    super.key,
+  });
+
+  final String relationStatus;
+  final String? statutLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final String libelle = statutLabel ?? relationLabel(relationStatus);
+    final bool etoile = relationStatus == 'AMBASSADEUR';
+    final CpiTone tone = switch (relationStatus) {
+      'AMBASSADEUR' => CpiTone.success,
+      'REFUS' => CpiTone.danger,
+      _ => CpiTone.neutral,
+    };
+    return Semantics(
+      label: 'Statut : $libelle${etoile ? ', a accepté' : ''}',
+      child: ExcludeSemantics(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            if (etoile) ...<Widget>[
+              Icon(
+                PhosphorIconsFill.star,
+                size: CpiIconSize.xs,
+                color: context.cpi.success,
+              ),
+              const SizedBox(width: CpiSpacing.xxs),
+            ],
+            CpiTag(libelle, tone: tone),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String ouiNonNsp(bool? value) {
+  if (value == null) return 'Indéterminé';
+  return value ? 'Oui' : 'Non';
+}
 
 class _PiedDeFiche extends ConsumerWidget {
   const _PiedDeFiche({required this.data});
@@ -220,11 +281,9 @@ class _Fiche extends ConsumerWidget {
           crossAxisAlignment: WrapCrossAlignment.center,
           children: <Widget>[
             if (status.aSignaler != null) SyncStatusChip(status: status),
-            Semantics(
-              label: 'Relation : ${relationLabel(data.relationStatus)}',
-              child: ExcludeSemantics(
-                child: CpiTag(relationLabel(data.relationStatus)),
-              ),
+            StatutTag(
+              relationStatus: data.relationStatus,
+              statutLabel: data.statutQualificationLabel,
             ),
           ],
         ),
@@ -269,6 +328,34 @@ class _Fiche extends ConsumerWidget {
               label: 'Profession',
               value: profession,
             ),
+          if ((data.prenom ?? '').trim().isNotEmpty)
+            _info(
+              icon: PhosphorIconsRegular.identificationCard,
+              label: 'Prénom',
+              value: data.prenom!.trim(),
+            ),
+          if ((data.etablissement ?? '').trim().isNotEmpty)
+            _info(
+              icon: PhosphorIconsRegular.buildings,
+              label: 'Établissement',
+              value: data.etablissement!.trim(),
+            ),
+          if ((data.syndicat ?? '').trim().isNotEmpty)
+            _info(
+              icon: PhosphorIconsRegular.usersThree,
+              label: 'Syndicat',
+              value: data.syndicat!.trim(),
+            ),
+          _info(
+            icon: PhosphorIconsRegular.info,
+            label: 'Connaît l’UES',
+            value: ouiNonNsp(data.connaitUes),
+          ),
+          _info(
+            icon: PhosphorIconsRegular.phoneCall,
+            label: 'Déjà contacté',
+            value: ouiNonNsp(data.contacte),
+          ),
           if (ief != null)
             _info(
               icon: PhosphorIconsRegular.buildings,

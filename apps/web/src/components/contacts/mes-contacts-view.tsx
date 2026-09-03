@@ -256,7 +256,10 @@ function TableRepresentants({ items }: { items: RepresentantRow[] }) {
               )}
             </TableCell>
             <TableCell>
-              <RelationBadge status={representant.relationStatus} />
+              <RelationBadge
+                status={representant.relationStatus}
+                label={representant.statutQualificationLabel}
+              />
             </TableCell>
           </TableRow>
         ))}

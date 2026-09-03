@@ -24,6 +24,7 @@ interface MockDb {
     MockFn
   >;
   representantRelationChange: Record<'create' | 'findMany', MockFn>;
+  repCallAttempt: Record<'findMany', MockFn>;
   representantComment: Record<
     'findMany' | 'findUniqueOrThrow' | 'count' | 'createMany' | 'updateMany',
     MockFn
@@ -65,6 +66,8 @@ const foreignRow = (): Record<string, unknown> => ({
   createdAt: date,
   updatedAt: date,
   relationStatus: RepresentantRelation.INCONNU,
+  statutQualificationId: null,
+  statutQualification: null,
   whatsappStatus: WhatsappStatus.NON_DEMANDE,
   whatsappE164: null,
   profession: null,
@@ -73,7 +76,7 @@ const foreignRow = (): Record<string, unknown> => ({
   syndicat: null,
   connaitUES: null,
   contacte: null,
-  _count: { prospects: 42 },
+  _count: { prospects: 42, repCallAttempts: 3 },
 });
 
 let db: MockDb;
@@ -91,6 +94,7 @@ beforeEach(() => {
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     representantRelationChange: { create: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
+    repCallAttempt: { findMany: vi.fn().mockResolvedValue([]) },
     representantComment: {
       findMany: vi.fn().mockResolvedValue([]),
       findUniqueOrThrow: vi.fn(),
@@ -558,6 +562,66 @@ describe('historique de relation', () => {
     db.representant.findFirst.mockResolvedValue({ id: 'rep-9', createdById: COMMERCIAL.id });
 
     await expect(service.relationHistory('rep-9')).resolves.toEqual({ items: [] });
+  });
+});
+
+describe('historique des appels', () => {
+  it('rend 404 sur une fiche absente, sans lire les appels', async () => {
+    db.representant.findFirst.mockResolvedValue(null);
+
+    await expect(service.callHistory('rep-9')).rejects.toBeInstanceOf(NotFoundException);
+    expect(db.repCallAttempt.findMany).not.toHaveBeenCalled();
+  });
+
+  it('rend chaque appel avec son auteur, son statut et la personne proposée', async () => {
+    db.representant.findFirst.mockResolvedValue({ id: 'rep-9', createdById: COMMERCIAL.id });
+    db.repCallAttempt.findMany.mockResolvedValue([
+      {
+        id: 'att-1',
+        outcome: 'REFUSED',
+        statutQualificationId: 'sq-1',
+        statutQualification: { label: 'Non intéressé' },
+        comment: 'Rappeler après les examens',
+        callbackAt: null,
+        promisedProspects: null,
+        etablissementConfirme: true,
+        numeroConfirme: null,
+        contacte: false,
+        connaitUES: true,
+        syndicat: 'SAEMSS',
+        suggestion: { suggestedName: 'Fatou Sarr', suggestedPhoneE164: '+221771234567', note: null },
+        performedById: COMMERCIAL.id,
+        performedBy: { fullName: COMMERCIAL.fullName },
+        clientCreatedAt: date,
+      },
+    ]);
+
+    const result = await service.callHistory('rep-9');
+
+    expect(result.items).toEqual([
+      {
+        id: 'att-1',
+        outcome: 'REFUSED',
+        statutQualificationId: 'sq-1',
+        statutQualificationLabel: 'Non intéressé',
+        comment: 'Rappeler après les examens',
+        callbackAt: null,
+        promisedProspects: null,
+        etablissementConfirme: true,
+        numeroConfirme: null,
+        contacte: false,
+        connaitUES: true,
+        syndicat: 'SAEMSS',
+        suggestedName: 'Fatou Sarr',
+        suggestedPhoneE164: '+221771234567',
+        suggestedNote: null,
+        performedById: COMMERCIAL.id,
+        performedByName: COMMERCIAL.fullName,
+        clientCreatedAt: date.toISOString(),
+      },
+    ]);
+    const args = db.repCallAttempt.findMany.mock.calls[0]?.[0] as { orderBy: unknown[] };
+    expect(args.orderBy).toEqual([{ clientCreatedAt: 'desc' }, { id: 'desc' }]);
   });
 });
 

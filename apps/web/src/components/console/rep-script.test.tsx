@@ -92,6 +92,9 @@ function rep(over: Partial<ScriptedRepresentant> & { id: string }): ScriptedRepr
     updatedAt: '2026-01-01T00:00:00.000Z',
     prospectCount: 0,
     relationStatus: 'INCONNU',
+    statutQualificationId: null,
+    statutQualificationLabel: null,
+    callAttemptCount: 0,
     whatsappStatus: 'NON_DEMANDE',
     whatsappE164: null,
     whatsappNumber: null,
@@ -806,14 +809,13 @@ describe('RepScript : filtrer et parcourir ses fiches', () => {
     });
   });
 
-  it('range sous « Contacté » tout ce qui a été contacté, acceptés et refus compris', async () => {
+  it('ne propose plus « Contacté », qui se lisait comme « a accepté »', async () => {
     await renderListe();
 
-    await choisirRelation('Contacté');
+    await userEvent.click(screen.getByRole('combobox', { name: 'Relation' }));
 
-    await waitFor(() => {
-      expect(relationDemandee()).toEqual(['CONTACTE', 'AMBASSADEUR', 'REFUS']);
-    });
+    expect(await screen.findByRole('option', { name: 'A accepté' })).toBeTruthy();
+    expect(screen.queryByRole('option', { name: 'Contacté' })).toBeNull();
   });
 
   it('ne demande que les acceptés sous « A accepté »', async () => {

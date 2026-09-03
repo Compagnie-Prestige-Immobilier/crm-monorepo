@@ -241,20 +241,20 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         builder: _chues((GoRouterState state) => const RappelsScreen()),
       ),
       GoRoute(
-        path: Routes.grandPublicMesContacts,
-        name: 'grandPublicMesContacts',
+        path: Routes.grandPublicCorrections,
+        name: 'grandPublicCorrections',
         parentNavigatorKey: rootNavigatorKey,
         builder: (BuildContext context, GoRouterState state) =>
             const ProjectScope(
               project: CpiProject.grandPublic,
-              child: MesContactsScreen(grandPublic: true),
+              child: CorrectionsScreen(),
             ),
       ),
       GoRoute(
-        path: Routes.mesContacts,
-        name: 'mesContacts',
+        path: Routes.corrections,
+        name: 'corrections',
         parentNavigatorKey: rootNavigatorKey,
-        builder: _chues((GoRouterState state) => const MesContactsScreen()),
+        builder: _chues((GoRouterState state) => const CorrectionsScreen()),
       ),
       GoRoute(
         path: '/grand-public/phase2',
@@ -301,10 +301,10 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
           StatefulShellBranch(
             routes: <RouteBase>[
               GoRoute(
-                path: Routes.grandPublicCorrections,
-                name: 'grandPublicCorrections',
+                path: Routes.grandPublicMesContacts,
+                name: 'grandPublicMesContacts',
                 builder: (BuildContext context, GoRouterState state) =>
-                    const CorrectionsScreen(),
+                    const MesContactsScreen(grandPublic: true),
               ),
             ],
           ),
@@ -448,10 +448,10 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
           StatefulShellBranch(
             routes: <RouteBase>[
               GoRoute(
-                path: Routes.corrections,
-                name: 'corrections',
+                path: Routes.mesContacts,
+                name: 'mesContacts',
                 builder: (BuildContext context, GoRouterState state) =>
-                    const CorrectionsScreen(),
+                    const MesContactsScreen(),
               ),
             ],
           ),

@@ -172,7 +172,7 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
             CpiRow(
               title: 'À corriger',
               trailing: _Valeur('$aCorriger', chevron: true),
-              onTap: () => context.go(correctionsDeLaCoque(context)),
+              onTap: () => ouvrirCorrections(context),
             ),
             CpiRow(
               leading: const Icon(

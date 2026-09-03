@@ -48,6 +48,7 @@ import {
   RepresentantLookupDto,
   RepresentantLookupQueryDto,
   RepresentantQueryDto,
+  RepresentantCallAttemptListDto,
   RepresentantRelationChangeListDto,
   UpdateRepresentantDto,
 } from './dto.js';
@@ -197,6 +198,21 @@ export class RepresentantsController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<RepresentantRelationChangeListDto> {
     return this.representants.relationHistory(id);
+  }
+
+  @Get(':id/call-attempts')
+  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
+  @ApiOperation({
+    operationId: 'listRepresentantCallAttempts',
+    summary: 'Les appels consignés sur une fiche, du plus récent au plus ancien.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({ status: 200, type: RepresentantCallAttemptListDto })
+  @ApiResponse({ status: 404, type: ApiErrorDto, description: 'REPRESENTANT_NOT_FOUND.' })
+  callHistory(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<RepresentantCallAttemptListDto> {
+    return this.representants.callHistory(id);
   }
 
   @Get(':id/comments')

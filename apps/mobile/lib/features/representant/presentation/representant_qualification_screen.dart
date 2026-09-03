@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:forui/forui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/notifications/rep_callback_notifications.dart';
@@ -9,6 +10,8 @@ import '../../../core/providers/app_providers.dart';
 import '../../../core/router/back_navigation.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/phone.dart';
+import '../../../core/utils/relative_time.dart';
+import '../../../core/utils/whatsapp.dart';
 import '../../../data/local/database.dart';
 import '../../../ui/widgets/cpi_action_bar.dart';
 import '../../../ui/widgets/cpi_choice_group.dart';
@@ -20,9 +23,15 @@ import '../../../ui/widgets/phone_field.dart';
 import '../../permissions/alarme_permission.dart';
 import '../../phase2/presentation/callback_picker.dart';
 import '../../rappels/presentation/rappels_screen.dart' show quandRappeler;
+import 'representant_detail_screen.dart'
+    show StatutTag, libelleIssueRepresentant;
 
 /// L'appel a abouti, ou non. Ce qu'il a donné se dit ensuite, au statut.
 enum _Resultat { joignable, injoignable }
+
+/// La fiche avant d'appeler, le résultat et son statut, les renseignements si
+/// le statut les exige encore, puis le rappel, le commentaire et l'envoi.
+enum _Etape { fiche, resultat, renseignements, fin }
 
 /// Les effets proposés par branche. `SCHEDULE_CALLBACK` est dans les DEUX : on
 /// rappelle aussi qui on n'a pas joint.
@@ -38,7 +47,7 @@ const Set<String> _effetsInjoignable = <String>{
   'SCHEDULE_CALLBACK',
 };
 
-/// Ces effets closent l'appel : le script reste posé, plus rien n'y est exigé.
+/// Ces effets closent l'appel : les renseignements ne sont plus demandés.
 /// La regle tient a l'EFFET et jamais au libelle, que l'administrateur renomme.
 const Set<String> _effetsSansScript = <String>{'REFUSED', 'SCHEDULE_CALLBACK'};
 
@@ -98,18 +107,17 @@ class _RepresentantQualificationScreenState
   bool? memeNumeroWhatsapp;
   DateTime? rappelAt;
   bool saving = false;
-  bool alreadyQualifiedWarned = false;
   String? echec;
 
-  /// 1 : ce que l'appel a donné. 2 : ce qu'il reste à dire, et l'envoi.
-  int etape = 1;
+  _Etape etape = _Etape.fiche;
+  bool enAvant = true;
 
-  static const int etapes = 2;
-
-  static const List<String> questions = <String>[
-    'Comment s\'est passé l\'appel ?',
-    'Quelque chose à ajouter ?',
-  ];
+  static const Map<_Etape, String> questions = <_Etape, String>{
+    _Etape.fiche: 'Avant l\'appel',
+    _Etape.resultat: 'Comment s\'est passé l\'appel ?',
+    _Etape.renseignements: 'Ce qu\'il vous a dit',
+    _Etape.fin: 'Pour finir',
+  };
 
   @override
   void dispose() {
@@ -125,9 +133,23 @@ class _RepresentantQualificationScreenState
   }
 
   /// Une personne proposée à la place de celle qu'on vient d'appeler : elle
-  /// n'a de sens que si le représentant n'est pas ambassadeur.
+  /// n'a de sens que sur un refus, dit par le statut ou par l'ambassadeur.
   bool get proposeQuelquUn =>
-      resultat == _Resultat.joignable && ambassadeur == false;
+      resultat == _Resultat.joignable &&
+      (statutChoisi?.effect == 'REFUSED' ||
+          (renseignementsExiges && ambassadeur == false));
+
+  /// Un « à rappeler » ou un refus se consigne sans les six questions : elles
+  /// ne sont posées qu'à qui a accepté de parler.
+  bool get renseignementsExiges =>
+      resultat == _Resultat.joignable && _scriptExige(statutChoisi);
+
+  List<_Etape> get parcours => <_Etape>[
+    _Etape.fiche,
+    _Etape.resultat,
+    if (renseignementsExiges) _Etape.renseignements,
+    _Etape.fin,
+  ];
 
   /// Les statuts que la branche choisie propose, dans l'ordre servi. Lu SOUS
   /// `build` : `ref.watch` est ce qui fait reparaître la liste quand la
@@ -154,23 +176,16 @@ class _RepresentantQualificationScreenState
   void erreur(BuildContext context, String message) =>
       cpiToast(context, message);
 
-  /// Ce qui retient la première étape, dans l'ordre : le résultat, le statut,
-  /// le script s'il est encore exigé, puis l'heure du rappel. Le statut passe
-  /// avant le script parce que c'est lui qui dit ce que le script exige.
-  String? get manqueResultat {
-    final _Resultat? choix = resultat;
-    if (choix == null) return 'Choisissez d\'abord le résultat';
-    final StatutQualificationRow? statut = statutChoisi;
-    // Le référentiel n'est pas encore descendu : la qualification reste
-    // possible sans lui, comme sur un appareil qui ne le connaît pas.
-    if (statut == null && statutsProposes.isNotEmpty) {
-      return 'Choisissez un statut';
-    }
-    if (choix == _Resultat.joignable && _scriptExige(statut)) {
-      final String? manquant = manqueJoignable;
-      if (manquant != null) return manquant;
-    }
-    if ((statut?.requiresCallback ?? false) && rappelAt == null) {
+  /// Ce qui retient une étape, dit en une phrase. Null : on peut avancer.
+  String? manqueEtape(_Etape e) => switch (e) {
+    _Etape.fiche => null,
+    _Etape.resultat => manqueResultat,
+    _Etape.renseignements => manqueRenseignements,
+    _Etape.fin => manqueFin,
+  };
+
+  String? get manqueFin {
+    if ((statutChoisi?.requiresCallback ?? false) && rappelAt == null) {
       return 'Choisissez quand rappeler';
     }
     if (proposeQuelquUn &&
@@ -181,8 +196,18 @@ class _RepresentantQualificationScreenState
     return null;
   }
 
+  String? get manqueResultat {
+    if (resultat == null) return 'Choisissez d\'abord le résultat';
+    // Le référentiel n'est pas encore descendu : la qualification reste
+    // possible sans lui, comme sur un appareil qui ne le connaît pas.
+    if (statutChoisi == null && statutsProposes.isNotEmpty) {
+      return 'Choisissez un statut';
+    }
+    return null;
+  }
+
   /// Les six questions de la branche joignable, dans l'ordre du script.
-  String? get manqueJoignable {
+  String? get manqueRenseignements {
     if (etablissementConfirme == null) {
       return 'Confirmez l\'établissement';
     }
@@ -193,20 +218,24 @@ class _RepresentantQualificationScreenState
     if (aEteContacte == null) return 'Dites s\'il a été contacté';
     if (connaitUES == null) return 'Dites s\'il connaît l\'UES';
     if (ambassadeur == null) return 'Dites s\'il est ambassadeur';
-    if (ambassadeur != true) return null;
-    if (memeNumeroWhatsapp == null) {
-      return 'Dites s\'il a WhatsApp sur ce numéro';
-    }
-    if (memeNumeroWhatsapp == false &&
-        Phone.parse(whatsapp.text) is! PhoneValid) {
-      return 'Écrivez le numéro WhatsApp';
+    if (ambassadeur == true) {
+      if (memeNumeroWhatsapp == null) {
+        return 'Dites s\'il a WhatsApp sur ce numéro';
+      }
+      if (memeNumeroWhatsapp == false &&
+          Phone.parse(whatsapp.text) is! PhoneValid) {
+        return 'Écrivez le numéro WhatsApp';
+      }
     }
     return null;
   }
 
-  /// Ce qui manque encore pour enregistrer, dit en une phrase. Null quand la
-  /// réponse est complète : le bouton s'allume alors.
-  String? get manque => manqueResultat;
+  /// Ce qui manque encore pour enregistrer, toutes étapes confondues. Null
+  /// quand la réponse est complète : le bouton s'allume alors.
+  String? get manque =>
+      manqueResultat ??
+      (renseignementsExiges ? manqueRenseignements : null) ??
+      manqueEtape(_Etape.fin);
 
   static String? _ouiNon(bool? value) =>
       value == null ? null : (value ? 'Oui' : 'Non');
@@ -224,7 +253,7 @@ class _RepresentantQualificationScreenState
       _Resultat.injoignable => 'Injoignable',
       null => null,
     }),
-    if (resultat == _Resultat.joignable) ...<CpiRecapLine>[
+    if (renseignementsExiges) ...<CpiRecapLine>[
       CpiRecapLine('Établissement confirmé', _ouiNon(etablissementConfirme)),
       if (etablissementConfirme == false &&
           nouvelEtablissement.text.trim().isNotEmpty)
@@ -273,33 +302,26 @@ class _RepresentantQualificationScreenState
     popOrHome(context);
   }
 
-  Future<void> avertirDejaQualifie(String titre) async {
-    final bool? continuer = await cpiConfirm(
-      context,
-      title: titre,
-      message: 'Voulez-vous quand même consigner un nouvel appel ?',
-      confirmLabel: 'Continuer',
-    );
-    if (!mounted) return;
-    if (continuer != true) {
-      Navigator.of(context).pop();
-    }
+  void suivant() {
+    final List<_Etape> etapes = parcours;
+    final int index = etapes.indexOf(etape);
+    if (index + 1 >= etapes.length) return;
+    setState(() {
+      enAvant = true;
+      etape = etapes[index + 1];
+    });
   }
 
-  /// Une relation déjà tranchée — acceptée ou refusée — se signale avant toute
-  /// saisie : rappeler quelqu'un qui a dit non se fait sciemment.
-  void maybeWarnAlreadyQualified(RepresentantSyncViewData? representant) {
-    if (alreadyQualifiedWarned) return;
-    final String? titre = switch (representant?.relationStatus) {
-      'AMBASSADEUR' =>
-        'Cette personne a déjà accepté d\'être représentant CPI CHUES.',
-      'REFUS' => 'Cette personne a déjà refusé.',
-      _ => null,
-    };
-    if (titre == null) return;
-    alreadyQualifiedWarned = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) unawaited(avertirDejaQualifie(titre));
+  void precedent() {
+    final List<_Etape> etapes = parcours;
+    final int index = etapes.indexOf(etape);
+    if (index <= 0) {
+      unawaited(quitter());
+      return;
+    }
+    setState(() {
+      enAvant = false;
+      etape = etapes[index - 1];
     });
   }
 
@@ -312,16 +334,17 @@ class _RepresentantQualificationScreenState
       erreur(context, 'Choisissez le résultat de l’appel.');
       return;
     }
-    // Le bouton ne s'allume que quand `manqueResultat` est nul ; ce garde-fou
-    // ne fait que nommer, sous la coque, la première question restée sans
-    // réponse si l'écriture est déclenchée autrement.
-    final String? manquant = manqueResultat;
+    // Le bouton ne s'allume que quand `manque` est nul ; ce garde-fou ne fait
+    // que nommer, sous la coque, la première question restée sans réponse si
+    // l'écriture est déclenchée autrement.
+    final String? manquant = manque;
     if (manquant != null) {
       erreur(context, manquant);
       return;
     }
     final bool joignable = choix == _Resultat.joignable;
-    final bool ambassadeurOui = joignable && ambassadeur == true;
+    final bool renseigne = renseignementsExiges;
+    final bool ambassadeurOui = renseigne && ambassadeur == true;
 
     // Sans statut, l'issue reste celle que ce script tirait de ses questions :
     // c'est ce que consigne un appareil dont le référentiel n'est pas descendu.
@@ -359,7 +382,7 @@ class _RepresentantQualificationScreenState
             statutQualificationId: statut?.id,
             // Une question sans réponse n'est pas un refus : le statut la pose
             // désormais facultative, et le serveur comble ce silence lui-même.
-            relationStatus: !joignable || ambassadeur == null
+            relationStatus: !renseigne || ambassadeur == null
                 ? null
                 : (ambassadeurOui ? 'AMBASSADEUR' : 'REFUS'),
             whatsappStatus: ambassadeurOui
@@ -368,13 +391,14 @@ class _RepresentantQualificationScreenState
             whatsappE164: whatsappE164,
             comment: commentaire.text,
             callbackAt: rappelAt,
-            // Les renseignements 1–4 se prennent sur tout appel joignable,
-            // ambassadeur ou non : ce sont des renseignements, pas une branche.
-            etablissementConfirme: joignable ? etablissementConfirme : null,
-            etablissementSaisi: joignable ? nouvelEtablissement.text : null,
-            contacte: joignable ? aEteContacte : null,
-            connaitUES: joignable ? connaitUES : null,
-            syndicat: joignable ? syndicatNom.text : null,
+            // Les renseignements 1–4 se prennent sur tout appel joignable qui
+            // les a exigés, ambassadeur ou non : ce sont des renseignements,
+            // pas une branche.
+            etablissementConfirme: renseigne ? etablissementConfirme : null,
+            etablissementSaisi: renseigne ? nouvelEtablissement.text : null,
+            contacte: renseigne ? aEteContacte : null,
+            connaitUES: renseigne ? connaitUES : null,
+            syndicat: renseigne ? syndicatNom.text : null,
             // Seulement quand la personne appelée n'est pas ambassadeur :
             // ailleurs, la question de la remplaçante n'a pas été posée.
             suggestedPhone: proposeQuelquUn
@@ -432,23 +456,21 @@ class _RepresentantQualificationScreenState
     final RepresentantSyncViewData? representant = ref
         .watch(representantDetailProvider(widget.representantId))
         .value;
-    maybeWarnAlreadyQualified(representant);
-    final String? manque = this.manque;
-    final bool premiere = etape == 1;
+    final List<_Etape> etapes = parcours;
+    final bool premiere = etape == _Etape.fiche;
+    final String question = questions[etape]!;
 
     return CpiStepScope(
       first: premiere,
       onExit: () => unawaited(quitter()),
-      onBack: saving ? null : () => setState(() => etape = 1),
+      onBack: saving ? null : precedent,
       child: CpiScaffold(
-        title: questions[etape - 1],
+        title: question,
         showTitle: false,
         leading: CpiHeaderAction(
           icon: PhosphorIconsRegular.arrowLeft,
           label: premiere ? 'Retour' : 'Étape précédente',
-          onPressed: premiere
-              ? () => unawaited(quitter())
-              : (saving ? null : () => setState(() => etape = 1)),
+          onPressed: saving ? null : precedent,
         ),
         banner: echec == null
             ? null
@@ -458,39 +480,23 @@ class _RepresentantQualificationScreenState
                 actionLabel: 'Réessayer',
                 onAction: () => unawaited(enregistrer(context)),
               ),
-        footer: CpiActionBar(
-          child: premiere
-              ? CpiButton(
-                  'Continuer',
-                  icon: PhosphorIconsRegular.arrowRight,
-                  subtitle: manqueResultat,
-                  onPressed: manqueResultat == null
-                      ? () => setState(() => etape = 2)
-                      : null,
-                )
-              : Builder(
-                  builder: (BuildContext context) => CpiButton(
-                    'Enregistrer',
-                    loading: saving,
-                    subtitle: manque,
-                    onPressed: manque == null
-                        ? () => unawaited(enregistrer(context))
-                        : null,
-                  ),
-                ),
-        ),
+        footer: CpiActionBar(child: _pied(context)),
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             CpiStepHeader(
-              step: etape,
-              total: etapes,
-              question: questions[etape - 1],
+              step: etapes.indexOf(etape) + 1,
+              total: etapes.length,
+              question: question,
+              forward: enAvant,
             ),
             Expanded(
-              child: premiere
-                  ? _corpsResultat(theme, representant)
-                  : _corpsDetails(theme, representant),
+              child: switch (etape) {
+                _Etape.fiche => _corpsFiche(theme, representant),
+                _Etape.resultat => _corpsResultat(theme, representant),
+                _Etape.renseignements => _corpsRenseignements(theme),
+                _Etape.fin => _corpsFin(theme, representant),
+              },
             ),
           ],
         ),
@@ -498,17 +504,124 @@ class _RepresentantQualificationScreenState
     );
   }
 
-  /// Étape 1 : le résultat de l'appel et ce qu'il entraîne aussitôt.
+  Widget _pied(BuildContext context) => switch (etape) {
+    _Etape.fiche => CpiButton(
+      'Consigner l\'appel',
+      icon: PhosphorIconsRegular.phoneCall,
+      onPressed: suivant,
+    ),
+    _Etape.resultat || _Etape.renseignements => CpiButton(
+      'Continuer',
+      icon: PhosphorIconsRegular.arrowRight,
+      subtitle: manqueEtape(etape),
+      onPressed: manqueEtape(etape) == null ? suivant : null,
+    ),
+    _Etape.fin => Builder(
+      builder: (BuildContext context) => CpiButton(
+        'Enregistrer',
+        loading: saving,
+        subtitle: manque,
+        onPressed: manque == null ? () => unawaited(enregistrer(context)) : null,
+      ),
+    ),
+  };
+
+  static EdgeInsets get _marge => const EdgeInsets.fromLTRB(
+    CpiSpacing.md,
+    0,
+    CpiSpacing.md,
+    CpiSpacing.md,
+  );
+
+  /// Étape 1 : la fiche telle qu'elle est, avant de composer le numéro.
+  Widget _corpsFiche(ThemeData theme, RepresentantSyncViewData? representant) {
+    if (representant == null) {
+      return const Center(child: FCircularProgress(semanticsLabel: 'Chargement'));
+    }
+    // Le nom complet importé porte souvent déjà le prénom : ne pas le redire.
+    final String prenom = (representant.prenom ?? '').trim();
+    final String nom = prenom.isEmpty || representant.fullName.contains(prenom)
+        ? representant.fullName
+        : '${representant.fullName} $prenom';
+    final WhatsappStatus? whatsapp = WhatsappStatus.parse(
+      representant.whatsappStatus,
+    );
+    final String? whatsappLigne = switch (whatsapp) {
+      WhatsappStatus.memeNumero => 'Même numéro',
+      WhatsappStatus.autreNumero when representant.whatsappE164 != null =>
+        Phone.format(representant.whatsappE164!),
+      _ => null,
+    };
+    final DateTime? dernier = representant.lastCallAt;
+    final String? issue = representant.lastCallOutcome;
+    final int tentatives = representant.callAttemptCount;
+
+    return ListView(
+      padding: _marge,
+      children: <Widget>[
+        // Même pastille que la fiche : « Statut actuel » en ligne débordait
+        // sur un petit écran avec un libellé long.
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: Text('Statut actuel', style: theme.textTheme.titleSmall),
+            ),
+            StatutTag(
+              relationStatus: representant.relationStatus,
+              statutLabel: representant.statutQualificationLabel,
+            ),
+          ],
+        ),
+        const SizedBox(height: CpiSpacing.sm),
+        CpiCard.rows(<CpiRow>[
+          CpiRow(title: 'Nom', subtitle: nom),
+          CpiRow(
+            title: 'Téléphone',
+            subtitle: Phone.format(representant.phoneE164),
+          ),
+          if (whatsappLigne != null)
+            CpiRow(title: 'WhatsApp', subtitle: whatsappLigne),
+          if ((representant.etablissement ?? '').trim().isNotEmpty)
+            CpiRow(
+              title: 'Établissement',
+              subtitle: representant.etablissement!.trim(),
+            ),
+          if ((representant.profession ?? '').trim().isNotEmpty)
+            CpiRow(
+              title: 'Profession',
+              subtitle: representant.profession!.trim(),
+            ),
+        ]),
+        const SizedBox(height: CpiSpacing.sm),
+        CpiCard.rows(<CpiRow>[
+          CpiRow(
+            title: 'Dernière interaction',
+            subtitle: dernier == null ? 'Jamais appelé' : relativeTime(dernier),
+          ),
+          if (issue != null)
+            CpiRow(
+              title: 'Résultat',
+              subtitle: libelleIssueRepresentant(issue),
+            ),
+          CpiRow(
+            title: 'Tentatives',
+            subtitle: switch (tentatives) {
+              0 => 'Aucun appel',
+              1 => '1 appel',
+              _ => '$tentatives appels',
+            },
+          ),
+        ]),
+      ],
+    );
+  }
+
+  /// Étape 2 : le résultat de l'appel et le statut qui le résume.
   Widget _corpsResultat(
     ThemeData theme,
     RepresentantSyncViewData? representant,
   ) => ListView(
-    padding: const EdgeInsets.fromLTRB(
-      CpiSpacing.md,
-      0,
-      CpiSpacing.md,
-      CpiSpacing.md,
-    ),
+    padding: _marge,
     children: <Widget>[
       CpiCard(
         child: Column(
@@ -526,10 +639,7 @@ class _RepresentantQualificationScreenState
             ),
             if (representant != null)
               Text(
-                <String>[
-                  Phone.format(representant.phoneE164),
-                  ?representant.etablissement,
-                ].where((String s) => s.isNotEmpty).join(' · '),
+                Phone.format(representant.phoneE164),
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -540,7 +650,7 @@ class _RepresentantQualificationScreenState
       const SizedBox(height: CpiSpacing.lg),
       _ChoixUnique<_Resultat>(
         // L'en-tête d'étape pose déjà la question.
-        label: questions[0],
+        label: questions[_Etape.resultat]!,
         showLabel: false,
         value: resultat,
         // Le statut et son heure repartent de zéro : les deux branches ne
@@ -556,98 +666,7 @@ class _RepresentantQualificationScreenState
           (_Resultat.injoignable, 'Injoignable'),
         ],
       ),
-      if (resultat == _Resultat.joignable) ...<Widget>[
-        const SizedBox(height: CpiSpacing.lg),
-        // 1. L'établissement en fiche est-il le bon ?
-        _OuiNon(
-          label: 'Confirmer l\'établissement ?',
-          value: etablissementConfirme,
-          onChanged: (bool value) =>
-              setState(() => etablissementConfirme = value),
-        ),
-        CpiReveal(
-          visible: etablissementConfirme == false,
-          child: Padding(
-            padding: const EdgeInsets.only(top: CpiSpacing.sm),
-            child: CpiField(
-              label: 'Nouvel établissement',
-              controller: nouvelEtablissement,
-              hint: 'Ex. Lycée Blaise Diagne',
-              onChanged: (String _) => setState(() {}),
-              textCapitalization: TextCapitalization.words,
-            ),
-          ),
-        ),
-        // 2. A-t-il déjà été contacté ?
-        const SizedBox(height: CpiSpacing.md),
-        _OuiNon(
-          label: 'Avez-vous été contacté ?',
-          value: aEteContacte,
-          onChanged: (bool value) => setState(() => aEteContacte = value),
-        ),
-        // 3. Connaît-il l'UES ?
-        const SizedBox(height: CpiSpacing.md),
-        _OuiNon(
-          label: 'Connaissez-vous l\'UES ?',
-          value: connaitUES,
-          onChanged: (bool value) => setState(() => connaitUES = value),
-        ),
-        // 4. Sur quel syndicat ? Choisi dans le référentiel, FACULTATIF.
-        const SizedBox(height: CpiSpacing.md),
-        _champSyndicat(),
-        // 5. Ambassadeur : c'est l'ancien « représentant CPI CHUES », mapping
-        // outcome/relationStatus inchangé.
-        const SizedBox(height: CpiSpacing.md),
-        _OuiNon(
-          label: 'Ambassadeur ?',
-          value: ambassadeur,
-          onChanged: (bool value) => setState(() {
-            ambassadeur = value;
-            if (!value) memeNumeroWhatsapp = null;
-          }),
-        ),
-        // WhatsApp ne se pose qu'à un ambassadeur : sur un non, la fiche ferme
-        // en REFUS et l'on passe à la personne proposée.
-        if (ambassadeur == true) ...<Widget>[
-          // 6. WhatsApp sur le numéro en fiche ?
-          const SizedBox(height: CpiSpacing.md),
-          _OuiNon(
-            label: 'A-t-il WhatsApp sur ce numéro ?',
-            value: memeNumeroWhatsapp,
-            onChanged: (bool value) =>
-                setState(() => memeNumeroWhatsapp = value),
-          ),
-          CpiReveal(
-            visible: memeNumeroWhatsapp == false,
-            child: Padding(
-              padding: const EdgeInsets.only(top: CpiSpacing.sm),
-              child: PhoneField(
-                controller: whatsapp,
-                label: 'Numéro WhatsApp',
-                onChanged: (String _) => setState(() {}),
-              ),
-            ),
-          ),
-        ],
-        // Un non n'est pas une impasse : la personne connaît souvent quelqu'un
-        // à appeler à sa place, et c'est là qu'elle le dit.
-        CpiReveal(
-          visible: proposeQuelquUn,
-          child: Padding(
-            padding: const EdgeInsets.only(top: CpiSpacing.lg),
-            child: _PersonneProposee(
-              theme: theme,
-              telephone: suggestionTelephone,
-              nom: suggestionNom,
-              note: suggestionNote,
-              onChanged: () => setState(() {}),
-            ),
-          ),
-        ),
-      ],
-      // Le statut se pose EN DERNIER : il résume l'appel, et il ne se choisit
-      // bien qu'une fois les questions posées. Rien à montrer tant que le
-      // référentiel n'est pas descendu.
+      // Rien à montrer tant que le référentiel n'est pas descendu.
       if (statutsProposes.isNotEmpty) ...<Widget>[
         const SizedBox(height: CpiSpacing.lg),
         _ChoixUnique<StatutQualificationRow>(
@@ -663,24 +682,82 @@ class _RepresentantQualificationScreenState
           ],
         ),
       ],
-      if (statutChoisi?.requiresCallback ?? false) ...<Widget>[
-        const SizedBox(height: CpiSpacing.lg),
-        CallbackPicker(
-          now: DateTime.now(),
-          required: true,
-          onChanged: (DateTime? at) => setState(() => rappelAt = at),
+    ],
+  );
+
+  /// Étape 3 : les six questions du script, et la personne proposée.
+  Widget _corpsRenseignements(ThemeData theme) => ListView(
+    padding: _marge,
+    children: <Widget>[
+      // 1. L'établissement en fiche est-il le bon ?
+      _OuiNon(
+        label: 'Confirmer l\'établissement ?',
+        value: etablissementConfirme,
+        onChanged: (bool value) =>
+            setState(() => etablissementConfirme = value),
+      ),
+      CpiReveal(
+        visible: etablissementConfirme == false,
+        child: Padding(
+          padding: const EdgeInsets.only(top: CpiSpacing.sm),
+          child: CpiField(
+            label: 'Nouvel établissement',
+            controller: nouvelEtablissement,
+            hint: 'Ex. Lycée Blaise Diagne',
+            onChanged: (String _) => setState(() {}),
+            textCapitalization: TextCapitalization.words,
+          ),
         ),
-      ],
-      if (resultat != null) ...<Widget>[
-        const SizedBox(height: CpiSpacing.lg),
-        CpiField(
-          label: 'Commentaire (facultatif)',
-          controller: commentaire,
-          hint: 'En une phrase',
-          maxLength: 2000,
-          maxLines: 3,
-          textCapitalization: TextCapitalization.sentences,
-          onChanged: (String _) => setState(() {}),
+      ),
+      // 2. A-t-il déjà été contacté ?
+      const SizedBox(height: CpiSpacing.md),
+      _OuiNon(
+        label: 'Avez-vous été contacté ?',
+        value: aEteContacte,
+        onChanged: (bool value) => setState(() => aEteContacte = value),
+      ),
+      // 3. Connaît-il l'UES ?
+      const SizedBox(height: CpiSpacing.md),
+      _OuiNon(
+        label: 'Connaissez-vous l\'UES ?',
+        value: connaitUES,
+        onChanged: (bool value) => setState(() => connaitUES = value),
+      ),
+      // 4. Sur quel syndicat ? Choisi dans le référentiel, FACULTATIF.
+      const SizedBox(height: CpiSpacing.md),
+      _champSyndicat(),
+      // 5. Ambassadeur : c'est l'ancien « représentant CPI CHUES », mapping
+      // outcome/relationStatus inchangé.
+      const SizedBox(height: CpiSpacing.md),
+      _OuiNon(
+        label: 'Ambassadeur ?',
+        value: ambassadeur,
+        onChanged: (bool value) => setState(() {
+          ambassadeur = value;
+          if (!value) memeNumeroWhatsapp = null;
+        }),
+      ),
+      // WhatsApp ne se pose qu'à un ambassadeur : sur un non, la fiche ferme
+      // en REFUS et l'on passe à la personne proposée.
+      if (ambassadeur == true) ...<Widget>[
+        // 6. WhatsApp sur le numéro en fiche ?
+        const SizedBox(height: CpiSpacing.md),
+        _OuiNon(
+          label: 'A-t-il WhatsApp sur ce numéro ?',
+          value: memeNumeroWhatsapp,
+          onChanged: (bool value) =>
+              setState(() => memeNumeroWhatsapp = value),
+        ),
+        CpiReveal(
+          visible: memeNumeroWhatsapp == false,
+          child: Padding(
+            padding: const EdgeInsets.only(top: CpiSpacing.sm),
+            child: PhoneField(
+              controller: whatsapp,
+              label: 'Numéro WhatsApp',
+              onChanged: (String _) => setState(() {}),
+            ),
+          ),
         ),
       ],
     ],
@@ -718,19 +795,46 @@ class _RepresentantQualificationScreenState
     );
   }
 
-  /// Étape 2 : la relecture de ce qui part. Le commentaire se saisit à l'étape
-  /// de qualification, sous les questions.
-  Widget _corpsDetails(
+  /// Dernière étape : l'heure du rappel si le statut la demande, la personne
+  /// proposée sur un refus, le commentaire, et la relecture de ce qui part.
+  Widget _corpsFin(
     ThemeData theme,
     RepresentantSyncViewData? representant,
   ) => ListView(
-    padding: const EdgeInsets.fromLTRB(
-      CpiSpacing.md,
-      0,
-      CpiSpacing.md,
-      CpiSpacing.md,
-    ),
-    children: <Widget>[CpiRecap(lines: recapDe(representant))],
+    padding: _marge,
+    children: <Widget>[
+      if (statutChoisi?.requiresCallback ?? false) ...<Widget>[
+        CallbackPicker(
+          now: DateTime.now(),
+          required: true,
+          onChanged: (DateTime? at) => setState(() => rappelAt = at),
+        ),
+        const SizedBox(height: CpiSpacing.lg),
+      ],
+      // Un non n'est pas une impasse : la personne connaît souvent quelqu'un
+      // à appeler à sa place, et c'est là qu'elle le dit.
+      if (proposeQuelquUn) ...<Widget>[
+        _PersonneProposee(
+          theme: theme,
+          telephone: suggestionTelephone,
+          nom: suggestionNom,
+          note: suggestionNote,
+          onChanged: () => setState(() {}),
+        ),
+        const SizedBox(height: CpiSpacing.lg),
+      ],
+      CpiField(
+        label: 'Commentaire (facultatif)',
+        controller: commentaire,
+        hint: 'En une phrase',
+        maxLength: 2000,
+        maxLines: 3,
+        textCapitalization: TextCapitalization.sentences,
+        onChanged: (String _) => setState(() {}),
+      ),
+      const SizedBox(height: CpiSpacing.lg),
+      CpiRecap(lines: recapDe(representant)),
+    ],
   );
 }
 

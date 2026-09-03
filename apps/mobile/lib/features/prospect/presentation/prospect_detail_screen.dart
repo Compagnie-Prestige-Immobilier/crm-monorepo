@@ -267,6 +267,11 @@ class _Situation extends ConsumerWidget {
       ref.watch(incomeBandsProvider).value,
       (IncomeBand b) => (b.id, b.label),
     );
+    final String? canal = _libelleDe(
+      data.canalProvenanceId,
+      ref.watch(canauxProvenanceProvider).value,
+      (CanauxProvenanceData c) => (c.id, c.label),
+    );
 
     final List<CpiRow> lignes = <CpiRow?>[
       _ligne('Situation', kSituationLabels[data.type ?? '']),
@@ -288,6 +293,11 @@ class _Situation extends ConsumerWidget {
       _ligne('Personne relais', data.relaisNom),
       _ligne('Téléphone du relais', data.relaisPhoneE164),
       _ligne('Tranche de revenus', tranche),
+      _ligne(
+        'Durée de remboursement',
+        data.dureeSystemeMois == null ? null : '${data.dureeSystemeMois} mois',
+      ),
+      _ligne('Canal de provenance', canal),
     ].nonNulls.toList(growable: false);
 
     if (lignes.isEmpty) return const SizedBox.shrink();

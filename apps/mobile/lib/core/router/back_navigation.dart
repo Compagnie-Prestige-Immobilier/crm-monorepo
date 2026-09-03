@@ -22,10 +22,10 @@ void popOrHome(BuildContext context, {String fallback = Routes.home}) {
   router.go(fallback);
 }
 
-bool _canPopHere(BuildContext context) {
+bool canPopHere(BuildContext context) {
   final GoRouter? router = GoRouter.maybeOf(context);
   if (router != null) return router.canPop();
-  return Navigator.of(context).canPop();
+  return Navigator.maybeOf(context)?.canPop() ?? false;
 }
 
 class CpiBackButton extends StatelessWidget {
@@ -78,7 +78,7 @@ class CpiPopScope extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool canPop = _canPopHere(context);
+    final bool canPop = canPopHere(context);
     return PopScope<Object?>(
       canPop: canPop,
       onPopInvokedWithResult: (bool didPop, Object? _) {

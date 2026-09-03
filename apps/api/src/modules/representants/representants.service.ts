@@ -32,6 +32,7 @@ import type {
   RepresentantLookupDto,
   RepresentantQueryDto,
   UpdateRepresentantDto,
+  RepresentantCallAttemptListDto,
   RepresentantRelationChangeListDto,
 } from './dto.js';
 import { applyRelationChange, toRelationChangeDto } from './relation-change.js';
@@ -43,7 +44,8 @@ export const REPRESENTANT_INCLUDE = {
   ief: { select: { name: true } },
   createdBy: { select: { id: true, fullName: true } },
   lastCallBy: { select: { fullName: true } },
-  _count: { select: { prospects: { where: { deletedAt: null } } } },
+  statutQualification: { select: { label: true } },
+  _count: { select: { prospects: { where: { deletedAt: null } }, repCallAttempts: true } },
 } satisfies Prisma.RepresentantInclude;
 
 const INCLUDE = REPRESENTANT_INCLUDE;
@@ -133,6 +135,8 @@ export function toRepresentantDto(row: RepresentantRow): RepresentantDto {
     updatedAt: row.updatedAt.toISOString(),
     prospectCount: row._count.prospects,
     relationStatus: row.relationStatus,
+    statutQualificationId: row.statutQualificationId,
+    statutQualificationLabel: row.statutQualification?.label ?? null,
     whatsappStatus: row.whatsappStatus,
     whatsappE164: row.whatsappE164,
     whatsappNumber: whatsappNumberOf(row),
@@ -144,6 +148,7 @@ export function toRepresentantDto(row: RepresentantRow): RepresentantDto {
     contacte: row.contacte,
     lastCallOutcome: row.lastCallOutcome,
     lastCallAt: row.lastCallAt?.toISOString() ?? null,
+    callAttemptCount: row._count.repCallAttempts,
     lastCallById: row.lastCallById,
     lastCallByName: row.lastCallBy?.fullName ?? null,
     nextCallbackAt: row.nextCallbackAt?.toISOString() ?? null,
@@ -424,6 +429,53 @@ export class RepresentantsService {
     });
 
     return { items: rows.map(toRelationChangeDto) };
+  }
+
+  /** Même lecture globale que `relationHistory` : un appel suit sa fiche. */
+  async callHistory(id: string): Promise<RepresentantCallAttemptListDto> {
+    const representant = await this.prisma.representant.findFirst({
+      where: { id, deletedAt: null },
+      select: { id: true },
+    });
+    if (!representant) {
+      throw new NotFoundException({
+        code: 'REPRESENTANT_NOT_FOUND',
+        message: 'Représentant introuvable.',
+      });
+    }
+
+    const rows = await this.prisma.repCallAttempt.findMany({
+      where: { representantId: id },
+      include: {
+        performedBy: { select: { fullName: true } },
+        statutQualification: { select: { label: true } },
+        suggestion: { select: { suggestedName: true, suggestedPhoneE164: true, note: true } },
+      },
+      orderBy: [{ clientCreatedAt: 'desc' }, { id: 'desc' }],
+    });
+
+    return {
+      items: rows.map((row) => ({
+        id: row.id,
+        outcome: row.outcome,
+        statutQualificationId: row.statutQualificationId,
+        statutQualificationLabel: row.statutQualification?.label ?? null,
+        comment: row.comment,
+        callbackAt: row.callbackAt?.toISOString() ?? null,
+        promisedProspects: row.promisedProspects,
+        etablissementConfirme: row.etablissementConfirme,
+        numeroConfirme: row.numeroConfirme,
+        contacte: row.contacte,
+        connaitUES: row.connaitUES,
+        syndicat: row.syndicat,
+        suggestedName: row.suggestion?.suggestedName ?? null,
+        suggestedPhoneE164: row.suggestion?.suggestedPhoneE164 ?? null,
+        suggestedNote: row.suggestion?.note ?? null,
+        performedById: row.performedById,
+        performedByName: row.performedBy.fullName,
+        clientCreatedAt: row.clientCreatedAt.toISOString(),
+      })),
+    };
   }
 
   async listComments(

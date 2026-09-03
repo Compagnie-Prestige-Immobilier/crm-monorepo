@@ -2088,6 +2088,7 @@ class SyncEngine {
                 departementId: r.departementId,
                 iefId: Value<String?>(r.iefId),
                 relationStatus: Value<String>(r.relationStatus.value),
+                statutQualificationId: Value<String?>(r.statutQualificationId),
                 whatsappStatus: Value<String>(r.whatsappStatus.value),
                 whatsappE164: Value<String?>(r.whatsappE164),
                 profession: Value<String?>(r.profession),
@@ -2099,6 +2100,7 @@ class SyncEngine {
                 lastCallOutcome: Value<String?>(r.lastCallOutcome?.value),
                 lastCallAt: Value<DateTime?>(r.lastCallAt),
                 lastCallById: Value<String?>(r.lastCallById),
+                callAttemptCount: Value<int>(r.callAttemptCount.toInt()),
                 nextCallbackAt: Value<DateTime?>(r.nextCallbackAt),
                 createdById: r.createdById,
                 clientCreatedAt: r.clientCreatedAt,
@@ -2121,6 +2123,9 @@ class SyncEngine {
                   iefId: const CustomExpression<String>('excluded.ief_id'),
                   relationStatus: const CustomExpression<String>(
                     'excluded.relation_status',
+                  ),
+                  statutQualificationId: const CustomExpression<String>(
+                    'excluded.statut_qualification_id',
                   ),
                   whatsappStatus: const CustomExpression<String>(
                     'excluded.whatsapp_status',
@@ -2149,6 +2154,9 @@ class SyncEngine {
                   lastCallById: const CustomExpression<String>(
                     'excluded.last_call_by_id',
                   ),
+                  callAttemptCount: const CustomExpression<int>(
+                    'excluded.call_attempt_count',
+                  ),
                   nextCallbackAt: const CustomExpression<DateTime>(
                     'excluded.next_callback_at',
                   ),
@@ -2160,9 +2168,18 @@ class SyncEngine {
                     'excluded.local_updated_at',
                   ),
                 ),
-                where: (Representants old) => const CustomExpression<int>(
-                  'excluded.rev',
-                ).isBiggerThan(old.rev),
+                // Un `rev` égal ne revient que sur une page rejouée ou après
+                // un curseur remis à zéro : la relire est sans effet, sauf
+                // pour les colonnes apparues depuis. Une saisie en file, elle,
+                // garde la main jusqu'à sa remontée.
+                where: (Representants old) => const CustomExpression<bool>(
+                  'excluded.rev > representants.rev OR ('
+                  'excluded.rev = representants.rev AND NOT EXISTS ('
+                  'SELECT 1 FROM outbox o WHERE o.status IN '
+                  "('pending', 'syncing', 'conflict', 'failed') "
+                  'AND (o.entity_id = representants.id '
+                  'OR o.dependency_key = representants.id)))',
+                ),
               ),
             );
         count++;
@@ -2201,6 +2218,7 @@ class SyncEngine {
                 lastCallOutcome: Value<String?>(p.lastCallOutcome?.value),
                 lastCallAt: Value<DateTime?>(p.lastCallAt),
                 lastCallById: Value<String?>(p.lastCallById),
+                callAttemptCount: Value<int>(p.callAttemptCount.toInt()),
                 createdById: p.ownedByCommercialId,
                 statut: Value<String>(p.statut.value),
                 clientCreatedAt: p.clientCreatedAt,
@@ -2284,6 +2302,9 @@ class SyncEngine {
                   lastCallById: const CustomExpression<String>(
                     'excluded.last_call_by_id',
                   ),
+                  callAttemptCount: const CustomExpression<int>(
+                    'excluded.call_attempt_count',
+                  ),
                   statut: const CustomExpression<String>('excluded.statut'),
                   rev: const CustomExpression<int>('excluded.rev'),
                   serverUpdatedAt: const CustomExpression<DateTime>(
@@ -2296,9 +2317,15 @@ class SyncEngine {
                     'excluded.deleted_at',
                   ),
                 ),
-                where: (Prospects old) => const CustomExpression<int>(
-                  'excluded.rev',
-                ).isBiggerThan(old.rev),
+                where: (Prospects old) => const CustomExpression<bool>(
+                  'excluded.rev > prospects.rev OR ('
+                  'excluded.rev = prospects.rev AND NOT EXISTS ('
+                  'SELECT 1 FROM outbox o WHERE o.status IN '
+                  "('pending', 'syncing', 'conflict', 'failed') "
+                  'AND (o.entity_id = prospects.id '
+                  'OR o.dependency_key = prospects.id '
+                  "OR o.dependency_key = 'phase2:' || prospects.id)))",
+                ),
               ),
             );
         // Les parcours, sans arbitrage : un parcours s'ouvre et ne se ferme

@@ -27,6 +27,7 @@ import {
   ConfirmGrandPublicConversionDto,
   CreateProspectDto,
   MergeProspectsDto,
+  ProspectCallAttemptListDto,
   ProspectConflictDto,
   ProspectDto,
   ProspectListDto,
@@ -73,6 +74,22 @@ export class ProspectsController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ProspectDto> {
     return this.prospects.get(user, id);
+  }
+
+  @Get(':id/call-attempts')
+  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
+  @ApiOperation({
+    operationId: 'listProspectCallAttempts',
+    summary: 'Les tentatives d’appel consignées sur une fiche, de la plus récente à la plus ancienne.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({ status: 200, type: ProspectCallAttemptListDto })
+  @ApiErrors({ 404: 'PROSPECT_NOT_FOUND · fiche absente ou supprimée.' })
+  callHistory(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ProspectCallAttemptListDto> {
+    return this.prospects.callHistory(user, id);
   }
 
   @Post()

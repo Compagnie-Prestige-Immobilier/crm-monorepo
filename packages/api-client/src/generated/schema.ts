@@ -835,6 +835,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/representants/{id}/call-attempts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Les appels consignés sur une fiche, du plus récent au plus ancien. */
+    get: operations['listRepresentantCallAttempts'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/representants/{id}/comments': {
     parameters: {
       query?: never;
@@ -911,6 +928,23 @@ export interface paths {
     head?: never;
     /** Modifie un prospect. */
     patch: operations['updateProspect'];
+    trace?: never;
+  };
+  '/api/v1/prospects/{id}/call-attempts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Les tentatives d’appel consignées sur une fiche, de la plus récente à la plus ancienne. */
+    get: operations['listProspectCallAttempts'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
     trace?: never;
   };
   '/api/v1/prospects/{id}/parcours/grand-public/consentement': {
@@ -2956,7 +2990,7 @@ export interface paths {
     };
     /**
      * Les fiches attribuées à l’appelant, tous lots confondus.
-     * @description Sert au mobile à borner son tirage. `tout: true` pour ADMIN, SUPERVISEUR et DIRECTION : les deux listes sont alors vides et aucun filtre ne s’applique.
+     * @description Sert au mobile à borner son tirage. `tout: true` pour ADMIN seulement : les deux listes sont alors vides et aucun filtre ne s’applique. Supervision et direction ne voient sur le téléphone que les fiches qu’une campagne leur a confiées.
      */
     get: operations['mesAttributions'];
     put?: never;
@@ -3583,6 +3617,10 @@ export interface components {
       updatedAt: string;
       prospectCount: number;
       relationStatus: components['schemas']['RepresentantRelation'];
+      /** Format: uuid */
+      statutQualificationId: string | null;
+      /** @description Libellé du statut de qualification, affiché à la place de `relationStatus`. Nul sur une fiche jamais qualifiée. */
+      statutQualificationLabel: string | null;
       whatsappStatus: components['schemas']['WhatsappStatus'];
       /** @description Renseigné avec le seul statut AUTRE_NUMERO. */
       whatsappE164: string | null;
@@ -3598,6 +3636,8 @@ export interface components {
       lastCallOutcome: components['schemas']['RepCallOutcome'] | null;
       /** Format: date-time */
       lastCallAt: string | null;
+      /** @description Nombre d’appels consignés sur cette fiche. */
+      callAttemptCount: number;
       /** Format: uuid */
       lastCallById: string | null;
       lastCallByName: string | null;
@@ -3771,6 +3811,35 @@ export interface components {
       /** @description De la plus récente à la plus ancienne. */
       items: components['schemas']['RepresentantRelationChangeDto'][];
     };
+    RepresentantCallAttemptDto: {
+      /** Format: uuid */
+      id: string;
+      outcome: components['schemas']['RepCallOutcome'];
+      /** Format: uuid */
+      statutQualificationId: string | null;
+      statutQualificationLabel: string | null;
+      comment: string | null;
+      /** Format: date-time */
+      callbackAt: string | null;
+      promisedProspects: number | null;
+      etablissementConfirme: boolean | null;
+      numeroConfirme: boolean | null;
+      contacte: boolean | null;
+      connaitUES: boolean | null;
+      syndicat: string | null;
+      suggestedName: string | null;
+      suggestedPhoneE164: string | null;
+      suggestedNote: string | null;
+      /** Format: uuid */
+      performedById: string;
+      performedByName: string;
+      /** Format: date-time */
+      clientCreatedAt: string;
+    };
+    RepresentantCallAttemptListDto: {
+      /** @description Du plus récent au plus ancien. */
+      items: components['schemas']['RepresentantCallAttemptDto'][];
+    };
     RepresentantCommentDto: {
       /** Format: uuid */
       id: string;
@@ -3920,6 +3989,8 @@ export interface components {
       lastComment: string | null;
       /** Format: date-time */
       lastAttemptAt: string | null;
+      /** @description Nombre de tentatives d’appel consignées. */
+      callAttemptCount: number;
       lastCallOutcome: components['schemas']['CallOutcome'] | null;
       /** Format: date-time */
       lastCallAt: string | null;
@@ -3942,6 +4013,30 @@ export interface components {
     ProspectListDto: {
       items: components['schemas']['ProspectDto'][];
       meta: components['schemas']['PageMetaDto'];
+    };
+    ProspectCallAttemptDto: {
+      /** Format: uuid */
+      id: string;
+      outcome: components['schemas']['CallOutcome'];
+      /** @description Libellé du motif choisi. */
+      reasonLabel: string | null;
+      method: components['schemas']['EnrollmentMethod'] | null;
+      comment: string | null;
+      email: string | null;
+      fonctionnaire: boolean | null;
+      engagementEnCours: boolean | null;
+      dureeEtablissementMois: number | null;
+      /** Format: date-time */
+      rendezVousAt: string | null;
+      /** Format: uuid */
+      performedById: string;
+      performedByName: string;
+      /** Format: date-time */
+      clientCreatedAt: string;
+    };
+    ProspectCallAttemptListDto: {
+      /** @description Du plus récent au plus ancien. */
+      items: components['schemas']['ProspectCallAttemptDto'][];
     };
     CreateProspectDto: {
       /**
@@ -9733,6 +9828,63 @@ export interface operations {
       };
     };
   };
+  listRepresentantCallAttempts: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RepresentantCallAttemptListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description REPRESENTANT_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
   listRepresentantComments: {
     parameters: {
       query?: {
@@ -10209,6 +10361,63 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ProspectConflictDto'];
+        };
+      };
+    };
+  };
+  listProspectCallAttempts: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProspectCallAttemptListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description PROSPECT_NOT_FOUND · fiche absente ou supprimée. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
         };
       };
     };

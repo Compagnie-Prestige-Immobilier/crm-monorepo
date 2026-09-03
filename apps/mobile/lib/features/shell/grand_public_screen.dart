@@ -101,7 +101,7 @@ class GrandPublicScreen extends ConsumerWidget {
               titre: 'Mes contacts',
               detail: 'Les personnes que vous avez appelées',
               icon: PhosphorIconsRegular.addressBook,
-              onTap: () => context.push(Routes.grandPublicMesContacts).ignore(),
+              onTap: () => context.go(Routes.grandPublicMesContacts),
             ),
           ],
         ),

@@ -17,16 +17,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../support/db_fixture.dart';
 import '../support/fake_api.dart';
 
-/// Le résultat d'un appel à un représentant.
+/// Le résultat d'un appel à un représentant, en étapes : la fiche avant
+/// d'appeler, le résultat et son statut, les renseignements seulement quand le
+/// statut les exige, puis le rappel, la personne proposée et l'envoi.
 ///
-/// Deux choses s'y jouent : le bouton ne ment plus (il reste éteint et DIT ce
-/// qui manque, au lieu de laisser taper puis de reprocher), et un « non » n'est
-/// plus une impasse : la personne appelée propose souvent quelqu'un d'autre.
+/// Le bouton ne ment pas : il reste éteint et DIT ce qui manque, au lieu de
+/// laisser taper puis de reprocher.
 void main() {
   late AppDatabase db;
   late FakeApi api;
@@ -61,9 +63,17 @@ void main() {
     expect(issueDuStatut('AUTRE_CHOSE'), isNull);
   });
 
-  Future<void> ouvrir(WidgetTester tester) async {
+  Future<void> pomper(WidgetTester tester) async {
+    await tester.pump();
+    // 150 ms : la durée de l'animation d'appui de ForUI. Écourtée, elle laisse
+    // un minuteur en vol et le démontage échoue sur l'invariant.
+    await tester.pump(const Duration(milliseconds: 300));
+  }
+
+  /// Monte l'écran sur la fiche ; [surLaFiche] à faux passe au résultat.
+  Future<void> ouvrir(WidgetTester tester, {bool surLaFiche = false}) async {
     // Surface haute : le corps est un `ListView`, qui ne construit pas ce qui
-    // sort du viewport. Les champs de la personne proposée sont en bas.
+    // sort du viewport.
     tester.view.physicalSize = const Size(1080, 6000);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.resetPhysicalSize);
@@ -92,6 +102,9 @@ void main() {
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
+    if (surLaFiche) return;
+    await tester.tap(find.text('Consigner l\'appel'));
+    await pomper(tester);
   }
 
   Future<void> demonter(WidgetTester tester) async {
@@ -110,13 +123,20 @@ void main() {
 
   CpiButton continuer(WidgetTester tester) => bouton(tester, 'Continuer');
 
-  /// L'écran est en DEUX étapes : le résultat, puis les détails et l'envoi.
-  Future<void> versLesDetails(WidgetTester tester) async {
+  Future<void> etapeSuivante(WidgetTester tester) async {
     await tester.tap(find.text('Continuer'));
+    await pomper(tester);
+  }
+
+  Future<void> etapePrecedente(WidgetTester tester) async {
+    await tester.tap(find.bySemanticsLabel('Étape précédente'));
+    await pomper(tester);
+  }
+
+  Future<void> envoyer(WidgetTester tester) async {
+    await tester.tap(find.text('Enregistrer'));
     await tester.pump();
-    // 150 ms : la durée de l'animation d'appui de ForUI. Écourtée, elle laisse
-    // un minuteur en vol et le démontage échoue sur l'invariant.
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 400));
   }
 
   /// Le corps défile : une tuile hors du viewport ne reçoit aucun geste.
@@ -134,7 +154,7 @@ void main() {
   );
 
   /// La tuile [reponse] de la question [question] : plusieurs « Oui »/« Non »
-  /// coexistent maintenant, il faut viser dans le bon groupe.
+  /// coexistent, il faut viser dans le bon groupe.
   Finder tuile(String question, String reponse) => find.descendant(
     of: find.byWidgetPredicate(
       (Widget w) => w is CpiChoiceGroup && w.label == question,
@@ -142,17 +162,75 @@ void main() {
     matching: find.text(reponse),
   );
 
-  /// Renseignements 1 à 4 du script, posés quel que soit l'ambassadeur.
+  Future<void> statut(WidgetTester tester, String label) =>
+      taper(tester, tuile('Statut de qualification', label));
+
+  /// Renseignements 1 à 3 du script, posés quel que soit l'ambassadeur.
   Future<void> renseignements(WidgetTester tester) async {
     await taper(tester, tuile('Confirmer l\'établissement ?', 'Oui'));
     await taper(tester, tuile('Avez-vous été contacté ?', 'Oui'));
     await taper(tester, tuile('Connaissez-vous l\'UES ?', 'Oui'));
   }
 
-  Future<void> statut(WidgetTester tester, String label) =>
-      taper(tester, tuile('Statut de qualification', label));
+  /// Joignable, intéressé, ambassadeur avec WhatsApp : le chemin le plus long,
+  /// jusqu'à la dernière étape.
+  Future<void> ambassadeurComplet(WidgetTester tester) async {
+    await taper(tester, find.text('Joignable'));
+    await statut(tester, 'Intéressé');
+    await etapeSuivante(tester);
+    await renseignements(tester);
+    await taper(tester, tuile('Ambassadeur ?', 'Oui'));
+    await taper(tester, tuile('A-t-il WhatsApp sur ce numéro ?', 'Oui'));
+    await etapeSuivante(tester);
+  }
 
-  testWidgets('le bouton reste éteint et suit l\'ordre du script', (
+  testWidgets('la fiche se lit avant de composer le numéro', (
+    WidgetTester tester,
+  ) async {
+    await db.customStatement('DELETE FROM representants');
+    await insertRepresentant(
+      db,
+      id: 'rep-1',
+      phone: '+221770000001',
+      fullName: 'Ousmane Fall',
+      prenom: 'Ousmane',
+      whatsappStatus: 'MEME_NUMERO',
+      etablissement: 'Lycée de Bakel',
+      lastCallOutcome: 'CALLBACK',
+      lastCallAt: t0.subtract(const Duration(days: 2)),
+      callAttemptCount: 3,
+    );
+    await ouvrir(tester, surLaFiche: true);
+
+    expect(find.text('Avant l\'appel'), findsOneWidget);
+    expect(find.text('+221 77 000 00 01'), findsOneWidget);
+    expect(find.text('Même numéro'), findsOneWidget);
+    expect(find.text('Lycée de Bakel'), findsOneWidget);
+    expect(find.text('À rappeler'), findsOneWidget);
+    expect(find.text('3 appels'), findsOneWidget);
+    expect(find.text('Pas encore contacté'), findsOneWidget);
+    expect(find.text('Joignable'), findsNothing);
+
+    await tester.tap(find.text('Consigner l\'appel'));
+    await pomper(tester);
+    expect(find.text('Joignable'), findsOneWidget);
+
+    await demonter(tester);
+  });
+
+  testWidgets('une fiche jamais appelée le dit, sans WhatsApp inventé', (
+    WidgetTester tester,
+  ) async {
+    await ouvrir(tester, surLaFiche: true);
+
+    expect(find.text('Jamais appelé'), findsOneWidget);
+    expect(find.text('Aucun appel'), findsOneWidget);
+    expect(find.text('WhatsApp'), findsNothing);
+
+    await demonter(tester);
+  });
+
+  testWidgets('le bouton reste éteint et suit l\'ordre des étapes', (
     WidgetTester tester,
   ) async {
     await ouvrir(tester);
@@ -160,12 +238,15 @@ void main() {
     expect(continuer(tester).onPressed, isNull);
     expect(continuer(tester).subtitle, 'Choisissez d\'abord le résultat');
 
-    // Le statut vient avant le script : c'est lui qui dit ce que le script
-    // exige encore.
     await taper(tester, find.text('Joignable'));
     expect(continuer(tester).subtitle, 'Choisissez un statut');
 
     await statut(tester, 'Intéressé');
+    expect(continuer(tester).onPressed, isNotNull);
+    expect(continuer(tester).subtitle, isNull);
+
+    await etapeSuivante(tester);
+    expect(find.text('Ce qu\'il vous a dit'), findsOneWidget);
     expect(continuer(tester).subtitle, 'Confirmez l\'établissement');
 
     await taper(tester, tuile('Confirmer l\'établissement ?', 'Oui'));
@@ -182,40 +263,32 @@ void main() {
 
     await taper(tester, tuile('A-t-il WhatsApp sur ce numéro ?', 'Oui'));
     expect(continuer(tester).onPressed, isNotNull);
-    expect(continuer(tester).subtitle, isNull);
 
-    // L'étape des détails n'ajoute aucune obligation : le bouton d'envoi y est
-    // allumé d'emblée.
-    await versLesDetails(tester);
+    await etapeSuivante(tester);
+    expect(find.text('Pour finir'), findsOneWidget);
     expect(enregistrer(tester).onPressed, isNotNull);
     expect(enregistrer(tester).subtitle, isNull);
 
     await demonter(tester);
   });
 
-  testWidgets('un « non » à l\'ambassadeur ouvre la personne proposée', (
+  // Un refus saute les renseignements : la personne proposée se note à la
+  // dernière étape, et un « non » n'est pas une impasse.
+  testWidgets('un refus va droit à la fin et ouvre la personne proposée', (
     WidgetTester tester,
   ) async {
     await ouvrir(tester);
 
     await taper(tester, find.text('Joignable'));
-    await renseignements(tester);
-    expect(
-      find.text('Il propose quelqu\'un d\'autre ? (facultatif)'),
-      findsNothing,
-    );
-
-    // Le « non » ouvre les champs sur place : la personne proposée se note
-    // pendant l'appel, pas une étape plus loin.
-    await taper(tester, tuile('Ambassadeur ?', 'Non'));
     await statut(tester, 'Non intéressé');
+    await etapeSuivante(tester);
+
+    expect(find.text('Confirmer l\'établissement ?'), findsNothing);
+    expect(find.text('Pour finir'), findsOneWidget);
     expect(
       find.text('Il propose quelqu\'un d\'autre ? (facultatif)'),
       findsOneWidget,
     );
-    // Ni numéro ni WhatsApp ne sont demandés à un non-ambassadeur.
-    expect(find.text('Confirmer le numéro ?'), findsNothing);
-    expect(find.text('A-t-il WhatsApp sur ce numéro ?'), findsNothing);
 
     await tester.enterText(champ('Son numéro'), '77 123 45 67');
     await tester.pump();
@@ -230,16 +303,42 @@ void main() {
     );
     await tester.pump();
 
-    await versLesDetails(tester);
-    await tester.tap(find.text('Enregistrer'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await envoyer(tester);
 
     expect(writes.suggestedPhone, '+221771234567');
     expect(writes.suggestedName, 'Fatou Sarr');
     expect(writes.suggestedNote, 'Elle est déléguée du personnel.');
     expect(writes.outcome, 'REFUSED');
+    expect(writes.statutQualificationId, 'sq-non-interesse');
+    // Aucune question posée : c'est le statut qui tranche, côté serveur.
+    expect(writes.relationStatus, isNull);
+
+    await demonter(tester);
+  });
+
+  // Un ambassadeur qui dit non pendant le script reste un refus, avec la
+  // personne proposée en fin de parcours.
+  testWidgets('un « non » à l\'ambassadeur propose aussi quelqu\'un', (
+    WidgetTester tester,
+  ) async {
+    await ouvrir(tester);
+
+    await taper(tester, find.text('Joignable'));
+    await statut(tester, 'Intéressé');
+    await etapeSuivante(tester);
+    await renseignements(tester);
+    await taper(tester, tuile('Ambassadeur ?', 'Non'));
+    expect(find.text('A-t-il WhatsApp sur ce numéro ?'), findsNothing);
+    await etapeSuivante(tester);
+
+    expect(
+      find.text('Il propose quelqu\'un d\'autre ? (facultatif)'),
+      findsOneWidget,
+    );
+    await envoyer(tester);
+
     expect(writes.relationStatus, 'REFUS');
+    expect(writes.outcome, 'REACHED');
 
     await demonter(tester);
   });
@@ -252,9 +351,8 @@ void main() {
     await ouvrir(tester);
 
     await taper(tester, find.text('Joignable'));
-    await renseignements(tester);
-    await taper(tester, tuile('Ambassadeur ?', 'Non'));
     await statut(tester, 'Non intéressé');
+    await etapeSuivante(tester);
 
     expect(find.text('Son numéro'), findsOneWidget);
     expect(find.text('Son nom et prénom (facultatif)'), findsNothing);
@@ -270,37 +368,16 @@ void main() {
     await demonter(tester);
   });
 
-  // La date de rappel est exigée par le STATUT, plus par le résultat : elle
-  // n'apparaît que sur celui qui la porte.
+  // La date de rappel est exigée par le STATUT : elle n'apparaît qu'avec lui,
+  // à la dernière étape.
   testWidgets('le sélecteur de date ne suit que le statut qui l\'exige', (
     WidgetTester tester,
   ) async {
     await ouvrir(tester);
 
-    await taper(tester, find.text('Joignable'));
-    await renseignements(tester);
-    await taper(tester, tuile('Ambassadeur ?', 'Oui'));
-    await taper(tester, tuile('A-t-il WhatsApp sur ce numéro ?', 'Oui'));
+    await ambassadeurComplet(tester);
     expect(find.text('Demain 9 h'), findsNothing);
-
-    await statut(tester, 'Intéressé');
-    expect(find.text('Demain 9 h'), findsNothing);
-
-    await statut(tester, 'À rappeler');
-    expect(find.text('Demain 9 h'), findsOneWidget);
-    expect(continuer(tester).subtitle, 'Choisissez quand rappeler');
-
-    await taper(tester, find.text('Demain 9 h'));
-    await versLesDetails(tester);
-    expect(find.text('Rappel'), findsOneWidget);
-
-    await tester.tap(find.text('Enregistrer'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
-
-    expect(writes.outcome, 'CALLBACK');
-    expect(writes.callbackAt, isNotNull);
-    expect(alarmes.posees.single.at.hour, 9);
+    expect(find.text('Rappel'), findsNothing);
 
     await demonter(tester);
   });
@@ -318,63 +395,9 @@ void main() {
     expect(tuile('Statut de qualification', 'Intéressé'), findsNothing);
 
     await taper(tester, find.text('Joignable'));
-    await renseignements(tester);
-    await taper(tester, tuile('Ambassadeur ?', 'Oui'));
-    await taper(tester, tuile('A-t-il WhatsApp sur ce numéro ?', 'Oui'));
     expect(tuile('Statut de qualification', 'À rappeler'), findsOneWidget);
     expect(tuile('Statut de qualification', 'Intéressé'), findsOneWidget);
     expect(tuile('Statut de qualification', 'Pas de réponse'), findsNothing);
-
-    await demonter(tester);
-  });
-
-  // L'ambassadeur ne décide plus de l'issue : elle se dérive du statut, comme
-  // le fait le serveur, qui refuse celle qui le contredit.
-  testWidgets('l\'issue vient du statut, pas de l\'ambassadeur', (
-    WidgetTester tester,
-  ) async {
-    await ouvrir(tester);
-
-    await taper(tester, find.text('Joignable'));
-    await renseignements(tester);
-    await taper(tester, tuile('Ambassadeur ?', 'Oui'));
-    await taper(tester, tuile('A-t-il WhatsApp sur ce numéro ?', 'Oui'));
-    await statut(tester, 'Non intéressé');
-
-    await versLesDetails(tester);
-    expect(find.text('Non intéressé'), findsOneWidget);
-    await tester.tap(find.text('Enregistrer'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
-
-    expect(writes.outcome, 'REFUSED');
-    expect(writes.relationStatus, 'AMBASSADEUR');
-    expect(writes.statutQualificationId, 'sq-non-interesse');
-
-    await demonter(tester);
-  });
-
-  // Un statut qui clôt l'appel n'exige plus les six questions : elles restent
-  // posées pour qui a l'information, sans retenir l'enregistrement.
-  testWidgets('un statut de refus enregistre sans une réponse du script', (
-    WidgetTester tester,
-  ) async {
-    await ouvrir(tester);
-
-    await taper(tester, find.text('Joignable'));
-    expect(continuer(tester).subtitle, 'Choisissez un statut');
-
-    await statut(tester, 'Non intéressé');
-    expect(continuer(tester).onPressed, isNotNull);
-    expect(find.text('Confirmer l\'établissement ?'), findsOneWidget);
-
-    await versLesDetails(tester);
-    await tester.tap(find.text('Enregistrer'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
-
-    expect(writes.outcome, 'REFUSED');
-    expect(writes.callbackAt, isNull);
 
     await demonter(tester);
   });
@@ -387,19 +410,22 @@ void main() {
 
     await taper(tester, find.text('Joignable'));
     await statut(tester, 'À rappeler');
-    expect(continuer(tester).onPressed, isNull);
-    expect(continuer(tester).subtitle, 'Choisissez quand rappeler');
-
-    await taper(tester, find.text('Demain 9 h'));
     expect(continuer(tester).onPressed, isNotNull);
 
-    await versLesDetails(tester);
-    await tester.tap(find.text('Enregistrer'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await etapeSuivante(tester);
+    expect(find.text('Confirmer l\'établissement ?'), findsNothing);
+    expect(enregistrer(tester).onPressed, isNull);
+    expect(enregistrer(tester).subtitle, 'Choisissez quand rappeler');
+
+    await taper(tester, find.text('Demain 9 h'));
+    expect(enregistrer(tester).onPressed, isNotNull);
+    expect(find.text('Rappel'), findsOneWidget);
+
+    await envoyer(tester);
 
     expect(writes.outcome, 'CALLBACK');
     expect(writes.callbackAt, isNotNull);
+    expect(alarmes.posees.single.at.hour, 9);
 
     await demonter(tester);
   });
@@ -413,11 +439,9 @@ void main() {
 
     await taper(tester, find.text('Joignable'));
     await statut(tester, 'À rappeler');
+    await etapeSuivante(tester);
     await taper(tester, find.text('Demain 9 h'));
-    await versLesDetails(tester);
-    await tester.tap(find.text('Enregistrer'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await envoyer(tester);
 
     expect(writes.relationStatus, isNull);
 
@@ -441,6 +465,7 @@ void main() {
 
     await taper(tester, find.text('Joignable'));
     await statut(tester, 'Intéressé');
+    await etapeSuivante(tester);
     expect(continuer(tester).onPressed, isNull);
     expect(continuer(tester).subtitle, 'Confirmez l\'établissement');
 
@@ -455,6 +480,7 @@ void main() {
 
     await demonter(tester);
   });
+
   // Sans statut, rien ne part : le vocabulaire est ce que la campagne exploite.
   testWidgets(
     'l\'enregistrement est retenu tant qu\'aucun statut n\'est pris',
@@ -483,10 +509,8 @@ void main() {
     await taper(tester, find.text('Injoignable'));
     expect(continuer(tester).onPressed, isNotNull);
 
-    await versLesDetails(tester);
-    await tester.tap(find.text('Enregistrer'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await etapeSuivante(tester);
+    await envoyer(tester);
 
     expect(writes.outcome, 'UNREACHABLE');
     expect(writes.statutQualificationId, isNull);
@@ -503,8 +527,8 @@ void main() {
 
     await taper(tester, find.text('Injoignable'));
     await statut(tester, 'À rappeler');
+    await etapeSuivante(tester);
     await taper(tester, find.text('Demain 9 h'));
-    await versLesDetails(tester);
 
     await tester.tap(find.text('Enregistrer'));
     await tester.tap(find.text('Enregistrer'));
@@ -525,22 +549,16 @@ void main() {
 
     await taper(tester, find.text('Injoignable'));
     await statut(tester, 'À rappeler');
+    await etapeSuivante(tester);
     await taper(tester, find.text('Demain 9 h'));
 
-    // Changer de résultat rouvre la question du statut : l'heure du statut
-    // qu'on quitte ne doit pas suivre.
-    await taper(tester, find.text('Joignable'));
-    await renseignements(tester);
-    await taper(tester, tuile('Ambassadeur ?', 'Oui'));
-    await taper(tester, tuile('A-t-il WhatsApp sur ce numéro ?', 'Oui'));
-    await statut(tester, 'Intéressé');
-
-    await versLesDetails(tester);
+    // Revenir changer de résultat rouvre la question du statut : l'heure du
+    // statut qu'on quitte ne doit pas suivre.
+    await etapePrecedente(tester);
+    await ambassadeurComplet(tester);
     expect(find.text('Rappel'), findsNothing);
 
-    await tester.tap(find.text('Enregistrer'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await envoyer(tester);
 
     expect(writes.outcome, 'REACHED');
     expect(writes.callbackAt, isNull);
@@ -554,17 +572,16 @@ void main() {
     await ouvrir(tester);
 
     await taper(tester, find.text('Joignable'));
-    await renseignements(tester);
-    await taper(tester, tuile('Ambassadeur ?', 'Non'));
     await statut(tester, 'Non intéressé');
-    expect(continuer(tester).onPressed, isNotNull);
+    await etapeSuivante(tester);
+    expect(enregistrer(tester).onPressed, isNotNull);
 
     await tester.enterText(champ('Son numéro'), '77 12');
     await tester.pump();
 
-    expect(continuer(tester).onPressed, isNull);
+    expect(enregistrer(tester).onPressed, isNull);
     expect(
-      continuer(tester).subtitle,
+      enregistrer(tester).subtitle,
       'Numéro de la personne proposée incomplet',
     );
 
@@ -576,24 +593,13 @@ void main() {
   ) async {
     await ouvrir(tester);
 
-    await taper(tester, find.text('Joignable'));
-    await renseignements(tester);
-    await taper(tester, tuile('Ambassadeur ?', 'Oui'));
-    expect(
-      find.text('Il propose quelqu\'un d\'autre ? (facultatif)'),
-      findsNothing,
-    );
-    await taper(tester, tuile('A-t-il WhatsApp sur ce numéro ?', 'Oui'));
-    await statut(tester, 'Intéressé');
-    await versLesDetails(tester);
+    await ambassadeurComplet(tester);
     expect(
       find.text('Il propose quelqu\'un d\'autre ? (facultatif)'),
       findsNothing,
     );
 
-    await tester.tap(find.text('Enregistrer'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await envoyer(tester);
 
     expect(writes.outcome, 'REACHED');
     expect(writes.suggestedPhone, isNull);
@@ -612,6 +618,8 @@ void main() {
     await ouvrir(tester);
 
     await taper(tester, find.text('Joignable'));
+    await statut(tester, 'Intéressé');
+    await etapeSuivante(tester);
     await taper(tester, tuile('Confirmer l\'établissement ?', 'Non'));
     await tester.enterText(
       champ('Nouvel établissement'),
@@ -626,12 +634,8 @@ void main() {
     await tester.pump();
     await taper(tester, tuile('Ambassadeur ?', 'Oui'));
     await taper(tester, tuile('A-t-il WhatsApp sur ce numéro ?', 'Oui'));
-    await statut(tester, 'Intéressé');
-
-    await versLesDetails(tester);
-    await tester.tap(find.text('Enregistrer'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await etapeSuivante(tester);
+    await envoyer(tester);
 
     final OutboxData op = (await db.select(db.outbox).get()).singleWhere(
       (OutboxData o) => o.entityType == 'rep_call_attempt',
@@ -648,7 +652,8 @@ void main() {
     expect(payload['whatsappStatus'], 'MEME_NUMERO');
     expect(payload['statutQualificationId'], 'sq-interesse');
 
-    // La fiche locale a suivi : nouvel établissement et syndicat.
+    // La fiche locale a suivi : nouvel établissement, syndicat, et un appel de
+    // plus au compteur.
     final Representant rep = await (db.select(
       db.representants,
     )..where((Representants r) => r.id.equals('rep-1'))).getSingle();
@@ -656,9 +661,11 @@ void main() {
     expect(rep.syndicat, 'Syndicat Test');
     expect(rep.connaitUes, isTrue);
     expect(rep.contacte, isFalse);
+    expect(rep.callAttemptCount, 1);
 
     await demonter(tester);
   });
+
   // Le rappel promis la semaine dernière est tenu par l'appel qu'on vient de
   // consigner : il doit quitter la liste ET son alarme doit être désarmée,
   // sinon elle sonne pour un appel déjà passé.
@@ -673,15 +680,8 @@ void main() {
     );
 
     await ouvrir(tester);
-    await taper(tester, find.text('Joignable'));
-    await renseignements(tester);
-    await taper(tester, tuile('Ambassadeur ?', 'Oui'));
-    await taper(tester, tuile('A-t-il WhatsApp sur ce numéro ?', 'Oui'));
-    await statut(tester, 'Intéressé');
-    await versLesDetails(tester);
-    await tester.tap(find.text('Enregistrer'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await ambassadeurComplet(tester);
+    await envoyer(tester);
 
     expect(await db.select(db.repCallbackReminders).get(), isEmpty);
     expect(alarmes.annulees, <String>[promis]);
@@ -702,14 +702,31 @@ void main() {
     await ouvrir(tester);
     await taper(tester, find.text('Injoignable'));
     await statut(tester, 'À rappeler');
+    await etapeSuivante(tester);
     await taper(tester, find.text('Demain 9 h'));
-    await versLesDetails(tester);
-    await tester.tap(find.text('Enregistrer'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await envoyer(tester);
 
     expect(alarmes.posees.single.phoneE164, '+221770000001');
     expect(alarmes.posees.single.at.hour, 9);
+
+    await demonter(tester);
+  });
+
+  testWidgets('la flèche recule d\'une étape et garde les réponses', (
+    WidgetTester tester,
+  ) async {
+    await ouvrir(tester);
+    await taper(tester, find.text('Joignable'));
+    await statut(tester, 'Intéressé');
+    await etapeSuivante(tester);
+    await renseignements(tester);
+
+    await etapePrecedente(tester);
+    expect(find.text('Comment s\'est passé l\'appel ?'), findsOneWidget);
+
+    await etapeSuivante(tester);
+    expect(continuer(tester).subtitle, 'Dites s\'il est ambassadeur');
+    expect(find.byIcon(PhosphorIconsRegular.arrowLeft), findsOneWidget);
 
     await demonter(tester);
   });
