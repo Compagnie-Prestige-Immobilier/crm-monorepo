@@ -1,4 +1,4 @@
-import { PrismaClient, PrismaPg, Role } from '@crm/database';
+import { LotExportCible, PrismaClient, PrismaPg, Projet, Role } from '@crm/database';
 import { v7 as uuidv7 } from 'uuid';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -22,9 +22,10 @@ const prospects = new ProspectsService(prisma as unknown as PrismaService);
 let awa: AuthenticatedUser;
 let omar: AuthenticatedUser;
 let admin: AuthenticatedUser;
+let sienne = '';
 let confiee = '';
-let orpheline = '';
 let dOmar = '';
+let lotId = '';
 
 const identity = (row: {
   id: string;
@@ -72,14 +73,34 @@ beforeAll(async () => {
     return id;
   };
 
-  confiee = await creerProspect(`Confiee${RUN}`, admin.id, 1);
-  orpheline = await creerProspect(`Orpheline${RUN}`, admin.id, 2);
+  sienne = await creerProspect(`Sienne${RUN}`, awa.id, 1);
+  confiee = await creerProspect(`Confiee${RUN}`, admin.id, 2);
   dOmar = await creerProspect(`DOmar${RUN}`, omar.id, 3);
+
+  // La répartition est le seul lien entre une fiche et le téléconseiller qui
+  // ne l'a pas créée : sans elle, il ne la voit pas.
+  const lot = await prisma.lotExport.create({
+    data: {
+      name: `Campagne ${RUN}`,
+      cible: LotExportCible.PROSPECTS,
+      projet: Projet.CHUES,
+      filters: {},
+      itemCount: 2,
+      createdById: admin.id,
+      items: {
+        create: [
+          { position: 1, prospectId: confiee, assigneeId: awa.id, day: 1 },
+          { position: 2, prospectId: dOmar, assigneeId: omar.id, day: 1 },
+        ],
+      },
+    },
+  });
+  lotId = lot.id;
 });
 
 afterAll(async () => {
-  const ids = [confiee, orpheline, dOmar];
-  await prisma.prospect.deleteMany({ where: { id: { in: ids } } });
+  await prisma.lotExport.deleteMany({ where: { id: lotId } });
+  await prisma.prospect.deleteMany({ where: { id: { in: [sienne, confiee, dOmar] } } });
   await prisma.user.deleteMany({ where: { id: { in: [awa.id, omar.id, admin.id] } } });
   await prisma.$disconnect();
 });
@@ -89,34 +110,53 @@ const nomsVusPar = async (user: AuthenticatedUser): Promise<string[]> => {
   return page.items.map((row) => row.nom).toSorted();
 };
 
-describe('la portée des prospects est la MÊME au panneau et sur le téléphone', () => {
-  it('le téléconseiller voit toutes les fiches vivantes', async () => {
-    expect(await nomsVusPar(awa)).toEqual([`Confiee${RUN}`, `DOmar${RUN}`, `Orpheline${RUN}`]);
+describe('un téléconseiller voit ce que la campagne lui attribue', () => {
+  it('voit ses propres fiches et celles qui lui sont attribuées', async () => {
+    expect(await nomsVusPar(awa)).toEqual([`Confiee${RUN}`, `Sienne${RUN}`]);
   });
 
-  it('une fiche créée par un collègue reste visible', async () => {
-    const vus = await nomsVusPar(awa);
-
-    expect(vus).toContain(`Orpheline${RUN}`);
-    expect(vus).toContain(`DOmar${RUN}`);
+  it('ne voit pas la fiche attribuée à un collègue', async () => {
+    expect(await nomsVusPar(awa)).not.toContain(`DOmar${RUN}`);
+    expect(await nomsVusPar(omar)).toEqual([`DOmar${RUN}`]);
   });
 
-  it('la file d’appel du web compte ce que le téléphone compte', async () => {
+  it('la file d’appel du web compte ce que la portée montre', async () => {
     const page = await prospects.list(awa, { pageSize: 200, search: RUN, phase2Status: 'PENDING' });
 
-    expect(page.meta.total).toBe(3);
+    expect(page.meta.total).toBe(2);
     expect(page.items.map((item) => item.id)).toContain(confiee);
   });
 
-  it('une fiche s’ouvre en détail', async () => {
+  it('ouvre en détail une fiche que la campagne lui a confiée', async () => {
     await expect(prospects.get(awa, confiee)).resolves.toMatchObject({ id: confiee });
   });
 
-  it('la fiche d’un collègue reste accessible en détail', async () => {
-    await expect(prospects.get(awa, dOmar)).resolves.toMatchObject({ id: dOmar });
+  it('refuse le détail d’une fiche qui ne lui est pas attribuée', async () => {
+    await expect(prospects.get(awa, dOmar)).rejects.toMatchObject({
+      response: { code: 'NOT_OWNER' },
+    });
+  });
+
+  it('perd la fiche dès qu’elle est réattribuée', async () => {
+    await prisma.lotExportItem.update({
+      where: { lotId_position: { lotId, position: 1 } },
+      data: { assigneeId: omar.id },
+    });
+
+    try {
+      expect(await nomsVusPar(awa)).toEqual([`Sienne${RUN}`]);
+      await expect(prospects.get(awa, confiee)).rejects.toMatchObject({
+        response: { code: 'NOT_OWNER' },
+      });
+    } finally {
+      await prisma.lotExportItem.update({
+        where: { lotId_position: { lotId, position: 1 } },
+        data: { assigneeId: awa.id },
+      });
+    }
   });
 
   it('l’ADMIN, lui, voit les trois fiches', async () => {
-    expect(await nomsVusPar(admin)).toEqual([`Confiee${RUN}`, `DOmar${RUN}`, `Orpheline${RUN}`]);
+    expect(await nomsVusPar(admin)).toEqual([`Confiee${RUN}`, `DOmar${RUN}`, `Sienne${RUN}`]);
   });
 });
