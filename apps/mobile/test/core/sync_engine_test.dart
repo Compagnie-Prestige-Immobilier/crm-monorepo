@@ -1763,6 +1763,75 @@ void main() {
       expect(await engine.readCursor(), 'cur-1');
     });
 
+    // Le curseur remis à zéro par une migration renvoie chaque fiche au même
+    // `rev` : c'est ainsi qu'une colonne neuve atteint une fiche déjà en base.
+    test('une fiche au même rev, sans saisie en file, reprend la page', () async {
+      await insertRepresentant(
+        db,
+        id: 'repA',
+        phone: '+221770000001',
+        rev: 3,
+        serverUpdatedAt: t0,
+      );
+      api.pullPages.add(
+        _page(<RepresentantDto>[
+          representantDto(
+            id: 'repA',
+            phoneE164: '+221770000001',
+            callAttemptCount: 2,
+          ),
+        ]),
+      );
+
+      await engine.pullChanges();
+
+      final Representant rep = (await db.select(db.representants).get()).single;
+      expect(rep.callAttemptCount, 2);
+    });
+
+    test('une fiche au même rev garde sa saisie en file', () async {
+      await insertRepresentant(
+        db,
+        id: 'repA',
+        phone: '+221770000001',
+        fullName: 'Nom modifié ici',
+        rev: 3,
+        serverUpdatedAt: t0,
+      );
+      await db.customStatement(
+        'INSERT INTO outbox '
+        '(id, dependency_key, entity_type, entity_id, op, payload, '
+        ' next_attempt_at, created_at) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        <Object?>[
+          'op-1',
+          'repA',
+          'rep_call_attempt',
+          'att-1',
+          'create',
+          '{}',
+          t0.toIso8601String(),
+          t0.toIso8601String(),
+        ],
+      );
+      api.pullPages.add(
+        _page(<RepresentantDto>[
+          representantDto(
+            id: 'repA',
+            phoneE164: '+221770000001',
+            fullName: 'Nom du serveur',
+            callAttemptCount: 2,
+          ),
+        ]),
+      );
+
+      await engine.pullChanges();
+
+      final Representant rep = (await db.select(db.representants).get()).single;
+      expect(rep.fullName, 'Nom modifié ici');
+      expect(rep.callAttemptCount, 0);
+    });
+
     test('une page rejouée n\'écrase pas une révision plus récente', () async {
       await insertRepresentant(
         db,
@@ -2714,3 +2783,26 @@ class _ZeroRandom implements Random {
   @override
   int nextInt(int max) => 0;
 }
+
+/// Une page de pull qui ne porte que des représentants.
+PullPage _page(List<RepresentantDto> representants) => PullPage(
+  changes: SyncChangesDto(
+    departements: const <DepartementDto>[],
+    iefs: const <IefDto>[],
+    banques: const <BanqueDto>[],
+    syndicats: const <SyndicatDto>[],
+    canauxProvenance: const <CanalProvenanceDto>[],
+    incomeBands: const <IncomeBandDto>[],
+    professions: const <ProfessionDto>[],
+    employeurs: const <EmployeurDto>[],
+    pays: const <PaysDto>[],
+    visiteReferentiels: const <SyncVisiteReferentielDto>[],
+    representants: representants,
+    prospects: const <ProspectDto>[],
+    visites: const <SyncVisiteDto>[],
+  ),
+  deletions: const <SyncDeletionDto>[],
+  nextCursor: 'cur-2',
+  hasMore: false,
+  serverTime: t0,
+);

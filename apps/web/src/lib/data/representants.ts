@@ -185,6 +185,18 @@ export async function fetchRepresentant(
   return unwrap(await client.GET('/api/v1/representants/{id}', { params: { path: { id } } }));
 }
 
+export type RepresentantCallAttempt = components['schemas']['RepresentantCallAttemptDto'];
+
+export async function fetchRepresentantCallAttempts(
+  id: string,
+  client: ApiClient = getApiClient(),
+): Promise<RepresentantCallAttempt[]> {
+  const payload = unwrap(
+    await client.GET('/api/v1/representants/{id}/call-attempts', { params: { path: { id } } }),
+  );
+  return payload.items;
+}
+
 export async function fetchRepresentantRelationHistory(
   id: string,
   client: ApiClient = getApiClient(),

@@ -132,6 +132,8 @@ import 'package:crm_api_client/src/model/phase2_status_count_dto.dart';
 import 'package:crm_api_client/src/model/phase2_status_list_dto.dart';
 import 'package:crm_api_client/src/model/presence_counts_dto.dart';
 import 'package:crm_api_client/src/model/profession_dto.dart';
+import 'package:crm_api_client/src/model/prospect_call_attempt_dto.dart';
+import 'package:crm_api_client/src/model/prospect_call_attempt_list_dto.dart';
 import 'package:crm_api_client/src/model/prospect_conflict_dto.dart';
 import 'package:crm_api_client/src/model/prospect_conflict_existing_dto.dart';
 import 'package:crm_api_client/src/model/prospect_dto.dart';
@@ -156,6 +158,8 @@ import 'package:crm_api_client/src/model/rendered_template_dto.dart';
 import 'package:crm_api_client/src/model/reorder_bank_case_stages_dto.dart';
 import 'package:crm_api_client/src/model/reorder_visite_referentiel_dto.dart';
 import 'package:crm_api_client/src/model/rep_call_attempt_result_dto.dart';
+import 'package:crm_api_client/src/model/representant_call_attempt_dto.dart';
+import 'package:crm_api_client/src/model/representant_call_attempt_list_dto.dart';
 import 'package:crm_api_client/src/model/representant_comment_dto.dart';
 import 'package:crm_api_client/src/model/representant_comment_list_dto.dart';
 import 'package:crm_api_client/src/model/representant_dto.dart';
@@ -715,6 +719,12 @@ ReturnType deserialize<ReturnType, BaseType>(
       return ProfessionDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'Projet':
+    case 'ProspectCallAttemptDto':
+      return ProspectCallAttemptDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'ProspectCallAttemptListDto':
+      return ProspectCallAttemptListDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'ProspectConflictDto':
       return ProspectConflictDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -790,6 +800,14 @@ ReturnType deserialize<ReturnType, BaseType>(
       return RepCallAttemptResultDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'RepCallOutcome':
+    case 'RepresentantCallAttemptDto':
+      return RepresentantCallAttemptDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'RepresentantCallAttemptListDto':
+      return RepresentantCallAttemptListDto.fromJson(
+            value as Map<String, dynamic>,
+          )
+          as ReturnType;
     case 'RepresentantCommentDto':
       return RepresentantCommentDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;

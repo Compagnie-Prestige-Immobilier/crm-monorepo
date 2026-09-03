@@ -87,7 +87,7 @@ void main() {
     });
   });
 
-  group('flux des représentants : vide tant qu\'on n\'a pas cherché', () {
+  group('flux des représentants : la liste se voit sans chercher', () {
     late AppDatabase db;
     late ReferenceRepository repo;
 
@@ -97,16 +97,16 @@ void main() {
     });
     tearDown(() => db.close());
 
-    test('sans recherche, la liste est vide même avec des fiches', () async {
+    test('sans recherche, toutes les fiches du périmètre sortent', () async {
       for (int i = 0; i < 12; i++) {
         await insertRepresentant(db, id: 'r$i', phone: '+2217700${1000 + i}');
       }
 
-      final List<RepresentantSyncViewData> vide = await repo
+      final List<RepresentantSyncViewData> tout = await repo
           .watchRepresentants()
           .first;
 
-      expect(vide, isEmpty);
+      expect(tout, hasLength(12));
     });
 
     test('la recherche atteint n\'importe quelle fiche', () async {

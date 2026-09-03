@@ -5,6 +5,7 @@ export interface LastAttempt {
   outcome: CallOutcome;
   comment: string | null;
   at: Date;
+  count: number;
 }
 
 interface LastAttemptRow {
@@ -12,6 +13,7 @@ interface LastAttemptRow {
   outcome: CallOutcome;
   comment: string | null;
   at: Date;
+  count: bigint;
 }
 
 export interface RawQueryRunner {
@@ -29,7 +31,8 @@ export async function lastAttemptsByProspect(
       p."id"        AS "prospectId",
       a."outcome"   AS "outcome",
       a."comment"   AS "comment",
-      a."createdAt" AS "at"
+      a."createdAt" AS "at",
+      (SELECT COUNT(*) FROM "call_attempts" n WHERE n."prospectId" = p."id") AS "count"
     FROM "prospects" p
     JOIN LATERAL (
       SELECT ca."outcome", ca."comment", ca."createdAt"
@@ -42,6 +45,9 @@ export async function lastAttemptsByProspect(
   `;
 
   return new Map(
-    rows.map((row) => [row.prospectId, { outcome: row.outcome, comment: row.comment, at: row.at }]),
+    rows.map((row) => [
+      row.prospectId,
+      { outcome: row.outcome, comment: row.comment, at: row.at, count: Number(row.count) },
+    ]),
   );
 }

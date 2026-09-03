@@ -58,8 +58,8 @@ import { formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import {
+  REPRESENTANT_RELATION_CHOICES,
   REPRESENTANT_RELATION_LABELS,
-  REPRESENTANT_RELATIONS,
   type RepresentantRelation,
 } from '@/lib/representant-filters';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
@@ -148,17 +148,16 @@ function etablissementAnswer(confirme: boolean | null, nouvel: string): Partial<
 /** Apparition d'une question qui n'était pas là : douce, et coupée si l'on préfère. */
 const REVELE = 'animate-in fade-in-0 slide-in-from-top-1 duration-200 motion-reduce:animate-none';
 
-/** Qui a accepté ou refusé a d'abord été contacté : « Contacté » les ramène aussi. */
 const RELATIONS_DEMANDEES: Record<RepresentantRelation, RepresentantRelation[]> = {
   INCONNU: ['INCONNU'],
-  CONTACTE: ['CONTACTE', 'AMBASSADEUR', 'REFUS'],
+  CONTACTE: ['CONTACTE'],
   AMBASSADEUR: ['AMBASSADEUR'],
   REFUS: ['REFUS'],
 };
 
 const RELATION_ITEMS = [
   { value: 'tous', label: 'Tous' },
-  ...REPRESENTANT_RELATIONS.map((relation) => ({
+  ...REPRESENTANT_RELATION_CHOICES.map((relation) => ({
     value: relation,
     label: REPRESENTANT_RELATION_LABELS[relation],
   })),
@@ -329,7 +328,7 @@ function ResultatsAnnuaire({
                 {row.departementName === null ? '' : ` · ${row.departementName}`}
               </span>
             </span>
-            <RelationBadge status={row.relationStatus} />
+            <RelationBadge status={row.relationStatus} label={row.statutQualificationLabel} />
           </button>
         </li>
       ))}
@@ -850,7 +849,10 @@ function EnTeteRepresentant({ representant }: { representant: ScriptedRepresenta
             <p className="text-[0.8125rem] text-muted-foreground">{sousTitre}</p>
           )}
         </div>
-        <RelationBadge status={representant.relationStatus} />
+        <RelationBadge
+          status={representant.relationStatus}
+          label={representant.statutQualificationLabel}
+        />
       </div>
 
       <div className="flex items-center gap-3">

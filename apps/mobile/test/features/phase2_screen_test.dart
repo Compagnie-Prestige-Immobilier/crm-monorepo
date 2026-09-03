@@ -280,6 +280,51 @@ void main() {
     },
   );
 
+  // Le téléconseiller lit la fiche AVANT de dérouler le script : qui c'est,
+  // ce que le dernier appel a donné, et combien de fois on a déjà essayé.
+  phase2TestWidgets('un numéro connu montre la fiche avant le script', (
+    WidgetTester tester,
+  ) async {
+    await insertRepresentant(db, id: 'rep-1', phone: '+221770000009');
+    await insertProspect(
+      db,
+      id: 'pros-1',
+      representantId: 'rep-1',
+      phone: '+221771234567',
+      nom: 'Diop',
+      prenom: 'Awa',
+    );
+    await (db.update(db.prospects)..where((Prospects p) => p.id.equals('pros-1')))
+        .write(
+          ProspectsCompanion(
+            whatsappE164: const Value<String?>('+221771234568'),
+            lastCallOutcome: const Value<String?>('CALLBACK'),
+            lastCallAt: Value<DateTime?>(t0.subtract(const Duration(days: 1))),
+            callAttemptCount: const Value<int>(2),
+          ),
+        );
+
+    await tester.pumpWidget(host());
+    await type(tester, '771234567');
+
+    expect(find.text('Awa Diop'), findsOneWidget);
+    expect(find.text('+221 77 123 45 68'), findsOneWidget);
+    expect(find.text('À rappeler'), findsOneWidget);
+    expect(find.text('2 appels'), findsOneWidget);
+    expect(find.text('À traiter'), findsOneWidget);
+  });
+
+  phase2TestWidgets('un numéro connu sans fiche locale dit ce qu\'il sait', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(host());
+    await type(tester, '771234567');
+
+    expect(find.text('+221 77 123 45 67'), findsOneWidget);
+    expect(find.text('Jamais appelé'), findsOneWidget);
+    expect(find.text('Aucun appel'), findsOneWidget);
+  });
+
   phase2TestWidgets(
     'un numéro connu et ouvert ouvre les quatre cartes de méthode',
     (WidgetTester tester) async {

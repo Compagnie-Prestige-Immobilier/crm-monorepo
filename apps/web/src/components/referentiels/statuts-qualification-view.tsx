@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 
 import { Field } from '@/components/forms/field';
 import { QueryErrorState } from '@/components/query-error-state';
+import { RelationBadge } from '@/components/representants/relation-badge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -50,7 +51,7 @@ import {
   type StatutQualificationEffect,
   type StatutRelationPosee,
 } from '@/lib/data/statuts-qualification';
-import { REPRESENTANT_RELATIONS, REPRESENTANT_RELATION_LABELS } from '@/lib/representant-filters';
+import { REPRESENTANT_RELATION_LABELS } from '@/lib/representant-filters';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 
@@ -71,16 +72,12 @@ const AUCUNE = 'AUCUNE';
 
 type RelationChoisie = NonNullable<StatutRelationPosee> | typeof AUCUNE;
 
+/** Seules les deux issues qui tranchent se posent : l'étoile, ou le refus. */
 const RELATIONS_POSEES: readonly { value: RelationChoisie; label: string }[] = [
   { value: AUCUNE, label: 'Ne tranche pas' },
-  ...REPRESENTANT_RELATIONS.map((relation) => ({
-    value: relation,
-    label: REPRESENTANT_RELATION_LABELS[relation],
-  })),
+  { value: 'AMBASSADEUR', label: REPRESENTANT_RELATION_LABELS.AMBASSADEUR },
+  { value: 'REFUS', label: REPRESENTANT_RELATION_LABELS.REFUS },
 ];
-
-const libelleRelation = (relation: StatutRelationPosee): string =>
-  relation === null ? 'Ne tranche pas' : REPRESENTANT_RELATION_LABELS[relation];
 
 const EMPTY: Draft = {
   code: '',
@@ -219,7 +216,7 @@ function Branche({
             <TableHead>Code</TableHead>
             <TableHead>Effet</TableHead>
             <TableHead>Priorité</TableHead>
-            <TableHead>Relation posée</TableHead>
+            <TableHead>Décision</TableHead>
             <TableHead>État</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
@@ -242,10 +239,12 @@ function Branche({
                   {PRIORITE_TRAITEMENT_LABELS[statut.priorite]}
                 </Badge>
               </TableCell>
-              <TableCell
-                className={statut.relationStatus === null ? 'text-muted-foreground' : undefined}
-              >
-                {libelleRelation(statut.relationStatus)}
+              <TableCell>
+                {statut.relationStatus === null ? (
+                  <span className="text-muted-foreground">Ne tranche pas</span>
+                ) : (
+                  <RelationBadge status={statut.relationStatus} />
+                )}
               </TableCell>
               <TableCell>
                 <Badge variant={statut.isActive ? 'default' : 'outline'}>
@@ -466,8 +465,8 @@ function FormulaireStatut({
           </Field>
 
           <Field
-            label="Relation posée"
-            description="Appliquée quand le téléconseiller ne répond pas lui-même à la question."
+            label="Décision"
+            description="Ce que le statut conclut sur la fiche : l’étoile, le refus, ou rien."
           >
             {(props) => (
               <Select

@@ -52,6 +52,9 @@ void main() {
             projet: const Value<String>('GRAND_PUBLIC'),
             type: const Value<String?>('FONCTIONNAIRE'),
             profession: const Value<String?>('Institutrice'),
+            canalProvenanceId: const Value<String?>('cn-1'),
+            incomeBandId: const Value<String?>('rev-1'),
+            dureeSystemeMois: const Value<int?>(36),
             createdById: 'u-1',
             clientCreatedAt: t0,
             localUpdatedAt: t0,
@@ -166,12 +169,17 @@ void main() {
     expect(find.text('Fonctionnaire'), findsOneWidget);
     expect(find.text('Profession'), findsOneWidget);
     expect(find.text('Institutrice'), findsOneWidget);
+    expect(find.text('Tranche de revenus'), findsOneWidget);
+    expect(find.text('Revenu Test'), findsOneWidget);
+    expect(find.text('Durée de remboursement'), findsOneWidget);
+    expect(find.text('36 mois'), findsOneWidget);
+    expect(find.text('Canal de provenance'), findsOneWidget);
+    expect(find.text('Parrainage'), findsOneWidget);
     for (final String vide in <String>[
       'Ancienneté',
       'Type de contrat',
       'Pays de résidence',
       'WhatsApp',
-      'Tranche de revenus',
     ]) {
       expect(find.text(vide), findsNothing, reason: '« $vide » est vide');
     }

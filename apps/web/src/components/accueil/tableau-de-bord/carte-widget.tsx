@@ -15,6 +15,7 @@ import type { ReactNode } from 'react';
 import { evaluerMarques } from '@/components/accueil/tableau-de-bord/recommandation';
 import {
   SOURCES,
+  donneesVides,
   mesurerDonnees,
   reglagesHonores,
   spanClass,
@@ -49,7 +50,9 @@ function hauteurDe(
   forme: Forme,
   marque: DashboardMarque | undefined,
   taille: DashboardTaille,
+  vide: boolean,
 ): 'compacte' | 'normale' | 'haute' {
+  if (vide) return 'compacte';
   if (taille === 'pleine' || forme === 'equipe') return 'haute';
   if (marque === 'tuile') return 'compacte';
   return 'normale';
@@ -225,6 +228,7 @@ export function CarteWidget({
 
   const { label: titre, forme, description } = entreeDe(catalogue, widget.source);
   const evaluees = donnees === undefined ? [] : evaluerMarques(forme, mesurerDonnees(donnees));
+  const vide = donnees === undefined ? false : donneesVides(donnees);
   const taille: DashboardTaille = widget.taille ?? 'demi';
   const honors = reglagesHonores(widget.marque);
   const presentation = widget.presentation ?? {};
@@ -243,7 +247,7 @@ export function CarteWidget({
       <ChartCard
         title={titre}
         info={description}
-        hauteur={hauteurDe(forme, widget.marque, taille)}
+        hauteur={hauteurDe(forme, widget.marque, taille, vide)}
         actions={
           editing ? (
             <div className="flex shrink-0 items-center gap-0.5">

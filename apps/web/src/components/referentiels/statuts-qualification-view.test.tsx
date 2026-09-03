@@ -85,7 +85,7 @@ describe('référentiel des statuts de qualification', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: /Modifier Très intéressé/ }));
 
-    const relation = await screen.findByRole('combobox', { name: /Relation posée/ });
+    const relation = await screen.findByRole('combobox', { name: /Décision/ });
     expect(relation.textContent).toContain('A accepté');
 
     await userEvent.click(relation);

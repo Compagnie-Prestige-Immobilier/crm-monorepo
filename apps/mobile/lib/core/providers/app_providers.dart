@@ -138,6 +138,14 @@ final StreamProvider<int> representantCountProvider = StreamProvider<int>((
       .watchRepresentantCount(moi: _moi(ref));
 });
 
+final StreamProvider<int> representantsAppelesProvider = StreamProvider<int>((
+  Ref ref,
+) {
+  return ref
+      .watch(referenceRepositoryProvider)
+      .watchRepresentantsAppeles(moi: _moi(ref));
+});
+
 final StreamProvider<int> prospectCountProvider = StreamProvider<int>((
   Ref ref,
 ) {
@@ -592,6 +600,7 @@ typedef Contact = ({
   DateTime? at,
   String? issue,
   String statut,
+  String? statutLabel,
 });
 
 /// Les représentants que J'AI appelés, du plus récent au plus ancien.
@@ -602,25 +611,26 @@ final StreamProvider<List<Contact>> mesContactsRepresentantsProvider =
         authControllerProvider.select((AuthState s) => s.userId),
       );
       if (moi == null) return Stream<List<Contact>>.value(const <Contact>[]);
-      return (db.select(db.representants)
+      return (db.select(db.representantSyncView)
             ..where(
-              (Representants t) =>
+              (RepresentantSyncView t) =>
                   t.lastCallById.equals(moi) & t.deletedAt.isNull(),
             )
-            ..orderBy(<OrderClauseGenerator<Representants>>[
-              (Representants t) => OrderingTerm.desc(t.lastCallAt),
+            ..orderBy(<OrderClauseGenerator<RepresentantSyncView>>[
+              (RepresentantSyncView t) => OrderingTerm.desc(t.lastCallAt),
             ]))
           .watch()
           .map(
-            (List<Representant> rows) => rows
+            (List<RepresentantSyncViewData> rows) => rows
                 .map(
-                  (Representant r) => (
+                  (RepresentantSyncViewData r) => (
                     id: r.id,
                     nom: r.fullName,
                     phoneE164: r.phoneE164,
                     at: r.lastCallAt,
                     issue: r.lastCallOutcome,
                     statut: r.relationStatus,
+                    statutLabel: r.statutQualificationLabel,
                   ),
                 )
                 .toList(growable: false),
@@ -672,6 +682,7 @@ final mesContactsProspectsProvider = StreamProvider.family<List<Contact>, bool>(
                 at: r.read<DateTime?>('at'),
                 issue: r.read<String?>('issue'),
                 statut: r.read<String>('statut'),
+                statutLabel: null,
               ),
             )
             .toList(growable: false),

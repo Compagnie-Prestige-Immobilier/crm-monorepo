@@ -33,6 +33,18 @@ export const REPRESENTANT_RELATION_LABELS: Record<RepresentantRelation, string> 
   REFUS: 'Refus',
 };
 
+/**
+ * Ce qu'un utilisateur peut choisir. CONTACTE n'y est plus : « contacté » se
+ * lit sur le statut de qualification, et proposé à côté de « a accepté » il
+ * se confondait avec lui. Les fiches qui le portent encore s'affichent, et le
+ * gardent tant qu'on ne tranche pas.
+ */
+export const REPRESENTANT_RELATION_CHOICES = [
+  'INCONNU',
+  'AMBASSADEUR',
+  'REFUS',
+] as const satisfies readonly RepresentantRelation[];
+
 export const REPRESENTANT_SORT_FIELDS = [
   'clientCreatedAt',
   'fullName',

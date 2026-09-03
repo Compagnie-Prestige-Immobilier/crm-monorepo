@@ -40,6 +40,11 @@ export const MODE_EPARGNE_LABELS: Record<ModeEpargne, string> = {
   AUCUN: 'Aucune',
 };
 
+export const PAYMENT_MODE_LABELS: Record<PaymentMode, string> = {
+  COMPTANT: 'Comptant',
+  ECHELONNE: 'Échelonné',
+};
+
 export type SessionUser = Schemas['AuthUserDto'];
 export type UserRow = Schemas['UserDto'];
 export type RepresentantRow = Schemas['RepresentantDto'];

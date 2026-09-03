@@ -226,12 +226,8 @@ class ReferenceRepository {
     String? moi,
   }) {
     final String terme = (search ?? '').trim();
-    // Annuaire de milliers de fiches : tout dérouler laisse croire à un total
-    // faux (« il n'y en a que 500 »). L'écran reste vide tant qu'on n'a pas
-    // cherché ; un résultat n'apparaît que pour une recherche explicite.
-    if (terme.isEmpty) {
-      return Stream<List<RepresentantSyncViewData>>.value(const []);
-    }
+    // ponytail: pas de LIMIT, le périmètre borne déjà la liste ; paginer si un
+    // compte se retrouve avec plus de quelques milliers de fiches.
     final String pattern = '%${terme.toLowerCase()}%';
     // Un numéro se tape avec des espaces (« 77 152 11 62 ») et se range en
     // E.164 : sans cette seconde forme, aucune recherche par téléphone ne sort.
@@ -380,6 +376,22 @@ class ReferenceRepository {
         .customSelect(
           'SELECT COUNT(*) AS c FROM representants '
           'WHERE deleted_at IS NULL ${_perimetre('representant')}',
+          variables: <Variable<Object>>[Variable<String>(moi ?? '')],
+          readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+            _db.representants,
+            _db.attributions,
+          },
+        )
+        .map((QueryRow row) => row.read<int>('c'))
+        .watchSingle();
+  }
+
+  Stream<int> watchRepresentantsAppeles({String? moi}) {
+    return _db
+        .customSelect(
+          'SELECT COUNT(*) AS c FROM representants '
+          'WHERE deleted_at IS NULL AND last_call_at IS NOT NULL '
+          '${_perimetre('representant')}',
           variables: <Variable<Object>>[Variable<String>(moi ?? '')],
           readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
             _db.representants,

@@ -278,6 +278,9 @@ CREATE TABLE representants (
     -- `phase2_directory.phase2_status`, une valeur ajoutée côté serveur ferait
     -- avorter la page de pull entière.
     relation_status TEXT NOT NULL DEFAULT 'INCONNU',
+    -- Le libellé visible de la fiche, comme sur le web. Sans REFERENCES : le
+    -- référentiel se peuple par sa propre route, la fiche peut arriver avant.
+    statut_qualification_id TEXT NULL,
     -- Trois états et non un booléen, et SANS CHECK pour la même raison que
     -- `relation_status` : rien d'autre ne distingue « il n'a pas WhatsApp » de
     -- « la question ne lui a pas été posée ».
@@ -303,6 +306,7 @@ CREATE TABLE representants (
     last_call_outcome TEXT NULL,
     last_call_at DATETIME NULL,
     last_call_by_id TEXT NULL,
+    call_attempt_count INTEGER NOT NULL DEFAULT 0,
     next_callback_at DATETIME NULL,
     created_by_id TEXT NOT NULL,
     -- Horodatage de la saisie sur le terrain, distinct de l'arrivée en base :
@@ -387,6 +391,7 @@ CREATE TABLE prospects (
     last_call_outcome TEXT NULL,
     last_call_at DATETIME NULL,
     last_call_by_id TEXT NULL,
+    call_attempt_count INTEGER NOT NULL DEFAULT 0,
     statut TEXT NOT NULL DEFAULT 'NOUVEAU',
     client_created_at DATETIME NOT NULL,
     rev INTEGER NOT NULL DEFAULT 1,
@@ -765,12 +770,14 @@ CREATE INDEX notifications_unread_idx ON notifications (read_at);
 CREATE VIEW representant_sync_view AS
 SELECT
     r.*,
+    sq.label AS statut_qualification_label,
     CASE
         WHEN o.status IS NOT NULL THEN o.status
         WHEN r.server_updated_at IS NULL THEN 'draft'
         ELSE 'synced'
     END AS sync_status
 FROM representants AS r
+LEFT JOIN statuts_qualification AS sq ON sq.id = r.statut_qualification_id
 LEFT JOIN outbox AS o
     ON o.entity_type = 'representant'
     AND o.entity_id = r.id

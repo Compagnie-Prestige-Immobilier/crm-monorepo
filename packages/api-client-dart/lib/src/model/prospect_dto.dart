@@ -130,6 +130,8 @@ class ProspectDto {
 
     required this.lastAttemptAt,
 
+    required this.callAttemptCount,
+
     required this.lastCallOutcome,
 
     required this.lastCallAt,
@@ -366,6 +368,10 @@ class ProspectDto {
   @JsonKey(name: r'lastAttemptAt', required: true, includeIfNull: true)
   final DateTime? lastAttemptAt;
 
+  /// Nombre de tentatives d’appel consignées.
+  @JsonKey(name: r'callAttemptCount', required: true, includeIfNull: false)
+  final num callAttemptCount;
+
   @JsonKey(
     name: r'lastCallOutcome',
     required: true,
@@ -459,6 +465,7 @@ class ProspectDto {
                 lastOutcome,
                 lastComment,
                 lastAttemptAt,
+                callAttemptCount,
                 lastCallOutcome,
                 lastCallAt,
                 lastCallById,
@@ -521,6 +528,7 @@ class ProspectDto {
                 other.lastOutcome,
                 other.lastComment,
                 other.lastAttemptAt,
+                other.callAttemptCount,
                 other.lastCallOutcome,
                 other.lastCallAt,
                 other.lastCallById,
@@ -589,6 +597,7 @@ class ProspectDto {
         lastOutcome,
         lastComment,
         lastAttemptAt,
+        callAttemptCount,
         lastCallOutcome,
         lastCallAt,
         lastCallById,

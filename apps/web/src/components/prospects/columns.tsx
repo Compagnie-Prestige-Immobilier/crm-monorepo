@@ -8,6 +8,7 @@ import {
   PencilIcon,
   Trash2Icon,
 } from 'lucide-react';
+import Link from 'next/link';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -72,7 +73,16 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
       cell: ({ row }) => (
         <div className="min-w-0">
           <p className="truncate font-[600]">
-            {row.original.prenom} {row.original.nom}
+            <Link
+              href={
+                row.original.projet === 'GRAND_PUBLIC'
+                  ? `/grand-public/${row.original.id}`
+                  : `/chues/prospects/${row.original.id}`
+              }
+              className="underline-offset-4 hover:underline"
+            >
+              {row.original.prenom} {row.original.nom}
+            </Link>
           </p>
           <p className="truncate text-[0.75rem] text-muted-foreground">
             {formatPhone(row.original.phoneE164)}

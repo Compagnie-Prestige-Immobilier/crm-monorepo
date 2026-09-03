@@ -7,6 +7,7 @@ import { renderWithQuery } from '@/test/render-query';
 
 const fetchRepresentant = vi.hoisted(() => vi.fn());
 const fetchRelationHistory = vi.hoisted(() => vi.fn());
+const fetchCallAttempts = vi.hoisted(() => vi.fn());
 const fetchProspects = vi.hoisted(() => vi.fn());
 const fetchComments = vi.hoisted(() => vi.fn());
 
@@ -16,6 +17,7 @@ vi.mock('@/lib/data/representants', async () => {
     ...actual,
     fetchRepresentant: () => fetchRepresentant() as unknown,
     fetchRepresentantRelationHistory: () => fetchRelationHistory() as unknown,
+    fetchRepresentantCallAttempts: () => fetchCallAttempts() as unknown,
     fetchRepresentantComments: () => fetchComments() as unknown,
   };
 });
@@ -53,6 +55,12 @@ const FICHE = {
   syndicat: null,
   connaitUES: null,
   contacte: null,
+  lastCallOutcome: null,
+  lastCallAt: null,
+  lastCallById: null,
+  lastCallByName: null,
+  callAttemptCount: 0,
+  nextCallbackAt: null,
   notes: null,
   clientCreatedAt: '2026-03-01T09:00:00.000Z',
   createdAt: '2026-03-01T09:00:00.000Z',
@@ -82,8 +90,53 @@ const change = (
 beforeEach(() => {
   fetchRepresentant.mockResolvedValue(FICHE);
   fetchRelationHistory.mockResolvedValue([]);
+  fetchCallAttempts.mockResolvedValue([]);
   fetchProspects.mockResolvedValue({ items: [], total: 0, page: 1, pageCount: 0 });
   fetchComments.mockResolvedValue([]);
+});
+
+describe('RepresentantDetailView, les appels', () => {
+  it('liste chaque appel avec son statut, ses réponses et la personne proposée', async () => {
+    fetchCallAttempts.mockResolvedValue([
+      {
+        id: 'att-1',
+        outcome: 'REFUSED',
+        statutQualificationId: 'sq-1',
+        statutQualificationLabel: 'Non intéressé',
+        comment: 'Rappeler après les examens',
+        callbackAt: null,
+        promisedProspects: null,
+        etablissementConfirme: true,
+        numeroConfirme: null,
+        contacte: false,
+        connaitUES: true,
+        syndicat: 'SAEMSS',
+        suggestedName: 'Fatou Sarr',
+        suggestedPhoneE164: '+221771234567',
+        suggestedNote: null,
+        performedById: 'u-2',
+        performedByName: 'Awa Sy',
+        clientCreatedAt: '2026-03-04T09:15:00.000Z',
+      },
+    ]);
+    renderWithQuery(<RepresentantDetailView representantId="rep-1" author={AUTHOR} />);
+
+    const appels = await screen.findByRole('list', { name: 'Appels' });
+    const texte = within(appels).getAllByRole('listitem')[0]?.textContent ?? '';
+    expect(texte).toContain('Non intéressé');
+    expect(texte).toContain('Awa Sy');
+    expect(texte).toContain('Établissement confirmé : Oui');
+    expect(texte).toContain('Contacté : Non');
+    expect(texte).toContain('Syndicat : SAEMSS');
+    expect(texte).toContain('Fatou Sarr');
+    expect(texte).toContain('Rappeler après les examens');
+  });
+
+  it('dit quoi faire quand aucun appel n’est consigné', async () => {
+    renderWithQuery(<RepresentantDetailView representantId="rep-1" author={AUTHOR} />);
+
+    expect(await screen.findByText(/Aucun appel consigné/u)).toBeTruthy();
+  });
 });
 
 describe('RepresentantDetailView', () => {
@@ -183,5 +236,17 @@ describe('RepresentantDetailView, ce que l’appel a appris', () => {
 
     expect(await screen.findByText('+221779876543')).toBeTruthy();
     expect(screen.getByText('Proviseur')).toBeTruthy();
+  });
+
+  it('montre le dernier appel quand il existe', async () => {
+    fetchRepresentant.mockResolvedValue({
+      ...FICHE,
+      lastCallOutcome: 'REACHED',
+      lastCallAt: '2026-03-04T09:15:00.000Z',
+    });
+    renderWithQuery(<RepresentantDetailView representantId="rep-1" author={AUTHOR} />);
+
+    expect(await screen.findByText('Joint')).toBeTruthy();
+    expect(screen.getByText(/04 mars 2026/u)).toBeTruthy();
   });
 });

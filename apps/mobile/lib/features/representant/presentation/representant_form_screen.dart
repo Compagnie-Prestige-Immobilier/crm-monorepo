@@ -931,9 +931,11 @@ class _ChampRelation extends StatelessWidget {
   final String status;
   final ValueChanged<String> onChanged;
 
+  // Comme le web : « contacté » se lit sur le statut de qualification, et
+  // proposé à côté de « a accepté » il se confondait avec lui. Une fiche qui
+  // le porte encore le garde tant qu'on ne tranche pas.
   static const List<String> _choix = <String>[
     'INCONNU',
-    'CONTACTE',
     'AMBASSADEUR',
     'REFUS',
   ];
@@ -944,7 +946,7 @@ class _ChampRelation extends StatelessWidget {
     icon: PhosphorIconsRegular.handshake,
     value: status,
     options: <CpiChoice<String>>[
-      for (final String valeur in _choix)
+      for (final String valeur in <String>{..._choix, status})
         CpiChoice<String>(value: valeur, label: relationLabel(valeur)),
     ],
     // Se corrige en touchant un autre choix : la relation a toujours un état,

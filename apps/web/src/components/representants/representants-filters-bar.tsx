@@ -25,8 +25,8 @@ import { queryKeys } from '@/lib/query-keys';
 import {
   clearRepresentantAdvancedFilters,
   countActiveRepresentantFilters,
+  REPRESENTANT_RELATION_CHOICES,
   REPRESENTANT_RELATION_LABELS,
-  REPRESENTANT_RELATIONS,
   REPRESENTANT_SORT_FIELDS,
   REPRESENTANT_SORT_LABELS,
   type RepresentantRelation,
@@ -45,7 +45,7 @@ const PRESENCE_ITEMS = [
 
 const RELATION_ITEMS = [
   { value: 'tous', label: 'Tous' },
-  ...REPRESENTANT_RELATIONS.map((relation) => ({
+  ...REPRESENTANT_RELATION_CHOICES.map((relation) => ({
     value: relation,
     label: REPRESENTANT_RELATION_LABELS[relation],
   })),

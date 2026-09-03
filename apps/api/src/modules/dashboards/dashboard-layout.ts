@@ -252,7 +252,9 @@ export function resolveLayout(
  * par téléconseiller dessous. Courte à dessein, et tout y est déplaçable et
  * retirable comme le reste.
  */
-const USINE: Record<DashboardEcran, readonly DashboardSource[]> = {
+type WidgetUsine = DashboardSource | DispositionWidget;
+
+const USINE: Record<DashboardEcran, readonly WidgetUsine[]> = {
   visites: [
     'total-visites',
     'moyenne-journaliere',
@@ -267,7 +269,11 @@ const USINE: Record<DashboardEcran, readonly DashboardSource[]> = {
     'a-rappeler',
     'taux-de-qualification',
     'adhesions',
-    'repartition-statuts-qualification',
+    {
+      source: 'repartition-statuts-qualification',
+      taille: 'pleine',
+      presentation: { valeurs: true },
+    },
     'par-teleconseiller',
   ],
   'grand-public': ['taux-de-joignabilite', 'prospects-notes', 'adhesions', 'par-teleconseiller'],
@@ -292,6 +298,10 @@ const USINE_DIRECTION: Record<DashboardEcran, readonly DashboardSource[]> = {
   ],
 };
 
+function widgetUsine(item: WidgetUsine): DispositionWidget {
+  return typeof item === 'string' ? { source: item } : item;
+}
+
 export function dispositionUsine(
   ecran: DashboardEcran,
   voitLesMontants = false,
@@ -300,9 +310,6 @@ export function dispositionUsine(
   return {
     version: 1,
     preset: 'essentiel',
-    widgets: sanitize(
-      ecran,
-      sources.map((source) => ({ source })),
-    ),
+    widgets: sanitize(ecran, sources.map(widgetUsine)),
   };
 }

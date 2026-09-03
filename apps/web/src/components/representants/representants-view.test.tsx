@@ -1,4 +1,5 @@
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as RepresentantsModule from '@/lib/data/representants';
@@ -162,13 +163,31 @@ describe('RepresentantsView vue par un SUPERVISEUR', () => {
     renderWithQuery(<RepresentantsView canAdminister={false} />);
 
     expect(await screen.findByRole('button', { name: 'Nouveau représentant' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Exporter' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Exporter/u })).toBeTruthy();
+  });
+
+  it('nomme clairement l’export filtré et l’export complet', async () => {
+    setUrl('/chues/representants?search=Ndeye');
+    renderWithQuery(<RepresentantsView canAdminister={false} />);
+
+    await screen.findAllByText('Ndeye Fall');
+    fireEvent.click(screen.getByRole('button', { name: /Exporter/u }));
+
+    expect(screen.getByText('Exporter la vue filtrée')).toBeTruthy();
+    expect(screen.getByText('Exporter tous les représentants')).toBeTruthy();
   });
 });
 
-const fiche = (id: string, fullName: string, relationStatus: string) => ({
+const fiche = (
+  id: string,
+  fullName: string,
+  relationStatus: string,
+  statutQualificationLabel: string | null = null,
+) => ({
   id,
   fullName,
+  statutQualificationLabel,
+  callAttemptCount: 0,
   phoneE164: '+221771234567',
   departementId: 'd-1',
   departementName: 'Dakar',
@@ -217,6 +236,28 @@ describe('RepresentantsView, état de la relation', () => {
       if (ligne === null) throw new Error(`Ligne introuvable pour ${nom as string}.`);
       expect(within(ligne).getByText(etat as string)).toBeTruthy();
     }
+  });
+
+  it('affiche le statut de qualification à la place de la relation, sans perdre l’étoile', async () => {
+    fetchRepresentants.mockReturnValue(
+      Promise.resolve({
+        items: [fiche('r-3', 'Awa Ba', 'AMBASSADEUR', 'Très intéressé')],
+        total: 1,
+        page: 1,
+        pageCount: 1,
+      }),
+    );
+    setUrl('/chues/representants');
+    renderWithQuery(<RepresentantsView canAdminister />);
+
+    const table = (await screen.findAllByRole('table'))[0];
+    if (table === undefined) throw new Error('Aucun tableau.');
+    const ligne = within(table).getByText('Awa Ba').closest('tr');
+    if (ligne === null) throw new Error('Ligne introuvable.');
+
+    expect(within(ligne).getByText('Très intéressé')).toBeTruthy();
+    expect(within(ligne).queryByText('A accepté')).toBeNull();
+    expect(within(ligne).getByText('Très intéressé').querySelector('svg')).not.toBeNull();
   });
 
   it('mène de chaque nom à sa fiche', async () => {

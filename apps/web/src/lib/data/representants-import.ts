@@ -3,7 +3,7 @@ import { unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
 import { toRepresentantQuery } from '@/lib/data/representants';
-import type { RepresentantFilters } from '@/lib/representant-filters';
+import { EMPTY_REPRESENTANT_FILTERS, type RepresentantFilters } from '@/lib/representant-filters';
 
 type Schemas = components['schemas'];
 
@@ -32,8 +32,13 @@ export const REPRESENTANTS_TEMPLATE_URL = '/api/v1/export/representants-modele.x
 
 export const REPRESENTANTS_TEMPLATE_FILE_NAME = 'cpi-representants-modele.xlsx';
 
-export function buildRepresentantsExportUrl(filters: RepresentantFilters): string {
-  const query = toRepresentantQuery(filters);
+export type RepresentantsExportMode = 'filtered' | 'all';
+
+export function buildRepresentantsExportUrl(
+  filters: RepresentantFilters,
+  mode: RepresentantsExportMode = 'filtered',
+): string {
+  const query = toRepresentantQuery(mode === 'all' ? EMPTY_REPRESENTANT_FILTERS : filters);
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(query)) {
     if (key === 'page' || key === 'pageSize' || key === 'sortBy' || key === 'sortOrder') continue;
@@ -45,6 +50,10 @@ export function buildRepresentantsExportUrl(filters: RepresentantFilters): strin
     : `/api/v1/export/representants.xlsx?${rendered}`;
 }
 
-export function representantsExportFileName(now = new Date()): string {
-  return `cpi-representants-${now.toISOString().slice(0, 10)}.xlsx`;
+export function representantsExportFileName(
+  now = new Date(),
+  mode: RepresentantsExportMode = 'filtered',
+): string {
+  const suffix = mode === 'all' ? '-tous' : '';
+  return `cpi-representants${suffix}-${now.toISOString().slice(0, 10)}.xlsx`;
 }

@@ -40,6 +40,7 @@ import { queryKeys } from '@/lib/query-keys';
 import {
   CALL_OUTCOME_LABELS,
   MODE_EPARGNE_LABELS,
+  PAYMENT_MODE_LABELS,
   PROSPECT_STATUT_LABELS,
   SEGMENT_LABELS,
   TYPE_CONTRAT_LABELS,
@@ -383,6 +384,16 @@ export function GrandPublicProspectDetail({
             </Ligne>
             <Ligne label={libelleMetier(prospect.type)}>
               <Texte value={prospect.profession} absent="Non renseignée" />
+            </Ligne>
+            <Ligne label="Revenu mensuel">
+              <Texte value={prospect.incomeBandLabel} absent="Non renseigné" />
+            </Ligne>
+            <Ligne label="Paiement">
+              {prospect.paymentMode === null ? (
+                <Absent>Non renseigné</Absent>
+              ) : (
+                PAYMENT_MODE_LABELS[prospect.paymentMode]
+              )}
             </Ligne>
             <LignesSituation prospect={prospect} />
             <Ligne label="Canal de provenance">

@@ -107,6 +107,8 @@ abstract class _$ProspectDtoCWProxy {
 
   ProspectDto lastAttemptAt(DateTime? lastAttemptAt);
 
+  ProspectDto callAttemptCount(num callAttemptCount);
+
   ProspectDto lastCallOutcome(CallOutcome? lastCallOutcome);
 
   ProspectDto lastCallAt(DateTime? lastCallAt);
@@ -184,6 +186,7 @@ abstract class _$ProspectDtoCWProxy {
     CallOutcome? lastOutcome,
     String? lastComment,
     DateTime? lastAttemptAt,
+    num callAttemptCount,
     CallOutcome? lastCallOutcome,
     DateTime? lastCallAt,
     String? lastCallById,
@@ -389,6 +392,10 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
       this(lastAttemptAt: lastAttemptAt);
 
   @override
+  ProspectDto callAttemptCount(num callAttemptCount) =>
+      this(callAttemptCount: callAttemptCount);
+
+  @override
   ProspectDto lastCallOutcome(CallOutcome? lastCallOutcome) =>
       this(lastCallOutcome: lastCallOutcome);
 
@@ -481,6 +488,7 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
     Object? lastOutcome = const $CopyWithPlaceholder(),
     Object? lastComment = const $CopyWithPlaceholder(),
     Object? lastAttemptAt = const $CopyWithPlaceholder(),
+    Object? callAttemptCount = const $CopyWithPlaceholder(),
     Object? lastCallOutcome = const $CopyWithPlaceholder(),
     Object? lastCallAt = const $CopyWithPlaceholder(),
     Object? lastCallById = const $CopyWithPlaceholder(),
@@ -697,6 +705,10 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
           ? _value.lastAttemptAt
           // ignore: cast_nullable_to_non_nullable
           : lastAttemptAt as DateTime?,
+      callAttemptCount: callAttemptCount == const $CopyWithPlaceholder()
+          ? _value.callAttemptCount
+          // ignore: cast_nullable_to_non_nullable
+          : callAttemptCount as num,
       lastCallOutcome: lastCallOutcome == const $CopyWithPlaceholder()
           ? _value.lastCallOutcome
           // ignore: cast_nullable_to_non_nullable
@@ -807,6 +819,7 @@ ProspectDto _$ProspectDtoFromJson(
       'lastOutcome',
       'lastComment',
       'lastAttemptAt',
+      'callAttemptCount',
       'lastCallOutcome',
       'lastCallAt',
       'lastCallById',
@@ -978,6 +991,7 @@ ProspectDto _$ProspectDtoFromJson(
       'lastAttemptAt',
       (v) => v == null ? null : DateTime.parse(v as String),
     ),
+    callAttemptCount: $checkedConvert('callAttemptCount', (v) => v as num),
     lastCallOutcome: $checkedConvert(
       'lastCallOutcome',
       (v) => $enumDecodeNullable(
@@ -1060,6 +1074,7 @@ Map<String, dynamic> _$ProspectDtoToJson(ProspectDto instance) =>
       'lastOutcome': _$CallOutcomeEnumMap[instance.lastOutcome],
       'lastComment': instance.lastComment,
       'lastAttemptAt': instance.lastAttemptAt?.toIso8601String(),
+      'callAttemptCount': instance.callAttemptCount,
       'lastCallOutcome': _$CallOutcomeEnumMap[instance.lastCallOutcome],
       'lastCallAt': instance.lastCallAt?.toIso8601String(),
       'lastCallById': instance.lastCallById,
