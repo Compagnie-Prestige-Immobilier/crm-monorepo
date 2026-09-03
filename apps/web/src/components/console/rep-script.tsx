@@ -21,6 +21,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -35,6 +42,12 @@ import {
 } from '@/lib/data/console';
 import { fetchReferenceData } from '@/lib/data/reference';
 import { fetchRepresentants, type ScriptedRepresentant } from '@/lib/data/representants';
+import {
+  fetchStatutsQualification,
+  statutsDeLaBranche,
+  type StatutQualification,
+  type StatutQualificationEffect,
+} from '@/lib/data/statuts-qualification';
 import { formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
@@ -42,19 +55,25 @@ import { EMPTY_REPRESENTANT_FILTERS, type RepresentantFilters } from '@/lib/repr
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { cn } from '@/lib/utils';
 
-/**
- * Ce que l'appel a donné : les TROIS issues du mobile, et rien d'autre.
- * `WRONG_NUMBER` reste lisible sur les appels déjà consignés — il n'est
- * simplement plus proposé à la saisie ; corriger un numéro faux se fait sur la
- * fiche, ce n'est pas le résultat d'un appel.
- */
-type Resultat = 'JOIGNABLE' | 'RAPPEL' | 'INJOIGNABLE';
+/** L'appel a abouti, ou non. Ce qu'il a donné se dit ensuite, au statut. */
+type Resultat = 'JOIGNABLE' | 'INJOIGNABLE';
 
 const RESULTATS: readonly { valeur: Resultat; label: string }[] = [
   { valeur: 'JOIGNABLE', label: 'Joignable' },
-  { valeur: 'RAPPEL', label: 'À rappeler' },
   { valeur: 'INJOIGNABLE', label: 'Injoignable' },
 ];
+
+const OUTCOME_PAR_EFFET: Record<StatutQualificationEffect, RepAnswer['outcome']> = {
+  REACHED: 'REACHED',
+  REFUSED: 'REFUSED',
+  SCHEDULE_CALLBACK: 'CALLBACK',
+  UNREACHABLE: 'UNREACHABLE',
+  WRONG_NUMBER: 'WRONG_NUMBER',
+};
+
+/** Le serveur dérive la même issue et refuse celle qui le contredit. */
+export const outcomeDuStatut = (effect: StatutQualificationEffect): RepAnswer['outcome'] =>
+  OUTCOME_PAR_EFFET[effect];
 
 const KEYBOARD_MAP: readonly (readonly [string, string])[] = [
   ['C', 'Copier le numéro'],
@@ -471,9 +490,44 @@ function QuestionSuggestion({
   );
 }
 
+/** Le vocabulaire du référentiel, borné à la branche que le résultat ouvre. */
+function ChoixStatut({
+  statuts,
+  value,
+  onChange,
+}: {
+  statuts: readonly StatutQualification[];
+  value: string | null;
+  onChange: (valeur: string | null) => void;
+}) {
+  return (
+    <div className={cn('flex max-w-80 flex-col gap-1.5', REVELE)}>
+      <label htmlFor="rep-statut" className="text-[1rem] font-[600]">
+        Statut de qualification
+      </label>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger id="rep-statut">
+          <SelectValue placeholder="Choisir un statut" />
+        </SelectTrigger>
+        <SelectContent>
+          {statuts.map((statut) => (
+            <SelectItem key={statut.id} value={statut.id}>
+              {statut.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 interface EtapeQuestionsProps {
   resultat: Resultat | null;
   onResultat: (valeur: Resultat) => void;
+  statuts: readonly StatutQualification[];
+  statutId: string | null;
+  onStatut: (valeur: string | null) => void;
+  exigeRappel: boolean;
   joignable: boolean;
   proposeQuelquUn: boolean;
   questionsJoignable: QuestionsJoignableProps;
@@ -497,17 +551,17 @@ function EtapeQuestions(props: EtapeQuestionsProps) {
         />
       </Question>
 
+      {props.resultat === null ? null : (
+        <ChoixStatut statuts={props.statuts} value={props.statutId} onChange={props.onStatut} />
+      )}
+
       {props.joignable ? <QuestionsJoignable {...props.questionsJoignable} /> : null}
 
       {props.proposeQuelquUn ? <QuestionSuggestion {...props.suggestion} /> : null}
 
-      {props.resultat === 'RAPPEL' || props.joignable ? (
+      {props.exigeRappel || props.joignable ? (
         <Question
-          titre={
-            props.resultat === 'RAPPEL'
-              ? 'Quand rappeler ?'
-              : 'Le rappeler plus tard ? (facultatif)'
-          }
+          titre={props.exigeRappel ? 'Quand rappeler ?' : 'Le rappeler plus tard ? (facultatif)'}
           anime
         >
           <ChoixEcheance
@@ -553,6 +607,7 @@ function EtapeQuestions(props: EtapeQuestionsProps) {
 interface RecapAppelProps {
   representant: ScriptedRepresentant;
   resultat: Resultat | null;
+  statutLabel: string | null;
   joignable: boolean;
   etablissementConfirme: boolean | null;
   nouvelEtablissement: string;
@@ -575,6 +630,7 @@ function RecapAppel(props: RecapAppelProps) {
         intitule="Résultat"
         valeur={RESULTATS.find((item) => item.valeur === props.resultat)?.label ?? null}
       />
+      <Recap intitule="Statut" valeur={props.statutLabel} />
       {props.joignable ? (
         <>
           <Recap
@@ -690,6 +746,7 @@ function syndicatsDe(
 
 interface EtatManque {
   resultat: Resultat | null;
+  statut: StatutQualification | null;
   joignable: boolean;
   etablissementConfirme: boolean | null;
   nouvelEtablissement: string;
@@ -707,6 +764,7 @@ interface EtatManque {
 /** Ce qui empêche encore d'enregistrer, en une phrase, ou rien. */
 function manqueDe(etat: EtatManque): string | null {
   if (etat.resultat === null) return 'Choisissez d’abord le résultat';
+  if (etat.statut === null) return 'Choisissez un statut de qualification';
   if (etat.joignable) {
     const script = manqueJoignable({
       etablissementConfirme: etat.etablissementConfirme,
@@ -719,7 +777,7 @@ function manqueDe(etat: EtatManque): string | null {
     });
     if (script !== null) return script;
   }
-  if (etat.resultat === 'RAPPEL' && etat.rappelAt === null) return 'Choisissez quand rappeler';
+  if (etat.statut.requiresCallback && etat.rappelAt === null) return 'Choisissez quand rappeler';
   // Le serveur jette une suggestion sans numéro : plutôt que d'effacer en
   // silence ce qui vient d'être dicté, l'enregistrement attend le numéro.
   if (etat.proposeQuelquUn && etat.suggestionCommencee && digitsOf(etat.sugPhone) < 9) {
@@ -730,6 +788,7 @@ function manqueDe(etat: EtatManque): string | null {
 
 interface EtatReponse {
   resultat: Resultat;
+  statut: StatutQualification;
   joignable: boolean;
   chuesOui: boolean;
   etablissementConfirme: boolean | null;
@@ -746,12 +805,6 @@ interface EtatReponse {
   sugName: string;
   sugNote: string;
   commentaire: string;
-}
-
-function outcomeDe(resultat: Resultat, chuesOui: boolean): RepAnswer['outcome'] {
-  if (resultat === 'JOIGNABLE') return chuesOui ? 'REACHED' : 'REFUSED';
-  if (resultat === 'RAPPEL') return 'CALLBACK';
-  return 'UNREACHABLE';
 }
 
 function champsJoignable(etat: EtatReponse): Partial<RepAnswer> {
@@ -785,7 +838,8 @@ function champsSuggestion(etat: EtatReponse): Partial<RepAnswer> {
 /** Chaque champ voyage seul : ce que la question n'a pas posé ne part pas. */
 function reponseDe(etat: EtatReponse): RepAnswer {
   return {
-    outcome: outcomeDe(etat.resultat, etat.chuesOui),
+    outcome: outcomeDuStatut(etat.statut.effect),
+    statutQualificationId: etat.statut.id,
     ...(etat.resultat === 'JOIGNABLE'
       ? { relationStatus: etat.chuesOui ? ('AMBASSADEUR' as const) : ('REFUS' as const) }
       : {}),
@@ -812,6 +866,7 @@ function Qualification({
 }) {
   const [etape, setEtape] = useState<1 | 2>(1);
   const [resultat, setResultat] = useState<Resultat | null>(null);
+  const [statutId, setStatutId] = useState<string | null>(null);
   const [etablissementConfirme, setEtablissementConfirme] = useState<boolean | null>(null);
   const [nouvelEtablissement, setNouvelEtablissement] = useState('');
   const [contacte, setContacte] = useState<boolean | null>(null);
@@ -840,6 +895,12 @@ function Qualification({
   });
   const { options: syndicatOptions, name: syndicatName } = syndicatsDe(reference.data, syndicatId);
 
+  const referentielStatuts = useQuery({
+    queryKey: queryKeys.statutsQualification,
+    queryFn: () => fetchStatutsQualification(),
+    staleTime: 5 * 60_000,
+  });
+
   const send = useMutation({
     mutationFn: (answer: RepAnswer) => pushRepCallAttempt(buildRepAttempt(representant.id, answer)),
     onSuccess: () => {
@@ -852,6 +913,8 @@ function Qualification({
   });
 
   const joignable = resultat === 'JOIGNABLE';
+  const statuts = statutsDeLaBranche(referentielStatuts.data ?? [], joignable);
+  const statut = statuts.find((ligne) => ligne.id === statutId) ?? null;
   /** Une personne proposée n'a de sens que si l'appelé a dit non. */
   const proposeQuelquUn = joignable && ambassadeur === false;
   const suggestionCommencee =
@@ -859,6 +922,7 @@ function Qualification({
 
   const manque = manqueDe({
     resultat,
+    statut,
     joignable,
     etablissementConfirme,
     nouvelEtablissement,
@@ -874,10 +938,11 @@ function Qualification({
   });
 
   const enregistrer = (): void => {
-    if (manque !== null || resultat === null || send.isPending) return;
+    if (manque !== null || resultat === null || statut === null || send.isPending) return;
     send.mutate(
       reponseDe({
         resultat,
+        statut,
         joignable,
         chuesOui: joignable && ambassadeur === true,
         etablissementConfirme,
@@ -900,6 +965,8 @@ function Qualification({
 
   const choisirResultat = (valeur: Resultat): void => {
     setResultat(valeur);
+    // Chaque branche a ses propres statuts : celui d'en face ne vaut plus.
+    setStatutId(null);
     if (valeur !== 'JOIGNABLE') {
       setEtablissementConfirme(null);
       setContacte(null);
@@ -969,6 +1036,10 @@ function Qualification({
         <EtapeQuestions
           resultat={resultat}
           onResultat={choisirResultat}
+          statuts={statuts}
+          statutId={statutId}
+          onStatut={setStatutId}
+          exigeRappel={statut?.requiresCallback === true}
           joignable={joignable}
           proposeQuelquUn={proposeQuelquUn}
           questionsJoignable={{
@@ -1004,6 +1075,7 @@ function Qualification({
           <RecapAppel
             representant={representant}
             resultat={resultat}
+            statutLabel={statut?.label ?? null}
             joignable={joignable}
             etablissementConfirme={etablissementConfirme}
             nouvelEtablissement={nouvelEtablissement}

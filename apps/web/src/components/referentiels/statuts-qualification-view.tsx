@@ -261,11 +261,13 @@ function FormulaireStatut({
   // reconfigure pas. Le serveur refuse de toute façon.
   const regleFigee = statut?.isSystem === true;
 
-  const form = useForm<Draft>({ defaultValues: EMPTY });
-  const effect = form.watch('effect');
+  const { register, handleSubmit, reset, watch, setValue, formState } = useForm<Draft>({
+    defaultValues: EMPTY,
+  });
 
   useEffect(() => {
-    form.reset(
+    if (!open) return;
+    reset(
       statut === null
         ? EMPTY
         : {
@@ -276,7 +278,10 @@ function FormulaireStatut({
             sortOrder: statut.sortOrder,
           },
     );
-  }, [statut, form]);
+  }, [open, statut, reset]);
+
+  // oxlint-disable-next-line react/incompatible-library -- faux positif react-hook-form
+  const effect = watch('effect');
 
   const save = useMutation({
     mutationFn: (values: Draft) =>
@@ -316,15 +321,15 @@ function FormulaireStatut({
 
         <form
           className="flex flex-col gap-4"
-          onSubmit={form.handleSubmit((values) => {
+          onSubmit={handleSubmit((values) => {
             save.mutate(values);
           })}
         >
-          <Field label="Libellé" required error={form.formState.errors.label?.message}>
+          <Field label="Libellé" required error={formState.errors.label?.message}>
             {(props) => (
               <Input
                 {...props}
-                {...form.register('label', {
+                {...register('label', {
                   required: 'Le libellé est obligatoire.',
                   maxLength: { value: 120, message: 'Libellé trop long.' },
                 })}
@@ -336,13 +341,13 @@ function FormulaireStatut({
             label="Code"
             required={!modification}
             description="Lettres, chiffres et soulignés. Immuable."
-            error={form.formState.errors.code?.message}
+            error={formState.errors.code?.message}
           >
             {(props) => (
               <Input
                 {...props}
                 disabled={modification}
-                {...form.register('code', {
+                {...register('code', {
                   required: modification ? false : 'Le code est obligatoire.',
                   pattern: {
                     value: /^[A-Za-z][A-Za-z0-9_]*$/u,
@@ -358,8 +363,8 @@ function FormulaireStatut({
               <Select
                 value={effect}
                 onValueChange={(value) => {
-                  form.setValue('effect', value as StatutQualificationEffect);
-                  if (value !== 'SCHEDULE_CALLBACK') form.setValue('requiresCallback', false);
+                  setValue('effect', value as StatutQualificationEffect);
+                  if (value !== 'SCHEDULE_CALLBACK') setValue('requiresCallback', false);
                 }}
                 disabled={modification}
               >
@@ -383,7 +388,7 @@ function FormulaireStatut({
             <input
               type="checkbox"
               disabled={regleFigee || effect !== 'SCHEDULE_CALLBACK'}
-              {...form.register('requiresCallback')}
+              {...register('requiresCallback')}
             />
             Exige la date du rappel
           </label>
@@ -395,7 +400,7 @@ function FormulaireStatut({
                 type="number"
                 min={0}
                 max={9999}
-                {...form.register('sortOrder', { valueAsNumber: true })}
+                {...register('sortOrder', { valueAsNumber: true })}
               />
             )}
           </Field>
