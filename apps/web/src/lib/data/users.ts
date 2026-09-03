@@ -70,6 +70,17 @@ export async function resetUserPassword(
   );
 }
 
-export async function deleteUser(id: string, client: ApiClient = getApiClient()): Promise<void> {
-  unwrap(await client.DELETE('/api/v1/users/{id}', { params: { path: { id } } }));
+export async function deleteUser(
+  id: string,
+  handoverToId?: string,
+  client: ApiClient = getApiClient(),
+): Promise<void> {
+  unwrap(
+    await client.DELETE('/api/v1/users/{id}', {
+      params: {
+        path: { id },
+        query: handoverToId === undefined ? {} : { handoverToId },
+      },
+    }),
+  );
 }

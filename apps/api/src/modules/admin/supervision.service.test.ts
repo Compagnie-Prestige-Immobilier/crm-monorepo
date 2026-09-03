@@ -3,6 +3,7 @@ import { Role } from '@crm/database';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
+import { WorkShiftsService } from '../analytics/work-shifts.service.js';
 import { SupervisionService } from './supervision.service.js';
 
 interface HeartbeatRow {
@@ -13,11 +14,20 @@ interface HeartbeatRow {
   appVersion: string | null;
 }
 
+interface SlotRow {
+  userId: string;
+  slot: Date;
+  firstSeenAt: Date;
+  lastSeenAt: Date;
+  activeSeconds: number;
+}
+
 const prismaWith = (
   findMany: ReturnType<typeof vi.fn>,
   heartbeats: HeartbeatRow[] = [],
   queryRaw: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue([]),
   groupBy: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue([]),
+  slots: SlotRow[] = [],
 ): { service: SupervisionService; findMany: typeof findMany } => {
   const prisma = {
     user: { findMany },
@@ -27,13 +37,21 @@ const prismaWith = (
     repCallAttempt: { groupBy },
     bankCaseTransition: { groupBy },
     agentHeartbeat: { findMany: vi.fn().mockResolvedValue(heartbeats) },
-    agentActivityDay: { findMany: vi.fn().mockResolvedValue([]) },
+    agentActivitySlot: { findMany: vi.fn().mockResolvedValue(slots) },
+    appSetting: { findUnique: vi.fn().mockResolvedValue(null) },
     $queryRaw: queryRaw,
   };
-  return {
-    service: new SupervisionService(prisma as unknown as PrismaService),
-    findMany,
-  };
+  const service = new SupervisionService(
+    prisma as unknown as PrismaService,
+    new WorkShiftsService(prisma as unknown as PrismaService),
+  );
+  return { service, findMany };
+};
+
+/** Créneaux par défaut, ceux que `WorkShiftsService` rend sans réglage en base. */
+const slotAt = (hour: number, activeSeconds: number): SlotRow => {
+  const slot = new Date(Date.UTC(2026, 8, 3, hour));
+  return { userId: 'usr-1', slot, firstSeenAt: slot, lastSeenAt: slot, activeSeconds };
 };
 
 const teleconseiller = {
@@ -193,14 +211,61 @@ describe('le rendement du jour', () => {
 
       await service.overview();
 
-      const dayWindow = queryRaw.mock.calls[0]?.[1] as { values: Date[] };
-      expect(dayWindow.values.map((value) => value.toISOString())).toEqual([
+      const dates = (queryRaw.mock.calls[0] as unknown[])
+        .flatMap((value) => {
+          const fragment = (value as { values?: unknown }).values;
+          return Array.isArray(fragment) ? (fragment as unknown[]) : [value];
+        })
+        .filter((value): value is Date => value instanceof Date);
+
+      expect([...new Set(dates.map((date) => date.toISOString()))]).toEqual([
         '2026-09-03T00:00:00.000Z',
         '2026-09-04T00:00:00.000Z',
       ]);
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('rend le dernier appel, les joints, les qualifiés, les reprises et le temps mort', async () => {
+    const firstCallAt = new Date('2026-09-03T08:12:00.000Z');
+    const lastCallAt = new Date('2026-09-03T17:40:00.000Z');
+    const { service } = prismaWith(
+      vi.fn().mockResolvedValue([teleconseiller, autreTeleconseiller]),
+      [],
+      vi.fn().mockResolvedValue([
+        {
+          userId: 'usr-1',
+          calls: 14,
+          firstCallAt,
+          lastCallAt,
+          reachedToday: 9,
+          qualifiedToday: 4,
+          repeatCalls: 3,
+          deadSeconds: 2400,
+          deadGaps: 2,
+          medianGapSeconds: 420,
+          medianUploadLagSeconds: 7320,
+        },
+      ]),
+    );
+
+    const [awa, bineta] = (await service.overview()).teleconseillers;
+
+    expect(awa?.lastCallAt).toBe(lastCallAt.toISOString());
+    expect(awa?.reachedToday).toBe(9);
+    expect(awa?.qualifiedToday).toBe(4);
+    expect(awa?.repeatCalls).toBe(3);
+    expect(awa?.deadSeconds).toBe(2400);
+    expect(awa?.deadGaps).toBe(2);
+
+    // Aucune tentative : des zéros et des null, jamais NaN.
+    expect(bineta?.lastCallAt).toBeNull();
+    expect(bineta?.reachedToday).toBe(0);
+    expect(bineta?.qualifiedToday).toBe(0);
+    expect(bineta?.repeatCalls).toBe(0);
+    expect(bineta?.deadSeconds).toBe(0);
+    expect(bineta?.deadGaps).toBe(0);
   });
 
   it('une requête de rendement en échec laisse la présence lisible', async () => {
@@ -227,5 +292,74 @@ describe('le rendement du jour', () => {
     expect(row?.medianGapSeconds).toBeNull();
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
+  });
+});
+
+describe('la présence découpée à l’heure', () => {
+  it('somme les tranches du jour, et ne retient dans les créneaux que celles qui y tombent', async () => {
+    const { service } = prismaWith(
+      vi.fn().mockResolvedValue([teleconseiller]),
+      [],
+      vi.fn().mockResolvedValue([]),
+      vi.fn().mockResolvedValue([]),
+      // 8 h précède le créneau du matin, 14 h tombe dans la pause.
+      [slotAt(8, 600), slotAt(9, 3000), slotAt(14, 1200), slotAt(15, 900)],
+    );
+
+    const [row] = (await service.overview()).teleconseillers;
+
+    expect(row?.activeSecondsToday).toBe(5700);
+    expect(row?.activeSecondsInShifts).toBe(3900);
+    expect(row?.firstSeenToday).toBe(new Date(Date.UTC(2026, 8, 3, 8)).toISOString());
+  });
+
+  it('un compte sans aucune tranche rend zéro, jamais NaN', async () => {
+    const { service } = prismaWith(vi.fn().mockResolvedValue([teleconseiller]));
+
+    const [row] = (await service.overview()).teleconseillers;
+
+    expect(row?.activeSecondsToday).toBe(0);
+    expect(row?.activeSecondsInShifts).toBe(0);
+    expect(row?.firstSeenToday).toBeNull();
+  });
+});
+
+describe('le temps de créneau déjà écoulé', () => {
+  const aLHeureDite = async (iso: string): Promise<number> => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date(iso));
+      const { service } = prismaWith(vi.fn().mockResolvedValue([]));
+      return (await service.overview()).shiftSecondsElapsed;
+    } finally {
+      vi.useRealTimers();
+    }
+  };
+
+  it('vaut zéro avant l’ouverture', async () => {
+    expect(await aLHeureDite('2026-09-03T07:30:00.000Z')).toBe(0);
+  });
+
+  it('compte l’heure entamée du matin', async () => {
+    expect(await aLHeureDite('2026-09-03T10:00:00.000Z')).toBe(3600);
+  });
+
+  it('n’avance plus pendant la pause', async () => {
+    expect(await aLHeureDite('2026-09-03T14:30:00.000Z')).toBe(18000);
+  });
+
+  it('plafonne à la durée des deux créneaux après la fermeture', async () => {
+    expect(await aLHeureDite('2026-09-03T21:00:00.000Z')).toBe(28800);
+  });
+
+  it('rend les créneaux qui ont servi au calcul', async () => {
+    const { service } = prismaWith(vi.fn().mockResolvedValue([]));
+
+    const { shifts } = await service.overview();
+
+    expect(shifts.map((shift) => [shift.key, shift.start, shift.end])).toEqual([
+      ['morning', '09:00', '14:00'],
+      ['afternoon', '15:00', '18:00'],
+    ]);
   });
 });

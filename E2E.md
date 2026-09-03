@@ -1,9 +1,7 @@
 # Plan de tests navigateur du panel web CPI CRM
 
-Document unique d'exécution. Il fusionne les trois plans de travail
-(`E2E-accueil.md`, `E2E-chues.md`, `E2E-admin.md`) en une seule source de
-vérité, destinée à des dizaines d'agents indépendants qui écriront chacun un
-fichier de spec Playwright sans se voir.
+Document unique d'exécution et source de vérité des parcours Playwright du
+panel web.
 
 Racine du dépôt : `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo`.
 Pile visée : API NestJS sur `http://localhost:3001`, web Next sur
@@ -6419,7 +6417,6 @@ ADM-PAR-05, GP-20, GP-30) ne sont pas absorbés par le balayage ROL-17 à ROL-21
 le balayage prouve le refus et l'absence de chargement de données, ces scénarios
 prouvent la phrase exacte qui nomme l'écran. Le recouvrement est signalé sur
 chaque entrée.
-
 
 
 

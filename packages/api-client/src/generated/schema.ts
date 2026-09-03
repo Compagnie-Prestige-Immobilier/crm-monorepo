@@ -6086,6 +6086,23 @@ export interface components {
     };
     /** @enum {string} */
     PresenceState: 'ONLINE' | 'RECENT' | 'AWAY';
+    ScorePartDto: {
+      /** @enum {string} */
+      key: 'assiduite' | 'regularite' | 'rythme' | 'contact' | 'qualification' | 'efficience';
+      label: string;
+      /** @description Atteinte de la cible, de 0 à 1, plafonnée à 1. */
+      ratio: number;
+      /** @description Part de la note portée par ce critère. */
+      weight: number;
+    };
+    ScoreDto: {
+      /** @description Note de 0 à 100 sur la journée en cours. `null` quand rien ne peut être jugé : `reason` dit alors pourquoi, et l’écran affiche le motif au lieu d’un zéro. */
+      value: number | null;
+      /** @enum {string|null} */
+      reason: 'journee_non_commencee' | 'presence_non_mesuree' | 'aucun_appel' | null;
+      /** @description Le détail qui compose la note. Vide quand `value` est nulle. */
+      parts: components['schemas']['ScorePartDto'][];
+    };
     SupervisedUserDto: {
       /** Format: uuid */
       id: string;
@@ -6127,6 +6144,8 @@ export interface components {
       lastWriteAt: string | null;
       /** @description Temps actif observé aujourd’hui, en secondes. Les interruptions de plus de 90 secondes ne sont pas comptées. */
       activeSecondsToday: number;
+      /** @description Part du temps actif tombée dans les créneaux de travail, en secondes. La présence est découpée à l’heure : une tranche compte dès que son heure de début appartient à un créneau, donc un créneau réglé à une demi-heure compte l’heure entière. */
+      activeSecondsInShifts: number;
       /** Format: date-time */
       firstSeenToday: string | null;
       /** @description Tentatives d’appel du jour, prospects et représentants confondus, comptées sur l’heure de l’appel et non sur celle de la remontée. */
@@ -6137,6 +6156,22 @@ export interface components {
       medianUploadLagSeconds: number | null;
       /** Format: date-time */
       firstCallAt: string | null;
+      /**
+       * Format: date-time
+       * @description Dernière tentative du jour. Avec `firstCallAt`, donne l’amplitude de la journée.
+       */
+      lastCallAt: string | null;
+      /** @description Appels du jour ayant obtenu une réponse : prospect joignable (toute issue hors numéro injoignable ou faux numéro) et représentant qui a décroché, qu’il dise oui ou non. */
+      reachedToday: number;
+      /** @description Appels du jour ayant abouti : méthode obtenue côté prospect, représentant qualifié côté représentant. Un représentant appelé plusieurs fois ne compte qu’une fois, sur sa dernière réponse du jour. */
+      qualifiedToday: number;
+      /** @description Appels du jour au-delà du premier sur une même fiche. Zéro quand chaque fiche n’a été appelée qu’une fois. */
+      repeatCalls: number;
+      /** @description Temps mort, en secondes : somme des écarts de plus de quinze minutes entre deux appels consécutifs tombant dans le MÊME créneau. La pause entre les deux créneaux n’en est pas un. */
+      deadSeconds: number;
+      /** @description Nombre de trous comptés dans `deadSeconds`. */
+      deadGaps: number;
+      score: components['schemas']['ScoreDto'];
     };
     PresenceCountsDto: {
       online: number;
@@ -6154,6 +6189,10 @@ export interface components {
        * @default 20
        */
       onlineWindowMinutes: number;
+      /** @description Secondes de créneau déjà écoulées à `observedAt`, les deux créneaux cumulés. Zéro avant l’ouverture, plafonné à leur durée totale après. */
+      shiftSecondsElapsed: number;
+      /** @description Créneaux servant à ce calcul, pour les nommer sans un second appel. */
+      shifts: components['schemas']['WorkShiftDto'][];
       teleconseillers: components['schemas']['SupervisedUserDto'][];
       finances: components['schemas']['SupervisedUserDto'][];
       counts: components['schemas']['PresenceCountsDto'];

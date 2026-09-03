@@ -5,6 +5,7 @@
 // ignore_for_file: unused_element
 import 'package:crm_api_client/src/model/presence_counts_dto.dart';
 import 'package:crm_api_client/src/model/supervised_user_dto.dart';
+import 'package:crm_api_client/src/model/work_shift_dto.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/src/equatable_utils.dart';
@@ -24,6 +25,10 @@ class SupervisionDto {
     required this.observedAt,
 
     this.onlineWindowMinutes = 20,
+
+    required this.shiftSecondsElapsed,
+
+    required this.shifts,
 
     required this.teleconseillers,
 
@@ -45,6 +50,14 @@ class SupervisionDto {
   )
   final num onlineWindowMinutes;
 
+  /// Secondes de créneau déjà écoulées à `observedAt`, les deux créneaux cumulés. Zéro avant l’ouverture, plafonné à leur durée totale après.
+  @JsonKey(name: r'shiftSecondsElapsed', required: true, includeIfNull: false)
+  final num shiftSecondsElapsed;
+
+  /// Créneaux servant à ce calcul, pour les nommer sans un second appel.
+  @JsonKey(name: r'shifts', required: true, includeIfNull: false)
+  final List<WorkShiftDto> shifts;
+
   @JsonKey(name: r'teleconseillers', required: true, includeIfNull: false)
   final List<SupervisedUserDto> teleconseillers;
 
@@ -62,6 +75,8 @@ class SupervisionDto {
               [
                 observedAt,
                 onlineWindowMinutes,
+                shiftSecondsElapsed,
+                shifts,
                 teleconseillers,
                 finances,
                 counts,
@@ -69,6 +84,8 @@ class SupervisionDto {
               [
                 other.observedAt,
                 other.onlineWindowMinutes,
+                other.shiftSecondsElapsed,
+                other.shifts,
                 other.teleconseillers,
                 other.finances,
                 other.counts,
@@ -82,6 +99,8 @@ class SupervisionDto {
       mapPropsToHashCode([
         observedAt,
         onlineWindowMinutes,
+        shiftSecondsElapsed,
+        shifts,
         teleconseillers,
         finances,
         counts,

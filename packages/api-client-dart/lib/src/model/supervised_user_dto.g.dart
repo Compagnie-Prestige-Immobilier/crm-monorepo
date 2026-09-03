@@ -41,6 +41,8 @@ abstract class _$SupervisedUserDtoCWProxy {
 
   SupervisedUserDto activeSecondsToday(num activeSecondsToday);
 
+  SupervisedUserDto activeSecondsInShifts(num activeSecondsInShifts);
+
   SupervisedUserDto firstSeenToday(DateTime? firstSeenToday);
 
   SupervisedUserDto callsToday(num callsToday);
@@ -50,6 +52,20 @@ abstract class _$SupervisedUserDtoCWProxy {
   SupervisedUserDto medianUploadLagSeconds(num? medianUploadLagSeconds);
 
   SupervisedUserDto firstCallAt(DateTime? firstCallAt);
+
+  SupervisedUserDto lastCallAt(DateTime? lastCallAt);
+
+  SupervisedUserDto reachedToday(num reachedToday);
+
+  SupervisedUserDto qualifiedToday(num qualifiedToday);
+
+  SupervisedUserDto repeatCalls(num repeatCalls);
+
+  SupervisedUserDto deadSeconds(num deadSeconds);
+
+  SupervisedUserDto deadGaps(num deadGaps);
+
+  SupervisedUserDto score(ScoreDto score);
 
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SupervisedUserDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
@@ -75,11 +91,19 @@ abstract class _$SupervisedUserDtoCWProxy {
     String? appVersion,
     DateTime? lastWriteAt,
     num activeSecondsToday,
+    num activeSecondsInShifts,
     DateTime? firstSeenToday,
     num callsToday,
     num? medianGapSeconds,
     num? medianUploadLagSeconds,
     DateTime? firstCallAt,
+    DateTime? lastCallAt,
+    num reachedToday,
+    num qualifiedToday,
+    num repeatCalls,
+    num deadSeconds,
+    num deadGaps,
+    ScoreDto score,
   });
 }
 
@@ -151,6 +175,10 @@ class _$SupervisedUserDtoCWProxyImpl implements _$SupervisedUserDtoCWProxy {
       this(activeSecondsToday: activeSecondsToday);
 
   @override
+  SupervisedUserDto activeSecondsInShifts(num activeSecondsInShifts) =>
+      this(activeSecondsInShifts: activeSecondsInShifts);
+
+  @override
   SupervisedUserDto firstSeenToday(DateTime? firstSeenToday) =>
       this(firstSeenToday: firstSeenToday);
 
@@ -168,6 +196,32 @@ class _$SupervisedUserDtoCWProxyImpl implements _$SupervisedUserDtoCWProxy {
   @override
   SupervisedUserDto firstCallAt(DateTime? firstCallAt) =>
       this(firstCallAt: firstCallAt);
+
+  @override
+  SupervisedUserDto lastCallAt(DateTime? lastCallAt) =>
+      this(lastCallAt: lastCallAt);
+
+  @override
+  SupervisedUserDto reachedToday(num reachedToday) =>
+      this(reachedToday: reachedToday);
+
+  @override
+  SupervisedUserDto qualifiedToday(num qualifiedToday) =>
+      this(qualifiedToday: qualifiedToday);
+
+  @override
+  SupervisedUserDto repeatCalls(num repeatCalls) =>
+      this(repeatCalls: repeatCalls);
+
+  @override
+  SupervisedUserDto deadSeconds(num deadSeconds) =>
+      this(deadSeconds: deadSeconds);
+
+  @override
+  SupervisedUserDto deadGaps(num deadGaps) => this(deadGaps: deadGaps);
+
+  @override
+  SupervisedUserDto score(ScoreDto score) => this(score: score);
 
   @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SupervisedUserDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
@@ -194,11 +248,19 @@ class _$SupervisedUserDtoCWProxyImpl implements _$SupervisedUserDtoCWProxy {
     Object? appVersion = const $CopyWithPlaceholder(),
     Object? lastWriteAt = const $CopyWithPlaceholder(),
     Object? activeSecondsToday = const $CopyWithPlaceholder(),
+    Object? activeSecondsInShifts = const $CopyWithPlaceholder(),
     Object? firstSeenToday = const $CopyWithPlaceholder(),
     Object? callsToday = const $CopyWithPlaceholder(),
     Object? medianGapSeconds = const $CopyWithPlaceholder(),
     Object? medianUploadLagSeconds = const $CopyWithPlaceholder(),
     Object? firstCallAt = const $CopyWithPlaceholder(),
+    Object? lastCallAt = const $CopyWithPlaceholder(),
+    Object? reachedToday = const $CopyWithPlaceholder(),
+    Object? qualifiedToday = const $CopyWithPlaceholder(),
+    Object? repeatCalls = const $CopyWithPlaceholder(),
+    Object? deadSeconds = const $CopyWithPlaceholder(),
+    Object? deadGaps = const $CopyWithPlaceholder(),
+    Object? score = const $CopyWithPlaceholder(),
   }) {
     return SupervisedUserDto(
       id: id == const $CopyWithPlaceholder()
@@ -269,6 +331,11 @@ class _$SupervisedUserDtoCWProxyImpl implements _$SupervisedUserDtoCWProxy {
           ? _value.activeSecondsToday
           // ignore: cast_nullable_to_non_nullable
           : activeSecondsToday as num,
+      activeSecondsInShifts:
+          activeSecondsInShifts == const $CopyWithPlaceholder()
+          ? _value.activeSecondsInShifts
+          // ignore: cast_nullable_to_non_nullable
+          : activeSecondsInShifts as num,
       firstSeenToday: firstSeenToday == const $CopyWithPlaceholder()
           ? _value.firstSeenToday
           // ignore: cast_nullable_to_non_nullable
@@ -290,6 +357,34 @@ class _$SupervisedUserDtoCWProxyImpl implements _$SupervisedUserDtoCWProxy {
           ? _value.firstCallAt
           // ignore: cast_nullable_to_non_nullable
           : firstCallAt as DateTime?,
+      lastCallAt: lastCallAt == const $CopyWithPlaceholder()
+          ? _value.lastCallAt
+          // ignore: cast_nullable_to_non_nullable
+          : lastCallAt as DateTime?,
+      reachedToday: reachedToday == const $CopyWithPlaceholder()
+          ? _value.reachedToday
+          // ignore: cast_nullable_to_non_nullable
+          : reachedToday as num,
+      qualifiedToday: qualifiedToday == const $CopyWithPlaceholder()
+          ? _value.qualifiedToday
+          // ignore: cast_nullable_to_non_nullable
+          : qualifiedToday as num,
+      repeatCalls: repeatCalls == const $CopyWithPlaceholder()
+          ? _value.repeatCalls
+          // ignore: cast_nullable_to_non_nullable
+          : repeatCalls as num,
+      deadSeconds: deadSeconds == const $CopyWithPlaceholder()
+          ? _value.deadSeconds
+          // ignore: cast_nullable_to_non_nullable
+          : deadSeconds as num,
+      deadGaps: deadGaps == const $CopyWithPlaceholder()
+          ? _value.deadGaps
+          // ignore: cast_nullable_to_non_nullable
+          : deadGaps as num,
+      score: score == const $CopyWithPlaceholder()
+          ? _value.score
+          // ignore: cast_nullable_to_non_nullable
+          : score as ScoreDto,
     );
   }
 }
@@ -327,11 +422,19 @@ SupervisedUserDto _$SupervisedUserDtoFromJson(Map<String, dynamic> json) =>
           'appVersion',
           'lastWriteAt',
           'activeSecondsToday',
+          'activeSecondsInShifts',
           'firstSeenToday',
           'callsToday',
           'medianGapSeconds',
           'medianUploadLagSeconds',
           'firstCallAt',
+          'lastCallAt',
+          'reachedToday',
+          'qualifiedToday',
+          'repeatCalls',
+          'deadSeconds',
+          'deadGaps',
+          'score',
         ],
       );
       final val = SupervisedUserDto(
@@ -384,6 +487,10 @@ SupervisedUserDto _$SupervisedUserDtoFromJson(Map<String, dynamic> json) =>
           'activeSecondsToday',
           (v) => v as num,
         ),
+        activeSecondsInShifts: $checkedConvert(
+          'activeSecondsInShifts',
+          (v) => v as num,
+        ),
         firstSeenToday: $checkedConvert(
           'firstSeenToday',
           (v) => v == null ? null : DateTime.parse(v as String),
@@ -397,6 +504,19 @@ SupervisedUserDto _$SupervisedUserDtoFromJson(Map<String, dynamic> json) =>
         firstCallAt: $checkedConvert(
           'firstCallAt',
           (v) => v == null ? null : DateTime.parse(v as String),
+        ),
+        lastCallAt: $checkedConvert(
+          'lastCallAt',
+          (v) => v == null ? null : DateTime.parse(v as String),
+        ),
+        reachedToday: $checkedConvert('reachedToday', (v) => v as num),
+        qualifiedToday: $checkedConvert('qualifiedToday', (v) => v as num),
+        repeatCalls: $checkedConvert('repeatCalls', (v) => v as num),
+        deadSeconds: $checkedConvert('deadSeconds', (v) => v as num),
+        deadGaps: $checkedConvert('deadGaps', (v) => v as num),
+        score: $checkedConvert(
+          'score',
+          (v) => ScoreDto.fromJson(v as Map<String, dynamic>),
         ),
       );
       return val;
@@ -421,11 +541,19 @@ Map<String, dynamic> _$SupervisedUserDtoToJson(SupervisedUserDto instance) =>
       'appVersion': instance.appVersion,
       'lastWriteAt': instance.lastWriteAt?.toIso8601String(),
       'activeSecondsToday': instance.activeSecondsToday,
+      'activeSecondsInShifts': instance.activeSecondsInShifts,
       'firstSeenToday': instance.firstSeenToday?.toIso8601String(),
       'callsToday': instance.callsToday,
       'medianGapSeconds': instance.medianGapSeconds,
       'medianUploadLagSeconds': instance.medianUploadLagSeconds,
       'firstCallAt': instance.firstCallAt?.toIso8601String(),
+      'lastCallAt': instance.lastCallAt?.toIso8601String(),
+      'reachedToday': instance.reachedToday,
+      'qualifiedToday': instance.qualifiedToday,
+      'repeatCalls': instance.repeatCalls,
+      'deadSeconds': instance.deadSeconds,
+      'deadGaps': instance.deadGaps,
+      'score': instance.score.toJson(),
     };
 
 const _$RoleEnumMap = {
