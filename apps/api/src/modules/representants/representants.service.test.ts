@@ -279,6 +279,33 @@ describe('périmètre par campagne', () => {
     expect(whereOf()).not.toHaveProperty('AND');
   });
 
+  it('`mesFiches` borne le SUPERVISEUR à ce qu’il doit appeler', async () => {
+    const superviseur = { ...COMMERCIAL, id: 'sup-1', role: Role.SUPERVISEUR };
+    await service.list(superviseur, { mesFiches: true });
+
+    expect(whereOf().AND).toEqual([
+      { OR: [{ createdById: 'sup-1' }, { lotItems: { some: { assigneeId: 'sup-1' } } }] },
+    ]);
+  });
+
+  it('`mesFiches` borne aussi l’ADMIN, sans quoi le drapeau ne voudrait rien dire', async () => {
+    await service.list(ADMIN, { mesFiches: true });
+
+    expect(whereOf().AND).toEqual([
+      { OR: [{ createdById: ADMIN.id }, { lotItems: { some: { assigneeId: ADMIN.id } } }] },
+    ]);
+  });
+
+  it('`mesFiches` ne change rien pour un COMMERCIAL, déjà borné', async () => {
+    await service.list(COMMERCIAL, { mesFiches: true });
+
+    expect(whereOf().AND).toEqual([
+      {
+        OR: [{ createdById: COMMERCIAL.id }, { lotItems: { some: { assigneeId: COMMERCIAL.id } } }],
+      },
+    ]);
+  });
+
   it('un détail hors périmètre est INTROUVABLE, pas refusé', async () => {
     db.representant.findFirst.mockResolvedValue(null);
 

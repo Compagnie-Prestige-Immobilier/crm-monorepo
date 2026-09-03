@@ -358,6 +358,16 @@ export class RepresentantExportQueryDto {
 }
 
 export class RepresentantQueryDto extends RepresentantExportQueryDto {
+  @ApiPropertyOptional({
+    type: Boolean,
+    description:
+      'true : ne rend que ses propres fiches et celles qu’une campagne lui a confiées, quel que soit le rôle. L’écran d’appel le pose, l’annuaire non.',
+  })
+  @IsOptional()
+  @Transform(queryBoolean)
+  @IsBoolean()
+  mesFiches?: boolean;
+
   @ApiPropertyOptional({ enum: RepresentantSortField, enumName: 'RepresentantSortField' })
   @IsOptional()
   @IsEnum(RepresentantSortField)

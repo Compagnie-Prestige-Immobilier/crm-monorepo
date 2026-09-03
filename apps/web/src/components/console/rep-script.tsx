@@ -37,11 +37,10 @@ import {
   formatCallbackAt,
   pushRepCallAttempt,
   repRelationSettled,
-  repScriptKeys,
   type RepAnswer,
 } from '@/lib/data/console';
 import { fetchReferenceData } from '@/lib/data/reference';
-import { fetchRepresentants, type ScriptedRepresentant } from '@/lib/data/representants';
+import { fetchRepresentantsAQualifier, type ScriptedRepresentant } from '@/lib/data/representants';
 import {
   fetchStatutsQualification,
   statutsDeLaBranche,
@@ -51,7 +50,6 @@ import {
 import { formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
-import { EMPTY_REPRESENTANT_FILTERS, type RepresentantFilters } from '@/lib/representant-filters';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { cn } from '@/lib/utils';
 
@@ -136,14 +134,6 @@ const REVELE = 'animate-in fade-in-0 slide-in-from-top-1 duration-200 motion-red
  * L'annuaire, cherché par le SERVEUR : il compare le nom et le numéro réduit à
  * ses chiffres, donc « 77 123 45 67 » trouve la même fiche que « 771234567 ».
  */
-const annuaireFilters = (search: string): RepresentantFilters => ({
-  ...EMPTY_REPRESENTANT_FILTERS,
-  search,
-  sortBy: 'fullName',
-  sortDir: 'asc',
-  pageSize: 20,
-});
-
 /**
  * Étape 1 : qualifier un représentant, dans l'ordre et les mots de
  * l'application mobile.
@@ -164,8 +154,8 @@ export function RepScript() {
   // dérouler laisse croire à un total faux. Rien ne s'affiche tant qu'on n'a
   // pas cherché.
   const annuaire = useQuery({
-    queryKey: queryKeys.representants(annuaireFilters(cherche)),
-    queryFn: () => fetchRepresentants(annuaireFilters(cherche)),
+    queryKey: [...queryKeys.representantsRoot, 'a-qualifier', cherche] as const,
+    queryFn: () => fetchRepresentantsAQualifier(cherche),
     enabled: choisi === null && cherche !== '',
     placeholderData: (previous) => previous,
   });
@@ -190,7 +180,9 @@ export function RepScript() {
         onEnregistre={(nom) => {
           setConfirme(nom);
           setChoisi(null);
-          void queryClient.invalidateQueries({ queryKey: repScriptKeys.root });
+          // La racine, pas la seule liste de l'écran : le compteur « pas encore
+          // qualifiés » de l'accueil se lit sous une autre clé de la même famille.
+          void queryClient.invalidateQueries({ queryKey: queryKeys.representantsRoot });
         }}
       />
     );
@@ -222,7 +214,7 @@ function ResultatsAnnuaire({
   liste,
   onOuvrir,
 }: {
-  annuaire: UseQueryResult<Awaited<ReturnType<typeof fetchRepresentants>>>;
+  annuaire: UseQueryResult<Awaited<ReturnType<typeof fetchRepresentantsAQualifier>>>;
   liste: readonly ScriptedRepresentant[];
   onOuvrir: (row: ScriptedRepresentant) => void;
 }) {
@@ -249,7 +241,11 @@ function ResultatsAnnuaire({
   }
 
   if (liste.length === 0) {
-    return <p className="text-[0.9375rem]">Aucun résultat. Vérifiez le nom ou le numéro.</p>;
+    return (
+      <p className="text-[0.9375rem]">
+        Aucun résultat parmi vos fiches. Vérifiez le nom ou le numéro, ou demandez une campagne.
+      </p>
+    );
   }
 
   return (

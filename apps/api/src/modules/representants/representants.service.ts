@@ -191,7 +191,7 @@ export class RepresentantsService {
     // Un téléconseiller ne lit que ses campagnes ; l'encadrement lit tout. Le
     // cloisonnement voyage dans `AND` : `where.OR` porte déjà la recherche libre.
     const where: Prisma.RepresentantWhereInput = { deletedAt: null, ...suiviWhere(query) };
-    const portee = attributionScope(user);
+    const portee = attributionScope(user, { malgreLeRole: query.mesFiches === true });
     if (portee.OR) where.AND = [portee];
     if (query.commercialId) {
       where.createdById = query.commercialId;

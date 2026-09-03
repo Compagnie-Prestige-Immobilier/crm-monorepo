@@ -9137,6 +9137,8 @@ export interface operations {
         suivi?: components['schemas']['RepresentantSuivi'];
         /** @description Qui a passé le dernier appel. Un téléconseiller y met son propre identifiant. */
         lastCallById?: string;
+        /** @description true : ne rend que ses propres fiches et celles qu’une campagne lui a confiées, quel que soit le rôle. L’écran d’appel le pose, l’annuaire non. */
+        mesFiches?: boolean;
         sortBy?: components['schemas']['RepresentantSortField'];
         sortOrder?: components['schemas']['SortOrder'];
         page?: number;

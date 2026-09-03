@@ -36,11 +36,16 @@ export const readScope = (
  *
  * `Representant` et `Prospect` portent tous deux `createdById` et `lotItems` :
  * la même clause vaut pour les deux modèles.
+ *
+ * `malgreLeRole` borne aussi l'encadrement : sur l'écran d'appel, un
+ * superviseur ne compose que les numéros qui lui reviennent. Sa vue d'ensemble
+ * de l'annuaire et de la supervision passe par un appel sans cette option.
  */
 export const attributionScope = (
   user: Pick<AuthenticatedUser, 'id' | 'role'>,
+  options: { malgreLeRole?: boolean } = {},
 ): Prisma.RepresentantWhereInput & Prisma.ProspectWhereInput =>
-  readsEveryone(user)
+  readsEveryone(user) && options.malgreLeRole !== true
     ? {}
     : { OR: [{ createdById: user.id }, { lotItems: { some: { assigneeId: user.id } } }] };
 

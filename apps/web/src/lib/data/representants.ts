@@ -133,6 +133,27 @@ export async function fetchRepresentantsSuivi(
   return flattenPage(unwrap(await client.GET('/api/v1/representants', { params: { query } })));
 }
 
+/**
+ * Ce que l'écran d'appel a le droit d'appeler : ses propres fiches et celles
+ * qu'une campagne lui a confiées. Ne passe pas par `RepresentantFilters` : ce
+ * n'est pas un critère que l'utilisateur pose, c'est la portée de l'écran, et
+ * elle vaut pour tous les rôles, encadrement compris.
+ */
+export async function fetchRepresentantsAQualifier(
+  search: string,
+  client: ApiClient = getApiClient(),
+): Promise<Paginated<RepresentantRow>> {
+  const query: RepresentantQuery = {
+    mesFiches: true,
+    search,
+    sortBy: 'fullName',
+    sortOrder: 'asc',
+    page: 1,
+    pageSize: 20,
+  };
+  return flattenPage(unwrap(await client.GET('/api/v1/representants', { params: { query } })));
+}
+
 /** Les représentants dont ce téléconseiller a passé le DERNIER appel, du plus récent au plus ancien. */
 export async function fetchRepresentantsAppeles(
   lastCallById: string,
