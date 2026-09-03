@@ -80,9 +80,22 @@ export function matchesHint(typed: string, hint: string): boolean {
 export type PresenceState = Schemas['PresenceState'];
 export type SupervisedUser = Schemas['SupervisedUserDto'];
 export type Supervision = Schemas['SupervisionDto'];
+export type WorkShifts = Schemas['WorkShiftsDto'];
+export type UpdateWorkShifts = Schemas['UpdateWorkShiftsDto'];
 
 export async function fetchSupervision(client: ApiClient = getApiClient()): Promise<Supervision> {
   return unwrap(await client.GET('/api/v1/admin/supervision'));
+}
+
+export async function fetchWorkShifts(client: ApiClient = getApiClient()): Promise<WorkShifts> {
+  return unwrap(await client.GET('/api/v1/supervision/creneaux'));
+}
+
+export async function updateWorkShifts(
+  body: UpdateWorkShifts,
+  client: ApiClient = getApiClient(),
+): Promise<WorkShifts> {
+  return unwrap(await client.PUT('/api/v1/supervision/creneaux', { body }));
 }
 
 const PRESENCE_STATES = ['ONLINE', 'RECENT', 'AWAY'] as const satisfies readonly PresenceState[];
@@ -128,6 +141,35 @@ export function formatElapsed(minutes: number | null): string {
   return `${String(days)} j`;
 }
 
+export function formatClock(iso: string | null): string {
+  if (iso === null) return 'Sans objet';
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return 'Sans objet';
+  return new Intl.DateTimeFormat('fr-FR', {
+    timeZone: 'Africa/Dakar',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(at);
+}
+
+/** Un retard négatif ne vient pas du réseau : l'horloge du téléphone avance. */
+export function formatDuration(seconds: number | null): string {
+  if (seconds === null) return 'Sans objet';
+  if (seconds < 0) return 'Horloge en avance';
+  if (seconds < 60) return `${String(seconds)} s`;
+  return `${String(Math.round(seconds / 60))} min`;
+}
+
+export function formatActiveDuration(seconds: number): string {
+  if (seconds < 60) return '< 1 min';
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return hours === 0
+    ? `${String(minutes)} min`
+    : `${String(hours)} h ${String(rest).padStart(2, '0')}`;
+}
+
 export type SupervisionGranularity = Schemas['SupervisionGranularity'];
 export type ActivityRow = Schemas['SupervisionActivityRowDto'];
 export type ActivityTeleconseiller = Schemas['SupervisionTeleconseillerDto'];
@@ -170,8 +212,9 @@ export function supervisionActivityKey(
   range: ActivityRange,
   granularity: SupervisionGranularity,
   projet: Schemas['Projet'],
+  shift?: { start: string; end: string },
 ): readonly unknown[] {
-  return ['supervision', 'activite', range.from, range.to, granularity, projet];
+  return ['supervision', 'activite', range.from, range.to, granularity, projet, shift];
 }
 
 /** `projet` est obligatoire : omis, l'API compte les deux projets dans les mêmes chiffres. */
@@ -180,6 +223,7 @@ export async function fetchSupervisionActivite(
     range: ActivityRange;
     granularity: SupervisionGranularity;
     projet: Schemas['Projet'];
+    shift?: { start: string; end: string };
   },
   client: ApiClient = getApiClient(),
 ): Promise<SupervisionActivity> {
@@ -191,6 +235,9 @@ export async function fetchSupervisionActivite(
           actTo: `${input.range.to}T23:59:59.999Z`,
           granularity: input.granularity,
           projet: input.projet,
+          ...(input.shift === undefined
+            ? {}
+            : { timeFrom: input.shift.start, timeTo: input.shift.end }),
         },
       },
     }),

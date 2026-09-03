@@ -39,6 +39,18 @@ abstract class _$SupervisedUserDtoCWProxy {
 
   SupervisedUserDto lastWriteAt(DateTime? lastWriteAt);
 
+  SupervisedUserDto activeSecondsToday(num activeSecondsToday);
+
+  SupervisedUserDto firstSeenToday(DateTime? firstSeenToday);
+
+  SupervisedUserDto callsToday(num callsToday);
+
+  SupervisedUserDto medianGapSeconds(num? medianGapSeconds);
+
+  SupervisedUserDto medianUploadLagSeconds(num? medianUploadLagSeconds);
+
+  SupervisedUserDto firstCallAt(DateTime? firstCallAt);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SupervisedUserDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -62,6 +74,12 @@ abstract class _$SupervisedUserDtoCWProxy {
     num? pendingOps,
     String? appVersion,
     DateTime? lastWriteAt,
+    num activeSecondsToday,
+    DateTime? firstSeenToday,
+    num callsToday,
+    num? medianGapSeconds,
+    num? medianUploadLagSeconds,
+    DateTime? firstCallAt,
   });
 }
 
@@ -129,6 +147,29 @@ class _$SupervisedUserDtoCWProxyImpl implements _$SupervisedUserDtoCWProxy {
       this(lastWriteAt: lastWriteAt);
 
   @override
+  SupervisedUserDto activeSecondsToday(num activeSecondsToday) =>
+      this(activeSecondsToday: activeSecondsToday);
+
+  @override
+  SupervisedUserDto firstSeenToday(DateTime? firstSeenToday) =>
+      this(firstSeenToday: firstSeenToday);
+
+  @override
+  SupervisedUserDto callsToday(num callsToday) => this(callsToday: callsToday);
+
+  @override
+  SupervisedUserDto medianGapSeconds(num? medianGapSeconds) =>
+      this(medianGapSeconds: medianGapSeconds);
+
+  @override
+  SupervisedUserDto medianUploadLagSeconds(num? medianUploadLagSeconds) =>
+      this(medianUploadLagSeconds: medianUploadLagSeconds);
+
+  @override
+  SupervisedUserDto firstCallAt(DateTime? firstCallAt) =>
+      this(firstCallAt: firstCallAt);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SupervisedUserDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -152,6 +193,12 @@ class _$SupervisedUserDtoCWProxyImpl implements _$SupervisedUserDtoCWProxy {
     Object? pendingOps = const $CopyWithPlaceholder(),
     Object? appVersion = const $CopyWithPlaceholder(),
     Object? lastWriteAt = const $CopyWithPlaceholder(),
+    Object? activeSecondsToday = const $CopyWithPlaceholder(),
+    Object? firstSeenToday = const $CopyWithPlaceholder(),
+    Object? callsToday = const $CopyWithPlaceholder(),
+    Object? medianGapSeconds = const $CopyWithPlaceholder(),
+    Object? medianUploadLagSeconds = const $CopyWithPlaceholder(),
+    Object? firstCallAt = const $CopyWithPlaceholder(),
   }) {
     return SupervisedUserDto(
       id: id == const $CopyWithPlaceholder()
@@ -218,6 +265,31 @@ class _$SupervisedUserDtoCWProxyImpl implements _$SupervisedUserDtoCWProxy {
           ? _value.lastWriteAt
           // ignore: cast_nullable_to_non_nullable
           : lastWriteAt as DateTime?,
+      activeSecondsToday: activeSecondsToday == const $CopyWithPlaceholder()
+          ? _value.activeSecondsToday
+          // ignore: cast_nullable_to_non_nullable
+          : activeSecondsToday as num,
+      firstSeenToday: firstSeenToday == const $CopyWithPlaceholder()
+          ? _value.firstSeenToday
+          // ignore: cast_nullable_to_non_nullable
+          : firstSeenToday as DateTime?,
+      callsToday: callsToday == const $CopyWithPlaceholder()
+          ? _value.callsToday
+          // ignore: cast_nullable_to_non_nullable
+          : callsToday as num,
+      medianGapSeconds: medianGapSeconds == const $CopyWithPlaceholder()
+          ? _value.medianGapSeconds
+          // ignore: cast_nullable_to_non_nullable
+          : medianGapSeconds as num?,
+      medianUploadLagSeconds:
+          medianUploadLagSeconds == const $CopyWithPlaceholder()
+          ? _value.medianUploadLagSeconds
+          // ignore: cast_nullable_to_non_nullable
+          : medianUploadLagSeconds as num?,
+      firstCallAt: firstCallAt == const $CopyWithPlaceholder()
+          ? _value.firstCallAt
+          // ignore: cast_nullable_to_non_nullable
+          : firstCallAt as DateTime?,
     );
   }
 }
@@ -254,6 +326,12 @@ SupervisedUserDto _$SupervisedUserDtoFromJson(Map<String, dynamic> json) =>
           'pendingOps',
           'appVersion',
           'lastWriteAt',
+          'activeSecondsToday',
+          'firstSeenToday',
+          'callsToday',
+          'medianGapSeconds',
+          'medianUploadLagSeconds',
+          'firstCallAt',
         ],
       );
       final val = SupervisedUserDto(
@@ -302,6 +380,24 @@ SupervisedUserDto _$SupervisedUserDtoFromJson(Map<String, dynamic> json) =>
           'lastWriteAt',
           (v) => v == null ? null : DateTime.parse(v as String),
         ),
+        activeSecondsToday: $checkedConvert(
+          'activeSecondsToday',
+          (v) => v as num,
+        ),
+        firstSeenToday: $checkedConvert(
+          'firstSeenToday',
+          (v) => v == null ? null : DateTime.parse(v as String),
+        ),
+        callsToday: $checkedConvert('callsToday', (v) => v as num),
+        medianGapSeconds: $checkedConvert('medianGapSeconds', (v) => v as num?),
+        medianUploadLagSeconds: $checkedConvert(
+          'medianUploadLagSeconds',
+          (v) => v as num?,
+        ),
+        firstCallAt: $checkedConvert(
+          'firstCallAt',
+          (v) => v == null ? null : DateTime.parse(v as String),
+        ),
       );
       return val;
     });
@@ -324,6 +420,12 @@ Map<String, dynamic> _$SupervisedUserDtoToJson(SupervisedUserDto instance) =>
       'pendingOps': instance.pendingOps,
       'appVersion': instance.appVersion,
       'lastWriteAt': instance.lastWriteAt?.toIso8601String(),
+      'activeSecondsToday': instance.activeSecondsToday,
+      'firstSeenToday': instance.firstSeenToday?.toIso8601String(),
+      'callsToday': instance.callsToday,
+      'medianGapSeconds': instance.medianGapSeconds,
+      'medianUploadLagSeconds': instance.medianUploadLagSeconds,
+      'firstCallAt': instance.firstCallAt?.toIso8601String(),
     };
 
 const _$RoleEnumMap = {

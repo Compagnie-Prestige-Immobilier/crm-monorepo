@@ -12,7 +12,7 @@ interface UpsertArgs {
 const serviceWith = (
   upsert: ReturnType<typeof vi.fn>,
 ): { service: HeartbeatService; upsert: typeof upsert } => {
-  const prisma = { agentHeartbeat: { upsert } };
+  const prisma = { agentHeartbeat: { upsert }, $executeRaw: vi.fn().mockResolvedValue(1) };
   return { service: new HeartbeatService(prisma as unknown as PrismaService), upsert };
 };
 

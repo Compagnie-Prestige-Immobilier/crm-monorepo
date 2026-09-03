@@ -60,7 +60,7 @@ import {
   type DashboardEcran,
   type DashboardWidget,
 } from '@/lib/data/disposition';
-import { LIVE_SLOW_INTERVAL_MS, shouldShowError, shouldShowSkeleton } from '@/lib/live';
+import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
 import { queryKeys } from '@/lib/query-keys';
 import type { Role } from '@/lib/types';
 
@@ -152,7 +152,7 @@ function etatDesJeux(
 
 export function ChiffresView({ ecran, role }: { ecran: DashboardEcran; role: Role }) {
   const { filters, setFilters } = useUrlFilters(chiffresFiltersAdapter);
-  const live = useLive({ intervalMs: LIVE_SLOW_INTERVAL_MS });
+  const live = useLive();
   const queryClient = useQueryClient();
 
   const projet: Projet = ecran === 'chues' ? 'CHUES' : 'GRAND_PUBLIC';

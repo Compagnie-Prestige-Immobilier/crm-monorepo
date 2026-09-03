@@ -412,7 +412,7 @@ class _RepresentantQualificationScreenState
               ),
         );
       }
-      unawaited(ref.read(syncCoordinatorProvider.notifier).run());
+      ref.read(syncCoordinatorProvider.notifier).nudge();
       if (context.mounted) Navigator.of(context).pop();
     } on Object catch (error) {
       if (!context.mounted) return;

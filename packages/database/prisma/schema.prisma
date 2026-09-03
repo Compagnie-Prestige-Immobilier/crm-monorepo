@@ -321,6 +321,7 @@ model User {
   representantComments     RepresentantComment[]        @relation("RepresentantCommentAuthor")
 
   heartbeat AgentHeartbeat?
+  activityDays AgentActivityDay[]
 
   visitesEnregistrees Visite[]          @relation("VisiteCreatedBy")
   dashboardLayouts    DashboardLayout[] @relation("DashboardLayoutUser")
@@ -1037,6 +1038,20 @@ model AgentHeartbeat {
   updatedAt DateTime @updatedAt
 
   @@map("agent_heartbeats")
+}
+
+model AgentActivityDay {
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  day    DateTime @db.Date
+
+  firstSeenAt  DateTime
+  lastSeenAt   DateTime
+  activeSeconds Int @default(0)
+
+  @@id([userId, day])
+  @@index([day])
+  @@map("agent_activity_days")
 }
 
 model AuditLog {

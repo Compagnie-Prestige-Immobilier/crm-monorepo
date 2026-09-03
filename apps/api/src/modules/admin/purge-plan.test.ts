@@ -50,6 +50,10 @@ const PURGE_EXEMPT = new Map<string, string>([
     'trace de présence, UNE ligne par compte, en `onDelete: Cascade` : elle part avec le compte, et la réécrire suffit à la remettre à jour. Lui donner une étape à elle seule effacerait des lignes qui renaissent au pull suivant, tout en faisant paraître « jamais vu » des comptes toujours en service',
   ],
   [
+    'agent_activity_days',
+    'temps de présence observé, une ligne par compte et par journée, en `onDelete: Cascade` : elle part avec le compte. Comme `agent_heartbeats`, elle mesure la présence de l’application, pas une donnée métier, et lui donner une étape à elle seule effacerait le temps de travail de comptes toujours en service',
+  ],
+  [
     'device_tokens',
     'sous-système push retiré : aucun code n’écrit plus cette table, conservée une version pour que la mise à jour reste réversible (docs/migrations-en-attente.md), et emportée en cascade avec son compte',
   ],

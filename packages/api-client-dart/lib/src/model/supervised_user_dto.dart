@@ -52,6 +52,18 @@ class SupervisedUserDto {
     required this.appVersion,
 
     required this.lastWriteAt,
+
+    required this.activeSecondsToday,
+
+    required this.firstSeenToday,
+
+    required this.callsToday,
+
+    required this.medianGapSeconds,
+
+    required this.medianUploadLagSeconds,
+
+    required this.firstCallAt,
   });
 
   @JsonKey(name: r'id', required: true, includeIfNull: false)
@@ -120,6 +132,28 @@ class SupervisedUserDto {
   @JsonKey(name: r'lastWriteAt', required: true, includeIfNull: true)
   final DateTime? lastWriteAt;
 
+  /// Temps actif observé aujourd’hui, en secondes. Les interruptions de plus de 90 secondes ne sont pas comptées.
+  @JsonKey(name: r'activeSecondsToday', required: true, includeIfNull: false)
+  final num activeSecondsToday;
+
+  @JsonKey(name: r'firstSeenToday', required: true, includeIfNull: true)
+  final DateTime? firstSeenToday;
+
+  /// Tentatives d’appel du jour, prospects et représentants confondus, comptées sur l’heure de l’appel et non sur celle de la remontée.
+  @JsonKey(name: r'callsToday', required: true, includeIfNull: false)
+  final num callsToday;
+
+  /// Médiane, en secondes, de l’écart entre deux tentatives consécutives du jour. `null` en deçà de deux tentatives : un écart n’existe pas encore.
+  @JsonKey(name: r'medianGapSeconds', required: true, includeIfNull: true)
+  final num? medianGapSeconds;
+
+  /// Médiane, en secondes, du retard de remontée : temps écoulé entre l’appel sur le téléphone et son arrivée au serveur. Négatif quand l’horloge du téléphone avance sur celle du serveur. `null` sans aucune tentative du jour.
+  @JsonKey(name: r'medianUploadLagSeconds', required: true, includeIfNull: true)
+  final num? medianUploadLagSeconds;
+
+  @JsonKey(name: r'firstCallAt', required: true, includeIfNull: true)
+  final DateTime? firstCallAt;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is SupervisedUserDto &&
@@ -142,6 +176,12 @@ class SupervisedUserDto {
                 pendingOps,
                 appVersion,
                 lastWriteAt,
+                activeSecondsToday,
+                firstSeenToday,
+                callsToday,
+                medianGapSeconds,
+                medianUploadLagSeconds,
+                firstCallAt,
               ],
               [
                 other.id,
@@ -160,6 +200,12 @@ class SupervisedUserDto {
                 other.pendingOps,
                 other.appVersion,
                 other.lastWriteAt,
+                other.activeSecondsToday,
+                other.firstSeenToday,
+                other.callsToday,
+                other.medianGapSeconds,
+                other.medianUploadLagSeconds,
+                other.firstCallAt,
               ],
             );
   }
@@ -184,6 +230,12 @@ class SupervisedUserDto {
         pendingOps,
         appVersion,
         lastWriteAt,
+        activeSecondsToday,
+        firstSeenToday,
+        callsToday,
+        medianGapSeconds,
+        medianUploadLagSeconds,
+        firstCallAt,
       ]);
 
   factory SupervisedUserDto.fromJson(Map<String, dynamic> json) =>

@@ -16325,6 +16325,26 @@
               "format": "uuid",
               "type": "string"
             }
+          },
+          {
+            "name": "timeFrom",
+            "required": false,
+            "in": "query",
+            "description": "Heure de début quotidienne, Dakar.",
+            "schema": {
+              "example": "09:00",
+              "type": "string"
+            }
+          },
+          {
+            "name": "timeTo",
+            "required": false,
+            "in": "query",
+            "description": "Heure de fin quotidienne, exclue.",
+            "schema": {
+              "example": "14:00",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -16375,6 +16395,124 @@
           }
         ],
         "summary": "Activité des téléconseillers sur la fenêtre demandée.",
+        "tags": ["supervision"]
+      }
+    },
+    "/api/v1/supervision/creneaux": {
+      "get": {
+        "operationId": "getSupervisionCreneaux",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkShiftsDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Créneaux de travail suivis.",
+        "tags": ["supervision"]
+      },
+      "put": {
+        "operationId": "updateSupervisionCreneaux",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWorkShiftsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkShiftsDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Modifie les créneaux de travail.",
         "tags": ["supervision"]
       }
     },
@@ -27293,6 +27431,66 @@
           "prospectsByRepresentant"
         ]
       },
+      "WorkShiftDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": ["morning", "afternoon"]
+          },
+          "label": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string",
+            "example": "09:00"
+          },
+          "end": {
+            "type": "string",
+            "example": "14:00"
+          }
+        },
+        "required": ["key", "label", "start", "end"]
+      },
+      "WorkShiftsDto": {
+        "type": "object",
+        "properties": {
+          "shifts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkShiftDto"
+            }
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": ["shifts", "updatedAt"]
+      },
+      "UpdateWorkShiftsDto": {
+        "type": "object",
+        "properties": {
+          "morningStart": {
+            "type": "string",
+            "example": "09:00"
+          },
+          "morningEnd": {
+            "type": "string",
+            "example": "14:00"
+          },
+          "afternoonStart": {
+            "type": "string",
+            "example": "15:00"
+          },
+          "afternoonEnd": {
+            "type": "string",
+            "example": "18:00"
+          }
+        },
+        "required": ["morningStart", "morningEnd", "afternoonStart", "afternoonEnd"]
+      },
       "PurgeDomainKey": {
         "type": "string",
         "enum": [
@@ -27504,6 +27702,34 @@
             "format": "date-time",
             "nullable": true,
             "description": "Dernière écriture métier : tentative d’appel ou transition de dossier. Cherchée sur les 31 derniers jours seulement ; au-delà, vaut null."
+          },
+          "activeSecondsToday": {
+            "type": "number",
+            "description": "Temps actif observé aujourd’hui, en secondes. Les interruptions de plus de 90 secondes ne sont pas comptées."
+          },
+          "firstSeenToday": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "callsToday": {
+            "type": "number",
+            "description": "Tentatives d’appel du jour, prospects et représentants confondus, comptées sur l’heure de l’appel et non sur celle de la remontée."
+          },
+          "medianGapSeconds": {
+            "type": "number",
+            "nullable": true,
+            "description": "Médiane, en secondes, de l’écart entre deux tentatives consécutives du jour. `null` en deçà de deux tentatives : un écart n’existe pas encore."
+          },
+          "medianUploadLagSeconds": {
+            "type": "number",
+            "nullable": true,
+            "description": "Médiane, en secondes, du retard de remontée : temps écoulé entre l’appel sur le téléphone et son arrivée au serveur. Négatif quand l’horloge du téléphone avance sur celle du serveur. `null` sans aucune tentative du jour."
+          },
+          "firstCallAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         },
         "required": [
@@ -27522,7 +27748,13 @@
           "lastPullAt",
           "pendingOps",
           "appVersion",
-          "lastWriteAt"
+          "lastWriteAt",
+          "activeSecondsToday",
+          "firstSeenToday",
+          "callsToday",
+          "medianGapSeconds",
+          "medianUploadLagSeconds",
+          "firstCallAt"
         ]
       },
       "PresenceCountsDto": {

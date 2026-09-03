@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:developer' as developer;
+import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../background/background_sync.dart';
+import '../network/api_environment.dart';
 import '../sync/api_port.dart';
 import '../sync/sync_engine.dart';
 import '../updates/app_update_controller.dart';
@@ -92,6 +94,14 @@ class SyncUiState {
 
 class SyncCoordinator extends Notifier<SyncUiState> {
   static const Duration foregroundPeriod = Duration(seconds: 60);
+  static const List<Duration> fastRetryDelays = <Duration>[
+    Duration(seconds: 1),
+    Duration(seconds: 2),
+    Duration(seconds: 5),
+    Duration(seconds: 10),
+    Duration(seconds: 20),
+    Duration(seconds: 30),
+  ];
 
   /// L'annuaire complet fait plusieurs centaines de milliers de lignes. Le
   /// borner par cycle étale le premier remplissage au lieu de bloquer une
@@ -99,8 +109,17 @@ class SyncCoordinator extends Notifier<SyncUiState> {
   static const int directoryPagesPerRun = 3;
 
   Timer? _periodic;
+  Timer? _fastRetry;
+  Timer? _presenceBeat;
+  Timer? _presenceReconnect;
+  WebSocket? _presenceSocket;
   AppLifecycleListener? _lifecycle;
   bool _observing = false;
+  bool _foreground = true;
+  bool _pushRequested = false;
+  bool _pushing = false;
+  bool _presenceConnecting = false;
+  int _fastRetryIndex = 0;
 
   @override
   SyncUiState build() {
@@ -120,7 +139,7 @@ class SyncCoordinator extends Notifier<SyncUiState> {
       AsyncValue<bool?>? _,
       AsyncValue<bool?> next,
     ) {
-      if (next.value == false) unawaited(run(pull: false));
+      if (next.value == false) nudge();
     });
     ref.listen<AsyncValue<List<ConnectivityResult>>>(
       connectivityTriggerProvider,
@@ -129,7 +148,7 @@ class SyncCoordinator extends Notifier<SyncUiState> {
         AsyncValue<List<ConnectivityResult>> next,
       ) {
         if (next.value == null) return;
-        unawaited(run(pull: false));
+        nudge();
       },
     );
     scheduleMicrotask(_start);
@@ -141,12 +160,19 @@ class SyncCoordinator extends Notifier<SyncUiState> {
     _observing = true;
     _lifecycle = AppLifecycleListener(
       onResume: () {
+        _foreground = true;
         _startPeriodic();
         unawaited(run());
+        nudge();
+        unawaited(_connectPresence());
       },
       onPause: () {
+        _foreground = false;
         _periodic?.cancel();
         _periodic = null;
+        _fastRetry?.cancel();
+        _fastRetry = null;
+        _stopPresence();
         unawaited(_scheduleCatchUp());
       },
     );
@@ -162,6 +188,9 @@ class SyncCoordinator extends Notifier<SyncUiState> {
   void _teardown() {
     _periodic?.cancel();
     _periodic = null;
+    _fastRetry?.cancel();
+    _fastRetry = null;
+    _stopPresence();
     _lifecycle?.dispose();
     _lifecycle = null;
     _observing = false;
@@ -169,7 +198,54 @@ class SyncCoordinator extends Notifier<SyncUiState> {
 
   bool get isPolling => _periodic?.isActive ?? false;
 
-  void nudge() => unawaited(run(pull: false));
+  void nudge() {
+    _pushRequested = true;
+    _fastRetry?.cancel();
+    _fastRetry = null;
+    unawaited(_pushPending());
+  }
+
+  Future<void> _pushPending() async {
+    if (!_foreground || _pushing || !_pushRequested) return;
+    _pushing = true;
+    _pushRequested = false;
+    try {
+      final SyncOutcome outcome = await run(pull: false);
+      if (!ref.mounted || !_foreground) return;
+      if (outcome.status == SyncRunStatus.skipped) {
+        _scheduleFastRetry();
+        return;
+      }
+      if (outcome.isOk) {
+        _fastRetryIndex = 0;
+        // Enchaîner sans avoir rien poussé tourne à vide : ce qui reste en file
+        // attend son `nextAttemptAt`, qu'un tour de plus n'avance pas.
+        if (outcome.pushed > 0 &&
+            await ref.read(syncEngineProvider).schedulableCount() > 0) {
+          _pushRequested = true;
+        }
+        return;
+      }
+      if (outcome.shouldRetry) _scheduleFastRetry();
+    } finally {
+      _pushing = false;
+      if (_pushRequested && _fastRetry == null && ref.mounted) {
+        scheduleMicrotask(_pushPending);
+      }
+    }
+  }
+
+  void _scheduleFastRetry() {
+    if (!_foreground || _fastRetry != null) return;
+    final int index = _fastRetryIndex.clamp(0, fastRetryDelays.length - 1);
+    final Duration delay = fastRetryDelays[index];
+    if (_fastRetryIndex < fastRetryDelays.length - 1) _fastRetryIndex++;
+    _pushRequested = true;
+    _fastRetry = Timer(delay, () {
+      _fastRetry = null;
+      unawaited(_pushPending());
+    });
+  }
 
   Future<SyncOutcome> run({bool pull = true}) async {
     final SyncEngine engine = ref.read(syncEngineProvider);
@@ -205,6 +281,7 @@ class SyncCoordinator extends Notifier<SyncUiState> {
       // lui redemander le plancher de version.
       if (outcome.isOk) {
         ref.read(appUpdateControllerProvider.notifier).recheckAfterSync();
+        unawaited(_connectPresence());
       }
       if (pull && outcome.isOk) await _pullDirectory();
       return outcome;
@@ -222,6 +299,78 @@ class SyncCoordinator extends Notifier<SyncUiState> {
         kind: FailureKind.retryable,
       );
     }
+  }
+
+  Future<void> _connectPresence() async {
+    if (!_foreground || _presenceSocket != null || _presenceConnecting) return;
+    final String? token = ref.read(syncEngineProvider).tokens.accessToken;
+    if (token == null) return;
+
+    _presenceConnecting = true;
+    try {
+      final Uri base = Uri.parse(ApiEnvironment.baseUrl);
+      final Uri uri = base.replace(
+        scheme: base.scheme == 'https' ? 'wss' : 'ws',
+        path: '/api/v1/presence/live',
+        query: null,
+      );
+      final WebSocket socket = await WebSocket.connect(
+        uri.toString(),
+        headers: <String, dynamic>{
+          HttpHeaders.authorizationHeader: 'Bearer $token',
+          HttpHeaders.userAgentHeader: ApiEnvironment.userAgent,
+        },
+      );
+      if (!_foreground || !ref.mounted) {
+        await socket.close();
+        return;
+      }
+      _presenceSocket = socket;
+      _presenceReconnect?.cancel();
+      _presenceReconnect = null;
+      socket.add('beat');
+      _presenceBeat = Timer.periodic(
+        const Duration(seconds: 15),
+        (Timer _) => socket.add('beat'),
+      );
+      void reconnect() {
+        if (identical(_presenceSocket, socket)) {
+          _presenceSocket = null;
+          _presenceBeat?.cancel();
+          _presenceBeat = null;
+          _schedulePresenceReconnect();
+        }
+      }
+
+      socket.listen(
+        (dynamic _) {},
+        onDone: reconnect,
+        onError: (Object _, StackTrace _) => reconnect(),
+        cancelOnError: true,
+      );
+    } on Object {
+      _schedulePresenceReconnect();
+    } finally {
+      _presenceConnecting = false;
+    }
+  }
+
+  void _schedulePresenceReconnect() {
+    if (!_foreground || !ref.mounted || _presenceReconnect != null) return;
+    _presenceReconnect = Timer(const Duration(seconds: 5), () {
+      _presenceReconnect = null;
+      unawaited(_connectPresence());
+    });
+  }
+
+  void _stopPresence() {
+    _presenceBeat?.cancel();
+    _presenceBeat = null;
+    _presenceReconnect?.cancel();
+    _presenceReconnect = null;
+    final WebSocket? socket = _presenceSocket;
+    _presenceSocket = null;
+    unawaited(socket?.close());
   }
 
   /// L'annuaire n'avait qu'un seul déclencheur, un bouton d'écran : le
