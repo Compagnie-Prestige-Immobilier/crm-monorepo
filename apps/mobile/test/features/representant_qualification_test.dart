@@ -160,7 +160,12 @@ void main() {
     expect(continuer(tester).onPressed, isNull);
     expect(continuer(tester).subtitle, 'Choisissez d\'abord le résultat');
 
+    // Le statut vient avant le script : c'est lui qui dit ce que le script
+    // exige encore.
     await taper(tester, find.text('Joignable'));
+    expect(continuer(tester).subtitle, 'Choisissez un statut');
+
+    await statut(tester, 'Intéressé');
     expect(continuer(tester).subtitle, 'Confirmez l\'établissement');
 
     await taper(tester, tuile('Confirmer l\'établissement ?', 'Oui'));
@@ -176,10 +181,6 @@ void main() {
     expect(continuer(tester).subtitle, 'Dites s\'il a WhatsApp sur ce numéro');
 
     await taper(tester, tuile('A-t-il WhatsApp sur ce numéro ?', 'Oui'));
-    expect(continuer(tester).onPressed, isNull);
-    expect(continuer(tester).subtitle, 'Choisissez un statut');
-
-    await statut(tester, 'Intéressé');
     expect(continuer(tester).onPressed, isNotNull);
     expect(continuer(tester).subtitle, isNull);
 
@@ -353,6 +354,107 @@ void main() {
     await demonter(tester);
   });
 
+  // Un statut qui clôt l'appel n'exige plus les six questions : elles restent
+  // posées pour qui a l'information, sans retenir l'enregistrement.
+  testWidgets('un statut de refus enregistre sans une réponse du script', (
+    WidgetTester tester,
+  ) async {
+    await ouvrir(tester);
+
+    await taper(tester, find.text('Joignable'));
+    expect(continuer(tester).subtitle, 'Choisissez un statut');
+
+    await statut(tester, 'Non intéressé');
+    expect(continuer(tester).onPressed, isNotNull);
+    expect(find.text('Confirmer l\'établissement ?'), findsOneWidget);
+
+    await versLesDetails(tester);
+    await tester.tap(find.text('Enregistrer'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(writes.outcome, 'REFUSED');
+    expect(writes.callbackAt, isNull);
+
+    await demonter(tester);
+  });
+
+  // La date, elle, reste exigée : c'est elle qui arme l'alarme.
+  testWidgets('« À rappeler » se passe du script mais pas de la date', (
+    WidgetTester tester,
+  ) async {
+    await ouvrir(tester);
+
+    await taper(tester, find.text('Joignable'));
+    await statut(tester, 'À rappeler');
+    expect(continuer(tester).onPressed, isNull);
+    expect(continuer(tester).subtitle, 'Choisissez quand rappeler');
+
+    await taper(tester, find.text('Demain 9 h'));
+    expect(continuer(tester).onPressed, isNotNull);
+
+    await versLesDetails(tester);
+    await tester.tap(find.text('Enregistrer'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(writes.outcome, 'CALLBACK');
+    expect(writes.callbackAt, isNotNull);
+
+    await demonter(tester);
+  });
+
+  // La question de l'ambassadeur sans réponse ne vaut pas un refus : marquer
+  // REFUS quelqu'un à qui l'on n'a rien demandé ferme sa fiche pour de bon.
+  testWidgets('sans réponse à l\'ambassadeur, aucune relation ne part', (
+    WidgetTester tester,
+  ) async {
+    await ouvrir(tester);
+
+    await taper(tester, find.text('Joignable'));
+    await statut(tester, 'À rappeler');
+    await taper(tester, find.text('Demain 9 h'));
+    await versLesDetails(tester);
+    await tester.tap(find.text('Enregistrer'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(writes.relationStatus, isNull);
+
+    final OutboxData op = (await db.select(db.outbox).get()).singleWhere(
+      (OutboxData o) => o.entityType == 'rep_call_attempt',
+    );
+    expect(
+      (jsonDecode(op.payload) as Map<String, Object?>)['relationStatus'],
+      isNull,
+    );
+
+    await demonter(tester);
+  });
+
+  // Un statut qui ouvre la relation garde le script entier : c'est là que se
+  // prennent les renseignements.
+  testWidgets('un statut joignable exige encore tout le script', (
+    WidgetTester tester,
+  ) async {
+    await ouvrir(tester);
+
+    await taper(tester, find.text('Joignable'));
+    await statut(tester, 'Intéressé');
+    expect(continuer(tester).onPressed, isNull);
+    expect(continuer(tester).subtitle, 'Confirmez l\'établissement');
+
+    await renseignements(tester);
+    expect(continuer(tester).subtitle, 'Dites s\'il est ambassadeur');
+
+    await taper(tester, tuile('Ambassadeur ?', 'Oui'));
+    expect(continuer(tester).subtitle, 'Dites s\'il a WhatsApp sur ce numéro');
+
+    await taper(tester, tuile('A-t-il WhatsApp sur ce numéro ?', 'Oui'));
+    expect(continuer(tester).onPressed, isNotNull);
+
+    await demonter(tester);
+  });
   // Sans statut, rien ne part : le vocabulaire est ce que la campagne exploite.
   testWidgets(
     'l\'enregistrement est retenu tant qu\'aucun statut n\'est pris',

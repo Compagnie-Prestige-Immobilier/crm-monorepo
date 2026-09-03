@@ -38,6 +38,15 @@ const Set<String> _effetsInjoignable = <String>{
   'SCHEDULE_CALLBACK',
 };
 
+/// Ces effets closent l'appel : le script reste posé, plus rien n'y est exigé.
+/// La regle tient a l'EFFET et jamais au libelle, que l'administrateur renomme.
+const Set<String> _effetsSansScript = <String>{'REFUSED', 'SCHEDULE_CALLBACK'};
+
+/// Sans statut le script est exige en entier, comme avant que le referentiel
+/// existe : c'est lui qui portait alors l'issue.
+bool _scriptExige(StatutQualificationRow? statut) =>
+    statut == null || !_effetsSansScript.contains(statut.effect);
+
 /// L'issue que porte un statut. Le serveur fait la MÊME dérivation et refuse
 /// une issue qui la contredit (`REP_OUTCOME_STATUT_MISMATCH`) : les deux
 /// calculs doivent coïncider exactement.
@@ -145,24 +154,29 @@ class _RepresentantQualificationScreenState
   void erreur(BuildContext context, String message) =>
       cpiToast(context, message);
 
-  /// Ce qui retient la première étape : le résultat et ce qu'il entraîne. Suit
-  /// l'ordre du script pour que le message nomme la première question restée
-  /// sans réponse.
+  /// Ce qui retient la première étape, dans l'ordre : le résultat, le statut,
+  /// le script s'il est encore exigé, puis l'heure du rappel. Le statut passe
+  /// avant le script parce que c'est lui qui dit ce que le script exige.
   String? get manqueResultat {
     final _Resultat? choix = resultat;
     if (choix == null) return 'Choisissez d\'abord le résultat';
-    if (choix == _Resultat.joignable) {
-      final String? manquant = manqueJoignable;
-      if (manquant != null) return manquant;
-    }
     final StatutQualificationRow? statut = statutChoisi;
     // Le référentiel n'est pas encore descendu : la qualification reste
     // possible sans lui, comme sur un appareil qui ne le connaît pas.
-    if (statut == null) {
-      return statutsProposes.isEmpty ? null : 'Choisissez un statut';
+    if (statut == null && statutsProposes.isNotEmpty) {
+      return 'Choisissez un statut';
     }
-    if (statut.requiresCallback && rappelAt == null) {
+    if (choix == _Resultat.joignable && _scriptExige(statut)) {
+      final String? manquant = manqueJoignable;
+      if (manquant != null) return manquant;
+    }
+    if ((statut?.requiresCallback ?? false) && rappelAt == null) {
       return 'Choisissez quand rappeler';
+    }
+    if (proposeQuelquUn &&
+        suggestionCommencee &&
+        Phone.parse(suggestionTelephone.text) is! PhoneValid) {
+      return 'Numéro de la personne proposée incomplet';
     }
     return null;
   }
@@ -179,21 +193,13 @@ class _RepresentantQualificationScreenState
     if (aEteContacte == null) return 'Dites s\'il a été contacté';
     if (connaitUES == null) return 'Dites s\'il connaît l\'UES';
     if (ambassadeur == null) return 'Dites s\'il est ambassadeur';
-
-    if (ambassadeur == true) {
-      if (memeNumeroWhatsapp == null) {
-        return 'Dites s\'il a WhatsApp sur ce numéro';
-      }
-      if (memeNumeroWhatsapp == false &&
-          Phone.parse(whatsapp.text) is! PhoneValid) {
-        return 'Écrivez le numéro WhatsApp';
-      }
+    if (ambassadeur != true) return null;
+    if (memeNumeroWhatsapp == null) {
+      return 'Dites s\'il a WhatsApp sur ce numéro';
     }
-
-    if (proposeQuelquUn &&
-        suggestionCommencee &&
-        Phone.parse(suggestionTelephone.text) is! PhoneValid) {
-      return 'Numéro de la personne proposée incomplet';
+    if (memeNumeroWhatsapp == false &&
+        Phone.parse(whatsapp.text) is! PhoneValid) {
+      return 'Écrivez le numéro WhatsApp';
     }
     return null;
   }
@@ -351,10 +357,11 @@ class _RepresentantQualificationScreenState
             createdById: moi,
             outcome: issue,
             statutQualificationId: statut?.id,
-            relationStatus: switch (choix) {
-              _Resultat.joignable => ambassadeurOui ? 'AMBASSADEUR' : 'REFUS',
-              _ => null,
-            },
+            // Une question sans réponse n'est pas un refus : le statut la pose
+            // désormais facultative, et le serveur comble ce silence lui-même.
+            relationStatus: !joignable || ambassadeur == null
+                ? null
+                : (ambassadeurOui ? 'AMBASSADEUR' : 'REFUS'),
             whatsappStatus: ambassadeurOui
                 ? (memeNumeroWhatsapp! ? 'MEME_NUMERO' : 'AUTRE_NUMERO')
                 : null,
