@@ -5918,19 +5918,21 @@ export interface components {
       prospectsCreated: number;
       /** @description Représentants distincts appelés sur la période. */
       representantsContacted: number;
-      /** @description Appels à des représentants, issues encore saisissables seulement : REACHED, REFUSED, CALLBACK, UNREACHABLE. Dénominateur de `repContactRate` et de `repCallbackRate`. */
+      /** @description Appels à des représentants, issues encore saisissables : REACHED, REFUSED, CALLBACK, UNREACHABLE, WRONG_NUMBER. */
       repCalls: number;
+      /** @description Issue WRONG_NUMBER : faux numéro parmi les appels représentants. */
+      repWrongNumber: number;
       /** @description Représentants qui ont DÉCROCHÉ et répondu : REACHED ou REFUSED. Un refus est un contact ; un rappel promis n’en est pas encore un. */
       repReached: number;
       /** @description Issue CALLBACK : rappel promis, date posée. */
       repCallback: number;
       /** @description Issue UNREACHABLE : n’a pas décroché. */
       repUnreachable: number;
-      /** @description Issues d’héritage que le terrain ne saisit plus : PROSPECTS_PROMISED, WRONG_NUMBER, OTHER. Hors de tous les taux. */
+      /** @description Issues d’héritage que le terrain ne saisit plus : PROSPECTS_PROMISED, OTHER. Hors de tous les taux. */
       repOther: number;
       /** @description Part des appels représentants où quelqu’un a répondu, en pourcentage. `null` sans aucun appel. */
       repContactRate: number | null;
-      /** @description Part des appels représentants finissant en rappel, en pourcentage. */
+      /** @description Part des appels représentants finissant en rappel, en pourcentage. Dénominateur : appels hors faux numéro. */
       repCallbackRate: number | null;
       /** @description Représentants DISTINCTS dont la dernière réponse de la fenêtre a été obtenue par ce téléconseiller. Attribué à qui a obtenu la réponse, pas à qui a appelé le premier. NON SOMMABLE entre périodes ni entre téléconseillers. */
       repQuestioned: number;
@@ -5965,19 +5967,21 @@ export interface components {
       prospectsCreated: number;
       /** @description Représentants distincts appelés sur la période. */
       representantsContacted: number;
-      /** @description Appels à des représentants, issues encore saisissables seulement : REACHED, REFUSED, CALLBACK, UNREACHABLE. Dénominateur de `repContactRate` et de `repCallbackRate`. */
+      /** @description Appels à des représentants, issues encore saisissables : REACHED, REFUSED, CALLBACK, UNREACHABLE, WRONG_NUMBER. */
       repCalls: number;
+      /** @description Issue WRONG_NUMBER : faux numéro parmi les appels représentants. */
+      repWrongNumber: number;
       /** @description Représentants qui ont DÉCROCHÉ et répondu : REACHED ou REFUSED. Un refus est un contact ; un rappel promis n’en est pas encore un. */
       repReached: number;
       /** @description Issue CALLBACK : rappel promis, date posée. */
       repCallback: number;
       /** @description Issue UNREACHABLE : n’a pas décroché. */
       repUnreachable: number;
-      /** @description Issues d’héritage que le terrain ne saisit plus : PROSPECTS_PROMISED, WRONG_NUMBER, OTHER. Hors de tous les taux. */
+      /** @description Issues d’héritage que le terrain ne saisit plus : PROSPECTS_PROMISED, OTHER. Hors de tous les taux. */
       repOther: number;
       /** @description Part des appels représentants où quelqu’un a répondu, en pourcentage. `null` sans aucun appel. */
       repContactRate: number | null;
-      /** @description Part des appels représentants finissant en rappel, en pourcentage. */
+      /** @description Part des appels représentants finissant en rappel, en pourcentage. Dénominateur : appels hors faux numéro. */
       repCallbackRate: number | null;
       /** @description Représentants DISTINCTS dont la dernière réponse de la fenêtre a été obtenue par ce téléconseiller. Attribué à qui a obtenu la réponse, pas à qui a appelé le premier. NON SOMMABLE entre périodes ni entre téléconseillers. */
       repQuestioned: number;
@@ -6035,6 +6039,19 @@ export interface components {
       label: string;
       prospects: number;
     };
+    SupervisionRepStatutDto: {
+      /** Format: uuid */
+      id: string;
+      code: string;
+      label: string;
+      isActive: boolean;
+      count: number;
+    };
+    SupervisionRepStatutsDto: {
+      /** @description Représentants distincts comptés dans la répartition. */
+      total: number;
+      items: components['schemas']['SupervisionRepStatutDto'][];
+    };
     SupervisionActivityDto: {
       /** Format: date-time */
       from: string | null;
@@ -6053,6 +6070,8 @@ export interface components {
       prospectsByTeleconseiller: components['schemas']['SupervisionHistogramBarDto'][];
       /** @description Stock courant de prospects rattachés à chaque représentant. */
       prospectsByRepresentant: components['schemas']['SupervisionHistogramBarDto'][];
+      /** @description Répartition des représentants par statut de qualification, basée sur leur dernier appel portant un statut dans la fenêtre. `null` sans représentant dans la fenêtre. */
+      repQualificationStatuses: components['schemas']['SupervisionRepStatutsDto'] | null;
     };
     WorkShiftDto: {
       /** @enum {string} */
@@ -6324,6 +6343,7 @@ export interface components {
       | 'taux-de-contact'
       | 'a-rappeler'
       | 'taux-de-qualification'
+      | 'repartition-statuts-qualification'
       | 'taux-de-joignabilite'
       | 'prospects-notes'
       | 'adhesions'

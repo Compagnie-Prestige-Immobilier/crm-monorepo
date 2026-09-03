@@ -754,6 +754,7 @@ const LIGNE_VIDE = {
   prospectsCreated: 0,
   representantsContacted: 0,
   repCalls: 0,
+  repWrongNumber: 0,
   repReached: 0,
   repCallback: 0,
   repUnreachable: 0,
@@ -800,6 +801,7 @@ export class FakeActivity {
       scores: [],
       prospectsByTeleconseiller: this.prospectsByTeleconseiller,
       prospectsByRepresentant: this.prospectsByRepresentant,
+      repQualificationStatuses: null,
     });
   }
 

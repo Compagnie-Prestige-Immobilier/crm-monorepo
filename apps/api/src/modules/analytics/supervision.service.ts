@@ -550,43 +550,44 @@ export class SupervisionActivityService {
     const tcFilter = query.commercialId
       ? Prisma.sql`AND rca."performedById" = ${query.commercialId}`
       : Prisma.sql``;
-    const repStatuts = estGrandPublic
-      ? null
-      : await this.prisma.$queryRaw<{ id: string; code: string; label: string; isActive: boolean; count: number }[]>`
-        WITH last_calls AS (
-          SELECT DISTINCT ON (rca."representantId")
-            rca."representantId" AS "repId",
-            rca."statutQualificationId" AS "sid"
-          FROM "rep_call_attempts" rca
-          WHERE rca."statutQualificationId" IS NOT NULL
-            AND ${repWindow} ${tcFilter}
-          ORDER BY rca."representantId", rca."clientCreatedAt" DESC, rca."id" DESC
-        ),
-        counts AS (
-          SELECT "sid", COUNT(*)::int AS count
-          FROM last_calls
-          GROUP BY "sid"
-        )
-        SELECT sq.id, sq.code, sq.label, sq."isActive", COALESCE(c.count, 0)::int AS count
-        FROM "statuts_qualification" sq
-        LEFT JOIN counts c ON c."sid" = sq.id
-        WHERE sq."isActive" = TRUE OR c.count > 0
-        ORDER BY sq."sortOrder" ASC, sq."label" ASC
-      `;
-
-    const repQualificationStatuses: SupervisionRepStatutsDto | null =
-      repStatuts === null
-        ? null
-        : {
-            total: repStatuts.reduce((sum, row) => sum + row.count, 0),
-            items: repStatuts.map((row): SupervisionRepStatutDto => ({
-              id: row.id,
-              code: row.code,
-              label: row.label,
-              isActive: row.isActive,
-              count: row.count,
-            })),
-          };
+    let repQualificationStatuses: SupervisionRepStatutsDto | null = null;
+    if (!estGrandPublic) {
+      try {
+        const repStatuts = await this.prisma.$queryRaw<{ id: string; code: string; label: string; isActive: boolean; count: number }[]>`
+          WITH last_calls AS (
+            SELECT DISTINCT ON (rca."representantId")
+              rca."representantId" AS "repId",
+              rca."statutQualificationId" AS "sid"
+            FROM "rep_call_attempts" rca
+            WHERE rca."statutQualificationId" IS NOT NULL
+              AND ${repWindow} ${tcFilter}
+            ORDER BY rca."representantId", rca."clientCreatedAt" DESC, rca."id" DESC
+          ),
+          counts AS (
+            SELECT "sid", COUNT(*)::int AS count
+            FROM last_calls
+            GROUP BY "sid"
+          )
+          SELECT sq.id, sq.code, sq.label, sq."isActive", COALESCE(c.count, 0)::int AS count
+          FROM "statuts_qualification" sq
+          LEFT JOIN counts c ON c."sid" = sq.id
+          WHERE sq."isActive" = TRUE OR c.count > 0
+          ORDER BY sq."sortOrder" ASC, sq."label" ASC
+        `;
+        repQualificationStatuses = {
+          total: repStatuts.reduce((sum, row) => sum + row.count, 0),
+          items: repStatuts.map((row): SupervisionRepStatutDto => ({
+            id: row.id,
+            code: row.code,
+            label: row.label,
+            isActive: row.isActive,
+            count: row.count,
+          })),
+        };
+      } catch (error: unknown) {
+        this.logger.warn(`répartition des statuts indisponible: ${String(error)}`);
+      }
+    }
 
     return {
       from: query.actFrom ? inclusiveDateFrom(query.actFrom).toISOString() : null,

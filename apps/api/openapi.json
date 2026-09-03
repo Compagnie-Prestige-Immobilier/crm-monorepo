@@ -27171,7 +27171,11 @@
           },
           "repCalls": {
             "type": "number",
-            "description": "Appels à des représentants, issues encore saisissables seulement : REACHED, REFUSED, CALLBACK, UNREACHABLE. Dénominateur de `repContactRate` et de `repCallbackRate`."
+            "description": "Appels à des représentants, issues encore saisissables : REACHED, REFUSED, CALLBACK, UNREACHABLE, WRONG_NUMBER."
+          },
+          "repWrongNumber": {
+            "type": "number",
+            "description": "Issue WRONG_NUMBER : faux numéro parmi les appels représentants."
           },
           "repReached": {
             "type": "number",
@@ -27187,7 +27191,7 @@
           },
           "repOther": {
             "type": "number",
-            "description": "Issues d’héritage que le terrain ne saisit plus : PROSPECTS_PROMISED, WRONG_NUMBER, OTHER. Hors de tous les taux."
+            "description": "Issues d’héritage que le terrain ne saisit plus : PROSPECTS_PROMISED, OTHER. Hors de tous les taux."
           },
           "repContactRate": {
             "type": "number",
@@ -27197,7 +27201,7 @@
           "repCallbackRate": {
             "type": "number",
             "nullable": true,
-            "description": "Part des appels représentants finissant en rappel, en pourcentage."
+            "description": "Part des appels représentants finissant en rappel, en pourcentage. Dénominateur : appels hors faux numéro."
           },
           "repQuestioned": {
             "type": "number",
@@ -27236,6 +27240,7 @@
           "prospectsCreated",
           "representantsContacted",
           "repCalls",
+          "repWrongNumber",
           "repReached",
           "repCallback",
           "repUnreachable",
@@ -27296,7 +27301,11 @@
           },
           "repCalls": {
             "type": "number",
-            "description": "Appels à des représentants, issues encore saisissables seulement : REACHED, REFUSED, CALLBACK, UNREACHABLE. Dénominateur de `repContactRate` et de `repCallbackRate`."
+            "description": "Appels à des représentants, issues encore saisissables : REACHED, REFUSED, CALLBACK, UNREACHABLE, WRONG_NUMBER."
+          },
+          "repWrongNumber": {
+            "type": "number",
+            "description": "Issue WRONG_NUMBER : faux numéro parmi les appels représentants."
           },
           "repReached": {
             "type": "number",
@@ -27312,7 +27321,7 @@
           },
           "repOther": {
             "type": "number",
-            "description": "Issues d’héritage que le terrain ne saisit plus : PROSPECTS_PROMISED, WRONG_NUMBER, OTHER. Hors de tous les taux."
+            "description": "Issues d’héritage que le terrain ne saisit plus : PROSPECTS_PROMISED, OTHER. Hors de tous les taux."
           },
           "repContactRate": {
             "type": "number",
@@ -27322,7 +27331,7 @@
           "repCallbackRate": {
             "type": "number",
             "nullable": true,
-            "description": "Part des appels représentants finissant en rappel, en pourcentage."
+            "description": "Part des appels représentants finissant en rappel, en pourcentage. Dénominateur : appels hors faux numéro."
           },
           "repQuestioned": {
             "type": "number",
@@ -27350,6 +27359,7 @@
           "prospectsCreated",
           "representantsContacted",
           "repCalls",
+          "repWrongNumber",
           "repReached",
           "repCallback",
           "repUnreachable",
@@ -27493,6 +27503,44 @@
         },
         "required": ["id", "label", "prospects"]
       },
+      "SupervisionRepStatutDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": ["id", "code", "label", "isActive", "count"]
+      },
+      "SupervisionRepStatutsDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "description": "Représentants distincts comptés dans la répartition."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupervisionRepStatutDto"
+            }
+          }
+        },
+        "required": ["total", "items"]
+      },
       "SupervisionActivityDto": {
         "type": "object",
         "properties": {
@@ -27555,6 +27603,16 @@
             "items": {
               "$ref": "#/components/schemas/SupervisionHistogramBarDto"
             }
+          },
+          "repQualificationStatuses": {
+            "nullable": true,
+            "description": "Répartition des représentants par statut de qualification, basée sur leur dernier appel portant un statut dans la fenêtre. `null` sans représentant dans la fenêtre.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SupervisionRepStatutsDto"
+              }
+            ]
           }
         },
         "required": [
@@ -27566,7 +27624,8 @@
           "teleconseillers",
           "scores",
           "prospectsByTeleconseiller",
-          "prospectsByRepresentant"
+          "prospectsByRepresentant",
+          "repQualificationStatuses"
         ]
       },
       "WorkShiftDto": {
@@ -28251,6 +28310,7 @@
           "taux-de-contact",
           "a-rappeler",
           "taux-de-qualification",
+          "repartition-statuts-qualification",
           "taux-de-joignabilite",
           "prospects-notes",
           "adhesions",

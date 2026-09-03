@@ -29,6 +29,8 @@ abstract class _$SupervisionActivityRowDtoCWProxy {
 
   SupervisionActivityRowDto repCalls(num repCalls);
 
+  SupervisionActivityRowDto repWrongNumber(num repWrongNumber);
+
   SupervisionActivityRowDto repReached(num repReached);
 
   SupervisionActivityRowDto repCallback(num repCallback);
@@ -71,6 +73,7 @@ abstract class _$SupervisionActivityRowDtoCWProxy {
     num prospectsCreated,
     num representantsContacted,
     num repCalls,
+    num repWrongNumber,
     num repReached,
     num repCallback,
     num repUnreachable,
@@ -132,6 +135,10 @@ class _$SupervisionActivityRowDtoCWProxyImpl
 
   @override
   SupervisionActivityRowDto repCalls(num repCalls) => this(repCalls: repCalls);
+
+  @override
+  SupervisionActivityRowDto repWrongNumber(num repWrongNumber) =>
+      this(repWrongNumber: repWrongNumber);
 
   @override
   SupervisionActivityRowDto repReached(num repReached) =>
@@ -198,6 +205,7 @@ class _$SupervisionActivityRowDtoCWProxyImpl
     Object? prospectsCreated = const $CopyWithPlaceholder(),
     Object? representantsContacted = const $CopyWithPlaceholder(),
     Object? repCalls = const $CopyWithPlaceholder(),
+    Object? repWrongNumber = const $CopyWithPlaceholder(),
     Object? repReached = const $CopyWithPlaceholder(),
     Object? repCallback = const $CopyWithPlaceholder(),
     Object? repUnreachable = const $CopyWithPlaceholder(),
@@ -257,6 +265,10 @@ class _$SupervisionActivityRowDtoCWProxyImpl
           ? _value.repCalls
           // ignore: cast_nullable_to_non_nullable
           : repCalls as num,
+      repWrongNumber: repWrongNumber == const $CopyWithPlaceholder()
+          ? _value.repWrongNumber
+          // ignore: cast_nullable_to_non_nullable
+          : repWrongNumber as num,
       repReached: repReached == const $CopyWithPlaceholder()
           ? _value.repReached
           // ignore: cast_nullable_to_non_nullable
@@ -337,6 +349,7 @@ SupervisionActivityRowDto _$SupervisionActivityRowDtoFromJson(
       'prospectsCreated',
       'representantsContacted',
       'repCalls',
+      'repWrongNumber',
       'repReached',
       'repCallback',
       'repUnreachable',
@@ -366,6 +379,7 @@ SupervisionActivityRowDto _$SupervisionActivityRowDtoFromJson(
       (v) => v as num,
     ),
     repCalls: $checkedConvert('repCalls', (v) => v as num),
+    repWrongNumber: $checkedConvert('repWrongNumber', (v) => v as num),
     repReached: $checkedConvert('repReached', (v) => v as num),
     repCallback: $checkedConvert('repCallback', (v) => v as num),
     repUnreachable: $checkedConvert('repUnreachable', (v) => v as num),
@@ -402,6 +416,7 @@ Map<String, dynamic> _$SupervisionActivityRowDtoToJson(
   'prospectsCreated': instance.prospectsCreated,
   'representantsContacted': instance.representantsContacted,
   'repCalls': instance.repCalls,
+  'repWrongNumber': instance.repWrongNumber,
   'repReached': instance.repReached,
   'repCallback': instance.repCallback,
   'repUnreachable': instance.repUnreachable,
