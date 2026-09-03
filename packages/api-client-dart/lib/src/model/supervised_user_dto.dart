@@ -3,7 +3,7 @@
 //
 
 // ignore_for_file: unused_element
-import 'package:crm_api_client/src/model/score_dto.dart';
+import 'package:crm_api_client/src/model/performance_score.dart';
 import 'package:crm_api_client/src/model/presence_state.dart';
 import 'package:crm_api_client/src/model/role.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
@@ -200,7 +200,7 @@ class SupervisedUserDto {
   final num deadGaps;
 
   @JsonKey(name: r'score', required: true, includeIfNull: false)
-  final ScoreDto score;
+  final PerformanceScore score;
 
   bool operator ==(Object other) {
     return identical(this, other) ||

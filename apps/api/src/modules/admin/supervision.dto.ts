@@ -2,49 +2,10 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Role } from '@crm/database';
 
 import { WorkShiftDto } from '../analytics/supervision.dto.js';
-import type { ScoreKey, ScoreReason } from './performance-score.js';
+import { PerformanceScore } from './performance-score.js';
 import { PRESENCE_ONLINE_WINDOW_MINUTES, type PresenceState } from './presence.js';
 
 export const PRESENCE_STATES = ['ONLINE', 'RECENT', 'AWAY'] as const;
-
-export class ScorePartDto {
-  @ApiProperty({
-    enum: ['assiduite', 'regularite', 'rythme', 'contact', 'qualification', 'efficience'],
-  })
-  key!: ScoreKey;
-
-  @ApiProperty() label!: string;
-
-  @ApiProperty({ type: Number, description: 'Atteinte de la cible, de 0 à 1, plafonnée à 1.' })
-  ratio!: number;
-
-  @ApiProperty({ type: Number, description: 'Part de la note portée par ce critère.' })
-  weight!: number;
-}
-
-/** Déclaré avant ses porteurs : `emitDecoratorMetadata` lit le type à la définition de la classe. */
-export class ScoreDto {
-  @ApiProperty({
-    type: Number,
-    nullable: true,
-    description:
-      'Note de 0 à 100 sur la journée en cours. `null` quand rien ne peut être jugé : ' +
-      '`reason` dit alors pourquoi, et l’écran affiche le motif au lieu d’un zéro.',
-  })
-  value!: number | null;
-
-  @ApiProperty({
-    enum: ['journee_non_commencee', 'presence_non_mesuree', 'aucun_appel'],
-    nullable: true,
-  })
-  reason!: ScoreReason | null;
-
-  @ApiProperty({
-    type: () => [ScorePartDto],
-    description: 'Le détail qui compose la note. Vide quand `value` est nulle.',
-  })
-  parts!: ScorePartDto[];
-}
 
 export class SupervisedUserDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
@@ -219,8 +180,8 @@ export class SupervisedUserDto {
   @ApiProperty({ type: Number, description: 'Nombre de trous comptés dans `deadSeconds`.' })
   deadGaps!: number;
 
-  @ApiProperty({ type: () => ScoreDto })
-  score!: ScoreDto;
+  @ApiProperty({ type: () => PerformanceScore })
+  score!: PerformanceScore;
 }
 
 export class PresenceCountsDto {

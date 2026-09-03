@@ -2,6 +2,8 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Projet } from '@crm/database';
 import { IsEnum, IsISO8601, IsOptional, IsUUID, Matches } from 'class-validator';
 
+import { PerformanceScore } from '../admin/performance-score.js';
+
 export enum SupervisionGranularity {
   DAY = 'day',
   WEEK = 'week',
@@ -191,6 +193,56 @@ export class SupervisionHistogramBarDto {
   @ApiProperty({ type: Number }) prospects!: number;
 }
 
+export class SupervisionScoreDto {
+  @ApiProperty({ format: 'uuid' }) teleconseillerId!: string;
+  @ApiProperty() teleconseillerName!: string;
+
+  @ApiProperty({
+    type: Number,
+    description: 'Présence relevée dans les créneaux, en secondes, sur toute la fenêtre.',
+  })
+  activeSecondsInShifts!: number;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      'Secondes de créneau écoulées sur les seuls jours où le compte a été vu. La ' +
+      'journée en cours ne compte que sa portion passée ; un filtre horaire restreint ' +
+      'd’autant les créneaux.',
+  })
+  shiftSecondsElapsed!: number;
+
+  @ApiProperty({ type: Number, description: 'Tentatives, prospects et représentants confondus.' })
+  calls!: number;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      'Prospects dont le numéro s’est révélé exploitable, plus représentants ayant répondu.',
+  })
+  reached!: number;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      'Méthodes obtenues, plus représentants dont la DERNIÈRE réponse de la fenêtre est REACHED.',
+  })
+  qualified!: number;
+
+  @ApiProperty({ type: Number, description: 'Appels au-delà du premier sur une même fiche.' })
+  repeatCalls!: number;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      'Écarts de plus de quinze minutes entre deux appels du même créneau et du même jour.',
+  })
+  deadSeconds!: number;
+
+  @ApiProperty({ type: () => PerformanceScore })
+  score!: PerformanceScore;
+}
+
 export class SupervisionActivityDto {
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) from!: string | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) to!: string | null;
@@ -219,6 +271,15 @@ export class SupervisionActivityDto {
     description: 'Tous les téléconseillers, y compris ceux sans aucun acte sur la fenêtre.',
   })
   teleconseillers!: SupervisionTeleconseillerDto[];
+
+  @ApiProperty({
+    type: () => [SupervisionScoreDto],
+    description:
+      'Une note par téléconseiller pour TOUTE la fenêtre, recalculée depuis les appels ' +
+      'et la présence : rien n’est figé, corriger la définition corrige l’historique. ' +
+      'Vide si le calcul a échoué.',
+  })
+  scores!: SupervisionScoreDto[];
 
   @ApiProperty({
     type: () => [SupervisionHistogramBarDto],

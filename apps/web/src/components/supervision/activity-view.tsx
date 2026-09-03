@@ -13,16 +13,26 @@ import {
   ChevronsUpDownIcon,
   DownloadIcon,
   Clock3Icon,
+  GaugeIcon,
   PhoneCallIcon,
   PhoneOffIcon,
   TargetIcon,
   UserPlusIcon,
   type LucideIcon,
 } from 'lucide-react';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 
 import { DatePicker } from '@/components/filters/date-picker';
 import { QueryErrorState } from '@/components/query-error-state';
+import {
+  Fact,
+  ScoreBadge,
+  ScoreFacts,
+  ScoreParts,
+  ScoreToggle,
+  byScoreDesc,
+  callsPerActiveHour,
+} from '@/components/supervision/score';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -52,6 +62,8 @@ import {
   famillesDuProjet,
   fetchSupervisionActivite,
   fetchWorkShifts,
+  formatActiveDuration,
+  formatDuration,
   presetRange,
   sortActivityLines,
   supervisionActivityKey,
@@ -66,6 +78,7 @@ import {
   type PeriodPreset,
   type SortDirection,
   type SupervisionGranularity,
+  type SupervisionScore,
   type UpdateWorkShifts,
   type WorkShifts,
 } from '@/lib/data/admin';
@@ -306,6 +319,8 @@ export function ActivityView({ projet }: { projet: Projet }) {
 
       <ShiftComparison range={range} granularity={granularity} projet={projet} famille={famille} />
 
+      <ScoreSection scores={data.scores} />
+
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -406,6 +421,115 @@ export function ActivityView({ projet }: { projet: Projet }) {
         </Card>
       ) : null}
     </div>
+  );
+}
+
+/** Section à part, et non une colonne du tableau d'activité : la note ne suit ni
+    le tri par colonne, ni le filtre par famille, ni le découpage par jour. */
+function ScoreSection({ scores }: { scores: SupervisionScore[] }) {
+  const shiftsQuery = useQuery({
+    queryKey: ['supervision', 'creneaux'],
+    queryFn: () => fetchWorkShifts(),
+  });
+  const [openId, setOpenId] = useState<string | null>(null);
+
+  const creneaux = (shiftsQuery.data?.shifts ?? []).map(
+    (shift) => `${shift.label} ${shift.start}-${shift.end}`,
+  );
+
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <div className="px-5 py-4">
+          <h2
+            id="rendement-periode"
+            className="flex items-center gap-2 font-display text-[1.0625rem] font-[700]"
+          >
+            <GaugeIcon className="size-4" aria-hidden="true" />
+            Rendement sur la période
+          </h2>
+          <p className="mt-1 text-[0.8125rem] text-muted-foreground">
+            {creneaux.length > 0
+              ? `Note calculée sur ${creneaux.join(' et ')} ; rétrécir ces créneaux rétrécit d’autant la mesure. `
+              : ''}
+            Seuls les jours où le compte a été vu sont comptés : un dimanche ou un congé ne fait pas
+            baisser la note.
+          </p>
+        </div>
+
+        <Table aria-labelledby="rendement-periode">
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead>Téléconseiller</TableHead>
+              <TableHead>Rendement</TableHead>
+              <TableHead className="text-right">Appels</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {byScoreDesc(scores).map((row) => {
+              const open = openId === row.teleconseillerId;
+              return (
+                <Fragment key={row.teleconseillerId}>
+                  <TableRow>
+                    <th scope="row" className="px-3 py-2.5 text-left font-[400]">
+                      <ScoreToggle
+                        open={open}
+                        onToggle={() => {
+                          setOpenId(open ? null : row.teleconseillerId);
+                        }}
+                      >
+                        <span className="font-[600]">{row.teleconseillerName}</span>
+                      </ScoreToggle>
+                    </th>
+                    <TableCell>
+                      <ScoreBadge score={row.score} />
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatNumber(row.calls)}
+                    </TableCell>
+                  </TableRow>
+                  {open ? (
+                    <TableRow className="bg-secondary/40 hover:bg-secondary/40">
+                      <TableCell colSpan={3} className="px-5 pb-4 pt-2">
+                        <div className="grid gap-x-10 gap-y-4 md:grid-cols-2">
+                          <ScoreFacts title="Période">
+                            <Fact
+                              label="Présence en créneau"
+                              value={formatActiveDuration(row.activeSecondsInShifts)}
+                            />
+                            <Fact
+                              label="Créneaux écoulés"
+                              value={formatActiveDuration(row.shiftSecondsElapsed)}
+                            />
+                            <Fact
+                              label="Appels par heure active"
+                              value={callsPerActiveHour(row.calls, row.activeSecondsInShifts)}
+                            />
+                            <Fact label="Joints" value={formatNumber(row.reached)} />
+                            <Fact label="Qualifiés" value={formatNumber(row.qualified)} />
+                            <Fact label="Reprises" value={formatNumber(row.repeatCalls)} />
+                            <Fact label="Temps mort" value={formatDuration(row.deadSeconds)} />
+                          </ScoreFacts>
+
+                          <ScoreParts parts={row.score.parts} />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : null}
+                </Fragment>
+              );
+            })}
+            {scores.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={3} className="py-8 text-center">
+                  Aucune note sur cette période. Élargissez la période.
+                </TableCell>
+              </TableRow>
+            ) : null}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   );
 }
 
