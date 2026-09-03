@@ -25,6 +25,10 @@ abstract class _$RepresentantExportQueryDtoCWProxy {
     RepresentantRelation? relationStatus,
   );
 
+  RepresentantExportQueryDto statutQualificationId(
+    String? statutQualificationId,
+  );
+
   RepresentantExportQueryDto whatsappStatus(WhatsappStatus? whatsappStatus);
 
   RepresentantExportQueryDto hasWhatsapp(bool? hasWhatsapp);
@@ -48,6 +52,7 @@ abstract class _$RepresentantExportQueryDtoCWProxy {
     DateTime? dateTo,
     bool? hasProspects,
     RepresentantRelation? relationStatus,
+    String? statutQualificationId,
     WhatsappStatus? whatsappStatus,
     bool? hasWhatsapp,
     RepresentantSuivi? suivi,
@@ -93,6 +98,11 @@ class _$RepresentantExportQueryDtoCWProxyImpl
   ) => this(relationStatus: relationStatus);
 
   @override
+  RepresentantExportQueryDto statutQualificationId(
+    String? statutQualificationId,
+  ) => this(statutQualificationId: statutQualificationId);
+
+  @override
   RepresentantExportQueryDto whatsappStatus(WhatsappStatus? whatsappStatus) =>
       this(whatsappStatus: whatsappStatus);
 
@@ -124,6 +134,7 @@ class _$RepresentantExportQueryDtoCWProxyImpl
     Object? dateTo = const $CopyWithPlaceholder(),
     Object? hasProspects = const $CopyWithPlaceholder(),
     Object? relationStatus = const $CopyWithPlaceholder(),
+    Object? statutQualificationId = const $CopyWithPlaceholder(),
     Object? whatsappStatus = const $CopyWithPlaceholder(),
     Object? hasWhatsapp = const $CopyWithPlaceholder(),
     Object? suivi = const $CopyWithPlaceholder(),
@@ -162,6 +173,11 @@ class _$RepresentantExportQueryDtoCWProxyImpl
           ? _value.relationStatus
           // ignore: cast_nullable_to_non_nullable
           : relationStatus as RepresentantRelation?,
+      statutQualificationId:
+          statutQualificationId == const $CopyWithPlaceholder()
+          ? _value.statutQualificationId
+          // ignore: cast_nullable_to_non_nullable
+          : statutQualificationId as String?,
       whatsappStatus: whatsappStatus == const $CopyWithPlaceholder()
           ? _value.whatsappStatus
           // ignore: cast_nullable_to_non_nullable
@@ -218,6 +234,10 @@ RepresentantExportQueryDto _$RepresentantExportQueryDtoFromJson(
         unknownValue: RepresentantRelation.unknownDefaultOpenApi,
       ),
     ),
+    statutQualificationId: $checkedConvert(
+      'statutQualificationId',
+      (v) => v as String?,
+    ),
     whatsappStatus: $checkedConvert(
       'whatsappStatus',
       (v) => $enumDecodeNullable(
@@ -252,6 +272,8 @@ Map<String, dynamic> _$RepresentantExportQueryDtoToJson(
   if (instance.hasProspects case final value?) 'hasProspects': value,
   if (_$RepresentantRelationEnumMap[instance.relationStatus] case final value?)
     'relationStatus': value,
+  if (instance.statutQualificationId case final value?)
+    'statutQualificationId': value,
   if (_$WhatsappStatusEnumMap[instance.whatsappStatus] case final value?)
     'whatsappStatus': value,
   if (instance.hasWhatsapp case final value?) 'hasWhatsapp': value,
