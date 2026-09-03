@@ -37,6 +37,7 @@
   "devDependencies": {
     "@types/node": "catalog:",
     "eslint-plugin-sonarjs": "catalog:",
+    "fkill": "10.0.3",
     "knip": "catalog:",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
