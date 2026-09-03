@@ -85,6 +85,12 @@ const OUTCOME_PAR_EFFET: Record<StatutQualificationEffect, RepAnswer['outcome']>
 export const outcomeDuStatut = (effect: StatutQualificationEffect): RepAnswer['outcome'] =>
   OUTCOME_PAR_EFFET[effect];
 
+/** Ces effets closent l'appel : le script reste posé, plus rien n'y est exigé. */
+const EFFETS_SANS_SCRIPT: readonly StatutQualificationEffect[] = ['REFUSED', 'SCHEDULE_CALLBACK'];
+
+const scriptExige = (effect: StatutQualificationEffect): boolean =>
+  !EFFETS_SANS_SCRIPT.includes(effect);
+
 const KEYBOARD_MAP: readonly (readonly [string, string])[] = [
   ['C', 'Copier le numéro'],
   ['E', 'Corriger la fiche'],
@@ -888,7 +894,7 @@ interface EtatManque {
 function manqueDe(etat: EtatManque): string | null {
   if (etat.resultat === null) return 'Choisissez d’abord le résultat';
   if (etat.statut === null) return 'Choisissez un statut de qualification';
-  if (etat.joignable) {
+  if (etat.joignable && scriptExige(etat.statut.effect)) {
     const script = manqueJoignable({
       etablissementConfirme: etat.etablissementConfirme,
       nouvelEtablissement: etat.nouvelEtablissement,
@@ -910,10 +916,9 @@ function manqueDe(etat: EtatManque): string | null {
 }
 
 interface EtatReponse {
-  resultat: Resultat;
   statut: StatutQualification;
   joignable: boolean;
-  chuesOui: boolean;
+  ambassadeur: boolean | null;
   etablissementConfirme: boolean | null;
   nouvelEtablissement: string;
   contacte: boolean | null;
@@ -940,8 +945,13 @@ function champsJoignable(etat: EtatReponse): Partial<RepAnswer> {
   };
 }
 
+function champsRelation(etat: EtatReponse): Partial<RepAnswer> {
+  if (!etat.joignable || etat.ambassadeur === null) return {};
+  return { relationStatus: etat.ambassadeur ? ('AMBASSADEUR' as const) : ('REFUS' as const) };
+}
+
 function champsWhatsapp(etat: EtatReponse): Partial<RepAnswer> {
-  if (!etat.chuesOui) return {};
+  if (!etat.joignable || etat.ambassadeur !== true) return {};
   const meme = etat.memeWhatsapp === true;
   return {
     whatsappStatus: meme ? ('MEME_NUMERO' as const) : ('AUTRE_NUMERO' as const),
@@ -963,9 +973,7 @@ function reponseDe(etat: EtatReponse): RepAnswer {
   return {
     outcome: outcomeDuStatut(etat.statut.effect),
     statutQualificationId: etat.statut.id,
-    ...(etat.resultat === 'JOIGNABLE'
-      ? { relationStatus: etat.chuesOui ? ('AMBASSADEUR' as const) : ('REFUS' as const) }
-      : {}),
+    ...champsRelation(etat),
     ...champsJoignable(etat),
     ...champsWhatsapp(etat),
     ...(etat.statut.requiresCallback && etat.rappelAt !== null
@@ -1066,10 +1074,9 @@ function Qualification({
     if (manque !== null || resultat === null || statut === null || send.isPending) return;
     send.mutate(
       reponseDe({
-        resultat,
         statut,
         joignable,
-        chuesOui: joignable && ambassadeur === true,
+        ambassadeur,
         etablissementConfirme,
         nouvelEtablissement,
         contacte,

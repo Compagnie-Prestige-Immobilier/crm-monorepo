@@ -282,3 +282,108 @@ describe('l’enregistrement attend le statut', () => {
     });
   });
 });
+
+describe('l’effet du statut décide si le script est exigé', () => {
+  it('laisse « À rappeler » enregistrer sans une seule réponse du script', async () => {
+    await ouvrirQualification();
+    await repondre('Joignable');
+    await choisirStatut('À rappeler');
+    await repondre('Demain 9 h');
+    await userEvent.click(screen.getByRole('button', { name: 'Continuer' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(() => {
+      expect(pushRepCallAttempt).toHaveBeenCalledTimes(1);
+    });
+    const envoi = pushRepCallAttempt.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(envoi).toMatchObject({ outcome: 'CALLBACK', statutQualificationId: 's-3' });
+    expect(envoi['etablissementConfirme']).toBeUndefined();
+    expect(envoi['contacte']).toBeUndefined();
+    expect(envoi['connaitUES']).toBeUndefined();
+    expect(typeof envoi['callbackAt']).toBe('string');
+  });
+
+  it('exige quand même la date de rappel, script vierge ou non', async () => {
+    await ouvrirQualification();
+    await repondre('Joignable');
+    await choisirStatut('À rappeler');
+
+    expect(screen.getByText('Choisissez quand rappeler')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Continuer' }).hasAttribute('disabled')).toBe(true);
+  });
+
+  it('garde les questions du script affichées, facultatives et répondables', async () => {
+    await ouvrirQualification();
+    await repondre('Joignable');
+    await choisirStatut('Non intéressé');
+
+    expect(screen.getByText('L’établissement de la fiche est-il confirmé ?')).toBeTruthy();
+
+    await repondreA('A-t-il déjà été contacté ?', 'Oui');
+    await userEvent.click(screen.getByRole('button', { name: 'Continuer' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(() => {
+      expect(pushRepCallAttempt).toHaveBeenCalledTimes(1);
+    });
+    expect(pushRepCallAttempt.mock.calls[0]?.[0]).toMatchObject({ contacte: true });
+  });
+
+  it('laisse un statut d’effet REFUSED enregistrer sans réponse ni date', async () => {
+    await ouvrirQualification();
+    await repondre('Joignable');
+    await choisirStatut('Non intéressé');
+
+    expect(screen.queryByText('Quand rappeler ?')).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Continuer' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(() => {
+      expect(pushRepCallAttempt).toHaveBeenCalledTimes(1);
+    });
+    const envoi = pushRepCallAttempt.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(envoi).toMatchObject({ outcome: 'REFUSED', statutQualificationId: 's-2' });
+    expect(envoi['callbackAt']).toBeUndefined();
+  });
+
+  it('n’envoie aucune relation quand la question CPI CHUES reste sans réponse', async () => {
+    await ouvrirQualification();
+    await repondre('Joignable');
+    await choisirStatut('Non intéressé');
+    await userEvent.click(screen.getByRole('button', { name: 'Continuer' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(() => {
+      expect(pushRepCallAttempt).toHaveBeenCalledTimes(1);
+    });
+    const envoi = pushRepCallAttempt.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(envoi['relationStatus']).toBeUndefined();
+  });
+
+  it('exige le script en entier sous un statut d’effet REACHED', async () => {
+    await ouvrirQualification();
+    await repondre('Joignable');
+    await choisirStatut('Intéressé');
+
+    expect(screen.getByText('Dites si l’établissement est confirmé')).toBeTruthy();
+
+    await repondreA('L’établissement de la fiche est-il confirmé ?', 'Oui');
+
+    expect(screen.getByText('Dites s’il a déjà été contacté')).toBeTruthy();
+
+    await repondreA('A-t-il déjà été contacté ?', 'Oui');
+    await repondreA('Connaît-il l’UES ?', 'Oui');
+
+    expect(screen.getByText('Dites s’il est représentant CPI CHUES')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Continuer' }).hasAttribute('disabled')).toBe(true);
+  });
+
+  it('demande le statut avant le script, puisque c’est lui qui l’exige', async () => {
+    await ouvrirQualification();
+    await repondre('Joignable');
+
+    expect(screen.getByText('Choisissez un statut de qualification')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Continuer' }).hasAttribute('disabled')).toBe(true);
+  });
+});
