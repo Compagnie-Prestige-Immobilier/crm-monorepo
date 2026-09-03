@@ -296,7 +296,7 @@ describe('DashboardVisitesView', () => {
       source: 'utilisateur',
       updatedAt: null,
     });
-    fetchStatsMock.mockResolvedValue({ ...stats, parObjet: [bucket('o1', 'VERSEMENT', 0)] });
+    fetchStatsMock.mockResolvedValue({ ...stats, parObjet: [] });
     // oxlint-disable-next-line jsx-a11y/aria-role -- prop métier, pas un rôle ARIA
     renderWithQuery(<DashboardVisitesView role="ACCUEIL" />);
 

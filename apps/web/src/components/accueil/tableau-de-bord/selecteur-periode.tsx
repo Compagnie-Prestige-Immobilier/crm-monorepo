@@ -40,7 +40,7 @@ const LIBELLES_COMPARAISON: Record<Comparaison, string> = {
 };
 
 function defaultRange(): Plage {
-  return plageDuPreset('ce-mois', new Date());
+  return plageDuPreset('aujourdhui', new Date());
 }
 
 export function dashboardFiltersFromParams(params: URLSearchParams): DashboardFilters {
@@ -59,7 +59,7 @@ export function dashboardFiltersFromParams(params: URLSearchParams): DashboardFi
 
   const validPreset = PILLS.some((pill) => pill.preset === preset)
     ? (preset as PeriodePreset)
-    : 'ce-mois';
+    : 'aujourdhui';
   const plage = plageDuPreset(validPreset, new Date());
   return { preset: validPreset, du: plage.du, au: plage.au, comparaison };
 }
@@ -78,7 +78,7 @@ export const dashboardFiltersAdapter: UrlFilterAdapter<DashboardFilters> = {
   },
   cleared: () => {
     const plage = defaultRange();
-    return { preset: 'ce-mois', du: plage.du, au: plage.au, comparaison: 'aucune' };
+    return { preset: 'aujourdhui', du: plage.du, au: plage.au, comparaison: 'aucune' };
   },
 };
 

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/providers/app_providers.dart';
@@ -31,6 +32,7 @@ class HomeScreen extends ConsumerWidget {
     final ThemeData theme = Theme.of(context);
     final AuthState auth = ref.watch(authControllerProvider);
     final AsyncValue<int> representants = ref.watch(representantCountProvider);
+    final AsyncValue<int> appeles = ref.watch(representantsAppelesProvider);
     final AsyncValue<int> prospects = ref.watch(prospectCountProvider);
     final AsyncValue<int> sansProspect = ref.watch(
       representantsSansProspectProvider,
@@ -38,8 +40,11 @@ class HomeScreen extends ConsumerWidget {
     final List<ActivityDay> activity =
         ref.watch(activityLast7DaysProvider).value ?? const <ActivityDay>[];
     final bool chiffresIllisibles =
-        representants.hasError || prospects.hasError || sansProspect.hasError;
-    final AsyncValue<int> aQualifier = representants;
+        representants.hasError ||
+        appeles.hasError ||
+        prospects.hasError ||
+        sansProspect.hasError;
+    final int? total = representants.value;
     final AsyncValue<int> aConvertir = prospects;
 
     // Sans liste confiée, la qualification passe par l'annuaire : le
@@ -61,6 +66,7 @@ class HomeScreen extends ConsumerWidget {
             actionLabel: 'Réessayer',
             onAction: () {
               ref.invalidate(representantCountProvider);
+              ref.invalidate(representantsAppelesProvider);
               ref.invalidate(prospectCountProvider);
               ref.invalidate(representantsSansProspectProvider);
             },
@@ -69,10 +75,10 @@ class HomeScreen extends ConsumerWidget {
       _EtapeCard(
         rang: 1,
         titre: 'Qualifier les représentants',
-        phrase: 'Appelez chaque représentant et notez sa réponse.',
-        compte: aQualifier,
+        phrase: 'Notez la réponse de chaque représentant appelé.',
+        compte: appeles,
         libelle: (int n) =>
-            n == 1 ? 'représentant à appeler' : 'représentants à appeler',
+            '${n == 1 ? 'appelé' : 'appelés'} sur ${total ?? '…'} représentants',
         onTap: ouvrirQualification,
       ),
       _EtapeCard(
@@ -283,7 +289,7 @@ class _Raccourcis extends ConsumerWidget {
           PhosphorIconsRegular.addressBook,
           size: CpiIconSize.lg,
         ),
-        onTap: () => context.pushOnce(Routes.mesContacts),
+        onTap: () => context.go(Routes.mesContacts),
       ),
       CpiRow(
         title: unread == 0

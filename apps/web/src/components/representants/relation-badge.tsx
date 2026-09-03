@@ -13,11 +13,22 @@ const VARIANTS: Record<RepresentantRelation, NonNullable<BadgeProps['variant']>>
   REFUS: 'destructive',
 };
 
-export function RelationBadge({ status }: { status: RepresentantRelation }) {
+/**
+ * Le statut de qualification est le libellé visible ; `relationStatus` ne
+ * décide plus que de la couleur et de l'étoile. Les fiches jamais qualifiées
+ * retombent sur le libellé de la relation.
+ */
+export function RelationBadge({
+  status,
+  label,
+}: {
+  status: RepresentantRelation;
+  label?: string | null;
+}) {
   return (
     <Badge variant={VARIANTS[status]}>
       {status === 'AMBASSADEUR' ? <StarIcon className="fill-current" aria-hidden="true" /> : null}
-      {REPRESENTANT_RELATION_LABELS[status]}
+      {label ?? REPRESENTANT_RELATION_LABELS[status]}
     </Badge>
   );
 }

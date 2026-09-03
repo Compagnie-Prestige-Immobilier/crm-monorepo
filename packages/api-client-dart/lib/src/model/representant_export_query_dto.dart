@@ -38,6 +38,8 @@ class RepresentantExportQueryDto {
 
     this.relationStatus,
 
+    this.statutQualificationId,
+
     this.whatsappStatus,
 
     this.hasWhatsapp,
@@ -81,6 +83,14 @@ class RepresentantExportQueryDto {
   )
   final RepresentantRelation? relationStatus;
 
+  /// Statut de qualification du dernier appel. Sert le filtre de l’annuaire ET le tirage d’un lot d’appels.
+  @JsonKey(
+    name: r'statutQualificationId',
+    required: false,
+    includeIfNull: false,
+  )
+  final String? statutQualificationId;
+
   @JsonKey(
     name: r'whatsappStatus',
     required: false,
@@ -119,6 +129,7 @@ class RepresentantExportQueryDto {
                 dateTo,
                 hasProspects,
                 relationStatus,
+                statutQualificationId,
                 whatsappStatus,
                 hasWhatsapp,
                 suivi,
@@ -133,6 +144,7 @@ class RepresentantExportQueryDto {
                 other.dateTo,
                 other.hasProspects,
                 other.relationStatus,
+                other.statutQualificationId,
                 other.whatsappStatus,
                 other.hasWhatsapp,
                 other.suivi,
@@ -153,6 +165,7 @@ class RepresentantExportQueryDto {
         dateTo,
         hasProspects,
         relationStatus,
+        statutQualificationId,
         whatsappStatus,
         hasWhatsapp,
         suivi,

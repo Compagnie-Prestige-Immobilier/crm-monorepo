@@ -161,7 +161,7 @@ export class LotsExportController {
     operationId: 'mesAttributions',
     summary: 'Les fiches attribuées à l’appelant, tous lots confondus.',
     description:
-      'Sert au mobile à borner son tirage. `tout: true` pour ADMIN, SUPERVISEUR et DIRECTION : les deux listes sont alors vides et aucun filtre ne s’applique.',
+      'Sert au mobile à borner son tirage. `tout: true` pour ADMIN seulement : les deux listes sont alors vides et aucun filtre ne s’applique. Supervision et direction ne voient sur le téléphone que les fiches qu’une campagne leur a confiées.',
   })
   @ApiResponse({ status: 200, type: MesAttributionsDto })
   mesAttributions(@CurrentUser() user: AuthenticatedUser): Promise<MesAttributionsDto> {

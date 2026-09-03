@@ -10,6 +10,7 @@ import 'package:cpi_go/features/accueil/presentation/chiffres_screen.dart';
 import 'package:cpi_go/features/accueil/presentation/registre_screen.dart';
 import 'package:cpi_go/features/auth/auth_controller.dart';
 import 'package:cpi_go/features/auth/auth_state.dart';
+import 'package:cpi_go/features/contacts/presentation/mes_contacts_screen.dart';
 import 'package:cpi_go/features/corrections/presentation/corrections_screen.dart';
 import 'package:cpi_go/features/reglages/presentation/reglages_screen.dart';
 import 'package:cpi_go/features/shell/grand_public_fiches_screen.dart';
@@ -137,7 +138,7 @@ void main() {
   });
 
   coqueTestWidgets(
-    'le Grand Public a Accueil, Fiches, À corriger et Réglages',
+    'le Grand Public a Accueil, Fiches, Contacts et Réglages',
     (WidgetTester tester) async {
       await open(tester, 'COMMERCIAL', Routes.grandPublic);
 
@@ -146,10 +147,20 @@ void main() {
       await onglet(tester, 'Fiches');
       expect(find.byType(GrandPublicFichesScreen), findsOneWidget);
 
+      await onglet(tester, 'Contacts');
+      expect(find.byType(MesContactsScreen), findsOneWidget);
+
       await onglet(tester, 'Réglages');
       expect(find.byType(ReglagesScreen), findsOneWidget);
 
-      await onglet(tester, 'À corriger');
+      // « À corriger » a quitté le pied : il se pousse depuis les réglages.
+      await tester.tap(
+        find.descendant(
+          of: find.byType(ReglagesScreen),
+          matching: find.text('À corriger'),
+        ),
+      );
+      await settle(tester);
       expect(find.byType(CorrectionsScreen), findsOneWidget);
     },
   );

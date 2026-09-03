@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/providers/app_providers.dart';
@@ -31,7 +30,7 @@ class SyncBadge extends ConsumerWidget {
           : '$count élément${count > 1 ? 's' : ''} en attente de synchronisation',
       count: count,
       emphasis: !clean,
-      onTap: () => context.go(correctionsDeLaCoque(context)),
+      onTap: () => ouvrirCorrections(context),
     );
   }
 }

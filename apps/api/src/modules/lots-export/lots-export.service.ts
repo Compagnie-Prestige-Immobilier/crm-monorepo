@@ -6,7 +6,7 @@ import type { Writable } from 'node:stream';
 import { PassThrough } from 'node:stream';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { buildProspectWhere } from '../../common/prospect-where.js';
-import { readsEveryone } from '../../common/scope.js';
+import { isAdmin } from '../../common/scope.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { RepresentantExportQueryDto } from '../representants/dto.js';
 import { suiviWhere } from '../representants/representants.service.js';
@@ -242,7 +242,7 @@ export class LotsExportService {
    * seul les fiches supprimées, sans qu'un `deletedAt` traîne côté item.
    */
   async mesAttributions(user: AuthenticatedUser): Promise<MesAttributionsDto> {
-    if (readsEveryone(user)) return { representantIds: [], prospectIds: [], tout: true };
+    if (isAdmin(user)) return { representantIds: [], prospectIds: [], tout: true };
 
     const [representants, prospects] = await Promise.all([
       this.prisma.lotExportItem.findMany({

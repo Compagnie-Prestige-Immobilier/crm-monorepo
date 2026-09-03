@@ -56,7 +56,10 @@ class SyncEngine {
   /// v3 : les commentaires d'une fiche remontent depuis la file hors ligne.
   /// v4 : les liens banque, syndicat et représentant d'un prospect peuvent
   /// être nuls ; le tirage exige ce numéro en en-tête et refuse en dessous.
-  static const int payloadVersion = 5;
+  /// v6 : la tentative auprès d'un représentant porte `statutQualificationId`.
+  /// C'est ce nombre que la route dédiée compare au `minPayloadVersion` de
+  /// chaque statut ; en dessous, aucun statut ne descend.
+  static const int payloadVersion = 6;
 
   /// Poids qu'un lot peut atteindre sur le fil ; c'est lui que le `sendTimeout`
   /// du profil `push` doit pouvoir émettre sur un lien montant EDGE.
@@ -1272,6 +1275,7 @@ class SyncEngine {
     _pulling = true;
     try {
       await pullCallOutcomeReasons();
+      await pullStatutsQualification();
       int applied = 0;
       String? cursor = await readCursor();
       bool listesBougees = false;
@@ -1373,6 +1377,49 @@ class SyncEngine {
                 sortOrder: Value<int>(r.sortOrder.toInt()),
                 color: Value<String?>(r.color),
                 minPayloadVersion: Value<int>(r.minPayloadVersion.toInt()),
+              ),
+            );
+      }
+    });
+    return items.length;
+  }
+
+  /// Le vocabulaire de qualification d'un représentant, REMPLACÉ en entier.
+  ///
+  /// Même route dédiée que les motifs d'appel, hors curseur keyset : un
+  /// téléphone déjà en service se peuple à la première synchronisation. Le
+  /// remplacement est franc, contrairement aux motifs : le champ est FACULTATIF
+  /// dans le contrat, et une tentative en file qui citerait un statut retiré
+  /// part sans lui plutôt qu'en échec définitif.
+  ///
+  /// L'ordre d'affichage se décide au serveur : le rang servi est recopié dans
+  /// `position`, faute de quoi la liste se réordonnerait toute seule.
+  Future<int> pullStatutsQualification() async {
+    final List<StatutQualificationDto> items;
+    try {
+      items = await _api.pullStatutsQualification(
+        payloadVersion: payloadVersion,
+      );
+    } on ApiException {
+      return 0;
+    }
+    if (items.isEmpty) return 0;
+    await _db.transaction(() async {
+      await _db.delete(_db.statutsQualification).go();
+      for (int rang = 0; rang < items.length; rang++) {
+        final StatutQualificationDto statut = items[rang];
+        await _db
+            .into(_db.statutsQualification)
+            .insertOnConflictUpdate(
+              StatutsQualificationCompanion.insert(
+                code: statut.code,
+                id: statut.id,
+                label: statut.label,
+                effect: statut.effect.value,
+                requiresCallback: Value<bool>(statut.requiresCallback),
+                isActive: Value<bool>(statut.isActive),
+                position: Value<int>(rang),
+                minPayloadVersion: Value<int>(statut.minPayloadVersion.toInt()),
               ),
             );
       }
@@ -2041,6 +2088,7 @@ class SyncEngine {
                 departementId: r.departementId,
                 iefId: Value<String?>(r.iefId),
                 relationStatus: Value<String>(r.relationStatus.value),
+                statutQualificationId: Value<String?>(r.statutQualificationId),
                 whatsappStatus: Value<String>(r.whatsappStatus.value),
                 whatsappE164: Value<String?>(r.whatsappE164),
                 profession: Value<String?>(r.profession),
@@ -2052,6 +2100,7 @@ class SyncEngine {
                 lastCallOutcome: Value<String?>(r.lastCallOutcome?.value),
                 lastCallAt: Value<DateTime?>(r.lastCallAt),
                 lastCallById: Value<String?>(r.lastCallById),
+                callAttemptCount: Value<int>(r.callAttemptCount.toInt()),
                 nextCallbackAt: Value<DateTime?>(r.nextCallbackAt),
                 createdById: r.createdById,
                 clientCreatedAt: r.clientCreatedAt,
@@ -2074,6 +2123,9 @@ class SyncEngine {
                   iefId: const CustomExpression<String>('excluded.ief_id'),
                   relationStatus: const CustomExpression<String>(
                     'excluded.relation_status',
+                  ),
+                  statutQualificationId: const CustomExpression<String>(
+                    'excluded.statut_qualification_id',
                   ),
                   whatsappStatus: const CustomExpression<String>(
                     'excluded.whatsapp_status',
@@ -2102,6 +2154,9 @@ class SyncEngine {
                   lastCallById: const CustomExpression<String>(
                     'excluded.last_call_by_id',
                   ),
+                  callAttemptCount: const CustomExpression<int>(
+                    'excluded.call_attempt_count',
+                  ),
                   nextCallbackAt: const CustomExpression<DateTime>(
                     'excluded.next_callback_at',
                   ),
@@ -2113,9 +2168,18 @@ class SyncEngine {
                     'excluded.local_updated_at',
                   ),
                 ),
-                where: (Representants old) => const CustomExpression<int>(
-                  'excluded.rev',
-                ).isBiggerThan(old.rev),
+                // Un `rev` égal ne revient que sur une page rejouée ou après
+                // un curseur remis à zéro : la relire est sans effet, sauf
+                // pour les colonnes apparues depuis. Une saisie en file, elle,
+                // garde la main jusqu'à sa remontée.
+                where: (Representants old) => const CustomExpression<bool>(
+                  'excluded.rev > representants.rev OR ('
+                  'excluded.rev = representants.rev AND NOT EXISTS ('
+                  'SELECT 1 FROM outbox o WHERE o.status IN '
+                  "('pending', 'syncing', 'conflict', 'failed') "
+                  'AND (o.entity_id = representants.id '
+                  'OR o.dependency_key = representants.id)))',
+                ),
               ),
             );
         count++;
@@ -2154,6 +2218,7 @@ class SyncEngine {
                 lastCallOutcome: Value<String?>(p.lastCallOutcome?.value),
                 lastCallAt: Value<DateTime?>(p.lastCallAt),
                 lastCallById: Value<String?>(p.lastCallById),
+                callAttemptCount: Value<int>(p.callAttemptCount.toInt()),
                 createdById: p.ownedByCommercialId,
                 statut: Value<String>(p.statut.value),
                 clientCreatedAt: p.clientCreatedAt,
@@ -2237,6 +2302,9 @@ class SyncEngine {
                   lastCallById: const CustomExpression<String>(
                     'excluded.last_call_by_id',
                   ),
+                  callAttemptCount: const CustomExpression<int>(
+                    'excluded.call_attempt_count',
+                  ),
                   statut: const CustomExpression<String>('excluded.statut'),
                   rev: const CustomExpression<int>('excluded.rev'),
                   serverUpdatedAt: const CustomExpression<DateTime>(
@@ -2249,9 +2317,15 @@ class SyncEngine {
                     'excluded.deleted_at',
                   ),
                 ),
-                where: (Prospects old) => const CustomExpression<int>(
-                  'excluded.rev',
-                ).isBiggerThan(old.rev),
+                where: (Prospects old) => const CustomExpression<bool>(
+                  'excluded.rev > prospects.rev OR ('
+                  'excluded.rev = prospects.rev AND NOT EXISTS ('
+                  'SELECT 1 FROM outbox o WHERE o.status IN '
+                  "('pending', 'syncing', 'conflict', 'failed') "
+                  'AND (o.entity_id = prospects.id '
+                  'OR o.dependency_key = prospects.id '
+                  "OR o.dependency_key = 'phase2:' || prospects.id)))",
+                ),
               ),
             );
         // Les parcours, sans arbitrage : un parcours s'ouvre et ne se ferme

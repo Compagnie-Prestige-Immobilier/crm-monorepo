@@ -94,4 +94,17 @@ describe('assainissement de la disposition d’un écran de chiffres', () => {
     expect(direction).toContain('couverture-derniere-campagne');
     expect(direction).toContain('hors-attribution-derniere-campagne');
   });
+
+  it('met la répartition des statuts de qualification en graphique large dès l’usine', () => {
+    const widget = dispositionUsine('chues').widgets.find(
+      (item) => item.source === 'repartition-statuts-qualification',
+    );
+
+    expect(widget).toMatchObject({
+      source: 'repartition-statuts-qualification',
+      marque: 'barres-horizontales',
+      taille: 'pleine',
+      presentation: { valeurs: true },
+    });
+  });
 });

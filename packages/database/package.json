@@ -27,6 +27,7 @@
     "db:studio": "prisma studio",
     "db:seed": "tsx src/seed.ts",
     "db:seed:demo": "tsx src/demo-workspace-seed.ts",
+    "db:seed:dev-chues": "tsx src/seed-dev-chues.ts",
     "db:deploy:one": "prisma migrate deploy"
   },
   "dependencies": {

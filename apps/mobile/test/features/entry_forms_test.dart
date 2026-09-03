@@ -1683,8 +1683,7 @@ void main() {
       await tester.pumpWidget(hostPicker());
       await tester.pumpAndSettle();
 
-      expect(find.text('Cherchez un représentant'), findsOneWidget);
-      expect(find.text('Tapez son nom ou son numéro.'), findsOneWidget);
+      expect(find.text('Aucune fiche dans vos campagnes.'), findsOneWidget);
       expect(bouton('Créer un représentant'), findsNothing);
 
       await tester.enterText(find.byType(EditableText).first, 'Ousmane');
@@ -1777,7 +1776,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Ambassadeur'));
+      await tester.tap(find.text('A accepté'));
       await tester.pumpAndSettle();
       await jusquAuContact(tester);
       await tester.tap(find.text('Enregistrer et saisir des prospects'));

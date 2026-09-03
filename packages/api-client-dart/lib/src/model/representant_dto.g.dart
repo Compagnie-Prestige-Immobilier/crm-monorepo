@@ -39,6 +39,10 @@ abstract class _$RepresentantDtoCWProxy {
 
   RepresentantDto relationStatus(RepresentantRelation relationStatus);
 
+  RepresentantDto statutQualificationId(String? statutQualificationId);
+
+  RepresentantDto statutQualificationLabel(String? statutQualificationLabel);
+
   RepresentantDto whatsappStatus(WhatsappStatus whatsappStatus);
 
   RepresentantDto whatsappE164(String? whatsappE164);
@@ -60,6 +64,8 @@ abstract class _$RepresentantDtoCWProxy {
   RepresentantDto lastCallOutcome(RepCallOutcome? lastCallOutcome);
 
   RepresentantDto lastCallAt(DateTime? lastCallAt);
+
+  RepresentantDto callAttemptCount(num callAttemptCount);
 
   RepresentantDto lastCallById(String? lastCallById);
 
@@ -90,6 +96,8 @@ abstract class _$RepresentantDtoCWProxy {
     DateTime updatedAt,
     num prospectCount,
     RepresentantRelation relationStatus,
+    String? statutQualificationId,
+    String? statutQualificationLabel,
     WhatsappStatus whatsappStatus,
     String? whatsappE164,
     String? whatsappNumber,
@@ -101,6 +109,7 @@ abstract class _$RepresentantDtoCWProxy {
     bool? contacte,
     RepCallOutcome? lastCallOutcome,
     DateTime? lastCallAt,
+    num callAttemptCount,
     String? lastCallById,
     String? lastCallByName,
     DateTime? nextCallbackAt,
@@ -169,6 +178,14 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
       this(relationStatus: relationStatus);
 
   @override
+  RepresentantDto statutQualificationId(String? statutQualificationId) =>
+      this(statutQualificationId: statutQualificationId);
+
+  @override
+  RepresentantDto statutQualificationLabel(String? statutQualificationLabel) =>
+      this(statutQualificationLabel: statutQualificationLabel);
+
+  @override
   RepresentantDto whatsappStatus(WhatsappStatus whatsappStatus) =>
       this(whatsappStatus: whatsappStatus);
 
@@ -209,6 +226,10 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
       this(lastCallAt: lastCallAt);
 
   @override
+  RepresentantDto callAttemptCount(num callAttemptCount) =>
+      this(callAttemptCount: callAttemptCount);
+
+  @override
   RepresentantDto lastCallById(String? lastCallById) =>
       this(lastCallById: lastCallById);
 
@@ -244,6 +265,8 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
     Object? updatedAt = const $CopyWithPlaceholder(),
     Object? prospectCount = const $CopyWithPlaceholder(),
     Object? relationStatus = const $CopyWithPlaceholder(),
+    Object? statutQualificationId = const $CopyWithPlaceholder(),
+    Object? statutQualificationLabel = const $CopyWithPlaceholder(),
     Object? whatsappStatus = const $CopyWithPlaceholder(),
     Object? whatsappE164 = const $CopyWithPlaceholder(),
     Object? whatsappNumber = const $CopyWithPlaceholder(),
@@ -255,6 +278,7 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
     Object? contacte = const $CopyWithPlaceholder(),
     Object? lastCallOutcome = const $CopyWithPlaceholder(),
     Object? lastCallAt = const $CopyWithPlaceholder(),
+    Object? callAttemptCount = const $CopyWithPlaceholder(),
     Object? lastCallById = const $CopyWithPlaceholder(),
     Object? lastCallByName = const $CopyWithPlaceholder(),
     Object? nextCallbackAt = const $CopyWithPlaceholder(),
@@ -324,6 +348,16 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
           ? _value.relationStatus
           // ignore: cast_nullable_to_non_nullable
           : relationStatus as RepresentantRelation,
+      statutQualificationId:
+          statutQualificationId == const $CopyWithPlaceholder()
+          ? _value.statutQualificationId
+          // ignore: cast_nullable_to_non_nullable
+          : statutQualificationId as String?,
+      statutQualificationLabel:
+          statutQualificationLabel == const $CopyWithPlaceholder()
+          ? _value.statutQualificationLabel
+          // ignore: cast_nullable_to_non_nullable
+          : statutQualificationLabel as String?,
       whatsappStatus: whatsappStatus == const $CopyWithPlaceholder()
           ? _value.whatsappStatus
           // ignore: cast_nullable_to_non_nullable
@@ -368,6 +402,10 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
           ? _value.lastCallAt
           // ignore: cast_nullable_to_non_nullable
           : lastCallAt as DateTime?,
+      callAttemptCount: callAttemptCount == const $CopyWithPlaceholder()
+          ? _value.callAttemptCount
+          // ignore: cast_nullable_to_non_nullable
+          : callAttemptCount as num,
       lastCallById: lastCallById == const $CopyWithPlaceholder()
           ? _value.lastCallById
           // ignore: cast_nullable_to_non_nullable
@@ -416,6 +454,8 @@ RepresentantDto _$RepresentantDtoFromJson(
       'updatedAt',
       'prospectCount',
       'relationStatus',
+      'statutQualificationId',
+      'statutQualificationLabel',
       'whatsappStatus',
       'whatsappE164',
       'whatsappNumber',
@@ -427,6 +467,7 @@ RepresentantDto _$RepresentantDtoFromJson(
       'contacte',
       'lastCallOutcome',
       'lastCallAt',
+      'callAttemptCount',
       'lastCallById',
       'lastCallByName',
       'nextCallbackAt',
@@ -459,6 +500,14 @@ RepresentantDto _$RepresentantDtoFromJson(
         unknownValue: RepresentantRelation.unknownDefaultOpenApi,
       ),
     ),
+    statutQualificationId: $checkedConvert(
+      'statutQualificationId',
+      (v) => v as String?,
+    ),
+    statutQualificationLabel: $checkedConvert(
+      'statutQualificationLabel',
+      (v) => v as String?,
+    ),
     whatsappStatus: $checkedConvert(
       'whatsappStatus',
       (v) => $enumDecode(
@@ -487,6 +536,7 @@ RepresentantDto _$RepresentantDtoFromJson(
       'lastCallAt',
       (v) => v == null ? null : DateTime.parse(v as String),
     ),
+    callAttemptCount: $checkedConvert('callAttemptCount', (v) => v as num),
     lastCallById: $checkedConvert('lastCallById', (v) => v as String?),
     lastCallByName: $checkedConvert('lastCallByName', (v) => v as String?),
     nextCallbackAt: $checkedConvert(
@@ -515,6 +565,8 @@ Map<String, dynamic> _$RepresentantDtoToJson(RepresentantDto instance) =>
       'updatedAt': instance.updatedAt.toIso8601String(),
       'prospectCount': instance.prospectCount,
       'relationStatus': _$RepresentantRelationEnumMap[instance.relationStatus]!,
+      'statutQualificationId': instance.statutQualificationId,
+      'statutQualificationLabel': instance.statutQualificationLabel,
       'whatsappStatus': _$WhatsappStatusEnumMap[instance.whatsappStatus]!,
       'whatsappE164': instance.whatsappE164,
       'whatsappNumber': instance.whatsappNumber,
@@ -526,6 +578,7 @@ Map<String, dynamic> _$RepresentantDtoToJson(RepresentantDto instance) =>
       'contacte': instance.contacte,
       'lastCallOutcome': _$RepCallOutcomeEnumMap[instance.lastCallOutcome],
       'lastCallAt': instance.lastCallAt?.toIso8601String(),
+      'callAttemptCount': instance.callAttemptCount,
       'lastCallById': instance.lastCallById,
       'lastCallByName': instance.lastCallByName,
       'nextCallbackAt': instance.nextCallbackAt?.toIso8601String(),

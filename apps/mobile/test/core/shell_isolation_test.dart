@@ -335,7 +335,11 @@ void main() {
     await tester.tap(find.text('Corriger'));
     await settle(tester);
 
-    expect(path(router), Routes.grandPublicCorrections);
+    expect(find.byType(CorrectionsScreen), findsOneWidget);
+    expect(
+      projetDeLaCoque(sous(tester, CorrectionsScreen)),
+      CpiProject.grandPublic,
+    );
 
     await unmount(tester);
   });

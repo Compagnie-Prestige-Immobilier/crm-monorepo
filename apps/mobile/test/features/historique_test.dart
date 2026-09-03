@@ -15,6 +15,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../support/db_fixture.dart';
@@ -232,6 +233,38 @@ void main() {
     await teardownTree(tester);
   });
 
+  testWidgets('la ligne porte le statut de qualification et l\'étoile', (
+    WidgetTester tester,
+  ) async {
+    await db
+        .into(db.statutsQualification)
+        .insert(
+          StatutsQualificationCompanion.insert(
+            code: 'TRES_INTERESSE',
+            id: 'sq-1',
+            label: 'Très intéressé',
+            effect: 'REACHED',
+          ),
+        );
+    await insertRepresentant(
+      db,
+      id: 'rep-1',
+      phone: '+221770000001',
+      fullName: 'Ousmane Fall',
+      relationStatus: 'AMBASSADEUR',
+      statutQualificationId: 'sq-1',
+      serverUpdatedAt: DateTime.utc(2026, 9, 1),
+    );
+    await mount(tester);
+    await chercher(tester, 'Ousmane');
+
+    expect(find.text('Très intéressé'), findsOneWidget);
+    expect(find.text('A accepté'), findsNothing);
+    expect(find.byIcon(PhosphorIconsFill.star), findsOneWidget);
+
+    await teardownTree(tester);
+  });
+
   // La feuille « Nouvelle fiche » offrait de créer un représentant : la base
   // des représentants est importée depuis le web, le mobile n'en crée plus.
   testWidgets('le bouton du pied mène droit au choix du représentant', (
@@ -278,8 +311,8 @@ void main() {
     await teardownTree(tester);
   });
 
-  // Sans recherche, l'écran invite à chercher : rien ne se déroule tout seul.
-  testWidgets('l\'état de départ invite à chercher un représentant', (
+  // Le périmètre borne déjà la liste : elle se déroule sans qu'on cherche.
+  testWidgets('les fiches se voient sans recherche', (
     WidgetTester tester,
   ) async {
     await insertRepresentant(
@@ -290,9 +323,18 @@ void main() {
     );
     await mount(tester);
 
-    expect(find.byType(CpiEmptyState), findsOneWidget);
-    expect(find.text('Cherchez un représentant'), findsOneWidget);
-    expect(find.text('Ousmane Fall'), findsNothing);
+    expect(find.byType(CpiEmptyState), findsNothing);
+    expect(find.text('Ousmane Fall'), findsOneWidget);
+
+    await teardownTree(tester);
+  });
+
+  testWidgets('sans fiche, l\'écran dit d\'où elles viendront', (
+    WidgetTester tester,
+  ) async {
+    await mount(tester);
+
+    expect(find.text('Aucune fiche dans vos campagnes.'), findsOneWidget);
     final CpiEmptyState vide = tester.widget<CpiEmptyState>(
       find.byType(CpiEmptyState),
     );
@@ -319,11 +361,11 @@ void main() {
     expect(find.text('Aucun résultat.'), findsOneWidget);
     expect(find.text('Ousmane Fall'), findsNothing);
 
-    // Effacer ramène l'écran de départ, pas la liste entière.
+    // Effacer ramène la liste entière.
     await tester.tap(find.text('Effacer la recherche'));
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(find.text('Cherchez un représentant'), findsOneWidget);
+    expect(find.text('Ousmane Fall'), findsOneWidget);
     expect(find.text('Aminata'), findsNothing);
 
     await teardownTree(tester);

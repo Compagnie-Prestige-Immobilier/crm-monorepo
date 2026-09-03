@@ -26,6 +26,7 @@ import 'package:crm_api_client/src/api/prospects_api.dart';
 import 'package:crm_api_client/src/api/referentiels_api.dart';
 import 'package:crm_api_client/src/api/rep_campaigns_api.dart';
 import 'package:crm_api_client/src/api/representants_api.dart';
+import 'package:crm_api_client/src/api/statuts_qualification_api.dart';
 import 'package:crm_api_client/src/api/suggestions_api.dart';
 import 'package:crm_api_client/src/api/supervision_api.dart';
 import 'package:crm_api_client/src/api/sync_api.dart';
@@ -268,6 +269,12 @@ class CrmApiClient {
   /// by doing that all interceptors will not be executed
   RepresentantsApi getRepresentantsApi() {
     return RepresentantsApi(dio);
+  }
+
+  /// Get StatutsQualificationApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  StatutsQualificationApi getStatutsQualificationApi() {
+    return StatutsQualificationApi(dio);
   }
 
   /// Get SuggestionsApi instance, base route and serializer can be overridden by a given but be careful,

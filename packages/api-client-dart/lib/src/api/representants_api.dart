@@ -14,12 +14,12 @@ import 'package:crm_api_client/src/model/create_representant_comment_dto.dart';
 import 'package:crm_api_client/src/model/create_representant_dto.dart';
 import 'package:crm_api_client/src/model/import_report_dto.dart';
 import 'package:crm_api_client/src/model/ok_dto.dart';
+import 'package:crm_api_client/src/model/representant_call_attempt_list_dto.dart';
 import 'package:crm_api_client/src/model/representant_comment_dto.dart';
 import 'package:crm_api_client/src/model/representant_comment_list_dto.dart';
 import 'package:crm_api_client/src/model/representant_dto.dart';
 import 'package:crm_api_client/src/model/representant_list_dto.dart';
 import 'package:crm_api_client/src/model/representant_lookup_dto.dart';
-import 'package:crm_api_client/src/model/representant_relation.dart';
 import 'package:crm_api_client/src/model/representant_relation_change_list_dto.dart';
 import 'package:crm_api_client/src/model/representant_sort_field.dart';
 import 'package:crm_api_client/src/model/representant_suivi.dart';
@@ -583,6 +583,88 @@ class RepresentantsApi {
     );
   }
 
+  /// Les appels consignés sur une fiche, du plus récent au plus ancien.
+  ///
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [RepresentantCallAttemptListDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<RepresentantCallAttemptListDto>>
+  listRepresentantCallAttempts({
+    required String id,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/representants/{id}/call-attempts'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    RepresentantCallAttemptListDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<
+              RepresentantCallAttemptListDto,
+              RepresentantCallAttemptListDto
+            >(rawData, 'RepresentantCallAttemptListDto', growable: true);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<RepresentantCallAttemptListDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// Fil de commentaires d’une fiche, du plus récent au plus ancien.
   ///
   ///
@@ -768,11 +850,13 @@ class RepresentantsApi {
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [hasProspects] - true : au moins un prospect vivant. false : aucun (représentant dormant).
-  /// * [relationStatus]
+  /// * [statutQualificationId] - Statut de qualification du dernier appel. Sert le filtre de l’annuaire ET le tirage d’un lot d’appels.
   /// * [whatsappStatus]
   /// * [hasWhatsapp]
   /// * [suivi] - A_RAPPELER : un rappel promis reste dû (`nextCallbackAt`), tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien.
   /// * [lastCallById] - Qui a passé le dernier appel. Un téléconseiller y met son propre identifiant.
+  /// * [relationStatus] - Un ou plusieurs états de relation, séparés par des virgules. `CONTACTE,AMBASSADEUR,REFUS` rend tout ce qui a été contacté.
+  /// * [mesFiches] - true : ne rend que ses propres fiches et celles qu’une campagne lui a confiées, quel que soit le rôle. L’écran d’appel le pose, l’annuaire non.
   /// * [sortBy]
   /// * [sortOrder]
   /// * [page]
@@ -794,11 +878,13 @@ class RepresentantsApi {
     DateTime? dateFrom,
     DateTime? dateTo,
     bool? hasProspects,
-    RepresentantRelation? relationStatus,
+    String? statutQualificationId,
     WhatsappStatus? whatsappStatus,
     bool? hasWhatsapp,
     RepresentantSuivi? suivi,
     String? lastCallById,
+    String? relationStatus,
+    bool? mesFiches,
     RepresentantSortField? sortBy,
     SortOrder? sortOrder,
     num? page = 1,
@@ -831,11 +917,14 @@ class RepresentantsApi {
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
       if (hasProspects != null) r'hasProspects': hasProspects,
-      if (relationStatus != null) r'relationStatus': relationStatus,
+      if (statutQualificationId != null)
+        r'statutQualificationId': statutQualificationId,
       if (whatsappStatus != null) r'whatsappStatus': whatsappStatus,
       if (hasWhatsapp != null) r'hasWhatsapp': hasWhatsapp,
       if (suivi != null) r'suivi': suivi,
       if (lastCallById != null) r'lastCallById': lastCallById,
+      if (relationStatus != null) r'relationStatus': relationStatus,
+      if (mesFiches != null) r'mesFiches': mesFiches,
       if (sortBy != null) r'sortBy': sortBy,
       if (sortOrder != null) r'sortOrder': sortOrder,
       if (page != null) r'page': page,

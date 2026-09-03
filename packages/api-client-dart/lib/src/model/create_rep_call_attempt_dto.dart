@@ -28,6 +28,8 @@ class CreateRepCallAttemptDto {
 
     required this.outcome,
 
+    this.statutQualificationId,
+
     this.promisedProspects,
 
     this.comment,
@@ -79,6 +81,14 @@ class CreateRepCallAttemptDto {
     unknownEnumValue: RepCallOutcome.unknownDefaultOpenApi,
   )
   final RepCallOutcome outcome;
+
+  /// Statut de qualification recueilli. FACULTATIF : les versions déjà installées ne l’émettent pas, et un refus mettrait leur saisie en échec définitif. Quand il est présent, c’est lui qui commande l’issue enregistrée.
+  @JsonKey(
+    name: r'statutQualificationId',
+    required: false,
+    includeIfNull: false,
+  )
+  final String? statutQualificationId;
 
   /// Fiches promises. Admis uniquement pour l’issue PROSPECTS_PROMISED.
   // minimum: 0
@@ -177,6 +187,7 @@ class CreateRepCallAttemptDto {
                 id,
                 representantId,
                 outcome,
+                statutQualificationId,
                 promisedProspects,
                 comment,
                 relationStatus,
@@ -200,6 +211,7 @@ class CreateRepCallAttemptDto {
                 other.id,
                 other.representantId,
                 other.outcome,
+                other.statutQualificationId,
                 other.promisedProspects,
                 other.comment,
                 other.relationStatus,
@@ -229,6 +241,7 @@ class CreateRepCallAttemptDto {
         id,
         representantId,
         outcome,
+        statutQualificationId,
         promisedProspects,
         comment,
         relationStatus,

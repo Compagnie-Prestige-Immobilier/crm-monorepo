@@ -25,6 +25,7 @@ import { Card } from '@/components/ui/card';
 import {
   SOURCES,
   appliquerPresentation,
+  donneesVides,
   type Catalogue,
   type DashboardMarque,
   type DashboardTaille,
@@ -160,6 +161,7 @@ export function renderMark(
 
   if (donnees.forme === 'equipe') return <TableauEquipe donnee={donnees.donnee} caption={titre} />;
   if (donnees.forme === 'scalaire') return marqueScalaire(donnees.donnee, marque, titre);
+  if (donneesVides(donnees)) return <EmptyChart message={messageVide} />;
   if (donnees.forme === 'matrice')
     return marqueMatrice(donnees.donnee, marque, titre, presentation, messageVide);
   if (donnees.forme === 'composition')
@@ -172,8 +174,6 @@ export function renderMark(
     donnees.forme === 'classement'
       ? appliquerPresentation(donnees.donnee, presentation)
       : donnees.donnee;
-  if (items.every((item) => item.value === 0)) return <EmptyChart message={messageVide} />;
-
   return marqueSerie(items, marque, titre, presentation);
 }
 

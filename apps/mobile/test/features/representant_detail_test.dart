@@ -20,6 +20,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../support/db_fixture.dart';
@@ -213,7 +214,51 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(find.text('Ambassadeur'), findsOneWidget);
+    expect(find.text('A accepté'), findsOneWidget);
+
+    await teardownTree(tester);
+  });
+
+  testWidgets('la fiche montre le statut de qualification, étoile comprise', (
+    WidgetTester tester,
+  ) async {
+    await db
+        .into(db.statutsQualification)
+        .insert(
+          StatutsQualificationCompanion.insert(
+            code: 'TRES_INTERESSE',
+            id: 'sq-1',
+            label: 'Très intéressé',
+            effect: 'REACHED',
+          ),
+        );
+    await insertRepresentant(
+      db,
+      id: 'rep-1',
+      phone: '+221770000001',
+      relationStatus: 'AMBASSADEUR',
+      statutQualificationId: 'sq-1',
+    );
+
+    final ProviderContainer container = await makeContainer(tester);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: AppTheme.light,
+          locale: const Locale('fr'),
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          supportedLocales: const <Locale>[Locale('fr')],
+          home: const RepresentantDetailScreen(representantId: 'rep-1'),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('Très intéressé'), findsOneWidget);
+    expect(find.text('A accepté'), findsNothing);
+    expect(find.byIcon(PhosphorIconsFill.star), findsOneWidget);
 
     await teardownTree(tester);
   });
@@ -338,6 +383,35 @@ void main() {
 
       await teardownTree(tester);
     });
+
+    testWidgets(
+      'les réponses du script de qualification se lisent sur la fiche',
+      (WidgetTester tester) async {
+        await insertRepresentant(
+          db,
+          id: 'rep-1',
+          phone: '+221770000001',
+          prenom: 'Awa',
+          etablissement: 'École Test',
+          syndicat: 'Syndicat Test',
+          connaitUES: true,
+          contacte: false,
+        );
+        await mountFiche(tester);
+
+        expect(find.text('Prénom'), findsOneWidget);
+        expect(find.text('Awa'), findsOneWidget);
+        expect(find.text('Établissement'), findsOneWidget);
+        expect(find.text('École Test'), findsOneWidget);
+        expect(find.text('Syndicat'), findsOneWidget);
+        expect(find.text('Connaît l’UES'), findsOneWidget);
+        expect(find.text('Déjà contacté'), findsOneWidget);
+        expect(find.text('Oui'), findsOneWidget);
+        expect(find.text('Non'), findsOneWidget);
+
+        await teardownTree(tester);
+      },
+    );
 
     testWidgets('un état inconnu de ce client s\'affiche quand même', (
       WidgetTester tester,

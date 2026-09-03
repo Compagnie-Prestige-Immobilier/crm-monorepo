@@ -549,10 +549,6 @@ export async function pushCallAttempt(
   );
 }
 
-export const repScriptKeys = {
-  root: ['console', 'representants'] as const,
-};
-
 /** Une relation tranchée n'a plus rien à donner au script : elle est en queue de file. */
 const REP_RELATION_RANK: Record<RepresentantRelation, number> = {
   INCONNU: 0,
@@ -593,6 +589,8 @@ export interface RepAnswer {
   readonly contacte?: boolean;
   readonly connaitUES?: boolean;
   readonly syndicat?: string;
+  /** Statut choisi au script. C'est lui qui commande `outcome`, jamais l'inverse. */
+  readonly statutQualificationId?: string;
 }
 
 export function buildRepAttempt(

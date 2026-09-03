@@ -50,6 +50,8 @@ enum DashboardSource {
   aRappeler(r'a-rappeler'),
   @JsonValue(r'taux-de-qualification')
   tauxDeQualification(r'taux-de-qualification'),
+  @JsonValue(r'repartition-statuts-qualification')
+  repartitionStatutsQualification(r'repartition-statuts-qualification'),
   @JsonValue(r'taux-de-joignabilite')
   tauxDeJoignabilite(r'taux-de-joignabilite'),
   @JsonValue(r'prospects-notes')

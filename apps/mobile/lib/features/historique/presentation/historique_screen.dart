@@ -22,6 +22,8 @@ import '../../../ui/widgets/error_state.dart';
 import '../../../ui/widgets/search_field.dart';
 import '../../../ui/widgets/sync_status_icon.dart';
 import '../../../ui/async_value_x.dart';
+import '../../representant/presentation/representant_detail_screen.dart'
+    show StatutTag;
 
 /// La base des représentants vient du web : on ne les crée pas ici, on en
 /// choisit un pour l'appeler et le qualifier.
@@ -213,7 +215,12 @@ class _RepresentantTile extends StatelessWidget {
                 size: CpiIconSize.xl,
                 labelled: false,
               ),
-        trailing: signal == null ? null : CpiTag(signal, tone: status.tone),
+        trailing: signal == null
+            ? StatutTag(
+                relationStatus: data.relationStatus,
+                statutLabel: data.statutQualificationLabel,
+              )
+            : CpiTag(signal, tone: status.tone),
         onTap: () => context.pushOnce(Routes.representantDetailFor(data.id)),
       ),
     ]);
@@ -244,9 +251,10 @@ class _EmptyHistorique extends StatelessWidget {
       );
     }
     return const CpiEmptyState(
-      icon: PhosphorIconsDuotone.magnifyingGlass,
-      title: 'Cherchez un représentant',
-      message: 'Tapez un nom ou un numéro pour le retrouver.',
+      icon: PhosphorIconsDuotone.usersThree,
+      title: 'Aucune fiche dans vos campagnes.',
+      message:
+          'La liste se remplit quand une campagne vous attribue des numéros.',
     );
   }
 }

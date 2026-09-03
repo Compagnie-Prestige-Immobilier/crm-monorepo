@@ -19,13 +19,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { fetchReferenceData } from '@/lib/data/reference';
+import { fetchStatutsQualification } from '@/lib/data/statuts-qualification';
 import { formatDate } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
 import {
   clearRepresentantAdvancedFilters,
   countActiveRepresentantFilters,
+  REPRESENTANT_RELATION_CHOICES,
   REPRESENTANT_RELATION_LABELS,
-  REPRESENTANT_RELATIONS,
   REPRESENTANT_SORT_FIELDS,
   REPRESENTANT_SORT_LABELS,
   type RepresentantRelation,
@@ -44,7 +45,7 @@ const PRESENCE_ITEMS = [
 
 const RELATION_ITEMS = [
   { value: 'tous', label: 'Tous' },
-  ...REPRESENTANT_RELATIONS.map((relation) => ({
+  ...REPRESENTANT_RELATION_CHOICES.map((relation) => ({
     value: relation,
     label: REPRESENTANT_RELATION_LABELS[relation],
   })),
@@ -65,12 +66,24 @@ export function RepresentantsFiltersBar() {
   const orderId = useId();
   const presenceId = useId();
   const relationId = useId();
+  const statutId = useId();
 
   const { data: reference } = useQuery({
     queryKey: queryKeys.reference,
     queryFn: () => fetchReferenceData(),
     staleTime: 5 * 60_000,
   });
+
+  const { data: statuts } = useQuery({
+    queryKey: queryKeys.statutsQualification,
+    queryFn: () => fetchStatutsQualification(),
+    staleTime: 5 * 60_000,
+  });
+
+  const statutItems = [
+    { value: 'tous', label: 'Tous' },
+    ...(statuts ?? []).map((statut) => ({ value: statut.id, label: statut.label })),
+  ];
 
   const [regionDraft, setRegionDraft] = useState<string | null>(null);
   const departements = reference?.departements ?? [];
@@ -130,6 +143,29 @@ export function RepresentantsFiltersBar() {
             </SelectTrigger>
             <SelectContent>
               {RELATION_ITEMS.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex min-w-[13rem] flex-1 flex-col gap-1.5">
+          <Label htmlFor={statutId}>Statut de qualification</Label>
+          <Select
+            items={statutItems}
+            value={filters.statutQualificationId ?? 'tous'}
+            onValueChange={(value) => {
+              if (value === null) return;
+              setFilters({ statutQualificationId: value === 'tous' ? null : value });
+            }}
+          >
+            <SelectTrigger id={statutId} className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {statutItems.map((item) => (
                 <SelectItem key={item.value} value={item.value}>
                   {item.label}
                 </SelectItem>
