@@ -13,6 +13,7 @@ import { renderWithQuery } from '@/test/render-query';
 
 const pushRepCallAttempt = vi.fn();
 const fetchRepresentants = vi.fn();
+const fetchRepresentantsAQualifier = vi.fn();
 const fetchReferenceData = vi.fn();
 const fetchStatutsQualification = vi.fn();
 
@@ -31,7 +32,11 @@ vi.mock('@/lib/data/reference', async (importOriginal) => {
 
 vi.mock('@/lib/data/representants', async (importOriginal) => {
   const actual = await importOriginal<typeof RepresentantsData>();
-  return { ...actual, fetchRepresentants: (...args: unknown[]) => fetchRepresentants(...args) };
+  return {
+    ...actual,
+    fetchRepresentants: (...args: unknown[]) => fetchRepresentants(...args),
+    fetchRepresentantsAQualifier: (...args: unknown[]) => fetchRepresentantsAQualifier(...args),
+  };
 });
 
 vi.mock('@/lib/data/statuts-qualification', async (importOriginal) => {
@@ -128,13 +133,16 @@ beforeEach(() => {
   pushRepCallAttempt.mockReset();
   pushRepCallAttempt.mockResolvedValue({ status: 'applied', attemptId: 'a-1', suggestion: null });
   fetchRepresentants.mockReset();
-  fetchRepresentants.mockResolvedValue({
+  fetchRepresentantsAQualifier.mockReset();
+  const page = {
     items: [REPRESENTANT],
     total: 1,
     page: 1,
     pageSize: 20,
     pageCount: 1,
-  });
+  };
+  fetchRepresentants.mockResolvedValue(page);
+  fetchRepresentantsAQualifier.mockResolvedValue(page);
   fetchReferenceData.mockReset();
   fetchReferenceData.mockResolvedValue({ syndicats: [] });
   fetchStatutsQualification.mockReset();
@@ -176,7 +184,7 @@ describe('le sélecteur de statut', () => {
     ]);
   });
 
-  it('ne propose que les statuts de la branche non aboutie', async () => {
+  it('ne propose que les statuts de la branche non aboutie, plus le rappel', async () => {
     await ouvrirQualification();
     await repondre('Injoignable');
     await userEvent.click(
@@ -184,6 +192,7 @@ describe('le sélecteur de statut', () => {
     );
 
     expect((await screen.findAllByRole('option')).map((option) => option.textContent)).toEqual([
+      'À rappeler',
       'Pas de réponse',
       'Faux numéro',
     ]);
@@ -228,6 +237,14 @@ describe('la date de rappel suit le statut, pas le résultat', () => {
 
     expect(screen.getByText('Choisissez quand rappeler')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Continuer' }).hasAttribute('disabled')).toBe(true);
+  });
+
+  it('s’ouvre sur un appel non abouti quand le rappel est retenu', async () => {
+    await ouvrirQualification();
+    await repondre('Injoignable');
+    await choisirStatut('À rappeler');
+
+    expect(screen.getByText('Quand rappeler ?')).toBeTruthy();
   });
 
   it('ne s’ouvre sur aucun statut d’appel non abouti', async () => {
