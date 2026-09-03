@@ -30,6 +30,7 @@ import { WorkShiftsService } from './work-shifts.service.js';
     QualityService,
     SegmentConversionsService,
     SupervisionActivityService,
+    WorkShiftsService,
   ],
 })
 export class AnalyticsModule {}

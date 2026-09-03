@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:crm_api_client/src/model/score_dto.dart';
 import 'package:crm_api_client/src/model/presence_state.dart';
 import 'package:crm_api_client/src/model/role.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
@@ -55,6 +56,8 @@ class SupervisedUserDto {
 
     required this.activeSecondsToday,
 
+    required this.activeSecondsInShifts,
+
     required this.firstSeenToday,
 
     required this.callsToday,
@@ -64,6 +67,20 @@ class SupervisedUserDto {
     required this.medianUploadLagSeconds,
 
     required this.firstCallAt,
+
+    required this.lastCallAt,
+
+    required this.reachedToday,
+
+    required this.qualifiedToday,
+
+    required this.repeatCalls,
+
+    required this.deadSeconds,
+
+    required this.deadGaps,
+
+    required this.score,
   });
 
   @JsonKey(name: r'id', required: true, includeIfNull: false)
@@ -136,6 +153,10 @@ class SupervisedUserDto {
   @JsonKey(name: r'activeSecondsToday', required: true, includeIfNull: false)
   final num activeSecondsToday;
 
+  /// Part du temps actif tombée dans les créneaux de travail, en secondes. La présence est découpée à l’heure : une tranche compte dès que son heure de début appartient à un créneau, donc un créneau réglé à une demi-heure compte l’heure entière.
+  @JsonKey(name: r'activeSecondsInShifts', required: true, includeIfNull: false)
+  final num activeSecondsInShifts;
+
   @JsonKey(name: r'firstSeenToday', required: true, includeIfNull: true)
   final DateTime? firstSeenToday;
 
@@ -153,6 +174,33 @@ class SupervisedUserDto {
 
   @JsonKey(name: r'firstCallAt', required: true, includeIfNull: true)
   final DateTime? firstCallAt;
+
+  /// Dernière tentative du jour. Avec `firstCallAt`, donne l’amplitude de la journée.
+  @JsonKey(name: r'lastCallAt', required: true, includeIfNull: true)
+  final DateTime? lastCallAt;
+
+  /// Appels du jour ayant obtenu une réponse : prospect joignable (toute issue hors numéro injoignable ou faux numéro) et représentant qui a décroché, qu’il dise oui ou non.
+  @JsonKey(name: r'reachedToday', required: true, includeIfNull: false)
+  final num reachedToday;
+
+  /// Appels du jour ayant abouti : méthode obtenue côté prospect, représentant qualifié côté représentant. Un représentant appelé plusieurs fois ne compte qu’une fois, sur sa dernière réponse du jour.
+  @JsonKey(name: r'qualifiedToday', required: true, includeIfNull: false)
+  final num qualifiedToday;
+
+  /// Appels du jour au-delà du premier sur une même fiche. Zéro quand chaque fiche n’a été appelée qu’une fois.
+  @JsonKey(name: r'repeatCalls', required: true, includeIfNull: false)
+  final num repeatCalls;
+
+  /// Temps mort, en secondes : somme des écarts de plus de quinze minutes entre deux appels consécutifs tombant dans le MÊME créneau. La pause entre les deux créneaux n’en est pas un.
+  @JsonKey(name: r'deadSeconds', required: true, includeIfNull: false)
+  final num deadSeconds;
+
+  /// Nombre de trous comptés dans `deadSeconds`.
+  @JsonKey(name: r'deadGaps', required: true, includeIfNull: false)
+  final num deadGaps;
+
+  @JsonKey(name: r'score', required: true, includeIfNull: false)
+  final ScoreDto score;
 
   bool operator ==(Object other) {
     return identical(this, other) ||
@@ -177,11 +225,19 @@ class SupervisedUserDto {
                 appVersion,
                 lastWriteAt,
                 activeSecondsToday,
+                activeSecondsInShifts,
                 firstSeenToday,
                 callsToday,
                 medianGapSeconds,
                 medianUploadLagSeconds,
                 firstCallAt,
+                lastCallAt,
+                reachedToday,
+                qualifiedToday,
+                repeatCalls,
+                deadSeconds,
+                deadGaps,
+                score,
               ],
               [
                 other.id,
@@ -201,11 +257,19 @@ class SupervisedUserDto {
                 other.appVersion,
                 other.lastWriteAt,
                 other.activeSecondsToday,
+                other.activeSecondsInShifts,
                 other.firstSeenToday,
                 other.callsToday,
                 other.medianGapSeconds,
                 other.medianUploadLagSeconds,
                 other.firstCallAt,
+                other.lastCallAt,
+                other.reachedToday,
+                other.qualifiedToday,
+                other.repeatCalls,
+                other.deadSeconds,
+                other.deadGaps,
+                other.score,
               ],
             );
   }
@@ -231,11 +295,19 @@ class SupervisedUserDto {
         appVersion,
         lastWriteAt,
         activeSecondsToday,
+        activeSecondsInShifts,
         firstSeenToday,
         callsToday,
         medianGapSeconds,
         medianUploadLagSeconds,
         firstCallAt,
+        lastCallAt,
+        reachedToday,
+        qualifiedToday,
+        repeatCalls,
+        deadSeconds,
+        deadGaps,
+        score,
       ]);
 
   factory SupervisedUserDto.fromJson(Map<String, dynamic> json) =>
