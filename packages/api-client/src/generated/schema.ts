@@ -663,6 +663,81 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/statuts-qualification': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Statuts qu’un client de saisie sait émettre.
+     * @description Restreint aux statuts actifs dont `minPayloadVersion` ne dépasse pas la version déclarée. Un statut que l’appelant ne saurait pas renvoyer ne lui est jamais proposé : sa remontée finirait en échec définitif, hors ligne, sans possibilité de correction.
+     */
+    get: operations['listStatutsQualification'];
+    put?: never;
+    /** Ajouter un statut de qualification. */
+    post: operations['createStatutQualification'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/statuts-qualification/administration': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Tous les statuts, actifs ou non, toutes versions de charge utile. */
+    get: operations['listAllStatutsQualification'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/statuts-qualification/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Renommer un statut, changer son rang, ou sa règle si elle n’est pas système. */
+    patch: operations['updateStatutQualification'];
+    trace?: never;
+  };
+  '/api/v1/statuts-qualification/{id}/active': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Activer ou désactiver un statut.
+     * @description Un statut désactivé disparaît de la saisie et reste lisible sur les fiches qui le désignent. Vider une branche du script de son dernier statut actif est refusé.
+     */
+    post: operations['setStatutQualificationActive'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/representants': {
     parameters: {
       query?: never;
@@ -3380,6 +3455,47 @@ export interface components {
       isActive: boolean;
     };
     /** @enum {string} */
+    StatutQualificationEffect:
+      'REACHED' | 'REFUSED' | 'SCHEDULE_CALLBACK' | 'UNREACHABLE' | 'WRONG_NUMBER';
+    StatutQualificationDto: {
+      /** Format: uuid */
+      id: string;
+      code: string;
+      label: string;
+      effect: components['schemas']['StatutQualificationEffect'];
+      /** @description La date du rappel est exigée par ce statut. */
+      requiresCallback: boolean;
+      isActive: boolean;
+      /** @description Le script s’appuie dessus : sa règle ne se reconfigure pas. */
+      isSystem: boolean;
+      sortOrder: number;
+      /** @description Version de charge utile minimale sachant émettre ce code. */
+      minPayloadVersion: number;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    StatutQualificationListDto: {
+      items: components['schemas']['StatutQualificationDto'][];
+    };
+    CreateStatutQualificationDto: {
+      /** @description Immuable : l’historique le référence. */
+      code: string;
+      label: string;
+      effect: components['schemas']['StatutQualificationEffect'];
+      /** @default false */
+      requiresCallback: boolean;
+      /** @default 100 */
+      sortOrder: number;
+    };
+    UpdateStatutQualificationDto: {
+      label?: string;
+      requiresCallback?: boolean;
+      sortOrder?: number;
+    };
+    SetStatutQualificationActiveDto: {
+      isActive: boolean;
+    };
+    /** @enum {string} */
     RepresentantRelation: 'INCONNU' | 'CONTACTE' | 'AMBASSADEUR' | 'REFUS';
     /** @enum {string} */
     WhatsappStatus: 'NON_DEMANDE' | 'MEME_NUMERO' | 'AUTRE_NUMERO' | 'AUCUN';
@@ -4779,6 +4895,11 @@ export interface components {
       /** Format: uuid */
       representantId: string;
       outcome: components['schemas']['RepCallOutcome'];
+      /**
+       * Format: uuid
+       * @description Statut de qualification recueilli. FACULTATIF : les versions déjà installées ne l’émettent pas, et un refus mettrait leur saisie en échec définitif. Quand il est présent, c’est lui qui commande l’issue enregistrée.
+       */
+      statutQualificationId?: string;
       /** @description Fiches promises. Admis uniquement pour l’issue PROSPECTS_PROMISED. */
       promisedProspects?: number;
       /** @description Obligatoire et non vide si l’issue vaut OTHER. */
@@ -6166,6 +6287,11 @@ export interface components {
       /** @description true : au moins un prospect vivant. false : aucun (représentant dormant). */
       hasProspects?: boolean;
       relationStatus?: components['schemas']['RepresentantRelation'];
+      /**
+       * Format: uuid
+       * @description Statut de qualification du dernier appel. Sert le filtre de l’annuaire ET le tirage d’un lot d’appels.
+       */
+      statutQualificationId?: string;
       whatsappStatus?: components['schemas']['WhatsappStatus'];
       hasWhatsapp?: boolean;
       /** @description A_RAPPELER : un rappel promis reste dû (`nextCallbackAt`), tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien. */
@@ -8690,6 +8816,291 @@ export interface operations {
       };
     };
   };
+  listStatutsQualification: {
+    parameters: {
+      query: {
+        /** @description Version de charge utile de l’appelant. Un statut qu’il ne saurait pas émettre ne lui est jamais proposé : sa remontée finirait en échec définitif, hors ligne. */
+        payloadVersion: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['StatutQualificationListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  createStatutQualification: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateStatutQualificationDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['StatutQualificationDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description STATUT_QUALIFICATION_CODE_CONFLICT, _LABEL_CONFLICT, _CALLBACK_NOT_ALLOWED. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listAllStatutsQualification: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['StatutQualificationListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  updateStatutQualification: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateStatutQualificationDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['StatutQualificationDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description STATUT_QUALIFICATION_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description STATUT_QUALIFICATION_SYSTEM_IMMUTABLE, _LABEL_CONFLICT, _CALLBACK_NOT_ALLOWED. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  setStatutQualificationActive: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SetStatutQualificationActiveDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['StatutQualificationDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description STATUT_QUALIFICATION_LAST_OF_BRANCH. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
   listRepresentants: {
     parameters: {
       query?: {
@@ -8706,6 +9117,8 @@ export interface operations {
         /** @description true : au moins un prospect vivant. false : aucun (représentant dormant). */
         hasProspects?: boolean;
         relationStatus?: components['schemas']['RepresentantRelation'];
+        /** @description Statut de qualification du dernier appel. Sert le filtre de l’annuaire ET le tirage d’un lot d’appels. */
+        statutQualificationId?: string;
         whatsappStatus?: components['schemas']['WhatsappStatus'];
         hasWhatsapp?: boolean;
         /** @description A_RAPPELER : un rappel promis reste dû (`nextCallbackAt`), tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien. */
@@ -15899,6 +16312,8 @@ export interface operations {
         /** @description true : au moins un prospect vivant. false : aucun (représentant dormant). */
         hasProspects?: boolean;
         relationStatus?: components['schemas']['RepresentantRelation'];
+        /** @description Statut de qualification du dernier appel. Sert le filtre de l’annuaire ET le tirage d’un lot d’appels. */
+        statutQualificationId?: string;
         whatsappStatus?: components['schemas']['WhatsappStatus'];
         hasWhatsapp?: boolean;
         /** @description A_RAPPELER : un rappel promis reste dû (`nextCallbackAt`), tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien. */
