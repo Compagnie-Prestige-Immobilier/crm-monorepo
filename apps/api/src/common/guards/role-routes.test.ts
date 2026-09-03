@@ -205,6 +205,8 @@ const ADMISES: readonly string[] = [
   'SuggestionsController.list',
 
   'SupervisionController.activite',
+  'SupervisionController.creneaux',
+  'SupervisionController.updateCreneaux',
   'UsersController.list',
   'VisitesController.bundle',
   ...DISPOSITION,

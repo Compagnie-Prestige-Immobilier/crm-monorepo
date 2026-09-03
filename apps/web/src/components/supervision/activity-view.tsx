@@ -1,11 +1,18 @@
 'use client';
 
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import {
   ArrowDownIcon,
   ArrowUpIcon,
   ChevronsUpDownIcon,
   DownloadIcon,
+  Clock3Icon,
   PhoneCallIcon,
   PhoneOffIcon,
   TargetIcon,
@@ -19,6 +26,8 @@ import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -42,9 +51,11 @@ import {
   dakarToday,
   famillesDuProjet,
   fetchSupervisionActivite,
+  fetchWorkShifts,
   presetRange,
   sortActivityLines,
   supervisionActivityKey,
+  updateWorkShifts,
   type ActivityColumn,
   type ActivityCounts,
   type ActivityFamille,
@@ -55,6 +66,8 @@ import {
   type PeriodPreset,
   type SortDirection,
   type SupervisionGranularity,
+  type UpdateWorkShifts,
+  type WorkShifts,
 } from '@/lib/data/admin';
 import { downloadCsv } from '@/lib/csv';
 import { formatDecimal, formatNumber, formatRateOrNone, formatShortDate } from '@/lib/format';
@@ -269,6 +282,10 @@ export function ActivityView({ projet }: { projet: Projet }) {
 
   return (
     <div className="flex flex-col gap-6">
+      <p className="text-[0.9375rem] text-muted-foreground">
+        Ce volet mesure les appels et les saisies. La connexion à l’application est suivie dans
+        Comptes.
+      </p>
       {toolbar}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -286,6 +303,8 @@ export function ActivityView({ projet }: { projet: Projet }) {
           );
         })}
       </div>
+
+      <ShiftComparison range={range} granularity={granularity} projet={projet} famille={famille} />
 
       <Card>
         <CardContent className="p-0">
@@ -388,6 +407,213 @@ export function ActivityView({ projet }: { projet: Projet }) {
       ) : null}
     </div>
   );
+}
+
+function ShiftComparison({
+  range,
+  granularity,
+  projet,
+  famille,
+}: {
+  range: ActivityRange;
+  granularity: SupervisionGranularity;
+  projet: Projet;
+  famille: ActivityFamille;
+}) {
+  const queryClient = useQueryClient();
+  const shiftsQuery = useQuery({
+    queryKey: ['supervision', 'creneaux'],
+    queryFn: () => fetchWorkShifts(),
+  });
+  const shifts = shiftsQuery.data?.shifts ?? [];
+  const results = useQueries({
+    queries: shifts.map((shift) => ({
+      queryKey: supervisionActivityKey(range, granularity, projet, shift),
+      queryFn: () =>
+        fetchSupervisionActivite({
+          range,
+          granularity,
+          projet,
+          shift: { start: shift.start, end: shift.end },
+        }),
+      placeholderData: keepPreviousData,
+    })),
+  });
+  const [draft, setDraft] = useState<UpdateWorkShifts | null>(null);
+
+  const save = useMutation({
+    mutationFn: (body: UpdateWorkShifts) => updateWorkShifts(body),
+    onSuccess: async (next: WorkShifts) => {
+      queryClient.setQueryData(['supervision', 'creneaux'], next);
+      await queryClient.invalidateQueries({ queryKey: ['supervision', 'activite'] });
+      setDraft(null);
+    },
+  });
+
+  if (shiftsQuery.isPending || shifts.length === 0) return null;
+
+  const callsOf = (counts: ActivityCounts): number =>
+    famille === 'representants' ? counts.repCalls : counts.calls;
+  const successOf = (counts: ActivityCounts): number =>
+    famille === 'representants' ? counts.repReached : counts.methodObtained;
+  const rateOf = (counts: ActivityCounts): number | null =>
+    famille === 'representants' ? counts.repContactRate : counts.reachRate;
+
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+          <div>
+            <h2 className="flex items-center gap-2 font-display text-[1.0625rem] font-[700]">
+              <Clock3Icon className="size-4" aria-hidden="true" />
+              Efficacité par créneau
+            </h2>
+            <p className="mt-1 text-[0.8125rem] text-muted-foreground">
+              Appels par heure et résultat des appels, sur la période choisie.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const [morning, afternoon] = shifts;
+              if (draft !== null || morning === undefined || afternoon === undefined) {
+                setDraft(null);
+                return;
+              }
+              setDraft({
+                morningStart: morning.start,
+                morningEnd: morning.end,
+                afternoonStart: afternoon.start,
+                afternoonEnd: afternoon.end,
+              });
+            }}
+          >
+            {draft === null ? 'Modifier les horaires' : 'Annuler'}
+          </Button>
+        </div>
+
+        {draft !== null ? (
+          <form
+            className="grid gap-4 border-y border-border px-5 py-4 sm:grid-cols-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              save.mutate(draft);
+            }}
+          >
+            <TimeField
+              label="Matin, début"
+              value={draft.morningStart}
+              onChange={(morningStart) => setDraft({ ...draft, morningStart })}
+            />
+            <TimeField
+              label="Matin, fin"
+              value={draft.morningEnd}
+              onChange={(morningEnd) => setDraft({ ...draft, morningEnd })}
+            />
+            <TimeField
+              label="Après-midi, début"
+              value={draft.afternoonStart}
+              onChange={(afternoonStart) => setDraft({ ...draft, afternoonStart })}
+            />
+            <TimeField
+              label="Après-midi, fin"
+              value={draft.afternoonEnd}
+              onChange={(afternoonEnd) => setDraft({ ...draft, afternoonEnd })}
+            />
+            <div className="sm:col-span-4">
+              <Button type="submit" size="sm" disabled={save.isPending}>
+                Enregistrer
+              </Button>
+              {save.isError ? (
+                <p className="mt-2 text-[0.8125rem] text-destructive">
+                  Horaires invalides. Vérifiez leur ordre et leur chevauchement.
+                </p>
+              ) : null}
+            </div>
+          </form>
+        ) : null}
+
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead>Créneau</TableHead>
+              <TableHead className="text-right">Appels</TableHead>
+              <TableHead className="text-right">Appels/h</TableHead>
+              <TableHead className="text-right">
+                {famille === 'representants' ? 'Joints' : 'Méthodes'}
+              </TableHead>
+              <TableHead className="text-right">Taux</TableHead>
+              <TableHead className="text-right">Prospects saisis</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {shifts.map((shift, index) => {
+              const counts = results[index]?.data?.totals;
+              const duration = (shiftMinutes(shift.start, shift.end) / 60) * rangeDays(range);
+              const calls = counts === undefined ? 0 : callsOf(counts);
+              return (
+                <TableRow key={shift.key}>
+                  <TableCell className="font-[600]">
+                    {shift.label} · {shift.start}–{shift.end}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{formatNumber(calls)}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatDecimal(duration === 0 ? 0 : calls / duration)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatNumber(counts === undefined ? 0 : successOf(counts))}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatRateOrNone(counts === undefined ? null : rateOf(counts))}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatNumber(counts?.prospectsCreated ?? 0)}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TimeField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const id = `shift-${label.toLocaleLowerCase().replaceAll(/[^a-z]+/gu, '-')}`;
+  return (
+    <div className="grid gap-2">
+      <Label htmlFor={id}>{label}</Label>
+      <Input
+        id={id}
+        type="time"
+        value={value}
+        required
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </div>
+  );
+}
+
+function shiftMinutes(start: string, end: string): number {
+  const [startHour = 0, startMinute = 0] = start.split(':').map(Number);
+  const [endHour = 0, endMinute = 0] = end.split(':').map(Number);
+  return endHour * 60 + endMinute - startHour * 60 - startMinute;
+}
+
+function rangeDays(range: ActivityRange): number {
+  const from = Date.parse(`${range.from}T00:00:00.000Z`);
+  const to = Date.parse(`${range.to}T00:00:00.000Z`);
+  return Math.max(1, Math.floor((to - from) / 86_400_000) + 1);
 }
 
 function valeurAffichee(colonne: ActivityColumn, valeur: number | null, decimal = false): string {

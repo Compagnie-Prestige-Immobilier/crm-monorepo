@@ -13,6 +13,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   PRESENCE_LABELS,
   fetchSupervision,
+  formatActiveDuration,
+  formatClock,
+  formatDuration,
   formatElapsed,
   knownPresence,
   minutesSince,
@@ -67,7 +70,7 @@ export function SupervisionView() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-[0.9375rem] text-muted-foreground">
-          Présence et dernière activité des comptes.
+          Présence observée par l’application. Les appels et saisies sont dans le volet Activité.
         </p>
         <LiveIndicator
           state={live.stateOf(supervision.isError)}
@@ -172,13 +175,28 @@ function PresenceTable({
                 État
               </th>
               <th scope="col" className="px-5 py-2 text-right font-[600]">
-                Activité
+                Dernier signal
               </th>
               <th scope="col" className="px-5 py-2 text-right font-[600]">
-                Sessions
+                Temps actif aujourd’hui
               </th>
               <th scope="col" className="px-5 py-2 text-right font-[600]">
-                Synchro
+                Appels aujourd’hui
+              </th>
+              <th scope="col" className="px-5 py-2 text-right font-[600]">
+                Premier appel
+              </th>
+              <th scope="col" className="px-5 py-2 text-right font-[600]">
+                Cadence médiane
+              </th>
+              <th scope="col" className="px-5 py-2 text-right font-[600]">
+                Retard de synchro
+              </th>
+              <th scope="col" className="px-5 py-2 text-right font-[600]">
+                Dernière saisie
+              </th>
+              <th scope="col" className="px-5 py-2 text-right font-[600]">
+                En attente
               </th>
             </tr>
           </thead>
@@ -203,15 +221,30 @@ function PresenceTable({
                 <td className="px-5 py-2 text-right tabular-nums">
                   {formatElapsed(minutesSince(user.lastSeenAt, observedAt))}
                 </td>
-                <td className="px-5 py-2 text-right tabular-nums">{user.sessionCount}</td>
+                <td className="px-5 py-2 text-right tabular-nums">
+                  {formatActiveDuration(user.activeSecondsToday)}
+                </td>
+                <td className="px-5 py-2 text-right tabular-nums">{user.callsToday}</td>
+                <td className="px-5 py-2 text-right tabular-nums">
+                  {formatClock(user.firstCallAt)}
+                </td>
+                <td className="px-5 py-2 text-right tabular-nums">
+                  {formatDuration(user.medianGapSeconds)}
+                </td>
+                <td className="px-5 py-2 text-right tabular-nums">
+                  {formatDuration(user.medianUploadLagSeconds)}
+                </td>
                 <td className="px-5 py-2 text-right tabular-nums text-muted-foreground">
-                  {formatElapsed(minutesSince(user.lastSyncAt, observedAt))}
+                  {formatElapsed(minutesSince(user.lastWriteAt, observedAt))}
+                </td>
+                <td className="px-5 py-2 text-right tabular-nums">
+                  {user.pendingOps === null ? 'Inconnu' : user.pendingOps}
                 </td>
               </tr>
             ))}
             {users.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-5 py-6 text-center text-muted-foreground">
+                <td colSpan={10} className="px-5 py-6 text-center text-muted-foreground">
                   {empty}
                 </td>
               </tr>

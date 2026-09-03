@@ -11,6 +11,7 @@ import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import { Logger } from 'nestjs-pino';
 import multipart from '@fastify/multipart';
+import websocket from '@fastify/websocket';
 
 import { AppModule } from './app.module.js';
 import { DEMO_MODE_HEADER } from './modules/export/demo-marking.js';
@@ -18,6 +19,7 @@ import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter.
 import { normalizeErrorBody } from './common/errors/normalize.js';
 import { readEnv, type ApiEnv } from './env.js';
 import { WorkspaceContext } from './workspaces/workspace.js';
+import { PresenceSocketService } from './modules/heartbeat/presence-socket.service.js';
 
 interface FastifyErrorReply {
   code: (status: number) => { send: (payload: unknown) => unknown };
@@ -61,7 +63,9 @@ export function createApiAdapter(env: ApiEnv): FastifyAdapter {
 
 export async function createApiApp(): Promise<NestFastifyApplication> {
   const env = readEnv();
-  const app = await NestFactory.create<NestFastifyApplication>(AppModule, createApiAdapter(env), {
+  const adapter = createApiAdapter(env);
+  await adapter.getInstance().register(websocket, { options: { maxPayload: 64 } });
+  const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter, {
     bufferLogs: true,
   });
 
@@ -70,6 +74,10 @@ export async function createApiApp(): Promise<NestFastifyApplication> {
   const workspace = app.get(WorkspaceContext);
   const httpLogger = app.get(Logger);
   const http = app.getHttpAdapter().getInstance();
+  const presence = app.get(PresenceSocketService);
+  http.get('/api/v1/presence/live', { websocket: true }, (socket, request) => {
+    presence.connect(socket, request.headers);
+  });
   http.addHook('onRequest', (request, _reply, done) => {
     requestStartedAt.set(request, Date.now());
     workspace.run(done);
