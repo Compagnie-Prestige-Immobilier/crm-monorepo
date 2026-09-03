@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { EmployeurType } from '@crm/database';
+import { EmployeurType, StatutQualificationEffect } from '@crm/database';
 import {
   IsBoolean,
   IsEnum,
@@ -587,6 +587,105 @@ export class UpdateCallOutcomeReasonDto {
 
 export class SetCallOutcomeReasonActiveDto {
   @ApiProperty({ type: Boolean })
+  @IsBoolean()
+  isActive!: boolean;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Statuts de qualification du représentant
+// ─────────────────────────────────────────────────────────────────────────────
+
+export class StatutQualificationDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ maxLength: 64 }) code!: string;
+  @ApiProperty({ maxLength: 120 }) label!: string;
+  @ApiProperty({ enum: StatutQualificationEffect, enumName: 'StatutQualificationEffect' })
+  effect!: StatutQualificationEffect;
+  @ApiProperty({ description: 'La date du rappel est exigée par ce statut.' })
+  requiresCallback!: boolean;
+  @ApiProperty() isActive!: boolean;
+  @ApiProperty({ description: 'Le script s’appuie dessus : sa règle ne se reconfigure pas.' })
+  isSystem!: boolean;
+  @ApiProperty() sortOrder!: number;
+  @ApiProperty({ description: 'Version de charge utile minimale sachant émettre ce code.' })
+  minPayloadVersion!: number;
+  @ApiProperty({ format: 'date-time' }) updatedAt!: string;
+}
+
+export class StatutQualificationListDto {
+  @ApiProperty({ type: () => [StatutQualificationDto] }) items!: StatutQualificationDto[];
+}
+
+export class StatutQualificationFieldQueryDto {
+  @ApiProperty({
+    type: Number,
+    description:
+      'Version de charge utile de l’appelant. Un statut qu’il ne saurait pas émettre ne lui est jamais proposé : sa remontée finirait en échec définitif, hors ligne.',
+  })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  payloadVersion!: number;
+}
+
+export class CreateStatutQualificationDto {
+  @ApiProperty({ maxLength: 64, description: 'Immuable : l’historique le référence.' })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(64)
+  @Matches(/^[A-Za-z][A-Za-z0-9_]*$/u, {
+    message: 'Le code ne contient que des lettres, des chiffres et des soulignés.',
+  })
+  code!: string;
+
+  @ApiProperty({ maxLength: 120 })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  label!: string;
+
+  @ApiProperty({ enum: StatutQualificationEffect, enumName: 'StatutQualificationEffect' })
+  @IsEnum(StatutQualificationEffect)
+  effect!: StatutQualificationEffect;
+
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @IsBoolean()
+  requiresCallback?: boolean;
+
+  @ApiPropertyOptional({ minimum: 0, maximum: 9999, default: 100 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(9999)
+  sortOrder?: number;
+}
+
+export class UpdateStatutQualificationDto {
+  @ApiPropertyOptional({ maxLength: 120 })
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  label?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  requiresCallback?: boolean;
+
+  @ApiPropertyOptional({ minimum: 0, maximum: 9999 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(9999)
+  sortOrder?: number;
+}
+
+export class SetStatutQualificationActiveDto {
+  @ApiProperty()
   @IsBoolean()
   isActive!: boolean;
 }

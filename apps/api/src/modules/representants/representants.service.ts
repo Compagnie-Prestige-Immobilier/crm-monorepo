@@ -88,6 +88,7 @@ export function suiviWhere(query: RepresentantExportQueryDto): Prisma.Representa
     ...(query.suivi === RepresentantSuivi.INJOIGNABLE
       ? { lastCallOutcome: RepCallOutcome.UNREACHABLE }
       : {}),
+    ...(query.statutQualificationId ? { statutQualificationId: query.statutQualificationId } : {}),
   };
 }
 

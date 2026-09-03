@@ -27,6 +27,7 @@ import { ReferentielsController } from '../../modules/referentiels/referentiels.
 import { RepCampaignsController } from '../../modules/rep-campaigns/rep-campaigns.controller.js';
 import { RepresentantsController } from '../../modules/representants/representants.controller.js';
 import { SuggestionsController } from '../../modules/suggestions/suggestions.controller.js';
+import { StatutsQualificationController } from '../../modules/referentiels/statuts-qualification.controller.js';
 import { SupervisionController } from '../../modules/analytics/supervision.controller.js';
 import { SyncController } from '../../modules/sync/sync.controller.js';
 import { CallOutcomeReasonsController } from '../../modules/referentiels/call-outcome-reasons.controller.js';
@@ -63,6 +64,7 @@ const CONTROLLERS: readonly Controller[] = [
   RepCampaignsController,
   RepresentantsController,
   SuggestionsController,
+  StatutsQualificationController,
   SupervisionController,
   SyncController,
   UsersController,
@@ -162,6 +164,7 @@ const ADMISES: readonly string[] = [
   'AuthController.changeMyPassword',
   'AuthController.me',
   'CallOutcomeReasonsController.list',
+  'StatutsQualificationController.list',
   'CallbacksController.list',
   'AuthController.switchWorkspace',
   'NotificationsController.mine',
@@ -221,6 +224,7 @@ const SOCLE: readonly string[] = [
   'AuthController.me',
   'AuthController.refresh',
   'CallOutcomeReasonsController.list',
+  'StatutsQualificationController.list',
   'AuthController.switchWorkspace',
   'HealthController.live',
   'HealthController.ready',

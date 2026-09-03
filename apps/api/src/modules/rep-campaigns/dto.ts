@@ -35,6 +35,15 @@ export class CreateRepCallAttemptDto {
   outcome!: RepCallOutcome;
 
   @ApiPropertyOptional({
+    format: 'uuid',
+    description:
+      'Statut de qualification recueilli. FACULTATIF : les versions déjà installées ne l’émettent pas, et un refus mettrait leur saisie en échec définitif. Quand il est présent, c’est lui qui commande l’issue enregistrée.',
+  })
+  @IsOptional()
+  @IsUUID()
+  statutQualificationId?: string;
+
+  @ApiPropertyOptional({
     type: Number,
     minimum: 0,
     maximum: 10_000,

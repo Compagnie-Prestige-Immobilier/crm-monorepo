@@ -6,6 +6,7 @@ export * from './seed-data/banques.js';
 export * from './seed-data/syndicats.js';
 export * from './seed-data/bank-workflow.js';
 export * from './seed-data/call-outcomes.js';
+export * from './seed-data/statuts-qualification.js';
 export * from './seed-data/canaux-provenance.js';
 export * from './seed-data/professions.js';
 export * from './seed-data/income-bands.js';
