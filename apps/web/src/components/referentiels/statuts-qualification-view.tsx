@@ -375,6 +375,10 @@ function FormulaireStatut({
           <Field label="Effet" description="Il décide de la branche et de l’issue enregistrée.">
             {(props) => (
               <Select
+                items={STATUT_QUALIFICATION_EFFECTS.map((valeur) => ({
+                  value: valeur,
+                  label: STATUT_QUALIFICATION_EFFECT_LABELS[valeur],
+                }))}
                 value={effect}
                 onValueChange={(value) => {
                   setValue('effect', value as StatutQualificationEffect);
@@ -402,6 +406,10 @@ function FormulaireStatut({
           <Field label="Priorité" description="Ordre dans lequel le plateau reprend les fiches.">
             {(props) => (
               <Select
+                items={PRIORITES_TRAITEMENT.map((valeur) => ({
+                  value: valeur,
+                  label: PRIORITE_TRAITEMENT_LABELS[valeur],
+                }))}
                 value={priorite}
                 onValueChange={(value) => {
                   setValue('priorite', value as PrioriteTraitement);

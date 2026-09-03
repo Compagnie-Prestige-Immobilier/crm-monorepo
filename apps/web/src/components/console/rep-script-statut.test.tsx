@@ -190,6 +190,20 @@ describe('le sélecteur de statut', () => {
   });
 });
 
+describe('ce que le déclencheur affiche', () => {
+  it('montre le LIBELLÉ du statut retenu, jamais son identifiant', async () => {
+    await ouvrirQualification();
+    await repondre('Joignable');
+    await choisirStatut('Intéressé');
+
+    const declencheur = screen.getByRole('combobox', { name: /Statut de qualification/u });
+
+    expect(declencheur.textContent).toContain('Intéressé');
+    // L'identifiant est un UUID : le lire à l'écran ne dit rien à personne.
+    expect(declencheur.textContent).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}/u);
+  });
+});
+
 describe('la date de rappel suit le statut, pas le résultat', () => {
   it('n’est exigée que par le statut qui la réclame', async () => {
     await ouvrirQualification();
