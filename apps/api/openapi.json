@@ -3661,14 +3661,6 @@
             }
           },
           {
-            "name": "relationStatus",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "$ref": "#/components/schemas/RepresentantRelation"
-            }
-          },
-          {
             "name": "statutQualificationId",
             "required": false,
             "in": "query",
@@ -3710,6 +3702,16 @@
             "description": "Qui a passé le dernier appel. Un téléconseiller y met son propre identifiant.",
             "schema": {
               "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "relationStatus",
+            "required": false,
+            "in": "query",
+            "description": "Un ou plusieurs états de relation, séparés par des virgules. `CONTACTE,AMBASSADEUR,REFUS` rend tout ce qui a été contacté.",
+            "schema": {
+              "example": "CONTACTE,AMBASSADEUR,REFUS",
               "type": "string"
             }
           },
@@ -20361,6 +20363,11 @@
         "enum": ["HAUTE", "NORMALE", "BASSE"],
         "description": "Ordre de reprise : un « Très intéressé » se rappelle avant un « Non éligible »."
       },
+      "RepresentantRelation": {
+        "type": "string",
+        "enum": ["INCONNU", "CONTACTE", "AMBASSADEUR", "REFUS"],
+        "description": "La relation posée sur la fiche. Nulle quand le statut ne tranche rien."
+      },
       "StatutQualificationDto": {
         "type": "object",
         "properties": {
@@ -20395,6 +20402,15 @@
               }
             ]
           },
+          "relationStatus": {
+            "nullable": true,
+            "description": "La relation posée sur la fiche. Nulle quand le statut ne tranche rien.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RepresentantRelation"
+              }
+            ]
+          },
           "isActive": {
             "type": "boolean"
           },
@@ -20418,6 +20434,7 @@
           "effect",
           "requiresCallback",
           "priorite",
+          "relationStatus",
           "isActive",
           "isSystem",
           "minPayloadVersion",
@@ -20466,6 +20483,15 @@
                 "$ref": "#/components/schemas/PrioriteTraitement"
               }
             ]
+          },
+          "relationStatus": {
+            "nullable": true,
+            "description": "Relation posée sur la fiche quand le client n’en envoie pas.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RepresentantRelation"
+              }
+            ]
           }
         },
         "required": ["code", "label", "effect"]
@@ -20486,6 +20512,15 @@
                 "$ref": "#/components/schemas/PrioriteTraitement"
               }
             ]
+          },
+          "relationStatus": {
+            "nullable": true,
+            "description": "Nul retire la relation posée : le statut cesse alors de trancher.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RepresentantRelation"
+              }
+            ]
           }
         }
       },
@@ -20497,10 +20532,6 @@
           }
         },
         "required": ["isActive"]
-      },
-      "RepresentantRelation": {
-        "type": "string",
-        "enum": ["INCONNU", "CONTACTE", "AMBASSADEUR", "REFUS"]
       },
       "WhatsappStatus": {
         "type": "string",

@@ -4,7 +4,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ChangeSource, Prisma, RepCallOutcome, WhatsappStatus } from '@crm/database';
+import {
+  ChangeSource,
+  Prisma,
+  RepCallOutcome,
+  RepresentantRelation,
+  WhatsappStatus,
+} from '@crm/database';
 import { v7 as uuidv7 } from 'uuid';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
@@ -86,7 +92,9 @@ const TRI_DU_SUIVI: Record<RepresentantSuivi, RepresentantSortField> = {
   [RepresentantSuivi.INJOIGNABLE]: RepresentantSortField.LAST_CALL_AT,
 };
 
-export function suiviWhere(query: RepresentantExportQueryDto): Prisma.RepresentantWhereInput {
+export function suiviWhere(
+  query: Pick<RepresentantExportQueryDto, 'lastCallById' | 'suivi' | 'statutQualificationId'>,
+): Prisma.RepresentantWhereInput {
   return {
     ...(query.lastCallById ? { lastCallById: query.lastCallById } : {}),
     ...(query.suivi === RepresentantSuivi.A_RAPPELER ? { nextCallbackAt: { not: null } } : {}),
@@ -95,6 +103,14 @@ export function suiviWhere(query: RepresentantExportQueryDto): Prisma.Representa
       : {}),
     ...(query.statutQualificationId ? { statutQualificationId: query.statutQualificationId } : {}),
   };
+}
+
+/** Un seul état reste une égalité : l'index s'en sert, et la clause se lit. */
+function relationWhere(relations: RepresentantRelation[] = []): Prisma.RepresentantWhereInput {
+  const [relation, ...autres] = relations;
+  if (relation === undefined) return {};
+  if (autres.length === 0) return { relationStatus: relation };
+  return { relationStatus: { in: [relation, ...autres] } };
 }
 
 type RepresentantRow = Prisma.RepresentantGetPayload<{ include: typeof REPRESENTANT_INCLUDE }>;
@@ -190,7 +206,11 @@ export class RepresentantsService {
 
     // Un téléconseiller ne lit que ses campagnes ; l'encadrement lit tout. Le
     // cloisonnement voyage dans `AND` : `where.OR` porte déjà la recherche libre.
-    const where: Prisma.RepresentantWhereInput = { deletedAt: null, ...suiviWhere(query) };
+    const where: Prisma.RepresentantWhereInput = {
+      deletedAt: null,
+      ...suiviWhere(query),
+      ...relationWhere(query.relationStatus),
+    };
     const portee = attributionScope(user, { malgreLeRole: query.mesFiches === true });
     if (portee.OR) where.AND = [portee];
     if (query.commercialId) {
@@ -198,7 +218,6 @@ export class RepresentantsService {
     }
     if (query.departementId) where.departementId = query.departementId;
     if (query.iefId) where.iefId = query.iefId;
-    if (query.relationStatus) where.relationStatus = query.relationStatus;
     if (query.whatsappStatus || query.hasWhatsapp !== undefined) {
       where.whatsappStatus = { in: allowedWhatsappStatuses(query) };
     }

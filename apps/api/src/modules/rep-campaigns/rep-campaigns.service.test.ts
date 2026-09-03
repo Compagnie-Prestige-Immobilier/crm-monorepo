@@ -1,5 +1,10 @@
 import { ConflictException, ForbiddenException } from '@nestjs/common';
-import { RepCallOutcome, Role, StatutQualificationEffect } from '@crm/database';
+import {
+  RepCallOutcome,
+  RepresentantRelation,
+  Role,
+  StatutQualificationEffect,
+} from '@crm/database';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
@@ -23,7 +28,8 @@ const REP = '0198a000-0000-7000-8000-000000000001';
 interface Tx {
   repCallAttempt: { createMany: MockFn };
   representantSuggestion: { create: MockFn };
-  representant: { findFirst: MockFn; update: MockFn };
+  representant: { findFirst: MockFn; update: MockFn; updateMany: MockFn };
+  representantRelationChange: { create: MockFn };
 }
 
 let tx: Tx;
@@ -50,7 +56,9 @@ beforeEach(() => {
     representant: {
       findFirst: vi.fn().mockResolvedValue(null),
       update: vi.fn().mockResolvedValue({ id: REP }),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
+    representantRelationChange: { create: vi.fn() },
   };
   db = {
     repCallAttempt: { findUnique: vi.fn().mockResolvedValue(null) },
@@ -343,5 +351,95 @@ describe('le statut de qualification commande l’issue', () => {
     expect((await service.recordAttempt(ALICE, body)).status).toBe(
       RepCallAttemptApplyStatus.APPLIED,
     );
+  });
+});
+
+describe('la relation que le statut pose sur la fiche', () => {
+  const STATUT = '0198c000-0000-7000-8000-000000000002';
+
+  const statut = (relationStatus: RepresentantRelation | null) => ({
+    id: STATUT,
+    code: 'NON_INTERESSE',
+    label: 'Non intéressé',
+    effect: StatutQualificationEffect.REFUSED,
+    requiresCallback: false,
+    relationStatus,
+    isActive: true,
+  });
+
+  const bascule = (): Record<string, unknown> | undefined =>
+    (
+      tx.representant.updateMany.mock.calls[0] as [{ data: Record<string, unknown> }] | undefined
+    )?.[0].data;
+
+  const refus = (): CreateRepCallAttemptDto => {
+    const body = baseBody();
+    body.outcome = RepCallOutcome.REFUSED;
+    body.statutQualificationId = STATUT;
+    return body;
+  };
+
+  it('bascule la relation quand le client n’en envoie pas', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(statut(RepresentantRelation.REFUS));
+
+    await service.recordAttempt(ALICE, refus());
+
+    expect(bascule()).toMatchObject({ relationStatus: RepresentantRelation.REFUS });
+  });
+
+  it('laisse le dernier mot au client qui répond à la question', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(statut(RepresentantRelation.REFUS));
+    const body = refus();
+    body.relationStatus = RepresentantRelation.AMBASSADEUR;
+
+    await service.recordAttempt(ALICE, body);
+
+    expect(bascule()).toMatchObject({ relationStatus: RepresentantRelation.AMBASSADEUR });
+  });
+
+  it('ne pose rien quand le statut ne tranche pas', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(statut(null));
+
+    await service.recordAttempt(ALICE, refus());
+
+    expect(tx.representant.updateMany).not.toHaveBeenCalled();
+  });
+
+  // Une transition refusee ne doit PAS faire echouer l'enregistrement : la
+  // tentative vient du terrain, souvent hors ligne, et l'erreur serait
+  // definitive. La relation posee est simplement laissee de cote.
+  it('enregistre la tentative même quand la relation posée serait un retour en arrière', async () => {
+    db.representant.findFirst.mockResolvedValue({
+      id: REP,
+      relationStatus: RepresentantRelation.AMBASSADEUR,
+      whatsappStatus: 'NON_DEMANDE',
+      whatsappE164: null,
+      phoneE164: '+221771234567',
+      lastCallAt: null,
+    });
+    db.statutQualification.findUnique.mockResolvedValue(statut(RepresentantRelation.CONTACTE));
+
+    const resultat = await service.recordAttempt(ALICE, refus());
+
+    expect(resultat.status).toBe(RepCallAttemptApplyStatus.APPLIED);
+    expect(tx.representant.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('refuse en revanche la relation ILLÉGALE que le client affirme', async () => {
+    db.representant.findFirst.mockResolvedValue({
+      id: REP,
+      relationStatus: RepresentantRelation.AMBASSADEUR,
+      whatsappStatus: 'NON_DEMANDE',
+      whatsappE164: null,
+      phoneE164: '+221771234567',
+      lastCallAt: null,
+    });
+    db.statutQualification.findUnique.mockResolvedValue(statut(RepresentantRelation.REFUS));
+    const body = refus();
+    body.relationStatus = RepresentantRelation.CONTACTE;
+
+    await expect(service.recordAttempt(ALICE, body)).rejects.toMatchObject({
+      response: { code: 'REPRESENTANT_RELATION_TRANSITION_REFUSED' },
+    });
   });
 });

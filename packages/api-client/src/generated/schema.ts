@@ -3480,6 +3480,11 @@ export interface components {
      * @enum {string}
      */
     PrioriteTraitement: 'HAUTE' | 'NORMALE' | 'BASSE';
+    /**
+     * @description La relation posée sur la fiche. Nulle quand le statut ne tranche rien.
+     * @enum {string}
+     */
+    RepresentantRelation: 'INCONNU' | 'CONTACTE' | 'AMBASSADEUR' | 'REFUS';
     StatutQualificationDto: {
       /** Format: uuid */
       id: string;
@@ -3490,6 +3495,8 @@ export interface components {
       requiresCallback: boolean;
       /** @description Ordre de reprise : un « Très intéressé » se rappelle avant un « Non éligible ». */
       priorite: components['schemas']['PrioriteTraitement'];
+      /** @description La relation posée sur la fiche. Nulle quand le statut ne tranche rien. */
+      relationStatus: components['schemas']['RepresentantRelation'] | null;
       isActive: boolean;
       /** @description Le script s’appuie dessus : sa règle ne se reconfigure pas. */
       isSystem: boolean;
@@ -3510,17 +3517,19 @@ export interface components {
       requiresCallback: boolean;
       /** @default NORMALE */
       priorite: components['schemas']['PrioriteTraitement'];
+      /** @description Relation posée sur la fiche quand le client n’en envoie pas. */
+      relationStatus?: components['schemas']['RepresentantRelation'] | null;
     };
     UpdateStatutQualificationDto: {
       label?: string;
       requiresCallback?: boolean;
       priorite?: components['schemas']['PrioriteTraitement'];
+      /** @description Nul retire la relation posée : le statut cesse alors de trancher. */
+      relationStatus?: components['schemas']['RepresentantRelation'] | null;
     };
     SetStatutQualificationActiveDto: {
       isActive: boolean;
     };
-    /** @enum {string} */
-    RepresentantRelation: 'INCONNU' | 'CONTACTE' | 'AMBASSADEUR' | 'REFUS';
     /** @enum {string} */
     WhatsappStatus: 'NON_DEMANDE' | 'MEME_NUMERO' | 'AUTRE_NUMERO' | 'AUCUN';
     /** @enum {string} */
@@ -9243,7 +9252,6 @@ export interface operations {
         dateTo?: string;
         /** @description true : au moins un prospect vivant. false : aucun (représentant dormant). */
         hasProspects?: boolean;
-        relationStatus?: components['schemas']['RepresentantRelation'];
         /** @description Statut de qualification du dernier appel. Sert le filtre de l’annuaire ET le tirage d’un lot d’appels. */
         statutQualificationId?: string;
         whatsappStatus?: components['schemas']['WhatsappStatus'];
@@ -9252,6 +9260,8 @@ export interface operations {
         suivi?: components['schemas']['RepresentantSuivi'];
         /** @description Qui a passé le dernier appel. Un téléconseiller y met son propre identifiant. */
         lastCallById?: string;
+        /** @description Un ou plusieurs états de relation, séparés par des virgules. `CONTACTE,AMBASSADEUR,REFUS` rend tout ce qui a été contacté. */
+        relationStatus?: string;
         /** @description true : ne rend que ses propres fiches et celles qu’une campagne lui a confiées, quel que soit le rôle. L’écran d’appel le pose, l’annuaire non. */
         mesFiches?: boolean;
         sortBy?: components['schemas']['RepresentantSortField'];

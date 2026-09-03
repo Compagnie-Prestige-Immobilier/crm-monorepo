@@ -1,5 +1,10 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
-import { PrioriteTraitement, RepCallOutcome, StatutQualificationEffect } from '@crm/database';
+import {
+  PrioriteTraitement,
+  RepCallOutcome,
+  RepresentantRelation,
+  StatutQualificationEffect,
+} from '@crm/database';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
@@ -16,6 +21,7 @@ interface Row {
   effect: StatutQualificationEffect;
   requiresCallback: boolean;
   priorite: PrioriteTraitement;
+  relationStatus: RepresentantRelation | null;
   isActive: boolean;
   isSystem: boolean;
   sortOrder: number;
@@ -27,6 +33,7 @@ interface Row {
 const ligne = (over: Partial<Row> & Pick<Row, 'id' | 'code' | 'label' | 'effect'>): Row => ({
   requiresCallback: false,
   priorite: PrioriteTraitement.NORMALE,
+  relationStatus: null,
   isActive: true,
   isSystem: false,
   sortOrder: 100,
@@ -380,5 +387,48 @@ describe('priorité de traitement', () => {
     const modifie = await service.update('1', { priorite: PrioriteTraitement.HAUTE });
 
     expect(modifie.priorite).toBe(PrioriteTraitement.HAUTE);
+  });
+});
+
+describe('la relation que le statut pose', () => {
+  it('la rend sur chaque ligne servie, pour que le client sache ce qu’elle décide', async () => {
+    prisma.rows = [{ ...INTERESSE, relationStatus: RepresentantRelation.AMBASSADEUR }];
+
+    const { items } = await service.listAll();
+
+    expect(items[0]?.relationStatus).toBe(RepresentantRelation.AMBASSADEUR);
+  });
+
+  // La règle de rappel est celle du script et se verrouille sur une ligne
+  // système ; la relation posée, elle, est un arbitrage du métier.
+  it('se modifie sur un statut SYSTÈME, et se retire en la mettant à nul', async () => {
+    const pose = await service.update(INTERESSE.id, {
+      relationStatus: RepresentantRelation.AMBASSADEUR,
+    });
+    expect(pose.relationStatus).toBe(RepresentantRelation.AMBASSADEUR);
+
+    const retiree = await service.update(INTERESSE.id, { relationStatus: null });
+    expect(retiree.relationStatus).toBeNull();
+  });
+
+  it('se pose à la création', async () => {
+    const cree = await service.create({
+      code: 'DEJA_MEMBRE',
+      label: 'Déjà membre',
+      effect: StatutQualificationEffect.REACHED,
+      relationStatus: RepresentantRelation.AMBASSADEUR,
+    });
+
+    expect(cree.relationStatus).toBe(RepresentantRelation.AMBASSADEUR);
+  });
+
+  it('reste nulle quand la création ne la donne pas : un statut qui ne tranche rien ne pose rien', async () => {
+    const cree = await service.create({
+      code: 'A_REVOIR',
+      label: 'À revoir',
+      effect: StatutQualificationEffect.REACHED,
+    });
+
+    expect(cree.relationStatus).toBeNull();
   });
 });

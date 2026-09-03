@@ -48,6 +48,13 @@ export const PRIORITE_TRAITEMENT_LABELS: Record<PrioriteTraitement, string> = {
 };
 
 /**
+ * La relation que le statut pose sur la fiche, nulle quand il ne tranche rien.
+ * Le serveur ne l'applique que si le client ne répond pas lui-même à la
+ * question.
+ */
+export type StatutRelationPosee = StatutQualification['relationStatus'];
+
+/**
  * La branche du script où le statut se propose, DÉDUITE de l'effet. Le serveur
  * fait la même déduction : une colonne « joignable » divergerait de l'effet à
  * la première correction.

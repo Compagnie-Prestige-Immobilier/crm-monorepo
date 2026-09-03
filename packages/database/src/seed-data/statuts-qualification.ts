@@ -4,6 +4,12 @@ export interface StatutQualificationSeed {
   effect: 'REACHED' | 'REFUSED' | 'SCHEDULE_CALLBACK' | 'UNREACHABLE' | 'WRONG_NUMBER';
   requiresCallback: boolean;
   priorite: 'HAUTE' | 'NORMALE' | 'BASSE';
+  /**
+   * La relation que le statut pose sur la fiche, nulle quand il ne tranche
+   * rien : « a rappeler » ne tranche pas, un numero occupe ne dit rien de
+   * l'interet.
+   */
+  relationStatus: 'INCONNU' | 'CONTACTE' | 'AMBASSADEUR' | 'REFUS' | null;
   sortOrder: number;
 }
 
@@ -27,6 +33,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     effect: 'REACHED',
     requiresCallback: false,
     priorite: 'NORMALE',
+    relationStatus: 'AMBASSADEUR',
     sortOrder: 10,
   },
   {
@@ -35,6 +42,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     effect: 'REACHED',
     requiresCallback: false,
     priorite: 'HAUTE',
+    relationStatus: 'AMBASSADEUR',
     sortOrder: 20,
   },
   {
@@ -43,6 +51,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     effect: 'REACHED',
     requiresCallback: false,
     priorite: 'HAUTE',
+    relationStatus: 'AMBASSADEUR',
     sortOrder: 30,
   },
   {
@@ -51,6 +60,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     effect: 'REACHED',
     requiresCallback: false,
     priorite: 'NORMALE',
+    relationStatus: 'AMBASSADEUR',
     sortOrder: 40,
   },
   {
@@ -59,6 +69,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     effect: 'REFUSED',
     requiresCallback: false,
     priorite: 'BASSE',
+    relationStatus: 'REFUS',
     sortOrder: 50,
   },
   {
@@ -67,6 +78,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     effect: 'REFUSED',
     requiresCallback: false,
     priorite: 'BASSE',
+    relationStatus: 'REFUS',
     sortOrder: 60,
   },
   // Le seul qui exige une date : c'est lui qui arme l'alarme du telephone.
@@ -76,6 +88,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     effect: 'SCHEDULE_CALLBACK',
     requiresCallback: true,
     priorite: 'HAUTE',
+    relationStatus: null,
     sortOrder: 70,
   },
 
@@ -86,6 +99,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     effect: 'UNREACHABLE',
     requiresCallback: false,
     priorite: 'NORMALE',
+    relationStatus: null,
     sortOrder: 110,
   },
   {
@@ -94,6 +108,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     effect: 'UNREACHABLE',
     requiresCallback: false,
     priorite: 'NORMALE',
+    relationStatus: null,
     sortOrder: 120,
   },
   {
@@ -102,6 +117,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     effect: 'UNREACHABLE',
     requiresCallback: false,
     priorite: 'NORMALE',
+    relationStatus: null,
     sortOrder: 130,
   },
   {
@@ -110,6 +126,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     effect: 'UNREACHABLE',
     requiresCallback: false,
     priorite: 'NORMALE',
+    relationStatus: null,
     sortOrder: 140,
   },
   {
@@ -118,6 +135,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     effect: 'WRONG_NUMBER',
     requiresCallback: false,
     priorite: 'BASSE',
+    relationStatus: null,
     sortOrder: 150,
   },
   {
@@ -126,6 +144,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     effect: 'WRONG_NUMBER',
     requiresCallback: false,
     priorite: 'BASSE',
+    relationStatus: null,
     sortOrder: 160,
   },
 ];

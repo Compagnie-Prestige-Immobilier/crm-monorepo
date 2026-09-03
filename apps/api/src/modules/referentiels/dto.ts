@@ -1,6 +1,11 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { EmployeurType, PrioriteTraitement, StatutQualificationEffect } from '@crm/database';
+import {
+  EmployeurType,
+  PrioriteTraitement,
+  RepresentantRelation,
+  StatutQualificationEffect,
+} from '@crm/database';
 import {
   IsBoolean,
   IsEnum,
@@ -609,6 +614,13 @@ export class StatutQualificationDto {
     description: 'Ordre de reprise : un « Très intéressé » se rappelle avant un « Non éligible ».',
   })
   priorite!: PrioriteTraitement;
+  @ApiProperty({
+    enum: RepresentantRelation,
+    enumName: 'RepresentantRelation',
+    nullable: true,
+    description: 'La relation posée sur la fiche. Nulle quand le statut ne tranche rien.',
+  })
+  relationStatus!: RepresentantRelation | null;
   @ApiProperty() isActive!: boolean;
   @ApiProperty({ description: 'Le script s’appuie dessus : sa règle ne se reconfigure pas.' })
   isSystem!: boolean;
@@ -666,6 +678,16 @@ export class CreateStatutQualificationDto {
   @IsOptional()
   @IsEnum(PrioriteTraitement)
   priorite?: PrioriteTraitement;
+
+  @ApiPropertyOptional({
+    enum: RepresentantRelation,
+    enumName: 'RepresentantRelation',
+    nullable: true,
+    description: 'Relation posée sur la fiche quand le client n’en envoie pas.',
+  })
+  @IsOptional()
+  @IsEnum(RepresentantRelation)
+  relationStatus?: RepresentantRelation | null;
 }
 
 export class UpdateStatutQualificationDto {
@@ -685,6 +707,16 @@ export class UpdateStatutQualificationDto {
   @IsOptional()
   @IsEnum(PrioriteTraitement)
   priorite?: PrioriteTraitement;
+
+  @ApiPropertyOptional({
+    enum: RepresentantRelation,
+    enumName: 'RepresentantRelation',
+    nullable: true,
+    description: 'Nul retire la relation posée : le statut cesse alors de trancher.',
+  })
+  @IsOptional()
+  @IsEnum(RepresentantRelation)
+  relationStatus?: RepresentantRelation | null;
 }
 
 export class SetStatutQualificationActiveDto {

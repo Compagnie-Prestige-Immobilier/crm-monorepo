@@ -219,9 +219,33 @@ describe('filtre par état de relation', () => {
     (db.representant.findMany.mock.calls[0] as [{ where: Record<string, unknown> }])[0].where;
 
   it('ne retient que les fiches dans l’état demandé', async () => {
-    await service.list(ADMIN, { relationStatus: RepresentantRelation.AMBASSADEUR });
+    await service.list(ADMIN, { relationStatus: [RepresentantRelation.AMBASSADEUR] });
 
     expect(whereOf().relationStatus).toBe(RepresentantRelation.AMBASSADEUR);
+  });
+
+  it('retient tous les états demandés quand il y en a plusieurs', async () => {
+    await service.list(ADMIN, {
+      relationStatus: [
+        RepresentantRelation.CONTACTE,
+        RepresentantRelation.AMBASSADEUR,
+        RepresentantRelation.REFUS,
+      ],
+    });
+
+    expect(whereOf().relationStatus).toEqual({
+      in: [
+        RepresentantRelation.CONTACTE,
+        RepresentantRelation.AMBASSADEUR,
+        RepresentantRelation.REFUS,
+      ],
+    });
+  });
+
+  it('ne filtre sur rien quand la liste est vide', async () => {
+    await service.list(ADMIN, { relationStatus: [] });
+
+    expect(whereOf()).not.toHaveProperty('relationStatus');
   });
 
   it('ne filtre sur rien quand l’état n’est pas demandé', async () => {
@@ -242,7 +266,7 @@ describe('filtre par état de relation', () => {
   });
 
   it('n’ajoute aucun cloisonnement pour l’encadrement', async () => {
-    await service.list(ADMIN, { relationStatus: RepresentantRelation.AMBASSADEUR });
+    await service.list(ADMIN, { relationStatus: [RepresentantRelation.AMBASSADEUR] });
 
     expect(whereOf()).toMatchObject({ relationStatus: RepresentantRelation.AMBASSADEUR });
     expect(whereOf()).not.toHaveProperty('AND');
@@ -273,7 +297,7 @@ describe('périmètre par campagne', () => {
   it('le SUPERVISEUR n’est borné par rien', async () => {
     await service.list(
       { ...COMMERCIAL, id: 'sup-1', role: Role.SUPERVISEUR },
-      { relationStatus: RepresentantRelation.AMBASSADEUR },
+      { relationStatus: [RepresentantRelation.AMBASSADEUR] },
     );
 
     expect(whereOf()).not.toHaveProperty('AND');

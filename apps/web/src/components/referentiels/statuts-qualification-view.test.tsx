@@ -32,6 +32,7 @@ const statut = (patch: Partial<StatutQualification>): StatutQualification => ({
   effect: 'REACHED',
   requiresCallback: false,
   priorite: 'HAUTE',
+  relationStatus: 'AMBASSADEUR',
   isActive: true,
   isSystem: true,
   minPayloadVersion: 6,
@@ -46,6 +47,7 @@ const BASSE = statut({
   label: 'Non éligible',
   effect: 'REFUSED',
   priorite: 'BASSE',
+  relationStatus: null,
 });
 
 describe('référentiel des statuts de qualification', () => {
@@ -68,6 +70,36 @@ describe('référentiel des statuts de qualification', () => {
 
   // La règle de rappel est celle du script et se verrouille sur une ligne
   // système ; la priorité, elle, est un arbitrage de plateau qui se change.
+  it('dit ligne par ligne la relation que le statut pose, et son absence', async () => {
+    renderWithQuery(<StatutsQualificationView />);
+
+    const pose = (await screen.findByText('Très intéressé')).closest('tr');
+    const rien = screen.getByText('Non éligible').closest('tr');
+
+    expect(pose?.textContent).toContain('A accepté');
+    expect(rien?.textContent).toContain('Ne tranche pas');
+  });
+
+  it('pose la relation depuis un statut SYSTÈME, et la retire', async () => {
+    renderWithQuery(<StatutsQualificationView />);
+
+    await userEvent.click(await screen.findByRole('button', { name: /Modifier Très intéressé/ }));
+
+    const relation = await screen.findByRole('combobox', { name: /Relation posée/ });
+    expect(relation.textContent).toContain('A accepté');
+
+    await userEvent.click(relation);
+    await userEvent.click(await screen.findByRole('option', { name: 'Ne tranche pas' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    await vi.waitFor(() => {
+      expect(updateStatutQualification).toHaveBeenCalledWith(
+        's-1',
+        expect.objectContaining({ relationStatus: null }),
+      );
+    });
+  });
+
   it('laisse changer la priorité d’un statut SYSTÈME', async () => {
     renderWithQuery(<StatutsQualificationView />);
 
