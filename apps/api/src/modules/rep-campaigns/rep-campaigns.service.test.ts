@@ -1,5 +1,5 @@
 import { ConflictException, ForbiddenException } from '@nestjs/common';
-import { RepCallOutcome, Role } from '@crm/database';
+import { RepCallOutcome, Role, StatutQualificationEffect } from '@crm/database';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
@@ -30,6 +30,7 @@ let tx: Tx;
 let db: {
   repCallAttempt: { findUnique: MockFn };
   representant: { findFirst: MockFn };
+  statutQualification: { findUnique: MockFn };
   $transaction: MockFn;
 };
 let service: RepCampaignsService;
@@ -63,6 +64,7 @@ beforeEach(() => {
         lastCallAt: null,
       }),
     },
+    statutQualification: { findUnique: vi.fn().mockResolvedValue(null) },
     $transaction: vi.fn((fn: (client: Tx) => unknown) => fn(tx)),
   };
   service = new RepCampaignsService(
@@ -246,5 +248,100 @@ describe('périmètre par campagne', () => {
       db.representant.findFirst.mock.calls[0] as [{ where: Record<string, unknown> }]
     )[0].where;
     expect(where).not.toHaveProperty('OR');
+  });
+});
+
+describe('le statut de qualification commande l’issue', () => {
+  const STATUT = '0198c000-0000-7000-8000-000000000001';
+
+  const statut = (over: Record<string, unknown> = {}) => ({
+    id: STATUT,
+    code: 'INTERESSE',
+    label: 'Intéressé',
+    effect: StatutQualificationEffect.REACHED,
+    requiresCallback: false,
+    isActive: true,
+    ...over,
+  });
+
+  it('accepte une tentative SANS statut : les versions déjà installées n’en émettent pas', async () => {
+    const resultat = await service.recordAttempt(ALICE, baseBody());
+
+    expect(resultat.status).toBe(RepCallAttemptApplyStatus.APPLIED);
+    expect(db.statutQualification.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('enregistre le statut sur la tentative ET sur la fiche', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(statut());
+    const body = baseBody();
+    body.statutQualificationId = STATUT;
+
+    await service.recordAttempt(ALICE, body);
+
+    expect(tx.repCallAttempt.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [expect.objectContaining({ statutQualificationId: STATUT })],
+      }),
+    );
+    expect(tx.representant.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ statutQualificationId: STATUT }),
+      }),
+    );
+  });
+
+  it('refuse une issue qui contredit le statut, au lieu d’enregistrer la contradiction', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(statut());
+    const body = baseBody();
+    body.statutQualificationId = STATUT;
+    body.outcome = RepCallOutcome.UNREACHABLE;
+
+    await expect(service.recordAttempt(ALICE, body)).rejects.toMatchObject({
+      response: { code: 'REP_OUTCOME_STATUT_MISMATCH' },
+    });
+    expect(tx.repCallAttempt.createMany).not.toHaveBeenCalled();
+  });
+
+  it('refuse un statut inconnu', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(null);
+    const body = baseBody();
+    body.statutQualificationId = STATUT;
+
+    await expect(service.recordAttempt(ALICE, body)).rejects.toMatchObject({
+      response: { code: 'REP_STATUT_QUALIFICATION_UNKNOWN' },
+    });
+  });
+
+  it('refuse un statut retiré depuis la dernière synchronisation', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(statut({ isActive: false }));
+    const body = baseBody();
+    body.statutQualificationId = STATUT;
+
+    await expect(service.recordAttempt(ALICE, body)).rejects.toMatchObject({
+      response: { code: 'REP_STATUT_QUALIFICATION_INACTIVE' },
+    });
+  });
+
+  it('exige la date quand le statut arme un rappel, par la règle qui existait déjà', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(
+      statut({
+        code: 'A_RAPPELER',
+        label: 'À rappeler',
+        effect: StatutQualificationEffect.SCHEDULE_CALLBACK,
+        requiresCallback: true,
+      }),
+    );
+    const body = baseBody();
+    body.statutQualificationId = STATUT;
+    body.outcome = RepCallOutcome.CALLBACK;
+
+    await expect(service.recordAttempt(ALICE, body)).rejects.toMatchObject({
+      response: { code: 'REP_CAMPAIGN_CALLBACK_AT_REQUIRED' },
+    });
+
+    body.callbackAt = '2026-09-10T09:00:00.000Z';
+    expect((await service.recordAttempt(ALICE, body)).status).toBe(
+      RepCallAttemptApplyStatus.APPLIED,
+    );
   });
 });

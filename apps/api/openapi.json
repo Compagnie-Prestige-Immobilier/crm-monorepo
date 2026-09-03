@@ -3213,6 +3213,381 @@
         "tags": ["call-outcome-reasons"]
       }
     },
+    "/api/v1/statuts-qualification": {
+      "get": {
+        "description": "Restreint aux statuts actifs dont `minPayloadVersion` ne dépasse pas la version déclarée. Un statut que l’appelant ne saurait pas renvoyer ne lui est jamais proposé : sa remontée finirait en échec définitif, hors ligne, sans possibilité de correction.",
+        "operationId": "listStatutsQualification",
+        "parameters": [
+          {
+            "name": "payloadVersion",
+            "required": true,
+            "in": "query",
+            "description": "Version de charge utile de l’appelant. Un statut qu’il ne saurait pas émettre ne lui est jamais proposé : sa remontée finirait en échec définitif, hors ligne.",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatutQualificationListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Statuts qu’un client de saisie sait émettre.",
+        "tags": ["statuts-qualification"]
+      },
+      "post": {
+        "operationId": "createStatutQualification",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateStatutQualificationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatutQualificationDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "STATUT_QUALIFICATION_CODE_CONFLICT, _LABEL_CONFLICT, _CALLBACK_NOT_ALLOWED.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ajouter un statut de qualification.",
+        "tags": ["statuts-qualification"]
+      }
+    },
+    "/api/v1/statuts-qualification/administration": {
+      "get": {
+        "operationId": "listAllStatutsQualification",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatutQualificationListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tous les statuts, actifs ou non, toutes versions de charge utile.",
+        "tags": ["statuts-qualification"]
+      }
+    },
+    "/api/v1/statuts-qualification/{id}": {
+      "patch": {
+        "operationId": "updateStatutQualification",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStatutQualificationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatutQualificationDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "STATUT_QUALIFICATION_NOT_FOUND.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "STATUT_QUALIFICATION_SYSTEM_IMMUTABLE, _LABEL_CONFLICT, _CALLBACK_NOT_ALLOWED.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Renommer un statut, changer son rang, ou sa règle si elle n’est pas système.",
+        "tags": ["statuts-qualification"]
+      }
+    },
+    "/api/v1/statuts-qualification/{id}/active": {
+      "post": {
+        "description": "Un statut désactivé disparaît de la saisie et reste lisible sur les fiches qui le désignent. Vider une branche du script de son dernier statut actif est refusé.",
+        "operationId": "setStatutQualificationActive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetStatutQualificationActiveDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatutQualificationDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "STATUT_QUALIFICATION_LAST_OF_BRANCH.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Activer ou désactiver un statut.",
+        "tags": ["statuts-qualification"]
+      }
+    },
     "/api/v1/representants": {
       "get": {
         "description": "Un COMMERCIAL ne voit que les représentants qu’il a créés ou qui lui sont attribués dans un lot d’export. ADMIN, SUPERVISEUR et DIRECTION voient tout.",
@@ -3291,6 +3666,16 @@
             "in": "query",
             "schema": {
               "$ref": "#/components/schemas/RepresentantRelation"
+            }
+          },
+          {
+            "name": "statutQualificationId",
+            "required": false,
+            "in": "query",
+            "description": "Statut de qualification du dernier appel. Sert le filtre de l’annuaire ET le tirage d’un lot d’appels.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
             }
           },
           {
@@ -16677,6 +17062,16 @@
             }
           },
           {
+            "name": "statutQualificationId",
+            "required": false,
+            "in": "query",
+            "description": "Statut de qualification du dernier appel. Sert le filtre de l’annuaire ET le tirage d’un lot d’appels.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "whatsappStatus",
             "required": false,
             "in": "query",
@@ -19802,6 +20197,138 @@
         }
       },
       "SetCallOutcomeReasonActiveDto": {
+        "type": "object",
+        "properties": {
+          "isActive": {
+            "type": "boolean"
+          }
+        },
+        "required": ["isActive"]
+      },
+      "StatutQualificationEffect": {
+        "type": "string",
+        "enum": ["REACHED", "REFUSED", "SCHEDULE_CALLBACK", "UNREACHABLE", "WRONG_NUMBER"]
+      },
+      "StatutQualificationDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "effect": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StatutQualificationEffect"
+              }
+            ]
+          },
+          "requiresCallback": {
+            "type": "boolean",
+            "description": "La date du rappel est exigée par ce statut."
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "isSystem": {
+            "type": "boolean",
+            "description": "Le script s’appuie dessus : sa règle ne se reconfigure pas."
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "minPayloadVersion": {
+            "type": "number",
+            "description": "Version de charge utile minimale sachant émettre ce code."
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "label",
+          "effect",
+          "requiresCallback",
+          "isActive",
+          "isSystem",
+          "sortOrder",
+          "minPayloadVersion",
+          "updatedAt"
+        ]
+      },
+      "StatutQualificationListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatutQualificationDto"
+            }
+          }
+        },
+        "required": ["items"]
+      },
+      "CreateStatutQualificationDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "Immuable : l’historique le référence."
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "effect": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StatutQualificationEffect"
+              }
+            ]
+          },
+          "requiresCallback": {
+            "type": "boolean",
+            "default": false
+          },
+          "sortOrder": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9999,
+            "default": 100
+          }
+        },
+        "required": ["code", "label", "effect"]
+      },
+      "UpdateStatutQualificationDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "requiresCallback": {
+            "type": "boolean"
+          },
+          "sortOrder": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9999
+          }
+        }
+      },
+      "SetStatutQualificationActiveDto": {
         "type": "object",
         "properties": {
           "isActive": {
@@ -23620,6 +24147,11 @@
                 "$ref": "#/components/schemas/RepCallOutcome"
               }
             ]
+          },
+          "statutQualificationId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Statut de qualification recueilli. FACULTATIF : les versions déjà installées ne l’émettent pas, et un refus mettrait leur saisie en échec définitif. Quand il est présent, c’est lui qui commande l’issue enregistrée."
           },
           "promisedProspects": {
             "type": "number",
@@ -27461,6 +27993,11 @@
                 "$ref": "#/components/schemas/RepresentantRelation"
               }
             ]
+          },
+          "statutQualificationId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Statut de qualification du dernier appel. Sert le filtre de l’annuaire ET le tirage d’un lot d’appels."
           },
           "whatsappStatus": {
             "allOf": [

@@ -22,6 +22,10 @@ const SCHEMA_PATH = new URL(
 const PURGE_EXEMPT = new Map<string, string>([
   ['app_settings', 'réglages de workflow et non données métier'],
   [
+    'statuts_qualification',
+    'référentiel administrable, comme les banques ou les syndicats : la purge efface les fiches, pas le vocabulaire avec lequel on les qualifie. Les fiches qui le désignent partent par « Représentants », et `onDelete: Restrict` interdit qu’un statut disparaisse en laissant une fiche orpheline',
+  ],
+  [
     'refresh_tokens',
     'sessions, emportées en cascade avec leur compte ; les purger seules déconnecterait tout le monde sans rien effacer',
   ],

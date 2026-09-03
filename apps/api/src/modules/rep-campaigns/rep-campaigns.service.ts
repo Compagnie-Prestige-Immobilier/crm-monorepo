@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ChangeSource, RepCallOutcome } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { outcomeOf } from '../referentiels/statuts-qualification.service.js';
 import { type AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { normalizePhone } from '../../common/phone.js';
 import { attributionScope } from '../../common/scope.js';
@@ -17,6 +18,9 @@ import {
 } from './dto.js';
 import {
   callbackAtRequired,
+  issueContreditStatut,
+  statutInactif,
+  statutInconnu,
   commentRequired,
   phoneConflict,
   promisedNotAllowed,
@@ -60,6 +64,10 @@ export class RepCampaignsService {
     // la tentative entière, comme `suggestedPhone`.
     const newPhone =
       body.numeroConfirme === false && body.phone ? normalizePhone(body.phone) : undefined;
+
+    // Le statut commande l'issue. Résolu AVANT la transaction : c'est une
+    // lecture, et la faire dedans allongerait le verrou pour rien.
+    await this.assertStatutCoherent(body);
 
     const applied = await this.prisma.$transaction(async (tx) => {
       const inserted = await tx.repCallAttempt.createMany({
@@ -123,6 +131,29 @@ export class RepCampaignsService {
     );
   }
 
+  /**
+   * Quand un statut est envoyé, il fait foi : l'issue en découle, et une issue
+   * qui la contredit est refusée plutôt qu'enregistrée. Sans statut, l'issue
+   * envoyée fait foi, comme le font les versions déjà installées.
+   */
+  private async assertStatutCoherent(body: CreateRepCallAttemptDto): Promise<void> {
+    if (body.statutQualificationId === undefined) return;
+
+    const statut = await this.prisma.statutQualification.findUnique({
+      where: { id: body.statutQualificationId },
+    });
+    if (!statut) throw statutInconnu();
+    if (!statut.isActive) throw statutInactif(statut.label);
+
+    const attendue = outcomeOf(statut.effect);
+    if (body.outcome !== attendue) throw issueContreditStatut(attendue, body.outcome);
+
+    // Pas de garde sur `requiresCallback` ici : `assertCallbackAllowed` ne
+    // l'autorise que sur l'effet SCHEDULE_CALLBACK, dont l'issue dérivée est
+    // CALLBACK, que `validatedComment` refuse déjà sans date. Un second garde
+    // serait une branche que rien ne peut atteindre.
+  }
+
   /** Seconde lecture, hors périmètre : « pas à vous » ne se confond pas avec « n'existe pas ». */
   private async absent(representantId: string): Promise<Error> {
     const ailleurs = await this.prisma.representant.findFirst({
@@ -159,6 +190,7 @@ function attemptRow(body: CreateRepCallAttemptDto, performedById: string, commen
     contacte: body.contacte ?? null,
     connaitUES: body.connaitUES ?? null,
     syndicat: body.syndicat?.trim() || null,
+    statutQualificationId: body.statutQualificationId ?? null,
     clientCreatedAt: new Date(body.clientCreatedAt),
   };
 }
@@ -173,6 +205,9 @@ function representantPatch(
     ...(body.syndicat !== undefined ? { syndicat: body.syndicat.trim() || null } : {}),
     ...(body.connaitUES !== undefined ? { connaitUES: body.connaitUES } : {}),
     ...(body.contacte !== undefined ? { contacte: body.contacte } : {}),
+    ...(body.statutQualificationId !== undefined
+      ? { statutQualificationId: body.statutQualificationId }
+      : {}),
     ...(body.etablissementConfirme === false && body.etablissement !== undefined
       ? { etablissement: body.etablissement.trim() || null }
       : {}),

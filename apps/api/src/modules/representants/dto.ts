@@ -317,6 +317,15 @@ export class RepresentantExportQueryDto {
   @IsEnum(RepresentantRelation)
   relationStatus?: RepresentantRelation;
 
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description:
+      'Statut de qualification du dernier appel. Sert le filtre de l’annuaire ET le tirage d’un lot d’appels.',
+  })
+  @IsOptional()
+  @IsUUID()
+  statutQualificationId?: string;
+
   @ApiPropertyOptional({ enum: WhatsappStatus, enumName: 'WhatsappStatus' })
   @IsOptional()
   @IsEnum(WhatsappStatus)
