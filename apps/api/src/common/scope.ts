@@ -55,9 +55,10 @@ export const prospectReadScope = (
 ): Prisma.ProspectWhereInput => attributionScope(user);
 
 /**
- * Portée des prospects sur le TÉLÉPHONE. Volontairement plus étroite que
- * `prospectReadScope` : lire le travail de tous à l'écran est une chose, en
- * tirer le portefeuille national sur un appareil en est une autre.
+ * Portée des prospects sur le TÉLÉPHONE : aucune. Le tirage est GLOBAL et c'est
+ * l'appareil qui filtre, sans quoi une réattribution de campagne effacerait des
+ * fiches déjà ouvertes hors ligne. La portée d'écran, elle, reste
+ * `prospectReadScope`.
  */
 export const prospectSyncScope = (
   _user: Pick<AuthenticatedUser, 'id' | 'role'>,
