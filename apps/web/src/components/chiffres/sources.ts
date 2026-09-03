@@ -186,23 +186,23 @@ const parTeleconseiller = (chues: boolean): SourceChiffre => ({
  */
 export const SOURCES_CHIFFRES = {
   'taux-de-contact': {
-    label: 'Taux de contact des représentants',
+    label: 'Taux de joignabilité des représentants',
     forme: 'scalaire',
     jeu: 'activite',
     description:
-      'La part des appels aux représentants où quelqu’un a décroché. Un refus compte : il a répondu.',
+      'La part des appels aux représentants où quelqu’un a décroché. Un refus compte : il a répondu. Les faux numéros sont exclus du calcul.',
     groupe: 'Appels aux représentants',
     extraire: ({ activite }) =>
       activite === undefined
         ? null
         : scalaireTaux(
             activite.totals.repContactRate,
-            `${formatNumber(activite.totals.repReached)} joints sur ${formatNumber(activite.totals.repCalls)} appels aux représentants`,
+            `${formatNumber(activite.totals.repReached)} joints sur ${formatNumber(activite.totals.repCalls - activite.totals.repWrongNumber)} appels`,
             'Aucun appel à un représentant sur la période',
           ),
   },
   'a-rappeler': {
-    label: 'Taux de rendez-vous des représentants',
+    label: 'Taux de rappel des représentants',
     forme: 'scalaire',
     jeu: 'activite',
     description:
@@ -213,12 +213,46 @@ export const SOURCES_CHIFFRES = {
         ? null
         : scalaireTaux(
             activite.totals.repCallbackRate,
-            `${formatNumber(activite.totals.repCallback)} rendez-vous sur ${formatNumber(activite.totals.repCalls)} appels aux représentants`,
+            `${formatNumber(activite.totals.repCallback)} rappels sur ${formatNumber(activite.totals.repCalls - activite.totals.repWrongNumber)} appels`,
             'Aucun appel à un représentant sur la période',
           ),
   },
   'taux-de-qualification': {
     label: 'Taux de qualification des représentants',
+    forme: 'scalaire',
+    jeu: 'activite',
+    description: 'La part des représentants interrogés qui acceptent d’être représentant CHUES.',
+    groupe: 'Appels aux représentants',
+    extraire: ({ activite }) =>
+      activite === undefined
+        ? null
+        : scalaireTaux(
+            activite.totals.repQualificationRate,
+            `${formatNumber(activite.totals.repQualified)} acceptent sur ${formatNumber(activite.totals.repQuestioned)} interrogés`,
+            'Aucun représentant interrogé sur la période',
+          ),
+  },
+  'repartition-statuts-qualification': {
+    label: 'Répartition des statuts de qualification',
+    forme: 'classement',
+    jeu: 'activite',
+    description:
+      'Nombre de représentants par statut de qualification, basé sur leur dernier appel dans la période.',
+    groupe: 'Appels aux représentants',
+    extraire: ({ activite }) => {
+      if (activite === undefined || activite.repQualificationStatuses === null) return null;
+      return {
+        forme: 'classement',
+        donnee: activite.repQualificationStatuses.items.map((item) => ({
+          id: item.id,
+          label: item.label,
+          value: item.count,
+        })),
+      };
+    },
+  },
+  'taux-de-joignabilite': {
+    label: 'Taux de joignabilité des prospects',
     forme: 'scalaire',
     jeu: 'activite',
     description: 'La part des représentants interrogés qui acceptent d’être représentant CHUES.',
@@ -449,6 +483,7 @@ const SOURCES_CHUES_SEULEMENT: readonly string[] = [
   'taux-de-contact',
   'a-rappeler',
   'taux-de-qualification',
+  'repartition-statuts-qualification',
 ];
 
 /** Les montants ne s'ouvrent qu'à la direction, comme la disposition d'usine du serveur. */
