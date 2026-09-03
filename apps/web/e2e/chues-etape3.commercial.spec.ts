@@ -3,7 +3,7 @@ import { expect, test, type APIRequestContext, type Page } from '@playwright/tes
 import { adminApi, ensureWorkspaceFixtures } from './fixtures';
 
 /**
- * ET3-1 à ET3-6 (E2E-chues.md §5.4) : `/chues/console`, étape 3, convertir un
+ * ET3-1 à ET3-6 (E2E.md) : `/chues/console`, étape 3, convertir un
  * prospect. L'écran ouvre sur la recherche, la fiche choisie reçoit l'appel,
  * puis on revient à la liste ; `?fiche=<id>` ouvre directement la fiche.
  *

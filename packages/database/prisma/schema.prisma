@@ -321,7 +321,7 @@ model User {
   representantComments     RepresentantComment[]        @relation("RepresentantCommentAuthor")
 
   heartbeat AgentHeartbeat?
-  activityDays AgentActivityDay[]
+  activitySlots AgentActivitySlot[]
 
   visitesEnregistrees Visite[]          @relation("VisiteCreatedBy")
   dashboardLayouts    DashboardLayout[] @relation("DashboardLayoutUser")
@@ -1040,18 +1040,21 @@ model AgentHeartbeat {
   @@map("agent_heartbeats")
 }
 
-model AgentActivityDay {
+/// Présence observée, découpée à l'heure : la journée seule ne dit pas quelle
+/// part du temps tombe dans les créneaux de travail. `slot` est l'heure de
+/// Dakar tronquée, stockée en UTC, les deux ne différant jamais.
+model AgentActivitySlot {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  day    DateTime @db.Date
+  slot   DateTime
 
   firstSeenAt  DateTime
   lastSeenAt   DateTime
   activeSeconds Int @default(0)
 
-  @@id([userId, day])
-  @@index([day])
-  @@map("agent_activity_days")
+  @@id([userId, slot])
+  @@index([slot])
+  @@map("agent_activity_slots")
 }
 
 model AuditLog {

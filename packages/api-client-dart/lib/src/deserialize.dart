@@ -166,6 +166,8 @@ import 'package:crm_api_client/src/model/representant_productivity_list_dto.dart
 import 'package:crm_api_client/src/model/representant_relation_change_dto.dart';
 import 'package:crm_api_client/src/model/representant_relation_change_list_dto.dart';
 import 'package:crm_api_client/src/model/reset_password_dto.dart';
+import 'package:crm_api_client/src/model/score_dto.dart';
+import 'package:crm_api_client/src/model/score_part_dto.dart';
 import 'package:crm_api_client/src/model/segment_change_dto.dart';
 import 'package:crm_api_client/src/model/segment_change_list_dto.dart';
 import 'package:crm_api_client/src/model/segment_conversion_author_dto.dart';
@@ -825,6 +827,10 @@ ReturnType deserialize<ReturnType, BaseType>(
       return ResetPasswordDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'Role':
+    case 'ScoreDto':
+      return ScoreDto.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'ScorePartDto':
+      return ScorePartDto.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'SegmentChangeDto':
       return SegmentChangeDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;

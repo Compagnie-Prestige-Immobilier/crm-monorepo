@@ -8,12 +8,14 @@ import {
   PowerIcon,
   PowerOffIcon,
   SearchIcon,
+  Trash2Icon,
   UserPlusIcon,
 } from 'lucide-react';
 import { useId, useState } from 'react';
 import { toast } from 'sonner';
 
 import { DeactivateUserDialog } from '@/components/commerciaux/deactivate-user-dialog';
+import { DeleteUsersDialog } from '@/components/commerciaux/delete-users-dialog';
 import { PasswordDialog } from '@/components/commerciaux/password-dialog';
 import { useUserFilters } from '@/components/commerciaux/use-user-filters';
 import { UserFormDialog } from '@/components/commerciaux/user-form-dialog';
@@ -45,13 +47,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { fetchUsers, setUserActive } from '@/lib/data/users';
+import { deleteUser, fetchUsers, setUserActive } from '@/lib/data/users';
 import { formatDateTime, formatNumber, formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import { ROLE_LABELS, type Role, type UserRow } from '@/lib/types';
 import { useDebouncedSearch } from '@/lib/use-debounced-search';
-import { ROLES } from '@/lib/user-filters';
+import { EMPTY_USER_FILTERS, ROLES, type UserFilters } from '@/lib/user-filters';
 import { cn } from '@/lib/utils';
 
 type ActiveFilterValue = 'tous' | 'actifs' | 'desactives';
@@ -75,26 +77,50 @@ const ACTIVE_ITEMS = [
   { value: 'desactives', label: 'Désactivés' },
 ];
 
+/** Repreneurs possibles : l'API n'accepte qu'un téléconseiller actif. */
+const HANDOVER_FILTERS: UserFilters = {
+  ...EMPTY_USER_FILTERS,
+  role: 'COMMERCIAL',
+  isActive: true,
+  pageSize: 200,
+};
+
 export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
   const queryClient = useQueryClient();
   const searchId = useId();
 
   const { filters, setFilters } = useUserFilters();
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  // Une sélection survivant à un changement de filtre supprimerait des comptes
+  // que l'écran ne montre plus.
+  const applyFilters = (patch: Partial<UserFilters>): void => {
+    setSelectedIds([]);
+    setFilters(patch);
+  };
+
   const { draft: searchDraft, setDraft: setSearchDraft } = useDebouncedSearch(
     filters.search,
     (search) => {
-      setFilters({ search });
+      applyFilters({ search });
     },
   );
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<UserRow | undefined>(undefined);
   const [passwordTarget, setPasswordTarget] = useState<UserRow | null>(null);
   const [deactivating, setDeactivating] = useState<UserRow | null>(null);
+  const [deleting, setDeleting] = useState<UserRow[]>([]);
 
   const { data, isPending, isFetching, isError, error, refetch } = useQuery({
     queryKey: queryKeys.commerciaux(filters),
     queryFn: () => fetchUsers(filters),
     placeholderData: (previous) => previous,
+  });
+
+  const { data: repreneurs } = useQuery({
+    queryKey: queryKeys.commerciaux(HANDOVER_FILTERS),
+    queryFn: () => fetchUsers(HANDOVER_FILTERS),
+    staleTime: 300_000,
   });
 
   const toggleActive = useMutation({
@@ -143,6 +169,38 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.reference });
     },
   });
+
+  const remove = useMutation({
+    // Séquentiel : chaque suppression transfère le portefeuille au repreneur,
+    // et deux transferts concurrents sur la même cible se marcheraient dessus.
+    mutationFn: async ({ users, handoverToId }: { users: UserRow[]; handoverToId?: string }) => {
+      for (const user of users) {
+        await deleteUser(user.id, handoverToId);
+      }
+      return users;
+    },
+    onSuccess: (supprimes) => {
+      setDeleting([]);
+      setSelectedIds([]);
+      const premier = supprimes[0];
+      toast.success(
+        supprimes.length === 1 && premier !== undefined
+          ? `${premier.fullName} supprimé.`
+          : `${formatNumber(supprimes.length)} comptes supprimés.`,
+      );
+    },
+    onError: (error) => {
+      toastApiError(error, 'Suppression impossible. Réessayez.');
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.commerciauxRoot });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.reference });
+    },
+  });
+
+  const rows = data?.items ?? [];
+  const selectables = rows.filter((row) => row.id !== currentUserId);
+  const selection = rows.filter((row) => selectedIds.includes(row.id));
 
   const activeValue: ActiveFilterValue = (() => {
     if (filters.isActive === null) return 'tous';
@@ -201,7 +259,7 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
             value={filters.role ?? ALL_ROLES}
             onValueChange={(value) => {
               if (value === null) return;
-              setFilters({ role: value === ALL_ROLES ? null : (value as Role) });
+              applyFilters({ role: value === ALL_ROLES ? null : (value as Role) });
             }}
           >
             <SelectTrigger id="role-compte">
@@ -224,7 +282,7 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
             value={activeValue}
             onValueChange={(value) => {
               if (value === null) return;
-              setFilters({ isActive: ACTIVE_FILTER[value] });
+              applyFilters({ isActive: ACTIVE_FILTER[value] });
             }}
           >
             <SelectTrigger id="etat-compte">
@@ -240,6 +298,35 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
           </Select>
         </div>
       </section>
+
+      {selection.length === 0 ? null : (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3 shadow-elev-sm">
+          <p className="text-[0.875rem]">
+            <span className="font-[600] tabular-nums">{formatNumber(selection.length)}</span>{' '}
+            {selection.length === 1 ? 'compte sélectionné' : 'comptes sélectionnés'}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setSelectedIds([]);
+              }}
+            >
+              Tout désélectionner
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={remove.isPending}
+              onClick={() => {
+                setDeleting(selection);
+              }}
+            >
+              <Trash2Icon aria-hidden="true" />
+              Supprimer
+            </Button>
+          </div>
+        </div>
+      )}
 
       {(() => {
         if (isPending) return <TableSkeleton />;
@@ -264,6 +351,22 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
+                    <TableHead className="w-10">
+                      <input
+                        type="checkbox"
+                        className="size-4 align-middle"
+                        aria-label="Sélectionner tous les comptes affichés"
+                        disabled={selectables.length === 0}
+                        checked={
+                          selectables.length > 0 && selection.length === selectables.length
+                        }
+                        onChange={(event) => {
+                          setSelectedIds(
+                            event.target.checked ? selectables.map((row) => row.id) : [],
+                          );
+                        }}
+                      />
+                    </TableHead>
                     <TableHead>Utilisateur</TableHead>
                     <TableHead>Identifiants</TableHead>
                     <TableHead className="text-right">Prospects</TableHead>
@@ -276,7 +379,7 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
                 <TableBody>
                   {data.items.length === 0 ? (
                     <TableRow className="hover:bg-transparent">
-                      <TableCell colSpan={5} className="py-16 text-center">
+                      <TableCell colSpan={6} className="py-16 text-center">
                         <p className="font-[600]">Aucun compte ne correspond à ces critères.</p>
                         <p className="mt-1 text-[0.8125rem] text-muted-foreground">
                           Élargissez la recherche ou créez un compte.
@@ -294,6 +397,22 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
                         )}
                       >
                         <TableCell>
+                          <input
+                            type="checkbox"
+                            className="size-4 align-middle"
+                            aria-label={`Sélectionner ${user.fullName}`}
+                            disabled={user.id === currentUserId}
+                            checked={selectedIds.includes(user.id)}
+                            onChange={(event) => {
+                              setSelectedIds((current) =>
+                                event.target.checked
+                                  ? [...current, user.id]
+                                  : current.filter((id) => id !== user.id),
+                              );
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell>
                           <div className="flex min-w-0 flex-col gap-1">
                             <div className="flex flex-wrap items-center gap-2">
                               <span
@@ -304,6 +423,7 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
                               >
                                 {user.fullName}
                               </span>
+                              <Badge variant="secondary">{ROLE_LABELS[user.role]}</Badge>
                               {user.isActive ? null : (
                                 <Badge variant="destructive">Désactivé</Badge>
                               )}
@@ -380,6 +500,16 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
                                 )}
                                 {user.isActive ? 'Désactiver le compte' : 'Réactiver le compte'}
                               </DropdownMenuItem>
+                              <DropdownMenuItem
+                                disabled={user.id === currentUserId || remove.isPending}
+                                variant="destructive"
+                                onClick={() => {
+                                  setDeleting([user]);
+                                }}
+                              >
+                                <Trash2Icon aria-hidden="true" />
+                                Supprimer le compte
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -395,7 +525,7 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
 
       <DeactivateUserDialog
         user={deactivating}
-        repreneurs={data?.items ?? []}
+        repreneurs={repreneurs?.items ?? []}
         pending={toggleActive.isPending}
         onOpenChange={(open) => {
           if (!open) setDeactivating(null);
@@ -408,6 +538,20 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
               ...(handoverToId === undefined ? {} : { handoverToId }),
             });
           }
+        }}
+      />
+      <DeleteUsersDialog
+        users={deleting}
+        repreneurs={repreneurs?.items ?? []}
+        pending={remove.isPending}
+        onOpenChange={(open) => {
+          if (!open) setDeleting([]);
+        }}
+        onConfirm={(handoverToId) => {
+          remove.mutate({
+            users: deleting,
+            ...(handoverToId === undefined ? {} : { handoverToId }),
+          });
         }}
       />
       <UserFormDialog open={formOpen} onOpenChange={setFormOpen} user={editing} />

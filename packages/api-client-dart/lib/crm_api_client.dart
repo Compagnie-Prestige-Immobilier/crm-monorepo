@@ -246,6 +246,8 @@ export 'package:crm_api_client/src/model/representant_sort_field.dart';
 export 'package:crm_api_client/src/model/representant_suivi.dart';
 export 'package:crm_api_client/src/model/reset_password_dto.dart';
 export 'package:crm_api_client/src/model/role.dart';
+export 'package:crm_api_client/src/model/score_dto.dart';
+export 'package:crm_api_client/src/model/score_part_dto.dart';
 export 'package:crm_api_client/src/model/segment_change_dto.dart';
 export 'package:crm_api_client/src/model/segment_change_list_dto.dart';
 export 'package:crm_api_client/src/model/segment_conversion_author_dto.dart';

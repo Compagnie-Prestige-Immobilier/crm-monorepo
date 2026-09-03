@@ -1,9 +1,50 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Role } from '@crm/database';
 
+import { WorkShiftDto } from '../analytics/supervision.dto.js';
+import type { ScoreKey, ScoreReason } from './performance-score.js';
 import { PRESENCE_ONLINE_WINDOW_MINUTES, type PresenceState } from './presence.js';
 
 export const PRESENCE_STATES = ['ONLINE', 'RECENT', 'AWAY'] as const;
+
+export class ScorePartDto {
+  @ApiProperty({
+    enum: ['assiduite', 'regularite', 'rythme', 'contact', 'qualification', 'efficience'],
+  })
+  key!: ScoreKey;
+
+  @ApiProperty() label!: string;
+
+  @ApiProperty({ type: Number, description: 'Atteinte de la cible, de 0 à 1, plafonnée à 1.' })
+  ratio!: number;
+
+  @ApiProperty({ type: Number, description: 'Part de la note portée par ce critère.' })
+  weight!: number;
+}
+
+/** Déclaré avant ses porteurs : `emitDecoratorMetadata` lit le type à la définition de la classe. */
+export class ScoreDto {
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description:
+      'Note de 0 à 100 sur la journée en cours. `null` quand rien ne peut être jugé : ' +
+      '`reason` dit alors pourquoi, et l’écran affiche le motif au lieu d’un zéro.',
+  })
+  value!: number | null;
+
+  @ApiProperty({
+    enum: ['journee_non_commencee', 'presence_non_mesuree', 'aucun_appel'],
+    nullable: true,
+  })
+  reason!: ScoreReason | null;
+
+  @ApiProperty({
+    type: () => [ScorePartDto],
+    description: 'Le détail qui compose la note. Vide quand `value` est nulle.',
+  })
+  parts!: ScorePartDto[];
+}
 
 export class SupervisedUserDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
@@ -88,6 +129,16 @@ export class SupervisedUserDto {
   })
   activeSecondsToday!: number;
 
+  @ApiProperty({
+    type: Number,
+    description:
+      'Part du temps actif tombée dans les créneaux de travail, en secondes. ' +
+      'La présence est découpée à l’heure : une tranche compte dès que son ' +
+      'heure de début appartient à un créneau, donc un créneau réglé à une ' +
+      'demi-heure compte l’heure entière.',
+  })
+  activeSecondsInShifts!: number;
+
   @ApiProperty({ type: String, format: 'date-time', nullable: true })
   firstSeenToday!: string | null;
 
@@ -121,6 +172,55 @@ export class SupervisedUserDto {
 
   @ApiProperty({ type: String, format: 'date-time', nullable: true })
   firstCallAt!: string | null;
+
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description: 'Dernière tentative du jour. Avec `firstCallAt`, donne l’amplitude de la journée.',
+  })
+  lastCallAt!: string | null;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      'Appels du jour ayant obtenu une réponse : prospect joignable (toute ' +
+      'issue hors numéro injoignable ou faux numéro) et représentant qui a ' +
+      'décroché, qu’il dise oui ou non.',
+  })
+  reachedToday!: number;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      'Appels du jour ayant abouti : méthode obtenue côté prospect, ' +
+      'représentant qualifié côté représentant. Un représentant appelé ' +
+      'plusieurs fois ne compte qu’une fois, sur sa dernière réponse du jour.',
+  })
+  qualifiedToday!: number;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      'Appels du jour au-delà du premier sur une même fiche. Zéro quand chaque ' +
+      'fiche n’a été appelée qu’une fois.',
+  })
+  repeatCalls!: number;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      'Temps mort, en secondes : somme des écarts de plus de quinze minutes ' +
+      'entre deux appels consécutifs tombant dans le MÊME créneau. La pause ' +
+      'entre les deux créneaux n’en est pas un.',
+  })
+  deadSeconds!: number;
+
+  @ApiProperty({ type: Number, description: 'Nombre de trous comptés dans `deadSeconds`.' })
+  deadGaps!: number;
+
+  @ApiProperty({ type: () => ScoreDto })
+  score!: ScoreDto;
 }
 
 export class PresenceCountsDto {
@@ -143,6 +243,20 @@ export class SupervisionDto {
     description: 'Fenêtre, en minutes, en deçà de laquelle un compte est dit connecté.',
   })
   onlineWindowMinutes!: number;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      'Secondes de créneau déjà écoulées à `observedAt`, les deux créneaux ' +
+      'cumulés. Zéro avant l’ouverture, plafonné à leur durée totale après.',
+  })
+  shiftSecondsElapsed!: number;
+
+  @ApiProperty({
+    type: () => [WorkShiftDto],
+    description: 'Créneaux servant à ce calcul, pour les nommer sans un second appel.',
+  })
+  shifts!: WorkShiftDto[];
 
   @ApiProperty({ type: () => [SupervisedUserDto] })
   teleconseillers!: SupervisedUserDto[];
