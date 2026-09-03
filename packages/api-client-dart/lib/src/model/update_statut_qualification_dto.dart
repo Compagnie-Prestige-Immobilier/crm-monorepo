@@ -18,13 +18,7 @@ part 'update_statut_qualification_dto.g.dart';
 )
 class UpdateStatutQualificationDto {
   /// Returns a new [UpdateStatutQualificationDto] instance.
-  UpdateStatutQualificationDto({
-    this.label,
-
-    this.requiresCallback,
-
-    this.sortOrder,
-  });
+  UpdateStatutQualificationDto({this.label, this.requiresCallback});
 
   @JsonKey(name: r'label', required: false, includeIfNull: false)
   final String? label;
@@ -32,25 +26,19 @@ class UpdateStatutQualificationDto {
   @JsonKey(name: r'requiresCallback', required: false, includeIfNull: false)
   final bool? requiresCallback;
 
-  // minimum: 0
-  // maximum: 9999
-  @JsonKey(name: r'sortOrder', required: false, includeIfNull: false)
-  final num? sortOrder;
-
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is UpdateStatutQualificationDto &&
             runtimeType == other.runtimeType &&
             equals(
-              [label, requiresCallback, sortOrder],
-              [other.label, other.requiresCallback, other.sortOrder],
+              [label, requiresCallback],
+              [other.label, other.requiresCallback],
             );
   }
 
   @override
   int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([label, requiresCallback, sortOrder]);
+      runtimeType.hashCode ^ mapPropsToHashCode([label, requiresCallback]);
 
   factory UpdateStatutQualificationDto.fromJson(Map<String, dynamic> json) =>
       _$UpdateStatutQualificationDtoFromJson(json);

@@ -3468,7 +3468,6 @@ export interface components {
       isActive: boolean;
       /** @description Le script s’appuie dessus : sa règle ne se reconfigure pas. */
       isSystem: boolean;
-      sortOrder: number;
       /** @description Version de charge utile minimale sachant émettre ce code. */
       minPayloadVersion: number;
       /** Format: date-time */
@@ -3484,13 +3483,10 @@ export interface components {
       effect: components['schemas']['StatutQualificationEffect'];
       /** @default false */
       requiresCallback: boolean;
-      /** @default 100 */
-      sortOrder: number;
     };
     UpdateStatutQualificationDto: {
       label?: string;
       requiresCallback?: boolean;
-      sortOrder?: number;
     };
     SetStatutQualificationActiveDto: {
       isActive: boolean;

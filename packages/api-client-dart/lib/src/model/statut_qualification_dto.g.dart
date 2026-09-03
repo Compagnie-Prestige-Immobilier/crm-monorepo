@@ -21,8 +21,6 @@ abstract class _$StatutQualificationDtoCWProxy {
 
   StatutQualificationDto isSystem(bool isSystem);
 
-  StatutQualificationDto sortOrder(num sortOrder);
-
   StatutQualificationDto minPayloadVersion(num minPayloadVersion);
 
   StatutQualificationDto updatedAt(DateTime updatedAt);
@@ -41,7 +39,6 @@ abstract class _$StatutQualificationDtoCWProxy {
     bool requiresCallback,
     bool isActive,
     bool isSystem,
-    num sortOrder,
     num minPayloadVersion,
     DateTime updatedAt,
   });
@@ -78,9 +75,6 @@ class _$StatutQualificationDtoCWProxyImpl
   StatutQualificationDto isSystem(bool isSystem) => this(isSystem: isSystem);
 
   @override
-  StatutQualificationDto sortOrder(num sortOrder) => this(sortOrder: sortOrder);
-
-  @override
   StatutQualificationDto minPayloadVersion(num minPayloadVersion) =>
       this(minPayloadVersion: minPayloadVersion);
 
@@ -103,7 +97,6 @@ class _$StatutQualificationDtoCWProxyImpl
     Object? requiresCallback = const $CopyWithPlaceholder(),
     Object? isActive = const $CopyWithPlaceholder(),
     Object? isSystem = const $CopyWithPlaceholder(),
-    Object? sortOrder = const $CopyWithPlaceholder(),
     Object? minPayloadVersion = const $CopyWithPlaceholder(),
     Object? updatedAt = const $CopyWithPlaceholder(),
   }) {
@@ -136,10 +129,6 @@ class _$StatutQualificationDtoCWProxyImpl
           ? _value.isSystem
           // ignore: cast_nullable_to_non_nullable
           : isSystem as bool,
-      sortOrder: sortOrder == const $CopyWithPlaceholder()
-          ? _value.sortOrder
-          // ignore: cast_nullable_to_non_nullable
-          : sortOrder as num,
       minPayloadVersion: minPayloadVersion == const $CopyWithPlaceholder()
           ? _value.minPayloadVersion
           // ignore: cast_nullable_to_non_nullable
@@ -176,7 +165,6 @@ StatutQualificationDto _$StatutQualificationDtoFromJson(
       'requiresCallback',
       'isActive',
       'isSystem',
-      'sortOrder',
       'minPayloadVersion',
       'updatedAt',
     ],
@@ -196,7 +184,6 @@ StatutQualificationDto _$StatutQualificationDtoFromJson(
     requiresCallback: $checkedConvert('requiresCallback', (v) => v as bool),
     isActive: $checkedConvert('isActive', (v) => v as bool),
     isSystem: $checkedConvert('isSystem', (v) => v as bool),
-    sortOrder: $checkedConvert('sortOrder', (v) => v as num),
     minPayloadVersion: $checkedConvert('minPayloadVersion', (v) => v as num),
     updatedAt: $checkedConvert('updatedAt', (v) => DateTime.parse(v as String)),
   );
@@ -213,7 +200,6 @@ Map<String, dynamic> _$StatutQualificationDtoToJson(
   'requiresCallback': instance.requiresCallback,
   'isActive': instance.isActive,
   'isSystem': instance.isSystem,
-  'sortOrder': instance.sortOrder,
   'minPayloadVersion': instance.minPayloadVersion,
   'updatedAt': instance.updatedAt.toIso8601String(),
 };

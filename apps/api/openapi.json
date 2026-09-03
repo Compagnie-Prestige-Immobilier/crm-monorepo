@@ -20242,9 +20242,6 @@
             "type": "boolean",
             "description": "Le script s’appuie dessus : sa règle ne se reconfigure pas."
           },
-          "sortOrder": {
-            "type": "number"
-          },
           "minPayloadVersion": {
             "type": "number",
             "description": "Version de charge utile minimale sachant émettre ce code."
@@ -20262,7 +20259,6 @@
           "requiresCallback",
           "isActive",
           "isSystem",
-          "sortOrder",
           "minPayloadVersion",
           "updatedAt"
         ]
@@ -20301,12 +20297,6 @@
           "requiresCallback": {
             "type": "boolean",
             "default": false
-          },
-          "sortOrder": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 9999,
-            "default": 100
           }
         },
         "required": ["code", "label", "effect"]
@@ -20320,11 +20310,6 @@
           },
           "requiresCallback": {
             "type": "boolean"
-          },
-          "sortOrder": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 9999
           }
         }
       },
