@@ -27067,6 +27067,50 @@
         "type": "string",
         "enum": ["ONLINE", "RECENT", "AWAY"]
       },
+      "ScorePartDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": ["assiduite", "regularite", "rythme", "contact", "qualification", "efficience"]
+          },
+          "label": {
+            "type": "string"
+          },
+          "ratio": {
+            "type": "number",
+            "description": "Atteinte de la cible, de 0 à 1, plafonnée à 1."
+          },
+          "weight": {
+            "type": "number",
+            "description": "Part de la note portée par ce critère."
+          }
+        },
+        "required": ["key", "label", "ratio", "weight"]
+      },
+      "ScoreDto": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "number",
+            "nullable": true,
+            "description": "Note de 0 à 100 sur la journée en cours. `null` quand rien ne peut être jugé : `reason` dit alors pourquoi, et l’écran affiche le motif au lieu d’un zéro."
+          },
+          "reason": {
+            "type": "string",
+            "enum": ["journee_non_commencee", "presence_non_mesuree", "aucun_appel"],
+            "nullable": true
+          },
+          "parts": {
+            "description": "Le détail qui compose la note. Vide quand `value` est nulle.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScorePartDto"
+            }
+          }
+        },
+        "required": ["value", "reason", "parts"]
+      },
       "SupervisedUserDto": {
         "type": "object",
         "properties": {
@@ -27151,6 +27195,10 @@
             "type": "number",
             "description": "Temps actif observé aujourd’hui, en secondes. Les interruptions de plus de 90 secondes ne sont pas comptées."
           },
+          "activeSecondsInShifts": {
+            "type": "number",
+            "description": "Part du temps actif tombée dans les créneaux de travail, en secondes. La présence est découpée à l’heure : une tranche compte dès que son heure de début appartient à un créneau, donc un créneau réglé à une demi-heure compte l’heure entière."
+          },
           "firstSeenToday": {
             "type": "string",
             "format": "date-time",
@@ -27174,6 +27222,35 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "lastCallAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Dernière tentative du jour. Avec `firstCallAt`, donne l’amplitude de la journée."
+          },
+          "reachedToday": {
+            "type": "number",
+            "description": "Appels du jour ayant obtenu une réponse : prospect joignable (toute issue hors numéro injoignable ou faux numéro) et représentant qui a décroché, qu’il dise oui ou non."
+          },
+          "qualifiedToday": {
+            "type": "number",
+            "description": "Appels du jour ayant abouti : méthode obtenue côté prospect, représentant qualifié côté représentant. Un représentant appelé plusieurs fois ne compte qu’une fois, sur sa dernière réponse du jour."
+          },
+          "repeatCalls": {
+            "type": "number",
+            "description": "Appels du jour au-delà du premier sur une même fiche. Zéro quand chaque fiche n’a été appelée qu’une fois."
+          },
+          "deadSeconds": {
+            "type": "number",
+            "description": "Temps mort, en secondes : somme des écarts de plus de quinze minutes entre deux appels consécutifs tombant dans le MÊME créneau. La pause entre les deux créneaux n’en est pas un."
+          },
+          "deadGaps": {
+            "type": "number",
+            "description": "Nombre de trous comptés dans `deadSeconds`."
+          },
+          "score": {
+            "$ref": "#/components/schemas/ScoreDto"
           }
         },
         "required": [
@@ -27194,11 +27271,19 @@
           "appVersion",
           "lastWriteAt",
           "activeSecondsToday",
+          "activeSecondsInShifts",
           "firstSeenToday",
           "callsToday",
           "medianGapSeconds",
           "medianUploadLagSeconds",
-          "firstCallAt"
+          "firstCallAt",
+          "lastCallAt",
+          "reachedToday",
+          "qualifiedToday",
+          "repeatCalls",
+          "deadSeconds",
+          "deadGaps",
+          "score"
         ]
       },
       "PresenceCountsDto": {
@@ -27229,6 +27314,17 @@
             "default": 20,
             "description": "Fenêtre, en minutes, en deçà de laquelle un compte est dit connecté."
           },
+          "shiftSecondsElapsed": {
+            "type": "number",
+            "description": "Secondes de créneau déjà écoulées à `observedAt`, les deux créneaux cumulés. Zéro avant l’ouverture, plafonné à leur durée totale après."
+          },
+          "shifts": {
+            "description": "Créneaux servant à ce calcul, pour les nommer sans un second appel.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkShiftDto"
+            }
+          },
           "teleconseillers": {
             "type": "array",
             "items": {
@@ -27245,7 +27341,15 @@
             "$ref": "#/components/schemas/PresenceCountsDto"
           }
         },
-        "required": ["observedAt", "onlineWindowMinutes", "teleconseillers", "finances", "counts"]
+        "required": [
+          "observedAt",
+          "onlineWindowMinutes",
+          "shiftSecondsElapsed",
+          "shifts",
+          "teleconseillers",
+          "finances",
+          "counts"
+        ]
       },
       "ExportMode": {
         "type": "string",

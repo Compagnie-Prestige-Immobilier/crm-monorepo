@@ -12,7 +12,7 @@ export interface WorkShift {
 
 const SETTING_KEY = 'supervision.creneaux';
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
-const DEFAULT_SHIFTS: readonly WorkShift[] = [
+export const DEFAULT_SHIFTS: readonly WorkShift[] = [
   { key: 'morning', label: 'Matin', start: '09:00', end: '14:00' },
   { key: 'afternoon', label: 'Après-midi', start: '15:00', end: '18:00' },
 ];
