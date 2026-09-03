@@ -21,6 +21,7 @@ function signals(overrides: Partial<ActivitySignals> = {}): ActivitySignals {
     hasLiveSession: true,
     lastLoginAt: null,
     lastTokenAt: null,
+    lastPresenceAt: null,
     lastSyncAt: null,
     lastWriteAt: null,
     ...overrides,
@@ -42,6 +43,10 @@ describe('dernière trace', () => {
 
   it('ne retient pas une source absente', () => {
     expect(lastSeenAt(signals({ lastWriteAt: minutesAgo(90) }))).toEqual(minutesAgo(90));
+  });
+
+  it('retient le dernier battement de la socket', () => {
+    expect(lastSeenAt(signals({ lastPresenceAt: minutesAgo(1) }))).toEqual(minutesAgo(1));
   });
 
   it('rend null quand rien n’a jamais été observé', () => {

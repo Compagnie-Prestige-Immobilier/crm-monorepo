@@ -126,6 +126,7 @@ import 'package:crm_api_client/src/model/origin_count_dto.dart';
 import 'package:crm_api_client/src/model/origin_label_count_dto.dart';
 import 'package:crm_api_client/src/model/page_meta_dto.dart';
 import 'package:crm_api_client/src/model/pays_dto.dart';
+import 'package:crm_api_client/src/model/performance_score.dart';
 import 'package:crm_api_client/src/model/phase2_status_count_dto.dart';
 import 'package:crm_api_client/src/model/phase2_status_list_dto.dart';
 import 'package:crm_api_client/src/model/presence_counts_dto.dart';
@@ -165,6 +166,7 @@ import 'package:crm_api_client/src/model/representant_productivity_list_dto.dart
 import 'package:crm_api_client/src/model/representant_relation_change_dto.dart';
 import 'package:crm_api_client/src/model/representant_relation_change_list_dto.dart';
 import 'package:crm_api_client/src/model/reset_password_dto.dart';
+import 'package:crm_api_client/src/model/score_part.dart';
 import 'package:crm_api_client/src/model/segment_change_dto.dart';
 import 'package:crm_api_client/src/model/segment_change_list_dto.dart';
 import 'package:crm_api_client/src/model/segment_conversion_author_dto.dart';
@@ -186,6 +188,7 @@ import 'package:crm_api_client/src/model/supervision_activity_dto.dart';
 import 'package:crm_api_client/src/model/supervision_activity_row_dto.dart';
 import 'package:crm_api_client/src/model/supervision_dto.dart';
 import 'package:crm_api_client/src/model/supervision_histogram_bar_dto.dart';
+import 'package:crm_api_client/src/model/supervision_score_dto.dart';
 import 'package:crm_api_client/src/model/supervision_teleconseiller_dto.dart';
 import 'package:crm_api_client/src/model/switch_workspace_dto.dart';
 import 'package:crm_api_client/src/model/sync_changes_dto.dart';
@@ -224,6 +227,7 @@ import 'package:crm_api_client/src/model/update_syndicat_dto.dart';
 import 'package:crm_api_client/src/model/update_user_dto.dart';
 import 'package:crm_api_client/src/model/update_visite_dto.dart';
 import 'package:crm_api_client/src/model/update_visite_referentiel_dto.dart';
+import 'package:crm_api_client/src/model/update_work_shifts_dto.dart';
 import 'package:crm_api_client/src/model/user_dto.dart';
 import 'package:crm_api_client/src/model/user_list_dto.dart';
 import 'package:crm_api_client/src/model/visite_dto.dart';
@@ -250,6 +254,8 @@ import 'package:crm_api_client/src/model/visite_stat_saisie_dto.dart';
 import 'package:crm_api_client/src/model/visite_stats_dto.dart';
 import 'package:crm_api_client/src/model/weekly_cohort_dto.dart';
 import 'package:crm_api_client/src/model/weekly_cohort_list_dto.dart';
+import 'package:crm_api_client/src/model/work_shift_dto.dart';
+import 'package:crm_api_client/src/model/work_shifts_dto.dart';
 
 final _regList = RegExp(r'^List<(.*)>$');
 final _regSet = RegExp(r'^Set<(.*)>$');
@@ -678,6 +684,9 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'PaymentMode':
     case 'PaysDto':
       return PaysDto.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'PerformanceScore':
+      return PerformanceScore.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'Phase2Status':
     case 'Phase2StatusCountDto':
       return Phase2StatusCountDto.fromJson(value as Map<String, dynamic>)
@@ -811,6 +820,8 @@ ReturnType deserialize<ReturnType, BaseType>(
       return ResetPasswordDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'Role':
+    case 'ScorePart':
+      return ScorePart.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'SegmentChangeDto':
       return SegmentChangeDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -883,6 +894,9 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'SupervisionGranularity':
     case 'SupervisionHistogramBarDto':
       return SupervisionHistogramBarDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'SupervisionScoreDto':
+      return SupervisionScoreDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'SupervisionTeleconseillerDto':
       return SupervisionTeleconseillerDto.fromJson(
@@ -1005,6 +1019,9 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'UpdateVisiteReferentielDto':
       return UpdateVisiteReferentielDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'UpdateWorkShiftsDto':
+      return UpdateWorkShiftsDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'UserDto':
       return UserDto.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'UserListDto':
@@ -1088,6 +1105,11 @@ ReturnType deserialize<ReturnType, BaseType>(
       return WeeklyCohortListDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'WhatsappStatus':
+    case 'WorkShiftDto':
+      return WorkShiftDto.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'WorkShiftsDto':
+      return WorkShiftsDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     default:
       RegExpMatch? match;
 

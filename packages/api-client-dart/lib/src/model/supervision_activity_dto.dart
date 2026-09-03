@@ -6,6 +6,7 @@
 import 'package:crm_api_client/src/model/supervision_activity_row_dto.dart';
 import 'package:crm_api_client/src/model/supervision_histogram_bar_dto.dart';
 import 'package:crm_api_client/src/model/supervision_granularity.dart';
+import 'package:crm_api_client/src/model/supervision_score_dto.dart';
 import 'package:crm_api_client/src/model/supervision_activity_counts_dto.dart';
 import 'package:crm_api_client/src/model/supervision_teleconseiller_dto.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
@@ -35,6 +36,8 @@ class SupervisionActivityDto {
     required this.totals,
 
     required this.teleconseillers,
+
+    required this.scores,
 
     required this.prospectsByTeleconseiller,
 
@@ -67,6 +70,10 @@ class SupervisionActivityDto {
   @JsonKey(name: r'teleconseillers', required: true, includeIfNull: false)
   final List<SupervisionTeleconseillerDto> teleconseillers;
 
+  /// Une note par téléconseiller pour TOUTE la fenêtre, recalculée depuis les appels et la présence : rien n’est figé, corriger la définition corrige l’historique. Vide si le calcul a échoué.
+  @JsonKey(name: r'scores', required: true, includeIfNull: false)
+  final List<SupervisionScoreDto> scores;
+
   /// Stock courant de prospects rattachés à chaque téléconseiller.
   @JsonKey(
     name: r'prospectsByTeleconseiller',
@@ -95,6 +102,7 @@ class SupervisionActivityDto {
                 items,
                 totals,
                 teleconseillers,
+                scores,
                 prospectsByTeleconseiller,
                 prospectsByRepresentant,
               ],
@@ -105,6 +113,7 @@ class SupervisionActivityDto {
                 other.items,
                 other.totals,
                 other.teleconseillers,
+                other.scores,
                 other.prospectsByTeleconseiller,
                 other.prospectsByRepresentant,
               ],
@@ -121,6 +130,7 @@ class SupervisionActivityDto {
         items,
         totals,
         teleconseillers,
+        scores,
         prospectsByTeleconseiller,
         prospectsByRepresentant,
       ]);

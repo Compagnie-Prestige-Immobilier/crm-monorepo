@@ -15931,6 +15931,26 @@
               "format": "uuid",
               "type": "string"
             }
+          },
+          {
+            "name": "timeFrom",
+            "required": false,
+            "in": "query",
+            "description": "Heure de début quotidienne, Dakar.",
+            "schema": {
+              "example": "09:00",
+              "type": "string"
+            }
+          },
+          {
+            "name": "timeTo",
+            "required": false,
+            "in": "query",
+            "description": "Heure de fin quotidienne, exclue.",
+            "schema": {
+              "example": "14:00",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -15981,6 +16001,124 @@
           }
         ],
         "summary": "Activité des téléconseillers sur la fenêtre demandée.",
+        "tags": ["supervision"]
+      }
+    },
+    "/api/v1/supervision/creneaux": {
+      "get": {
+        "operationId": "getSupervisionCreneaux",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkShiftsDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Créneaux de travail suivis.",
+        "tags": ["supervision"]
+      },
+      "put": {
+        "operationId": "updateSupervisionCreneaux",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWorkShiftsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkShiftsDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Modifie les créneaux de travail.",
         "tags": ["supervision"]
       }
     },
@@ -26652,6 +26790,105 @@
         },
         "required": ["id", "fullName", "isActive"]
       },
+      "ScorePart": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": ["assiduite", "regularite", "rythme", "contact", "qualification", "efficience"]
+          },
+          "label": {
+            "type": "string"
+          },
+          "ratio": {
+            "type": "number",
+            "description": "Atteinte de la cible, de 0 à 1, plafonnée à 1."
+          },
+          "weight": {
+            "type": "number",
+            "description": "Part de la note portée par ce critère."
+          }
+        },
+        "required": ["key", "label", "ratio", "weight"]
+      },
+      "PerformanceScore": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "number",
+            "nullable": true,
+            "description": "Note de 0 à 100 sur la fenêtre mesurée. `null` quand rien ne peut être jugé : `reason` dit alors pourquoi, et l’écran affiche le motif au lieu d’un zéro."
+          },
+          "reason": {
+            "type": "string",
+            "enum": ["journee_non_commencee", "presence_non_mesuree", "aucun_appel"],
+            "nullable": true
+          },
+          "parts": {
+            "description": "Le détail qui compose la note. Vide quand `value` est nulle.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScorePart"
+            }
+          }
+        },
+        "required": ["value", "reason", "parts"]
+      },
+      "SupervisionScoreDto": {
+        "type": "object",
+        "properties": {
+          "teleconseillerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "teleconseillerName": {
+            "type": "string"
+          },
+          "activeSecondsInShifts": {
+            "type": "number",
+            "description": "Présence relevée dans les créneaux, en secondes, sur toute la fenêtre."
+          },
+          "shiftSecondsElapsed": {
+            "type": "number",
+            "description": "Secondes de créneau écoulées sur les seuls jours où le compte a été vu. La journée en cours ne compte que sa portion passée ; un filtre horaire restreint d’autant les créneaux."
+          },
+          "calls": {
+            "type": "number",
+            "description": "Tentatives, prospects et représentants confondus."
+          },
+          "reached": {
+            "type": "number",
+            "description": "Prospects dont le numéro s’est révélé exploitable, plus représentants ayant répondu."
+          },
+          "qualified": {
+            "type": "number",
+            "description": "Méthodes obtenues, plus représentants dont la DERNIÈRE réponse de la fenêtre est REACHED."
+          },
+          "repeatCalls": {
+            "type": "number",
+            "description": "Appels au-delà du premier sur une même fiche."
+          },
+          "deadSeconds": {
+            "type": "number",
+            "description": "Écarts de plus de quinze minutes entre deux appels du même créneau et du même jour."
+          },
+          "score": {
+            "$ref": "#/components/schemas/PerformanceScore"
+          }
+        },
+        "required": [
+          "teleconseillerId",
+          "teleconseillerName",
+          "activeSecondsInShifts",
+          "shiftSecondsElapsed",
+          "calls",
+          "reached",
+          "qualified",
+          "repeatCalls",
+          "deadSeconds",
+          "score"
+        ]
+      },
       "SupervisionHistogramBarDto": {
         "type": "object",
         "properties": {
@@ -26711,6 +26948,13 @@
               "$ref": "#/components/schemas/SupervisionTeleconseillerDto"
             }
           },
+          "scores": {
+            "description": "Une note par téléconseiller pour TOUTE la fenêtre, recalculée depuis les appels et la présence : rien n’est figé, corriger la définition corrige l’historique. Vide si le calcul a échoué.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupervisionScoreDto"
+            }
+          },
           "prospectsByTeleconseiller": {
             "description": "Stock courant de prospects rattachés à chaque téléconseiller.",
             "type": "array",
@@ -26733,9 +26977,70 @@
           "items",
           "totals",
           "teleconseillers",
+          "scores",
           "prospectsByTeleconseiller",
           "prospectsByRepresentant"
         ]
+      },
+      "WorkShiftDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": ["morning", "afternoon"]
+          },
+          "label": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string",
+            "example": "09:00"
+          },
+          "end": {
+            "type": "string",
+            "example": "14:00"
+          }
+        },
+        "required": ["key", "label", "start", "end"]
+      },
+      "WorkShiftsDto": {
+        "type": "object",
+        "properties": {
+          "shifts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkShiftDto"
+            }
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": ["shifts", "updatedAt"]
+      },
+      "UpdateWorkShiftsDto": {
+        "type": "object",
+        "properties": {
+          "morningStart": {
+            "type": "string",
+            "example": "09:00"
+          },
+          "morningEnd": {
+            "type": "string",
+            "example": "14:00"
+          },
+          "afternoonStart": {
+            "type": "string",
+            "example": "15:00"
+          },
+          "afternoonEnd": {
+            "type": "string",
+            "example": "18:00"
+          }
+        },
+        "required": ["morningStart", "morningEnd", "afternoonStart", "afternoonEnd"]
       },
       "PurgeDomainKey": {
         "type": "string",
@@ -26948,6 +27253,67 @@
             "format": "date-time",
             "nullable": true,
             "description": "Dernière écriture métier : tentative d’appel ou transition de dossier. Cherchée sur les 31 derniers jours seulement ; au-delà, vaut null."
+          },
+          "activeSecondsToday": {
+            "type": "number",
+            "description": "Temps actif observé aujourd’hui, en secondes. Les interruptions de plus de 90 secondes ne sont pas comptées."
+          },
+          "activeSecondsInShifts": {
+            "type": "number",
+            "description": "Part du temps actif tombée dans les créneaux de travail, en secondes. La présence est découpée à l’heure : une tranche compte dès que son heure de début appartient à un créneau, donc un créneau réglé à une demi-heure compte l’heure entière."
+          },
+          "firstSeenToday": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "callsToday": {
+            "type": "number",
+            "description": "Tentatives d’appel du jour, prospects et représentants confondus, comptées sur l’heure de l’appel et non sur celle de la remontée."
+          },
+          "medianGapSeconds": {
+            "type": "number",
+            "nullable": true,
+            "description": "Médiane, en secondes, de l’écart entre deux tentatives consécutives du jour. `null` en deçà de deux tentatives : un écart n’existe pas encore."
+          },
+          "medianUploadLagSeconds": {
+            "type": "number",
+            "nullable": true,
+            "description": "Médiane, en secondes, du retard de remontée : temps écoulé entre l’appel sur le téléphone et son arrivée au serveur. Négatif quand l’horloge du téléphone avance sur celle du serveur. `null` sans aucune tentative du jour."
+          },
+          "firstCallAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastCallAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Dernière tentative du jour. Avec `firstCallAt`, donne l’amplitude de la journée."
+          },
+          "reachedToday": {
+            "type": "number",
+            "description": "Appels du jour ayant obtenu une réponse : prospect joignable (toute issue hors numéro injoignable ou faux numéro) et représentant qui a décroché, qu’il dise oui ou non."
+          },
+          "qualifiedToday": {
+            "type": "number",
+            "description": "Appels du jour ayant abouti : méthode obtenue côté prospect, représentant qualifié côté représentant. Un représentant appelé plusieurs fois ne compte qu’une fois, sur sa dernière réponse du jour."
+          },
+          "repeatCalls": {
+            "type": "number",
+            "description": "Appels du jour au-delà du premier sur une même fiche. Zéro quand chaque fiche n’a été appelée qu’une fois."
+          },
+          "deadSeconds": {
+            "type": "number",
+            "description": "Temps mort, en secondes : somme des écarts de plus de quinze minutes entre deux appels consécutifs tombant dans le MÊME créneau. La pause entre les deux créneaux n’en est pas un."
+          },
+          "deadGaps": {
+            "type": "number",
+            "description": "Nombre de trous comptés dans `deadSeconds`."
+          },
+          "score": {
+            "$ref": "#/components/schemas/PerformanceScore"
           }
         },
         "required": [
@@ -26966,7 +27332,21 @@
           "lastPullAt",
           "pendingOps",
           "appVersion",
-          "lastWriteAt"
+          "lastWriteAt",
+          "activeSecondsToday",
+          "activeSecondsInShifts",
+          "firstSeenToday",
+          "callsToday",
+          "medianGapSeconds",
+          "medianUploadLagSeconds",
+          "firstCallAt",
+          "lastCallAt",
+          "reachedToday",
+          "qualifiedToday",
+          "repeatCalls",
+          "deadSeconds",
+          "deadGaps",
+          "score"
         ]
       },
       "PresenceCountsDto": {
@@ -26997,6 +27377,17 @@
             "default": 20,
             "description": "Fenêtre, en minutes, en deçà de laquelle un compte est dit connecté."
           },
+          "shiftSecondsElapsed": {
+            "type": "number",
+            "description": "Secondes de créneau déjà écoulées à `observedAt`, les deux créneaux cumulés. Zéro avant l’ouverture, plafonné à leur durée totale après."
+          },
+          "shifts": {
+            "description": "Créneaux servant à ce calcul, pour les nommer sans un second appel.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkShiftDto"
+            }
+          },
           "teleconseillers": {
             "type": "array",
             "items": {
@@ -27013,7 +27404,15 @@
             "$ref": "#/components/schemas/PresenceCountsDto"
           }
         },
-        "required": ["observedAt", "onlineWindowMinutes", "teleconseillers", "finances", "counts"]
+        "required": [
+          "observedAt",
+          "onlineWindowMinutes",
+          "shiftSecondsElapsed",
+          "shifts",
+          "teleconseillers",
+          "finances",
+          "counts"
+        ]
       },
       "ExportMode": {
         "type": "string",

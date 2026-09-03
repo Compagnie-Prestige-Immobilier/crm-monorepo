@@ -2401,6 +2401,24 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/supervision/creneaux': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Créneaux de travail suivis. */
+    get: operations['getSupervisionCreneaux'];
+    /** Modifie les créneaux de travail. */
+    put: operations['updateSupervisionCreneaux'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/admin/purge': {
     parameters: {
       query?: never;
@@ -5832,6 +5850,43 @@ export interface components {
       fullName: string;
       isActive: boolean;
     };
+    ScorePart: {
+      /** @enum {string} */
+      key: 'assiduite' | 'regularite' | 'rythme' | 'contact' | 'qualification' | 'efficience';
+      label: string;
+      /** @description Atteinte de la cible, de 0 à 1, plafonnée à 1. */
+      ratio: number;
+      /** @description Part de la note portée par ce critère. */
+      weight: number;
+    };
+    PerformanceScore: {
+      /** @description Note de 0 à 100 sur la fenêtre mesurée. `null` quand rien ne peut être jugé : `reason` dit alors pourquoi, et l’écran affiche le motif au lieu d’un zéro. */
+      value: number | null;
+      /** @enum {string|null} */
+      reason: 'journee_non_commencee' | 'presence_non_mesuree' | 'aucun_appel' | null;
+      /** @description Le détail qui compose la note. Vide quand `value` est nulle. */
+      parts: components['schemas']['ScorePart'][];
+    };
+    SupervisionScoreDto: {
+      /** Format: uuid */
+      teleconseillerId: string;
+      teleconseillerName: string;
+      /** @description Présence relevée dans les créneaux, en secondes, sur toute la fenêtre. */
+      activeSecondsInShifts: number;
+      /** @description Secondes de créneau écoulées sur les seuls jours où le compte a été vu. La journée en cours ne compte que sa portion passée ; un filtre horaire restreint d’autant les créneaux. */
+      shiftSecondsElapsed: number;
+      /** @description Tentatives, prospects et représentants confondus. */
+      calls: number;
+      /** @description Prospects dont le numéro s’est révélé exploitable, plus représentants ayant répondu. */
+      reached: number;
+      /** @description Méthodes obtenues, plus représentants dont la DERNIÈRE réponse de la fenêtre est REACHED. */
+      qualified: number;
+      /** @description Appels au-delà du premier sur une même fiche. */
+      repeatCalls: number;
+      /** @description Écarts de plus de quinze minutes entre deux appels du même créneau et du même jour. */
+      deadSeconds: number;
+      score: components['schemas']['PerformanceScore'];
+    };
     SupervisionHistogramBarDto: {
       /** Format: uuid */
       id: string | null;
@@ -5850,10 +5905,36 @@ export interface components {
       totals: components['schemas']['SupervisionActivityCountsDto'];
       /** @description Tous les téléconseillers, y compris ceux sans aucun acte sur la fenêtre. */
       teleconseillers: components['schemas']['SupervisionTeleconseillerDto'][];
+      /** @description Une note par téléconseiller pour TOUTE la fenêtre, recalculée depuis les appels et la présence : rien n’est figé, corriger la définition corrige l’historique. Vide si le calcul a échoué. */
+      scores: components['schemas']['SupervisionScoreDto'][];
       /** @description Stock courant de prospects rattachés à chaque téléconseiller. */
       prospectsByTeleconseiller: components['schemas']['SupervisionHistogramBarDto'][];
       /** @description Stock courant de prospects rattachés à chaque représentant. */
       prospectsByRepresentant: components['schemas']['SupervisionHistogramBarDto'][];
+    };
+    WorkShiftDto: {
+      /** @enum {string} */
+      key: 'morning' | 'afternoon';
+      label: string;
+      /** @example 09:00 */
+      start: string;
+      /** @example 14:00 */
+      end: string;
+    };
+    WorkShiftsDto: {
+      shifts: components['schemas']['WorkShiftDto'][];
+      /** Format: date-time */
+      updatedAt: string | null;
+    };
+    UpdateWorkShiftsDto: {
+      /** @example 09:00 */
+      morningStart: string;
+      /** @example 14:00 */
+      morningEnd: string;
+      /** @example 15:00 */
+      afternoonStart: string;
+      /** @example 18:00 */
+      afternoonEnd: string;
     };
     /** @enum {string} */
     PurgeDomainKey:
@@ -5950,6 +6031,36 @@ export interface components {
        * @description Dernière écriture métier : tentative d’appel ou transition de dossier. Cherchée sur les 31 derniers jours seulement ; au-delà, vaut null.
        */
       lastWriteAt: string | null;
+      /** @description Temps actif observé aujourd’hui, en secondes. Les interruptions de plus de 90 secondes ne sont pas comptées. */
+      activeSecondsToday: number;
+      /** @description Part du temps actif tombée dans les créneaux de travail, en secondes. La présence est découpée à l’heure : une tranche compte dès que son heure de début appartient à un créneau, donc un créneau réglé à une demi-heure compte l’heure entière. */
+      activeSecondsInShifts: number;
+      /** Format: date-time */
+      firstSeenToday: string | null;
+      /** @description Tentatives d’appel du jour, prospects et représentants confondus, comptées sur l’heure de l’appel et non sur celle de la remontée. */
+      callsToday: number;
+      /** @description Médiane, en secondes, de l’écart entre deux tentatives consécutives du jour. `null` en deçà de deux tentatives : un écart n’existe pas encore. */
+      medianGapSeconds: number | null;
+      /** @description Médiane, en secondes, du retard de remontée : temps écoulé entre l’appel sur le téléphone et son arrivée au serveur. Négatif quand l’horloge du téléphone avance sur celle du serveur. `null` sans aucune tentative du jour. */
+      medianUploadLagSeconds: number | null;
+      /** Format: date-time */
+      firstCallAt: string | null;
+      /**
+       * Format: date-time
+       * @description Dernière tentative du jour. Avec `firstCallAt`, donne l’amplitude de la journée.
+       */
+      lastCallAt: string | null;
+      /** @description Appels du jour ayant obtenu une réponse : prospect joignable (toute issue hors numéro injoignable ou faux numéro) et représentant qui a décroché, qu’il dise oui ou non. */
+      reachedToday: number;
+      /** @description Appels du jour ayant abouti : méthode obtenue côté prospect, représentant qualifié côté représentant. Un représentant appelé plusieurs fois ne compte qu’une fois, sur sa dernière réponse du jour. */
+      qualifiedToday: number;
+      /** @description Appels du jour au-delà du premier sur une même fiche. Zéro quand chaque fiche n’a été appelée qu’une fois. */
+      repeatCalls: number;
+      /** @description Temps mort, en secondes : somme des écarts de plus de quinze minutes entre deux appels consécutifs tombant dans le MÊME créneau. La pause entre les deux créneaux n’en est pas un. */
+      deadSeconds: number;
+      /** @description Nombre de trous comptés dans `deadSeconds`. */
+      deadGaps: number;
+      score: components['schemas']['PerformanceScore'];
     };
     PresenceCountsDto: {
       online: number;
@@ -5967,6 +6078,10 @@ export interface components {
        * @default 20
        */
       onlineWindowMinutes: number;
+      /** @description Secondes de créneau déjà écoulées à `observedAt`, les deux créneaux cumulés. Zéro avant l’ouverture, plafonné à leur durée totale après. */
+      shiftSecondsElapsed: number;
+      /** @description Créneaux servant à ce calcul, pour les nommer sans un second appel. */
+      shifts: components['schemas']['WorkShiftDto'][];
       teleconseillers: components['schemas']['SupervisedUserDto'][];
       finances: components['schemas']['SupervisedUserDto'][];
       counts: components['schemas']['PresenceCountsDto'];
@@ -15469,6 +15584,10 @@ export interface operations {
         projet?: components['schemas']['Projet'];
         /** @description Un seul téléconseiller : borne les lignes, la liste et les histogrammes. */
         commercialId?: string;
+        /** @description Heure de début quotidienne, Dakar. */
+        timeFrom?: string;
+        /** @description Heure de fin quotidienne, exclue. */
+        timeTo?: string;
       };
       header?: never;
       path?: never;
@@ -15482,6 +15601,102 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['SupervisionActivityDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getSupervisionCreneaux: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WorkShiftsDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  updateSupervisionCreneaux: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateWorkShiftsDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WorkShiftsDto'];
         };
       };
       /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
