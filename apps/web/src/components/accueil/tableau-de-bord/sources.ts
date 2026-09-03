@@ -458,6 +458,23 @@ export function mesurerDonnees(donnees: DonneesSource): {
   }
 }
 
+export function donneesVides(donnees: DonneesSource): boolean {
+  switch (donnees.forme) {
+    case 'classement':
+    case 'cyclique':
+    case 'serie-temporelle':
+      return donnees.donnee.length === 0;
+    case 'composition': {
+      const items = donnees.donnee.flatMap((ligne) => ligne.segments);
+      return items.length === 0 || items.every((item) => item.value === 0);
+    }
+    case 'matrice':
+      return donnees.donnee.cellules.every((cellule) => cellule.value === 0);
+    default:
+      return false;
+  }
+}
+
 export function spanClass(
   marque: DashboardMarque | undefined,
   taille: DashboardTaille | undefined,

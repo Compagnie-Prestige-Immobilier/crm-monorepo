@@ -13,6 +13,8 @@ abstract class _$CreateRepCallAttemptDtoCWProxy {
 
   CreateRepCallAttemptDto outcome(RepCallOutcome outcome);
 
+  CreateRepCallAttemptDto statutQualificationId(String? statutQualificationId);
+
   CreateRepCallAttemptDto promisedProspects(num? promisedProspects);
 
   CreateRepCallAttemptDto comment(String? comment);
@@ -59,6 +61,7 @@ abstract class _$CreateRepCallAttemptDtoCWProxy {
     String id,
     String representantId,
     RepCallOutcome outcome,
+    String? statutQualificationId,
     num? promisedProspects,
     String? comment,
     RepresentantRelation? relationStatus,
@@ -97,6 +100,11 @@ class _$CreateRepCallAttemptDtoCWProxyImpl
   @override
   CreateRepCallAttemptDto outcome(RepCallOutcome outcome) =>
       this(outcome: outcome);
+
+  @override
+  CreateRepCallAttemptDto statutQualificationId(
+    String? statutQualificationId,
+  ) => this(statutQualificationId: statutQualificationId);
 
   @override
   CreateRepCallAttemptDto promisedProspects(num? promisedProspects) =>
@@ -179,6 +187,7 @@ class _$CreateRepCallAttemptDtoCWProxyImpl
     Object? id = const $CopyWithPlaceholder(),
     Object? representantId = const $CopyWithPlaceholder(),
     Object? outcome = const $CopyWithPlaceholder(),
+    Object? statutQualificationId = const $CopyWithPlaceholder(),
     Object? promisedProspects = const $CopyWithPlaceholder(),
     Object? comment = const $CopyWithPlaceholder(),
     Object? relationStatus = const $CopyWithPlaceholder(),
@@ -211,6 +220,11 @@ class _$CreateRepCallAttemptDtoCWProxyImpl
           ? _value.outcome
           // ignore: cast_nullable_to_non_nullable
           : outcome as RepCallOutcome,
+      statutQualificationId:
+          statutQualificationId == const $CopyWithPlaceholder()
+          ? _value.statutQualificationId
+          // ignore: cast_nullable_to_non_nullable
+          : statutQualificationId as String?,
       promisedProspects: promisedProspects == const $CopyWithPlaceholder()
           ? _value.promisedProspects
           // ignore: cast_nullable_to_non_nullable
@@ -317,6 +331,10 @@ CreateRepCallAttemptDto _$CreateRepCallAttemptDtoFromJson(
         unknownValue: RepCallOutcome.unknownDefaultOpenApi,
       ),
     ),
+    statutQualificationId: $checkedConvert(
+      'statutQualificationId',
+      (v) => v as String?,
+    ),
     promisedProspects: $checkedConvert('promisedProspects', (v) => v as num?),
     comment: $checkedConvert('comment', (v) => v as String?),
     relationStatus: $checkedConvert(
@@ -368,6 +386,8 @@ Map<String, dynamic> _$CreateRepCallAttemptDtoToJson(
   'id': instance.id,
   'representantId': instance.representantId,
   'outcome': _$RepCallOutcomeEnumMap[instance.outcome]!,
+  if (instance.statutQualificationId case final value?)
+    'statutQualificationId': value,
   if (instance.promisedProspects case final value?) 'promisedProspects': value,
   if (instance.comment case final value?) 'comment': value,
   if (_$RepresentantRelationEnumMap[instance.relationStatus] case final value?)

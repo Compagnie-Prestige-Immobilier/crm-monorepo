@@ -40,6 +40,10 @@ export const queryKeys = {
   iefs: ['referentiels', 'iefs'] as const,
   regions: ['referentiels', 'regions'] as const,
   referentielUsage: ['referentiels', 'usage'] as const,
+  /** Ce que la SAISIE propose : actifs seulement. */
+  statutsQualification: ['referentiels', 'statutsQualification'] as const,
+  /** Ce que l'ADMINISTRATION montre : tout, désactivés compris. */
+  statutsQualificationAdmin: ['referentiels', 'statutsQualification', 'administration'] as const,
 
   // ─── Registre des visites ─────────────────────────────────────────────────
   visitesRoot: ['visites'] as const,

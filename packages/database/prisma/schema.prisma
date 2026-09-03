@@ -193,6 +193,31 @@ enum CallOutcome {
 // issues sans objet pour un prospect (« a promis une liste »), et les
 // statistiques de phase 2 compteraient alors des appels qui ne la concernent
 // pas.
+// Effet machine d'un statut de qualification de representant. Il dit a la fois
+// l'issue a enregistrer et, par consequence, la branche du script ou le statut
+// se propose : UNREACHABLE et WRONG_NUMBER appartiennent a l'appel qui n'a pas
+// abouti, les trois autres a celui qui a abouti.
+//
+// Pas de colonne « joignable » a cote : elle serait une seconde verite, qui
+// divergerait de l'effet a la premiere correction.
+// Ordre de reprise d'une fiche qualifiee. Une enumeration et non un entier :
+// un rang chiffre ne dit rien de ce qu'il classe, et c'est exactement ce qui a
+// fait retirer `sortOrder` de l'interface. L'ordre de DECLARATION est celui du
+// tri croissant en base.
+enum PrioriteTraitement {
+  HAUTE
+  NORMALE
+  BASSE
+}
+
+enum StatutQualificationEffect {
+  REACHED
+  REFUSED
+  SCHEDULE_CALLBACK
+  UNREACHABLE
+  WRONG_NUMBER
+}
+
 enum RepCallOutcome {
   REACHED
   PROSPECTS_PROMISED
@@ -498,6 +523,12 @@ model Representant {
   /// écran de qualification, pas la décision.
   contacte   Boolean?
 
+  /// Degre d'interet recueilli au dernier appel. NULLABLE et sans defaut : les
+  /// fiches deja en base n'ont jamais eu la question, et un defaut leur
+  /// inventerait une reponse.
+  statutQualificationId String?
+  statutQualification   StatutQualification? @relation(fields: [statutQualificationId], references: [id], onDelete: Restrict)
+
   /// Le DERNIER appel (par `clientCreatedAt`), recopié depuis `RepCallAttempt`
   /// pour que les listes « injoignables » et « à rappeler » se filtrent sur la
   /// fiche, et descendent au téléphone avec elle. `nextCallbackAt` est le
@@ -535,6 +566,10 @@ model Representant {
   @@index([lastCallById, lastCallOutcome])
   @@index([nextCallbackAt])
   @@index([whatsappStatus])
+  // Filtre de l'annuaire, et axe de tirage d'un lot d'appels : le tirage borne
+  // par IEF avant de trier, d'ou le composite.
+  @@index([statutQualificationId])
+  @@index([statutQualificationId, iefId])
   @@map("representants")
 }
 
@@ -1164,6 +1199,12 @@ model RepCallAttempt {
   contacte              Boolean?
   connaitUES            Boolean?
   syndicat              String?
+
+  /// Le statut dit pendant CET appel. La fiche garde l'etat courant ; cette
+  /// colonne garde la trace. Nullable : les versions deja installees ne
+  /// l'emettent pas.
+  statutQualificationId String?
+  statutQualification   StatutQualification? @relation(fields: [statutQualificationId], references: [id], onDelete: Restrict)
 
   clientCreatedAt DateTime
   createdAt       DateTime @default(now())
@@ -2015,6 +2056,62 @@ model CallOutcomeReason {
 /// immuable puisque les visites déjà enregistrées le désignent, désactivation
 /// plutôt que suppression, `isSystem` pour ce que l'administration ne peut pas
 /// retirer des listes.
+/// Degre d'interet recueilli en qualifiant un representant, administrable.
+///
+/// Le script ne captait que la joignabilite : on ne distinguait pas celui qui
+/// refuse de celui qui redemande a etre rappele. Un referentiel et non une
+/// enumeration, parce que le vocabulaire commercial bouge et qu'une valeur
+/// figee dans le schema coute une migration, trois deploiements et une version
+/// d'APK sur le terrain.
+///
+/// Jamais supprime, seulement desactive : les fiches des annees passees
+/// continuent de le designer.
+model StatutQualification {
+  id String @id @default(uuid(7))
+
+  /// Immuable : l'historique le reference. Voir `CallOutcomeReason.code`.
+  code   String                    @unique
+  label  String                    @unique
+  effect StatutQualificationEffect
+
+  /// La date du rappel est exigee par CETTE ligne, jamais par le code.
+  requiresCallback Boolean @default(false)
+
+  /// Dans quel ordre le plateau reprend les fiches : un « Tres interesse »
+  /// joint se rappelle avant un « Non eligible ». Se modifie, y compris sur une
+  /// ligne systeme : c'est un arbitrage du metier, pas une regle du script.
+  ///
+  /// L'ordre d'ASC suit l'ordre de declaration des valeurs : HAUTE d'abord.
+  priorite PrioriteTraitement @default(NORMALE)
+
+  /// La relation que ce statut POSE sur la fiche. Nulle quand le statut ne
+  /// tranche rien : un numero occupe ne dit rien de l'interet, et « a rappeler »
+  /// dit qu'on n'a pas encore tranche. Ce que le client envoie garde le dernier
+  /// mot ; cette colonne comble son silence.
+  relationStatus RepresentantRelation?
+
+  /// Le script s'appuie dessus : une ligne systeme se desactive, ne se supprime
+  /// pas, et ses regles ne se modifient pas.
+  isSystem  Boolean @default(false)
+  isActive  Boolean @default(true)
+  sortOrder Int     @default(100)
+
+  /// Version de charge utile minimale sachant emettre ce code. Comparee a la
+  /// version declaree par l'appelant SUR LA ROUTE DEDIEE : un telephone ne
+  /// recoit jamais un code qu'il ne sait pas renvoyer, qui finirait en erreur
+  /// definitive hors ligne, sans possibilite de correction.
+  minPayloadVersion Int @default(6)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  representants Representant[]
+  attempts      RepCallAttempt[]
+
+  @@index([isActive, sortOrder])
+  @@map("statuts_qualification")
+}
+
 model VisiteEntreprise {
   id    String @id @default(uuid(7))
   /// Immuable : le registre le référence. Voir `BankCaseStage.code`.

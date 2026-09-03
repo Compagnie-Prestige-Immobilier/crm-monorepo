@@ -3,7 +3,11 @@ import { unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
 import { flattenPage } from '@/lib/api/query-params';
-import { EMPTY_REPRESENTANT_FILTERS, type RepresentantFilters } from '@/lib/representant-filters';
+import {
+  EMPTY_REPRESENTANT_FILTERS,
+  type RepresentantFilters,
+  type RepresentantRelation,
+} from '@/lib/representant-filters';
 import type { Paginated, RepresentantRow, UpdateRepresentantInput } from '@/lib/types';
 
 type RepresentantQuery = NonNullable<operations['listRepresentants']['parameters']['query']>;
@@ -91,6 +95,9 @@ export function toRepresentantQuery(filters: RepresentantFilters): RepresentantQ
   if (filters.dateTo !== null) query.dateTo = endOfDay(filters.dateTo);
   if (filters.hasProspects !== null) query.hasProspects = filters.hasProspects;
   if (filters.relationStatus !== null) query.relationStatus = filters.relationStatus;
+  if (filters.statutQualificationId !== null) {
+    query.statutQualificationId = filters.statutQualificationId;
+  }
   if (filters.sortBy !== EMPTY_REPRESENTANT_FILTERS.sortBy) query.sortBy = filters.sortBy;
   if (filters.sortDir !== EMPTY_REPRESENTANT_FILTERS.sortDir) {
     query.sortOrder = filters.sortDir;
@@ -130,6 +137,32 @@ export async function fetchRepresentantsSuivi(
   return flattenPage(unwrap(await client.GET('/api/v1/representants', { params: { query } })));
 }
 
+/**
+ * Ce que l'écran d'appel a le droit d'appeler : ses propres fiches et celles
+ * qu'une campagne lui a confiées. Ne passe pas par `RepresentantFilters` : ce
+ * n'est pas un critère que l'utilisateur pose, c'est la portée de l'écran, et
+ * elle vaut pour tous les rôles, encadrement compris.
+ */
+const A_QUALIFIER_PAGE_SIZE = 10;
+
+export async function fetchRepresentantsAQualifier(
+  criteres: { search: string; relationStatus: RepresentantRelation[] | null; page: number },
+  client: ApiClient = getApiClient(),
+): Promise<Paginated<RepresentantRow>> {
+  const query: RepresentantQuery = {
+    mesFiches: true,
+    search: criteres.search,
+    ...(criteres.relationStatus === null
+      ? {}
+      : { relationStatus: criteres.relationStatus.join(',') }),
+    sortBy: 'fullName',
+    sortOrder: 'asc',
+    page: criteres.page,
+    pageSize: A_QUALIFIER_PAGE_SIZE,
+  };
+  return flattenPage(unwrap(await client.GET('/api/v1/representants', { params: { query } })));
+}
+
 /** Les représentants dont ce téléconseiller a passé le DERNIER appel, du plus récent au plus ancien. */
 export async function fetchRepresentantsAppeles(
   lastCallById: string,
@@ -150,6 +183,18 @@ export async function fetchRepresentant(
   client: ApiClient = getApiClient(),
 ): Promise<RepresentantRow> {
   return unwrap(await client.GET('/api/v1/representants/{id}', { params: { path: { id } } }));
+}
+
+export type RepresentantCallAttempt = components['schemas']['RepresentantCallAttemptDto'];
+
+export async function fetchRepresentantCallAttempts(
+  id: string,
+  client: ApiClient = getApiClient(),
+): Promise<RepresentantCallAttempt[]> {
+  const payload = unwrap(
+    await client.GET('/api/v1/representants/{id}/call-attempts', { params: { path: { id } } }),
+  );
+  return payload.items;
 }
 
 export async function fetchRepresentantRelationHistory(

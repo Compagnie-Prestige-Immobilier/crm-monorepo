@@ -1,8 +1,15 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { ArrowLeftIcon, CalendarIcon, CopyIcon, PencilIcon } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ArrowLeftIcon,
+  CalendarIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CopyIcon,
+  PencilIcon,
+} from 'lucide-react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { copyPhone } from '@/components/console/console-ui';
@@ -21,6 +28,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -30,31 +44,52 @@ import {
   formatCallbackAt,
   pushRepCallAttempt,
   repRelationSettled,
-  repScriptKeys,
   type RepAnswer,
 } from '@/lib/data/console';
 import { fetchReferenceData } from '@/lib/data/reference';
-import { fetchRepresentants, type ScriptedRepresentant } from '@/lib/data/representants';
+import { fetchRepresentantsAQualifier, type ScriptedRepresentant } from '@/lib/data/representants';
+import {
+  fetchStatutsQualification,
+  statutsDeLaBranche,
+  type StatutQualification,
+  type StatutQualificationEffect,
+} from '@/lib/data/statuts-qualification';
 import { formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
-import { EMPTY_REPRESENTANT_FILTERS, type RepresentantFilters } from '@/lib/representant-filters';
+import {
+  REPRESENTANT_RELATION_CHOICES,
+  REPRESENTANT_RELATION_LABELS,
+  type RepresentantRelation,
+} from '@/lib/representant-filters';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { cn } from '@/lib/utils';
 
-/**
- * Ce que l'appel a donné : les TROIS issues du mobile, et rien d'autre.
- * `WRONG_NUMBER` reste lisible sur les appels déjà consignés — il n'est
- * simplement plus proposé à la saisie ; corriger un numéro faux se fait sur la
- * fiche, ce n'est pas le résultat d'un appel.
- */
-type Resultat = 'JOIGNABLE' | 'RAPPEL' | 'INJOIGNABLE';
+/** L'appel a abouti, ou non. Ce qu'il a donné se dit ensuite, au statut. */
+type Resultat = 'JOIGNABLE' | 'INJOIGNABLE';
 
 const RESULTATS: readonly { valeur: Resultat; label: string }[] = [
   { valeur: 'JOIGNABLE', label: 'Joignable' },
-  { valeur: 'RAPPEL', label: 'À rappeler' },
   { valeur: 'INJOIGNABLE', label: 'Injoignable' },
 ];
+
+const OUTCOME_PAR_EFFET: Record<StatutQualificationEffect, RepAnswer['outcome']> = {
+  REACHED: 'REACHED',
+  REFUSED: 'REFUSED',
+  SCHEDULE_CALLBACK: 'CALLBACK',
+  UNREACHABLE: 'UNREACHABLE',
+  WRONG_NUMBER: 'WRONG_NUMBER',
+};
+
+/** Le serveur dérive la même issue et refuse celle qui le contredit. */
+export const outcomeDuStatut = (effect: StatutQualificationEffect): RepAnswer['outcome'] =>
+  OUTCOME_PAR_EFFET[effect];
+
+/** Ces effets closent l'appel : le script reste posé, plus rien n'y est exigé. */
+const EFFETS_SANS_SCRIPT: readonly StatutQualificationEffect[] = ['REFUSED', 'SCHEDULE_CALLBACK'];
+
+const scriptExige = (effect: StatutQualificationEffect): boolean =>
+  !EFFETS_SANS_SCRIPT.includes(effect);
 
 const KEYBOARD_MAP: readonly (readonly [string, string])[] = [
   ['C', 'Copier le numéro'],
@@ -113,24 +148,30 @@ function etablissementAnswer(confirme: boolean | null, nouvel: string): Partial<
 /** Apparition d'une question qui n'était pas là : douce, et coupée si l'on préfère. */
 const REVELE = 'animate-in fade-in-0 slide-in-from-top-1 duration-200 motion-reduce:animate-none';
 
+const RELATIONS_DEMANDEES: Record<RepresentantRelation, RepresentantRelation[]> = {
+  INCONNU: ['INCONNU'],
+  CONTACTE: ['CONTACTE'],
+  AMBASSADEUR: ['AMBASSADEUR'],
+  REFUS: ['REFUS'],
+};
+
+const RELATION_ITEMS = [
+  { value: 'tous', label: 'Tous' },
+  ...REPRESENTANT_RELATION_CHOICES.map((relation) => ({
+    value: relation,
+    label: REPRESENTANT_RELATION_LABELS[relation],
+  })),
+];
+
 /**
  * L'annuaire, cherché par le SERVEUR : il compare le nom et le numéro réduit à
  * ses chiffres, donc « 77 123 45 67 » trouve la même fiche que « 771234567 ».
  */
-const annuaireFilters = (search: string): RepresentantFilters => ({
-  ...EMPTY_REPRESENTANT_FILTERS,
-  search,
-  sortBy: 'fullName',
-  sortDir: 'asc',
-  pageSize: 20,
-});
-
 /**
  * Étape 1 : qualifier un représentant, dans l'ordre et les mots de
  * l'application mobile.
  *
- * Rien n'est choisi d'office : l'écran ouvre sur la barre de recherche. La
- * qualification ne part au serveur qu'à « Enregistrer », en UNE tentative —
+ * La qualification ne part au serveur qu'à « Enregistrer », en UNE tentative,
  * c'est ce qui permet de revenir sur chaque réponse jusqu'au bout.
  */
 export function RepScript() {
@@ -138,20 +179,25 @@ export function RepScript() {
 
   const [choisi, setChoisi] = useState<ScriptedRepresentant | null>(null);
   const [search, setSearch] = useState('');
+  const [relation, setRelation] = useState<RepresentantRelation | null>(null);
+  const [page, setPage] = useState(1);
   const [confirme, setConfirme] = useState<string | null>(null);
   const cherche = useDebouncedValue(search).trim();
 
-  // Aucune liste par défaut : l'annuaire tient des milliers de fiches, tout
-  // dérouler laisse croire à un total faux. Rien ne s'affiche tant qu'on n'a
-  // pas cherché.
   const annuaire = useQuery({
-    queryKey: queryKeys.representants(annuaireFilters(cherche)),
-    queryFn: () => fetchRepresentants(annuaireFilters(cherche)),
-    enabled: choisi === null && cherche !== '',
+    queryKey: [...queryKeys.representantsRoot, 'a-qualifier', cherche, relation, page] as const,
+    queryFn: () =>
+      fetchRepresentantsAQualifier({
+        search: cherche,
+        relationStatus: relation === null ? null : RELATIONS_DEMANDEES[relation],
+        page,
+      }),
+    enabled: choisi === null,
     placeholderData: (previous) => previous,
   });
 
-  const liste = cherche === '' ? [] : (annuaire.data?.items ?? []);
+  const liste = annuaire.data?.items ?? [];
+  const pageCount = annuaire.data?.pageCount ?? 1;
 
   const ouvrir = useCallback((row: ScriptedRepresentant) => {
     setConfirme(null);
@@ -171,7 +217,9 @@ export function RepScript() {
         onEnregistre={(nom) => {
           setConfirme(nom);
           setChoisi(null);
-          void queryClient.invalidateQueries({ queryKey: repScriptKeys.root });
+          // La racine, pas la seule liste de l'écran : le compteur « pas encore
+          // qualifiés » de l'accueil se lit sous une autre clé de la même famille.
+          void queryClient.invalidateQueries({ queryKey: queryKeys.representantsRoot });
         }}
       />
     );
@@ -185,15 +233,33 @@ export function RepScript() {
         </p>
       )}
 
-      <ChampAnnuaire value={search} onChange={setSearch} />
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="min-w-[16rem] flex-1">
+          <ChampAnnuaire
+            value={search}
+            onChange={(valeur) => {
+              setSearch(valeur);
+              setPage(1);
+            }}
+          />
+        </div>
+        <FiltreRelation
+          value={relation}
+          onChange={(valeur) => {
+            setRelation(valeur);
+            setPage(1);
+          }}
+        />
+      </div>
 
-      <p className="text-[0.8125rem] text-muted-foreground">
-        Cherchez qui vous venez d’appeler par nom ou numéro.
-      </p>
+      <ResultatsAnnuaire
+        annuaire={annuaire}
+        liste={liste}
+        critereEnCours={cherche !== '' || relation !== null}
+        onOuvrir={ouvrir}
+      />
 
-      {cherche === '' ? null : (
-        <ResultatsAnnuaire annuaire={annuaire} liste={liste} onOuvrir={ouvrir} />
-      )}
+      {pageCount > 1 ? <Pages page={page} pageCount={pageCount} onPage={setPage} /> : null}
     </div>
   );
 }
@@ -201,10 +267,12 @@ export function RepScript() {
 function ResultatsAnnuaire({
   annuaire,
   liste,
+  critereEnCours,
   onOuvrir,
 }: {
-  annuaire: UseQueryResult<Awaited<ReturnType<typeof fetchRepresentants>>>;
+  annuaire: UseQueryResult<Awaited<ReturnType<typeof fetchRepresentantsAQualifier>>>;
   liste: readonly ScriptedRepresentant[];
+  critereEnCours: boolean;
   onOuvrir: (row: ScriptedRepresentant) => void;
 }) {
   if (annuaire.isError) {
@@ -230,7 +298,13 @@ function ResultatsAnnuaire({
   }
 
   if (liste.length === 0) {
-    return <p className="text-[0.9375rem]">Aucun résultat. Vérifiez le nom ou le numéro.</p>;
+    return (
+      <p className="text-[0.9375rem]">
+        {critereEnCours
+          ? 'Aucun résultat parmi vos fiches. Vérifiez le nom ou le numéro, ou demandez une campagne.'
+          : 'Aucune fiche ne vous est attribuée. Demandez une campagne.'}
+      </p>
+    );
   }
 
   return (
@@ -254,11 +328,90 @@ function ResultatsAnnuaire({
                 {row.departementName === null ? '' : ` · ${row.departementName}`}
               </span>
             </span>
-            <RelationBadge status={row.relationStatus} />
+            <RelationBadge status={row.relationStatus} label={row.statutQualificationLabel} />
           </button>
         </li>
       ))}
     </ol>
+  );
+}
+
+function FiltreRelation({
+  value,
+  onChange,
+}: {
+  value: RepresentantRelation | null;
+  onChange: (valeur: RepresentantRelation | null) => void;
+}) {
+  const id = useId();
+
+  return (
+    <div className="flex min-w-[12rem] flex-col gap-1.5">
+      <label htmlFor={id} className="text-[0.875rem] font-[600]">
+        Relation
+      </label>
+      {/* `items` n'est pas décoratif : sans lui, le déclencheur affiche la
+          VALEUR au lieu du libellé de la ligne choisie. */}
+      <Select
+        items={RELATION_ITEMS}
+        value={value ?? 'tous'}
+        onValueChange={(valeur) => {
+          if (valeur === null) return;
+          onChange(valeur === 'tous' ? null : (valeur as RepresentantRelation));
+        }}
+      >
+        <SelectTrigger id={id} className="h-12">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {RELATION_ITEMS.map((item) => (
+            <SelectItem key={item.value} value={item.value}>
+              {item.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+function Pages({
+  page,
+  pageCount,
+  onPage,
+}: {
+  page: number;
+  pageCount: number;
+  onPage: (page: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <Button
+        type="button"
+        variant="outline"
+        disabled={page <= 1}
+        onClick={() => {
+          onPage(page - 1);
+        }}
+      >
+        <ChevronLeftIcon aria-hidden="true" />
+        Page précédente
+      </Button>
+      <span className="min-w-20 text-center text-[0.9375rem] tabular-nums">
+        {page} / {pageCount}
+      </span>
+      <Button
+        type="button"
+        variant="outline"
+        disabled={page >= pageCount}
+        onClick={() => {
+          onPage(page + 1);
+        }}
+      >
+        Page suivante
+        <ChevronRightIcon aria-hidden="true" />
+      </Button>
+    </div>
   );
 }
 
@@ -471,9 +624,50 @@ function QuestionSuggestion({
   );
 }
 
+/** Le vocabulaire du référentiel, borné à la branche que le résultat ouvre. */
+function ChoixStatut({
+  statuts,
+  value,
+  onChange,
+}: {
+  statuts: readonly StatutQualification[];
+  value: string | null;
+  onChange: (valeur: string | null) => void;
+}) {
+  return (
+    <div className={cn('flex max-w-80 flex-col gap-1.5', REVELE)}>
+      <label htmlFor="rep-statut" className="text-[1rem] font-[600]">
+        Statut de qualification
+      </label>
+      {/* `items` n'est pas décoratif : sans lui, le déclencheur affiche la
+          VALEUR, donc l'identifiant, au lieu du libellé de la ligne choisie. */}
+      <Select
+        items={statuts.map((statut) => ({ value: statut.id, label: statut.label }))}
+        value={value}
+        onValueChange={onChange}
+      >
+        <SelectTrigger id="rep-statut">
+          <SelectValue placeholder="Choisir un statut" />
+        </SelectTrigger>
+        <SelectContent>
+          {statuts.map((statut) => (
+            <SelectItem key={statut.id} value={statut.id}>
+              {statut.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 interface EtapeQuestionsProps {
   resultat: Resultat | null;
   onResultat: (valeur: Resultat) => void;
+  statuts: readonly StatutQualification[];
+  statutId: string | null;
+  onStatut: (valeur: string | null) => void;
+  exigeRappel: boolean;
   joignable: boolean;
   proposeQuelquUn: boolean;
   questionsJoignable: QuestionsJoignableProps;
@@ -501,15 +695,15 @@ function EtapeQuestions(props: EtapeQuestionsProps) {
 
       {props.proposeQuelquUn ? <QuestionSuggestion {...props.suggestion} /> : null}
 
-      {props.resultat === 'RAPPEL' || props.joignable ? (
-        <Question
-          titre={
-            props.resultat === 'RAPPEL'
-              ? 'Quand rappeler ?'
-              : 'Le rappeler plus tard ? (facultatif)'
-          }
-          anime
-        >
+      {props.resultat === null ? null : (
+        <ChoixStatut statuts={props.statuts} value={props.statutId} onChange={props.onStatut} />
+      )}
+
+      {/* L'échéance ne se demande qu'au statut qui la réclame. Proposée sur
+          tout appel abouti, elle armait un rappel que personne n'avait promis,
+          et la fiche remontait dans « à rappeler » sans raison. */}
+      {props.exigeRappel ? (
+        <Question titre="Quand rappeler ?" anime>
           <ChoixEcheance
             now={props.rappel.now}
             value={props.rappel.value}
@@ -553,6 +747,7 @@ function EtapeQuestions(props: EtapeQuestionsProps) {
 interface RecapAppelProps {
   representant: ScriptedRepresentant;
   resultat: Resultat | null;
+  statutLabel: string | null;
   joignable: boolean;
   etablissementConfirme: boolean | null;
   nouvelEtablissement: string;
@@ -575,6 +770,7 @@ function RecapAppel(props: RecapAppelProps) {
         intitule="Résultat"
         valeur={RESULTATS.find((item) => item.valeur === props.resultat)?.label ?? null}
       />
+      <Recap intitule="Statut" valeur={props.statutLabel} />
       {props.joignable ? (
         <>
           <Recap
@@ -653,7 +849,10 @@ function EnTeteRepresentant({ representant }: { representant: ScriptedRepresenta
             <p className="text-[0.8125rem] text-muted-foreground">{sousTitre}</p>
           )}
         </div>
-        <RelationBadge status={representant.relationStatus} />
+        <RelationBadge
+          status={representant.relationStatus}
+          label={representant.statutQualificationLabel}
+        />
       </div>
 
       <div className="flex items-center gap-3">
@@ -690,6 +889,7 @@ function syndicatsDe(
 
 interface EtatManque {
   resultat: Resultat | null;
+  statut: StatutQualification | null;
   joignable: boolean;
   etablissementConfirme: boolean | null;
   nouvelEtablissement: string;
@@ -707,7 +907,8 @@ interface EtatManque {
 /** Ce qui empêche encore d'enregistrer, en une phrase, ou rien. */
 function manqueDe(etat: EtatManque): string | null {
   if (etat.resultat === null) return 'Choisissez d’abord le résultat';
-  if (etat.joignable) {
+  if (etat.statut === null) return 'Choisissez un statut de qualification';
+  if (etat.joignable && scriptExige(etat.statut.effect)) {
     const script = manqueJoignable({
       etablissementConfirme: etat.etablissementConfirme,
       nouvelEtablissement: etat.nouvelEtablissement,
@@ -719,7 +920,7 @@ function manqueDe(etat: EtatManque): string | null {
     });
     if (script !== null) return script;
   }
-  if (etat.resultat === 'RAPPEL' && etat.rappelAt === null) return 'Choisissez quand rappeler';
+  if (etat.statut.requiresCallback && etat.rappelAt === null) return 'Choisissez quand rappeler';
   // Le serveur jette une suggestion sans numéro : plutôt que d'effacer en
   // silence ce qui vient d'être dicté, l'enregistrement attend le numéro.
   if (etat.proposeQuelquUn && etat.suggestionCommencee && digitsOf(etat.sugPhone) < 9) {
@@ -729,9 +930,9 @@ function manqueDe(etat: EtatManque): string | null {
 }
 
 interface EtatReponse {
-  resultat: Resultat;
+  statut: StatutQualification;
   joignable: boolean;
-  chuesOui: boolean;
+  ambassadeur: boolean | null;
   etablissementConfirme: boolean | null;
   nouvelEtablissement: string;
   contacte: boolean | null;
@@ -748,12 +949,6 @@ interface EtatReponse {
   commentaire: string;
 }
 
-function outcomeDe(resultat: Resultat, chuesOui: boolean): RepAnswer['outcome'] {
-  if (resultat === 'JOIGNABLE') return chuesOui ? 'REACHED' : 'REFUSED';
-  if (resultat === 'RAPPEL') return 'CALLBACK';
-  return 'UNREACHABLE';
-}
-
 function champsJoignable(etat: EtatReponse): Partial<RepAnswer> {
   if (!etat.joignable) return {};
   return {
@@ -764,8 +959,13 @@ function champsJoignable(etat: EtatReponse): Partial<RepAnswer> {
   };
 }
 
+function champsRelation(etat: EtatReponse): Partial<RepAnswer> {
+  if (!etat.joignable || etat.ambassadeur === null) return {};
+  return { relationStatus: etat.ambassadeur ? ('AMBASSADEUR' as const) : ('REFUS' as const) };
+}
+
 function champsWhatsapp(etat: EtatReponse): Partial<RepAnswer> {
-  if (!etat.chuesOui) return {};
+  if (!etat.joignable || etat.ambassadeur !== true) return {};
   const meme = etat.memeWhatsapp === true;
   return {
     whatsappStatus: meme ? ('MEME_NUMERO' as const) : ('AUTRE_NUMERO' as const),
@@ -785,13 +985,14 @@ function champsSuggestion(etat: EtatReponse): Partial<RepAnswer> {
 /** Chaque champ voyage seul : ce que la question n'a pas posé ne part pas. */
 function reponseDe(etat: EtatReponse): RepAnswer {
   return {
-    outcome: outcomeDe(etat.resultat, etat.chuesOui),
-    ...(etat.resultat === 'JOIGNABLE'
-      ? { relationStatus: etat.chuesOui ? ('AMBASSADEUR' as const) : ('REFUS' as const) }
-      : {}),
+    outcome: outcomeDuStatut(etat.statut.effect),
+    statutQualificationId: etat.statut.id,
+    ...champsRelation(etat),
     ...champsJoignable(etat),
     ...champsWhatsapp(etat),
-    ...(etat.rappelAt === null ? {} : { callbackAt: etat.rappelAt }),
+    ...(etat.statut.requiresCallback && etat.rappelAt !== null
+      ? { callbackAt: etat.rappelAt }
+      : {}),
     ...champsSuggestion(etat),
     ...(etat.commentaire.trim() === '' ? {} : { comment: etat.commentaire.trim() }),
   };
@@ -812,6 +1013,7 @@ function Qualification({
 }) {
   const [etape, setEtape] = useState<1 | 2>(1);
   const [resultat, setResultat] = useState<Resultat | null>(null);
+  const [statutId, setStatutId] = useState<string | null>(null);
   const [etablissementConfirme, setEtablissementConfirme] = useState<boolean | null>(null);
   const [nouvelEtablissement, setNouvelEtablissement] = useState('');
   const [contacte, setContacte] = useState<boolean | null>(null);
@@ -840,6 +1042,12 @@ function Qualification({
   });
   const { options: syndicatOptions, name: syndicatName } = syndicatsDe(reference.data, syndicatId);
 
+  const referentielStatuts = useQuery({
+    queryKey: queryKeys.statutsQualification,
+    queryFn: () => fetchStatutsQualification(),
+    staleTime: 5 * 60_000,
+  });
+
   const send = useMutation({
     mutationFn: (answer: RepAnswer) => pushRepCallAttempt(buildRepAttempt(representant.id, answer)),
     onSuccess: () => {
@@ -852,6 +1060,8 @@ function Qualification({
   });
 
   const joignable = resultat === 'JOIGNABLE';
+  const statuts = statutsDeLaBranche(referentielStatuts.data ?? [], joignable);
+  const statut = statuts.find((ligne) => ligne.id === statutId) ?? null;
   /** Une personne proposée n'a de sens que si l'appelé a dit non. */
   const proposeQuelquUn = joignable && ambassadeur === false;
   const suggestionCommencee =
@@ -859,6 +1069,7 @@ function Qualification({
 
   const manque = manqueDe({
     resultat,
+    statut,
     joignable,
     etablissementConfirme,
     nouvelEtablissement,
@@ -874,12 +1085,12 @@ function Qualification({
   });
 
   const enregistrer = (): void => {
-    if (manque !== null || resultat === null || send.isPending) return;
+    if (manque !== null || resultat === null || statut === null || send.isPending) return;
     send.mutate(
       reponseDe({
-        resultat,
+        statut,
         joignable,
-        chuesOui: joignable && ambassadeur === true,
+        ambassadeur,
         etablissementConfirme,
         nouvelEtablissement,
         contacte,
@@ -900,6 +1111,8 @@ function Qualification({
 
   const choisirResultat = (valeur: Resultat): void => {
     setResultat(valeur);
+    // Chaque branche a ses propres statuts : celui d'en face ne vaut plus.
+    setStatutId(null);
     if (valeur !== 'JOIGNABLE') {
       setEtablissementConfirme(null);
       setContacte(null);
@@ -969,6 +1182,10 @@ function Qualification({
         <EtapeQuestions
           resultat={resultat}
           onResultat={choisirResultat}
+          statuts={statuts}
+          statutId={statutId}
+          onStatut={setStatutId}
+          exigeRappel={statut?.requiresCallback === true}
           joignable={joignable}
           proposeQuelquUn={proposeQuelquUn}
           questionsJoignable={{
@@ -1004,6 +1221,7 @@ function Qualification({
           <RecapAppel
             representant={representant}
             resultat={resultat}
+            statutLabel={statut?.label ?? null}
             joignable={joignable}
             etablissementConfirme={etablissementConfirme}
             nouvelEtablissement={nouvelEtablissement}

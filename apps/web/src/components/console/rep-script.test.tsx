@@ -1,20 +1,30 @@
+import type { ApiClient } from '@crm/api-client';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ETAPES } from '@/components/chues/etapes';
+import { HubView } from '@/components/chues/hub-view';
 import { RepScript } from '@/components/console/rep-script';
 import { navTitle } from '@/components/layout/nav-items';
 import type * as ConsoleData from '@/lib/data/console';
+import type * as Phase2Data from '@/lib/data/phase2';
 import type * as ReferenceData from '@/lib/data/reference';
 import type * as RepresentantsData from '@/lib/data/representants';
 import type { ScriptedRepresentant } from '@/lib/data/representants';
+import type * as StatutsData from '@/lib/data/statuts-qualification';
+import type { StatutQualification } from '@/lib/data/statuts-qualification';
 import { REP_CALL_OUTCOME_LABELS } from '@/lib/types';
+import type { RepresentantFilters } from '@/lib/representant-filters';
 import { renderWithQuery } from '@/test/render-query';
 
 const pushRepCallAttempt = vi.fn();
 const fetchRepresentants = vi.fn();
+const fetchRepresentantsAQualifier = vi.fn();
 const fetchReferenceData = vi.fn();
+const fetchStatutsQualification = vi.fn();
+const countPendingProspects = vi.fn();
+const fetchCallbacks = vi.fn();
 const toastError = vi.fn();
 const toastSuccess = vi.fn();
 
@@ -23,6 +33,15 @@ vi.mock('@/lib/data/console', async (importOriginal) => {
   return {
     ...actual,
     pushRepCallAttempt: (...args: unknown[]) => pushRepCallAttempt(...args) as unknown,
+    fetchCallbacks: (...args: unknown[]) => fetchCallbacks(...args) as unknown,
+  };
+});
+
+vi.mock('@/lib/data/phase2', async (importOriginal) => {
+  const actual = await importOriginal<typeof Phase2Data>();
+  return {
+    ...actual,
+    countPendingProspects: (...args: unknown[]) => countPendingProspects(...args) as unknown,
   };
 });
 
@@ -33,7 +52,16 @@ vi.mock('@/lib/data/reference', async (importOriginal) => {
 
 vi.mock('@/lib/data/representants', async (importOriginal) => {
   const actual = await importOriginal<typeof RepresentantsData>();
-  return { ...actual, fetchRepresentants: (...args: unknown[]) => fetchRepresentants(...args) };
+  return {
+    ...actual,
+    fetchRepresentants: (...args: unknown[]) => fetchRepresentants(...args),
+    fetchRepresentantsAQualifier: (...args: unknown[]) => fetchRepresentantsAQualifier(...args),
+  };
+});
+
+vi.mock('@/lib/data/statuts-qualification', async (importOriginal) => {
+  const actual = await importOriginal<typeof StatutsData>();
+  return { ...actual, fetchStatutsQualification: () => fetchStatutsQualification() as unknown };
 });
 
 vi.mock('sonner', () => ({
@@ -64,6 +92,9 @@ function rep(over: Partial<ScriptedRepresentant> & { id: string }): ScriptedRepr
     updatedAt: '2026-01-01T00:00:00.000Z',
     prospectCount: 0,
     relationStatus: 'INCONNU',
+    statutQualificationId: null,
+    statutQualificationLabel: null,
+    callAttemptCount: 0,
     whatsappStatus: 'NON_DEMANDE',
     whatsappE164: null,
     whatsappNumber: null,
@@ -82,6 +113,35 @@ function rep(over: Partial<ScriptedRepresentant> & { id: string }): ScriptedRepr
   };
 }
 
+function statut(over: Partial<StatutQualification> & { id: string }): StatutQualification {
+  return {
+    code: 'INTERESSE',
+    label: 'Intéressé',
+    effect: 'REACHED',
+    requiresCallback: false,
+    priorite: 'NORMALE',
+    relationStatus: null,
+    isActive: true,
+    isSystem: true,
+    minPayloadVersion: 6,
+    updatedAt: '2026-09-01T00:00:00.000Z',
+    ...over,
+  };
+}
+
+const STATUTS: StatutQualification[] = [
+  statut({ id: 's-1' }),
+  statut({ id: 's-2', code: 'NON_INTERESSE', label: 'Non intéressé', effect: 'REFUSED' }),
+  statut({
+    id: 's-3',
+    code: 'A_RAPPELER',
+    label: 'À rappeler',
+    effect: 'SCHEDULE_CALLBACK',
+    requiresCallback: true,
+  }),
+  statut({ id: 's-4', code: 'PAS_DE_REPONSE', label: 'Pas de réponse', effect: 'UNREACHABLE' }),
+];
+
 const PREMIER = rep({ id: 'r-1', fullName: 'Aminata Ndiaye' });
 const SECOND = rep({
   id: 'r-2',
@@ -93,26 +153,41 @@ const SECOND = rep({
 /** Une fiche que personne n'a confiée : elle ne s'atteint que par l'annuaire. */
 const HORS_LISTE = rep({ id: 'r-9', fullName: 'Bineta Diop', phoneE164: '+221779876543' });
 
-const page = (items: readonly ScriptedRepresentant[]) => ({
+type PageMeta = Partial<{ total: number; page: number; pageCount: number }>;
+
+const page = (items: readonly ScriptedRepresentant[], meta: PageMeta = {}) => ({
   items: [...items],
   total: items.length,
   page: 1,
-  pageSize: 20,
+  pageSize: 10,
   pageCount: 1,
+  ...meta,
 });
 
-async function renderListe(file: readonly ScriptedRepresentant[] = [PREMIER, SECOND]) {
-  fetchRepresentants.mockResolvedValue(page(file));
+async function renderListe(
+  file: readonly ScriptedRepresentant[] = [PREMIER, SECOND],
+  meta: PageMeta = {},
+) {
+  fetchRepresentants.mockResolvedValue(page(file, meta));
+  fetchRepresentantsAQualifier.mockResolvedValue(page(file, meta));
   const view = renderWithQuery(<RepScript />);
   await screen.findByLabelText('Qui avez-vous appelé ?');
   return view;
 }
 
-/** Ouvre la qualification de quelqu'un : la liste n'apparaît qu'à la recherche. */
+/** Ouvre la qualification de quelqu'un : la liste est là dès l'ouverture. */
 async function choisir(nom: RegExp): Promise<void> {
-  await userEvent.type(screen.getByLabelText('Qui avez-vous appelé ?'), 'a');
   await userEvent.click(await screen.findByRole('button', { name: nom }));
 }
+
+const relationDemandee = (): unknown =>
+  (fetchRepresentantsAQualifier.mock.calls.at(-1)?.[0] as Record<string, unknown> | undefined)
+    ?.relationStatus;
+
+const choisirRelation = async (label: string): Promise<void> => {
+  await userEvent.click(screen.getByRole('combobox', { name: 'Relation' }));
+  await userEvent.click(await screen.findByRole('option', { name: label }));
+};
 
 const repondre = async (label: string): Promise<void> => {
   await userEvent.click(screen.getByRole('button', { name: label }));
@@ -124,9 +199,23 @@ const repondreA = async (legende: string, label: string): Promise<void> => {
   await userEvent.click(within(fieldset).getByRole('button', { name: label }));
 };
 
+const choisirStatut = async (label: string): Promise<void> => {
+  await userEvent.click(screen.getByRole('combobox', { name: /Statut de qualification/u }));
+  await userEvent.click(await screen.findByRole('option', { name: label }));
+};
+
+const injoindre = async (): Promise<void> => {
+  await repondre('Injoignable');
+  await choisirStatut('Pas de réponse');
+};
+
 /** Parcourt les questions 1 à 5 du script joignable, jusqu'à l'ambassadeur. */
-const parcoursJoignable = async (ambassadeur: 'Oui' | 'Non'): Promise<void> => {
+const parcoursJoignable = async (
+  ambassadeur: 'Oui' | 'Non',
+  statutLabel = ambassadeur === 'Oui' ? 'Intéressé' : 'Non intéressé',
+): Promise<void> => {
   await repondre('Joignable');
+  await choisirStatut(statutLabel);
   await repondreA('L’établissement de la fiche est-il confirmé ?', 'Oui');
   await repondreA('A-t-il déjà été contacté ?', 'Oui');
   await repondreA('Connaît-il l’UES ?', 'Oui');
@@ -147,7 +236,10 @@ beforeEach(() => {
     suggestion: null,
   });
   fetchRepresentants.mockReset();
+  fetchRepresentantsAQualifier.mockReset();
   fetchRepresentants.mockResolvedValue(page([HORS_LISTE]));
+  fetchStatutsQualification.mockReset();
+  fetchStatutsQualification.mockResolvedValue(STATUTS);
   fetchReferenceData.mockReset();
   fetchReferenceData.mockResolvedValue({
     syndicats: [{ id: 'snd-saes', name: 'SAES', sigle: 'SAES', isActive: true, sortOrder: 1 }],
@@ -157,14 +249,14 @@ beforeEach(() => {
 });
 
 describe('RepScript : rien n’est choisi d’office', () => {
-  it('ouvre sur la seule barre de recherche, sans liste ni fiche', async () => {
+  it('ouvre sur ses fiches, sans rien avoir cherché ni ouvert', async () => {
     await renderListe();
 
     expect(screen.getByLabelText('Qui avez-vous appelé ?')).toBeTruthy();
     expect(screen.queryByRole('heading', { level: 2 })).toBeNull();
     expect(screen.queryByText(/Comment s’est passé l’appel/u)).toBeNull();
-    // Aucune liste tant qu'on n'a pas cherché.
-    expect(screen.queryByRole('button', { name: /Aminata Ndiaye/u })).toBeNull();
+    expect(await screen.findByRole('button', { name: /Aminata Ndiaye/u })).toBeTruthy();
+    expect(fetchRepresentantsAQualifier.mock.calls.at(-1)?.[0]).toMatchObject({ search: '' });
   });
 
   it('n’ouvre la fiche et les questions qu’après un choix', async () => {
@@ -176,14 +268,20 @@ describe('RepScript : rien n’est choisi d’office', () => {
     expect(screen.getByText('Comment s’est passé l’appel ?')).toBeTruthy();
   });
 
-  it('ne montre des résultats qu’une fois une recherche saisie', async () => {
+  it('porte la recherche saisie jusqu’au serveur', async () => {
     await renderListe([HORS_LISTE]);
-
-    expect(screen.queryByRole('button', { name: /Bineta Diop/u })).toBeNull();
 
     await userEvent.type(screen.getByLabelText('Qui avez-vous appelé ?'), 'Bineta');
 
     expect(await screen.findByRole('button', { name: /Bineta Diop/u })).toBeTruthy();
+    await waitFor(
+      () => {
+        expect(fetchRepresentantsAQualifier.mock.calls.at(-1)?.[0]).toMatchObject({
+          search: 'Bineta',
+        });
+      },
+      { timeout: 3000 },
+    );
   });
 
   it('cherche par numéro, espaces compris, et laisse le serveur comparer', async () => {
@@ -193,7 +291,7 @@ describe('RepScript : rien n’est choisi d’office', () => {
 
     await waitFor(
       () => {
-        expect(fetchRepresentants.mock.calls.at(-1)?.[0]).toMatchObject({
+        expect(fetchRepresentantsAQualifier.mock.calls.at(-1)?.[0]).toMatchObject({
           search: '77 987 65 43',
         });
       },
@@ -243,7 +341,7 @@ describe('RepScript : les questions restent, et on peut revenir', () => {
   it('revient d’une étape à l’autre par « Étape précédente »', async () => {
     await renderListe();
     await choisir(/Aminata Ndiaye/u);
-    await repondre('Injoignable');
+    await injoindre();
     await userEvent.click(screen.getByRole('button', { name: 'Continuer' }));
 
     expect(screen.getByRole('button', { name: 'Enregistrer' })).toBeTruthy();
@@ -336,7 +434,7 @@ describe('RepScript : une seule tentative, à la fin', () => {
     await renderListe();
     await choisir(/Aminata Ndiaye/u);
 
-    await repondre('Injoignable');
+    await injoindre();
 
     // Aucun envoi tant que l'écran de récapitulation n'a pas été validé.
     expect(pushRepCallAttempt).not.toHaveBeenCalled();
@@ -353,7 +451,7 @@ describe('RepScript : une seule tentative, à la fin', () => {
   it('revient à la liste après enregistrement, sans sauter sur quelqu’un', async () => {
     await renderListe();
     await choisir(/Aminata Ndiaye/u);
-    await repondre('Injoignable');
+    await injoindre();
     await enregistrer();
 
     await waitFor(() => {
@@ -366,7 +464,7 @@ describe('RepScript : une seule tentative, à la fin', () => {
   it('joint le commentaire saisi à la qualification', async () => {
     await renderListe();
     await choisir(/Aminata Ndiaye/u);
-    await repondre('Injoignable');
+    await injoindre();
     await userEvent.type(screen.getByLabelText('Commentaire'), 'Sonne dans le vide');
     await userEvent.click(screen.getByRole('button', { name: 'Continuer' }));
     await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
@@ -378,12 +476,13 @@ describe('RepScript : une seule tentative, à la fin', () => {
   });
 });
 
-describe('RepScript : « À rappeler » propose un calendrier', () => {
+describe('RepScript : le statut « À rappeler » propose un calendrier', () => {
   it('offre les créneaux du mobile et « Choisir une date »', async () => {
     await renderListe();
     await choisir(/Aminata Ndiaye/u);
 
-    await repondre('À rappeler');
+    await repondre('Joignable');
+    await choisirStatut('À rappeler');
 
     expect(screen.getByText('Quand rappeler ?')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Demain 9 h' })).toBeTruthy();
@@ -393,7 +492,8 @@ describe('RepScript : « À rappeler » propose un calendrier', () => {
   it('ouvre un calendrier puis les demi-heures du jour retenu', async () => {
     await renderListe();
     await choisir(/Aminata Ndiaye/u);
-    await repondre('À rappeler');
+    await repondre('Joignable');
+    await choisirStatut('À rappeler');
 
     await userEvent.click(screen.getByRole('button', { name: /Choisir une date/u }));
 
@@ -411,7 +511,7 @@ describe('RepScript : « À rappeler » propose un calendrier', () => {
   it('exige l’échéance et l’envoie dans « callbackAt »', async () => {
     await renderListe();
     await choisir(/Aminata Ndiaye/u);
-    await repondre('À rappeler');
+    await parcoursJoignable('Non', 'À rappeler');
 
     expect(screen.getByText('Choisissez quand rappeler')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Continuer' }).hasAttribute('disabled')).toBe(true);
@@ -429,26 +529,26 @@ describe('RepScript : « À rappeler » propose un calendrier', () => {
 });
 
 /** Il a décroché, il a répondu, et il demande quand même à être rappelé. */
-describe('RepScript : le rappel facultatif d’un joignable', () => {
-  it('propose une échéance sans jamais l’exiger', async () => {
+/** L'échéance appartient au statut qui la réclame, à lui seul. */
+describe('RepScript : l’échéance suit le statut, pas le résultat', () => {
+  it('ne la propose pas sur un joignable dont le statut ne l’exige pas', async () => {
     await renderListe();
     await choisir(/Aminata Ndiaye/u);
 
     await parcoursJoignable('Oui');
     await repondreA('A-t-il WhatsApp sur ce numéro ?', 'Oui');
 
-    expect(screen.getByText('Le rappeler plus tard ? (facultatif)')).toBeTruthy();
-    expect(screen.queryByText('Choisissez quand rappeler')).toBeNull();
+    expect(screen.queryByText('Quand rappeler ?')).toBeNull();
+    expect(screen.queryByText(/Le rappeler plus tard/u)).toBeNull();
     expect(screen.getByRole('button', { name: 'Continuer' }).hasAttribute('disabled')).toBe(false);
   });
 
-  it('envoie l’échéance avec l’issue REACHED, pas CALLBACK', async () => {
+  it('n’envoie aucune échéance sur une issue qui ne planifie pas de rappel', async () => {
     await renderListe();
     await choisir(/Aminata Ndiaye/u);
 
     await parcoursJoignable('Oui');
     await repondreA('A-t-il WhatsApp sur ce numéro ?', 'Oui');
-    await repondre('Demain 9 h');
     await userEvent.click(screen.getByRole('button', { name: 'Continuer' }));
     await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
 
@@ -456,14 +556,14 @@ describe('RepScript : le rappel facultatif d’un joignable', () => {
       expect(pushRepCallAttempt).toHaveBeenCalledTimes(1);
     });
     expect(dernierEnvoi()).toMatchObject({ outcome: 'REACHED', relationStatus: 'AMBASSADEUR' });
-    expect(typeof dernierEnvoi()['callbackAt']).toBe('string');
+    expect(dernierEnvoi()['callbackAt']).toBeUndefined();
   });
 
   it('ne propose rien après un injoignable', async () => {
     await renderListe();
     await choisir(/Aminata Ndiaye/u);
 
-    await repondre('Injoignable');
+    await injoindre();
 
     expect(screen.queryByText(/Le rappeler plus tard/u)).toBeNull();
     expect(screen.queryByText('Quand rappeler ?')).toBeNull();
@@ -538,8 +638,8 @@ describe('RepScript : la garde des relations déjà tranchées', () => {
   });
 });
 
-describe('RepScript : trois issues, comme le mobile', () => {
-  it('ne propose que Joignable, À rappeler et Injoignable', async () => {
+describe('RepScript : deux issues, le reste se dit au statut', () => {
+  it('ne propose que Joignable et Injoignable', async () => {
     await renderListe();
     await choisir(/Aminata Ndiaye/u);
 
@@ -548,7 +648,7 @@ describe('RepScript : trois issues, comme le mobile', () => {
       within(question as HTMLElement)
         .getAllByRole('button')
         .map((bouton) => bouton.textContent),
-    ).toEqual(['Joignable', 'À rappeler', 'Injoignable']);
+    ).toEqual(['Joignable', 'Injoignable']);
   });
 
   it('sort « Corriger la fiche » des réponses, sans la perdre', async () => {
@@ -626,5 +726,198 @@ describe('RepScript : l’écran d’appel ne montre que le nom et le numéro', 
       href: '/chues/appels-representants',
     });
     expect(navTitle('COMMERCIAL', '/chues/appels-representants')).toBe('Qualifier un représentant');
+  });
+});
+
+describe('RepScript : l’écran d’ouverture recompte après une qualification', () => {
+  const compteur = (total: number) => ({ items: [], total, page: 1, pageSize: 1, pageCount: 1 });
+
+  it('redemande le nombre de non qualifiés une fois l’appel enregistré', async () => {
+    let nonQualifies = 15;
+    fetchRepresentants.mockImplementation((filters: RepresentantFilters) => {
+      if (filters.relationStatus === 'INCONNU') return Promise.resolve(compteur(nonQualifies));
+      if (filters.relationStatus === 'AMBASSADEUR') return Promise.resolve(compteur(3));
+      return Promise.resolve(page([PREMIER]));
+    });
+    fetchRepresentantsAQualifier.mockResolvedValue(page([PREMIER]));
+    countPendingProspects.mockResolvedValue(310);
+    fetchCallbacks.mockResolvedValue({ items: [], serverTime: '2026-09-01T09:00:00.000Z' });
+
+    renderWithQuery(
+      <>
+        <HubView prenom="Fatou" />
+        <RepScript />
+      </>,
+    );
+    expect(await screen.findByText('15')).toBeTruthy();
+
+    await choisir(/Aminata Ndiaye/u);
+    await parcoursJoignable('Oui');
+    await repondreA('A-t-il WhatsApp sur ce numéro ?', 'Oui');
+    nonQualifies = 14;
+    await userEvent.click(screen.getByRole('button', { name: 'Continuer' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('14')).toBeTruthy();
+    });
+  });
+});
+
+/**
+ * L'écran d'appel ne montre QUE ce que la personne doit appeler. La portée est
+ * demandée au serveur, pas filtrée ici : un tri côté client laisserait passer
+ * les numéros par la requête.
+ */
+describe('RepScript : ce que l’écran d’appel a le droit d’appeler', () => {
+  it('demande au serveur ses propres fiches, pas l’annuaire entier', async () => {
+    await renderListe();
+
+    await userEvent.type(screen.getByLabelText('Qui avez-vous appelé ?'), 'Aminata');
+
+    await waitFor(
+      () => {
+        expect(fetchRepresentantsAQualifier).toHaveBeenCalled();
+      },
+      { timeout: 3000 },
+    );
+    expect(fetchRepresentants).not.toHaveBeenCalled();
+  });
+
+  it('dit d’où vient le vide, au lieu de laisser croire à une base vide', async () => {
+    await renderListe([]);
+
+    await userEvent.type(screen.getByLabelText('Qui avez-vous appelé ?'), 'Personne');
+
+    expect(await screen.findByText(/vos fiches/u)).toBeTruthy();
+  });
+});
+
+describe('RepScript : filtrer et parcourir ses fiches', () => {
+  const DIX = Array.from({ length: 10 }, (_, rang) =>
+    rep({ id: `r-p${rang}`, fullName: `Fiche ${rang}` }),
+  );
+
+  it('demande au serveur le statut de relation choisi, et en montre le libellé', async () => {
+    await renderListe();
+
+    await choisirRelation('Refus');
+
+    expect(screen.getByRole('combobox', { name: 'Relation' }).textContent).toContain('Refus');
+    await waitFor(() => {
+      expect(relationDemandee()).toEqual(['REFUS']);
+    });
+  });
+
+  it('ne propose plus « Contacté », qui se lisait comme « a accepté »', async () => {
+    await renderListe();
+
+    await userEvent.click(screen.getByRole('combobox', { name: 'Relation' }));
+
+    expect(await screen.findByRole('option', { name: 'A accepté' })).toBeTruthy();
+    expect(screen.queryByRole('option', { name: 'Contacté' })).toBeNull();
+  });
+
+  it('ne demande que les acceptés sous « A accepté »', async () => {
+    await renderListe();
+
+    await choisirRelation('A accepté');
+
+    await waitFor(() => {
+      expect(relationDemandee()).toEqual(['AMBASSADEUR']);
+    });
+  });
+
+  it('revient à « Tous » sans statut demandé', async () => {
+    await renderListe();
+
+    await choisirRelation('Refus');
+    await choisirRelation('Tous');
+
+    await waitFor(() => {
+      expect(relationDemandee()).toBeNull();
+    });
+  });
+
+  it('demande la page suivante au serveur, sans découper la liste ici', async () => {
+    await renderListe(DIX, { total: 24, pageCount: 3 });
+
+    expect(await screen.findByText('1 / 3')).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: /^Fiche \d/u })).toHaveLength(10);
+
+    await userEvent.click(screen.getByRole('button', { name: /Page suivante/u }));
+
+    expect(screen.getByText('2 / 3')).toBeTruthy();
+    await waitFor(() => {
+      expect(fetchRepresentantsAQualifier.mock.calls.at(-1)?.[0]).toMatchObject({ page: 2 });
+    });
+  });
+
+  it('revient à la première page quand la recherche change', async () => {
+    await renderListe(DIX, { total: 24, pageCount: 3 });
+    await userEvent.click(await screen.findByRole('button', { name: /Page suivante/u }));
+
+    await userEvent.type(screen.getByLabelText('Qui avez-vous appelé ?'), 'Ndiaye');
+
+    expect(screen.getByText('1 / 3')).toBeTruthy();
+    await waitFor(
+      () => {
+        expect(fetchRepresentantsAQualifier.mock.calls.at(-1)?.[0]).toMatchObject({
+          search: 'Ndiaye',
+          page: 1,
+        });
+      },
+      { timeout: 3000 },
+    );
+  });
+
+  it('revient à la première page quand le statut change', async () => {
+    await renderListe(DIX, { total: 24, pageCount: 3 });
+    await userEvent.click(await screen.findByRole('button', { name: /Page suivante/u }));
+
+    await choisirRelation('Refus');
+
+    expect(screen.getByText('1 / 3')).toBeTruthy();
+    await waitFor(() => {
+      expect(fetchRepresentantsAQualifier.mock.calls.at(-1)?.[0]).toMatchObject({
+        relationStatus: ['REFUS'],
+        page: 1,
+      });
+    });
+  });
+
+  it('demande dix lignes de ses propres fiches, page et statut compris', async () => {
+    const actual = await vi.importActual<typeof RepresentantsData>('@/lib/data/representants');
+    const GET = vi.fn().mockResolvedValue({
+      data: { items: [], meta: { total: 0, page: 2, pageSize: 10, pageCount: 3 } },
+      response: new Response(null, { status: 200 }),
+    });
+
+    await actual.fetchRepresentantsAQualifier({ search: 'a', relationStatus: ['REFUS'], page: 2 }, {
+      GET,
+    } as unknown as ApiClient);
+
+    expect(GET.mock.calls[0]?.[1]).toMatchObject({
+      params: {
+        query: { mesFiches: true, search: 'a', relationStatus: 'REFUS', page: 2, pageSize: 10 },
+      },
+    });
+  });
+
+  it('porte plusieurs états dans un seul paramètre, séparés par des virgules', async () => {
+    const actual = await vi.importActual<typeof RepresentantsData>('@/lib/data/representants');
+    const GET = vi.fn().mockResolvedValue({
+      data: { items: [], meta: { total: 0, page: 1, pageSize: 10, pageCount: 1 } },
+      response: new Response(null, { status: 200 }),
+    });
+
+    await actual.fetchRepresentantsAQualifier(
+      { search: '', relationStatus: ['CONTACTE', 'AMBASSADEUR', 'REFUS'], page: 1 },
+      { GET } as unknown as ApiClient,
+    );
+
+    expect(GET.mock.calls[0]?.[1]).toMatchObject({
+      params: { query: { relationStatus: 'CONTACTE,AMBASSADEUR,REFUS' } },
+    });
   });
 });

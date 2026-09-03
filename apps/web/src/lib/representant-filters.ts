@@ -33,7 +33,24 @@ export const REPRESENTANT_RELATION_LABELS: Record<RepresentantRelation, string> 
   REFUS: 'Refus',
 };
 
-export const REPRESENTANT_SORT_FIELDS = ['clientCreatedAt', 'fullName', 'prospects'] as const;
+/**
+ * Ce qu'un utilisateur peut choisir. CONTACTE n'y est plus : « contacté » se
+ * lit sur le statut de qualification, et proposé à côté de « a accepté » il
+ * se confondait avec lui. Les fiches qui le portent encore s'affichent, et le
+ * gardent tant qu'on ne tranche pas.
+ */
+export const REPRESENTANT_RELATION_CHOICES = [
+  'INCONNU',
+  'AMBASSADEUR',
+  'REFUS',
+] as const satisfies readonly RepresentantRelation[];
+
+export const REPRESENTANT_SORT_FIELDS = [
+  'clientCreatedAt',
+  'fullName',
+  'prospects',
+  'priorite',
+] as const;
 
 export type RepresentantSortField = (typeof REPRESENTANT_SORT_FIELDS)[number];
 
@@ -41,6 +58,7 @@ export const REPRESENTANT_SORT_LABELS: Record<RepresentantSortField, string> = {
   clientCreatedAt: 'Première saisie',
   fullName: 'Nom',
   prospects: 'Nombre de prospects',
+  priorite: 'Priorité de traitement',
 };
 
 export interface RepresentantFilters {
@@ -52,6 +70,7 @@ export interface RepresentantFilters {
   dateTo: string | null;
   hasProspects: boolean | null;
   relationStatus: RepresentantRelation | null;
+  statutQualificationId: string | null;
   sortBy: RepresentantSortField;
   sortDir: SortDirection;
   page: number;
@@ -67,6 +86,7 @@ export const EMPTY_REPRESENTANT_FILTERS: RepresentantFilters = {
   dateTo: null,
   hasProspects: null,
   relationStatus: null,
+  statutQualificationId: null,
   sortBy: 'clientCreatedAt',
   sortDir: 'desc',
   page: 1,
@@ -91,6 +111,7 @@ export function parseRepresentantFilters(
       'relationStatus',
       REPRESENTANT_RELATIONS,
     ),
+    statutQualificationId: readString(params, 'statutQualificationId'),
     sortBy:
       readEnum<RepresentantSortField>(params, 'sortBy', REPRESENTANT_SORT_FIELDS) ??
       EMPTY_REPRESENTANT_FILTERS.sortBy,
@@ -114,6 +135,7 @@ export function serializeRepresentantFilters(filters: RepresentantFilters): URLS
   put('dateTo', filters.dateTo);
   if (filters.hasProspects !== null) put('hasProspects', filters.hasProspects ? 'oui' : 'non');
   put('relationStatus', filters.relationStatus);
+  put('statutQualificationId', filters.statutQualificationId);
   if (filters.sortBy !== EMPTY_REPRESENTANT_FILTERS.sortBy) put('sortBy', filters.sortBy);
   if (filters.sortDir !== EMPTY_REPRESENTANT_FILTERS.sortDir) {
     put('sortDir', filters.sortDir);
@@ -148,5 +170,6 @@ export function countActiveRepresentantFilters(filters: RepresentantFilters): nu
   if (filters.dateFrom !== null || filters.dateTo !== null) count += 1;
   if (filters.hasProspects !== null) count += 1;
   if (filters.relationStatus !== null) count += 1;
+  if (filters.statutQualificationId !== null) count += 1;
   return count;
 }

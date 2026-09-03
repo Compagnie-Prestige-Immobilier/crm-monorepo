@@ -937,6 +937,11 @@ class WriteRepository {
           lastCallById: Value<String?>(createdById),
         ),
       );
+      await _db.customStatement(
+        'UPDATE prospects SET call_attempt_count = call_attempt_count + 1 '
+        'WHERE id = ?',
+        <Object>[prospectId],
+      );
       await _enqueue(
         dependencyKey: 'phase2:$prospectId',
         entityType: callAttemptEntity,
@@ -1009,6 +1014,7 @@ class WriteRepository {
     String? syndicat,
     bool? numeroConfirme,
     String? numeroSaisi,
+    String? statutQualificationId,
     String? id,
   }) async {
     final String entityId = id ?? Ids.newId();
@@ -1072,6 +1078,9 @@ class WriteRepository {
           contacte: contacte == null
               ? const Value<bool?>.absent()
               : Value<bool?>(contacte),
+          statutQualificationId: statutQualificationId == null
+              ? const Value<String?>.absent()
+              : Value<String?>(statutQualificationId),
           // Le résumé du dernier appel vient du serveur au pull. L'écrire AUSSI
           // ici est ce qui fait apparaître la fiche dans « Mes contacts » et
           // « Injoignables » hors ligne, sans attendre la remontée.
@@ -1081,6 +1090,11 @@ class WriteRepository {
           nextCallbackAt: Value<DateTime?>(callbackAt),
           localUpdatedAt: Value<DateTime>(now),
         ),
+      );
+      await _db.customStatement(
+        'UPDATE representants SET call_attempt_count = call_attempt_count + 1 '
+        'WHERE id = ?',
+        <Object>[representantId],
       );
       if (callbackAt != null) {
         await _db
@@ -1123,6 +1137,7 @@ class WriteRepository {
           'syndicat': ?normalizedSyndicat,
           'numeroConfirme': ?numeroConfirme,
           'phone': ?nouveauNumero,
+          'statutQualificationId': ?statutQualificationId,
           'clientCreatedAt': now.toUtc().toIso8601String(),
         },
         now: now,

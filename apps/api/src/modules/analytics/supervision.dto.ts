@@ -103,11 +103,16 @@ export class SupervisionActivityCountsDto {
   @ApiProperty({
     type: Number,
     description:
-      'Appels à des représentants, issues encore saisissables seulement : REACHED, ' +
-      'REFUSED, CALLBACK, UNREACHABLE. Dénominateur de `repContactRate` et de ' +
-      '`repCallbackRate`.',
+      'Appels à des représentants, issues encore saisissables : REACHED, ' +
+      'REFUSED, CALLBACK, UNREACHABLE, WRONG_NUMBER.',
   })
   repCalls!: number;
+
+  @ApiProperty({
+    type: Number,
+    description: 'Issue WRONG_NUMBER : faux numéro parmi les appels représentants.',
+  })
+  repWrongNumber!: number;
 
   @ApiProperty({
     type: Number,
@@ -127,7 +132,7 @@ export class SupervisionActivityCountsDto {
     type: Number,
     description:
       'Issues d’héritage que le terrain ne saisit plus : PROSPECTS_PROMISED, ' +
-      'WRONG_NUMBER, OTHER. Hors de tous les taux.',
+      'OTHER. Hors de tous les taux.',
   })
   repOther!: number;
 
@@ -143,7 +148,9 @@ export class SupervisionActivityCountsDto {
   @ApiProperty({
     type: Number,
     nullable: true,
-    description: 'Part des appels représentants finissant en rappel, en pourcentage.',
+    description:
+      'Part des appels représentants finissant en rappel, en pourcentage. ' +
+      'Dénominateur : appels hors faux numéro.',
   })
   repCallbackRate!: number | null;
 
@@ -243,6 +250,22 @@ export class SupervisionScoreDto {
   score!: PerformanceScore;
 }
 
+export class SupervisionRepStatutDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty() code!: string;
+  @ApiProperty() label!: string;
+  @ApiProperty({ type: Boolean }) isActive!: boolean;
+  @ApiProperty({ type: Number }) count!: number;
+}
+
+export class SupervisionRepStatutsDto {
+  @ApiProperty({ type: Number, description: 'Représentants distincts comptés dans la répartition.' })
+  total!: number;
+
+  @ApiProperty({ type: () => [SupervisionRepStatutDto] })
+  items!: SupervisionRepStatutDto[];
+}
+
 export class SupervisionActivityDto {
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) from!: string | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) to!: string | null;
@@ -292,6 +315,16 @@ export class SupervisionActivityDto {
     description: 'Stock courant de prospects rattachés à chaque représentant.',
   })
   prospectsByRepresentant!: SupervisionHistogramBarDto[];
+
+  @ApiProperty({
+    type: () => SupervisionRepStatutsDto,
+    nullable: true,
+    description:
+      'Répartition des représentants par statut de qualification, basée sur ' +
+      'leur dernier appel portant un statut dans la fenêtre. `null` sans ' +
+      'représentant dans la fenêtre.',
+  })
+  repQualificationStatuses!: SupervisionRepStatutsDto | null;
 }
 
 export class WorkShiftDto {

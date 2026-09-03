@@ -37,3 +37,23 @@ export const promisedNotAllowed = (): BadRequestException =>
 
 export const callbackAtRequired = (): BadRequestException =>
   error('REP_CAMPAIGN_CALLBACK_AT_REQUIRED', 'L’issue « À rappeler » exige une date de rappel.');
+
+export const statutInconnu = (): BadRequestException =>
+  error('REP_STATUT_QUALIFICATION_UNKNOWN', 'Ce statut de qualification n’existe pas.');
+
+export const statutInactif = (label: string): BadRequestException =>
+  error(
+    'REP_STATUT_QUALIFICATION_INACTIVE',
+    `Le statut « ${label} » a été retiré : choisissez-en un autre.`,
+  );
+
+/**
+ * Le statut commande l'issue. Un client qui envoie les deux calcule la même
+ * chose que le serveur : ce refus ne peut donc viser qu'un client fautif, et il
+ * vaut mieux le dire que d'enregistrer une contradiction.
+ */
+export const issueContreditStatut = (attendue: string, recue: string): BadRequestException =>
+  error(
+    'REP_OUTCOME_STATUT_MISMATCH',
+    `Le statut choisi impose l’issue « ${attendue} », or « ${recue} » a été envoyée.`,
+  );

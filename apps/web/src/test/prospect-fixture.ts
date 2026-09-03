@@ -56,6 +56,7 @@ export function prospectFixture(over: Partial<ProspectRow> & { id: string }): Pr
     lastOutcome: null,
     lastComment: null,
     lastAttemptAt: null,
+    callAttemptCount: 0,
     lastCallOutcome: null,
     lastCallAt: null,
     lastCallById: null,

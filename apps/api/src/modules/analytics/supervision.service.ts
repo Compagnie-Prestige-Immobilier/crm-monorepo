@@ -18,6 +18,8 @@ import type {
   SupervisionHistogramBarDto,
   SupervisionActivityRowDto,
   SupervisionQueryDto,
+  SupervisionRepStatutDto,
+  SupervisionRepStatutsDto,
   SupervisionScoreDto,
   SupervisionTeleconseillerDto,
   WorkShiftDto,
@@ -119,6 +121,7 @@ interface RepRow {
   jour: string;
   id: string;
   appels: number;
+  faux: number;
   joints: number;
   rappels: number;
   injoignables: number;
@@ -129,6 +132,7 @@ interface RepRow {
 
 const REP_VIDE: Omit<RepRow, 'jour' | 'id'> = {
   appels: 0,
+  faux: 0,
   joints: 0,
   rappels: 0,
   injoignables: 0,
@@ -244,8 +248,9 @@ export class SupervisionActivityService {
           SELECT
             rca."performedById"                             AS "userId",
             date_trunc(${unit}, rca."clientCreatedAt")      AS bucket,
-            (rca."outcome" IN ${REP_LIVE_OUTCOMES})::int     AS appel,
-            (rca."outcome" IN ${REP_ANSWERED_OUTCOMES})::int AS joint,
+            (rca."outcome" IN ${REP_LIVE_OUTCOMES})::int AS appel,
+            (rca."outcome" = 'WRONG_NUMBER')::int             AS faux,
+            (rca."outcome" IN ${REP_ANSWERED_OUTCOMES})::int  AS joint,
             (rca."outcome" = 'CALLBACK')::int                AS rappel,
             (rca."outcome" = 'UNREACHABLE')::int             AS injoignable,
             (rca."outcome" NOT IN ${REP_LIVE_OUTCOMES})::int AS autre
@@ -377,6 +382,7 @@ export class SupervisionActivityService {
           to_char(t.bucket, 'YYYY-MM-DD')     AS jour,
           t."userId"                          AS id,
           SUM(t.appel)::int                   AS appels,
+          SUM(t.faux)::int                    AS faux,
           SUM(t.joint)::int                   AS joints,
           SUM(t.rappel)::int                  AS rappels,
           SUM(t.injoignable)::int             AS injoignables,
@@ -408,6 +414,7 @@ export class SupervisionActivityService {
         reponses AS (${repReponses})
         SELECT
           COALESCE(SUM(t.appel), 0)::int       AS appels,
+          COALESCE(SUM(t.faux), 0)::int        AS faux,
           COALESCE(SUM(t.joint), 0)::int       AS joints,
           COALESCE(SUM(t.rappel), 0)::int      AS rappels,
           COALESCE(SUM(t.injoignable), 0)::int AS injoignables,
@@ -535,6 +542,49 @@ export class SupervisionActivityService {
 
     const repParLigne = new Map(repRows.map((row) => [`${row.jour}|${row.id}`, row]));
 
+    // Répartition des représentants par statut de qualification : le dernier
+    // appel portant un statut dans la fenêtre détermine le comptage. Les statuts
+    // actifs apparaissent même à zéro ; les statuts désactivés n'apparaissent
+    // que s'ils sont réellement présents.
+    const estGrandPublic = query.projet === Projet.GRAND_PUBLIC;
+    let repQualificationStatuses: SupervisionRepStatutsDto | null = null;
+    if (!estGrandPublic) {
+      const repStatuts = await this.prisma.$queryRaw<
+        { id: string; code: string; label: string; isActive: boolean; count: number }[]
+      >`
+        WITH last_calls AS (
+          SELECT DISTINCT ON (rca."representantId")
+            rca."performedById" AS "userId",
+            rca."statutQualificationId" AS "sid"
+          FROM "rep_call_attempts" rca
+          WHERE rca."statutQualificationId" IS NOT NULL
+            AND ${repWindow}
+          ORDER BY rca."representantId", rca."clientCreatedAt" DESC, rca."id" DESC
+        ),
+        counts AS (
+          SELECT "sid", COUNT(*)::int AS count
+          FROM last_calls
+          WHERE ${membreEquipe(Prisma.sql`"userId"`)}
+          GROUP BY "sid"
+        )
+        SELECT sq.id, sq.code, sq.label, sq."isActive", COALESCE(c.count, 0)::int AS count
+        FROM "statuts_qualification" sq
+        LEFT JOIN counts c ON c."sid" = sq.id
+        WHERE sq."isActive" = TRUE OR c.count > 0
+        ORDER BY sq."sortOrder" ASC, sq."label" ASC
+      `;
+      repQualificationStatuses = {
+        total: repStatuts.reduce((sum, row) => sum + row.count, 0),
+        items: repStatuts.map((row): SupervisionRepStatutDto => ({
+          id: row.id,
+          code: row.code,
+          label: row.label,
+          isActive: row.isActive,
+          count: row.count,
+        })),
+      };
+    }
+
     return {
       from: query.actFrom ? inclusiveDateFrom(query.actFrom).toISOString() : null,
       to: query.actTo ? inclusiveDateTo(query.actTo).toISOString() : null,
@@ -556,6 +606,7 @@ export class SupervisionActivityService {
       scores: rendement === null ? [] : notes(roster, rendement[0], rendement[1], creneaux),
       prospectsByTeleconseiller: prospectsByTeleconseiller.map(toHistogramBar),
       prospectsByRepresentant: prospectsByRepresentant.map(toHistogramBar),
+      repQualificationStatuses,
     };
   }
 }
@@ -625,6 +676,7 @@ function chiffres(base: TotalRow, rep: RepTotalRow): SupervisionActivityCountsDt
     prospectsCreated: base.prospects,
     representantsContacted: base.representants,
     repCalls: rep.appels,
+    repWrongNumber: rep.faux,
     repReached: rep.joints,
     repCallback: rep.rappels,
     repUnreachable: rep.injoignables,

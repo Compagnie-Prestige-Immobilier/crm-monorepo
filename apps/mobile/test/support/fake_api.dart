@@ -291,6 +291,28 @@ class FakeApi implements ApiPort {
     return callOutcomeReasons;
   }
 
+  /// Le référentiel des statuts de qualification à servir. Vide par défaut.
+  final List<StatutQualificationDto> statutsQualification =
+      <StatutQualificationDto>[];
+
+  /// Chaque appel à [pullStatutsQualification], avec la version reçue.
+  final List<int> statutCalls = <int>[];
+
+  ApiException? failNextStatutsPull;
+
+  @override
+  Future<List<StatutQualificationDto>> pullStatutsQualification({
+    required int payloadVersion,
+  }) async {
+    statutCalls.add(payloadVersion);
+    final ApiException? boom = failNextStatutsPull;
+    if (boom != null) {
+      failNextStatutsPull = null;
+      throw boom;
+    }
+    return statutsQualification;
+  }
+
   @override
   Future<PushResult> push({
     required String batchId,
@@ -526,6 +548,7 @@ ProspectDto prospectDto({
   lastOutcome: null,
   lastComment: null,
   lastAttemptAt: null,
+  callAttemptCount: 0,
   lastCallOutcome: lastCallOutcome,
   lastCallAt: lastCallAt,
   lastCallById: lastCallById,
@@ -637,12 +660,15 @@ RepresentantDto representantDto({
   String? lastCallById,
   String? lastCallByName,
   DateTime? nextCallbackAt,
+  int callAttemptCount = 0,
 }) => RepresentantDto(
   id: id,
   fullName: fullName,
   phoneE164: phoneE164,
   notes: null,
   relationStatus: relationStatus,
+  statutQualificationId: null,
+  statutQualificationLabel: null,
   whatsappStatus: whatsappStatus,
   whatsappE164: whatsappE164,
   prenom: prenom,
@@ -654,6 +680,7 @@ RepresentantDto representantDto({
   lastCallAt: lastCallAt,
   lastCallById: lastCallById,
   lastCallByName: lastCallByName,
+  callAttemptCount: callAttemptCount,
   nextCallbackAt: nextCallbackAt,
   // Calcule par le SERVEUR: la fabrique reproduit sa regle plutot que d'en
   // inventer une autre.
@@ -728,6 +755,11 @@ class ExplodingApi implements ApiPort {
 
   @override
   Future<List<CallOutcomeReasonDto>> pullCallOutcomeReasons({
+    required int payloadVersion,
+  }) => _boom();
+
+  @override
+  Future<List<StatutQualificationDto>> pullStatutsQualification({
     required int payloadVersion,
   }) => _boom();
 

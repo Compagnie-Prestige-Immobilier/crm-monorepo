@@ -3213,6 +3213,381 @@
         "tags": ["call-outcome-reasons"]
       }
     },
+    "/api/v1/statuts-qualification": {
+      "get": {
+        "description": "Restreint aux statuts actifs dont `minPayloadVersion` ne dépasse pas la version déclarée. Un statut que l’appelant ne saurait pas renvoyer ne lui est jamais proposé : sa remontée finirait en échec définitif, hors ligne, sans possibilité de correction.",
+        "operationId": "listStatutsQualification",
+        "parameters": [
+          {
+            "name": "payloadVersion",
+            "required": true,
+            "in": "query",
+            "description": "Version de charge utile de l’appelant. Un statut qu’il ne saurait pas émettre ne lui est jamais proposé : sa remontée finirait en échec définitif, hors ligne.",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatutQualificationListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Statuts qu’un client de saisie sait émettre.",
+        "tags": ["statuts-qualification"]
+      },
+      "post": {
+        "operationId": "createStatutQualification",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateStatutQualificationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatutQualificationDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "STATUT_QUALIFICATION_CODE_CONFLICT, _LABEL_CONFLICT, _CALLBACK_NOT_ALLOWED.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ajouter un statut de qualification.",
+        "tags": ["statuts-qualification"]
+      }
+    },
+    "/api/v1/statuts-qualification/administration": {
+      "get": {
+        "operationId": "listAllStatutsQualification",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatutQualificationListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tous les statuts, actifs ou non, toutes versions de charge utile.",
+        "tags": ["statuts-qualification"]
+      }
+    },
+    "/api/v1/statuts-qualification/{id}": {
+      "patch": {
+        "operationId": "updateStatutQualification",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStatutQualificationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatutQualificationDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "STATUT_QUALIFICATION_NOT_FOUND.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "STATUT_QUALIFICATION_SYSTEM_IMMUTABLE, _LABEL_CONFLICT, _CALLBACK_NOT_ALLOWED.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Renommer un statut, changer son rang, ou sa règle si elle n’est pas système.",
+        "tags": ["statuts-qualification"]
+      }
+    },
+    "/api/v1/statuts-qualification/{id}/active": {
+      "post": {
+        "description": "Un statut désactivé disparaît de la saisie et reste lisible sur les fiches qui le désignent. Vider une branche du script de son dernier statut actif est refusé.",
+        "operationId": "setStatutQualificationActive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetStatutQualificationActiveDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatutQualificationDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "STATUT_QUALIFICATION_LAST_OF_BRANCH.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Activer ou désactiver un statut.",
+        "tags": ["statuts-qualification"]
+      }
+    },
     "/api/v1/representants": {
       "get": {
         "description": "Un COMMERCIAL ne voit que les représentants qu’il a créés ou qui lui sont attribués dans un lot d’export. ADMIN, SUPERVISEUR et DIRECTION voient tout.",
@@ -3286,11 +3661,13 @@
             }
           },
           {
-            "name": "relationStatus",
+            "name": "statutQualificationId",
             "required": false,
             "in": "query",
+            "description": "Statut de qualification du dernier appel. Sert le filtre de l’annuaire ET le tirage d’un lot d’appels.",
             "schema": {
-              "$ref": "#/components/schemas/RepresentantRelation"
+              "format": "uuid",
+              "type": "string"
             }
           },
           {
@@ -3326,6 +3703,25 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "relationStatus",
+            "required": false,
+            "in": "query",
+            "description": "Un ou plusieurs états de relation, séparés par des virgules. `CONTACTE,AMBASSADEUR,REFUS` rend tout ce qui a été contacté.",
+            "schema": {
+              "example": "CONTACTE,AMBASSADEUR,REFUS",
+              "type": "string"
+            }
+          },
+          {
+            "name": "mesFiches",
+            "required": false,
+            "in": "query",
+            "description": "true : ne rend que ses propres fiches et celles qu’une campagne lui a confiées, quel que soit le rôle. L’écran d’appel le pose, l’annuaire non.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -3964,6 +4360,81 @@
           }
         ],
         "summary": "Bascules de relation déjà subies par une fiche, de la plus récente à la plus ancienne.",
+        "tags": ["representants"]
+      }
+    },
+    "/api/v1/representants/{id}/call-attempts": {
+      "get": {
+        "operationId": "listRepresentantCallAttempts",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepresentantCallAttemptListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "REPRESENTANT_NOT_FOUND.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Les appels consignés sur une fiche, du plus récent au plus ancien.",
         "tags": ["representants"]
       }
     },
@@ -4795,6 +5266,81 @@
           }
         ],
         "summary": "Supprime logiquement un prospect ; le numéro redevient ressaisissable.",
+        "tags": ["prospects"]
+      }
+    },
+    "/api/v1/prospects/{id}/call-attempts": {
+      "get": {
+        "operationId": "listProspectCallAttempts",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProspectCallAttemptListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "PROSPECT_NOT_FOUND · fiche absente ou supprimée.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Les tentatives d’appel consignées sur une fiche, de la plus récente à la plus ancienne.",
         "tags": ["prospects"]
       }
     },
@@ -16815,6 +17361,16 @@
             }
           },
           {
+            "name": "statutQualificationId",
+            "required": false,
+            "in": "query",
+            "description": "Statut de qualification du dernier appel. Sert le filtre de l’annuaire ET le tirage d’un lot d’appels.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "whatsappStatus",
             "required": false,
             "in": "query",
@@ -18355,7 +18911,7 @@
     },
     "/api/v1/lots-export/mes-attributions": {
       "get": {
-        "description": "Sert au mobile à borner son tirage. `tout: true` pour ADMIN, SUPERVISEUR et DIRECTION : les deux listes sont alors vides et aucun filtre ne s’applique.",
+        "description": "Sert au mobile à borner son tirage. `tout: true` pour ADMIN seulement : les deux listes sont alors vides et aucun filtre ne s’applique. Supervision et direction ne voient sur le téléphone que les fiches qu’une campagne leur a confiées.",
         "operationId": "mesAttributions",
         "parameters": [],
         "responses": {
@@ -19948,9 +20504,184 @@
         },
         "required": ["isActive"]
       },
+      "StatutQualificationEffect": {
+        "type": "string",
+        "enum": ["REACHED", "REFUSED", "SCHEDULE_CALLBACK", "UNREACHABLE", "WRONG_NUMBER"]
+      },
+      "PrioriteTraitement": {
+        "type": "string",
+        "enum": ["HAUTE", "NORMALE", "BASSE"],
+        "description": "Ordre de reprise : un « Très intéressé » se rappelle avant un « Non éligible »."
+      },
       "RepresentantRelation": {
         "type": "string",
-        "enum": ["INCONNU", "CONTACTE", "AMBASSADEUR", "REFUS"]
+        "enum": ["INCONNU", "CONTACTE", "AMBASSADEUR", "REFUS"],
+        "description": "La relation posée sur la fiche. Nulle quand le statut ne tranche rien."
+      },
+      "StatutQualificationDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "effect": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StatutQualificationEffect"
+              }
+            ]
+          },
+          "requiresCallback": {
+            "type": "boolean",
+            "description": "La date du rappel est exigée par ce statut."
+          },
+          "priorite": {
+            "description": "Ordre de reprise : un « Très intéressé » se rappelle avant un « Non éligible ».",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PrioriteTraitement"
+              }
+            ]
+          },
+          "relationStatus": {
+            "nullable": true,
+            "description": "La relation posée sur la fiche. Nulle quand le statut ne tranche rien.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RepresentantRelation"
+              }
+            ]
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "isSystem": {
+            "type": "boolean",
+            "description": "Le script s’appuie dessus : sa règle ne se reconfigure pas."
+          },
+          "minPayloadVersion": {
+            "type": "number",
+            "description": "Version de charge utile minimale sachant émettre ce code."
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "label",
+          "effect",
+          "requiresCallback",
+          "priorite",
+          "relationStatus",
+          "isActive",
+          "isSystem",
+          "minPayloadVersion",
+          "updatedAt"
+        ]
+      },
+      "StatutQualificationListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatutQualificationDto"
+            }
+          }
+        },
+        "required": ["items"]
+      },
+      "CreateStatutQualificationDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "Immuable : l’historique le référence."
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "effect": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StatutQualificationEffect"
+              }
+            ]
+          },
+          "requiresCallback": {
+            "type": "boolean",
+            "default": false
+          },
+          "priorite": {
+            "default": "NORMALE",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PrioriteTraitement"
+              }
+            ]
+          },
+          "relationStatus": {
+            "nullable": true,
+            "description": "Relation posée sur la fiche quand le client n’en envoie pas.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RepresentantRelation"
+              }
+            ]
+          }
+        },
+        "required": ["code", "label", "effect"]
+      },
+      "UpdateStatutQualificationDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "requiresCallback": {
+            "type": "boolean"
+          },
+          "priorite": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PrioriteTraitement"
+              }
+            ]
+          },
+          "relationStatus": {
+            "nullable": true,
+            "description": "Nul retire la relation posée : le statut cesse alors de trancher.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RepresentantRelation"
+              }
+            ]
+          }
+        }
+      },
+      "SetStatutQualificationActiveDto": {
+        "type": "object",
+        "properties": {
+          "isActive": {
+            "type": "boolean"
+          }
+        },
+        "required": ["isActive"]
       },
       "WhatsappStatus": {
         "type": "string",
@@ -19968,7 +20699,8 @@
           "fullName",
           "prospects",
           "lastCallAt",
-          "nextCallbackAt"
+          "nextCallbackAt",
+          "priorite"
         ]
       },
       "SortOrder": {
@@ -20055,6 +20787,16 @@
               }
             ]
           },
+          "statutQualificationId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "statutQualificationLabel": {
+            "type": "string",
+            "nullable": true,
+            "description": "Libellé du statut de qualification, affiché à la place de `relationStatus`. Nul sur une fiche jamais qualifiée."
+          },
           "whatsappStatus": {
             "allOf": [
               {
@@ -20110,6 +20852,10 @@
             "format": "date-time",
             "nullable": true
           },
+          "callAttemptCount": {
+            "type": "number",
+            "description": "Nombre d’appels consignés sur cette fiche."
+          },
           "lastCallById": {
             "type": "string",
             "format": "uuid",
@@ -20143,6 +20889,8 @@
           "updatedAt",
           "prospectCount",
           "relationStatus",
+          "statutQualificationId",
+          "statutQualificationLabel",
           "whatsappStatus",
           "whatsappE164",
           "whatsappNumber",
@@ -20154,6 +20902,7 @@
           "contacte",
           "lastCallOutcome",
           "lastCallAt",
+          "callAttemptCount",
           "lastCallById",
           "lastCallByName",
           "nextCallbackAt"
@@ -20576,6 +21325,120 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/RepresentantRelationChangeDto"
+            }
+          }
+        },
+        "required": ["items"]
+      },
+      "RepresentantCallAttemptDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "outcome": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RepCallOutcome"
+              }
+            ]
+          },
+          "statutQualificationId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "statutQualificationLabel": {
+            "type": "string",
+            "nullable": true
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "callbackAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "promisedProspects": {
+            "type": "number",
+            "nullable": true
+          },
+          "etablissementConfirme": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "numeroConfirme": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "contacte": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "connaitUES": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "syndicat": {
+            "type": "string",
+            "nullable": true
+          },
+          "suggestedName": {
+            "type": "string",
+            "nullable": true
+          },
+          "suggestedPhoneE164": {
+            "type": "string",
+            "nullable": true
+          },
+          "suggestedNote": {
+            "type": "string",
+            "nullable": true
+          },
+          "performedById": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "performedByName": {
+            "type": "string"
+          },
+          "clientCreatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "outcome",
+          "statutQualificationId",
+          "statutQualificationLabel",
+          "comment",
+          "callbackAt",
+          "promisedProspects",
+          "etablissementConfirme",
+          "numeroConfirme",
+          "contacte",
+          "connaitUES",
+          "syndicat",
+          "suggestedName",
+          "suggestedPhoneE164",
+          "suggestedNote",
+          "performedById",
+          "performedByName",
+          "clientCreatedAt"
+        ]
+      },
+      "RepresentantCallAttemptListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "Du plus récent au plus ancien.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RepresentantCallAttemptDto"
             }
           }
         },
@@ -21007,6 +21870,10 @@
             "format": "date-time",
             "nullable": true
           },
+          "callAttemptCount": {
+            "type": "number",
+            "description": "Nombre de tentatives d’appel consignées."
+          },
           "lastCallOutcome": {
             "nullable": true,
             "allOf": [
@@ -21108,6 +21975,7 @@
           "lastOutcome",
           "lastComment",
           "lastAttemptAt",
+          "callAttemptCount",
           "lastCallOutcome",
           "lastCallAt",
           "lastCallById",
@@ -21134,6 +22002,99 @@
           }
         },
         "required": ["items", "meta"]
+      },
+      "ProspectCallAttemptDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "outcome": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CallOutcome"
+              }
+            ]
+          },
+          "reasonLabel": {
+            "type": "string",
+            "nullable": true,
+            "description": "Libellé du motif choisi."
+          },
+          "method": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EnrollmentMethod"
+              }
+            ]
+          },
+          "comment": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "fonctionnaire": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "engagementEnCours": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "dureeEtablissementMois": {
+            "type": "number",
+            "nullable": true
+          },
+          "rendezVousAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "performedById": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "performedByName": {
+            "type": "string"
+          },
+          "clientCreatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "outcome",
+          "reasonLabel",
+          "method",
+          "comment",
+          "email",
+          "fonctionnaire",
+          "engagementEnCours",
+          "dureeEtablissementMois",
+          "rendezVousAt",
+          "performedById",
+          "performedByName",
+          "clientCreatedAt"
+        ]
+      },
+      "ProspectCallAttemptListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "Du plus récent au plus ancien.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProspectCallAttemptDto"
+            }
+          }
+        },
+        "required": ["items"]
       },
       "CreateProspectDto": {
         "type": "object",
@@ -23758,6 +24719,11 @@
                 "$ref": "#/components/schemas/RepCallOutcome"
               }
             ]
+          },
+          "statutQualificationId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Statut de qualification recueilli. FACULTATIF : les versions déjà installées ne l’émettent pas, et un refus mettrait leur saisie en échec définitif. Quand il est présent, c’est lui qui commande l’issue enregistrée."
           },
           "promisedProspects": {
             "type": "number",
@@ -26584,7 +27550,11 @@
           },
           "repCalls": {
             "type": "number",
-            "description": "Appels à des représentants, issues encore saisissables seulement : REACHED, REFUSED, CALLBACK, UNREACHABLE. Dénominateur de `repContactRate` et de `repCallbackRate`."
+            "description": "Appels à des représentants, issues encore saisissables : REACHED, REFUSED, CALLBACK, UNREACHABLE, WRONG_NUMBER."
+          },
+          "repWrongNumber": {
+            "type": "number",
+            "description": "Issue WRONG_NUMBER : faux numéro parmi les appels représentants."
           },
           "repReached": {
             "type": "number",
@@ -26600,7 +27570,7 @@
           },
           "repOther": {
             "type": "number",
-            "description": "Issues d’héritage que le terrain ne saisit plus : PROSPECTS_PROMISED, WRONG_NUMBER, OTHER. Hors de tous les taux."
+            "description": "Issues d’héritage que le terrain ne saisit plus : PROSPECTS_PROMISED, OTHER. Hors de tous les taux."
           },
           "repContactRate": {
             "type": "number",
@@ -26610,7 +27580,7 @@
           "repCallbackRate": {
             "type": "number",
             "nullable": true,
-            "description": "Part des appels représentants finissant en rappel, en pourcentage."
+            "description": "Part des appels représentants finissant en rappel, en pourcentage. Dénominateur : appels hors faux numéro."
           },
           "repQuestioned": {
             "type": "number",
@@ -26649,6 +27619,7 @@
           "prospectsCreated",
           "representantsContacted",
           "repCalls",
+          "repWrongNumber",
           "repReached",
           "repCallback",
           "repUnreachable",
@@ -26709,7 +27680,11 @@
           },
           "repCalls": {
             "type": "number",
-            "description": "Appels à des représentants, issues encore saisissables seulement : REACHED, REFUSED, CALLBACK, UNREACHABLE. Dénominateur de `repContactRate` et de `repCallbackRate`."
+            "description": "Appels à des représentants, issues encore saisissables : REACHED, REFUSED, CALLBACK, UNREACHABLE, WRONG_NUMBER."
+          },
+          "repWrongNumber": {
+            "type": "number",
+            "description": "Issue WRONG_NUMBER : faux numéro parmi les appels représentants."
           },
           "repReached": {
             "type": "number",
@@ -26725,7 +27700,7 @@
           },
           "repOther": {
             "type": "number",
-            "description": "Issues d’héritage que le terrain ne saisit plus : PROSPECTS_PROMISED, WRONG_NUMBER, OTHER. Hors de tous les taux."
+            "description": "Issues d’héritage que le terrain ne saisit plus : PROSPECTS_PROMISED, OTHER. Hors de tous les taux."
           },
           "repContactRate": {
             "type": "number",
@@ -26735,7 +27710,7 @@
           "repCallbackRate": {
             "type": "number",
             "nullable": true,
-            "description": "Part des appels représentants finissant en rappel, en pourcentage."
+            "description": "Part des appels représentants finissant en rappel, en pourcentage. Dénominateur : appels hors faux numéro."
           },
           "repQuestioned": {
             "type": "number",
@@ -26763,6 +27738,7 @@
           "prospectsCreated",
           "representantsContacted",
           "repCalls",
+          "repWrongNumber",
           "repReached",
           "repCallback",
           "repUnreachable",
@@ -26906,6 +27882,44 @@
         },
         "required": ["id", "label", "prospects"]
       },
+      "SupervisionRepStatutDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": ["id", "code", "label", "isActive", "count"]
+      },
+      "SupervisionRepStatutsDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "description": "Représentants distincts comptés dans la répartition."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupervisionRepStatutDto"
+            }
+          }
+        },
+        "required": ["total", "items"]
+      },
       "SupervisionActivityDto": {
         "type": "object",
         "properties": {
@@ -26968,6 +27982,16 @@
             "items": {
               "$ref": "#/components/schemas/SupervisionHistogramBarDto"
             }
+          },
+          "repQualificationStatuses": {
+            "nullable": true,
+            "description": "Répartition des représentants par statut de qualification, basée sur leur dernier appel portant un statut dans la fenêtre. `null` sans représentant dans la fenêtre.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SupervisionRepStatutsDto"
+              }
+            ]
           }
         },
         "required": [
@@ -26979,7 +28003,8 @@
           "teleconseillers",
           "scores",
           "prospectsByTeleconseiller",
-          "prospectsByRepresentant"
+          "prospectsByRepresentant",
+          "repQualificationStatuses"
         ]
       },
       "WorkShiftDto": {
@@ -27664,6 +28689,7 @@
           "taux-de-contact",
           "a-rappeler",
           "taux-de-qualification",
+          "repartition-statuts-qualification",
           "taux-de-joignabilite",
           "prospects-notes",
           "adhesions",
@@ -27860,6 +28886,11 @@
                 "$ref": "#/components/schemas/RepresentantRelation"
               }
             ]
+          },
+          "statutQualificationId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Statut de qualification du dernier appel. Sert le filtre de l’annuaire ET le tirage d’un lot d’appels."
           },
           "whatsappStatus": {
             "allOf": [

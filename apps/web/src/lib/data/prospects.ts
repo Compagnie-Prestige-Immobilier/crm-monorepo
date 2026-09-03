@@ -56,6 +56,18 @@ export async function fetchProspect(
   return unwrap(await client.GET('/api/v1/prospects/{id}', { params: { path: { id } } }));
 }
 
+export type ProspectCallAttempt = components['schemas']['ProspectCallAttemptDto'];
+
+export async function fetchProspectCallAttempts(
+  id: string,
+  client: ApiClient = getApiClient(),
+): Promise<ProspectCallAttempt[]> {
+  const payload = unwrap(
+    await client.GET('/api/v1/prospects/{id}/call-attempts', { params: { path: { id } } }),
+  );
+  return payload.items;
+}
+
 export async function createProspect(
   input: CreateProspectInput,
   client: ApiClient = getApiClient(),

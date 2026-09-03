@@ -1,10 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { ChangeSource, RepCallOutcome } from '@crm/database';
+import type { RepresentantRelation, StatutQualification } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { outcomeOf } from '../referentiels/statuts-qualification.service.js';
 import { type AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { normalizePhone } from '../../common/phone.js';
 import { attributionScope } from '../../common/scope.js';
+import { REPRESENTANT_RELATION_TRANSITIONS, isLegalTransition } from '../../common/transitions.js';
 import { COMMENT_MAX_LENGTH } from '../phase2/attempt-rules.js';
 import { applyRelationChange } from '../representants/relation-change.js';
 import { resolveWhatsappPatch, type WhatsappPatch } from '../representants/whatsapp.js';
@@ -17,6 +20,9 @@ import {
 } from './dto.js';
 import {
   callbackAtRequired,
+  issueContreditStatut,
+  statutInactif,
+  statutInconnu,
   commentRequired,
   phoneConflict,
   promisedNotAllowed,
@@ -61,6 +67,11 @@ export class RepCampaignsService {
     const newPhone =
       body.numeroConfirme === false && body.phone ? normalizePhone(body.phone) : undefined;
 
+    // Le statut commande l'issue. Résolu AVANT la transaction : c'est une
+    // lecture, et la faire dedans allongerait le verrou pour rien.
+    const statut = await this.statutCoherent(body);
+    const relation = relationAPoser(body, statut, representant.relationStatus);
+
     const applied = await this.prisma.$transaction(async (tx) => {
       const inserted = await tx.repCallAttempt.createMany({
         data: [attemptRow(body, user.id, comment)],
@@ -104,11 +115,11 @@ export class RepCampaignsService {
           data: { ...state, rev: { increment: 1 } },
         });
       }
-      if (body.relationStatus !== undefined) {
+      if (relation !== null) {
         await applyRelationChange(tx, {
           representantId: body.representantId,
           fromStatus: representant.relationStatus,
-          toStatus: body.relationStatus,
+          toStatus: relation,
           changedById: user.id,
           source: ChangeSource.MOBILE,
         });
@@ -121,6 +132,30 @@ export class RepCampaignsService {
       body.id,
       suggested,
     );
+  }
+
+  /**
+   * Quand un statut est envoyé, il fait foi : l'issue en découle, et une issue
+   * qui la contredit est refusée plutôt qu'enregistrée. Sans statut, l'issue
+   * envoyée fait foi, comme le font les versions déjà installées.
+   */
+  private async statutCoherent(body: CreateRepCallAttemptDto): Promise<StatutQualification | null> {
+    if (body.statutQualificationId === undefined) return null;
+
+    const statut = await this.prisma.statutQualification.findUnique({
+      where: { id: body.statutQualificationId },
+    });
+    if (!statut) throw statutInconnu();
+    if (!statut.isActive) throw statutInactif(statut.label);
+
+    const attendue = outcomeOf(statut.effect);
+    if (body.outcome !== attendue) throw issueContreditStatut(attendue, body.outcome);
+
+    // Pas de garde sur `requiresCallback` ici : `assertCallbackAllowed` ne
+    // l'autorise que sur l'effet SCHEDULE_CALLBACK, dont l'issue dérivée est
+    // CALLBACK, que `validatedComment` refuse déjà sans date. Un second garde
+    // serait une branche que rien ne peut atteindre.
+    return statut;
   }
 
   /** Seconde lecture, hors périmètre : « pas à vous » ne se confond pas avec « n'existe pas ». */
@@ -145,6 +180,26 @@ export class RepCampaignsService {
   }
 }
 
+/**
+ * Le client garde le dernier mot quand il répond à la question ; le statut
+ * comble son silence.
+ *
+ * Une relation venue du STATUT que la transition refuse est laissée de côté au
+ * lieu de lever : la tentative vient du terrain, souvent hors ligne, et un refus
+ * la perdrait définitivement. Celle que le client affirme garde la garde
+ * stricte de `applyRelationChange` : c'est une contradiction, pas un silence.
+ */
+function relationAPoser(
+  body: CreateRepCallAttemptDto,
+  statut: StatutQualification | null,
+  courante: RepresentantRelation,
+): RepresentantRelation | null {
+  if (body.relationStatus !== undefined) return body.relationStatus;
+  const posee = statut?.relationStatus ?? null;
+  if (posee === null) return null;
+  return isLegalTransition(REPRESENTANT_RELATION_TRANSITIONS, courante, posee) ? posee : null;
+}
+
 function attemptRow(body: CreateRepCallAttemptDto, performedById: string, comment: string | null) {
   return {
     id: body.id,
@@ -159,6 +214,7 @@ function attemptRow(body: CreateRepCallAttemptDto, performedById: string, commen
     contacte: body.contacte ?? null,
     connaitUES: body.connaitUES ?? null,
     syndicat: body.syndicat?.trim() || null,
+    statutQualificationId: body.statutQualificationId ?? null,
     clientCreatedAt: new Date(body.clientCreatedAt),
   };
 }
@@ -173,6 +229,9 @@ function representantPatch(
     ...(body.syndicat !== undefined ? { syndicat: body.syndicat.trim() || null } : {}),
     ...(body.connaitUES !== undefined ? { connaitUES: body.connaitUES } : {}),
     ...(body.contacte !== undefined ? { contacte: body.contacte } : {}),
+    ...(body.statutQualificationId !== undefined
+      ? { statutQualificationId: body.statutQualificationId }
+      : {}),
     ...(body.etablissementConfirme === false && body.etablissement !== undefined
       ? { etablissement: body.etablissement.trim() || null }
       : {}),

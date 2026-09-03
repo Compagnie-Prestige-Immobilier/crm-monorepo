@@ -54,6 +54,10 @@ class RepresentantDto {
 
     required this.relationStatus,
 
+    required this.statutQualificationId,
+
+    required this.statutQualificationLabel,
+
     required this.whatsappStatus,
 
     required this.whatsappE164,
@@ -75,6 +79,8 @@ class RepresentantDto {
     required this.lastCallOutcome,
 
     required this.lastCallAt,
+
+    required this.callAttemptCount,
 
     required this.lastCallById,
 
@@ -138,6 +144,17 @@ class RepresentantDto {
   )
   final RepresentantRelation relationStatus;
 
+  @JsonKey(name: r'statutQualificationId', required: true, includeIfNull: true)
+  final String? statutQualificationId;
+
+  /// Libellé du statut de qualification, affiché à la place de `relationStatus`. Nul sur une fiche jamais qualifiée.
+  @JsonKey(
+    name: r'statutQualificationLabel',
+    required: true,
+    includeIfNull: true,
+  )
+  final String? statutQualificationLabel;
+
   @JsonKey(
     name: r'whatsappStatus',
     required: true,
@@ -184,6 +201,10 @@ class RepresentantDto {
   @JsonKey(name: r'lastCallAt', required: true, includeIfNull: true)
   final DateTime? lastCallAt;
 
+  /// Nombre d’appels consignés sur cette fiche.
+  @JsonKey(name: r'callAttemptCount', required: true, includeIfNull: false)
+  final num callAttemptCount;
+
   @JsonKey(name: r'lastCallById', required: true, includeIfNull: true)
   final String? lastCallById;
 
@@ -216,6 +237,8 @@ class RepresentantDto {
                 updatedAt,
                 prospectCount,
                 relationStatus,
+                statutQualificationId,
+                statutQualificationLabel,
                 whatsappStatus,
                 whatsappE164,
                 whatsappNumber,
@@ -227,6 +250,7 @@ class RepresentantDto {
                 contacte,
                 lastCallOutcome,
                 lastCallAt,
+                callAttemptCount,
                 lastCallById,
                 lastCallByName,
                 nextCallbackAt,
@@ -248,6 +272,8 @@ class RepresentantDto {
                 other.updatedAt,
                 other.prospectCount,
                 other.relationStatus,
+                other.statutQualificationId,
+                other.statutQualificationLabel,
                 other.whatsappStatus,
                 other.whatsappE164,
                 other.whatsappNumber,
@@ -259,6 +285,7 @@ class RepresentantDto {
                 other.contacte,
                 other.lastCallOutcome,
                 other.lastCallAt,
+                other.callAttemptCount,
                 other.lastCallById,
                 other.lastCallByName,
                 other.nextCallbackAt,
@@ -286,6 +313,8 @@ class RepresentantDto {
         updatedAt,
         prospectCount,
         relationStatus,
+        statutQualificationId,
+        statutQualificationLabel,
         whatsappStatus,
         whatsappE164,
         whatsappNumber,
@@ -297,6 +326,7 @@ class RepresentantDto {
         contacte,
         lastCallOutcome,
         lastCallAt,
+        callAttemptCount,
         lastCallById,
         lastCallByName,
         nextCallbackAt,

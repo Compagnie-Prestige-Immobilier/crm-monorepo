@@ -11,6 +11,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/providers/connectivity.dart';
 import '../../../core/providers/sync_coordinator.dart';
+import '../../../core/router/back_navigation.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/router/single_push.dart';
 import '../../../core/sync/api_port.dart';
@@ -45,6 +46,7 @@ class CorrectionsScreen extends ConsumerWidget {
 
     return CpiScaffold(
       title: 'À corriger',
+      leading: canPopHere(context) ? const CpiBackButton() : null,
       banner: _band(context, ref, horsLigne: horsLigne),
       footer: bloquees == 0
           ? null

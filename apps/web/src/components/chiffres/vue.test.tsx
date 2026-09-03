@@ -49,6 +49,7 @@ const totaux = {
   prospectsCreated: 26,
   representantsContacted: 9,
   repCalls: 30,
+  repWrongNumber: 0,
   repReached: 21,
   repCallback: 6,
   repUnreachable: 3,
@@ -87,6 +88,7 @@ const activite = {
   ],
   prospectsByTeleconseiller: [],
   prospectsByRepresentant: [],
+  repQualificationStatuses: null,
 };
 
 const disposition = (sources: string[]) => ({
@@ -292,7 +294,7 @@ describe('l’écran Chiffres, du squelette aux chiffres', () => {
     await waitFor(() => {
       expect(screen.getAllByText('Prospects saisis').length).toBeGreaterThan(0);
     });
-    expect(screen.queryByText('Taux de contact des représentants')).toBeNull();
+    expect(screen.queryByText('Taux de joignabilité des représentants')).toBeNull();
   });
 
   // Deux familles d'appels sur le même écran : le titre de la tuile, et non son
@@ -308,10 +310,22 @@ describe('l’écran Chiffres, du squelette aux chiffres', () => {
     renderWithQuery(<ChiffresView ecran="chues" role={SUPERVISEUR} />);
 
     expect(
-      (await screen.findAllByText('Taux de contact des représentants')).length,
+      (await screen.findAllByText('Taux de joignabilité des représentants')).length,
     ).toBeGreaterThan(0);
     expect(screen.getAllByText('Taux de joignabilité des prospects').length).toBeGreaterThan(0);
     expect(screen.getByText('Sans objet')).toBeTruthy();
     expect(screen.getByText('Aucun appel à un prospect sur la période')).toBeTruthy();
+  });
+
+  it('une tuile de taux met le nombre en grand et le pourcentage en dessous', async () => {
+    setUrl('/chues/statistiques');
+    dispositionMock.mockResolvedValue(disposition(['taux-de-contact']));
+    activiteMock.mockResolvedValue(activite);
+
+    renderWithQuery(<ChiffresView ecran="chues" role={SUPERVISEUR} />);
+
+    expect((await screen.findAllByText('21')).length).toBeGreaterThan(0);
+    expect(screen.getByText('70,0 % · 21 joints sur 30 appels')).toBeTruthy();
+    expect(screen.queryByText('70,0 %')).toBeNull();
   });
 });

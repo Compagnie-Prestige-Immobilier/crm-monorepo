@@ -14,7 +14,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 23;
+  int get schemaVersion => 26;
 
   /// Les colonnes ajoutées à `call_attempts` par la v19. Déclarées ici parce
   /// que TROIS paliers recopient cette table : chacun engendre sa forme
@@ -61,6 +61,7 @@ class AppDatabase extends _$AppDatabase {
       prospects.dureeSystemeMois,
       prospects.canalProvenanceId,
       ..._prospectsV23(prospects),
+      prospects.callAttemptCount,
     ],
     columnTransformer: <GeneratedColumn<Object>, Expression<Object>>{
       prospects.projet: const Constant<String>('CHUES'),
@@ -307,6 +308,38 @@ class AppDatabase extends _$AppDatabase {
         // vie et la diaspora n'aurait aucun pays à choisir.
         await customStatement(
           'DELETE FROM sync_state WHERE collection = \'referentiels_mirror\'',
+        );
+      }
+      if (from < 24 && to >= 24) {
+        // Le référentiel des statuts a sa propre route, hors curseur keyset :
+        // la table neuve se peuple au premier pull, sans marqueur à effacer.
+        await m.createTable(statutsQualification);
+        await m.createIndex(statutsQualificationActiveIdx);
+      }
+      if (from < 25 && to >= 25) {
+        await m.addColumn(representants, representants.statutQualificationId);
+        // La vue joint désormais le libellé du statut : SQLite garde le texte
+        // d'une vue tel qu'il a été créé.
+        await m.recreateAllViews();
+        // Comme au palier v8 : une fiche déjà en base ne redescend plus, et son
+        // statut resterait vide à vie. Les saisies en file sont gardées par le
+        // pull, et un rev plus ancien n'écrase rien.
+        await customStatement(
+          'DELETE FROM sync_state WHERE collection = \'all\'',
+        );
+      }
+      if (from < 26 && to >= 26) {
+        await m.addColumn(representants, representants.callAttemptCount);
+        // Même garde qu'au palier v23 : avant la v13, `prospects` est recréée
+        // dans sa forme courante, colonne comprise.
+        if (from >= 13) {
+          await m.addColumn(prospects, prospects.callAttemptCount);
+        }
+        // `SELECT r.*` est figé à la création de la vue : sans recréation la
+        // colonne n'y paraît pas. Même curseur remis à zéro qu'au palier 25.
+        await m.recreateAllViews();
+        await customStatement(
+          'DELETE FROM sync_state WHERE collection = \'all\'',
         );
       }
     },

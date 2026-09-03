@@ -596,7 +596,7 @@ class LotsExportApi {
   }
 
   /// Les fiches attribuées à l’appelant, tous lots confondus.
-  /// Sert au mobile à borner son tirage. &#x60;tout: true&#x60; pour ADMIN, SUPERVISEUR et DIRECTION : les deux listes sont alors vides et aucun filtre ne s’applique.
+  /// Sert au mobile à borner son tirage. &#x60;tout: true&#x60; pour ADMIN seulement : les deux listes sont alors vides et aucun filtre ne s’applique. Supervision et direction ne voient sur le téléphone que les fiches qu’une campagne leur a confiées.
   ///
   /// Parameters:
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation

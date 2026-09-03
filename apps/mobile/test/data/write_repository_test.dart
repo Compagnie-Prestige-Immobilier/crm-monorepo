@@ -727,6 +727,41 @@ void main() {
       expect(jsonDecode(op.payload), containsPair('comment', 'Disponible.'));
     });
 
+    test('le statut de qualification part avec la tentative', () async {
+      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+
+      await repo.recordRepCallAttempt(
+        representantId: 'repA',
+        createdById: 'u-1',
+        outcome: 'REACHED',
+        statutQualificationId: 'sq-interesse',
+      );
+
+      final OutboxData op = (await allOutbox(db)).single;
+      expect(
+        jsonDecode(op.payload),
+        containsPair('statutQualificationId', 'sq-interesse'),
+      );
+    });
+
+    // Le champ est FACULTATIF dans le contrat : un envoi sans statut ne doit
+    // pas porter la clé, qu'un serveur strict lirait comme un statut inconnu.
+    test('sans statut, la clé ne part pas', () async {
+      await insertRepresentant(db, id: 'repA', phone: '+221770000001');
+
+      await repo.recordRepCallAttempt(
+        representantId: 'repA',
+        createdById: 'u-1',
+        outcome: 'UNREACHABLE',
+      );
+
+      final OutboxData op = (await allOutbox(db)).single;
+      expect(
+        jsonDecode(op.payload) as Map<String, Object?>,
+        isNot(contains('statutQualificationId')),
+      );
+    });
+
     // Sans écriture locale, « Mes contacts » et « Injoignables » attendaient la
     // remontée pour voir un appel consigné hors ligne.
     test('le résumé du dernier appel s\'écrit tout de suite', () async {

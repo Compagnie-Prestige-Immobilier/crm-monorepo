@@ -1,5 +1,5 @@
-import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { Transform, Type } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional, OmitType, PartialType } from '@nestjs/swagger';
+import { Transform, Type, type TransformFnParams } from 'class-transformer';
 import {
   IsBoolean,
   IsEnum,
@@ -200,6 +200,16 @@ export class RepresentantDto {
   @ApiProperty({ enum: RepresentantRelation, enumName: 'RepresentantRelation' })
   relationStatus!: RepresentantRelation;
 
+  @ApiProperty({ type: String, format: 'uuid', nullable: true })
+  statutQualificationId!: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'Libellé du statut de qualification, affiché à la place de `relationStatus`. Nul sur une fiche jamais qualifiée.',
+  })
+  statutQualificationLabel!: string | null;
+
   @ApiProperty({ enum: WhatsappStatus, enumName: 'WhatsappStatus' })
   whatsappStatus!: WhatsappStatus;
 
@@ -234,6 +244,8 @@ export class RepresentantDto {
   })
   lastCallOutcome!: RepCallOutcome | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) lastCallAt!: string | null;
+  @ApiProperty({ type: Number, description: 'Nombre d’appels consignés sur cette fiche.' })
+  callAttemptCount!: number;
   @ApiProperty({ type: String, format: 'uuid', nullable: true }) lastCallById!: string | null;
   @ApiProperty({ type: String, nullable: true }) lastCallByName!: string | null;
   @ApiProperty({
@@ -257,6 +269,7 @@ export enum RepresentantSortField {
   PROSPECTS = 'prospects',
   LAST_CALL_AT = 'lastCallAt',
   NEXT_CALLBACK_AT = 'nextCallbackAt',
+  PRIORITE = 'priorite',
 }
 
 /** Ce que le dernier appel laisse à faire. */
@@ -317,6 +330,15 @@ export class RepresentantExportQueryDto {
   @IsEnum(RepresentantRelation)
   relationStatus?: RepresentantRelation;
 
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description:
+      'Statut de qualification du dernier appel. Sert le filtre de l’annuaire ET le tirage d’un lot d’appels.',
+  })
+  @IsOptional()
+  @IsUUID()
+  statutQualificationId?: string;
+
   @ApiPropertyOptional({ enum: WhatsappStatus, enumName: 'WhatsappStatus' })
   @IsOptional()
   @IsEnum(WhatsappStatus)
@@ -347,7 +369,42 @@ export class RepresentantExportQueryDto {
   lastCallById?: string;
 }
 
-export class RepresentantQueryDto extends RepresentantExportQueryDto {
+const relationList = ({ value }: TransformFnParams): RepresentantRelation[] => {
+  const brut: unknown[] = Array.isArray(value) ? value : String(value).split(',');
+  return brut
+    .map((part) => String(part).trim())
+    .filter((part) => part !== '') as RepresentantRelation[];
+};
+
+/**
+ * `relationStatus` accepte ici plusieurs états, séparés par des virgules. Il
+ * reste unique sur l'export et les lots d'appels : une liste y élargirait le
+ * périmètre qu'ils bornent.
+ */
+export class RepresentantQueryDto extends OmitType(RepresentantExportQueryDto, [
+  'relationStatus',
+] as const) {
+  @ApiPropertyOptional({
+    type: String,
+    description:
+      'Un ou plusieurs états de relation, séparés par des virgules. `CONTACTE,AMBASSADEUR,REFUS` rend tout ce qui a été contacté.',
+    example: 'CONTACTE,AMBASSADEUR,REFUS',
+  })
+  @IsOptional()
+  @Transform(relationList)
+  @IsEnum(RepresentantRelation, { each: true })
+  relationStatus?: RepresentantRelation[];
+
+  @ApiPropertyOptional({
+    type: Boolean,
+    description:
+      'true : ne rend que ses propres fiches et celles qu’une campagne lui a confiées, quel que soit le rôle. L’écran d’appel le pose, l’annuaire non.',
+  })
+  @IsOptional()
+  @Transform(queryBoolean)
+  @IsBoolean()
+  mesFiches?: boolean;
+
   @ApiPropertyOptional({ enum: RepresentantSortField, enumName: 'RepresentantSortField' })
   @IsOptional()
   @IsEnum(RepresentantSortField)
@@ -552,6 +609,37 @@ export class RepresentantRelationChangeDto {
   source!: ChangeSource;
 
   @ApiProperty({ type: String, format: 'date-time' }) changedAt!: string;
+}
+
+/** Un appel consigné, avec les réponses du script telles qu'elles ont été dites ce jour-là. */
+export class RepresentantCallAttemptDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ enum: RepCallOutcome, enumName: 'RepCallOutcome' }) outcome!: RepCallOutcome;
+  @ApiProperty({ type: String, format: 'uuid', nullable: true })
+  statutQualificationId!: string | null;
+  @ApiProperty({ type: String, nullable: true }) statutQualificationLabel!: string | null;
+  @ApiProperty({ type: String, nullable: true }) comment!: string | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) callbackAt!: string | null;
+  @ApiProperty({ type: Number, nullable: true }) promisedProspects!: number | null;
+  @ApiProperty({ type: Boolean, nullable: true }) etablissementConfirme!: boolean | null;
+  @ApiProperty({ type: Boolean, nullable: true }) numeroConfirme!: boolean | null;
+  @ApiProperty({ type: Boolean, nullable: true }) contacte!: boolean | null;
+  @ApiProperty({ type: Boolean, nullable: true }) connaitUES!: boolean | null;
+  @ApiProperty({ type: String, nullable: true }) syndicat!: string | null;
+  @ApiProperty({ type: String, nullable: true }) suggestedName!: string | null;
+  @ApiProperty({ type: String, nullable: true }) suggestedPhoneE164!: string | null;
+  @ApiProperty({ type: String, nullable: true }) suggestedNote!: string | null;
+  @ApiProperty({ format: 'uuid' }) performedById!: string;
+  @ApiProperty() performedByName!: string;
+  @ApiProperty({ type: String, format: 'date-time' }) clientCreatedAt!: string;
+}
+
+export class RepresentantCallAttemptListDto {
+  @ApiProperty({
+    type: () => [RepresentantCallAttemptDto],
+    description: 'Du plus récent au plus ancien.',
+  })
+  items!: RepresentantCallAttemptDto[];
 }
 
 export class RepresentantRelationChangeListDto {

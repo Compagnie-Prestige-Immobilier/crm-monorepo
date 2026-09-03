@@ -41,6 +41,8 @@ class SupervisionActivityCountsDto {
 
     required this.repCalls,
 
+    required this.repWrongNumber,
+
     required this.repReached,
 
     required this.repCallback,
@@ -104,9 +106,13 @@ class SupervisionActivityCountsDto {
   )
   final num representantsContacted;
 
-  /// Appels à des représentants, issues encore saisissables seulement : REACHED, REFUSED, CALLBACK, UNREACHABLE. Dénominateur de `repContactRate` et de `repCallbackRate`.
+  /// Appels à des représentants, issues encore saisissables : REACHED, REFUSED, CALLBACK, UNREACHABLE, WRONG_NUMBER.
   @JsonKey(name: r'repCalls', required: true, includeIfNull: false)
   final num repCalls;
+
+  /// Issue WRONG_NUMBER : faux numéro parmi les appels représentants.
+  @JsonKey(name: r'repWrongNumber', required: true, includeIfNull: false)
+  final num repWrongNumber;
 
   /// Représentants qui ont DÉCROCHÉ et répondu : REACHED ou REFUSED. Un refus est un contact ; un rappel promis n’en est pas encore un.
   @JsonKey(name: r'repReached', required: true, includeIfNull: false)
@@ -120,7 +126,7 @@ class SupervisionActivityCountsDto {
   @JsonKey(name: r'repUnreachable', required: true, includeIfNull: false)
   final num repUnreachable;
 
-  /// Issues d’héritage que le terrain ne saisit plus : PROSPECTS_PROMISED, WRONG_NUMBER, OTHER. Hors de tous les taux.
+  /// Issues d’héritage que le terrain ne saisit plus : PROSPECTS_PROMISED, OTHER. Hors de tous les taux.
   @JsonKey(name: r'repOther', required: true, includeIfNull: false)
   final num repOther;
 
@@ -128,7 +134,7 @@ class SupervisionActivityCountsDto {
   @JsonKey(name: r'repContactRate', required: true, includeIfNull: true)
   final num? repContactRate;
 
-  /// Part des appels représentants finissant en rappel, en pourcentage.
+  /// Part des appels représentants finissant en rappel, en pourcentage. Dénominateur : appels hors faux numéro.
   @JsonKey(name: r'repCallbackRate', required: true, includeIfNull: true)
   final num? repCallbackRate;
 
@@ -161,6 +167,7 @@ class SupervisionActivityCountsDto {
                 prospectsCreated,
                 representantsContacted,
                 repCalls,
+                repWrongNumber,
                 repReached,
                 repCallback,
                 repUnreachable,
@@ -183,6 +190,7 @@ class SupervisionActivityCountsDto {
                 other.prospectsCreated,
                 other.representantsContacted,
                 other.repCalls,
+                other.repWrongNumber,
                 other.repReached,
                 other.repCallback,
                 other.repUnreachable,
@@ -211,6 +219,7 @@ class SupervisionActivityCountsDto {
         prospectsCreated,
         representantsContacted,
         repCalls,
+        repWrongNumber,
         repReached,
         repCallback,
         repUnreachable,

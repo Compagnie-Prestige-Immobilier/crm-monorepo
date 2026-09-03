@@ -58,21 +58,22 @@ const scalaire = (libelle: string, valeur: number): DonneesSource => ({
 });
 
 /**
- * Un taux se range dans une tuile, pas dans une valeur brute : la jauge et la
- * tuile lisent `valeur`, `affichage` porte le pourcentage et `libelle` le
- * dénominateur qui le rend vrai. Sans dénominateur, la tuile dit « Sans objet »
- * et non « 0 % ».
+ * Un taux se range dans une tuile : la jauge lit `valeur` (le pourcentage), la
+ * tuile affiche en grand le nombre brut qui le fait, le taux et son
+ * dénominateur en dessous. Sans dénominateur, la tuile dit « Sans objet » et
+ * non « 0 % ».
  */
 const scalaireTaux = (
   valeur: number | null,
+  numerateur: number,
   libelle: string,
   sansDenominateur: string,
 ): DonneesSource => ({
   forme: 'scalaire',
   donnee: {
-    libelle: valeur === null ? sansDenominateur : libelle,
+    libelle: valeur === null ? sansDenominateur : `${taux(valeur)} · ${libelle}`,
     valeur: valeur ?? 0,
-    affichage: taux(valeur),
+    affichage: valeur === null ? taux(valeur) : formatNumber(numerateur),
   },
 });
 
@@ -186,7 +187,7 @@ const parTeleconseiller = (chues: boolean): SourceChiffre => ({
  */
 export const SOURCES_CHIFFRES = {
   'taux-de-contact': {
-    label: 'Taux de contact des représentants',
+    label: 'Taux de joignabilité des représentants',
     forme: 'scalaire',
     jeu: 'activite',
     description:
@@ -197,12 +198,13 @@ export const SOURCES_CHIFFRES = {
         ? null
         : scalaireTaux(
             activite.totals.repContactRate,
-            `${formatNumber(activite.totals.repReached)} joints sur ${formatNumber(activite.totals.repCalls)} appels aux représentants`,
+            activite.totals.repReached,
+            `${formatNumber(activite.totals.repReached)} joints sur ${formatNumber(activite.totals.repCalls)} appels`,
             'Aucun appel à un représentant sur la période',
           ),
   },
   'a-rappeler': {
-    label: 'Taux de rendez-vous des représentants',
+    label: 'Taux de rappel des représentants',
     forme: 'scalaire',
     jeu: 'activite',
     description:
@@ -213,7 +215,8 @@ export const SOURCES_CHIFFRES = {
         ? null
         : scalaireTaux(
             activite.totals.repCallbackRate,
-            `${formatNumber(activite.totals.repCallback)} rendez-vous sur ${formatNumber(activite.totals.repCalls)} appels aux représentants`,
+            activite.totals.repCallback,
+            `${formatNumber(activite.totals.repCallback)} rappels sur ${formatNumber(activite.totals.repCalls)} appels`,
             'Aucun appel à un représentant sur la période',
           ),
   },
@@ -228,9 +231,32 @@ export const SOURCES_CHIFFRES = {
         ? null
         : scalaireTaux(
             activite.totals.repQualificationRate,
+            activite.totals.repQualified,
             `${formatNumber(activite.totals.repQualified)} acceptent sur ${formatNumber(activite.totals.repQuestioned)} interrogés`,
             'Aucun représentant interrogé sur la période',
           ),
+  },
+  'repartition-statuts-qualification': {
+    label: 'Répartition des statuts de qualification',
+    forme: 'classement',
+    jeu: 'activite',
+    description:
+      'Nombre de représentants par statut de qualification, basé sur leur dernier appel dans la période.',
+    groupe: 'Appels aux représentants',
+    extraire: ({ activite }) => {
+      if (activite === undefined || activite.repQualificationStatuses === null) return null;
+      return {
+        forme: 'classement',
+        donnee:
+          activite.repQualificationStatuses.total === 0
+            ? []
+            : activite.repQualificationStatuses.items.map((item) => ({
+                id: item.id,
+                label: item.label,
+                value: item.count,
+              })),
+      };
+    },
   },
   'taux-de-joignabilite': {
     label: 'Taux de joignabilité des prospects',
@@ -244,6 +270,7 @@ export const SOURCES_CHIFFRES = {
         ? null
         : scalaireTaux(
             activite.totals.reachRate,
+            joignables(activite.totals),
             `${formatNumber(joignables(activite.totals))} numéros exploitables sur ${formatNumber(activite.totals.calls)} appels aux prospects`,
             'Aucun appel à un prospect sur la période',
           ),
@@ -339,7 +366,7 @@ export const SOURCES_CHIFFRES = {
   },
   'de-l-appel-a-l-encaissement': {
     label: 'De l’appel à l’encaissement',
-    forme: 'composition',
+    forme: 'classement',
     jeu: 'entonnoir',
     description: 'Voir combien de dossiers passent chaque étape, du premier appel au paiement.',
     groupe: 'Résultats',
@@ -347,17 +374,15 @@ export const SOURCES_CHIFFRES = {
       entonnoir === undefined
         ? null
         : {
-            forme: 'composition',
-            donnee: [
-              {
-                ligne: 'Étapes',
-                segments: entonnoir.etapes.map((etape) => ({
-                  id: etape.label,
-                  label: etape.label,
-                  value: etape.count,
-                })),
-              },
-            ],
+            forme: 'classement',
+            donnee:
+              (entonnoir.etapes[0]?.count ?? 0) === 0
+                ? []
+                : entonnoir.etapes.map((etape) => ({
+                    id: etape.label,
+                    label: etape.label,
+                    value: etape.count,
+                  })),
           },
   },
   'methodes-d-adhesion': {
@@ -417,11 +442,11 @@ export const SOURCES_CHIFFRES = {
         ? null
         : {
             forme: 'classement',
-            donnee: delais.legs.map((leg) => ({
-              id: leg.leg,
-              label: leg.label,
-              value: leg.medianDays ?? 0,
-            })),
+            donnee: delais.legs.flatMap((leg) =>
+              leg.medianDays === null
+                ? []
+                : [{ id: leg.leg, label: leg.label, value: leg.medianDays }],
+            ),
           },
   },
   'rendement-par-departement': {
@@ -449,6 +474,7 @@ const SOURCES_CHUES_SEULEMENT: readonly string[] = [
   'taux-de-contact',
   'a-rappeler',
   'taux-de-qualification',
+  'repartition-statuts-qualification',
 ];
 
 /** Les montants ne s'ouvrent qu'à la direction, comme la disposition d'usine du serveur. */

@@ -132,6 +132,11 @@ class StubApi implements ApiPort {
     required int payloadVersion,
   }) async => const <CallOutcomeReasonDto>[];
 
+  @override
+  Future<List<StatutQualificationDto>> pullStatutsQualification({
+    required int payloadVersion,
+  }) async => const <StatutQualificationDto>[];
+
   /// Même raison que [pullVisiteReferentiels] : un refus, jamais des listes
   /// vides.
   @override
