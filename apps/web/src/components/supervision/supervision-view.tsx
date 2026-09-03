@@ -2,23 +2,37 @@
 
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { HeadsetIcon, LandmarkIcon, type LucideIcon } from 'lucide-react';
+import { useState } from 'react';
 
 import { AnimatedNumber } from '@/components/live/animated-number';
 import { LiveIndicator } from '@/components/live/live-indicator';
 import { useLive } from '@/components/live/use-live';
 import { QueryErrorState } from '@/components/query-error-state';
+import {
+  Fact,
+  ScoreBadge,
+  ScoreFacts,
+  ScoreParts,
+  ScoreToggle,
+  byScoreDesc,
+  callsPerActiveHour,
+} from '@/components/supervision/score';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   PRESENCE_LABELS,
   fetchSupervision,
+  formatActiveDuration,
+  formatClock,
+  formatDuration,
   formatElapsed,
   knownPresence,
   minutesSince,
   type PresenceState,
   type SupervisedUser,
 } from '@/lib/data/admin';
+import { formatNumber } from '@/lib/format';
 import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
 import { queryKeys } from '@/lib/query-keys';
 
@@ -28,9 +42,16 @@ const PRESENCE_VARIANT: Record<PresenceState, 'success' | 'info' | 'secondary'> 
   AWAY: 'secondary',
 };
 
+const COLUMNS = 6;
+
 function PresenceBadge({ presence }: { presence: string }) {
   const state = knownPresence(presence);
   return <Badge variant={PRESENCE_VARIANT[state]}>{PRESENCE_LABELS[state]}</Badge>;
+}
+
+function formatDeadTime(seconds: number, gaps: number): string {
+  if (gaps === 0) return 'Aucun';
+  return `${formatDuration(seconds)} sur ${formatNumber(gaps)} trou${gaps > 1 ? 's' : ''}`;
 }
 
 export function SupervisionView() {
@@ -63,12 +84,22 @@ export function SupervisionView() {
 
   if (data === undefined) return <SupervisionSkeleton />;
 
+  const creneaux = data.shifts.map((shift) => `${shift.label} ${shift.start}-${shift.end}`);
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-[0.9375rem] text-muted-foreground">
-          Présence et dernière activité des comptes.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <p className="text-[0.9375rem] text-muted-foreground">
+            Présence observée par l’application. Les appels et saisies sont dans le volet Activité.
+          </p>
+          {creneaux.length > 0 ? (
+            <p className="text-[0.8125rem] text-muted-foreground">
+              Rendement calculé sur {creneaux.join(' et ')},{' '}
+              {formatActiveDuration(data.shiftSecondsElapsed)} écoulées.
+            </p>
+          ) : null}
+        </div>
         <LiveIndicator
           state={live.stateOf(supervision.isError)}
           label={live.labelOf(supervision.isError)}
@@ -152,6 +183,8 @@ function PresenceTable({
   observedAt: string;
   empty: string;
 }) {
+  const [openId, setOpenId] = useState<string | null>(null);
+
   return (
     <Card className="animate-rise">
       <CardContent className="overflow-x-auto scrollbar-thin p-0">
@@ -171,47 +204,38 @@ function PresenceTable({
               <th scope="col" className="px-5 py-2 text-left font-[600]">
                 État
               </th>
-              <th scope="col" className="px-5 py-2 text-right font-[600]">
-                Activité
+              <th scope="col" className="px-5 py-2 text-left font-[600]">
+                Rendement
               </th>
               <th scope="col" className="px-5 py-2 text-right font-[600]">
-                Sessions
+                Temps actif aujourd’hui
               </th>
               <th scope="col" className="px-5 py-2 text-right font-[600]">
-                Synchro
+                Appels aujourd’hui
+              </th>
+              <th scope="col" className="px-5 py-2 text-right font-[600]">
+                En attente
               </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {users.map((user) => (
-              <tr
-                key={user.id}
-                className="transition-colors duration-(--dur-2) ease-(--ease-out-cpi)"
-              >
-                <th scope="row" className="px-5 py-2 text-left font-[400]">
-                  <span className="block font-[600]">{user.fullName}</span>
-                  <span className="block text-[0.75rem] text-muted-foreground">
-                    {user.username}
-                  </span>
-                </th>
-                <td className="px-5 py-2">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <PresenceBadge presence={user.presence} />
-                    {!user.isActive ? <Badge variant="outline">Désactivé</Badge> : null}
-                  </div>
-                </td>
-                <td className="px-5 py-2 text-right tabular-nums">
-                  {formatElapsed(minutesSince(user.lastSeenAt, observedAt))}
-                </td>
-                <td className="px-5 py-2 text-right tabular-nums">{user.sessionCount}</td>
-                <td className="px-5 py-2 text-right tabular-nums text-muted-foreground">
-                  {formatElapsed(minutesSince(user.lastSyncAt, observedAt))}
-                </td>
-              </tr>
-            ))}
+            {byScoreDesc(users).map((user) => {
+              const open = openId === user.id;
+              return (
+                <PresenceRows
+                  key={user.id}
+                  user={user}
+                  observedAt={observedAt}
+                  open={open}
+                  onToggle={() => {
+                    setOpenId(open ? null : user.id);
+                  }}
+                />
+              );
+            })}
             {users.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-5 py-6 text-center text-muted-foreground">
+                <td colSpan={COLUMNS} className="px-5 py-6 text-center text-muted-foreground">
                   {empty}
                 </td>
               </tr>
@@ -220,6 +244,81 @@ function PresenceTable({
         </table>
       </CardContent>
     </Card>
+  );
+}
+
+function PresenceRows({
+  user,
+  observedAt,
+  open,
+  onToggle,
+}: {
+  user: SupervisedUser;
+  observedAt: string;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <>
+      <tr className="transition-colors duration-(--dur-2) ease-(--ease-out-cpi)">
+        <th scope="row" className="px-5 py-2 text-left font-[400]">
+          <ScoreToggle open={open} onToggle={onToggle}>
+            <span className="block font-[600]">{user.fullName}</span>
+            <span className="block text-[0.75rem] text-muted-foreground">{user.username}</span>
+          </ScoreToggle>
+        </th>
+        <td className="px-5 py-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <PresenceBadge presence={user.presence} />
+            {!user.isActive ? <Badge variant="outline">Désactivé</Badge> : null}
+          </div>
+        </td>
+        <td className="px-5 py-2">
+          <ScoreBadge score={user.score} />
+        </td>
+        <td className="px-5 py-2 text-right tabular-nums">
+          {formatActiveDuration(user.activeSecondsToday)}
+        </td>
+        <td className="px-5 py-2 text-right tabular-nums">{user.callsToday}</td>
+        <td className="px-5 py-2 text-right tabular-nums">
+          {user.pendingOps === null ? 'Inconnu' : user.pendingOps}
+        </td>
+      </tr>
+      {open ? <DetailRow user={user} observedAt={observedAt} /> : null}
+    </>
+  );
+}
+
+function DetailRow({ user, observedAt }: { user: SupervisedUser; observedAt: string }) {
+  return (
+    <tr className="bg-muted/40">
+      <td colSpan={COLUMNS} className="px-5 pb-4 pt-2">
+        <div className="grid gap-x-10 gap-y-4 md:grid-cols-2">
+          <ScoreFacts title="Journée">
+            <Fact
+              label="Dernier signal"
+              value={formatElapsed(minutesSince(user.lastSeenAt, observedAt))}
+            />
+            <Fact label="Premier appel" value={formatClock(user.firstCallAt)} />
+            <Fact label="Dernier appel" value={formatClock(user.lastCallAt)} />
+            <Fact
+              label="Appels par heure active"
+              value={callsPerActiveHour(user.callsToday, user.activeSecondsInShifts)}
+            />
+            <Fact label="Cadence médiane" value={formatDuration(user.medianGapSeconds)} />
+            <Fact label="Temps mort" value={formatDeadTime(user.deadSeconds, user.deadGaps)} />
+            <Fact label="Reprises" value={formatNumber(user.repeatCalls)} />
+            <Fact label="Retard de synchro" value={formatDuration(user.medianUploadLagSeconds)} />
+            <Fact
+              label="Dernière saisie"
+              value={formatElapsed(minutesSince(user.lastWriteAt, observedAt))}
+            />
+          </ScoreFacts>
+
+          <ScoreParts parts={user.score.parts} />
+        </div>
+      </td>
+    </tr>
   );
 }
 

@@ -11,6 +11,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { SupervisionActivityRowDto } from './supervision.dto.js';
 import { SupervisionActivityService } from './supervision.service.js';
+import { WorkShiftsService } from './work-shifts.service.js';
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
@@ -131,7 +132,12 @@ async function semer(tx: Prisma.TransactionClient): Promise<Decor> {
     get: (cible, propriete, recepteur) => Reflect.get(cible, propriete, recepteur) as unknown,
   }) as unknown as PrismaService;
 
-  return { service: new SupervisionActivityService(client), tx, alice, bineta };
+  return {
+    service: new SupervisionActivityService(client, new WorkShiftsService(client)),
+    tx,
+    alice,
+    bineta,
+  };
 }
 
 async function surLeJeu<T>(run: (decor: Decor) => Promise<T>): Promise<T> {

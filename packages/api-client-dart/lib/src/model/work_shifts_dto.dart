@@ -1,0 +1,50 @@
+//
+// AUTO-GENERATED FILE, DO NOT MODIFY!
+//
+
+// ignore_for_file: unused_element
+import 'package:crm_api_client/src/model/work_shift_dto.dart';
+import 'package:copy_with_extension/copy_with_extension.dart';
+import 'package:json_annotation/json_annotation.dart';
+import 'package:equatable/src/equatable_utils.dart';
+
+part 'work_shifts_dto.g.dart';
+
+@CopyWith()
+@JsonSerializable(
+  checked: true,
+  createToJson: true,
+  disallowUnrecognizedKeys: false,
+  explicitToJson: true,
+)
+class WorkShiftsDto {
+  /// Returns a new [WorkShiftsDto] instance.
+  WorkShiftsDto({required this.shifts, required this.updatedAt});
+
+  @JsonKey(name: r'shifts', required: true, includeIfNull: false)
+  final List<WorkShiftDto> shifts;
+
+  @JsonKey(name: r'updatedAt', required: true, includeIfNull: true)
+  final DateTime? updatedAt;
+
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is WorkShiftsDto &&
+            runtimeType == other.runtimeType &&
+            equals([shifts, updatedAt], [other.shifts, other.updatedAt]);
+  }
+
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^ mapPropsToHashCode([shifts, updatedAt]);
+
+  factory WorkShiftsDto.fromJson(Map<String, dynamic> json) =>
+      _$WorkShiftsDtoFromJson(json);
+
+  Map<String, dynamic> toJson() => _$WorkShiftsDtoToJson(this);
+
+  @override
+  String toString() {
+    return toJson().toString();
+  }
+}

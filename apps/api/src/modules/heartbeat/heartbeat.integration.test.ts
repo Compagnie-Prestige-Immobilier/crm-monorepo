@@ -15,6 +15,11 @@ const heartbeat = new HeartbeatService(prisma);
 const TAG = 'it-heartbeat';
 let userId: string;
 
+const slotOf = (iso: string) =>
+  prisma.agentActivitySlot.findUniqueOrThrow({
+    where: { userId_slot: { userId, slot: new Date(iso) } },
+  });
+
 beforeAll(async () => {
   const row = await prisma.user.upsert({
     where: { email: `awa.${TAG}@cpi.test` },
@@ -32,10 +37,12 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await prisma.agentHeartbeat.deleteMany({ where: { userId } });
+  await prisma.agentActivitySlot.deleteMany({ where: { userId } });
 });
 
 afterAll(async () => {
   await prisma.agentHeartbeat.deleteMany({ where: { userId } });
+  await prisma.agentActivitySlot.deleteMany({ where: { userId } });
   await prisma.user.delete({ where: { id: userId } });
   await prisma.$disconnect();
 });
@@ -70,6 +77,46 @@ describe('battement de cœur, en base', () => {
     const row = await prisma.agentHeartbeat.findUniqueOrThrow({ where: { userId } });
     expect(row.lastPullAt?.toISOString()).toBe('2026-08-18T09:00:00.000Z');
     expect(row.lastPushAt?.toISOString()).toBe('2026-08-18T10:00:00.000Z');
+  });
+
+  it('compte le temps actif sans transformer une longue coupure en présence', async () => {
+    await heartbeat.record(userId, 'pull', {}, new Date('2026-08-18T09:00:00.000Z'));
+    await heartbeat.record(userId, 'pull', {}, new Date('2026-08-18T09:01:00.000Z'));
+    await heartbeat.record(userId, 'pull', {}, new Date('2026-08-18T09:02:40.000Z'));
+    await heartbeat.record(userId, 'pull', {}, new Date('2026-08-18T09:03:10.000Z'));
+
+    const row = await slotOf('2026-08-18T09:00:00.000Z');
+    expect(row.activeSeconds).toBe(90);
+    expect(row.firstSeenAt.toISOString()).toBe('2026-08-18T09:00:00.000Z');
+    expect(row.lastSeenAt.toISOString()).toBe('2026-08-18T09:03:10.000Z');
+  });
+
+  it('ne recule pas sur un signal arrivé en retard', async () => {
+    await heartbeat.record(userId, 'pull', {}, new Date('2026-08-18T09:00:00.000Z'));
+    await heartbeat.record(userId, 'pull', {}, new Date('2026-08-18T09:01:00.000Z'));
+    await heartbeat.record(userId, 'pull', {}, new Date('2026-08-18T09:00:30.000Z'));
+
+    const row = await slotOf('2026-08-18T09:00:00.000Z');
+    expect(row.activeSeconds).toBe(60);
+    expect(row.lastSeenAt.toISOString()).toBe('2026-08-18T09:01:00.000Z');
+  });
+
+  it('range chaque signal dans la tranche de son heure de Dakar', async () => {
+    await heartbeat.record(userId, 'pull', {}, new Date('2026-08-18T09:58:00.000Z'));
+    await heartbeat.record(userId, 'pull', {}, new Date('2026-08-18T10:04:00.000Z'));
+
+    expect((await slotOf('2026-08-18T09:00:00.000Z')).activeSeconds).toBe(0);
+    expect((await slotOf('2026-08-18T10:00:00.000Z')).firstSeenAt.toISOString()).toBe(
+      '2026-08-18T10:04:00.000Z',
+    );
+  });
+
+  it('porte au nouveau créneau l’écart qui enjambe l’heure', async () => {
+    await heartbeat.record(userId, 'pull', {}, new Date('2026-08-18T09:59:30.000Z'));
+    await heartbeat.record(userId, 'pull', {}, new Date('2026-08-18T10:00:20.000Z'));
+
+    expect((await slotOf('2026-08-18T09:00:00.000Z')).activeSeconds).toBe(0);
+    expect((await slotOf('2026-08-18T10:00:00.000Z')).activeSeconds).toBe(50);
   });
 
   it('part avec le compte, sans bloquer sa suppression', async () => {

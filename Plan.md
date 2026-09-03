@@ -1441,7 +1441,7 @@ calqué sur l'étape 1 pour que les deux écrans s'expliquent avec les mêmes mo
 | `apps/web/src/components/chiffres/sources.ts:58` à `:64`, `:160`, `:189` | TRANSFORMER | Colonne « Reste à appeler » de la table `par-teleconseiller` |
 | `…/chiffres/sources.ts:140` à `:153` | SUPPRIMER | Carte `reste-a-appeler` (D3) |
 | `apps/web/src/components/stats/campaigns-panel.tsx` | SUPPRIMER | « Pilotage de campagne » (`:69`), tuile « Reste à faire » (`:136`), « Fiches clôturées par jour » (`:152`). Déjà orpheline depuis la refonte Chiffres |
-| `apps/web/src/components/stats/banks-panel.tsx`, `apps/web/src/components/dashboard/funnel-panel.tsx` | À VÉRIFIER | Orphelines elles aussi. **Ne pas les supprimer dans ce chantier** ; se fier à `pnpm dead-code` et en parler au chantier Chiffres |
+| Anciens panneaux banque et entonnoir | SUPPRIMÉ | Knip a confirmé qu'ils n'avaient plus aucun appelant après la refonte Chiffres |
 | `apps/web/src/lib/stat-explanations.ts:27` à `:33`, `:95` à `:106` | SUPPRIMER | Clés `campaignContactRate`, `campaignReachRate`, `campaignAttemptsPerMethod`, `campaignRemaining`, `campaignClosedPerDay`, `campaignClosedPerCommercial` |
 | `apps/web/src/lib/data/advanced-stats.ts:25` | SUPPRIMER | `fetchCampaignPilotage`, plus `closedPerDayTotals`, `closedPerCommercial`, `estimatedEndLabel` s'ils n'ont plus d'appelant |
 
@@ -2232,9 +2232,8 @@ overflowed`. Tout écran neuf doit y entrer.
   `GrandPublicFichesScreen` (`app_providers.dart:275-283`, `:292-302`). Défaut
   préexistant. Le nouveau sélecteur reçoit son propre provider pour ne pas
   l'aggraver ; corriger le partage existant est hors périmètre.
-- **`apps/web/src/components/stats/banks-panel.tsx` et
-  `apps/web/src/components/dashboard/funnel-panel.tsx`** sont orphelines depuis
-  la refonte Chiffres. Ne pas les supprimer dans ce chantier : les signaler.
+- Les anciens panneaux banque et entonnoir, orphelins depuis la refonte
+  Chiffres, ont été supprimés après confirmation par Knip.
 - **`GET /v1/phase2/directory`, `GET /v1/phase2/callbacks` et le module
   `app-updates`** ne sont pas touchés, hors la publication de version de §3.4.
 - **Le déploiement lui-même** (`pnpm db:deploy`, publication de l'APK) n'est pas
@@ -2324,20 +2323,9 @@ Le chantier est terminé quand tout ce qui suit est vrai.
 
 ---
 
-## Sources fusionnées
+## Origine
 
-Ce document fusionne trois audits en lecture seule, réalisés le 28 août 2026 sur
-l'arbre de travail :
-
-| Fichier | Périmètre | Auteur |
-| --- | --- | --- |
-| `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/Plan-api.md` | `apps/api`, `packages/database` | backend-engineer (audit API) |
-| `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/Plan-web.md` | `apps/web` | frontend-engineer (audit web) |
-| `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/Plan-mobile.md` | `apps/mobile`, `packages/api-client-dart` | mobile-engineer (audit mobile) |
-
-En cas de divergence sur un nom de route, de DTO ou de champ, **le plan API fait
-foi** ; les écarts tranchés sont signalés en §2.
-
-
+Ce document consolide les audits API, web et mobile réalisés le 28 août 2026.
+Les écarts entre domaines sont tranchés en §2.
 
 

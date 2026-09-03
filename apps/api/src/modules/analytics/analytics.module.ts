@@ -9,6 +9,7 @@ import { QualityService } from './quality.service.js';
 import { SegmentConversionsService } from './segment-conversions.service.js';
 import { SupervisionController } from './supervision.controller.js';
 import { SupervisionActivityService } from './supervision.service.js';
+import { WorkShiftsService } from './work-shifts.service.js';
 
 @Module({
   controllers: [AnalyticsController, SupervisionController],
@@ -20,6 +21,7 @@ import { SupervisionActivityService } from './supervision.service.js';
     QualityService,
     SegmentConversionsService,
     SupervisionActivityService,
+    WorkShiftsService,
   ],
   exports: [
     AnalyticsService,
@@ -28,6 +30,7 @@ import { SupervisionActivityService } from './supervision.service.js';
     QualityService,
     SegmentConversionsService,
     SupervisionActivityService,
+    WorkShiftsService,
   ],
 })
 export class AnalyticsModule {}

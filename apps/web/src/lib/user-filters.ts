@@ -22,7 +22,7 @@ export interface UserFilters {
 
 export const EMPTY_USER_FILTERS: UserFilters = {
   search: '',
-  role: 'COMMERCIAL',
+  role: null,
   isActive: null,
   page: 1,
   pageSize: USER_PAGE_SIZE,
@@ -31,9 +31,8 @@ export const EMPTY_USER_FILTERS: UserFilters = {
 export type { RawSearchParams };
 
 function parseRole(role: string | null): Role | null {
-  if (role === 'tous') return null;
   if (role !== null && (ROLES as readonly string[]).includes(role)) return role as Role;
-  return EMPTY_USER_FILTERS.role;
+  return null;
 }
 
 function parseActive(value: string | null): boolean | null {
@@ -62,11 +61,7 @@ export function serializeUserFilters(filters: UserFilters): URLSearchParams {
   };
 
   put('search', filters.search.trim());
-  if (filters.role === null) {
-    put('role', 'tous');
-  } else if (filters.role !== EMPTY_USER_FILTERS.role) {
-    put('role', filters.role);
-  }
+  if (filters.role !== null) put('role', filters.role);
   if (filters.isActive !== null) put('isActive', filters.isActive ? 'oui' : 'non');
   if (filters.page !== 1) put('page', String(filters.page));
 
