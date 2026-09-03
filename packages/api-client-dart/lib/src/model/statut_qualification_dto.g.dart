@@ -19,6 +19,8 @@ abstract class _$StatutQualificationDtoCWProxy {
 
   StatutQualificationDto priorite(PrioriteTraitement priorite);
 
+  StatutQualificationDto relationStatus(RepresentantRelation? relationStatus);
+
   StatutQualificationDto isActive(bool isActive);
 
   StatutQualificationDto isSystem(bool isSystem);
@@ -40,6 +42,7 @@ abstract class _$StatutQualificationDtoCWProxy {
     StatutQualificationEffect effect,
     bool requiresCallback,
     PrioriteTraitement priorite,
+    RepresentantRelation? relationStatus,
     bool isActive,
     bool isSystem,
     num minPayloadVersion,
@@ -76,6 +79,10 @@ class _$StatutQualificationDtoCWProxyImpl
       this(priorite: priorite);
 
   @override
+  StatutQualificationDto relationStatus(RepresentantRelation? relationStatus) =>
+      this(relationStatus: relationStatus);
+
+  @override
   StatutQualificationDto isActive(bool isActive) => this(isActive: isActive);
 
   @override
@@ -103,6 +110,7 @@ class _$StatutQualificationDtoCWProxyImpl
     Object? effect = const $CopyWithPlaceholder(),
     Object? requiresCallback = const $CopyWithPlaceholder(),
     Object? priorite = const $CopyWithPlaceholder(),
+    Object? relationStatus = const $CopyWithPlaceholder(),
     Object? isActive = const $CopyWithPlaceholder(),
     Object? isSystem = const $CopyWithPlaceholder(),
     Object? minPayloadVersion = const $CopyWithPlaceholder(),
@@ -133,6 +141,10 @@ class _$StatutQualificationDtoCWProxyImpl
           ? _value.priorite
           // ignore: cast_nullable_to_non_nullable
           : priorite as PrioriteTraitement,
+      relationStatus: relationStatus == const $CopyWithPlaceholder()
+          ? _value.relationStatus
+          // ignore: cast_nullable_to_non_nullable
+          : relationStatus as RepresentantRelation?,
       isActive: isActive == const $CopyWithPlaceholder()
           ? _value.isActive
           // ignore: cast_nullable_to_non_nullable
@@ -176,6 +188,7 @@ StatutQualificationDto _$StatutQualificationDtoFromJson(
       'effect',
       'requiresCallback',
       'priorite',
+      'relationStatus',
       'isActive',
       'isSystem',
       'minPayloadVersion',
@@ -203,6 +216,14 @@ StatutQualificationDto _$StatutQualificationDtoFromJson(
         unknownValue: PrioriteTraitement.unknownDefaultOpenApi,
       ),
     ),
+    relationStatus: $checkedConvert(
+      'relationStatus',
+      (v) => $enumDecodeNullable(
+        _$RepresentantRelationEnumMap,
+        v,
+        unknownValue: RepresentantRelation.unknownDefaultOpenApi,
+      ),
+    ),
     isActive: $checkedConvert('isActive', (v) => v as bool),
     isSystem: $checkedConvert('isSystem', (v) => v as bool),
     minPayloadVersion: $checkedConvert('minPayloadVersion', (v) => v as num),
@@ -220,6 +241,7 @@ Map<String, dynamic> _$StatutQualificationDtoToJson(
   'effect': _$StatutQualificationEffectEnumMap[instance.effect]!,
   'requiresCallback': instance.requiresCallback,
   'priorite': _$PrioriteTraitementEnumMap[instance.priorite]!,
+  'relationStatus': _$RepresentantRelationEnumMap[instance.relationStatus],
   'isActive': instance.isActive,
   'isSystem': instance.isSystem,
   'minPayloadVersion': instance.minPayloadVersion,
@@ -240,4 +262,12 @@ const _$PrioriteTraitementEnumMap = {
   PrioriteTraitement.NORMALE: 'NORMALE',
   PrioriteTraitement.BASSE: 'BASSE',
   PrioriteTraitement.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$RepresentantRelationEnumMap = {
+  RepresentantRelation.INCONNU: 'INCONNU',
+  RepresentantRelation.CONTACTE: 'CONTACTE',
+  RepresentantRelation.AMBASSADEUR: 'AMBASSADEUR',
+  RepresentantRelation.REFUS: 'REFUS',
+  RepresentantRelation.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

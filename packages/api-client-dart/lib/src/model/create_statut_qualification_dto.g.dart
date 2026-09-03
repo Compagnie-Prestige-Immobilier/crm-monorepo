@@ -17,6 +17,10 @@ abstract class _$CreateStatutQualificationDtoCWProxy {
 
   CreateStatutQualificationDto priorite(PrioriteTraitement? priorite);
 
+  CreateStatutQualificationDto relationStatus(
+    RepresentantRelation? relationStatus,
+  );
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `CreateStatutQualificationDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -29,6 +33,7 @@ abstract class _$CreateStatutQualificationDtoCWProxy {
     StatutQualificationEffect effect,
     bool? requiresCallback,
     PrioriteTraitement? priorite,
+    RepresentantRelation? relationStatus,
   });
 }
 
@@ -58,6 +63,11 @@ class _$CreateStatutQualificationDtoCWProxyImpl
       this(priorite: priorite);
 
   @override
+  CreateStatutQualificationDto relationStatus(
+    RepresentantRelation? relationStatus,
+  ) => this(relationStatus: relationStatus);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `CreateStatutQualificationDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -70,6 +80,7 @@ class _$CreateStatutQualificationDtoCWProxyImpl
     Object? effect = const $CopyWithPlaceholder(),
     Object? requiresCallback = const $CopyWithPlaceholder(),
     Object? priorite = const $CopyWithPlaceholder(),
+    Object? relationStatus = const $CopyWithPlaceholder(),
   }) {
     return CreateStatutQualificationDto(
       code: code == const $CopyWithPlaceholder()
@@ -92,6 +103,10 @@ class _$CreateStatutQualificationDtoCWProxyImpl
           ? _value.priorite
           // ignore: cast_nullable_to_non_nullable
           : priorite as PrioriteTraitement?,
+      relationStatus: relationStatus == const $CopyWithPlaceholder()
+          ? _value.relationStatus
+          // ignore: cast_nullable_to_non_nullable
+          : relationStatus as RepresentantRelation?,
     );
   }
 }
@@ -137,6 +152,14 @@ CreateStatutQualificationDto _$CreateStatutQualificationDtoFromJson(
           ) ??
           PrioriteTraitement.NORMALE,
     ),
+    relationStatus: $checkedConvert(
+      'relationStatus',
+      (v) => $enumDecodeNullable(
+        _$RepresentantRelationEnumMap,
+        v,
+        unknownValue: RepresentantRelation.unknownDefaultOpenApi,
+      ),
+    ),
   );
   return val;
 });
@@ -150,6 +173,8 @@ Map<String, dynamic> _$CreateStatutQualificationDtoToJson(
   if (instance.requiresCallback case final value?) 'requiresCallback': value,
   if (_$PrioriteTraitementEnumMap[instance.priorite] case final value?)
     'priorite': value,
+  if (_$RepresentantRelationEnumMap[instance.relationStatus] case final value?)
+    'relationStatus': value,
 };
 
 const _$StatutQualificationEffectEnumMap = {
@@ -166,4 +191,12 @@ const _$PrioriteTraitementEnumMap = {
   PrioriteTraitement.NORMALE: 'NORMALE',
   PrioriteTraitement.BASSE: 'BASSE',
   PrioriteTraitement.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$RepresentantRelationEnumMap = {
+  RepresentantRelation.INCONNU: 'INCONNU',
+  RepresentantRelation.CONTACTE: 'CONTACTE',
+  RepresentantRelation.AMBASSADEUR: 'AMBASSADEUR',
+  RepresentantRelation.REFUS: 'REFUS',
+  RepresentantRelation.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

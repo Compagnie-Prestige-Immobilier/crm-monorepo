@@ -2084,6 +2084,12 @@ model StatutQualification {
   /// L'ordre d'ASC suit l'ordre de declaration des valeurs : HAUTE d'abord.
   priorite PrioriteTraitement @default(NORMALE)
 
+  /// La relation que ce statut POSE sur la fiche. Nulle quand le statut ne
+  /// tranche rien : un numero occupe ne dit rien de l'interet, et « a rappeler »
+  /// dit qu'on n'a pas encore tranche. Ce que le client envoie garde le dernier
+  /// mot ; cette colonne comble son silence.
+  relationStatus RepresentantRelation?
+
   /// Le script s'appuie dessus : une ligne systeme se desactive, ne se supprime
   /// pas, et ses regles ne se modifient pas.
   isSystem  Boolean @default(false)

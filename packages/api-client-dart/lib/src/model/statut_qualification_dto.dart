@@ -4,6 +4,7 @@
 
 // ignore_for_file: unused_element
 import 'package:crm_api_client/src/model/priorite_traitement.dart';
+import 'package:crm_api_client/src/model/representant_relation.dart';
 import 'package:crm_api_client/src/model/statut_qualification_effect.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
@@ -32,6 +33,8 @@ class StatutQualificationDto {
     required this.requiresCallback,
 
     required this.priorite,
+
+    required this.relationStatus,
 
     required this.isActive,
 
@@ -72,6 +75,15 @@ class StatutQualificationDto {
   )
   final PrioriteTraitement priorite;
 
+  /// La relation posée sur la fiche. Nulle quand le statut ne tranche rien.
+  @JsonKey(
+    name: r'relationStatus',
+    required: true,
+    includeIfNull: true,
+    unknownEnumValue: RepresentantRelation.unknownDefaultOpenApi,
+  )
+  final RepresentantRelation? relationStatus;
+
   @JsonKey(name: r'isActive', required: true, includeIfNull: false)
   final bool isActive;
 
@@ -98,6 +110,7 @@ class StatutQualificationDto {
                 effect,
                 requiresCallback,
                 priorite,
+                relationStatus,
                 isActive,
                 isSystem,
                 minPayloadVersion,
@@ -110,6 +123,7 @@ class StatutQualificationDto {
                 other.effect,
                 other.requiresCallback,
                 other.priorite,
+                other.relationStatus,
                 other.isActive,
                 other.isSystem,
                 other.minPayloadVersion,
@@ -128,6 +142,7 @@ class StatutQualificationDto {
         effect,
         requiresCallback,
         priorite,
+        relationStatus,
         isActive,
         isSystem,
         minPayloadVersion,

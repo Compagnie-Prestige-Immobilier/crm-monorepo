@@ -1,5 +1,5 @@
-import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { Transform, Type } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional, OmitType, PartialType } from '@nestjs/swagger';
+import { Transform, Type, type TransformFnParams } from 'class-transformer';
 import {
   IsBoolean,
   IsEnum,
@@ -357,7 +357,32 @@ export class RepresentantExportQueryDto {
   lastCallById?: string;
 }
 
-export class RepresentantQueryDto extends RepresentantExportQueryDto {
+const relationList = ({ value }: TransformFnParams): RepresentantRelation[] => {
+  const brut: unknown[] = Array.isArray(value) ? value : String(value).split(',');
+  return brut
+    .map((part) => String(part).trim())
+    .filter((part) => part !== '') as RepresentantRelation[];
+};
+
+/**
+ * `relationStatus` accepte ici plusieurs états, séparés par des virgules. Il
+ * reste unique sur l'export et les lots d'appels : une liste y élargirait le
+ * périmètre qu'ils bornent.
+ */
+export class RepresentantQueryDto extends OmitType(RepresentantExportQueryDto, [
+  'relationStatus',
+] as const) {
+  @ApiPropertyOptional({
+    type: String,
+    description:
+      'Un ou plusieurs états de relation, séparés par des virgules. `CONTACTE,AMBASSADEUR,REFUS` rend tout ce qui a été contacté.',
+    example: 'CONTACTE,AMBASSADEUR,REFUS',
+  })
+  @IsOptional()
+  @Transform(relationList)
+  @IsEnum(RepresentantRelation, { each: true })
+  relationStatus?: RepresentantRelation[];
+
   @ApiPropertyOptional({
     type: Boolean,
     description:

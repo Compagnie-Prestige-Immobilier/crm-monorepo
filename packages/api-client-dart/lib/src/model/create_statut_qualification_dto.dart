@@ -4,6 +4,7 @@
 
 // ignore_for_file: unused_element
 import 'package:crm_api_client/src/model/priorite_traitement.dart';
+import 'package:crm_api_client/src/model/representant_relation.dart';
 import 'package:crm_api_client/src/model/statut_qualification_effect.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
@@ -30,6 +31,8 @@ class CreateStatutQualificationDto {
     this.requiresCallback = false,
 
     this.priorite = PrioriteTraitement.NORMALE,
+
+    this.relationStatus,
   });
 
   /// Immuable : l’historique le référence.
@@ -64,18 +67,28 @@ class CreateStatutQualificationDto {
   )
   final PrioriteTraitement? priorite;
 
+  /// Relation posée sur la fiche quand le client n’en envoie pas.
+  @JsonKey(
+    name: r'relationStatus',
+    required: false,
+    includeIfNull: false,
+    unknownEnumValue: RepresentantRelation.unknownDefaultOpenApi,
+  )
+  final RepresentantRelation? relationStatus;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is CreateStatutQualificationDto &&
             runtimeType == other.runtimeType &&
             equals(
-              [code, label, effect, requiresCallback, priorite],
+              [code, label, effect, requiresCallback, priorite, relationStatus],
               [
                 other.code,
                 other.label,
                 other.effect,
                 other.requiresCallback,
                 other.priorite,
+                other.relationStatus,
               ],
             );
   }
@@ -83,7 +96,14 @@ class CreateStatutQualificationDto {
   @override
   int get hashCode =>
       runtimeType.hashCode ^
-      mapPropsToHashCode([code, label, effect, requiresCallback, priorite]);
+      mapPropsToHashCode([
+        code,
+        label,
+        effect,
+        requiresCallback,
+        priorite,
+        relationStatus,
+      ]);
 
   factory CreateStatutQualificationDto.fromJson(Map<String, dynamic> json) =>
       _$CreateStatutQualificationDtoFromJson(json);

@@ -19,7 +19,6 @@ import 'package:crm_api_client/src/model/representant_comment_list_dto.dart';
 import 'package:crm_api_client/src/model/representant_dto.dart';
 import 'package:crm_api_client/src/model/representant_list_dto.dart';
 import 'package:crm_api_client/src/model/representant_lookup_dto.dart';
-import 'package:crm_api_client/src/model/representant_relation.dart';
 import 'package:crm_api_client/src/model/representant_relation_change_list_dto.dart';
 import 'package:crm_api_client/src/model/representant_sort_field.dart';
 import 'package:crm_api_client/src/model/representant_suivi.dart';
@@ -768,12 +767,12 @@ class RepresentantsApi {
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [hasProspects] - true : au moins un prospect vivant. false : aucun (représentant dormant).
-  /// * [relationStatus]
   /// * [statutQualificationId] - Statut de qualification du dernier appel. Sert le filtre de l’annuaire ET le tirage d’un lot d’appels.
   /// * [whatsappStatus]
   /// * [hasWhatsapp]
   /// * [suivi] - A_RAPPELER : un rappel promis reste dû (`nextCallbackAt`), tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien.
   /// * [lastCallById] - Qui a passé le dernier appel. Un téléconseiller y met son propre identifiant.
+  /// * [relationStatus] - Un ou plusieurs états de relation, séparés par des virgules. `CONTACTE,AMBASSADEUR,REFUS` rend tout ce qui a été contacté.
   /// * [mesFiches] - true : ne rend que ses propres fiches et celles qu’une campagne lui a confiées, quel que soit le rôle. L’écran d’appel le pose, l’annuaire non.
   /// * [sortBy]
   /// * [sortOrder]
@@ -796,12 +795,12 @@ class RepresentantsApi {
     DateTime? dateFrom,
     DateTime? dateTo,
     bool? hasProspects,
-    RepresentantRelation? relationStatus,
     String? statutQualificationId,
     WhatsappStatus? whatsappStatus,
     bool? hasWhatsapp,
     RepresentantSuivi? suivi,
     String? lastCallById,
+    String? relationStatus,
     bool? mesFiches,
     RepresentantSortField? sortBy,
     SortOrder? sortOrder,
@@ -835,13 +834,13 @@ class RepresentantsApi {
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
       if (hasProspects != null) r'hasProspects': hasProspects,
-      if (relationStatus != null) r'relationStatus': relationStatus,
       if (statutQualificationId != null)
         r'statutQualificationId': statutQualificationId,
       if (whatsappStatus != null) r'whatsappStatus': whatsappStatus,
       if (hasWhatsapp != null) r'hasWhatsapp': hasWhatsapp,
       if (suivi != null) r'suivi': suivi,
       if (lastCallById != null) r'lastCallById': lastCallById,
+      if (relationStatus != null) r'relationStatus': relationStatus,
       if (mesFiches != null) r'mesFiches': mesFiches,
       if (sortBy != null) r'sortBy': sortBy,
       if (sortOrder != null) r'sortOrder': sortOrder,

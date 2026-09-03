@@ -72,6 +72,7 @@ const toDto = (row: StatutQualification): StatutQualificationDto => ({
   effect: row.effect,
   requiresCallback: row.requiresCallback,
   priorite: row.priorite,
+  relationStatus: row.relationStatus,
   isActive: row.isActive,
   isSystem: row.isSystem,
   minPayloadVersion: row.minPayloadVersion,
@@ -134,6 +135,7 @@ export class StatutsQualificationService {
         effect: input.effect,
         requiresCallback,
         priorite: input.priorite ?? PrioriteTraitement.NORMALE,
+        relationStatus: input.relationStatus ?? null,
         sortOrder: await this.rangSuivant(input.effect),
         isActive: true,
         isSystem: false,
@@ -146,9 +148,10 @@ export class StatutsQualificationService {
   async update(id: string, input: UpdateStatutQualificationDto): Promise<StatutQualificationDto> {
     const existing = await this.statut(id);
 
-    // Le libellé et la priorité se corrigent toujours, système compris : le
-    // second est un arbitrage de plateau. La RÈGLE, elle, ne se reconfigure
-    // pas : le script s'appuie dessus, et les clients déployés l'ont compilée.
+    // Le libellé, la priorité et la relation posée se corrigent toujours,
+    // système compris : ce sont des arbitrages du métier. La RÈGLE, elle, ne se
+    // reconfigure pas : le script s'appuie dessus, et les clients déployés
+    // l'ont compilée.
     if (existing.isSystem && input.requiresCallback !== undefined) {
       throw new ConflictException({
         code: StatutQualificationError.SYSTEM_IMMUTABLE,
@@ -181,6 +184,7 @@ export class StatutsQualificationService {
           ? {}
           : { requiresCallback: input.requiresCallback }),
         ...(input.priorite === undefined ? {} : { priorite: input.priorite }),
+        ...(input.relationStatus === undefined ? {} : { relationStatus: input.relationStatus }),
       },
     });
     return toDto(updated);

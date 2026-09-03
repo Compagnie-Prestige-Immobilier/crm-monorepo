@@ -148,6 +148,14 @@ function etablissementAnswer(confirme: boolean | null, nouvel: string): Partial<
 /** Apparition d'une question qui n'était pas là : douce, et coupée si l'on préfère. */
 const REVELE = 'animate-in fade-in-0 slide-in-from-top-1 duration-200 motion-reduce:animate-none';
 
+/** Qui a accepté ou refusé a d'abord été contacté : « Contacté » les ramène aussi. */
+const RELATIONS_DEMANDEES: Record<RepresentantRelation, RepresentantRelation[]> = {
+  INCONNU: ['INCONNU'],
+  CONTACTE: ['CONTACTE', 'AMBASSADEUR', 'REFUS'],
+  AMBASSADEUR: ['AMBASSADEUR'],
+  REFUS: ['REFUS'],
+};
+
 const RELATION_ITEMS = [
   { value: 'tous', label: 'Tous' },
   ...REPRESENTANT_RELATIONS.map((relation) => ({
@@ -180,7 +188,11 @@ export function RepScript() {
   const annuaire = useQuery({
     queryKey: [...queryKeys.representantsRoot, 'a-qualifier', cherche, relation, page] as const,
     queryFn: () =>
-      fetchRepresentantsAQualifier({ search: cherche, relationStatus: relation, page }),
+      fetchRepresentantsAQualifier({
+        search: cherche,
+        relationStatus: relation === null ? null : RELATIONS_DEMANDEES[relation],
+        page,
+      }),
     enabled: choisi === null,
     placeholderData: (previous) => previous,
   });

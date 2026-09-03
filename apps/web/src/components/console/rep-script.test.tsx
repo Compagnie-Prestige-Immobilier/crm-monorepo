@@ -117,6 +117,7 @@ function statut(over: Partial<StatutQualification> & { id: string }): StatutQual
     effect: 'REACHED',
     requiresCallback: false,
     priorite: 'NORMALE',
+    relationStatus: null,
     isActive: true,
     isSystem: true,
     minPayloadVersion: 6,
@@ -801,7 +802,27 @@ describe('RepScript : filtrer et parcourir ses fiches', () => {
 
     expect(screen.getByRole('combobox', { name: 'Relation' }).textContent).toContain('Refus');
     await waitFor(() => {
-      expect(relationDemandee()).toBe('REFUS');
+      expect(relationDemandee()).toEqual(['REFUS']);
+    });
+  });
+
+  it('range sous « Contacté » tout ce qui a été contacté, acceptés et refus compris', async () => {
+    await renderListe();
+
+    await choisirRelation('Contacté');
+
+    await waitFor(() => {
+      expect(relationDemandee()).toEqual(['CONTACTE', 'AMBASSADEUR', 'REFUS']);
+    });
+  });
+
+  it('ne demande que les acceptés sous « A accepté »', async () => {
+    await renderListe();
+
+    await choisirRelation('A accepté');
+
+    await waitFor(() => {
+      expect(relationDemandee()).toEqual(['AMBASSADEUR']);
     });
   });
 
@@ -857,7 +878,7 @@ describe('RepScript : filtrer et parcourir ses fiches', () => {
     expect(screen.getByText('1 / 3')).toBeTruthy();
     await waitFor(() => {
       expect(fetchRepresentantsAQualifier.mock.calls.at(-1)?.[0]).toMatchObject({
-        relationStatus: 'REFUS',
+        relationStatus: ['REFUS'],
         page: 1,
       });
     });
@@ -870,7 +891,7 @@ describe('RepScript : filtrer et parcourir ses fiches', () => {
       response: new Response(null, { status: 200 }),
     });
 
-    await actual.fetchRepresentantsAQualifier({ search: 'a', relationStatus: 'REFUS', page: 2 }, {
+    await actual.fetchRepresentantsAQualifier({ search: 'a', relationStatus: ['REFUS'], page: 2 }, {
       GET,
     } as unknown as ApiClient);
 
@@ -878,6 +899,23 @@ describe('RepScript : filtrer et parcourir ses fiches', () => {
       params: {
         query: { mesFiches: true, search: 'a', relationStatus: 'REFUS', page: 2, pageSize: 10 },
       },
+    });
+  });
+
+  it('porte plusieurs états dans un seul paramètre, séparés par des virgules', async () => {
+    const actual = await vi.importActual<typeof RepresentantsData>('@/lib/data/representants');
+    const GET = vi.fn().mockResolvedValue({
+      data: { items: [], meta: { total: 0, page: 1, pageSize: 10, pageCount: 1 } },
+      response: new Response(null, { status: 200 }),
+    });
+
+    await actual.fetchRepresentantsAQualifier(
+      { search: '', relationStatus: ['CONTACTE', 'AMBASSADEUR', 'REFUS'], page: 1 },
+      { GET } as unknown as ApiClient,
+    );
+
+    expect(GET.mock.calls[0]?.[1]).toMatchObject({
+      params: { query: { relationStatus: 'CONTACTE,AMBASSADEUR,REFUS' } },
     });
   });
 });

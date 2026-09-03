@@ -146,13 +146,15 @@ export async function fetchRepresentantsSuivi(
 const A_QUALIFIER_PAGE_SIZE = 10;
 
 export async function fetchRepresentantsAQualifier(
-  criteres: { search: string; relationStatus: RepresentantRelation | null; page: number },
+  criteres: { search: string; relationStatus: RepresentantRelation[] | null; page: number },
   client: ApiClient = getApiClient(),
 ): Promise<Paginated<RepresentantRow>> {
   const query: RepresentantQuery = {
     mesFiches: true,
     search: criteres.search,
-    ...(criteres.relationStatus === null ? {} : { relationStatus: criteres.relationStatus }),
+    ...(criteres.relationStatus === null
+      ? {}
+      : { relationStatus: criteres.relationStatus.join(',') }),
     sortBy: 'fullName',
     sortOrder: 'asc',
     page: criteres.page,

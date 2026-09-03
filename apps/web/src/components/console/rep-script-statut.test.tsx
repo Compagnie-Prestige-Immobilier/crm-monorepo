@@ -53,6 +53,7 @@ function statut(over: Partial<StatutQualification> & { id: string }): StatutQual
     effect: 'REACHED',
     requiresCallback: false,
     priorite: 'NORMALE',
+    relationStatus: null,
     isActive: true,
     isSystem: true,
     minPayloadVersion: 6,

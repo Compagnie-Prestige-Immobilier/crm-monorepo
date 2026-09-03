@@ -48,7 +48,9 @@ import {
   type PrioriteTraitement,
   type StatutQualification,
   type StatutQualificationEffect,
+  type StatutRelationPosee,
 } from '@/lib/data/statuts-qualification';
+import { REPRESENTANT_RELATIONS, REPRESENTANT_RELATION_LABELS } from '@/lib/representant-filters';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 
@@ -58,7 +60,27 @@ interface Draft {
   effect: StatutQualificationEffect;
   requiresCallback: boolean;
   priorite: PrioriteTraitement;
+  relation: RelationChoisie;
 }
+
+/**
+ * Le formulaire ne peut pas porter `null` : la valeur d'un `Select` est une
+ * chaine. Cette sentinelle est traduite en `null` a l'enregistrement.
+ */
+const AUCUNE = 'AUCUNE';
+
+type RelationChoisie = NonNullable<StatutRelationPosee> | typeof AUCUNE;
+
+const RELATIONS_POSEES: readonly { value: RelationChoisie; label: string }[] = [
+  { value: AUCUNE, label: 'Ne tranche pas' },
+  ...REPRESENTANT_RELATIONS.map((relation) => ({
+    value: relation,
+    label: REPRESENTANT_RELATION_LABELS[relation],
+  })),
+];
+
+const libelleRelation = (relation: StatutRelationPosee): string =>
+  relation === null ? 'Ne tranche pas' : REPRESENTANT_RELATION_LABELS[relation];
 
 const EMPTY: Draft = {
   code: '',
@@ -66,6 +88,7 @@ const EMPTY: Draft = {
   effect: 'REACHED',
   requiresCallback: false,
   priorite: 'NORMALE',
+  relation: AUCUNE,
 };
 
 const PRIORITE_VARIANTS: Record<PrioriteTraitement, 'warning' | 'secondary' | 'outline'> = {
@@ -73,6 +96,9 @@ const PRIORITE_VARIANTS: Record<PrioriteTraitement, 'warning' | 'secondary' | 'o
   NORMALE: 'secondary',
   BASSE: 'outline',
 };
+
+const relationPosee = (relation: RelationChoisie): StatutRelationPosee =>
+  relation === AUCUNE ? null : relation;
 
 export function StatutsQualificationView() {
   const queryClient = useQueryClient();
@@ -193,6 +219,7 @@ function Branche({
             <TableHead>Code</TableHead>
             <TableHead>Effet</TableHead>
             <TableHead>Priorité</TableHead>
+            <TableHead>Relation posée</TableHead>
             <TableHead>État</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
@@ -214,6 +241,11 @@ function Branche({
                 <Badge variant={PRIORITE_VARIANTS[statut.priorite]}>
                   {PRIORITE_TRAITEMENT_LABELS[statut.priorite]}
                 </Badge>
+              </TableCell>
+              <TableCell
+                className={statut.relationStatus === null ? 'text-muted-foreground' : undefined}
+              >
+                {libelleRelation(statut.relationStatus)}
               </TableCell>
               <TableCell>
                 <Badge variant={statut.isActive ? 'default' : 'outline'}>
@@ -289,6 +321,7 @@ function FormulaireStatut({
             effect: statut.effect,
             requiresCallback: statut.requiresCallback,
             priorite: statut.priorite,
+            relation: statut.relationStatus ?? AUCUNE,
           },
     );
   }, [open, statut, reset]);
@@ -296,6 +329,7 @@ function FormulaireStatut({
   // oxlint-disable-next-line react/incompatible-library -- faux positif react-hook-form
   const effect = watch('effect');
   const priorite = watch('priorite');
+  const relation = watch('relation');
 
   const save = useMutation({
     mutationFn: (values: Draft) =>
@@ -303,6 +337,7 @@ function FormulaireStatut({
         ? updateStatutQualification(statut.id, {
             label: values.label.trim(),
             priorite: values.priorite,
+            relationStatus: relationPosee(values.relation),
             ...(regleFigee ? {} : { requiresCallback: values.requiresCallback }),
           })
         : createStatutQualification({
@@ -311,6 +346,7 @@ function FormulaireStatut({
             effect: values.effect,
             requiresCallback: values.requiresCallback,
             priorite: values.priorite,
+            relationStatus: relationPosee(values.relation),
           }),
     onSuccess: () => {
       toast.success(modification ? 'Statut modifié.' : 'Statut ajouté.');
@@ -422,6 +458,32 @@ function FormulaireStatut({
                   {PRIORITES_TRAITEMENT.map((valeur) => (
                     <SelectItem key={valeur} value={valeur}>
                       {PRIORITE_TRAITEMENT_LABELS[valeur]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </Field>
+
+          <Field
+            label="Relation posée"
+            description="Appliquée quand le téléconseiller ne répond pas lui-même à la question."
+          >
+            {(props) => (
+              <Select
+                items={[...RELATIONS_POSEES]}
+                value={relation}
+                onValueChange={(value) => {
+                  setValue('relation', value as RelationChoisie);
+                }}
+              >
+                <SelectTrigger id={props.id}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {RELATIONS_POSEES.map((choix) => (
+                    <SelectItem key={choix.value} value={choix.value}>
+                      {choix.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
