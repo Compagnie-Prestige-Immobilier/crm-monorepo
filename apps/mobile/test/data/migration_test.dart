@@ -24,6 +24,7 @@ import 'generated_migrations/schema_v19.dart' as v19;
 import 'generated_migrations/schema_v20.dart' as v20;
 import 'generated_migrations/schema_v21.dart' as v21schema;
 import 'generated_migrations/schema_v22.dart' as v22schema;
+import 'generated_migrations/schema_v23.dart' as v23schema;
 
 /// Test doré de migration.
 ///
@@ -2391,6 +2392,57 @@ void main() {
       await db.close();
     },
   );
+
+  // Le vocabulaire de qualification arrive par une route dédiée : la table est
+  // neuve et se peuple au premier pull, sans marqueur de miroir à effacer.
+  test('v23 -> v24 ouvre les statuts sans toucher aux saisies en file', () async {
+    final schema = await verifier.schemaAt(23);
+    final v23schema.DatabaseAtV23 old = v23schema.DatabaseAtV23(
+      schema.newConnection(),
+    );
+    await old.customStatement(
+      'INSERT INTO outbox '
+      '(id, entity_type, entity_id, op, payload, next_attempt_at, created_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?)',
+      <Object?>[
+        'op-v23',
+        'rep_call_attempt',
+        'att-23',
+        'create',
+        '{}',
+        _iso,
+        _iso,
+      ],
+    );
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 24);
+
+    // La table s'ÉCRIT : « elle existe » se vérifierait aussi sur des colonnes
+    // au mauvais type. Un effet que ce client ignore passe, comme pour les
+    // motifs : aucun CHECK ne cite le vocabulaire du serveur.
+    await db.customStatement(
+      'INSERT INTO statuts_qualification '
+      '(code, id, label, effect, requires_callback, position) '
+      'VALUES (?, ?, ?, ?, ?, ?)',
+      <Object?>['A_RAPPELER', 'sq-1', 'À rappeler', 'EFFET_INCONNU', 1, 0],
+    );
+    final QueryRow statut = await db
+        .customSelect('SELECT id, requires_callback FROM statuts_qualification')
+        .getSingle();
+    expect(statut.read<String>('id'), 'sq-1');
+    expect(statut.read<bool>('requires_callback'), isTrue);
+
+    expect(
+      await db
+          .customSelect('SELECT id FROM outbox')
+          .getSingle()
+          .then((QueryRow row) => row.read<String>('id')),
+      'op-v23',
+    );
+    await db.close();
+  });
 
   test('v11 -> courant traverse sans créer les tables de campagne', () async {
     final schema = await verifier.schemaAt(11);

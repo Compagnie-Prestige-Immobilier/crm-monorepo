@@ -182,6 +182,19 @@ class ReferenceRepository {
         );
   }
 
+  /// Les statuts proposés à la qualification d'un représentant. Sans repli :
+  /// le champ est facultatif dans le contrat, et une liste vide laisse la
+  /// saisie possible plutôt que d'inventer un vocabulaire.
+  Stream<List<StatutQualificationRow>> watchStatutsQualification() {
+    return (_db.select(_db.statutsQualification)
+          ..where((StatutsQualification t) => t.isActive.equals(true))
+          ..orderBy(<OrderClauseGenerator<StatutsQualification>>[
+            (StatutsQualification t) => OrderingTerm.asc(t.position),
+            (StatutsQualification t) => OrderingTerm.asc(t.label),
+          ]))
+        .watch();
+  }
+
   Future<Representant?> findRepresentantByPhone(String phoneE164) {
     return (_db.select(_db.representants)
           ..where(

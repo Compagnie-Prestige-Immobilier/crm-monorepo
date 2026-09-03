@@ -56,7 +56,10 @@ class SyncEngine {
   /// v3 : les commentaires d'une fiche remontent depuis la file hors ligne.
   /// v4 : les liens banque, syndicat et représentant d'un prospect peuvent
   /// être nuls ; le tirage exige ce numéro en en-tête et refuse en dessous.
-  static const int payloadVersion = 5;
+  /// v6 : la tentative auprès d'un représentant porte `statutQualificationId`.
+  /// C'est ce nombre que la route dédiée compare au `minPayloadVersion` de
+  /// chaque statut ; en dessous, aucun statut ne descend.
+  static const int payloadVersion = 6;
 
   /// Poids qu'un lot peut atteindre sur le fil ; c'est lui que le `sendTimeout`
   /// du profil `push` doit pouvoir émettre sur un lien montant EDGE.
@@ -1272,6 +1275,7 @@ class SyncEngine {
     _pulling = true;
     try {
       await pullCallOutcomeReasons();
+      await pullStatutsQualification();
       int applied = 0;
       String? cursor = await readCursor();
       bool listesBougees = false;
@@ -1373,6 +1377,49 @@ class SyncEngine {
                 sortOrder: Value<int>(r.sortOrder.toInt()),
                 color: Value<String?>(r.color),
                 minPayloadVersion: Value<int>(r.minPayloadVersion.toInt()),
+              ),
+            );
+      }
+    });
+    return items.length;
+  }
+
+  /// Le vocabulaire de qualification d'un représentant, REMPLACÉ en entier.
+  ///
+  /// Même route dédiée que les motifs d'appel, hors curseur keyset : un
+  /// téléphone déjà en service se peuple à la première synchronisation. Le
+  /// remplacement est franc, contrairement aux motifs : le champ est FACULTATIF
+  /// dans le contrat, et une tentative en file qui citerait un statut retiré
+  /// part sans lui plutôt qu'en échec définitif.
+  ///
+  /// L'ordre d'affichage se décide au serveur : le rang servi est recopié dans
+  /// `position`, faute de quoi la liste se réordonnerait toute seule.
+  Future<int> pullStatutsQualification() async {
+    final List<StatutQualificationDto> items;
+    try {
+      items = await _api.pullStatutsQualification(
+        payloadVersion: payloadVersion,
+      );
+    } on ApiException {
+      return 0;
+    }
+    if (items.isEmpty) return 0;
+    await _db.transaction(() async {
+      await _db.delete(_db.statutsQualification).go();
+      for (int rang = 0; rang < items.length; rang++) {
+        final StatutQualificationDto statut = items[rang];
+        await _db
+            .into(_db.statutsQualification)
+            .insertOnConflictUpdate(
+              StatutsQualificationCompanion.insert(
+                code: statut.code,
+                id: statut.id,
+                label: statut.label,
+                effect: statut.effect.value,
+                requiresCallback: Value<bool>(statut.requiresCallback),
+                isActive: Value<bool>(statut.isActive),
+                position: Value<int>(rang),
+                minPayloadVersion: Value<int>(statut.minPayloadVersion.toInt()),
               ),
             );
       }

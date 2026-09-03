@@ -234,6 +234,28 @@ CREATE TABLE call_outcome_reasons (
 CREATE INDEX call_outcome_reasons_active_idx
     ON call_outcome_reasons (is_active, sort_order, label);
 
+-- Statuts de qualification d'un représentant, administrés depuis le web.
+--
+-- `effect` dit à la fois l'issue à enregistrer et la branche du script où le
+-- statut se propose : pas de colonne « joignable », qui serait une seconde
+-- vérité. Mêmes raisons qu'au-dessus pour l'absence de CHECK.
+--
+-- `position` est le rang servi par la route : l'ordre d'affichage se décide au
+-- serveur et ne redescend pas autrement.
+CREATE TABLE statuts_qualification (
+    code TEXT NOT NULL PRIMARY KEY,
+    id TEXT NOT NULL,
+    label TEXT NOT NULL,
+    effect TEXT NOT NULL,
+    requires_callback BOOLEAN NOT NULL DEFAULT 0,
+    is_active BOOLEAN NOT NULL DEFAULT 1,
+    position INTEGER NOT NULL DEFAULT 0,
+    min_payload_version INTEGER NOT NULL DEFAULT 6
+) AS StatutQualificationRow;
+
+CREATE INDEX statuts_qualification_active_idx
+    ON statuts_qualification (is_active, position, label);
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Métier
 -- ─────────────────────────────────────────────────────────────────────────────

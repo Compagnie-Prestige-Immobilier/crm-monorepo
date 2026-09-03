@@ -10,6 +10,7 @@ import 'package:cpi_go/data/repositories/write_repository.dart';
 import 'package:cpi_go/features/representant/presentation/representant_qualification_screen.dart';
 import 'package:cpi_go/ui/widgets/cpi_choice_group.dart';
 import 'package:cpi_go/ui/widgets/cpi_kit.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -44,9 +45,21 @@ void main() {
       phone: '+221770000001',
       fullName: 'Ousmane Fall',
     );
+    await semerLesStatuts(db);
   });
 
   tearDown(() => db.close());
+
+  // Le serveur dérive la même issue et REFUSE celle qui le contredit
+  // (`REP_OUTCOME_STATUT_MISMATCH`) : les cinq correspondances sont le contrat.
+  test('l\'issue se dérive de l\'effet du statut', () {
+    expect(issueDuStatut('REACHED'), 'REACHED');
+    expect(issueDuStatut('REFUSED'), 'REFUSED');
+    expect(issueDuStatut('SCHEDULE_CALLBACK'), 'CALLBACK');
+    expect(issueDuStatut('UNREACHABLE'), 'UNREACHABLE');
+    expect(issueDuStatut('WRONG_NUMBER'), 'WRONG_NUMBER');
+    expect(issueDuStatut('AUTRE_CHOSE'), isNull);
+  });
 
   Future<void> ouvrir(WidgetTester tester) async {
     // Surface haute : le corps est un `ListView`, qui ne construit pas ce qui
@@ -136,6 +149,9 @@ void main() {
     await taper(tester, tuile('Connaissez-vous l\'UES ?', 'Oui'));
   }
 
+  Future<void> statut(WidgetTester tester, String label) =>
+      taper(tester, tuile('Statut de qualification', label));
+
   testWidgets('le bouton reste éteint et suit l\'ordre du script', (
     WidgetTester tester,
   ) async {
@@ -160,6 +176,10 @@ void main() {
     expect(continuer(tester).subtitle, 'Dites s\'il a WhatsApp sur ce numéro');
 
     await taper(tester, tuile('A-t-il WhatsApp sur ce numéro ?', 'Oui'));
+    expect(continuer(tester).onPressed, isNull);
+    expect(continuer(tester).subtitle, 'Choisissez un statut');
+
+    await statut(tester, 'Intéressé');
     expect(continuer(tester).onPressed, isNotNull);
     expect(continuer(tester).subtitle, isNull);
 
@@ -187,6 +207,7 @@ void main() {
     // Le « non » ouvre les champs sur place : la personne proposée se note
     // pendant l'appel, pas une étape plus loin.
     await taper(tester, tuile('Ambassadeur ?', 'Non'));
+    await statut(tester, 'Non intéressé');
     expect(
       find.text('Il propose quelqu\'un d\'autre ? (facultatif)'),
       findsOneWidget,
@@ -232,6 +253,7 @@ void main() {
     await taper(tester, find.text('Joignable'));
     await renseignements(tester);
     await taper(tester, tuile('Ambassadeur ?', 'Non'));
+    await statut(tester, 'Non intéressé');
 
     expect(find.text('Son numéro'), findsOneWidget);
     expect(find.text('Son nom et prénom (facultatif)'), findsNothing);
@@ -247,9 +269,9 @@ void main() {
     await demonter(tester);
   });
 
-  // Joignable ne veut pas dire disponible : il répond, il donne ses réponses,
-  // et il demande à être rappelé plus tard. L'écran ne le permettait pas.
-  testWidgets('un appel abouti peut porter un rappel facultatif', (
+  // La date de rappel est exigée par le STATUT, plus par le résultat : elle
+  // n'apparaît que sur celui qui la porte.
+  testWidgets('le sélecteur de date ne suit que le statut qui l\'exige', (
     WidgetTester tester,
   ) async {
     await ouvrir(tester);
@@ -258,10 +280,16 @@ void main() {
     await renseignements(tester);
     await taper(tester, tuile('Ambassadeur ?', 'Oui'));
     await taper(tester, tuile('A-t-il WhatsApp sur ce numéro ?', 'Oui'));
+    expect(find.text('Demain 9 h'), findsNothing);
 
-    expect(find.text('Le rappeler plus tard ? (facultatif)'), findsOneWidget);
+    await statut(tester, 'Intéressé');
+    expect(find.text('Demain 9 h'), findsNothing);
+
+    await statut(tester, 'À rappeler');
+    expect(find.text('Demain 9 h'), findsOneWidget);
+    expect(continuer(tester).subtitle, 'Choisissez quand rappeler');
+
     await taper(tester, find.text('Demain 9 h'));
-
     await versLesDetails(tester);
     expect(find.text('Rappel'), findsOneWidget);
 
@@ -269,32 +297,119 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    // L'issue reste celle de l'appel : le rappel s'y ajoute, il ne la remplace
-    // pas. Le serveur accepte désormais `callbackAt` sur toute issue.
-    expect(writes.outcome, 'REACHED');
+    expect(writes.outcome, 'CALLBACK');
     expect(writes.callbackAt, isNotNull);
     expect(alarmes.posees.single.at.hour, 9);
 
     await demonter(tester);
   });
 
-  testWidgets('un refus peut lui aussi porter un rappel facultatif', (
+  // On rappelle aussi qui on n'a pas joint : « À rappeler » est le seul statut
+  // que les deux branches partagent.
+  testWidgets('« À rappeler » se propose des deux côtés', (
+    WidgetTester tester,
+  ) async {
+    await ouvrir(tester);
+
+    await taper(tester, find.text('Injoignable'));
+    expect(tuile('Statut de qualification', 'À rappeler'), findsOneWidget);
+    expect(tuile('Statut de qualification', 'Pas de réponse'), findsOneWidget);
+    expect(tuile('Statut de qualification', 'Intéressé'), findsNothing);
+
+    await taper(tester, find.text('Joignable'));
+    await renseignements(tester);
+    await taper(tester, tuile('Ambassadeur ?', 'Oui'));
+    await taper(tester, tuile('A-t-il WhatsApp sur ce numéro ?', 'Oui'));
+    expect(tuile('Statut de qualification', 'À rappeler'), findsOneWidget);
+    expect(tuile('Statut de qualification', 'Intéressé'), findsOneWidget);
+    expect(tuile('Statut de qualification', 'Pas de réponse'), findsNothing);
+
+    await demonter(tester);
+  });
+
+  // L'ambassadeur ne décide plus de l'issue : elle se dérive du statut, comme
+  // le fait le serveur, qui refuse celle qui le contredit.
+  testWidgets('l\'issue vient du statut, pas de l\'ambassadeur', (
     WidgetTester tester,
   ) async {
     await ouvrir(tester);
 
     await taper(tester, find.text('Joignable'));
     await renseignements(tester);
-    await taper(tester, tuile('Ambassadeur ?', 'Non'));
-    await taper(tester, find.text('Demain 9 h'));
+    await taper(tester, tuile('Ambassadeur ?', 'Oui'));
+    await taper(tester, tuile('A-t-il WhatsApp sur ce numéro ?', 'Oui'));
+    await statut(tester, 'Non intéressé');
+
+    await versLesDetails(tester);
+    expect(find.text('Non intéressé'), findsOneWidget);
+    await tester.tap(find.text('Enregistrer'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(writes.outcome, 'REFUSED');
+    expect(writes.relationStatus, 'AMBASSADEUR');
+    expect(writes.statutQualificationId, 'sq-non-interesse');
+
+    await demonter(tester);
+  });
+
+  // Sans statut, rien ne part : le vocabulaire est ce que la campagne exploite.
+  testWidgets(
+    'l\'enregistrement est retenu tant qu\'aucun statut n\'est pris',
+    (WidgetTester tester) async {
+      await ouvrir(tester);
+
+      await taper(tester, find.text('Injoignable'));
+      expect(continuer(tester).onPressed, isNull);
+      expect(continuer(tester).subtitle, 'Choisissez un statut');
+
+      await statut(tester, 'Pas de réponse');
+      expect(continuer(tester).onPressed, isNotNull);
+
+      await demonter(tester);
+    },
+  );
+
+  // Un téléphone dont le référentiel n'est pas encore descendu doit pouvoir
+  // qualifier : le champ est facultatif dans le contrat.
+  testWidgets('sans référentiel descendu, la qualification reste possible', (
+    WidgetTester tester,
+  ) async {
+    await db.customStatement('DELETE FROM statuts_qualification');
+    await ouvrir(tester);
+
+    await taper(tester, find.text('Injoignable'));
+    expect(continuer(tester).onPressed, isNotNull);
 
     await versLesDetails(tester);
     await tester.tap(find.text('Enregistrer'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(writes.outcome, 'REFUSED');
-    expect(writes.callbackAt, isNotNull);
+    expect(writes.outcome, 'UNREACHABLE');
+    expect(writes.statutQualificationId, isNull);
+
+    await demonter(tester);
+  });
+
+  // FOR-06 : deux appuis rapprochés consignaient deux appels, le verrou
+  // n'existait pas et `saving` se posait APRÈS l'attente d'autorisation.
+  testWidgets('deux appuis rapprochés ne consignent qu\'un appel', (
+    WidgetTester tester,
+  ) async {
+    await ouvrir(tester);
+
+    await taper(tester, find.text('Injoignable'));
+    await statut(tester, 'À rappeler');
+    await taper(tester, find.text('Demain 9 h'));
+    await versLesDetails(tester);
+
+    await tester.tap(find.text('Enregistrer'));
+    await tester.tap(find.text('Enregistrer'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(writes.appels, 1);
 
     await demonter(tester);
   });
@@ -306,9 +421,17 @@ void main() {
   ) async {
     await ouvrir(tester);
 
-    await taper(tester, find.text('À rappeler'));
-    await taper(tester, find.text('Demain 9 h'));
     await taper(tester, find.text('Injoignable'));
+    await statut(tester, 'À rappeler');
+    await taper(tester, find.text('Demain 9 h'));
+
+    // Changer de résultat rouvre la question du statut : l'heure du statut
+    // qu'on quitte ne doit pas suivre.
+    await taper(tester, find.text('Joignable'));
+    await renseignements(tester);
+    await taper(tester, tuile('Ambassadeur ?', 'Oui'));
+    await taper(tester, tuile('A-t-il WhatsApp sur ce numéro ?', 'Oui'));
+    await statut(tester, 'Intéressé');
 
     await versLesDetails(tester);
     expect(find.text('Rappel'), findsNothing);
@@ -317,7 +440,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(writes.outcome, 'UNREACHABLE');
+    expect(writes.outcome, 'REACHED');
     expect(writes.callbackAt, isNull);
 
     await demonter(tester);
@@ -331,6 +454,7 @@ void main() {
     await taper(tester, find.text('Joignable'));
     await renseignements(tester);
     await taper(tester, tuile('Ambassadeur ?', 'Non'));
+    await statut(tester, 'Non intéressé');
     expect(continuer(tester).onPressed, isNotNull);
 
     await tester.enterText(champ('Son numéro'), '77 12');
@@ -358,6 +482,7 @@ void main() {
       findsNothing,
     );
     await taper(tester, tuile('A-t-il WhatsApp sur ce numéro ?', 'Oui'));
+    await statut(tester, 'Intéressé');
     await versLesDetails(tester);
     expect(
       find.text('Il propose quelqu\'un d\'autre ? (facultatif)'),
@@ -399,6 +524,7 @@ void main() {
     await tester.pump();
     await taper(tester, tuile('Ambassadeur ?', 'Oui'));
     await taper(tester, tuile('A-t-il WhatsApp sur ce numéro ?', 'Oui'));
+    await statut(tester, 'Intéressé');
 
     await versLesDetails(tester);
     await tester.tap(find.text('Enregistrer'));
@@ -418,6 +544,7 @@ void main() {
     expect(payload['connaitUES'], true);
     expect(payload['syndicat'], 'Syndicat Test');
     expect(payload['whatsappStatus'], 'MEME_NUMERO');
+    expect(payload['statutQualificationId'], 'sq-interesse');
 
     // La fiche locale a suivi : nouvel établissement et syndicat.
     final Representant rep = await (db.select(
@@ -448,6 +575,7 @@ void main() {
     await renseignements(tester);
     await taper(tester, tuile('Ambassadeur ?', 'Oui'));
     await taper(tester, tuile('A-t-il WhatsApp sur ce numéro ?', 'Oui'));
+    await statut(tester, 'Intéressé');
     await versLesDetails(tester);
     await tester.tap(find.text('Enregistrer'));
     await tester.pump();
@@ -470,7 +598,8 @@ void main() {
     WidgetTester tester,
   ) async {
     await ouvrir(tester);
-    await taper(tester, find.text('À rappeler'));
+    await taper(tester, find.text('Injoignable'));
+    await statut(tester, 'À rappeler');
     await taper(tester, find.text('Demain 9 h'));
     await versLesDetails(tester);
     await tester.tap(find.text('Enregistrer'));
@@ -484,11 +613,41 @@ void main() {
   });
 }
 
+/// Le vocabulaire de qualification, tel qu'il descend de la route dédiée.
+Future<void> semerLesStatuts(AppDatabase db) async {
+  const List<(String, String, String, bool)> lignes =
+      <(String, String, String, bool)>[
+        ('INTERESSE', 'Intéressé', 'REACHED', false),
+        ('NON_INTERESSE', 'Non intéressé', 'REFUSED', false),
+        ('A_RAPPELER', 'À rappeler', 'SCHEDULE_CALLBACK', true),
+        ('PAS_DE_REPONSE', 'Pas de réponse', 'UNREACHABLE', false),
+        ('FAUX_NUMERO', 'Faux numéro', 'WRONG_NUMBER', false),
+      ];
+  for (int rang = 0; rang < lignes.length; rang++) {
+    final (String code, String label, String effect, bool rappel) =
+        lignes[rang];
+    await db
+        .into(db.statutsQualification)
+        .insert(
+          StatutsQualificationCompanion.insert(
+            code: code,
+            id: 'sq-${code.toLowerCase().replaceAll('_', '-')}',
+            label: label,
+            effect: effect,
+            requiresCallback: Value<bool>(rappel),
+            position: Value<int>(rang),
+          ),
+        );
+  }
+}
+
 /// L'écriture réelle, dont on retient les arguments reçus.
 class _WritesEspion extends WriteRepository {
   _WritesEspion(super.db);
 
+  int appels = 0;
   String? outcome;
+  String? statutQualificationId;
   String? relationStatus;
   String? suggestedPhone;
   String? suggestedName;
@@ -515,9 +674,12 @@ class _WritesEspion extends WriteRepository {
     String? syndicat,
     bool? numeroConfirme,
     String? numeroSaisi,
+    String? statutQualificationId,
     String? id,
   }) async {
+    appels++;
     this.outcome = outcome;
+    this.statutQualificationId = statutQualificationId;
     this.relationStatus = relationStatus;
     this.callbackAt = callbackAt;
     this.suggestedPhone = suggestedPhone;
@@ -542,6 +704,7 @@ class _WritesEspion extends WriteRepository {
       syndicat: syndicat,
       numeroConfirme: numeroConfirme,
       numeroSaisi: numeroSaisi,
+      statutQualificationId: statutQualificationId,
       id: id,
     );
   }

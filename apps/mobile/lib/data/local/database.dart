@@ -14,7 +14,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 23;
+  int get schemaVersion => 24;
 
   /// Les colonnes ajoutées à `call_attempts` par la v19. Déclarées ici parce
   /// que TROIS paliers recopient cette table : chacun engendre sa forme
@@ -308,6 +308,12 @@ class AppDatabase extends _$AppDatabase {
         await customStatement(
           'DELETE FROM sync_state WHERE collection = \'referentiels_mirror\'',
         );
+      }
+      if (from < 24 && to >= 24) {
+        // Le référentiel des statuts a sa propre route, hors curseur keyset :
+        // la table neuve se peuple au premier pull, sans marqueur à effacer.
+        await m.createTable(statutsQualification);
+        await m.createIndex(statutsQualificationActiveIdx);
       }
     },
     beforeOpen: (OpeningDetails details) async {
