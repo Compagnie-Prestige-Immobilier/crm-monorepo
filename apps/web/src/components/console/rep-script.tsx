@@ -551,19 +551,19 @@ function EtapeQuestions(props: EtapeQuestionsProps) {
         />
       </Question>
 
-      {props.resultat === null ? null : (
-        <ChoixStatut statuts={props.statuts} value={props.statutId} onChange={props.onStatut} />
-      )}
-
       {props.joignable ? <QuestionsJoignable {...props.questionsJoignable} /> : null}
 
       {props.proposeQuelquUn ? <QuestionSuggestion {...props.suggestion} /> : null}
 
-      {props.exigeRappel || props.joignable ? (
-        <Question
-          titre={props.exigeRappel ? 'Quand rappeler ?' : 'Le rappeler plus tard ? (facultatif)'}
-          anime
-        >
+      {props.resultat === null ? null : (
+        <ChoixStatut statuts={props.statuts} value={props.statutId} onChange={props.onStatut} />
+      )}
+
+      {/* L'échéance ne se demande qu'au statut qui la réclame. Proposée sur
+          tout appel abouti, elle armait un rappel que personne n'avait promis,
+          et la fiche remontait dans « à rappeler » sans raison. */}
+      {props.exigeRappel ? (
+        <Question titre="Quand rappeler ?" anime>
           <ChoixEcheance
             now={props.rappel.now}
             value={props.rappel.value}
@@ -845,7 +845,9 @@ function reponseDe(etat: EtatReponse): RepAnswer {
       : {}),
     ...champsJoignable(etat),
     ...champsWhatsapp(etat),
-    ...(etat.rappelAt === null ? {} : { callbackAt: etat.rappelAt }),
+    ...(etat.statut.requiresCallback && etat.rappelAt !== null
+      ? { callbackAt: etat.rappelAt }
+      : {}),
     ...champsSuggestion(etat),
     ...(etat.commentaire.trim() === '' ? {} : { comment: etat.commentaire.trim() }),
   };
