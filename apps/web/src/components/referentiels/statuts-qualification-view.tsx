@@ -183,7 +183,7 @@ function Branche({
             <TableHead>Libellé</TableHead>
             <TableHead>Code</TableHead>
             <TableHead>Effet</TableHead>
-            <TableHead>Rang</TableHead>
+            <TableHead>Priorité</TableHead>
             <TableHead>État</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
@@ -393,7 +393,10 @@ function FormulaireStatut({
             Exige la date du rappel
           </label>
 
-          <Field label="Rang" description="Plus petit, plus haut dans la liste.">
+          <Field
+            label="Priorité d’affichage"
+            description="Plus le nombre est petit, plus le statut est proposé haut dans la liste."
+          >
             {(props) => (
               <Input
                 {...props}

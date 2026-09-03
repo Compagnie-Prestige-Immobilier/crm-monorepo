@@ -109,7 +109,7 @@ const ATTEINT_AUTREMENT: Readonly<Record<string, string>> = {
   '/accueil/import': 'onglet · accueil/visites-tabs.tsx',
   '/admin': 'redirige vers le premier écran du rôle',
   '/admin/referentiels/issues-appel': 'lien · referentiels/referentiels-view.tsx',
-  '/admin/referentiels/statuts-qualification': 'lien · referentiels/referentiels-view.tsx',
+  '/admin/referentiels/statuts-qualification': 'redirige vers l’onglet qui l’a absorbé',
   '/chues': 'redirige l’agent bancaire vers son tableau de bord',
   '/chues/appels-representants': 'premier geste · chues/hub-view.tsx',
   '/chues/prospects/nouveau': 'deuxième geste · chues/hub-view.tsx',
