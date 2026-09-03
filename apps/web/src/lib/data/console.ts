@@ -593,6 +593,8 @@ export interface RepAnswer {
   readonly contacte?: boolean;
   readonly connaitUES?: boolean;
   readonly syndicat?: string;
+  /** Statut choisi au script. C'est lui qui commande `outcome`, jamais l'inverse. */
+  readonly statutQualificationId?: string;
 }
 
 export function buildRepAttempt(

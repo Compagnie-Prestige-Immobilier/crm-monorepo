@@ -9,12 +9,15 @@ import type * as ConsoleData from '@/lib/data/console';
 import type * as ReferenceData from '@/lib/data/reference';
 import type * as RepresentantsData from '@/lib/data/representants';
 import type { ScriptedRepresentant } from '@/lib/data/representants';
+import type * as StatutsData from '@/lib/data/statuts-qualification';
+import type { StatutQualification } from '@/lib/data/statuts-qualification';
 import { REP_CALL_OUTCOME_LABELS } from '@/lib/types';
 import { renderWithQuery } from '@/test/render-query';
 
 const pushRepCallAttempt = vi.fn();
 const fetchRepresentants = vi.fn();
 const fetchReferenceData = vi.fn();
+const fetchStatutsQualification = vi.fn();
 const toastError = vi.fn();
 const toastSuccess = vi.fn();
 
@@ -34,6 +37,11 @@ vi.mock('@/lib/data/reference', async (importOriginal) => {
 vi.mock('@/lib/data/representants', async (importOriginal) => {
   const actual = await importOriginal<typeof RepresentantsData>();
   return { ...actual, fetchRepresentants: (...args: unknown[]) => fetchRepresentants(...args) };
+});
+
+vi.mock('@/lib/data/statuts-qualification', async (importOriginal) => {
+  const actual = await importOriginal<typeof StatutsData>();
+  return { ...actual, fetchStatutsQualification: () => fetchStatutsQualification() as unknown };
 });
 
 vi.mock('sonner', () => ({
@@ -82,6 +90,34 @@ function rep(over: Partial<ScriptedRepresentant> & { id: string }): ScriptedRepr
   };
 }
 
+function statut(over: Partial<StatutQualification> & { id: string }): StatutQualification {
+  return {
+    code: 'INTERESSE',
+    label: 'Intéressé',
+    effect: 'REACHED',
+    requiresCallback: false,
+    isActive: true,
+    isSystem: true,
+    sortOrder: 10,
+    minPayloadVersion: 6,
+    updatedAt: '2026-09-01T00:00:00.000Z',
+    ...over,
+  };
+}
+
+const STATUTS: StatutQualification[] = [
+  statut({ id: 's-1' }),
+  statut({ id: 's-2', code: 'NON_INTERESSE', label: 'Non intéressé', effect: 'REFUSED' }),
+  statut({
+    id: 's-3',
+    code: 'A_RAPPELER',
+    label: 'À rappeler',
+    effect: 'SCHEDULE_CALLBACK',
+    requiresCallback: true,
+  }),
+  statut({ id: 's-4', code: 'PAS_DE_REPONSE', label: 'Pas de réponse', effect: 'UNREACHABLE' }),
+];
+
 const PREMIER = rep({ id: 'r-1', fullName: 'Aminata Ndiaye' });
 const SECOND = rep({
   id: 'r-2',
@@ -124,9 +160,23 @@ const repondreA = async (legende: string, label: string): Promise<void> => {
   await userEvent.click(within(fieldset).getByRole('button', { name: label }));
 };
 
+const choisirStatut = async (label: string): Promise<void> => {
+  await userEvent.click(screen.getByRole('combobox', { name: /Statut de qualification/u }));
+  await userEvent.click(await screen.findByRole('option', { name: label }));
+};
+
+const injoindre = async (): Promise<void> => {
+  await repondre('Injoignable');
+  await choisirStatut('Pas de réponse');
+};
+
 /** Parcourt les questions 1 à 5 du script joignable, jusqu'à l'ambassadeur. */
-const parcoursJoignable = async (ambassadeur: 'Oui' | 'Non'): Promise<void> => {
+const parcoursJoignable = async (
+  ambassadeur: 'Oui' | 'Non',
+  statutLabel = ambassadeur === 'Oui' ? 'Intéressé' : 'Non intéressé',
+): Promise<void> => {
   await repondre('Joignable');
+  await choisirStatut(statutLabel);
   await repondreA('L’établissement de la fiche est-il confirmé ?', 'Oui');
   await repondreA('A-t-il déjà été contacté ?', 'Oui');
   await repondreA('Connaît-il l’UES ?', 'Oui');
@@ -148,6 +198,8 @@ beforeEach(() => {
   });
   fetchRepresentants.mockReset();
   fetchRepresentants.mockResolvedValue(page([HORS_LISTE]));
+  fetchStatutsQualification.mockReset();
+  fetchStatutsQualification.mockResolvedValue(STATUTS);
   fetchReferenceData.mockReset();
   fetchReferenceData.mockResolvedValue({
     syndicats: [{ id: 'snd-saes', name: 'SAES', sigle: 'SAES', isActive: true, sortOrder: 1 }],
@@ -243,7 +295,7 @@ describe('RepScript : les questions restent, et on peut revenir', () => {
   it('revient d’une étape à l’autre par « Étape précédente »', async () => {
     await renderListe();
     await choisir(/Aminata Ndiaye/u);
-    await repondre('Injoignable');
+    await injoindre();
     await userEvent.click(screen.getByRole('button', { name: 'Continuer' }));
 
     expect(screen.getByRole('button', { name: 'Enregistrer' })).toBeTruthy();
@@ -336,7 +388,7 @@ describe('RepScript : une seule tentative, à la fin', () => {
     await renderListe();
     await choisir(/Aminata Ndiaye/u);
 
-    await repondre('Injoignable');
+    await injoindre();
 
     // Aucun envoi tant que l'écran de récapitulation n'a pas été validé.
     expect(pushRepCallAttempt).not.toHaveBeenCalled();
@@ -353,7 +405,7 @@ describe('RepScript : une seule tentative, à la fin', () => {
   it('revient à la liste après enregistrement, sans sauter sur quelqu’un', async () => {
     await renderListe();
     await choisir(/Aminata Ndiaye/u);
-    await repondre('Injoignable');
+    await injoindre();
     await enregistrer();
 
     await waitFor(() => {
@@ -366,7 +418,7 @@ describe('RepScript : une seule tentative, à la fin', () => {
   it('joint le commentaire saisi à la qualification', async () => {
     await renderListe();
     await choisir(/Aminata Ndiaye/u);
-    await repondre('Injoignable');
+    await injoindre();
     await userEvent.type(screen.getByLabelText('Commentaire'), 'Sonne dans le vide');
     await userEvent.click(screen.getByRole('button', { name: 'Continuer' }));
     await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
@@ -378,12 +430,13 @@ describe('RepScript : une seule tentative, à la fin', () => {
   });
 });
 
-describe('RepScript : « À rappeler » propose un calendrier', () => {
+describe('RepScript : le statut « À rappeler » propose un calendrier', () => {
   it('offre les créneaux du mobile et « Choisir une date »', async () => {
     await renderListe();
     await choisir(/Aminata Ndiaye/u);
 
-    await repondre('À rappeler');
+    await repondre('Joignable');
+    await choisirStatut('À rappeler');
 
     expect(screen.getByText('Quand rappeler ?')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Demain 9 h' })).toBeTruthy();
@@ -393,7 +446,8 @@ describe('RepScript : « À rappeler » propose un calendrier', () => {
   it('ouvre un calendrier puis les demi-heures du jour retenu', async () => {
     await renderListe();
     await choisir(/Aminata Ndiaye/u);
-    await repondre('À rappeler');
+    await repondre('Joignable');
+    await choisirStatut('À rappeler');
 
     await userEvent.click(screen.getByRole('button', { name: /Choisir une date/u }));
 
@@ -411,7 +465,7 @@ describe('RepScript : « À rappeler » propose un calendrier', () => {
   it('exige l’échéance et l’envoie dans « callbackAt »', async () => {
     await renderListe();
     await choisir(/Aminata Ndiaye/u);
-    await repondre('À rappeler');
+    await parcoursJoignable('Non', 'À rappeler');
 
     expect(screen.getByText('Choisissez quand rappeler')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Continuer' }).hasAttribute('disabled')).toBe(true);
@@ -463,7 +517,7 @@ describe('RepScript : le rappel facultatif d’un joignable', () => {
     await renderListe();
     await choisir(/Aminata Ndiaye/u);
 
-    await repondre('Injoignable');
+    await injoindre();
 
     expect(screen.queryByText(/Le rappeler plus tard/u)).toBeNull();
     expect(screen.queryByText('Quand rappeler ?')).toBeNull();
@@ -538,8 +592,8 @@ describe('RepScript : la garde des relations déjà tranchées', () => {
   });
 });
 
-describe('RepScript : trois issues, comme le mobile', () => {
-  it('ne propose que Joignable, À rappeler et Injoignable', async () => {
+describe('RepScript : deux issues, le reste se dit au statut', () => {
+  it('ne propose que Joignable et Injoignable', async () => {
     await renderListe();
     await choisir(/Aminata Ndiaye/u);
 
@@ -548,7 +602,7 @@ describe('RepScript : trois issues, comme le mobile', () => {
       within(question as HTMLElement)
         .getAllByRole('button')
         .map((bouton) => bouton.textContent),
-    ).toEqual(['Joignable', 'À rappeler', 'Injoignable']);
+    ).toEqual(['Joignable', 'Injoignable']);
   });
 
   it('sort « Corriger la fiche » des réponses, sans la perdre', async () => {
