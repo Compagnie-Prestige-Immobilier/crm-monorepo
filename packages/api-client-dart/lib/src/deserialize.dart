@@ -699,6 +699,7 @@ ReturnType deserialize<ReturnType, BaseType>(
       return PresenceCountsDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'PresenceState':
+    case 'PrioriteTraitement':
     case 'ProfessionDto':
       return ProfessionDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;

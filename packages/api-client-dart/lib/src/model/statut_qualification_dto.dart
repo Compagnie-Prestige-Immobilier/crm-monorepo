@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:crm_api_client/src/model/priorite_traitement.dart';
 import 'package:crm_api_client/src/model/statut_qualification_effect.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
@@ -29,6 +30,8 @@ class StatutQualificationDto {
     required this.effect,
 
     required this.requiresCallback,
+
+    required this.priorite,
 
     required this.isActive,
 
@@ -60,6 +63,15 @@ class StatutQualificationDto {
   @JsonKey(name: r'requiresCallback', required: true, includeIfNull: false)
   final bool requiresCallback;
 
+  /// Ordre de reprise : un « Très intéressé » se rappelle avant un « Non éligible ».
+  @JsonKey(
+    name: r'priorite',
+    required: true,
+    includeIfNull: false,
+    unknownEnumValue: PrioriteTraitement.unknownDefaultOpenApi,
+  )
+  final PrioriteTraitement priorite;
+
   @JsonKey(name: r'isActive', required: true, includeIfNull: false)
   final bool isActive;
 
@@ -85,6 +97,7 @@ class StatutQualificationDto {
                 label,
                 effect,
                 requiresCallback,
+                priorite,
                 isActive,
                 isSystem,
                 minPayloadVersion,
@@ -96,6 +109,7 @@ class StatutQualificationDto {
                 other.label,
                 other.effect,
                 other.requiresCallback,
+                other.priorite,
                 other.isActive,
                 other.isSystem,
                 other.minPayloadVersion,
@@ -113,6 +127,7 @@ class StatutQualificationDto {
         label,
         effect,
         requiresCallback,
+        priorite,
         isActive,
         isSystem,
         minPayloadVersion,

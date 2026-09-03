@@ -3,6 +3,7 @@ export interface StatutQualificationSeed {
   label: string;
   effect: 'REACHED' | 'REFUSED' | 'SCHEDULE_CALLBACK' | 'UNREACHABLE' | 'WRONG_NUMBER';
   requiresCallback: boolean;
+  priorite: 'HAUTE' | 'NORMALE' | 'BASSE';
   sortOrder: number;
 }
 
@@ -25,6 +26,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     label: 'Intéressé',
     effect: 'REACHED',
     requiresCallback: false,
+    priorite: 'NORMALE',
     sortOrder: 10,
   },
   {
@@ -32,6 +34,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     label: 'Très intéressé',
     effect: 'REACHED',
     requiresCallback: false,
+    priorite: 'HAUTE',
     sortOrder: 20,
   },
   {
@@ -39,6 +42,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     label: 'Rendez-vous obtenu',
     effect: 'REACHED',
     requiresCallback: false,
+    priorite: 'HAUTE',
     sortOrder: 30,
   },
   {
@@ -46,6 +50,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     label: 'Demande d’informations',
     effect: 'REACHED',
     requiresCallback: false,
+    priorite: 'NORMALE',
     sortOrder: 40,
   },
   {
@@ -53,6 +58,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     label: 'Non intéressé',
     effect: 'REFUSED',
     requiresCallback: false,
+    priorite: 'BASSE',
     sortOrder: 50,
   },
   {
@@ -60,6 +66,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     label: 'Non éligible',
     effect: 'REFUSED',
     requiresCallback: false,
+    priorite: 'BASSE',
     sortOrder: 60,
   },
   // Le seul qui exige une date : c'est lui qui arme l'alarme du telephone.
@@ -68,6 +75,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     label: 'À rappeler',
     effect: 'SCHEDULE_CALLBACK',
     requiresCallback: true,
+    priorite: 'HAUTE',
     sortOrder: 70,
   },
 
@@ -77,6 +85,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     label: 'Pas de réponse',
     effect: 'UNREACHABLE',
     requiresCallback: false,
+    priorite: 'NORMALE',
     sortOrder: 110,
   },
   {
@@ -84,6 +93,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     label: 'Téléphone indisponible',
     effect: 'UNREACHABLE',
     requiresCallback: false,
+    priorite: 'NORMALE',
     sortOrder: 120,
   },
   {
@@ -91,6 +101,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     label: 'Numéro occupé',
     effect: 'UNREACHABLE',
     requiresCallback: false,
+    priorite: 'NORMALE',
     sortOrder: 130,
   },
   {
@@ -98,6 +109,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     label: 'Messagerie',
     effect: 'UNREACHABLE',
     requiresCallback: false,
+    priorite: 'NORMALE',
     sortOrder: 140,
   },
   {
@@ -105,6 +117,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     label: 'Faux numéro',
     effect: 'WRONG_NUMBER',
     requiresCallback: false,
+    priorite: 'BASSE',
     sortOrder: 150,
   },
   {
@@ -112,6 +125,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     label: 'Numéro invalide',
     effect: 'WRONG_NUMBER',
     requiresCallback: false,
+    priorite: 'BASSE',
     sortOrder: 160,
   },
 ];

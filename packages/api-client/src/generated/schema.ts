@@ -3457,6 +3457,11 @@ export interface components {
     /** @enum {string} */
     StatutQualificationEffect:
       'REACHED' | 'REFUSED' | 'SCHEDULE_CALLBACK' | 'UNREACHABLE' | 'WRONG_NUMBER';
+    /**
+     * @description Ordre de reprise : un « Très intéressé » se rappelle avant un « Non éligible ».
+     * @enum {string}
+     */
+    PrioriteTraitement: 'HAUTE' | 'NORMALE' | 'BASSE';
     StatutQualificationDto: {
       /** Format: uuid */
       id: string;
@@ -3465,6 +3470,8 @@ export interface components {
       effect: components['schemas']['StatutQualificationEffect'];
       /** @description La date du rappel est exigée par ce statut. */
       requiresCallback: boolean;
+      /** @description Ordre de reprise : un « Très intéressé » se rappelle avant un « Non éligible ». */
+      priorite: components['schemas']['PrioriteTraitement'];
       isActive: boolean;
       /** @description Le script s’appuie dessus : sa règle ne se reconfigure pas. */
       isSystem: boolean;
@@ -3483,10 +3490,13 @@ export interface components {
       effect: components['schemas']['StatutQualificationEffect'];
       /** @default false */
       requiresCallback: boolean;
+      /** @default NORMALE */
+      priorite: components['schemas']['PrioriteTraitement'];
     };
     UpdateStatutQualificationDto: {
       label?: string;
       requiresCallback?: boolean;
+      priorite?: components['schemas']['PrioriteTraitement'];
     };
     SetStatutQualificationActiveDto: {
       isActive: boolean;
@@ -3499,7 +3509,13 @@ export interface components {
     RepresentantSuivi: 'A_RAPPELER' | 'INJOIGNABLE';
     /** @enum {string} */
     RepresentantSortField:
-      'clientCreatedAt' | 'createdAt' | 'fullName' | 'prospects' | 'lastCallAt' | 'nextCallbackAt';
+      | 'clientCreatedAt'
+      | 'createdAt'
+      | 'fullName'
+      | 'prospects'
+      | 'lastCallAt'
+      | 'nextCallbackAt'
+      | 'priorite';
     /** @enum {string} */
     SortOrder: 'asc' | 'desc';
     /**

@@ -1,5 +1,5 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
-import { RepCallOutcome, StatutQualificationEffect } from '@crm/database';
+import { PrioriteTraitement, RepCallOutcome, StatutQualificationEffect } from '@crm/database';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
@@ -15,6 +15,7 @@ interface Row {
   label: string;
   effect: StatutQualificationEffect;
   requiresCallback: boolean;
+  priorite: PrioriteTraitement;
   isActive: boolean;
   isSystem: boolean;
   sortOrder: number;
@@ -25,6 +26,7 @@ interface Row {
 
 const ligne = (over: Partial<Row> & Pick<Row, 'id' | 'code' | 'label' | 'effect'>): Row => ({
   requiresCallback: false,
+  priorite: PrioriteTraitement.NORMALE,
   isActive: true,
   isSystem: false,
   sortOrder: 100,
@@ -323,5 +325,46 @@ describe('activation', () => {
     prisma.rows[0]!.isActive = false;
 
     expect((await service.setActive('1', { isActive: true })).isActive).toBe(true);
+  });
+});
+
+describe('priorité de traitement', () => {
+  it('rend la priorité de chaque statut', async () => {
+    prisma.rows[0]!.priorite = PrioriteTraitement.BASSE;
+
+    const { items } = await service.listAll();
+
+    expect(items.map((statut) => [statut.code, statut.priorite])).toEqual([
+      ['INTERESSE', PrioriteTraitement.BASSE],
+      ['A_RAPPELER', PrioriteTraitement.NORMALE],
+      ['PAS_DE_REPONSE', PrioriteTraitement.NORMALE],
+    ]);
+  });
+
+  it('pose NORMALE quand la création n’en demande aucune', async () => {
+    const cree = await service.create({
+      code: 'RELANCE_TARDIVE',
+      label: 'Relance tardive',
+      effect: StatutQualificationEffect.REACHED,
+    });
+
+    expect(cree.priorite).toBe(PrioriteTraitement.NORMALE);
+  });
+
+  it('retient la priorité demandée à la création', async () => {
+    const cree = await service.create({
+      code: 'RELANCE_TARDIVE',
+      label: 'Relance tardive',
+      effect: StatutQualificationEffect.REACHED,
+      priorite: PrioriteTraitement.HAUTE,
+    });
+
+    expect(cree.priorite).toBe(PrioriteTraitement.HAUTE);
+  });
+
+  it('se change sur un statut SYSTÈME, contrairement à la règle de rappel', async () => {
+    const modifie = await service.update('1', { priorite: PrioriteTraitement.HAUTE });
+
+    expect(modifie.priorite).toBe(PrioriteTraitement.HAUTE);
   });
 });

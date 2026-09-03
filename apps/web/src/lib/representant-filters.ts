@@ -33,7 +33,12 @@ export const REPRESENTANT_RELATION_LABELS: Record<RepresentantRelation, string> 
   REFUS: 'Refus',
 };
 
-export const REPRESENTANT_SORT_FIELDS = ['clientCreatedAt', 'fullName', 'prospects'] as const;
+export const REPRESENTANT_SORT_FIELDS = [
+  'clientCreatedAt',
+  'fullName',
+  'prospects',
+  'priorite',
+] as const;
 
 export type RepresentantSortField = (typeof REPRESENTANT_SORT_FIELDS)[number];
 
@@ -41,6 +46,7 @@ export const REPRESENTANT_SORT_LABELS: Record<RepresentantSortField, string> = {
   clientCreatedAt: 'Première saisie',
   fullName: 'Nom',
   prospects: 'Nombre de prospects',
+  priorite: 'Priorité de traitement',
 };
 
 export interface RepresentantFilters {

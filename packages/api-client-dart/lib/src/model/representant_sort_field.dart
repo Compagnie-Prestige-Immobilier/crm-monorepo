@@ -18,6 +18,8 @@ enum RepresentantSortField {
   lastCallAt(r'lastCallAt'),
   @JsonValue(r'nextCallbackAt')
   nextCallbackAt(r'nextCallbackAt'),
+  @JsonValue(r'priorite')
+  priorite(r'priorite'),
   @JsonValue(r'unknown_default_open_api')
   unknownDefaultOpenApi(r'unknown_default_open_api');
 

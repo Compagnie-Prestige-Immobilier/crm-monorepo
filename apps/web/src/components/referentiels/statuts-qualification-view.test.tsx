@@ -1,0 +1,90 @@
+import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import type { StatutQualification } from '@/lib/data/statuts-qualification';
+import type * as StatutsModule from '@/lib/data/statuts-qualification';
+import { renderWithQuery } from '@/test/render-query';
+
+const fetchAllStatutsQualification = vi.fn();
+const updateStatutQualification = vi.fn();
+const setStatutQualificationActive = vi.fn();
+
+vi.mock('@/lib/data/statuts-qualification', async () => {
+  const actual = await vi.importActual<typeof StatutsModule>('@/lib/data/statuts-qualification');
+  return {
+    ...actual,
+    fetchAllStatutsQualification: () => fetchAllStatutsQualification() as unknown,
+    updateStatutQualification: (id: string, patch: unknown) =>
+      updateStatutQualification(id, patch) as unknown,
+    setStatutQualificationActive: (id: string, isActive: boolean) =>
+      setStatutQualificationActive(id, isActive) as unknown,
+  };
+});
+
+const { StatutsQualificationView } =
+  await import('@/components/referentiels/statuts-qualification-view');
+
+const statut = (patch: Partial<StatutQualification>): StatutQualification => ({
+  id: 's-1',
+  code: 'TRES_INTERESSE',
+  label: 'Très intéressé',
+  effect: 'REACHED',
+  requiresCallback: false,
+  priorite: 'HAUTE',
+  isActive: true,
+  isSystem: true,
+  minPayloadVersion: 6,
+  updatedAt: '2026-09-03T00:00:00.000Z',
+  ...patch,
+});
+
+const SYSTEME = statut({});
+const BASSE = statut({
+  id: 's-2',
+  code: 'NON_ELIGIBLE',
+  label: 'Non éligible',
+  effect: 'REFUSED',
+  priorite: 'BASSE',
+});
+
+describe('référentiel des statuts de qualification', () => {
+  beforeEach(() => {
+    fetchAllStatutsQualification.mockReturnValue(Promise.resolve([SYSTEME, BASSE]));
+    updateStatutQualification.mockReset();
+    updateStatutQualification.mockReturnValue(Promise.resolve(SYSTEME));
+    setStatutQualificationActive.mockReturnValue(Promise.resolve(SYSTEME));
+  });
+
+  it('dit ligne par ligne dans quel ordre le plateau reprend les fiches', async () => {
+    renderWithQuery(<StatutsQualificationView />);
+
+    const haute = (await screen.findByText('Très intéressé')).closest('tr');
+    const basse = screen.getByText('Non éligible').closest('tr');
+
+    expect(haute?.textContent).toContain('Haute');
+    expect(basse?.textContent).toContain('Basse');
+  });
+
+  // La règle de rappel est celle du script et se verrouille sur une ligne
+  // système ; la priorité, elle, est un arbitrage de plateau qui se change.
+  it('laisse changer la priorité d’un statut SYSTÈME', async () => {
+    renderWithQuery(<StatutsQualificationView />);
+
+    await userEvent.click(await screen.findByRole('button', { name: /Modifier Très intéressé/ }));
+
+    const priorite = await screen.findByRole('combobox', { name: /Priorité/ });
+    expect(priorite.hasAttribute('disabled')).toBe(false);
+
+    await userEvent.click(priorite);
+    await userEvent.click(await screen.findByRole('option', { name: 'Basse' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    await vi.waitFor(() => {
+      expect(updateStatutQualification).toHaveBeenCalledWith(
+        's-1',
+        expect.objectContaining({ priorite: 'BASSE' }),
+      );
+    });
+  });
+});

@@ -47,6 +47,7 @@ function statut(over: Partial<StatutQualification> & { id: string }): StatutQual
     label: 'Intéressé',
     effect: 'REACHED',
     requiresCallback: false,
+    priorite: 'NORMALE',
     isActive: true,
     isSystem: true,
     minPayloadVersion: 6,

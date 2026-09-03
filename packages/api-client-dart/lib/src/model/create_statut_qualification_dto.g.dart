@@ -15,6 +15,8 @@ abstract class _$CreateStatutQualificationDtoCWProxy {
 
   CreateStatutQualificationDto requiresCallback(bool? requiresCallback);
 
+  CreateStatutQualificationDto priorite(PrioriteTraitement? priorite);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `CreateStatutQualificationDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -26,6 +28,7 @@ abstract class _$CreateStatutQualificationDtoCWProxy {
     String label,
     StatutQualificationEffect effect,
     bool? requiresCallback,
+    PrioriteTraitement? priorite,
   });
 }
 
@@ -51,6 +54,10 @@ class _$CreateStatutQualificationDtoCWProxyImpl
       this(requiresCallback: requiresCallback);
 
   @override
+  CreateStatutQualificationDto priorite(PrioriteTraitement? priorite) =>
+      this(priorite: priorite);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `CreateStatutQualificationDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -62,6 +69,7 @@ class _$CreateStatutQualificationDtoCWProxyImpl
     Object? label = const $CopyWithPlaceholder(),
     Object? effect = const $CopyWithPlaceholder(),
     Object? requiresCallback = const $CopyWithPlaceholder(),
+    Object? priorite = const $CopyWithPlaceholder(),
   }) {
     return CreateStatutQualificationDto(
       code: code == const $CopyWithPlaceholder()
@@ -80,6 +88,10 @@ class _$CreateStatutQualificationDtoCWProxyImpl
           ? _value.requiresCallback
           // ignore: cast_nullable_to_non_nullable
           : requiresCallback as bool?,
+      priorite: priorite == const $CopyWithPlaceholder()
+          ? _value.priorite
+          // ignore: cast_nullable_to_non_nullable
+          : priorite as PrioriteTraitement?,
     );
   }
 }
@@ -115,6 +127,16 @@ CreateStatutQualificationDto _$CreateStatutQualificationDtoFromJson(
       'requiresCallback',
       (v) => v as bool? ?? false,
     ),
+    priorite: $checkedConvert(
+      'priorite',
+      (v) =>
+          $enumDecodeNullable(
+            _$PrioriteTraitementEnumMap,
+            v,
+            unknownValue: PrioriteTraitement.unknownDefaultOpenApi,
+          ) ??
+          PrioriteTraitement.NORMALE,
+    ),
   );
   return val;
 });
@@ -126,6 +148,8 @@ Map<String, dynamic> _$CreateStatutQualificationDtoToJson(
   'label': instance.label,
   'effect': _$StatutQualificationEffectEnumMap[instance.effect]!,
   if (instance.requiresCallback case final value?) 'requiresCallback': value,
+  if (_$PrioriteTraitementEnumMap[instance.priorite] case final value?)
+    'priorite': value,
 };
 
 const _$StatutQualificationEffectEnumMap = {
@@ -135,4 +159,11 @@ const _$StatutQualificationEffectEnumMap = {
   StatutQualificationEffect.UNREACHABLE: 'UNREACHABLE',
   StatutQualificationEffect.WRONG_NUMBER: 'WRONG_NUMBER',
   StatutQualificationEffect.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$PrioriteTraitementEnumMap = {
+  PrioriteTraitement.HAUTE: 'HAUTE',
+  PrioriteTraitement.NORMALE: 'NORMALE',
+  PrioriteTraitement.BASSE: 'BASSE',
+  PrioriteTraitement.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

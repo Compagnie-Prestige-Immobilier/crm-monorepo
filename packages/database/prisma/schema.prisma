@@ -200,6 +200,16 @@ enum CallOutcome {
 //
 // Pas de colonne « joignable » a cote : elle serait une seconde verite, qui
 // divergerait de l'effet a la premiere correction.
+// Ordre de reprise d'une fiche qualifiee. Une enumeration et non un entier :
+// un rang chiffre ne dit rien de ce qu'il classe, et c'est exactement ce qui a
+// fait retirer `sortOrder` de l'interface. L'ordre de DECLARATION est celui du
+// tri croissant en base.
+enum PrioriteTraitement {
+  HAUTE
+  NORMALE
+  BASSE
+}
+
 enum StatutQualificationEffect {
   REACHED
   REFUSED
@@ -2048,6 +2058,13 @@ model StatutQualification {
 
   /// La date du rappel est exigee par CETTE ligne, jamais par le code.
   requiresCallback Boolean @default(false)
+
+  /// Dans quel ordre le plateau reprend les fiches : un « Tres interesse »
+  /// joint se rappelle avant un « Non eligible ». Se modifie, y compris sur une
+  /// ligne systeme : c'est un arbitrage du metier, pas une regle du script.
+  ///
+  /// L'ordre d'ASC suit l'ordre de declaration des valeurs : HAUTE d'abord.
+  priorite PrioriteTraitement @default(NORMALE)
 
   /// Le script s'appuie dessus : une ligne systeme se desactive, ne se supprime
   /// pas, et ses regles ne se modifient pas.
