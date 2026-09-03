@@ -32,10 +32,12 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await prisma.agentHeartbeat.deleteMany({ where: { userId } });
+  await prisma.agentActivityDay.deleteMany({ where: { userId } });
 });
 
 afterAll(async () => {
   await prisma.agentHeartbeat.deleteMany({ where: { userId } });
+  await prisma.agentActivityDay.deleteMany({ where: { userId } });
   await prisma.user.delete({ where: { id: userId } });
   await prisma.$disconnect();
 });
@@ -70,6 +72,32 @@ describe('battement de cœur, en base', () => {
     const row = await prisma.agentHeartbeat.findUniqueOrThrow({ where: { userId } });
     expect(row.lastPullAt?.toISOString()).toBe('2026-08-18T09:00:00.000Z');
     expect(row.lastPushAt?.toISOString()).toBe('2026-08-18T10:00:00.000Z');
+  });
+
+  it('compte le temps actif sans transformer une longue coupure en présence', async () => {
+    await heartbeat.record(userId, 'pull', {}, new Date('2026-08-18T09:00:00.000Z'));
+    await heartbeat.record(userId, 'pull', {}, new Date('2026-08-18T09:01:00.000Z'));
+    await heartbeat.record(userId, 'pull', {}, new Date('2026-08-18T09:02:40.000Z'));
+    await heartbeat.record(userId, 'pull', {}, new Date('2026-08-18T09:03:10.000Z'));
+
+    const row = await prisma.agentActivityDay.findUniqueOrThrow({
+      where: { userId_day: { userId, day: new Date('2026-08-18T00:00:00.000Z') } },
+    });
+    expect(row.activeSeconds).toBe(90);
+    expect(row.firstSeenAt.toISOString()).toBe('2026-08-18T09:00:00.000Z');
+    expect(row.lastSeenAt.toISOString()).toBe('2026-08-18T09:03:10.000Z');
+  });
+
+  it('ne recule pas sur un signal arrivé en retard', async () => {
+    await heartbeat.record(userId, 'pull', {}, new Date('2026-08-18T09:00:00.000Z'));
+    await heartbeat.record(userId, 'pull', {}, new Date('2026-08-18T09:01:00.000Z'));
+    await heartbeat.record(userId, 'pull', {}, new Date('2026-08-18T09:00:30.000Z'));
+
+    const row = await prisma.agentActivityDay.findUniqueOrThrow({
+      where: { userId_day: { userId, day: new Date('2026-08-18T00:00:00.000Z') } },
+    });
+    expect(row.activeSeconds).toBe(60);
+    expect(row.lastSeenAt.toISOString()).toBe('2026-08-18T09:01:00.000Z');
   });
 
   it('part avec le compte, sans bloquer sa suppression', async () => {

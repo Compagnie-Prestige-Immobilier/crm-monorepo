@@ -380,6 +380,8 @@ function withinWindow(column: Prisma.Sql, query: SupervisionQueryDto): Prisma.Sq
   const bounds: Prisma.Sql[] = [];
   if (query.actFrom) bounds.push(Prisma.sql`${column} >= ${inclusiveDateFrom(query.actFrom)}`);
   if (query.actTo) bounds.push(Prisma.sql`${column} <= ${inclusiveDateTo(query.actTo)}`);
+  if (query.timeFrom) bounds.push(Prisma.sql`${column}::time >= ${query.timeFrom}::time`);
+  if (query.timeTo) bounds.push(Prisma.sql`${column}::time < ${query.timeTo}::time`);
   if (!bounds.length) return Prisma.sql`TRUE`;
   return Prisma.join(bounds, ' AND ');
 }
