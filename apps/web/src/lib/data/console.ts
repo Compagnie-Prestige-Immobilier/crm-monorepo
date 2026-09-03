@@ -549,10 +549,6 @@ export async function pushCallAttempt(
   );
 }
 
-export const repScriptKeys = {
-  root: ['console', 'representants'] as const,
-};
-
 /** Une relation tranchée n'a plus rien à donner au script : elle est en queue de file. */
 const REP_RELATION_RANK: Record<RepresentantRelation, number> = {
   INCONNU: 0,

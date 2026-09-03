@@ -774,6 +774,7 @@ class RepresentantsApi {
   /// * [hasWhatsapp]
   /// * [suivi] - A_RAPPELER : un rappel promis reste dû (`nextCallbackAt`), tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien.
   /// * [lastCallById] - Qui a passé le dernier appel. Un téléconseiller y met son propre identifiant.
+  /// * [mesFiches] - true : ne rend que ses propres fiches et celles qu’une campagne lui a confiées, quel que soit le rôle. L’écran d’appel le pose, l’annuaire non.
   /// * [sortBy]
   /// * [sortOrder]
   /// * [page]
@@ -801,6 +802,7 @@ class RepresentantsApi {
     bool? hasWhatsapp,
     RepresentantSuivi? suivi,
     String? lastCallById,
+    bool? mesFiches,
     RepresentantSortField? sortBy,
     SortOrder? sortOrder,
     num? page = 1,
@@ -840,6 +842,7 @@ class RepresentantsApi {
       if (hasWhatsapp != null) r'hasWhatsapp': hasWhatsapp,
       if (suivi != null) r'suivi': suivi,
       if (lastCallById != null) r'lastCallById': lastCallById,
+      if (mesFiches != null) r'mesFiches': mesFiches,
       if (sortBy != null) r'sortBy': sortBy,
       if (sortOrder != null) r'sortOrder': sortOrder,
       if (page != null) r'page': page,

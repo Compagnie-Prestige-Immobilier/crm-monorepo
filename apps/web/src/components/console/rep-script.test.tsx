@@ -3,21 +3,27 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ETAPES } from '@/components/chues/etapes';
+import { HubView } from '@/components/chues/hub-view';
 import { RepScript } from '@/components/console/rep-script';
 import { navTitle } from '@/components/layout/nav-items';
 import type * as ConsoleData from '@/lib/data/console';
+import type * as Phase2Data from '@/lib/data/phase2';
 import type * as ReferenceData from '@/lib/data/reference';
 import type * as RepresentantsData from '@/lib/data/representants';
 import type { ScriptedRepresentant } from '@/lib/data/representants';
 import type * as StatutsData from '@/lib/data/statuts-qualification';
 import type { StatutQualification } from '@/lib/data/statuts-qualification';
 import { REP_CALL_OUTCOME_LABELS } from '@/lib/types';
+import type { RepresentantFilters } from '@/lib/representant-filters';
 import { renderWithQuery } from '@/test/render-query';
 
 const pushRepCallAttempt = vi.fn();
 const fetchRepresentants = vi.fn();
+const fetchRepresentantsAQualifier = vi.fn();
 const fetchReferenceData = vi.fn();
 const fetchStatutsQualification = vi.fn();
+const countPendingProspects = vi.fn();
+const fetchCallbacks = vi.fn();
 const toastError = vi.fn();
 const toastSuccess = vi.fn();
 
@@ -26,6 +32,15 @@ vi.mock('@/lib/data/console', async (importOriginal) => {
   return {
     ...actual,
     pushRepCallAttempt: (...args: unknown[]) => pushRepCallAttempt(...args) as unknown,
+    fetchCallbacks: (...args: unknown[]) => fetchCallbacks(...args) as unknown,
+  };
+});
+
+vi.mock('@/lib/data/phase2', async (importOriginal) => {
+  const actual = await importOriginal<typeof Phase2Data>();
+  return {
+    ...actual,
+    countPendingProspects: (...args: unknown[]) => countPendingProspects(...args) as unknown,
   };
 });
 
@@ -36,7 +51,11 @@ vi.mock('@/lib/data/reference', async (importOriginal) => {
 
 vi.mock('@/lib/data/representants', async (importOriginal) => {
   const actual = await importOriginal<typeof RepresentantsData>();
-  return { ...actual, fetchRepresentants: (...args: unknown[]) => fetchRepresentants(...args) };
+  return {
+    ...actual,
+    fetchRepresentants: (...args: unknown[]) => fetchRepresentants(...args),
+    fetchRepresentantsAQualifier: (...args: unknown[]) => fetchRepresentantsAQualifier(...args),
+  };
 });
 
 vi.mock('@/lib/data/statuts-qualification', async (importOriginal) => {
@@ -139,6 +158,7 @@ const page = (items: readonly ScriptedRepresentant[]) => ({
 
 async function renderListe(file: readonly ScriptedRepresentant[] = [PREMIER, SECOND]) {
   fetchRepresentants.mockResolvedValue(page(file));
+  fetchRepresentantsAQualifier.mockResolvedValue(page(file));
   const view = renderWithQuery(<RepScript />);
   await screen.findByLabelText('Qui avez-vous appelé ?');
   return view;
@@ -197,6 +217,7 @@ beforeEach(() => {
     suggestion: null,
   });
   fetchRepresentants.mockReset();
+  fetchRepresentantsAQualifier.mockReset();
   fetchRepresentants.mockResolvedValue(page([HORS_LISTE]));
   fetchStatutsQualification.mockReset();
   fetchStatutsQualification.mockResolvedValue(STATUTS);
@@ -245,9 +266,7 @@ describe('RepScript : rien n’est choisi d’office', () => {
 
     await waitFor(
       () => {
-        expect(fetchRepresentants.mock.calls.at(-1)?.[0]).toMatchObject({
-          search: '77 987 65 43',
-        });
+        expect(fetchRepresentantsAQualifier.mock.calls.at(-1)?.[0]).toBe('77 987 65 43');
       },
       { timeout: 3000 },
     );
@@ -680,5 +699,69 @@ describe('RepScript : l’écran d’appel ne montre que le nom et le numéro', 
       href: '/chues/appels-representants',
     });
     expect(navTitle('COMMERCIAL', '/chues/appels-representants')).toBe('Qualifier un représentant');
+  });
+});
+
+describe('RepScript : l’écran d’ouverture recompte après une qualification', () => {
+  const compteur = (total: number) => ({ items: [], total, page: 1, pageSize: 1, pageCount: 1 });
+
+  it('redemande le nombre de non qualifiés une fois l’appel enregistré', async () => {
+    let nonQualifies = 15;
+    fetchRepresentants.mockImplementation((filters: RepresentantFilters) => {
+      if (filters.relationStatus === 'INCONNU') return Promise.resolve(compteur(nonQualifies));
+      if (filters.relationStatus === 'AMBASSADEUR') return Promise.resolve(compteur(3));
+      return Promise.resolve(page([PREMIER]));
+    });
+    fetchRepresentantsAQualifier.mockResolvedValue(page([PREMIER]));
+    countPendingProspects.mockResolvedValue(310);
+    fetchCallbacks.mockResolvedValue({ items: [], serverTime: '2026-09-01T09:00:00.000Z' });
+
+    renderWithQuery(
+      <>
+        <HubView prenom="Fatou" />
+        <RepScript />
+      </>,
+    );
+    expect(await screen.findByText('15')).toBeTruthy();
+
+    await choisir(/Aminata Ndiaye/u);
+    await parcoursJoignable('Oui');
+    await repondreA('A-t-il WhatsApp sur ce numéro ?', 'Oui');
+    nonQualifies = 14;
+    await userEvent.click(screen.getByRole('button', { name: 'Continuer' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('14')).toBeTruthy();
+    });
+  });
+});
+
+/**
+ * L'écran d'appel ne montre QUE ce que la personne doit appeler. La portée est
+ * demandée au serveur, pas filtrée ici : un tri côté client laisserait passer
+ * les numéros par la requête.
+ */
+describe('RepScript : ce que l’écran d’appel a le droit d’appeler', () => {
+  it('demande au serveur ses propres fiches, pas l’annuaire entier', async () => {
+    await renderListe();
+
+    await userEvent.type(screen.getByLabelText('Qui avez-vous appelé ?'), 'Aminata');
+
+    await waitFor(
+      () => {
+        expect(fetchRepresentantsAQualifier).toHaveBeenCalled();
+      },
+      { timeout: 3000 },
+    );
+    expect(fetchRepresentants).not.toHaveBeenCalled();
+  });
+
+  it('dit d’où vient le vide, au lieu de laisser croire à une base vide', async () => {
+    await renderListe([]);
+
+    await userEvent.type(screen.getByLabelText('Qui avez-vous appelé ?'), 'Personne');
+
+    expect(await screen.findByText(/vos fiches/u)).toBeTruthy();
   });
 });
