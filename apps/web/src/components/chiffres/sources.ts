@@ -255,21 +255,6 @@ export const SOURCES_CHIFFRES = {
     label: 'Taux de joignabilité des prospects',
     forme: 'scalaire',
     jeu: 'activite',
-    description: 'La part des représentants interrogés qui acceptent d’être représentant CHUES.',
-    groupe: 'Appels aux représentants',
-    extraire: ({ activite }) =>
-      activite === undefined
-        ? null
-        : scalaireTaux(
-            activite.totals.repQualificationRate,
-            `${formatNumber(activite.totals.repQualified)} acceptent sur ${formatNumber(activite.totals.repQuestioned)} interrogés`,
-            'Aucun représentant interrogé sur la période',
-          ),
-  },
-  'taux-de-joignabilite': {
-    label: 'Taux de joignabilité des prospects',
-    forme: 'scalaire',
-    jeu: 'activite',
     description:
       'La part des appels aux prospects, à l’étape conversion, dont le numéro s’est révélé exploitable. Un faux numéro compte comme un injoignable.',
     groupe: 'Appels aux prospects',
