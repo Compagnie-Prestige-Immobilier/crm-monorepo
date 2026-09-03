@@ -34,8 +34,6 @@ class StatutQualificationDto {
 
     required this.isSystem,
 
-    required this.sortOrder,
-
     required this.minPayloadVersion,
 
     required this.updatedAt,
@@ -69,9 +67,6 @@ class StatutQualificationDto {
   @JsonKey(name: r'isSystem', required: true, includeIfNull: false)
   final bool isSystem;
 
-  @JsonKey(name: r'sortOrder', required: true, includeIfNull: false)
-  final num sortOrder;
-
   /// Version de charge utile minimale sachant émettre ce code.
   @JsonKey(name: r'minPayloadVersion', required: true, includeIfNull: false)
   final num minPayloadVersion;
@@ -92,7 +87,6 @@ class StatutQualificationDto {
                 requiresCallback,
                 isActive,
                 isSystem,
-                sortOrder,
                 minPayloadVersion,
                 updatedAt,
               ],
@@ -104,7 +98,6 @@ class StatutQualificationDto {
                 other.requiresCallback,
                 other.isActive,
                 other.isSystem,
-                other.sortOrder,
                 other.minPayloadVersion,
                 other.updatedAt,
               ],
@@ -122,7 +115,6 @@ class StatutQualificationDto {
         requiresCallback,
         isActive,
         isSystem,
-        sortOrder,
         minPayloadVersion,
         updatedAt,
       ]);

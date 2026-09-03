@@ -11,19 +11,13 @@ abstract class _$UpdateStatutQualificationDtoCWProxy {
 
   UpdateStatutQualificationDto requiresCallback(bool? requiresCallback);
 
-  UpdateStatutQualificationDto sortOrder(num? sortOrder);
-
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `UpdateStatutQualificationDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
   /// ```dart
   /// UpdateStatutQualificationDto(...).copyWith(id: 12, name: "My name")
   /// ````
-  UpdateStatutQualificationDto call({
-    String? label,
-    bool? requiresCallback,
-    num? sortOrder,
-  });
+  UpdateStatutQualificationDto call({String? label, bool? requiresCallback});
 }
 
 /// Proxy class for `copyWith` functionality. This is a callable class and can be used as follows: `instanceOfUpdateStatutQualificationDto.copyWith(...)`. Additionally contains functions for specific fields e.g. `instanceOfUpdateStatutQualificationDto.copyWith.fieldName(...)`
@@ -41,10 +35,6 @@ class _$UpdateStatutQualificationDtoCWProxyImpl
       this(requiresCallback: requiresCallback);
 
   @override
-  UpdateStatutQualificationDto sortOrder(num? sortOrder) =>
-      this(sortOrder: sortOrder);
-
-  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `UpdateStatutQualificationDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -54,7 +44,6 @@ class _$UpdateStatutQualificationDtoCWProxyImpl
   UpdateStatutQualificationDto call({
     Object? label = const $CopyWithPlaceholder(),
     Object? requiresCallback = const $CopyWithPlaceholder(),
-    Object? sortOrder = const $CopyWithPlaceholder(),
   }) {
     return UpdateStatutQualificationDto(
       label: label == const $CopyWithPlaceholder()
@@ -65,10 +54,6 @@ class _$UpdateStatutQualificationDtoCWProxyImpl
           ? _value.requiresCallback
           // ignore: cast_nullable_to_non_nullable
           : requiresCallback as bool?,
-      sortOrder: sortOrder == const $CopyWithPlaceholder()
-          ? _value.sortOrder
-          // ignore: cast_nullable_to_non_nullable
-          : sortOrder as num?,
     );
   }
 }
@@ -91,7 +76,6 @@ UpdateStatutQualificationDto _$UpdateStatutQualificationDtoFromJson(
   final val = UpdateStatutQualificationDto(
     label: $checkedConvert('label', (v) => v as String?),
     requiresCallback: $checkedConvert('requiresCallback', (v) => v as bool?),
-    sortOrder: $checkedConvert('sortOrder', (v) => v as num?),
   );
   return val;
 });
@@ -101,5 +85,4 @@ Map<String, dynamic> _$UpdateStatutQualificationDtoToJson(
 ) => <String, dynamic>{
   if (instance.label case final value?) 'label': value,
   if (instance.requiresCallback case final value?) 'requiresCallback': value,
-  if (instance.sortOrder case final value?) 'sortOrder': value,
 };

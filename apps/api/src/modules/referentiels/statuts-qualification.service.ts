@@ -70,7 +70,6 @@ const toDto = (row: StatutQualification): StatutQualificationDto => ({
   requiresCallback: row.requiresCallback,
   isActive: row.isActive,
   isSystem: row.isSystem,
-  sortOrder: row.sortOrder,
   minPayloadVersion: row.minPayloadVersion,
   updatedAt: row.updatedAt.toISOString(),
 });
@@ -130,7 +129,7 @@ export class StatutsQualificationService {
         label,
         effect: input.effect,
         requiresCallback,
-        sortOrder: input.sortOrder ?? 100,
+        sortOrder: await this.rangSuivant(input.effect),
         isActive: true,
         isSystem: false,
         minPayloadVersion: NEW_STATUT_PAYLOAD_VERSION,
@@ -173,7 +172,6 @@ export class StatutsQualificationService {
       where: { id },
       data: {
         ...(input.label === undefined ? {} : { label: input.label.trim() }),
-        ...(input.sortOrder === undefined ? {} : { sortOrder: input.sortOrder }),
         ...(input.requiresCallback === undefined
           ? {}
           : { requiresCallback: input.requiresCallback }),
@@ -216,6 +214,21 @@ export class StatutsQualificationService {
       data: { isActive: input.isActive },
     });
     return toDto(updated);
+  }
+
+  /**
+   * L'ordre d'affichage ne se saisit pas : il ne dit rien du métier, et le
+   * demander à l'administrateur lui ferait trancher une question qu'il n'a pas.
+   * Un statut nouveau se pose à la fin de SA branche, jamais au milieu de
+   * l'autre.
+   */
+  private async rangSuivant(effect: StatutQualificationEffect): Promise<number> {
+    const dernier = await this.prisma.statutQualification.findFirst({
+      where: { effect: { in: [...brancheDe(effect)] } },
+      orderBy: { sortOrder: 'desc' },
+      select: { sortOrder: true },
+    });
+    return (dernier?.sortOrder ?? 0) + 10;
   }
 
   private async statut(id: string): Promise<StatutQualification> {

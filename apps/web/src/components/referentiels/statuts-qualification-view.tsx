@@ -54,7 +54,6 @@ interface Draft {
   label: string;
   effect: StatutQualificationEffect;
   requiresCallback: boolean;
-  sortOrder: number;
 }
 
 const EMPTY: Draft = {
@@ -62,7 +61,6 @@ const EMPTY: Draft = {
   label: '',
   effect: 'REACHED',
   requiresCallback: false,
-  sortOrder: 100,
 };
 
 export function StatutsQualificationView() {
@@ -183,7 +181,6 @@ function Branche({
             <TableHead>Libellé</TableHead>
             <TableHead>Code</TableHead>
             <TableHead>Effet</TableHead>
-            <TableHead>Priorité</TableHead>
             <TableHead>État</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
@@ -201,7 +198,6 @@ function Branche({
               </TableCell>
               <TableCell className="text-muted-foreground">{statut.code}</TableCell>
               <TableCell>{STATUT_QUALIFICATION_EFFECT_LABELS[statut.effect]}</TableCell>
-              <TableCell>{statut.sortOrder}</TableCell>
               <TableCell>
                 <Badge variant={statut.isActive ? 'default' : 'outline'}>
                   {statut.isActive ? 'Proposé' : 'Retiré'}
@@ -275,7 +271,6 @@ function FormulaireStatut({
             label: statut.label,
             effect: statut.effect,
             requiresCallback: statut.requiresCallback,
-            sortOrder: statut.sortOrder,
           },
     );
   }, [open, statut, reset]);
@@ -288,7 +283,6 @@ function FormulaireStatut({
       modification
         ? updateStatutQualification(statut.id, {
             label: values.label.trim(),
-            sortOrder: values.sortOrder,
             ...(regleFigee ? {} : { requiresCallback: values.requiresCallback }),
           })
         : createStatutQualification({
@@ -296,7 +290,6 @@ function FormulaireStatut({
             label: values.label.trim(),
             effect: values.effect,
             requiresCallback: values.requiresCallback,
-            sortOrder: values.sortOrder,
           }),
     onSuccess: () => {
       toast.success(modification ? 'Statut modifié.' : 'Statut ajouté.');
@@ -392,21 +385,6 @@ function FormulaireStatut({
             />
             Exige la date du rappel
           </label>
-
-          <Field
-            label="Priorité d’affichage"
-            description="Plus le nombre est petit, plus le statut est proposé haut dans la liste."
-          >
-            {(props) => (
-              <Input
-                {...props}
-                type="number"
-                min={0}
-                max={9999}
-                {...register('sortOrder', { valueAsNumber: true })}
-              />
-            )}
-          </Field>
 
           <DialogFooter>
             <Button type="submit" disabled={save.isPending}>

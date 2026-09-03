@@ -27,8 +27,6 @@ class CreateStatutQualificationDto {
     required this.effect,
 
     this.requiresCallback = false,
-
-    this.sortOrder = 100,
   });
 
   /// Immuable : l’historique le référence.
@@ -54,36 +52,20 @@ class CreateStatutQualificationDto {
   )
   final bool? requiresCallback;
 
-  // minimum: 0
-  // maximum: 9999
-  @JsonKey(
-    defaultValue: 100,
-    name: r'sortOrder',
-    required: false,
-    includeIfNull: false,
-  )
-  final num? sortOrder;
-
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is CreateStatutQualificationDto &&
             runtimeType == other.runtimeType &&
             equals(
-              [code, label, effect, requiresCallback, sortOrder],
-              [
-                other.code,
-                other.label,
-                other.effect,
-                other.requiresCallback,
-                other.sortOrder,
-              ],
+              [code, label, effect, requiresCallback],
+              [other.code, other.label, other.effect, other.requiresCallback],
             );
   }
 
   @override
   int get hashCode =>
       runtimeType.hashCode ^
-      mapPropsToHashCode([code, label, effect, requiresCallback, sortOrder]);
+      mapPropsToHashCode([code, label, effect, requiresCallback]);
 
   factory CreateStatutQualificationDto.fromJson(Map<String, dynamic> json) =>
       _$CreateStatutQualificationDtoFromJson(json);

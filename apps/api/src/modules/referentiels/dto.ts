@@ -606,7 +606,6 @@ export class StatutQualificationDto {
   @ApiProperty() isActive!: boolean;
   @ApiProperty({ description: 'Le script s’appuie dessus : sa règle ne se reconfigure pas.' })
   isSystem!: boolean;
-  @ApiProperty() sortOrder!: number;
   @ApiProperty({ description: 'Version de charge utile minimale sachant émettre ce code.' })
   minPayloadVersion!: number;
   @ApiProperty({ format: 'date-time' }) updatedAt!: string;
@@ -652,14 +651,6 @@ export class CreateStatutQualificationDto {
   @IsOptional()
   @IsBoolean()
   requiresCallback?: boolean;
-
-  @ApiPropertyOptional({ minimum: 0, maximum: 9999, default: 100 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(9999)
-  sortOrder?: number;
 }
 
 export class UpdateStatutQualificationDto {
@@ -674,14 +665,6 @@ export class UpdateStatutQualificationDto {
   @IsOptional()
   @IsBoolean()
   requiresCallback?: boolean;
-
-  @ApiPropertyOptional({ minimum: 0, maximum: 9999 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(9999)
-  sortOrder?: number;
 }
 
 export class SetStatutQualificationActiveDto {

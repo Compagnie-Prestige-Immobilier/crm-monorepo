@@ -83,6 +83,21 @@ class FakePrisma {
           .sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label)),
       ),
 
+    findFirst: ({
+      where,
+      orderBy,
+    }: {
+      where: { effect: { in: StatutQualificationEffect[] } };
+      orderBy?: unknown;
+      select?: unknown;
+    }): Promise<Row | null> => {
+      void orderBy;
+      const branche = this.rows
+        .filter((row) => where.effect.in.includes(row.effect))
+        .sort((a, b) => b.sortOrder - a.sortOrder);
+      return Promise.resolve(branche[0] ?? null);
+    },
+
     findUnique: ({
       where,
     }: {
@@ -229,6 +244,17 @@ describe('création', () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
+  it('pose le nouveau statut à la fin de SA branche, jamais au milieu de l’autre', async () => {
+    const cree = await service.create({
+      code: 'MESSAGERIE_PLEINE',
+      label: 'Messagerie pleine',
+      effect: StatutQualificationEffect.UNREACHABLE,
+    });
+
+    // Le dernier de la branche « non abouti » est PAS_DE_REPONSE, à 110.
+    expect(prisma.rows.find((row) => row.id === cree.id)?.sortOrder).toBe(120);
+  });
+
   it('normalise le code en majuscules et n’est jamais système', async () => {
     const cree = await service.create({
       code: ' curieux ',
@@ -294,7 +320,6 @@ describe('activation', () => {
   });
 
   it('réactive sans jamais se plaindre', async () => {
-    await service.update('1', { sortOrder: 5 });
     prisma.rows[0]!.isActive = false;
 
     expect((await service.setActive('1', { isActive: true })).isActive).toBe(true);

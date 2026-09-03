@@ -15,8 +15,6 @@ abstract class _$CreateStatutQualificationDtoCWProxy {
 
   CreateStatutQualificationDto requiresCallback(bool? requiresCallback);
 
-  CreateStatutQualificationDto sortOrder(num? sortOrder);
-
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `CreateStatutQualificationDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -28,7 +26,6 @@ abstract class _$CreateStatutQualificationDtoCWProxy {
     String label,
     StatutQualificationEffect effect,
     bool? requiresCallback,
-    num? sortOrder,
   });
 }
 
@@ -54,10 +51,6 @@ class _$CreateStatutQualificationDtoCWProxyImpl
       this(requiresCallback: requiresCallback);
 
   @override
-  CreateStatutQualificationDto sortOrder(num? sortOrder) =>
-      this(sortOrder: sortOrder);
-
-  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `CreateStatutQualificationDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -69,7 +62,6 @@ class _$CreateStatutQualificationDtoCWProxyImpl
     Object? label = const $CopyWithPlaceholder(),
     Object? effect = const $CopyWithPlaceholder(),
     Object? requiresCallback = const $CopyWithPlaceholder(),
-    Object? sortOrder = const $CopyWithPlaceholder(),
   }) {
     return CreateStatutQualificationDto(
       code: code == const $CopyWithPlaceholder()
@@ -88,10 +80,6 @@ class _$CreateStatutQualificationDtoCWProxyImpl
           ? _value.requiresCallback
           // ignore: cast_nullable_to_non_nullable
           : requiresCallback as bool?,
-      sortOrder: sortOrder == const $CopyWithPlaceholder()
-          ? _value.sortOrder
-          // ignore: cast_nullable_to_non_nullable
-          : sortOrder as num?,
     );
   }
 }
@@ -127,7 +115,6 @@ CreateStatutQualificationDto _$CreateStatutQualificationDtoFromJson(
       'requiresCallback',
       (v) => v as bool? ?? false,
     ),
-    sortOrder: $checkedConvert('sortOrder', (v) => v as num? ?? 100),
   );
   return val;
 });
@@ -139,7 +126,6 @@ Map<String, dynamic> _$CreateStatutQualificationDtoToJson(
   'label': instance.label,
   'effect': _$StatutQualificationEffectEnumMap[instance.effect]!,
   if (instance.requiresCallback case final value?) 'requiresCallback': value,
-  if (instance.sortOrder case final value?) 'sortOrder': value,
 };
 
 const _$StatutQualificationEffectEnumMap = {

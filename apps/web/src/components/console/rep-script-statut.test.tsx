@@ -49,7 +49,6 @@ function statut(over: Partial<StatutQualification> & { id: string }): StatutQual
     requiresCallback: false,
     isActive: true,
     isSystem: true,
-    sortOrder: 10,
     minPayloadVersion: 6,
     updatedAt: '2026-09-01T00:00:00.000Z',
     ...over,
