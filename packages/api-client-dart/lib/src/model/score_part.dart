@@ -7,7 +7,7 @@ import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/src/equatable_utils.dart';
 
-part 'score_part_dto.g.dart';
+part 'score_part.g.dart';
 
 @CopyWith()
 @JsonSerializable(
@@ -16,9 +16,9 @@ part 'score_part_dto.g.dart';
   disallowUnrecognizedKeys: false,
   explicitToJson: true,
 )
-class ScorePartDto {
-  /// Returns a new [ScorePartDto] instance.
-  ScorePartDto({
+class ScorePart {
+  /// Returns a new [ScorePart] instance.
+  ScorePart({
     required this.key,
 
     required this.label,
@@ -32,9 +32,9 @@ class ScorePartDto {
     name: r'key',
     required: true,
     includeIfNull: false,
-    unknownEnumValue: ScorePartDtoKeyEnum.unknownDefaultOpenApi,
+    unknownEnumValue: ScorePartKeyEnum.unknownDefaultOpenApi,
   )
-  final ScorePartDtoKeyEnum key;
+  final ScorePartKeyEnum key;
 
   @JsonKey(name: r'label', required: true, includeIfNull: false)
   final String label;
@@ -49,7 +49,7 @@ class ScorePartDto {
 
   bool operator ==(Object other) {
     return identical(this, other) ||
-        other is ScorePartDto &&
+        other is ScorePart &&
             runtimeType == other.runtimeType &&
             equals(
               [key, label, ratio, weight],
@@ -61,10 +61,10 @@ class ScorePartDto {
   int get hashCode =>
       runtimeType.hashCode ^ mapPropsToHashCode([key, label, ratio, weight]);
 
-  factory ScorePartDto.fromJson(Map<String, dynamic> json) =>
-      _$ScorePartDtoFromJson(json);
+  factory ScorePart.fromJson(Map<String, dynamic> json) =>
+      _$ScorePartFromJson(json);
 
-  Map<String, dynamic> toJson() => _$ScorePartDtoToJson(this);
+  Map<String, dynamic> toJson() => _$ScorePartToJson(this);
 
   @override
   String toString() {
@@ -72,7 +72,7 @@ class ScorePartDto {
   }
 }
 
-enum ScorePartDtoKeyEnum {
+enum ScorePartKeyEnum {
   @JsonValue(r'assiduite')
   assiduite(r'assiduite'),
   @JsonValue(r'regularite')
@@ -88,7 +88,7 @@ enum ScorePartDtoKeyEnum {
   @JsonValue(r'unknown_default_open_api')
   unknownDefaultOpenApi(r'unknown_default_open_api');
 
-  const ScorePartDtoKeyEnum(this.value);
+  const ScorePartKeyEnum(this.value);
 
   final String value;
 

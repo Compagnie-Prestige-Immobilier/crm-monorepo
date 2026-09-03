@@ -3,12 +3,12 @@
 //
 
 // ignore_for_file: unused_element
-import 'package:crm_api_client/src/model/score_part_dto.dart';
+import 'package:crm_api_client/src/model/score_part.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/src/equatable_utils.dart';
 
-part 'score_dto.g.dart';
+part 'performance_score.g.dart';
 
 @CopyWith()
 @JsonSerializable(
@@ -17,11 +17,17 @@ part 'score_dto.g.dart';
   disallowUnrecognizedKeys: false,
   explicitToJson: true,
 )
-class ScoreDto {
-  /// Returns a new [ScoreDto] instance.
-  ScoreDto({required this.value, required this.reason, required this.parts});
+class PerformanceScore {
+  /// Returns a new [PerformanceScore] instance.
+  PerformanceScore({
+    required this.value,
 
-  /// Note de 0 à 100 sur la journée en cours. `null` quand rien ne peut être jugé : `reason` dit alors pourquoi, et l’écran affiche le motif au lieu d’un zéro.
+    required this.reason,
+
+    required this.parts,
+  });
+
+  /// Note de 0 à 100 sur la fenêtre mesurée. `null` quand rien ne peut être jugé : `reason` dit alors pourquoi, et l’écran affiche le motif au lieu d’un zéro.
   @JsonKey(name: r'value', required: true, includeIfNull: true)
   final num? value;
 
@@ -29,17 +35,17 @@ class ScoreDto {
     name: r'reason',
     required: true,
     includeIfNull: true,
-    unknownEnumValue: ScoreDtoReasonEnum.unknownDefaultOpenApi,
+    unknownEnumValue: PerformanceScoreReasonEnum.unknownDefaultOpenApi,
   )
-  final ScoreDtoReasonEnum? reason;
+  final PerformanceScoreReasonEnum? reason;
 
   /// Le détail qui compose la note. Vide quand `value` est nulle.
   @JsonKey(name: r'parts', required: true, includeIfNull: false)
-  final List<ScorePartDto> parts;
+  final List<ScorePart> parts;
 
   bool operator ==(Object other) {
     return identical(this, other) ||
-        other is ScoreDto &&
+        other is PerformanceScore &&
             runtimeType == other.runtimeType &&
             equals(
               [value, reason, parts],
@@ -51,10 +57,10 @@ class ScoreDto {
   int get hashCode =>
       runtimeType.hashCode ^ mapPropsToHashCode([value, reason, parts]);
 
-  factory ScoreDto.fromJson(Map<String, dynamic> json) =>
-      _$ScoreDtoFromJson(json);
+  factory PerformanceScore.fromJson(Map<String, dynamic> json) =>
+      _$PerformanceScoreFromJson(json);
 
-  Map<String, dynamic> toJson() => _$ScoreDtoToJson(this);
+  Map<String, dynamic> toJson() => _$PerformanceScoreToJson(this);
 
   @override
   String toString() {
@@ -62,7 +68,7 @@ class ScoreDto {
   }
 }
 
-enum ScoreDtoReasonEnum {
+enum PerformanceScoreReasonEnum {
   @JsonValue(r'journee_non_commencee')
   journeeNonCommencee(r'journee_non_commencee'),
   @JsonValue(r'presence_non_mesuree')
@@ -72,7 +78,7 @@ enum ScoreDtoReasonEnum {
   @JsonValue(r'unknown_default_open_api')
   unknownDefaultOpenApi(r'unknown_default_open_api');
 
-  const ScoreDtoReasonEnum(this.value);
+  const PerformanceScoreReasonEnum(this.value);
 
   final String value;
 

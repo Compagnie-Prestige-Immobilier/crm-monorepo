@@ -26790,6 +26790,105 @@
         },
         "required": ["id", "fullName", "isActive"]
       },
+      "ScorePart": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": ["assiduite", "regularite", "rythme", "contact", "qualification", "efficience"]
+          },
+          "label": {
+            "type": "string"
+          },
+          "ratio": {
+            "type": "number",
+            "description": "Atteinte de la cible, de 0 à 1, plafonnée à 1."
+          },
+          "weight": {
+            "type": "number",
+            "description": "Part de la note portée par ce critère."
+          }
+        },
+        "required": ["key", "label", "ratio", "weight"]
+      },
+      "PerformanceScore": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "number",
+            "nullable": true,
+            "description": "Note de 0 à 100 sur la fenêtre mesurée. `null` quand rien ne peut être jugé : `reason` dit alors pourquoi, et l’écran affiche le motif au lieu d’un zéro."
+          },
+          "reason": {
+            "type": "string",
+            "enum": ["journee_non_commencee", "presence_non_mesuree", "aucun_appel"],
+            "nullable": true
+          },
+          "parts": {
+            "description": "Le détail qui compose la note. Vide quand `value` est nulle.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScorePart"
+            }
+          }
+        },
+        "required": ["value", "reason", "parts"]
+      },
+      "SupervisionScoreDto": {
+        "type": "object",
+        "properties": {
+          "teleconseillerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "teleconseillerName": {
+            "type": "string"
+          },
+          "activeSecondsInShifts": {
+            "type": "number",
+            "description": "Présence relevée dans les créneaux, en secondes, sur toute la fenêtre."
+          },
+          "shiftSecondsElapsed": {
+            "type": "number",
+            "description": "Secondes de créneau écoulées sur les seuls jours où le compte a été vu. La journée en cours ne compte que sa portion passée ; un filtre horaire restreint d’autant les créneaux."
+          },
+          "calls": {
+            "type": "number",
+            "description": "Tentatives, prospects et représentants confondus."
+          },
+          "reached": {
+            "type": "number",
+            "description": "Prospects dont le numéro s’est révélé exploitable, plus représentants ayant répondu."
+          },
+          "qualified": {
+            "type": "number",
+            "description": "Méthodes obtenues, plus représentants dont la DERNIÈRE réponse de la fenêtre est REACHED."
+          },
+          "repeatCalls": {
+            "type": "number",
+            "description": "Appels au-delà du premier sur une même fiche."
+          },
+          "deadSeconds": {
+            "type": "number",
+            "description": "Écarts de plus de quinze minutes entre deux appels du même créneau et du même jour."
+          },
+          "score": {
+            "$ref": "#/components/schemas/PerformanceScore"
+          }
+        },
+        "required": [
+          "teleconseillerId",
+          "teleconseillerName",
+          "activeSecondsInShifts",
+          "shiftSecondsElapsed",
+          "calls",
+          "reached",
+          "qualified",
+          "repeatCalls",
+          "deadSeconds",
+          "score"
+        ]
+      },
       "SupervisionHistogramBarDto": {
         "type": "object",
         "properties": {
@@ -26849,6 +26948,13 @@
               "$ref": "#/components/schemas/SupervisionTeleconseillerDto"
             }
           },
+          "scores": {
+            "description": "Une note par téléconseiller pour TOUTE la fenêtre, recalculée depuis les appels et la présence : rien n’est figé, corriger la définition corrige l’historique. Vide si le calcul a échoué.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupervisionScoreDto"
+            }
+          },
           "prospectsByTeleconseiller": {
             "description": "Stock courant de prospects rattachés à chaque téléconseiller.",
             "type": "array",
@@ -26871,6 +26977,7 @@
           "items",
           "totals",
           "teleconseillers",
+          "scores",
           "prospectsByTeleconseiller",
           "prospectsByRepresentant"
         ]
@@ -27067,50 +27174,6 @@
         "type": "string",
         "enum": ["ONLINE", "RECENT", "AWAY"]
       },
-      "ScorePartDto": {
-        "type": "object",
-        "properties": {
-          "key": {
-            "type": "string",
-            "enum": ["assiduite", "regularite", "rythme", "contact", "qualification", "efficience"]
-          },
-          "label": {
-            "type": "string"
-          },
-          "ratio": {
-            "type": "number",
-            "description": "Atteinte de la cible, de 0 à 1, plafonnée à 1."
-          },
-          "weight": {
-            "type": "number",
-            "description": "Part de la note portée par ce critère."
-          }
-        },
-        "required": ["key", "label", "ratio", "weight"]
-      },
-      "ScoreDto": {
-        "type": "object",
-        "properties": {
-          "value": {
-            "type": "number",
-            "nullable": true,
-            "description": "Note de 0 à 100 sur la journée en cours. `null` quand rien ne peut être jugé : `reason` dit alors pourquoi, et l’écran affiche le motif au lieu d’un zéro."
-          },
-          "reason": {
-            "type": "string",
-            "enum": ["journee_non_commencee", "presence_non_mesuree", "aucun_appel"],
-            "nullable": true
-          },
-          "parts": {
-            "description": "Le détail qui compose la note. Vide quand `value` est nulle.",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ScorePartDto"
-            }
-          }
-        },
-        "required": ["value", "reason", "parts"]
-      },
       "SupervisedUserDto": {
         "type": "object",
         "properties": {
@@ -27250,7 +27313,7 @@
             "description": "Nombre de trous comptés dans `deadSeconds`."
           },
           "score": {
-            "$ref": "#/components/schemas/ScoreDto"
+            "$ref": "#/components/schemas/PerformanceScore"
           }
         },
         "required": [

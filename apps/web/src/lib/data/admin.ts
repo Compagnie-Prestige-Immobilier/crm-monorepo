@@ -78,6 +78,8 @@ export function matchesHint(typed: string, hint: string): boolean {
 }
 
 export type PresenceState = Schemas['PresenceState'];
+export type PerformanceScore = Schemas['PerformanceScore'];
+export type SupervisionScore = Schemas['SupervisionScoreDto'];
 export type SupervisedUser = Schemas['SupervisedUserDto'];
 export type Supervision = Schemas['SupervisionDto'];
 export type WorkShifts = Schemas['WorkShiftsDto'];
