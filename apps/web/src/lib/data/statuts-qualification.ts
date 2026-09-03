@@ -56,10 +56,14 @@ const ABOUTI: readonly StatutQualificationEffect[] = ['REACHED', 'REFUSED', 'SCH
 
 export const estAbouti = (effect: StatutQualificationEffect): boolean => ABOUTI.includes(effect);
 
+/** Le rappel se propose des deux côtés : on rappelle aussi qui on n'a pas joint. */
 export const statutsDeLaBranche = (
   statuts: readonly StatutQualification[],
   abouti: boolean,
-): StatutQualification[] => statuts.filter((statut) => estAbouti(statut.effect) === abouti);
+): StatutQualification[] =>
+  statuts.filter(
+    (statut) => estAbouti(statut.effect) === abouti || statut.effect === 'SCHEDULE_CALLBACK',
+  );
 
 /** Vocabulaire de SAISIE : actifs seulement, servis dans l'ordre dicté. */
 export async function fetchStatutsQualification(

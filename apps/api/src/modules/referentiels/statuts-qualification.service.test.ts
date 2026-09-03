@@ -316,7 +316,21 @@ describe('activation', () => {
   });
 
   it('refuse de vider une branche de son DERNIER statut actif', async () => {
+    prisma.rows[1]!.isActive = false;
+
     await expect(service.setActive('3', { isActive: false })).rejects.toMatchObject({
+      response: { code: StatutQualificationError.LAST_OF_BRANCH },
+    });
+  });
+
+  it('laisse retirer le dernier non abouti tant que le rappel reste proposable', async () => {
+    expect((await service.setActive('3', { isActive: false })).isActive).toBe(false);
+  });
+
+  it('refuse de retirer le rappel quand il est le dernier statut de l’appel abouti', async () => {
+    prisma.rows[0]!.isActive = false;
+
+    await expect(service.setActive('2', { isActive: false })).rejects.toMatchObject({
       response: { code: StatutQualificationError.LAST_OF_BRANCH },
     });
   });
