@@ -192,6 +192,8 @@ import 'package:crm_api_client/src/model/supervision_activity_dto.dart';
 import 'package:crm_api_client/src/model/supervision_activity_row_dto.dart';
 import 'package:crm_api_client/src/model/supervision_dto.dart';
 import 'package:crm_api_client/src/model/supervision_histogram_bar_dto.dart';
+import 'package:crm_api_client/src/model/supervision_rep_statut_dto.dart';
+import 'package:crm_api_client/src/model/supervision_rep_statuts_dto.dart';
 import 'package:crm_api_client/src/model/supervision_score_dto.dart';
 import 'package:crm_api_client/src/model/supervision_teleconseiller_dto.dart';
 import 'package:crm_api_client/src/model/switch_workspace_dto.dart';
@@ -917,6 +919,12 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'SupervisionGranularity':
     case 'SupervisionHistogramBarDto':
       return SupervisionHistogramBarDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'SupervisionRepStatutDto':
+      return SupervisionRepStatutDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'SupervisionRepStatutsDto':
+      return SupervisionRepStatutsDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'SupervisionScoreDto':
       return SupervisionScoreDto.fromJson(value as Map<String, dynamic>)

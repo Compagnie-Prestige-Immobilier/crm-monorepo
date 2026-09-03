@@ -34,6 +34,7 @@ void main() {
     effect: effect,
     requiresCallback: requiresCallback,
     priorite: PrioriteTraitement.NORMALE,
+    relationStatus: null,
     isActive: isActive,
     isSystem: true,
     minPayloadVersion: 6,

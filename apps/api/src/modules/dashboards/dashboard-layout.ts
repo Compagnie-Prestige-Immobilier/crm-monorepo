@@ -128,7 +128,7 @@ const SOURCE_MARQUES: Record<DashboardSource, ReglesDeMarque> = {
   },
   'hors-attribution-derniere-campagne': CLASSEMENT,
   encaisse: CHIFFRE,
-  'de-l-appel-a-l-encaissement': COMPOSITION,
+  'de-l-appel-a-l-encaissement': CLASSEMENT,
   'methodes-d-adhesion': { defaut: 'anneau', compatibles: COMPOSITION_MARQUES },
   'par-banque': { defaut: 'anneau', compatibles: COMPOSITION_MARQUES },
   'delais-medians': CLASSEMENT,

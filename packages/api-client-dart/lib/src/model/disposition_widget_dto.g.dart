@@ -168,6 +168,8 @@ const _$DashboardSourceEnumMap = {
   DashboardSource.tauxDeContact: 'taux-de-contact',
   DashboardSource.aRappeler: 'a-rappeler',
   DashboardSource.tauxDeQualification: 'taux-de-qualification',
+  DashboardSource.repartitionStatutsQualification:
+      'repartition-statuts-qualification',
   DashboardSource.tauxDeJoignabilite: 'taux-de-joignabilite',
   DashboardSource.prospectsNotes: 'prospects-notes',
   DashboardSource.adhesions: 'adhesions',

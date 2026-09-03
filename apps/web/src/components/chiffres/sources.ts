@@ -358,7 +358,7 @@ export const SOURCES_CHIFFRES = {
   },
   'de-l-appel-a-l-encaissement': {
     label: 'De l’appel à l’encaissement',
-    forme: 'composition',
+    forme: 'classement',
     jeu: 'entonnoir',
     description: 'Voir combien de dossiers passent chaque étape, du premier appel au paiement.',
     groupe: 'Résultats',
@@ -366,17 +366,12 @@ export const SOURCES_CHIFFRES = {
       entonnoir === undefined
         ? null
         : {
-            forme: 'composition',
-            donnee: [
-              {
-                ligne: 'Étapes',
-                segments: entonnoir.etapes.map((etape) => ({
-                  id: etape.label,
-                  label: etape.label,
-                  value: etape.count,
-                })),
-              },
-            ],
+            forme: 'classement',
+            donnee: entonnoir.etapes.map((etape) => ({
+              id: etape.label,
+              label: etape.label,
+              value: etape.count,
+            })),
           },
   },
   'methodes-d-adhesion': {

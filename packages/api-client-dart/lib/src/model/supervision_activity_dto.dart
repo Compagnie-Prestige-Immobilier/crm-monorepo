@@ -4,6 +4,7 @@
 
 // ignore_for_file: unused_element
 import 'package:crm_api_client/src/model/supervision_activity_row_dto.dart';
+import 'package:crm_api_client/src/model/supervision_rep_statuts_dto.dart';
 import 'package:crm_api_client/src/model/supervision_histogram_bar_dto.dart';
 import 'package:crm_api_client/src/model/supervision_granularity.dart';
 import 'package:crm_api_client/src/model/supervision_score_dto.dart';
@@ -42,6 +43,8 @@ class SupervisionActivityDto {
     required this.prospectsByTeleconseiller,
 
     required this.prospectsByRepresentant,
+
+    required this.repQualificationStatuses,
   });
 
   @JsonKey(name: r'from', required: true, includeIfNull: true)
@@ -90,6 +93,14 @@ class SupervisionActivityDto {
   )
   final List<SupervisionHistogramBarDto> prospectsByRepresentant;
 
+  /// Répartition des représentants par statut de qualification, basée sur leur dernier appel portant un statut dans la fenêtre. `null` sans représentant dans la fenêtre.
+  @JsonKey(
+    name: r'repQualificationStatuses',
+    required: true,
+    includeIfNull: true,
+  )
+  final SupervisionRepStatutsDto? repQualificationStatuses;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is SupervisionActivityDto &&
@@ -105,6 +116,7 @@ class SupervisionActivityDto {
                 scores,
                 prospectsByTeleconseiller,
                 prospectsByRepresentant,
+                repQualificationStatuses,
               ],
               [
                 other.from,
@@ -116,6 +128,7 @@ class SupervisionActivityDto {
                 other.scores,
                 other.prospectsByTeleconseiller,
                 other.prospectsByRepresentant,
+                other.repQualificationStatuses,
               ],
             );
   }
@@ -133,6 +146,7 @@ class SupervisionActivityDto {
         scores,
         prospectsByTeleconseiller,
         prospectsByRepresentant,
+        repQualificationStatuses,
       ]);
 
   factory SupervisionActivityDto.fromJson(Map<String, dynamic> json) =>
