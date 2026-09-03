@@ -126,6 +126,7 @@ import 'package:crm_api_client/src/model/origin_count_dto.dart';
 import 'package:crm_api_client/src/model/origin_label_count_dto.dart';
 import 'package:crm_api_client/src/model/page_meta_dto.dart';
 import 'package:crm_api_client/src/model/pays_dto.dart';
+import 'package:crm_api_client/src/model/performance_score.dart';
 import 'package:crm_api_client/src/model/phase2_status_count_dto.dart';
 import 'package:crm_api_client/src/model/phase2_status_list_dto.dart';
 import 'package:crm_api_client/src/model/presence_counts_dto.dart';
@@ -165,8 +166,7 @@ import 'package:crm_api_client/src/model/representant_productivity_list_dto.dart
 import 'package:crm_api_client/src/model/representant_relation_change_dto.dart';
 import 'package:crm_api_client/src/model/representant_relation_change_list_dto.dart';
 import 'package:crm_api_client/src/model/reset_password_dto.dart';
-import 'package:crm_api_client/src/model/score_dto.dart';
-import 'package:crm_api_client/src/model/score_part_dto.dart';
+import 'package:crm_api_client/src/model/score_part.dart';
 import 'package:crm_api_client/src/model/segment_change_dto.dart';
 import 'package:crm_api_client/src/model/segment_change_list_dto.dart';
 import 'package:crm_api_client/src/model/segment_conversion_author_dto.dart';
@@ -188,6 +188,7 @@ import 'package:crm_api_client/src/model/supervision_activity_dto.dart';
 import 'package:crm_api_client/src/model/supervision_activity_row_dto.dart';
 import 'package:crm_api_client/src/model/supervision_dto.dart';
 import 'package:crm_api_client/src/model/supervision_histogram_bar_dto.dart';
+import 'package:crm_api_client/src/model/supervision_score_dto.dart';
 import 'package:crm_api_client/src/model/supervision_teleconseiller_dto.dart';
 import 'package:crm_api_client/src/model/switch_workspace_dto.dart';
 import 'package:crm_api_client/src/model/sync_changes_dto.dart';
@@ -683,6 +684,9 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'PaymentMode':
     case 'PaysDto':
       return PaysDto.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'PerformanceScore':
+      return PerformanceScore.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'Phase2Status':
     case 'Phase2StatusCountDto':
       return Phase2StatusCountDto.fromJson(value as Map<String, dynamic>)
@@ -816,10 +820,8 @@ ReturnType deserialize<ReturnType, BaseType>(
       return ResetPasswordDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'Role':
-    case 'ScoreDto':
-      return ScoreDto.fromJson(value as Map<String, dynamic>) as ReturnType;
-    case 'ScorePartDto':
-      return ScorePartDto.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'ScorePart':
+      return ScorePart.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'SegmentChangeDto':
       return SegmentChangeDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -892,6 +894,9 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'SupervisionGranularity':
     case 'SupervisionHistogramBarDto':
       return SupervisionHistogramBarDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'SupervisionScoreDto':
+      return SupervisionScoreDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'SupervisionTeleconseillerDto':
       return SupervisionTeleconseillerDto.fromJson(

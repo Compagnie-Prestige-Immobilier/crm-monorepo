@@ -797,6 +797,7 @@ export class FakeActivity {
       totals: LIGNE_VIDE,
       items: this.items,
       teleconseillers: this.teleconseillers,
+      scores: [],
       prospectsByTeleconseiller: this.prospectsByTeleconseiller,
       prospectsByRepresentant: this.prospectsByRepresentant,
     });

@@ -21,6 +21,8 @@ abstract class _$SupervisionActivityDtoCWProxy {
     List<SupervisionTeleconseillerDto> teleconseillers,
   );
 
+  SupervisionActivityDto scores(List<SupervisionScoreDto> scores);
+
   SupervisionActivityDto prospectsByTeleconseiller(
     List<SupervisionHistogramBarDto> prospectsByTeleconseiller,
   );
@@ -42,6 +44,7 @@ abstract class _$SupervisionActivityDtoCWProxy {
     List<SupervisionActivityRowDto> items,
     SupervisionActivityCountsDto totals,
     List<SupervisionTeleconseillerDto> teleconseillers,
+    List<SupervisionScoreDto> scores,
     List<SupervisionHistogramBarDto> prospectsByTeleconseiller,
     List<SupervisionHistogramBarDto> prospectsByRepresentant,
   });
@@ -78,6 +81,10 @@ class _$SupervisionActivityDtoCWProxyImpl
   ) => this(teleconseillers: teleconseillers);
 
   @override
+  SupervisionActivityDto scores(List<SupervisionScoreDto> scores) =>
+      this(scores: scores);
+
+  @override
   SupervisionActivityDto prospectsByTeleconseiller(
     List<SupervisionHistogramBarDto> prospectsByTeleconseiller,
   ) => this(prospectsByTeleconseiller: prospectsByTeleconseiller);
@@ -101,6 +108,7 @@ class _$SupervisionActivityDtoCWProxyImpl
     Object? items = const $CopyWithPlaceholder(),
     Object? totals = const $CopyWithPlaceholder(),
     Object? teleconseillers = const $CopyWithPlaceholder(),
+    Object? scores = const $CopyWithPlaceholder(),
     Object? prospectsByTeleconseiller = const $CopyWithPlaceholder(),
     Object? prospectsByRepresentant = const $CopyWithPlaceholder(),
   }) {
@@ -129,6 +137,10 @@ class _$SupervisionActivityDtoCWProxyImpl
           ? _value.teleconseillers
           // ignore: cast_nullable_to_non_nullable
           : teleconseillers as List<SupervisionTeleconseillerDto>,
+      scores: scores == const $CopyWithPlaceholder()
+          ? _value.scores
+          // ignore: cast_nullable_to_non_nullable
+          : scores as List<SupervisionScoreDto>,
       prospectsByTeleconseiller:
           prospectsByTeleconseiller == const $CopyWithPlaceholder()
           ? _value.prospectsByTeleconseiller
@@ -166,6 +178,7 @@ SupervisionActivityDto _$SupervisionActivityDtoFromJson(
       'items',
       'totals',
       'teleconseillers',
+      'scores',
       'prospectsByTeleconseiller',
       'prospectsByRepresentant',
     ],
@@ -210,6 +223,12 @@ SupervisionActivityDto _$SupervisionActivityDtoFromJson(
           )
           .toList(),
     ),
+    scores: $checkedConvert(
+      'scores',
+      (v) => (v as List<dynamic>)
+          .map((e) => SupervisionScoreDto.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    ),
     prospectsByTeleconseiller: $checkedConvert(
       'prospectsByTeleconseiller',
       (v) => (v as List<dynamic>)
@@ -241,6 +260,7 @@ Map<String, dynamic> _$SupervisionActivityDtoToJson(
   'items': instance.items.map((e) => e.toJson()).toList(),
   'totals': instance.totals.toJson(),
   'teleconseillers': instance.teleconseillers.map((e) => e.toJson()).toList(),
+  'scores': instance.scores.map((e) => e.toJson()).toList(),
   'prospectsByTeleconseiller': instance.prospectsByTeleconseiller
       .map((e) => e.toJson())
       .toList(),
