@@ -93,13 +93,20 @@ model StatutQualification {
   attempts      RepCallAttempt[]
 }
 
-// Trois effets suffisent : le script n'émet pas `PROSPECTS_PROMISED`, qui vient
-// d'un autre geste, ni `WRONG_NUMBER` ni `OTHER`, qui ne sont pas des degrés
-// d'intérêt.
+// Le référentiel couvre les DEUX branches du script. L'effet dit à la fois
+// l'issue à enregistrer et, par conséquence, la branche où le statut se
+// propose : `UNREACHABLE` et `WRONG_NUMBER` sont les statuts d'un appel qui
+// n'a pas abouti, les trois autres ceux d'un appel qui a abouti. Pas de
+// colonne « joignable » : elle serait une seconde vérité, qui divergerait.
+//
+// `PROSPECTS_PROMISED` et `OTHER` restent hors du référentiel : le script ne
+// les émet pas, et ce ne sont pas des degrés d'intérêt.
 enum StatutQualificationEffect {
   REACHED
   REFUSED
   SCHEDULE_CALLBACK
+  UNREACHABLE
+  WRONG_NUMBER
 }
 ```
 
@@ -267,16 +274,35 @@ l'oubli est silencieux, et c'est là qu'il faut un test écrit exprès.
 
 ## Données de départ
 
-| code             | label          | effect              | requiresCallback | isSystem |
-| ---------------- | -------------- | ------------------- | ---------------- | -------- |
-| `TRES_INTERESSE` | Très intéressé | `REACHED`           | non              | oui      |
-| `INTERESSE`      | Intéressé      | `REACHED`           | non              | oui      |
-| `A_RAPPELER`     | À rappeler     | `SCHEDULE_CALLBACK` | oui              | oui      |
-| `PAS_INTERESSE`  | Pas intéressé  | `REFUSED`           | non              | oui      |
+Treize statuts, tous `isSystem`, dans cet ordre. La branche n'est pas stockée :
+elle se lit sur l'effet.
 
-Les quatre sont `isSystem` : le script s'appuie dessus, les désactiver toutes
-laisserait un écran sans issue possible. L'admin peut en ajouter d'autres, qui
-se désactivent comme les quatre.
+### Appel abouti
+
+| code             | label                  | effect              | requiresCallback |
+| ---------------- | ---------------------- | ------------------- | ---------------- |
+| `INTERESSE`      | Intéressé              | `REACHED`           | non              |
+| `TRES_INTERESSE` | Très intéressé         | `REACHED`           | non              |
+| `RDV_OBTENU`     | Rendez-vous obtenu     | `REACHED`           | non              |
+| `DEMANDE_INFOS`  | Demande d'informations | `REACHED`           | non              |
+| `NON_INTERESSE`  | Non intéressé          | `REFUSED`           | non              |
+| `NON_ELIGIBLE`   | Non éligible           | `REFUSED`           | non              |
+| `A_RAPPELER`     | À rappeler             | `SCHEDULE_CALLBACK` | oui              |
+
+### Appel non abouti
+
+| code                     | label                  | effect         | requiresCallback |
+| ------------------------ | ---------------------- | -------------- | ---------------- |
+| `PAS_DE_REPONSE`         | Pas de réponse         | `UNREACHABLE`  | non              |
+| `TELEPHONE_INDISPONIBLE` | Téléphone indisponible | `UNREACHABLE`  | non              |
+| `NUMERO_OCCUPE`          | Numéro occupé          | `UNREACHABLE`  | non              |
+| `MESSAGERIE`             | Messagerie             | `UNREACHABLE`  | non              |
+| `FAUX_NUMERO`            | Faux numéro            | `WRONG_NUMBER` | non              |
+| `NUMERO_INVALIDE`        | Numéro invalide        | `WRONG_NUMBER` | non              |
+
+Les treize sont `isSystem` : le script s'appuie dessus, et les désactiver toutes
+laisserait une branche sans issue possible. L'admin peut en ajouter d'autres,
+qui se désactivent comme elles.
 
 Aucun référentiel du dépôt n'expose de suppression : une ligne se désactive, et
 les fiches des années passées continuent de la désigner. Celui-ci ne fait pas
@@ -284,6 +310,16 @@ exception.
 
 Aucune reprise des fiches existantes : leur statut reste nul, et c'est exact.
 Personne ne leur a posé la question.
+
+## Ordre de livraison
+
+Deux temps, à la demande du propriétaire :
+
+1. **Base, API et panel web.** Vérifiable de bout en bout sans toucher au
+   terrain : l'admin crée et désactive, le plateau qualifie depuis la console,
+   les listes se filtrent et un lot se tire sur le critère.
+2. **Mobile.** Le champ étant facultatif dans le contrat, le terrain continue
+   de qualifier sans lui pendant tout le premier temps.
 
 ## Compatibilité
 
