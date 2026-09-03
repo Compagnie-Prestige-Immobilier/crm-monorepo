@@ -505,7 +505,13 @@ function ChoixStatut({
       <label htmlFor="rep-statut" className="text-[1rem] font-[600]">
         Statut de qualification
       </label>
-      <Select value={value} onValueChange={onChange}>
+      {/* `items` n'est pas décoratif : sans lui, le déclencheur affiche la
+          VALEUR, donc l'identifiant, au lieu du libellé de la ligne choisie. */}
+      <Select
+        items={statuts.map((statut) => ({ value: statut.id, label: statut.label }))}
+        value={value}
+        onValueChange={onChange}
+      >
         <SelectTrigger id="rep-statut">
           <SelectValue placeholder="Choisir un statut" />
         </SelectTrigger>
