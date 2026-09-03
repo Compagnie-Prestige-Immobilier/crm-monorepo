@@ -91,6 +91,13 @@ export function ReferentielsView() {
         Listes de valeurs proposées à la saisie des prospects.{' '}
         <Link href="/admin/referentiels/issues-appel" className="underline underline-offset-2">
           Issues d’appel
+        </Link>{' '}
+        ·{' '}
+        <Link
+          href="/admin/referentiels/statuts-qualification"
+          className="underline underline-offset-2"
+        >
+          Statuts de qualification
         </Link>
       </p>
 

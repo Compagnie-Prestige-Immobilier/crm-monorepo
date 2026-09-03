@@ -52,6 +52,7 @@ export interface RepresentantFilters {
   dateTo: string | null;
   hasProspects: boolean | null;
   relationStatus: RepresentantRelation | null;
+  statutQualificationId: string | null;
   sortBy: RepresentantSortField;
   sortDir: SortDirection;
   page: number;
@@ -67,6 +68,7 @@ export const EMPTY_REPRESENTANT_FILTERS: RepresentantFilters = {
   dateTo: null,
   hasProspects: null,
   relationStatus: null,
+  statutQualificationId: null,
   sortBy: 'clientCreatedAt',
   sortDir: 'desc',
   page: 1,
@@ -91,6 +93,7 @@ export function parseRepresentantFilters(
       'relationStatus',
       REPRESENTANT_RELATIONS,
     ),
+    statutQualificationId: readString(params, 'statutQualificationId'),
     sortBy:
       readEnum<RepresentantSortField>(params, 'sortBy', REPRESENTANT_SORT_FIELDS) ??
       EMPTY_REPRESENTANT_FILTERS.sortBy,
@@ -114,6 +117,7 @@ export function serializeRepresentantFilters(filters: RepresentantFilters): URLS
   put('dateTo', filters.dateTo);
   if (filters.hasProspects !== null) put('hasProspects', filters.hasProspects ? 'oui' : 'non');
   put('relationStatus', filters.relationStatus);
+  put('statutQualificationId', filters.statutQualificationId);
   if (filters.sortBy !== EMPTY_REPRESENTANT_FILTERS.sortBy) put('sortBy', filters.sortBy);
   if (filters.sortDir !== EMPTY_REPRESENTANT_FILTERS.sortDir) {
     put('sortDir', filters.sortDir);
@@ -148,5 +152,6 @@ export function countActiveRepresentantFilters(filters: RepresentantFilters): nu
   if (filters.dateFrom !== null || filters.dateTo !== null) count += 1;
   if (filters.hasProspects !== null) count += 1;
   if (filters.relationStatus !== null) count += 1;
+  if (filters.statutQualificationId !== null) count += 1;
   return count;
 }
