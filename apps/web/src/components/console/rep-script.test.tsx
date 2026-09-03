@@ -483,26 +483,26 @@ describe('RepScript : le statut « À rappeler » propose un calendrier', () => 
 });
 
 /** Il a décroché, il a répondu, et il demande quand même à être rappelé. */
-describe('RepScript : le rappel facultatif d’un joignable', () => {
-  it('propose une échéance sans jamais l’exiger', async () => {
+/** L'échéance appartient au statut qui la réclame, à lui seul. */
+describe('RepScript : l’échéance suit le statut, pas le résultat', () => {
+  it('ne la propose pas sur un joignable dont le statut ne l’exige pas', async () => {
     await renderListe();
     await choisir(/Aminata Ndiaye/u);
 
     await parcoursJoignable('Oui');
     await repondreA('A-t-il WhatsApp sur ce numéro ?', 'Oui');
 
-    expect(screen.getByText('Le rappeler plus tard ? (facultatif)')).toBeTruthy();
-    expect(screen.queryByText('Choisissez quand rappeler')).toBeNull();
+    expect(screen.queryByText('Quand rappeler ?')).toBeNull();
+    expect(screen.queryByText(/Le rappeler plus tard/u)).toBeNull();
     expect(screen.getByRole('button', { name: 'Continuer' }).hasAttribute('disabled')).toBe(false);
   });
 
-  it('envoie l’échéance avec l’issue REACHED, pas CALLBACK', async () => {
+  it('n’envoie aucune échéance sur une issue qui ne planifie pas de rappel', async () => {
     await renderListe();
     await choisir(/Aminata Ndiaye/u);
 
     await parcoursJoignable('Oui');
     await repondreA('A-t-il WhatsApp sur ce numéro ?', 'Oui');
-    await repondre('Demain 9 h');
     await userEvent.click(screen.getByRole('button', { name: 'Continuer' }));
     await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
 
@@ -510,7 +510,7 @@ describe('RepScript : le rappel facultatif d’un joignable', () => {
       expect(pushRepCallAttempt).toHaveBeenCalledTimes(1);
     });
     expect(dernierEnvoi()).toMatchObject({ outcome: 'REACHED', relationStatus: 'AMBASSADEUR' });
-    expect(typeof dernierEnvoi()['callbackAt']).toBe('string');
+    expect(dernierEnvoi()['callbackAt']).toBeUndefined();
   });
 
   it('ne propose rien après un injoignable', async () => {
