@@ -198,6 +198,7 @@ export 'package:crm_api_client/src/model/phase2_status_count_dto.dart';
 export 'package:crm_api_client/src/model/phase2_status_list_dto.dart';
 export 'package:crm_api_client/src/model/presence_counts_dto.dart';
 export 'package:crm_api_client/src/model/presence_state.dart';
+export 'package:crm_api_client/src/model/priorite_traitement.dart';
 export 'package:crm_api_client/src/model/profession_dto.dart';
 export 'package:crm_api_client/src/model/projet.dart';
 export 'package:crm_api_client/src/model/prospect_conflict_dto.dart';

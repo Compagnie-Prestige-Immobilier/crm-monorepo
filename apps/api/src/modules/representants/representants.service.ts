@@ -70,6 +70,11 @@ function orderByFor(query: RepresentantQueryDto): Prisma.RepresentantOrderByWith
     case RepresentantSortField.NEXT_CALLBACK_AT:
       // Le rappel le plus proche d'abord, sauf tri explicite.
       return [{ nextCallbackAt: query.sortOrder ?? 'asc' }, { id: 'desc' }];
+    case RepresentantSortField.PRIORITE:
+      // `asc` suit l'ordre de declaration de l'enumeration, HAUTE d'abord, et
+      // PostgreSQL classe les NULL en dernier dans ce sens : une fiche jamais
+      // qualifiee ne double pas celles qu'on a jointes.
+      return [{ statutQualification: { priorite: query.sortOrder ?? 'asc' } }, { id: 'desc' }];
     case RepresentantSortField.CLIENT_CREATED_AT:
     default:
       return [{ clientCreatedAt: direction }, { id: 'desc' }];

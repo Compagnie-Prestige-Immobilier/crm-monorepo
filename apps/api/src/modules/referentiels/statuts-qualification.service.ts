@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { RepCallOutcome, StatutQualificationEffect } from '@crm/database';
+import { PrioriteTraitement, RepCallOutcome, StatutQualificationEffect } from '@crm/database';
 import type { StatutQualification } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
@@ -68,6 +68,7 @@ const toDto = (row: StatutQualification): StatutQualificationDto => ({
   label: row.label,
   effect: row.effect,
   requiresCallback: row.requiresCallback,
+  priorite: row.priorite,
   isActive: row.isActive,
   isSystem: row.isSystem,
   minPayloadVersion: row.minPayloadVersion,
@@ -129,6 +130,7 @@ export class StatutsQualificationService {
         label,
         effect: input.effect,
         requiresCallback,
+        priorite: input.priorite ?? PrioriteTraitement.NORMALE,
         sortOrder: await this.rangSuivant(input.effect),
         isActive: true,
         isSystem: false,
@@ -141,9 +143,9 @@ export class StatutsQualificationService {
   async update(id: string, input: UpdateStatutQualificationDto): Promise<StatutQualificationDto> {
     const existing = await this.statut(id);
 
-    // Le libellé et l'ordre se corrigent toujours. La RÈGLE d'un statut système
-    // ne se reconfigure pas : le script s'appuie dessus, et les clients
-    // déployés ont compilé son comportement.
+    // Le libellé et la priorité se corrigent toujours, système compris : le
+    // second est un arbitrage de plateau. La RÈGLE, elle, ne se reconfigure
+    // pas : le script s'appuie dessus, et les clients déployés l'ont compilée.
     if (existing.isSystem && input.requiresCallback !== undefined) {
       throw new ConflictException({
         code: StatutQualificationError.SYSTEM_IMMUTABLE,
@@ -175,6 +177,7 @@ export class StatutsQualificationService {
         ...(input.requiresCallback === undefined
           ? {}
           : { requiresCallback: input.requiresCallback }),
+        ...(input.priorite === undefined ? {} : { priorite: input.priorite }),
       },
     });
     return toDto(updated);

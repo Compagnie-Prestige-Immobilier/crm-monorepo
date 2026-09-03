@@ -36,6 +36,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
+  PRIORITES_TRAITEMENT,
+  PRIORITE_TRAITEMENT_LABELS,
   STATUT_QUALIFICATION_EFFECTS,
   STATUT_QUALIFICATION_EFFECT_LABELS,
   createStatutQualification,
@@ -43,6 +45,7 @@ import {
   fetchAllStatutsQualification,
   setStatutQualificationActive,
   updateStatutQualification,
+  type PrioriteTraitement,
   type StatutQualification,
   type StatutQualificationEffect,
 } from '@/lib/data/statuts-qualification';
@@ -54,6 +57,7 @@ interface Draft {
   label: string;
   effect: StatutQualificationEffect;
   requiresCallback: boolean;
+  priorite: PrioriteTraitement;
 }
 
 const EMPTY: Draft = {
@@ -61,6 +65,13 @@ const EMPTY: Draft = {
   label: '',
   effect: 'REACHED',
   requiresCallback: false,
+  priorite: 'NORMALE',
+};
+
+const PRIORITE_VARIANTS: Record<PrioriteTraitement, 'warning' | 'secondary' | 'outline'> = {
+  HAUTE: 'warning',
+  NORMALE: 'secondary',
+  BASSE: 'outline',
 };
 
 export function StatutsQualificationView() {
@@ -181,6 +192,7 @@ function Branche({
             <TableHead>Libellé</TableHead>
             <TableHead>Code</TableHead>
             <TableHead>Effet</TableHead>
+            <TableHead>Priorité</TableHead>
             <TableHead>État</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
@@ -198,6 +210,11 @@ function Branche({
               </TableCell>
               <TableCell className="text-muted-foreground">{statut.code}</TableCell>
               <TableCell>{STATUT_QUALIFICATION_EFFECT_LABELS[statut.effect]}</TableCell>
+              <TableCell>
+                <Badge variant={PRIORITE_VARIANTS[statut.priorite]}>
+                  {PRIORITE_TRAITEMENT_LABELS[statut.priorite]}
+                </Badge>
+              </TableCell>
               <TableCell>
                 <Badge variant={statut.isActive ? 'default' : 'outline'}>
                   {statut.isActive ? 'Proposé' : 'Retiré'}
@@ -271,18 +288,21 @@ function FormulaireStatut({
             label: statut.label,
             effect: statut.effect,
             requiresCallback: statut.requiresCallback,
+            priorite: statut.priorite,
           },
     );
   }, [open, statut, reset]);
 
   // oxlint-disable-next-line react/incompatible-library -- faux positif react-hook-form
   const effect = watch('effect');
+  const priorite = watch('priorite');
 
   const save = useMutation({
     mutationFn: (values: Draft) =>
       modification
         ? updateStatutQualification(statut.id, {
             label: values.label.trim(),
+            priorite: values.priorite,
             ...(regleFigee ? {} : { requiresCallback: values.requiresCallback }),
           })
         : createStatutQualification({
@@ -290,6 +310,7 @@ function FormulaireStatut({
             label: values.label.trim(),
             effect: values.effect,
             requiresCallback: values.requiresCallback,
+            priorite: values.priorite,
           }),
     onSuccess: () => {
       toast.success(modification ? 'Statut modifié.' : 'Statut ajouté.');
@@ -368,6 +389,31 @@ function FormulaireStatut({
                   {STATUT_QUALIFICATION_EFFECTS.map((valeur) => (
                     <SelectItem key={valeur} value={valeur}>
                       {STATUT_QUALIFICATION_EFFECT_LABELS[valeur]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </Field>
+
+          {/* La priorite reste ouverte sur une ligne systeme : elle dit dans
+              quel ordre le plateau reprend les fiches, pas ce que fait le
+              script. */}
+          <Field label="Priorité" description="Ordre dans lequel le plateau reprend les fiches.">
+            {(props) => (
+              <Select
+                value={priorite}
+                onValueChange={(value) => {
+                  setValue('priorite', value as PrioriteTraitement);
+                }}
+              >
+                <SelectTrigger id={props.id}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PRIORITES_TRAITEMENT.map((valeur) => (
+                    <SelectItem key={valeur} value={valeur}>
+                      {PRIORITE_TRAITEMENT_LABELS[valeur]}
                     </SelectItem>
                   ))}
                 </SelectContent>

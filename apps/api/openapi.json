@@ -20209,6 +20209,11 @@
         "type": "string",
         "enum": ["REACHED", "REFUSED", "SCHEDULE_CALLBACK", "UNREACHABLE", "WRONG_NUMBER"]
       },
+      "PrioriteTraitement": {
+        "type": "string",
+        "enum": ["HAUTE", "NORMALE", "BASSE"],
+        "description": "Ordre de reprise : un « Très intéressé » se rappelle avant un « Non éligible »."
+      },
       "StatutQualificationDto": {
         "type": "object",
         "properties": {
@@ -20235,6 +20240,14 @@
             "type": "boolean",
             "description": "La date du rappel est exigée par ce statut."
           },
+          "priorite": {
+            "description": "Ordre de reprise : un « Très intéressé » se rappelle avant un « Non éligible ».",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PrioriteTraitement"
+              }
+            ]
+          },
           "isActive": {
             "type": "boolean"
           },
@@ -20257,6 +20270,7 @@
           "label",
           "effect",
           "requiresCallback",
+          "priorite",
           "isActive",
           "isSystem",
           "minPayloadVersion",
@@ -20297,6 +20311,14 @@
           "requiresCallback": {
             "type": "boolean",
             "default": false
+          },
+          "priorite": {
+            "default": "NORMALE",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PrioriteTraitement"
+              }
+            ]
           }
         },
         "required": ["code", "label", "effect"]
@@ -20310,6 +20332,13 @@
           },
           "requiresCallback": {
             "type": "boolean"
+          },
+          "priorite": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PrioriteTraitement"
+              }
+            ]
           }
         }
       },
@@ -20342,7 +20371,8 @@
           "fullName",
           "prospects",
           "lastCallAt",
-          "nextCallbackAt"
+          "nextCallbackAt",
+          "priorite"
         ]
       },
       "SortOrder": {

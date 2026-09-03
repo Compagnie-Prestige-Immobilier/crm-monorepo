@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { EmployeurType, StatutQualificationEffect } from '@crm/database';
+import { EmployeurType, PrioriteTraitement, StatutQualificationEffect } from '@crm/database';
 import {
   IsBoolean,
   IsEnum,
@@ -603,6 +603,12 @@ export class StatutQualificationDto {
   effect!: StatutQualificationEffect;
   @ApiProperty({ description: 'La date du rappel est exigée par ce statut.' })
   requiresCallback!: boolean;
+  @ApiProperty({
+    enum: PrioriteTraitement,
+    enumName: 'PrioriteTraitement',
+    description: 'Ordre de reprise : un « Très intéressé » se rappelle avant un « Non éligible ».',
+  })
+  priorite!: PrioriteTraitement;
   @ApiProperty() isActive!: boolean;
   @ApiProperty({ description: 'Le script s’appuie dessus : sa règle ne se reconfigure pas.' })
   isSystem!: boolean;
@@ -651,6 +657,15 @@ export class CreateStatutQualificationDto {
   @IsOptional()
   @IsBoolean()
   requiresCallback?: boolean;
+
+  @ApiPropertyOptional({
+    enum: PrioriteTraitement,
+    enumName: 'PrioriteTraitement',
+    default: PrioriteTraitement.NORMALE,
+  })
+  @IsOptional()
+  @IsEnum(PrioriteTraitement)
+  priorite?: PrioriteTraitement;
 }
 
 export class UpdateStatutQualificationDto {
@@ -665,6 +680,11 @@ export class UpdateStatutQualificationDto {
   @IsOptional()
   @IsBoolean()
   requiresCallback?: boolean;
+
+  @ApiPropertyOptional({ enum: PrioriteTraitement, enumName: 'PrioriteTraitement' })
+  @IsOptional()
+  @IsEnum(PrioriteTraitement)
+  priorite?: PrioriteTraitement;
 }
 
 export class SetStatutQualificationActiveDto {

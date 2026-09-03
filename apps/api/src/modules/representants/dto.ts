@@ -257,6 +257,7 @@ export enum RepresentantSortField {
   PROSPECTS = 'prospects',
   LAST_CALL_AT = 'lastCallAt',
   NEXT_CALLBACK_AT = 'nextCallbackAt',
+  PRIORITE = 'priorite',
 }
 
 /** Ce que le dernier appel laisse à faire. */

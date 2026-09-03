@@ -11,6 +11,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { ROLES_KEY } from '../../common/decorators/roles.decorator.js';
+import { SortOrder } from '../../common/dto/prospect-filter.dto.js';
+import { RepresentantSortField } from './dto.js';
 import { RepresentantsController } from './representants.controller.js';
 import { RepresentantsService } from './representants.service.js';
 
@@ -866,5 +868,28 @@ describe('WhatsApp et profession sur la fiche', () => {
     await service.list(ADMIN, {});
 
     expect(whereOf()).not.toHaveProperty('whatsappStatus');
+  });
+});
+
+describe('tri par priorité de traitement', () => {
+  const orderByOf = (): unknown =>
+    (db.representant.findMany.mock.calls[0] as [{ orderBy: unknown }])[0].orderBy;
+
+  it('remonte les priorités hautes, et les fiches jamais qualifiées en dernier', async () => {
+    await service.list(ADMIN, { sortBy: RepresentantSortField.PRIORITE });
+
+    // `asc` sur l'énumération suit son ordre de déclaration, HAUTE d'abord, et
+    // PostgreSQL classe les NULL en dernier dans ce sens : une fiche sans
+    // statut ne double pas celles qu'on a qualifiées.
+    expect(orderByOf()).toEqual([{ statutQualification: { priorite: 'asc' } }, { id: 'desc' }]);
+  });
+
+  it('accepte l’ordre inverse quand il est demandé', async () => {
+    await service.list(ADMIN, {
+      sortBy: RepresentantSortField.PRIORITE,
+      sortOrder: SortOrder.DESC,
+    });
+
+    expect(orderByOf()).toEqual([{ statutQualification: { priorite: 'desc' } }, { id: 'desc' }]);
   });
 });

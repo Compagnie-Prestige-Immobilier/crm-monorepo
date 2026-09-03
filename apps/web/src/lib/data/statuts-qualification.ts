@@ -6,6 +6,7 @@ import { getApiClient } from '@/lib/api/browser';
 type Schemas = components['schemas'];
 
 export type StatutQualificationEffect = Schemas['StatutQualificationEffect'];
+export type PrioriteTraitement = Schemas['PrioriteTraitement'];
 export type StatutQualification = Schemas['StatutQualificationDto'];
 export type CreateStatutQualificationInput = Schemas['CreateStatutQualificationDto'];
 export type UpdateStatutQualificationInput = Schemas['UpdateStatutQualificationDto'];
@@ -31,6 +32,19 @@ export const STATUT_QUALIFICATION_EFFECT_LABELS: Record<StatutQualificationEffec
   SCHEDULE_CALLBACK: 'Appel abouti, rappel daté',
   UNREACHABLE: 'Appel non abouti',
   WRONG_NUMBER: 'Appel non abouti, mauvais numéro',
+};
+
+/** Du plus urgent au moins urgent : le serveur trie l'annuaire dans cet ordre. */
+export const PRIORITES_TRAITEMENT = [
+  'HAUTE',
+  'NORMALE',
+  'BASSE',
+] as const satisfies readonly PrioriteTraitement[];
+
+export const PRIORITE_TRAITEMENT_LABELS: Record<PrioriteTraitement, string> = {
+  HAUTE: 'Haute',
+  NORMALE: 'Normale',
+  BASSE: 'Basse',
 };
 
 /**

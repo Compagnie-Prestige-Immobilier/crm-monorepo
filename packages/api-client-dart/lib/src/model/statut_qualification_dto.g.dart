@@ -17,6 +17,8 @@ abstract class _$StatutQualificationDtoCWProxy {
 
   StatutQualificationDto requiresCallback(bool requiresCallback);
 
+  StatutQualificationDto priorite(PrioriteTraitement priorite);
+
   StatutQualificationDto isActive(bool isActive);
 
   StatutQualificationDto isSystem(bool isSystem);
@@ -37,6 +39,7 @@ abstract class _$StatutQualificationDtoCWProxy {
     String label,
     StatutQualificationEffect effect,
     bool requiresCallback,
+    PrioriteTraitement priorite,
     bool isActive,
     bool isSystem,
     num minPayloadVersion,
@@ -69,6 +72,10 @@ class _$StatutQualificationDtoCWProxyImpl
       this(requiresCallback: requiresCallback);
 
   @override
+  StatutQualificationDto priorite(PrioriteTraitement priorite) =>
+      this(priorite: priorite);
+
+  @override
   StatutQualificationDto isActive(bool isActive) => this(isActive: isActive);
 
   @override
@@ -95,6 +102,7 @@ class _$StatutQualificationDtoCWProxyImpl
     Object? label = const $CopyWithPlaceholder(),
     Object? effect = const $CopyWithPlaceholder(),
     Object? requiresCallback = const $CopyWithPlaceholder(),
+    Object? priorite = const $CopyWithPlaceholder(),
     Object? isActive = const $CopyWithPlaceholder(),
     Object? isSystem = const $CopyWithPlaceholder(),
     Object? minPayloadVersion = const $CopyWithPlaceholder(),
@@ -121,6 +129,10 @@ class _$StatutQualificationDtoCWProxyImpl
           ? _value.requiresCallback
           // ignore: cast_nullable_to_non_nullable
           : requiresCallback as bool,
+      priorite: priorite == const $CopyWithPlaceholder()
+          ? _value.priorite
+          // ignore: cast_nullable_to_non_nullable
+          : priorite as PrioriteTraitement,
       isActive: isActive == const $CopyWithPlaceholder()
           ? _value.isActive
           // ignore: cast_nullable_to_non_nullable
@@ -163,6 +175,7 @@ StatutQualificationDto _$StatutQualificationDtoFromJson(
       'label',
       'effect',
       'requiresCallback',
+      'priorite',
       'isActive',
       'isSystem',
       'minPayloadVersion',
@@ -182,6 +195,14 @@ StatutQualificationDto _$StatutQualificationDtoFromJson(
       ),
     ),
     requiresCallback: $checkedConvert('requiresCallback', (v) => v as bool),
+    priorite: $checkedConvert(
+      'priorite',
+      (v) => $enumDecode(
+        _$PrioriteTraitementEnumMap,
+        v,
+        unknownValue: PrioriteTraitement.unknownDefaultOpenApi,
+      ),
+    ),
     isActive: $checkedConvert('isActive', (v) => v as bool),
     isSystem: $checkedConvert('isSystem', (v) => v as bool),
     minPayloadVersion: $checkedConvert('minPayloadVersion', (v) => v as num),
@@ -198,6 +219,7 @@ Map<String, dynamic> _$StatutQualificationDtoToJson(
   'label': instance.label,
   'effect': _$StatutQualificationEffectEnumMap[instance.effect]!,
   'requiresCallback': instance.requiresCallback,
+  'priorite': _$PrioriteTraitementEnumMap[instance.priorite]!,
   'isActive': instance.isActive,
   'isSystem': instance.isSystem,
   'minPayloadVersion': instance.minPayloadVersion,
@@ -211,4 +233,11 @@ const _$StatutQualificationEffectEnumMap = {
   StatutQualificationEffect.UNREACHABLE: 'UNREACHABLE',
   StatutQualificationEffect.WRONG_NUMBER: 'WRONG_NUMBER',
   StatutQualificationEffect.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$PrioriteTraitementEnumMap = {
+  PrioriteTraitement.HAUTE: 'HAUTE',
+  PrioriteTraitement.NORMALE: 'NORMALE',
+  PrioriteTraitement.BASSE: 'BASSE',
+  PrioriteTraitement.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
