@@ -769,6 +769,7 @@ class RepresentantsApi {
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [hasProspects] - true : au moins un prospect vivant. false : aucun (représentant dormant).
   /// * [relationStatus]
+  /// * [statutQualificationId] - Statut de qualification du dernier appel. Sert le filtre de l’annuaire ET le tirage d’un lot d’appels.
   /// * [whatsappStatus]
   /// * [hasWhatsapp]
   /// * [suivi] - A_RAPPELER : un rappel promis reste dû (`nextCallbackAt`), tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien.
@@ -795,6 +796,7 @@ class RepresentantsApi {
     DateTime? dateTo,
     bool? hasProspects,
     RepresentantRelation? relationStatus,
+    String? statutQualificationId,
     WhatsappStatus? whatsappStatus,
     bool? hasWhatsapp,
     RepresentantSuivi? suivi,
@@ -832,6 +834,8 @@ class RepresentantsApi {
       if (dateTo != null) r'dateTo': dateTo,
       if (hasProspects != null) r'hasProspects': hasProspects,
       if (relationStatus != null) r'relationStatus': relationStatus,
+      if (statutQualificationId != null)
+        r'statutQualificationId': statutQualificationId,
       if (whatsappStatus != null) r'whatsappStatus': whatsappStatus,
       if (hasWhatsapp != null) r'hasWhatsapp': hasWhatsapp,
       if (suivi != null) r'suivi': suivi,

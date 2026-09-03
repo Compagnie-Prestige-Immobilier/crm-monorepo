@@ -62,6 +62,7 @@ import 'package:crm_api_client/src/model/create_prospect_dto.dart';
 import 'package:crm_api_client/src/model/create_rep_call_attempt_dto.dart';
 import 'package:crm_api_client/src/model/create_representant_comment_dto.dart';
 import 'package:crm_api_client/src/model/create_representant_dto.dart';
+import 'package:crm_api_client/src/model/create_statut_qualification_dto.dart';
 import 'package:crm_api_client/src/model/create_syndicat_dto.dart';
 import 'package:crm_api_client/src/model/create_user_dto.dart';
 import 'package:crm_api_client/src/model/create_visite_dto.dart';
@@ -176,8 +177,11 @@ import 'package:crm_api_client/src/model/segment_list_dto.dart';
 import 'package:crm_api_client/src/model/set_active_dto.dart';
 import 'package:crm_api_client/src/model/set_bank_case_stage_active_dto.dart';
 import 'package:crm_api_client/src/model/set_call_outcome_reason_active_dto.dart';
+import 'package:crm_api_client/src/model/set_statut_qualification_active_dto.dart';
 import 'package:crm_api_client/src/model/set_visite_import_change_selection_dto.dart';
 import 'package:crm_api_client/src/model/set_visite_referentiel_active_dto.dart';
+import 'package:crm_api_client/src/model/statut_qualification_dto.dart';
+import 'package:crm_api_client/src/model/statut_qualification_list_dto.dart';
 import 'package:crm_api_client/src/model/suggestion_dto.dart';
 import 'package:crm_api_client/src/model/suggestion_list_dto.dart';
 import 'package:crm_api_client/src/model/supervised_user_dto.dart';
@@ -219,6 +223,7 @@ import 'package:crm_api_client/src/model/update_offer_dto.dart';
 import 'package:crm_api_client/src/model/update_profession_dto.dart';
 import 'package:crm_api_client/src/model/update_prospect_dto.dart';
 import 'package:crm_api_client/src/model/update_representant_dto.dart';
+import 'package:crm_api_client/src/model/update_statut_qualification_dto.dart';
 import 'package:crm_api_client/src/model/update_suggestion_status_dto.dart';
 import 'package:crm_api_client/src/model/update_syndicat_dto.dart';
 import 'package:crm_api_client/src/model/update_user_dto.dart';
@@ -472,6 +477,11 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'CreateRepresentantDto':
       return CreateRepresentantDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'CreateStatutQualificationDto':
+      return CreateStatutQualificationDto.fromJson(
+            value as Map<String, dynamic>,
+          )
           as ReturnType;
     case 'CreateSyndicatDto':
       return CreateSyndicatDto.fromJson(value as Map<String, dynamic>)
@@ -845,6 +855,11 @@ ReturnType deserialize<ReturnType, BaseType>(
             value as Map<String, dynamic>,
           )
           as ReturnType;
+    case 'SetStatutQualificationActiveDto':
+      return SetStatutQualificationActiveDto.fromJson(
+            value as Map<String, dynamic>,
+          )
+          as ReturnType;
     case 'SetVisiteImportChangeSelectionDto':
       return SetVisiteImportChangeSelectionDto.fromJson(
             value as Map<String, dynamic>,
@@ -856,6 +871,13 @@ ReturnType deserialize<ReturnType, BaseType>(
           )
           as ReturnType;
     case 'SortOrder':
+    case 'StatutQualificationDto':
+      return StatutQualificationDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'StatutQualificationEffect':
+    case 'StatutQualificationListDto':
+      return StatutQualificationListDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'SuggestionDto':
       return SuggestionDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -989,6 +1011,11 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'UpdateRepresentantDto':
       return UpdateRepresentantDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'UpdateStatutQualificationDto':
+      return UpdateStatutQualificationDto.fromJson(
+            value as Map<String, dynamic>,
+          )
           as ReturnType;
     case 'UpdateSuggestionStatusDto':
       return UpdateSuggestionStatusDto.fromJson(value as Map<String, dynamic>)
