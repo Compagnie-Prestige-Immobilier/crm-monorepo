@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Prisma, Projet, Role } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
+import { performanceScore } from '../admin/performance-score.js';
 import {
   UNUSABLE_OUTCOMES,
   REP_ANSWERED_OUTCOMES,
@@ -17,8 +18,11 @@ import type {
   SupervisionHistogramBarDto,
   SupervisionActivityRowDto,
   SupervisionQueryDto,
+  SupervisionScoreDto,
   SupervisionTeleconseillerDto,
+  WorkShiftDto,
 } from './supervision.dto.js';
+import { DEFAULT_SHIFTS, WorkShiftsService } from './work-shifts.service.js';
 
 /**
  * Qui passe des appels, et apparaît donc dans l'équipe. L'encadrement décroche
@@ -26,6 +30,57 @@ import type {
  * L'ADMIN en est absent : c'est un compte d'administration, pas de plateau.
  */
 const TELECONSEIL_ROLES = [Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION] as const;
+
+/** Même seuil que la supervision des comptes : au-delà, l'écart devient du temps mort. */
+const DEAD_GAP_SECONDS = 15 * 60;
+
+const JOUR_SECONDES = 86_400;
+
+interface Creneau {
+  debut: number;
+  fin: number;
+}
+
+function secondesHorloge(value: string): number {
+  const [heures = 0, minutes = 0] = value.split(':').map(Number);
+  return heures * 3600 + minutes * 60;
+}
+
+function horloge(secondes: number): string {
+  const heures = Math.floor(secondes / 3600);
+  const minutes = Math.floor((secondes % 3600) / 60);
+  return `${String(heures).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+/**
+ * Les créneaux rabotés par le filtre horaire. Sans cette intersection, demander
+ * la seule matinée diviserait la note par une journée entière.
+ */
+function creneauxEffectifs(shifts: readonly WorkShiftDto[], query: SupervisionQueryDto): Creneau[] {
+  const bas = query.timeFrom ? secondesHorloge(query.timeFrom) : 0;
+  const haut = query.timeTo ? secondesHorloge(query.timeTo) : JOUR_SECONDES;
+  return shifts
+    .map((shift) => ({
+      debut: Math.max(secondesHorloge(shift.start), bas),
+      fin: Math.min(secondesHorloge(shift.end), haut),
+    }))
+    .filter((creneau) => creneau.fin > creneau.debut);
+}
+
+/** Un jour passé compte ses créneaux entiers, le jour courant sa portion écoulée. */
+function secondesEcoulees(jour: string, creneaux: readonly Creneau[], now: Date): number {
+  const aujourdhui = now.toISOString().slice(0, 10);
+  if (jour > aujourdhui) return 0;
+  const instant =
+    jour < aujourdhui
+      ? JOUR_SECONDES
+      : now.getUTCHours() * 3600 + now.getUTCMinutes() * 60 + now.getUTCSeconds();
+  return creneaux.reduce(
+    (total, creneau) =>
+      total + Math.min(Math.max(instant - creneau.debut, 0), creneau.fin - creneau.debut),
+    0,
+  );
+}
 
 interface ActivityRow {
   jour: string;
@@ -94,9 +149,30 @@ interface HistogramRow {
   prospects: number;
 }
 
+interface ScoreRow {
+  id: string;
+  appels: number;
+  joints: number;
+  qualifies: number;
+  rappels: number;
+  tempsMort: number;
+}
+
+/** Un jour où le compte a été vu : une tranche de présence, un appel, ou les deux. */
+interface JourVuRow {
+  id: string;
+  jour: string;
+  actifs: number;
+}
+
 @Injectable()
 export class SupervisionActivityService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(SupervisionActivityService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly workShifts: WorkShiftsService,
+  ) {}
 
   async activite(query: SupervisionQueryDto): Promise<SupervisionActivityDto> {
     const granularity = query.granularity ?? SupervisionGranularity.DAY;
@@ -191,6 +267,72 @@ export class SupervisionActivityService {
           ORDER BY rca."representantId", rca."clientCreatedAt" DESC, rca."id" DESC
     `;
 
+    // Les créneaux bornent le temps mort et le dénominateur de la note : lus
+    // avant le reste, ils ne peuvent pas s'attendre dans le même `Promise.all`.
+    const shifts = await this.workShifts
+      .get()
+      .then((settings) => settings.shifts)
+      .catch((error: unknown) => {
+        this.logger.warn(`créneaux illisibles, valeurs par défaut: ${String(error)}`);
+        return [...DEFAULT_SHIFTS];
+      });
+    const creneaux = creneauxEffectifs(shifts, query);
+
+    // Une seule ligne par appel, prospects et représentants confondus : c'est
+    // l'assiette de la note, du temps mort et des rappels.
+    const tentatives = Prisma.sql`
+          SELECT
+            ca."performedById"                              AS "userId",
+            ca."clientCreatedAt"                            AS quand,
+            'prospect'                                      AS famille,
+            ca."prospectId"::text                           AS cible,
+            (ca."outcome" NOT IN ${UNUSABLE_OUTCOMES})::int AS joint,
+            (ca."outcome" = 'METHOD_OBTAINED')::int         AS qualifie
+          FROM "call_attempts" ca
+          WHERE ${projetScope(Prisma.sql`ca."prospectId"`)}
+            AND ${withinWindow(Prisma.sql`ca."clientCreatedAt"`, query)}
+
+          UNION ALL
+          SELECT
+            rca."performedById", rca."clientCreatedAt", 'representant',
+            rca."representantId"::text,
+            (rca."outcome" IN ${REP_ANSWERED_OUTCOMES})::int, 0
+          FROM "rep_call_attempts" rca
+          WHERE ${repScope} AND ${repWindow}
+    `;
+
+    const creneauDe = Prisma.sql`CASE ${Prisma.join(
+      shifts.map(
+        (shift) =>
+          Prisma.sql`WHEN a.quand::time >= ${shift.start}::time AND a.quand::time < ${shift.end}::time THEN ${shift.key}::text`,
+      ),
+      ' ',
+    )} END`;
+
+    const situes = Prisma.sql`
+          SELECT a.*, ${creneauDe} AS creneau, date_trunc('day', a.quand) AS jour
+          FROM (${tentatives}) a
+          INNER JOIN "users" u ON u."id" = a."userId"
+          WHERE ${teleconseiller}
+    `;
+
+    // Un trou n'existe qu'à l'intérieur d'un créneau ET d'une journée : sans le
+    // second test, une nuit entre deux appels passerait pour du temps mort.
+    const ecartMort = Prisma.sql`
+      EXTRACT(EPOCH FROM p.ecart) > ${DEAD_GAP_SECONDS}
+      AND p.creneau = p."creneauPrecedent" AND p.jour = p."jourPrecedent"
+    `;
+
+    const dansCreneau = creneaux.length
+      ? Prisma.join(
+          creneaux.map(
+            (creneau) =>
+              Prisma.sql`(s."slot"::time >= ${horloge(creneau.debut)}::time AND s."slot"::time < ${horloge(creneau.fin)}::time)`,
+          ),
+          ' OR ',
+        )
+      : Prisma.sql`FALSE`;
+
     const [
       rows,
       repRows,
@@ -199,6 +341,7 @@ export class SupervisionActivityService {
       roster,
       prospectsByTeleconseiller,
       prospectsByRepresentant,
+      rendement,
     ] = await Promise.all([
       this.prisma.$queryRaw<ActivityRow[]>`
         WITH faits AS (${faits})
@@ -319,6 +462,75 @@ export class SupervisionActivityService {
         GROUP BY r."id", r."fullName"
         ORDER BY prospects DESC, label ASC
       `,
+
+      // La note complète l'écran, elle ne le porte pas : un échec vide `scores`
+      // sans effacer l'activité.
+      Promise.all([
+        this.prisma.$queryRaw<ScoreRow[]>`
+        WITH situes AS (${situes}),
+        paced AS (
+          SELECT
+            s.*,
+            s.quand - LAG(s.quand) OVER w AS ecart,
+            LAG(s.creneau) OVER w         AS "creneauPrecedent",
+            LAG(s.jour) OVER w            AS "jourPrecedent"
+          FROM situes s
+          WINDOW w AS (PARTITION BY s."userId" ORDER BY s.quand)
+        ),
+        rappels AS (
+          SELECT "userId", SUM(n - 1)::int AS repetitions
+          FROM (
+            SELECT "userId", famille, cible, COUNT(*)::int AS n
+            FROM situes GROUP BY 1, 2, 3
+          ) t
+          GROUP BY 1
+        ),
+        reponses AS (${repReponses}),
+        representants_qualifies AS (
+          SELECT "userId", SUM(qualifie)::int AS qualifies FROM reponses GROUP BY 1
+        )
+        SELECT
+          p."userId"                                             AS id,
+          COUNT(*)::int                                          AS appels,
+          SUM(p.joint)::int                                      AS joints,
+          (SUM(p.qualifie) + COALESCE(MAX(q.qualifies), 0))::int AS qualifies,
+          COALESCE(MAX(r.repetitions), 0)::int                   AS rappels,
+          COALESCE(
+            SUM(EXTRACT(EPOCH FROM p.ecart)) FILTER (WHERE ${ecartMort}), 0
+          )::int                                                 AS "tempsMort"
+        FROM paced p
+        LEFT JOIN representants_qualifies q ON q."userId" = p."userId"
+        LEFT JOIN rappels r ON r."userId" = p."userId"
+        GROUP BY p."userId"
+      `,
+        this.prisma.$queryRaw<JourVuRow[]>`
+        WITH situes AS (${situes}),
+        tranches AS (
+          SELECT
+            s."userId"                  AS "userId",
+            date_trunc('day', s."slot") AS jour,
+            COALESCE(SUM(s."activeSeconds") FILTER (WHERE ${dansCreneau}), 0)::int AS actifs
+          FROM "agent_activity_slots" s
+          INNER JOIN "users" u ON u."id" = s."userId"
+          WHERE ${teleconseiller} AND ${withinWindow(Prisma.sql`s."slot"`, query)}
+          GROUP BY 1, 2
+        ),
+        vus AS (
+          SELECT "userId", jour, actifs FROM tranches
+          UNION ALL
+          SELECT "userId", jour, 0 FROM situes
+        )
+        SELECT
+          "userId"                    AS id,
+          to_char(jour, 'YYYY-MM-DD') AS jour,
+          SUM(actifs)::int            AS actifs
+        FROM vus
+        GROUP BY 1, 2
+      `,
+      ]).catch((error: unknown) => {
+        this.logger.warn(`rendement de la fenêtre indisponible: ${String(error)}`);
+        return null;
+      }),
     ]);
 
     const repParLigne = new Map(repRows.map((row) => [`${row.jour}|${row.id}`, row]));
@@ -341,10 +553,63 @@ export class SupervisionActivityService {
         fullName: row.nom,
         isActive: row.actif,
       })),
+      scores: rendement === null ? [] : notes(roster, rendement[0], rendement[1], creneaux),
       prospectsByTeleconseiller: prospectsByTeleconseiller.map(toHistogramBar),
       prospectsByRepresentant: prospectsByRepresentant.map(toHistogramBar),
     };
   }
+}
+
+const AUCUN_APPEL: Omit<ScoreRow, 'id'> = {
+  appels: 0,
+  joints: 0,
+  qualifies: 0,
+  rappels: 0,
+  tempsMort: 0,
+};
+
+/**
+ * Une note par téléconseiller sur toute la fenêtre. Le dénominateur ne retient
+ * que les jours OÙ LE COMPTE A ÉTÉ VU : le dépôt n'a pas de calendrier ouvré, et
+ * facturer les dimanches ferait chuter l'assiduité de tout le monde.
+ */
+function notes(
+  roster: readonly RosterRow[],
+  metriques: readonly ScoreRow[],
+  jours: readonly JourVuRow[],
+  creneaux: readonly Creneau[],
+): SupervisionScoreDto[] {
+  const now = new Date();
+  const metriqueDe = new Map(metriques.map((row) => [row.id, row]));
+  const joursDe = new Map<string, JourVuRow[]>();
+  for (const jour of jours) {
+    const liste = joursDe.get(jour.id);
+    if (liste === undefined) joursDe.set(jour.id, [jour]);
+    else liste.push(jour);
+  }
+
+  return roster.map((membre): SupervisionScoreDto => {
+    const metrique = metriqueDe.get(membre.id) ?? AUCUN_APPEL;
+    const vus = joursDe.get(membre.id) ?? [];
+    const entrees = {
+      activeSecondsInShifts: vus.reduce((total, jour) => total + jour.actifs, 0),
+      shiftSecondsElapsed: vus.reduce(
+        (total, jour) => total + secondesEcoulees(jour.jour, creneaux, now),
+        0,
+      ),
+      calls: metrique.appels,
+      reached: metrique.joints,
+      qualified: metrique.qualifies,
+      repeatCalls: metrique.rappels,
+      deadSeconds: metrique.tempsMort,
+    };
+    return {
+      teleconseillerId: membre.id,
+      teleconseillerName: membre.nom,
+      ...entrees,
+      score: performanceScore(entrees),
+    };
+  });
 }
 
 function chiffres(base: TotalRow, rep: RepTotalRow): SupervisionActivityCountsDto {

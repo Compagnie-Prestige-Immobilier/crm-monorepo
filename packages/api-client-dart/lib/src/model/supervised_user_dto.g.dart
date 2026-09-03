@@ -65,7 +65,7 @@ abstract class _$SupervisedUserDtoCWProxy {
 
   SupervisedUserDto deadGaps(num deadGaps);
 
-  SupervisedUserDto score(ScoreDto score);
+  SupervisedUserDto score(PerformanceScore score);
 
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SupervisedUserDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
@@ -103,7 +103,7 @@ abstract class _$SupervisedUserDtoCWProxy {
     num repeatCalls,
     num deadSeconds,
     num deadGaps,
-    ScoreDto score,
+    PerformanceScore score,
   });
 }
 
@@ -221,7 +221,7 @@ class _$SupervisedUserDtoCWProxyImpl implements _$SupervisedUserDtoCWProxy {
   SupervisedUserDto deadGaps(num deadGaps) => this(deadGaps: deadGaps);
 
   @override
-  SupervisedUserDto score(ScoreDto score) => this(score: score);
+  SupervisedUserDto score(PerformanceScore score) => this(score: score);
 
   @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SupervisedUserDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
@@ -384,7 +384,7 @@ class _$SupervisedUserDtoCWProxyImpl implements _$SupervisedUserDtoCWProxy {
       score: score == const $CopyWithPlaceholder()
           ? _value.score
           // ignore: cast_nullable_to_non_nullable
-          : score as ScoreDto,
+          : score as PerformanceScore,
     );
   }
 }
@@ -516,7 +516,7 @@ SupervisedUserDto _$SupervisedUserDtoFromJson(Map<String, dynamic> json) =>
         deadGaps: $checkedConvert('deadGaps', (v) => v as num),
         score: $checkedConvert(
           'score',
-          (v) => ScoreDto.fromJson(v as Map<String, dynamic>),
+          (v) => PerformanceScore.fromJson(v as Map<String, dynamic>),
         ),
       );
       return val;

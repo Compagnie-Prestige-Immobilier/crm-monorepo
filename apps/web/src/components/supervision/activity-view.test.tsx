@@ -59,8 +59,41 @@ function payload(overrides: Partial<AdminModule.SupervisionActivity> = {}) {
       { id: ALICE, fullName: 'Alice Diop', isActive: true },
       { id: BINETA, fullName: 'Bineta Fall', isActive: true },
     ],
+    scores: [],
     ...overrides,
   };
+}
+
+const PARTS = [
+  { key: 'assiduite', label: 'Assiduité', ratio: 0.9, weight: 0.2 },
+  { key: 'regularite', label: 'Régularité', ratio: 0.8, weight: 0.15 },
+  { key: 'rythme', label: 'Rythme', ratio: 0.68, weight: 0.25 },
+  { key: 'contact', label: 'Contact', ratio: 0.5, weight: 0.2 },
+  { key: 'qualification', label: 'Qualification', ratio: 0.4, weight: 0.15 },
+  { key: 'efficience', label: 'Efficience', ratio: 1, weight: 0.05 },
+] as const;
+
+function scoreRow(
+  id: string,
+  name: string,
+  score: AdminModule.PerformanceScore,
+): AdminModule.SupervisionScore {
+  return {
+    teleconseillerId: id,
+    teleconseillerName: name,
+    activeSecondsInShifts: 10_800,
+    shiftSecondsElapsed: 14_400,
+    calls: 24,
+    reached: 12,
+    qualified: 6,
+    repeatCalls: 3,
+    deadSeconds: 2520,
+    score,
+  };
+}
+
+function rendementTable(): HTMLElement {
+  return screen.getByRole('table', { name: /Rendement sur la période/u });
 }
 
 function rowOf(name: string): HTMLElement {
@@ -283,5 +316,82 @@ describe('tableau d’activité des téléconseillers', () => {
       const last = fetchMock.mock.calls.at(-1)?.[0] as { range: { from: string; to: string } };
       expect(last.range.from < last.range.to).toBe(true);
     });
+  });
+});
+
+describe('rendement sur la période', () => {
+  async function render(scores: AdminModule.SupervisionScore[]): Promise<void> {
+    fetchMock.mockResolvedValue(payload({ scores }));
+    renderWithQuery(<ActivityView projet="CHUES" />);
+    await waitFor(() => {
+      expect(rendementTable()).toBeTruthy();
+    });
+  }
+
+  it('affiche le motif au lieu d’une note quand elle ne peut pas être calculée', async () => {
+    await render([
+      scoreRow(ALICE, 'Alice Diop', { value: null, reason: 'aucun_appel', parts: [] }),
+      scoreRow(BINETA, 'Bineta Fall', {
+        value: null,
+        reason: 'presence_non_mesuree',
+        parts: [],
+      }),
+    ]);
+
+    const rows = within(rendementTable()).getAllByRole('rowheader');
+    expect(rows).toHaveLength(2);
+    for (const [index, motif] of ['Aucun appel', 'Présence non mesurée'].entries()) {
+      const row = rows[index]?.closest('tr');
+      expect(within(row as HTMLElement).getAllByRole('cell')[0]?.textContent).toBe(motif);
+    }
+  });
+
+  it('range les comptes sans note derrière les notes basses', async () => {
+    await render([
+      scoreRow(BINETA, 'Bineta Fall', { value: null, reason: 'aucun_appel', parts: [] }),
+      scoreRow(ALICE, 'Alice Diop', { value: 0, reason: null, parts: [...PARTS] }),
+    ]);
+
+    const names = within(rendementTable())
+      .getAllByRole('rowheader')
+      .map((cell) => cell.textContent ?? '');
+    expect(names).toEqual([
+      expect.stringContaining('Alice Diop'),
+      expect.stringContaining('Bineta Fall'),
+    ]);
+  });
+
+  it('déplie les six parts de la note et les entrées du calcul', async () => {
+    await render([scoreRow(ALICE, 'Alice Diop', { value: 74, reason: null, parts: [...PARTS] })]);
+
+    const toggle = within(rendementTable()).getByRole('button', { name: /Alice Diop/u });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+
+    await userEvent.click(toggle);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+
+    const detail = within(rendementTable()).getByRole('cell', { name: /Détail de la note/u });
+    for (const part of PARTS) {
+      expect(within(detail).getByText(part.label)).toBeTruthy();
+    }
+    expect(within(detail).getByText('68 %')).toBeTruthy();
+    expect(within(detail).getByText('poids 25 %')).toBeTruthy();
+    expect(within(detail).getByText('8,0')).toBeTruthy();
+
+    await userEvent.click(toggle);
+    expect(screen.queryByText('Détail de la note')).toBeNull();
+  });
+
+  it('tient une période sans aucune note sans masquer le reste de l’écran', async () => {
+    await render([]);
+
+    expect(within(rendementTable()).getByText(/Aucune note sur cette période/u)).toBeTruthy();
+    expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
+  });
+
+  it('dit que les jours sans présence ne comptent pas', async () => {
+    await render([]);
+
+    expect(screen.getByText(/un dimanche ou un congé ne fait pas baisser la note/u)).toBeTruthy();
   });
 });

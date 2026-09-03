@@ -5983,6 +5983,43 @@ export interface components {
       fullName: string;
       isActive: boolean;
     };
+    ScorePart: {
+      /** @enum {string} */
+      key: 'assiduite' | 'regularite' | 'rythme' | 'contact' | 'qualification' | 'efficience';
+      label: string;
+      /** @description Atteinte de la cible, de 0 à 1, plafonnée à 1. */
+      ratio: number;
+      /** @description Part de la note portée par ce critère. */
+      weight: number;
+    };
+    PerformanceScore: {
+      /** @description Note de 0 à 100 sur la fenêtre mesurée. `null` quand rien ne peut être jugé : `reason` dit alors pourquoi, et l’écran affiche le motif au lieu d’un zéro. */
+      value: number | null;
+      /** @enum {string|null} */
+      reason: 'journee_non_commencee' | 'presence_non_mesuree' | 'aucun_appel' | null;
+      /** @description Le détail qui compose la note. Vide quand `value` est nulle. */
+      parts: components['schemas']['ScorePart'][];
+    };
+    SupervisionScoreDto: {
+      /** Format: uuid */
+      teleconseillerId: string;
+      teleconseillerName: string;
+      /** @description Présence relevée dans les créneaux, en secondes, sur toute la fenêtre. */
+      activeSecondsInShifts: number;
+      /** @description Secondes de créneau écoulées sur les seuls jours où le compte a été vu. La journée en cours ne compte que sa portion passée ; un filtre horaire restreint d’autant les créneaux. */
+      shiftSecondsElapsed: number;
+      /** @description Tentatives, prospects et représentants confondus. */
+      calls: number;
+      /** @description Prospects dont le numéro s’est révélé exploitable, plus représentants ayant répondu. */
+      reached: number;
+      /** @description Méthodes obtenues, plus représentants dont la DERNIÈRE réponse de la fenêtre est REACHED. */
+      qualified: number;
+      /** @description Appels au-delà du premier sur une même fiche. */
+      repeatCalls: number;
+      /** @description Écarts de plus de quinze minutes entre deux appels du même créneau et du même jour. */
+      deadSeconds: number;
+      score: components['schemas']['PerformanceScore'];
+    };
     SupervisionHistogramBarDto: {
       /** Format: uuid */
       id: string | null;
@@ -6001,6 +6038,8 @@ export interface components {
       totals: components['schemas']['SupervisionActivityCountsDto'];
       /** @description Tous les téléconseillers, y compris ceux sans aucun acte sur la fenêtre. */
       teleconseillers: components['schemas']['SupervisionTeleconseillerDto'][];
+      /** @description Une note par téléconseiller pour TOUTE la fenêtre, recalculée depuis les appels et la présence : rien n’est figé, corriger la définition corrige l’historique. Vide si le calcul a échoué. */
+      scores: components['schemas']['SupervisionScoreDto'][];
       /** @description Stock courant de prospects rattachés à chaque téléconseiller. */
       prospectsByTeleconseiller: components['schemas']['SupervisionHistogramBarDto'][];
       /** @description Stock courant de prospects rattachés à chaque représentant. */
@@ -6086,23 +6125,6 @@ export interface components {
     };
     /** @enum {string} */
     PresenceState: 'ONLINE' | 'RECENT' | 'AWAY';
-    ScorePartDto: {
-      /** @enum {string} */
-      key: 'assiduite' | 'regularite' | 'rythme' | 'contact' | 'qualification' | 'efficience';
-      label: string;
-      /** @description Atteinte de la cible, de 0 à 1, plafonnée à 1. */
-      ratio: number;
-      /** @description Part de la note portée par ce critère. */
-      weight: number;
-    };
-    ScoreDto: {
-      /** @description Note de 0 à 100 sur la journée en cours. `null` quand rien ne peut être jugé : `reason` dit alors pourquoi, et l’écran affiche le motif au lieu d’un zéro. */
-      value: number | null;
-      /** @enum {string|null} */
-      reason: 'journee_non_commencee' | 'presence_non_mesuree' | 'aucun_appel' | null;
-      /** @description Le détail qui compose la note. Vide quand `value` est nulle. */
-      parts: components['schemas']['ScorePartDto'][];
-    };
     SupervisedUserDto: {
       /** Format: uuid */
       id: string;
@@ -6171,7 +6193,7 @@ export interface components {
       deadSeconds: number;
       /** @description Nombre de trous comptés dans `deadSeconds`. */
       deadGaps: number;
-      score: components['schemas']['ScoreDto'];
+      score: components['schemas']['PerformanceScore'];
     };
     PresenceCountsDto: {
       online: number;

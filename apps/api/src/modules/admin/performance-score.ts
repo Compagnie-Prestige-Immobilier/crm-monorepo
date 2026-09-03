@@ -1,5 +1,7 @@
+import { ApiProperty } from '@nestjs/swagger';
+
 /**
- * Score de rendement d'un téléconseiller, sur la journée en cours.
+ * Score de rendement d'un téléconseiller, sur la fenêtre mesurée.
  *
  * Il ne sort JAMAIS un nombre seul : ses parts accompagnent la note, et
  * l'écran les affiche. Une note opaque qui classe des gens finit par punir
@@ -28,25 +30,49 @@ export interface ScoreInput {
 export type ScoreKey =
   'assiduite' | 'regularite' | 'rythme' | 'contact' | 'qualification' | 'efficience';
 
-export interface ScorePart {
-  readonly key: ScoreKey;
-  readonly label: string;
-  readonly ratio: number;
-  readonly weight: number;
+/**
+ * Les classes Swagger vivent ici, avec le calcul, et non dans le DTO d'un
+ * écran : les comptes et l'activité rendent la même note, et deux schémas
+ * jumeaux se seraient mis à diverger.
+ */
+export class ScorePart {
+  @ApiProperty({
+    enum: ['assiduite', 'regularite', 'rythme', 'contact', 'qualification', 'efficience'],
+  })
+  key!: ScoreKey;
+
+  @ApiProperty() label!: string;
+
+  @ApiProperty({ type: Number, description: 'Atteinte de la cible, de 0 à 1, plafonnée à 1.' })
+  ratio!: number;
+
+  @ApiProperty({ type: Number, description: 'Part de la note portée par ce critère.' })
+  weight!: number;
 }
 
 export type ScoreReason = 'journee_non_commencee' | 'presence_non_mesuree' | 'aucun_appel';
 
-export const SCORE_REASON_LABELS: Record<ScoreReason, string> = {
-  journee_non_commencee: 'Journée pas commencée',
-  presence_non_mesuree: 'Présence non mesurée',
-  aucun_appel: 'Aucun appel',
-};
+export class PerformanceScore {
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description:
+      'Note de 0 à 100 sur la fenêtre mesurée. `null` quand rien ne peut être jugé : ' +
+      '`reason` dit alors pourquoi, et l’écran affiche le motif au lieu d’un zéro.',
+  })
+  value!: number | null;
 
-export interface PerformanceScore {
-  readonly value: number | null;
-  readonly reason: ScoreReason | null;
-  readonly parts: ScorePart[];
+  @ApiProperty({
+    enum: ['journee_non_commencee', 'presence_non_mesuree', 'aucun_appel'],
+    nullable: true,
+  })
+  reason!: ScoreReason | null;
+
+  @ApiProperty({
+    type: () => [ScorePart],
+    description: 'Le détail qui compose la note. Vide quand `value` est nulle.',
+  })
+  parts!: ScorePart[];
 }
 
 const WEIGHTS: Record<ScoreKey, number> = {
