@@ -224,6 +224,7 @@ import 'package:crm_api_client/src/model/update_syndicat_dto.dart';
 import 'package:crm_api_client/src/model/update_user_dto.dart';
 import 'package:crm_api_client/src/model/update_visite_dto.dart';
 import 'package:crm_api_client/src/model/update_visite_referentiel_dto.dart';
+import 'package:crm_api_client/src/model/update_work_shifts_dto.dart';
 import 'package:crm_api_client/src/model/user_dto.dart';
 import 'package:crm_api_client/src/model/user_list_dto.dart';
 import 'package:crm_api_client/src/model/visite_dto.dart';
@@ -250,6 +251,8 @@ import 'package:crm_api_client/src/model/visite_stat_saisie_dto.dart';
 import 'package:crm_api_client/src/model/visite_stats_dto.dart';
 import 'package:crm_api_client/src/model/weekly_cohort_dto.dart';
 import 'package:crm_api_client/src/model/weekly_cohort_list_dto.dart';
+import 'package:crm_api_client/src/model/work_shift_dto.dart';
+import 'package:crm_api_client/src/model/work_shifts_dto.dart';
 
 final _regList = RegExp(r'^List<(.*)>$');
 final _regSet = RegExp(r'^Set<(.*)>$');
@@ -1005,6 +1008,9 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'UpdateVisiteReferentielDto':
       return UpdateVisiteReferentielDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'UpdateWorkShiftsDto':
+      return UpdateWorkShiftsDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'UserDto':
       return UserDto.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'UserListDto':
@@ -1088,6 +1094,11 @@ ReturnType deserialize<ReturnType, BaseType>(
       return WeeklyCohortListDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'WhatsappStatus':
+    case 'WorkShiftDto':
+      return WorkShiftDto.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'WorkShiftsDto':
+      return WorkShiftsDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     default:
       RegExpMatch? match;
 

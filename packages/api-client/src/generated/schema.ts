@@ -2401,6 +2401,24 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/supervision/creneaux': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Créneaux de travail suivis. */
+    get: operations['getSupervisionCreneaux'];
+    /** Modifie les créneaux de travail. */
+    put: operations['updateSupervisionCreneaux'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/admin/purge': {
     parameters: {
       query?: never;
@@ -5855,6 +5873,30 @@ export interface components {
       /** @description Stock courant de prospects rattachés à chaque représentant. */
       prospectsByRepresentant: components['schemas']['SupervisionHistogramBarDto'][];
     };
+    WorkShiftDto: {
+      /** @enum {string} */
+      key: 'morning' | 'afternoon';
+      label: string;
+      /** @example 09:00 */
+      start: string;
+      /** @example 14:00 */
+      end: string;
+    };
+    WorkShiftsDto: {
+      shifts: components['schemas']['WorkShiftDto'][];
+      /** Format: date-time */
+      updatedAt: string | null;
+    };
+    UpdateWorkShiftsDto: {
+      /** @example 09:00 */
+      morningStart: string;
+      /** @example 14:00 */
+      morningEnd: string;
+      /** @example 15:00 */
+      afternoonStart: string;
+      /** @example 18:00 */
+      afternoonEnd: string;
+    };
     /** @enum {string} */
     PurgeDomainKey:
       | 'teleconseillers'
@@ -5950,6 +5992,18 @@ export interface components {
        * @description Dernière écriture métier : tentative d’appel ou transition de dossier. Cherchée sur les 31 derniers jours seulement ; au-delà, vaut null.
        */
       lastWriteAt: string | null;
+      /** @description Temps actif observé aujourd’hui, en secondes. Les interruptions de plus de 90 secondes ne sont pas comptées. */
+      activeSecondsToday: number;
+      /** Format: date-time */
+      firstSeenToday: string | null;
+      /** @description Tentatives d’appel du jour, prospects et représentants confondus, comptées sur l’heure de l’appel et non sur celle de la remontée. */
+      callsToday: number;
+      /** @description Médiane, en secondes, de l’écart entre deux tentatives consécutives du jour. `null` en deçà de deux tentatives : un écart n’existe pas encore. */
+      medianGapSeconds: number | null;
+      /** @description Médiane, en secondes, du retard de remontée : temps écoulé entre l’appel sur le téléphone et son arrivée au serveur. Négatif quand l’horloge du téléphone avance sur celle du serveur. `null` sans aucune tentative du jour. */
+      medianUploadLagSeconds: number | null;
+      /** Format: date-time */
+      firstCallAt: string | null;
     };
     PresenceCountsDto: {
       online: number;
@@ -15469,6 +15523,10 @@ export interface operations {
         projet?: components['schemas']['Projet'];
         /** @description Un seul téléconseiller : borne les lignes, la liste et les histogrammes. */
         commercialId?: string;
+        /** @description Heure de début quotidienne, Dakar. */
+        timeFrom?: string;
+        /** @description Heure de fin quotidienne, exclue. */
+        timeTo?: string;
       };
       header?: never;
       path?: never;
@@ -15482,6 +15540,102 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['SupervisionActivityDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getSupervisionCreneaux: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WorkShiftsDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  updateSupervisionCreneaux: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateWorkShiftsDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WorkShiftsDto'];
         };
       };
       /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */

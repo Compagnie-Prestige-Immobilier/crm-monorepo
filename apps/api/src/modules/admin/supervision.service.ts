@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import { Role } from '@crm/database';
+import { Injectable, Logger } from '@nestjs/common';
+import { Prisma, Role } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import {
@@ -19,7 +19,7 @@ import type { SupervisedUserDto, SupervisionDto } from './supervision.dto.js';
  * table la plus lue de la base. Le battement de cœur vit donc dans sa propre
  * table, étroite et sans index secondaire (voir `agent_heartbeats`).
  *
- * Six agrégats, six requêtes. Aucune boucle par utilisateur : sur cinquante
+ * Un agrégat par requête, aucune boucle par utilisateur : sur cinquante
  * comptes, un `findMany` par compte ferait trois cents allers-retours pour un
  * écran qui se rafraîchit toutes les quinze secondes.
  */
@@ -58,15 +58,38 @@ function latest(a: Date | undefined, b: Date | undefined): Date | null {
 const optionalDate = (value: Date | null | undefined): Date | undefined => value ?? undefined;
 const isoOrNull = (value: Date | null | undefined): string | null => value?.toISOString() ?? null;
 
+interface CallMetricsRow {
+  userId: string;
+  calls: number;
+  firstCallAt: Date;
+  medianGapSeconds: number | null;
+  medianUploadLagSeconds: number | null;
+}
+
 @Injectable()
 export class SupervisionService {
+  private readonly logger = new Logger(SupervisionService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async overview(): Promise<SupervisionDto> {
     const now = new Date();
     const since = new Date(now.getTime() - ACTIVITY_WINDOW_DAYS * 86_400_000);
+    // Dakar est à UTC+00:00 toute l'année : la journée civile commence au
+    // minuit UTC.
+    const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
-    const [users, sessions, syncs, calls, transitions, heartbeats] = await Promise.all([
+    const [
+      users,
+      sessions,
+      syncs,
+      prospectCalls,
+      representativeCalls,
+      transitions,
+      heartbeats,
+      activityDays,
+      callMetrics,
+    ] = await Promise.all([
       this.prisma.user.findMany({
         where: {
           role: { in: [...SUPERVISED_ROLES] },
@@ -109,6 +132,12 @@ export class SupervisionService {
         _max: { createdAt: true },
       }),
 
+      this.prisma.repCallAttempt.groupBy({
+        by: ['performedById'],
+        where: { createdAt: { gte: since } },
+        _max: { createdAt: true },
+      }),
+
       this.prisma.bankCaseTransition.groupBy({
         by: ['performedById'],
         where: { createdAt: { gte: since } },
@@ -126,14 +155,28 @@ export class SupervisionService {
           appVersion: true,
         },
       }),
+      this.prisma.agentActivityDay.findMany({
+        where: { day: dayStart },
+        select: { userId: true, firstSeenAt: true, lastSeenAt: true, activeSeconds: true },
+      }),
+
+      // La cadence complète la présence, elle ne la porte pas : une requête
+      // en échec vide les colonnes de rendement sans effacer l'écran.
+      this.callMetricsToday(dayStart).catch((error: unknown) => {
+        this.logger.warn(`métriques d'appel du jour indisponibles: ${String(error)}`);
+        return [] as CallMetricsRow[];
+      }),
     ]);
 
     const tokenAt = toDateMap(sessions, 'userId', 'createdAt');
     const sessionCounts = new Map(sessions.map((row) => [row.userId, row._count._all]));
     const syncAt = toDateMap(syncs, 'userId', 'createdAt');
-    const callAt = toDateMap(calls, 'performedById', 'createdAt');
+    const prospectCallAt = toDateMap(prospectCalls, 'performedById', 'createdAt');
+    const representativeCallAt = toDateMap(representativeCalls, 'performedById', 'createdAt');
     const transitionAt = toDateMap(transitions, 'performedById', 'createdAt');
     const beatOf = new Map(heartbeats.map((row) => [row.userId, row]));
+    const activityOf = new Map(activityDays.map((row) => [row.userId, row]));
+    const metricsOf = new Map(callMetrics.map((row) => [row.userId, row]));
 
     const rows = users.map((user): SupervisedUserDto => {
       const beat = beatOf.get(user.id) ?? {
@@ -143,12 +186,15 @@ export class SupervisionService {
         appVersion: null,
       };
       const pushedAt = latest(syncAt.get(user.id), optionalDate(beat.lastPushAt));
+      const activity = activityOf.get(user.id);
+      const metrics = metricsOf.get(user.id);
 
       const signals: ActivitySignals = {
         isActive: user.isActive,
         hasLiveSession: tokenAt.has(user.id),
         lastLoginAt: user.lastLoginAt,
         lastTokenAt: tokenAt.get(user.id) ?? null,
+        lastPresenceAt: activity?.lastSeenAt ?? null,
         // Un pull ne laisse aucune autre trace : sans lui, un appareil ouvert
         // qui n'a rien à remonter passe pour absent pendant des heures.
         lastSyncAt: latest(optionalDate(pushedAt), optionalDate(beat.lastPullAt)),
@@ -156,7 +202,10 @@ export class SupervisionService {
         // transitions de dossier. On prend la plus récente des deux plutôt que
         // de brancher sur le rôle : un compte peut changer de rôle, son
         // historique ne change pas.
-        lastWriteAt: latest(callAt.get(user.id), transitionAt.get(user.id)),
+        lastWriteAt: latest(
+          latest(prospectCallAt.get(user.id), representativeCallAt.get(user.id)) ?? undefined,
+          transitionAt.get(user.id),
+        ),
       };
 
       return {
@@ -176,6 +225,12 @@ export class SupervisionService {
         pendingOps: beat.pendingOps,
         appVersion: beat.appVersion,
         lastWriteAt: isoOrNull(signals.lastWriteAt),
+        activeSecondsToday: activity?.activeSeconds ?? 0,
+        firstSeenToday: isoOrNull(activity?.firstSeenAt),
+        callsToday: metrics?.calls ?? 0,
+        medianGapSeconds: metrics?.medianGapSeconds ?? null,
+        medianUploadLagSeconds: metrics?.medianUploadLagSeconds ?? null,
+        firstCallAt: isoOrNull(metrics?.firstCallAt),
       };
     });
 
@@ -188,5 +243,48 @@ export class SupervisionService {
       finances: rows.filter((row) => row.role === Role.BANQUE_FINANCE),
       counts: { online: counts.ONLINE, recent: counts.RECENT, away: counts.AWAY },
     };
+  }
+
+  /**
+   * Rendement du jour, une ligne par compte ayant appelé. Le tri, l'écart entre
+   * deux appels et les médianes se font en base : rapatrier les tentatives pour
+   * les trier en JavaScript coûterait une lecture complète toutes les quinze
+   * secondes.
+   */
+  private callMetricsToday(dayStart: Date): Promise<CallMetricsRow[]> {
+    const dayEnd = new Date(dayStart.getTime() + 86_400_000);
+    const roles = Prisma.join([...SUPERVISED_ROLES]);
+    const dayWindow = Prisma.sql`"clientCreatedAt" >= ${dayStart} AND "clientCreatedAt" < ${dayEnd}`;
+
+    return this.prisma.$queryRaw<CallMetricsRow[]>`
+      WITH attempts AS (
+        SELECT "performedById" AS "userId", "clientCreatedAt", "createdAt"
+        FROM "call_attempts" WHERE ${dayWindow}
+        UNION ALL
+        SELECT "performedById", "clientCreatedAt", "createdAt"
+        FROM "rep_call_attempts" WHERE ${dayWindow}
+      ),
+      paced AS (
+        SELECT
+          a.*,
+          a."clientCreatedAt" - LAG(a."clientCreatedAt")
+            OVER (PARTITION BY a."userId" ORDER BY a."clientCreatedAt") AS gap
+        FROM attempts a
+        JOIN "users" u ON u."id" = a."userId" AND u."deletedAt" IS NULL
+        WHERE u."role"::text IN (${roles})
+      )
+      SELECT
+        "userId",
+        COUNT(*)::int         AS calls,
+        MIN("clientCreatedAt") AS "firstCallAt",
+        ROUND(percentile_cont(0.5) WITHIN GROUP (
+          ORDER BY EXTRACT(EPOCH FROM gap)
+        ))::int AS "medianGapSeconds",
+        ROUND(percentile_cont(0.5) WITHIN GROUP (
+          ORDER BY EXTRACT(EPOCH FROM ("createdAt" - "clientCreatedAt"))
+        ))::int AS "medianUploadLagSeconds"
+      FROM paced
+      GROUP BY "userId"
+    `;
   }
 }

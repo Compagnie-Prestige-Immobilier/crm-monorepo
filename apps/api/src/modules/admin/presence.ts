@@ -11,6 +11,7 @@ export interface ActivitySignals {
   readonly hasLiveSession: boolean;
   readonly lastLoginAt: Date | null;
   readonly lastTokenAt: Date | null;
+  readonly lastPresenceAt: Date | null;
   readonly lastSyncAt: Date | null;
   readonly lastWriteAt: Date | null;
 }
@@ -18,6 +19,7 @@ export interface ActivitySignals {
 export function lastSeenAt(signals: ActivitySignals): Date | null {
   const candidates = [
     signals.lastTokenAt,
+    signals.lastPresenceAt,
     signals.lastSyncAt,
     signals.lastWriteAt,
     signals.lastLoginAt,

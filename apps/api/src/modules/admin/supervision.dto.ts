@@ -80,6 +80,47 @@ export class SupervisedUserDto {
       'Cherchée sur les 31 derniers jours seulement ; au-delà, vaut null.',
   })
   lastWriteAt!: string | null;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      'Temps actif observé aujourd’hui, en secondes. Les interruptions de plus de 90 secondes ne sont pas comptées.',
+  })
+  activeSecondsToday!: number;
+
+  @ApiProperty({ type: String, format: 'date-time', nullable: true })
+  firstSeenToday!: string | null;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      'Tentatives d’appel du jour, prospects et représentants confondus, ' +
+      'comptées sur l’heure de l’appel et non sur celle de la remontée.',
+  })
+  callsToday!: number;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description:
+      'Médiane, en secondes, de l’écart entre deux tentatives consécutives du ' +
+      'jour. `null` en deçà de deux tentatives : un écart n’existe pas encore.',
+  })
+  medianGapSeconds!: number | null;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description:
+      'Médiane, en secondes, du retard de remontée : temps écoulé entre ' +
+      'l’appel sur le téléphone et son arrivée au serveur. Négatif quand ' +
+      'l’horloge du téléphone avance sur celle du serveur. `null` sans ' +
+      'aucune tentative du jour.',
+  })
+  medianUploadLagSeconds!: number | null;
+
+  @ApiProperty({ type: String, format: 'date-time', nullable: true })
+  firstCallAt!: string | null;
 }
 
 export class PresenceCountsDto {
