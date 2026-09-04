@@ -609,6 +609,13 @@ export class StatutQualificationDto {
   @ApiProperty({ description: 'La date du rappel est exigée par ce statut.' })
   requiresCallback!: boolean;
   @ApiProperty({
+    type: Number,
+    nullable: true,
+    description:
+      'Délai, en minutes, du réessai que l’application propose d’elle-même. Nul : aucun réessai.',
+  })
+  retryAfterMinutes!: number | null;
+  @ApiProperty({
     enum: PrioriteTraitement,
     enumName: 'PrioriteTraitement',
     description: 'Ordre de reprise : un « Très intéressé » se rappelle avant un « Non éligible ».',
@@ -670,6 +677,13 @@ export class CreateStatutQualificationDto {
   @IsBoolean()
   requiresCallback?: boolean;
 
+  @ApiPropertyOptional({ type: Number, nullable: true, minimum: 5, maximum: 10080 })
+  @IsOptional()
+  @IsInt()
+  @Min(5)
+  @Max(10080)
+  retryAfterMinutes?: number | null;
+
   @ApiPropertyOptional({
     enum: PrioriteTraitement,
     enumName: 'PrioriteTraitement',
@@ -702,6 +716,19 @@ export class UpdateStatutQualificationDto {
   @IsOptional()
   @IsBoolean()
   requiresCallback?: boolean;
+
+  @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    minimum: 5,
+    maximum: 10080,
+    description: 'Nul retire le réessai proposé.',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(5)
+  @Max(10080)
+  retryAfterMinutes?: number | null;
 
   @ApiPropertyOptional({ enum: PrioriteTraitement, enumName: 'PrioriteTraitement' })
   @IsOptional()

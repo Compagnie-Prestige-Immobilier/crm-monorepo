@@ -14,7 +14,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 26;
+  int get schemaVersion => 28;
 
   /// Les colonnes ajoutées à `call_attempts` par la v19. Déclarées ici parce
   /// que TROIS paliers recopient cette table : chacun engendre sa forme
@@ -340,6 +340,18 @@ class AppDatabase extends _$AppDatabase {
         await m.recreateAllViews();
         await customStatement(
           'DELETE FROM sync_state WHERE collection = \'all\'',
+        );
+      }
+      // La vue des représentants porte aussi l'effet du statut.
+      if (from < 27 && to >= 27) {
+        await m.recreateAllViews();
+      }
+      // Avant la v24, la table est créée dans sa forme courante, colonne
+      // comprise : ne l'ajouter qu'aux bases qui l'avaient déjà.
+      if (from >= 24 && from < 28 && to >= 28) {
+        await m.addColumn(
+          statutsQualification,
+          statutsQualification.retryAfterMinutes,
         );
       }
     },

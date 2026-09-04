@@ -87,27 +87,45 @@ String libelleIssueRepresentant(String code) => switch (code) {
 /// Même pastille que le web : le statut de qualification est le libellé,
 /// la relation ne décide que de la couleur et de l'étoile. Une fiche jamais
 /// qualifiée retombe sur le libellé de la relation.
+/// Le ton d'un effet de statut ou d'une issue d'appel : joint en vert, à
+/// rappeler en orange, refus en rouge, le reste neutre.
+CpiTone toneDeLEffet(String? effet) => switch (effet) {
+  'REACHED' || 'PROSPECTS_PROMISED' => CpiTone.success,
+  'SCHEDULE_CALLBACK' || 'CALLBACK' => CpiTone.warning,
+  'REFUSED' => CpiTone.danger,
+  _ => CpiTone.neutral,
+};
+
+/// La pastille dit où en est l'appel : le statut de qualification, sinon
+/// l'issue du dernier appel, sinon « Jamais appelé ». La relation ne parle
+/// pas, elle se voit : étoile pour qui a accepté, interdit pour qui a refusé.
 class StatutTag extends StatelessWidget {
   const StatutTag({
     required this.relationStatus,
     required this.statutLabel,
+    this.statutEffect,
+    this.lastCallOutcome,
     super.key,
   });
 
   final String relationStatus;
   final String? statutLabel;
+  final String? statutEffect;
+  final String? lastCallOutcome;
 
   @override
   Widget build(BuildContext context) {
-    final String libelle = statutLabel ?? relationLabel(relationStatus);
+    final String? issue = lastCallOutcome;
+    final String libelle =
+        statutLabel ??
+        (issue == null ? 'Jamais appelé' : libelleIssueRepresentant(issue));
+    final CpiTone tone = toneDeLEffet(statutLabel == null ? issue : statutEffect);
     final bool etoile = relationStatus == 'AMBASSADEUR';
-    final CpiTone tone = switch (relationStatus) {
-      'AMBASSADEUR' => CpiTone.success,
-      'REFUS' => CpiTone.danger,
-      _ => CpiTone.neutral,
-    };
+    final bool refus = relationStatus == 'REFUS';
     return Semantics(
-      label: 'Statut : $libelle${etoile ? ', a accepté' : ''}',
+      label:
+          'Statut : $libelle'
+          '${etoile ? ', a accepté' : ''}${refus ? ', a refusé' : ''}',
       child: ExcludeSemantics(
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -117,6 +135,14 @@ class StatutTag extends StatelessWidget {
                 PhosphorIconsFill.star,
                 size: CpiIconSize.xs,
                 color: context.cpi.success,
+              ),
+              const SizedBox(width: CpiSpacing.xxs),
+            ],
+            if (refus) ...<Widget>[
+              Icon(
+                PhosphorIconsFill.prohibit,
+                size: CpiIconSize.xs,
+                color: Theme.of(context).colorScheme.error,
               ),
               const SizedBox(width: CpiSpacing.xxs),
             ],
@@ -284,6 +310,8 @@ class _Fiche extends ConsumerWidget {
             StatutTag(
               relationStatus: data.relationStatus,
               statutLabel: data.statutQualificationLabel,
+              statutEffect: data.statutQualificationEffect,
+              lastCallOutcome: data.lastCallOutcome,
             ),
           ],
         ),

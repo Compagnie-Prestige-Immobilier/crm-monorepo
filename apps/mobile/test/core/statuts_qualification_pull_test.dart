@@ -33,6 +33,7 @@ void main() {
     label: code,
     effect: effect,
     requiresCallback: requiresCallback,
+    retryAfterMinutes: null,
     priorite: PrioriteTraitement.NORMALE,
     relationStatus: null,
     isActive: isActive,

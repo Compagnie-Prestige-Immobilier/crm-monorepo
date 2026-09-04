@@ -395,6 +395,67 @@ void main() {
       );
       expect(inbox.reads, <String>['ntf-1']);
     });
+
+    // Les rappels du serveur nomment des écrans du panneau : « /supervision »
+    // n'existe pas ici et ouvrait une « Page introuvable ».
+    GoRouter routeurAvecRappels() {
+      final GoRouter router = GoRouter(
+        initialLocation: Routes.notifications,
+        routes: <RouteBase>[
+          GoRoute(
+            path: Routes.notifications,
+            builder: (BuildContext context, GoRouterState state) =>
+                const NotificationsScreen(),
+          ),
+          GoRoute(
+            path: Routes.rappels,
+            builder: (BuildContext context, GoRouterState state) =>
+                const Scaffold(body: Center(child: Text('RAPPELS'))),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      return router;
+    }
+
+    testWidgets('une route du panneau n\'est pas un lien', (
+      WidgetTester tester,
+    ) async {
+      SinglePush.reset();
+      addTearDown(SinglePush.reset);
+      await PushInboxHelper(db).seed(message('ntf-1', route: '/supervision'));
+
+      await tester.pumpWidget(routedHost(routeurAvecRappels()));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(find.text('Appels en attente'), findsOneWidget);
+      expect(find.text('Ouvrir'), findsNothing);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 1));
+    });
+
+    testWidgets('un rappel du serveur mène à l\'écran des rappels', (
+      WidgetTester tester,
+    ) async {
+      SinglePush.reset();
+      addTearDown(SinglePush.reset);
+      await PushInboxHelper(db).seed(message('ntf-2', route: '/phase2/callbacks'));
+
+      await tester.pumpWidget(routedHost(routeurAvecRappels()));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(find.text('Ouvrir'), findsOneWidget);
+      await tester.tap(find.text('Appels en attente'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 800));
+      expect(find.text('RAPPELS'), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 1));
+    });
   });
 
   // ───────────────────────────────────────────────────────────────────────────

@@ -54,6 +54,7 @@ function statut(over: Partial<StatutQualification> & { id: string }): StatutQual
     requiresCallback: false,
     priorite: 'NORMALE',
     relationStatus: null,
+    retryAfterMinutes: null,
     isActive: true,
     isSystem: true,
     minPayloadVersion: 6,
@@ -72,7 +73,13 @@ const STATUTS: StatutQualification[] = [
     effect: 'SCHEDULE_CALLBACK',
     requiresCallback: true,
   }),
-  statut({ id: 's-4', code: 'PAS_DE_REPONSE', label: 'Pas de réponse', effect: 'UNREACHABLE' }),
+  statut({
+    id: 's-4',
+    code: 'PAS_DE_REPONSE',
+    label: 'Pas de réponse',
+    effect: 'UNREACHABLE',
+    retryAfterMinutes: 180,
+  }),
   statut({ id: 's-5', code: 'FAUX_NUMERO', label: 'Faux numéro', effect: 'WRONG_NUMBER' }),
 ];
 
@@ -95,6 +102,7 @@ const REPRESENTANT: ScriptedRepresentant = {
   relationStatus: 'INCONNU',
   statutQualificationId: null,
   statutQualificationLabel: null,
+  statutQualificationEffect: null,
   callAttemptCount: 0,
   whatsappStatus: 'NON_DEMANDE',
   whatsappE164: null,
@@ -258,6 +266,28 @@ describe('la date de rappel suit le statut, pas le résultat', () => {
 
     expect(screen.queryByText('Quand rappeler ?')).toBeNull();
     expect(screen.queryByText(/Le rappeler plus tard/u)).toBeNull();
+  });
+
+  // Un numéro qui n'a pas répondu se retente : le réessai arrive préréglé au
+  // délai du statut et part avec l'appel, sans rien demander de plus.
+  it('propose d’office le réessai que le statut porte', async () => {
+    await ouvrirQualification();
+    await repondre('Injoignable');
+    await choisirStatut('Pas de réponse');
+
+    expect(screen.getByText('Quand rappeler ?')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Continuer' }).hasAttribute('disabled')).toBe(false);
+    await userEvent.click(screen.getByRole('button', { name: 'Continuer' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(() => {
+      expect(pushRepCallAttempt).toHaveBeenCalledTimes(1);
+    });
+    const envoye = pushRepCallAttempt.mock.calls[0]?.[0] as { outcome: string; callbackAt: string };
+    expect(envoye.outcome).toBe('UNREACHABLE');
+    const delai = (new Date(envoye.callbackAt).getTime() - Date.now()) / 60_000;
+    expect(delai).toBeGreaterThan(175);
+    expect(delai).toBeLessThanOrEqual(180);
   });
 });
 

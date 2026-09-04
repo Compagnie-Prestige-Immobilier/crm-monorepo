@@ -6,6 +6,7 @@
 import 'package:crm_api_client/src/model/rep_call_outcome.dart';
 import 'package:crm_api_client/src/model/representant_relation.dart';
 import 'package:crm_api_client/src/model/whatsapp_status.dart';
+import 'package:crm_api_client/src/model/statut_qualification_effect.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/src/equatable_utils.dart';
@@ -57,6 +58,8 @@ class RepresentantDto {
     required this.statutQualificationId,
 
     required this.statutQualificationLabel,
+
+    required this.statutQualificationEffect,
 
     required this.whatsappStatus,
 
@@ -155,6 +158,15 @@ class RepresentantDto {
   )
   final String? statutQualificationLabel;
 
+  /// Effet du statut : c’est lui qui colore la pastille.
+  @JsonKey(
+    name: r'statutQualificationEffect',
+    required: true,
+    includeIfNull: true,
+    unknownEnumValue: StatutQualificationEffect.unknownDefaultOpenApi,
+  )
+  final StatutQualificationEffect? statutQualificationEffect;
+
   @JsonKey(
     name: r'whatsappStatus',
     required: true,
@@ -239,6 +251,7 @@ class RepresentantDto {
                 relationStatus,
                 statutQualificationId,
                 statutQualificationLabel,
+                statutQualificationEffect,
                 whatsappStatus,
                 whatsappE164,
                 whatsappNumber,
@@ -274,6 +287,7 @@ class RepresentantDto {
                 other.relationStatus,
                 other.statutQualificationId,
                 other.statutQualificationLabel,
+                other.statutQualificationEffect,
                 other.whatsappStatus,
                 other.whatsappE164,
                 other.whatsappNumber,
@@ -315,6 +329,7 @@ class RepresentantDto {
         relationStatus,
         statutQualificationId,
         statutQualificationLabel,
+        statutQualificationEffect,
         whatsappStatus,
         whatsappE164,
         whatsappNumber,

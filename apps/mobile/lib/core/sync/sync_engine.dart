@@ -1417,6 +1417,9 @@ class SyncEngine {
                 label: statut.label,
                 effect: statut.effect.value,
                 requiresCallback: Value<bool>(statut.requiresCallback),
+                retryAfterMinutes: Value<int?>(
+                  statut.retryAfterMinutes?.toInt(),
+                ),
                 isActive: Value<bool>(statut.isActive),
                 position: Value<int>(rang),
                 minPayloadVersion: Value<int>(statut.minPayloadVersion.toInt()),

@@ -2077,6 +2077,10 @@ model StatutQualification {
   /// La date du rappel est exigee par CETTE ligne, jamais par le code.
   requiresCallback Boolean @default(false)
 
+  /// Un numero occupe se retente : l'app propose d'elle-meme un reessai apres
+  /// ce delai, modifiable au moment de l'appel. Nul : pas de reessai propose.
+  retryAfterMinutes Int?
+
   /// Dans quel ordre le plateau reprend les fiches : un « Tres interesse »
   /// joint se rappelle avant un « Non eligible ». Se modifie, y compris sur une
   /// ligne systeme : c'est un arbitrage du metier, pas une regle du script.

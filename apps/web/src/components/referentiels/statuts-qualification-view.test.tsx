@@ -31,6 +31,7 @@ const statut = (patch: Partial<StatutQualification>): StatutQualification => ({
   label: 'Très intéressé',
   effect: 'REACHED',
   requiresCallback: false,
+  retryAfterMinutes: null,
   priorite: 'HAUTE',
   relationStatus: 'AMBASSADEUR',
   isActive: true,

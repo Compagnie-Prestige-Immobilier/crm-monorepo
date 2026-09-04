@@ -669,6 +669,7 @@ RepresentantDto representantDto({
   relationStatus: relationStatus,
   statutQualificationId: null,
   statutQualificationLabel: null,
+  statutQualificationEffect: null,
   whatsappStatus: whatsappStatus,
   whatsappE164: whatsappE164,
   prenom: prenom,

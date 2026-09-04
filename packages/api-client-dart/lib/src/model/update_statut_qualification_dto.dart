@@ -25,6 +25,8 @@ class UpdateStatutQualificationDto {
 
     this.requiresCallback,
 
+    this.retryAfterMinutes,
+
     this.priorite,
 
     this.relationStatus,
@@ -35,6 +37,12 @@ class UpdateStatutQualificationDto {
 
   @JsonKey(name: r'requiresCallback', required: false, includeIfNull: false)
   final bool? requiresCallback;
+
+  /// Nul retire le réessai proposé.
+  // minimum: 5
+  // maximum: 10080
+  @JsonKey(name: r'retryAfterMinutes', required: false, includeIfNull: false)
+  final num? retryAfterMinutes;
 
   @JsonKey(
     name: r'priorite',
@@ -58,10 +66,17 @@ class UpdateStatutQualificationDto {
         other is UpdateStatutQualificationDto &&
             runtimeType == other.runtimeType &&
             equals(
-              [label, requiresCallback, priorite, relationStatus],
+              [
+                label,
+                requiresCallback,
+                retryAfterMinutes,
+                priorite,
+                relationStatus,
+              ],
               [
                 other.label,
                 other.requiresCallback,
+                other.retryAfterMinutes,
                 other.priorite,
                 other.relationStatus,
               ],
@@ -71,7 +86,13 @@ class UpdateStatutQualificationDto {
   @override
   int get hashCode =>
       runtimeType.hashCode ^
-      mapPropsToHashCode([label, requiresCallback, priorite, relationStatus]);
+      mapPropsToHashCode([
+        label,
+        requiresCallback,
+        retryAfterMinutes,
+        priorite,
+        relationStatus,
+      ]);
 
   factory UpdateStatutQualificationDto.fromJson(Map<String, dynamic> json) =>
       _$UpdateStatutQualificationDtoFromJson(json);

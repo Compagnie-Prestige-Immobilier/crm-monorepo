@@ -9,7 +9,6 @@ import '../../../core/router/back_navigation.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/router/single_push.dart';
 import '../../../core/sync/phase2_directory_sync.dart';
-import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/phone.dart';
 import '../../../ui/async_value_x.dart';
@@ -19,7 +18,7 @@ import '../../../ui/widgets/error_state.dart';
 import '../../phase2/phase2_controller.dart';
 import '../../rappels/presentation/rappels_screen.dart' show quandRappeler;
 import '../../representant/presentation/representant_detail_screen.dart'
-    show libelleIssueRepresentant, relationLabel;
+    show StatutTag, libelleIssueRepresentant, relationLabel;
 
 /// Les personnes que J'AI appelées, du plus récent au plus ancien.
 ///
@@ -207,14 +206,17 @@ class _ContactTile extends StatelessWidget {
                       spacing: CpiSpacing.xs,
                       runSpacing: CpiSpacing.xxs,
                       children: <Widget>[
-                        if (issue != null) CpiTag(libelleIssue(issue)),
-                        if (contact.statut == 'AMBASSADEUR')
-                          Icon(
-                            PhosphorIconsFill.star,
-                            size: CpiIconSize.xs,
-                            color: context.cpi.success,
-                          ),
-                        CpiTag(statut),
+                        if (contact.representant)
+                          StatutTag(
+                            relationStatus: contact.statut,
+                            statutLabel: contact.statutLabel,
+                            statutEffect: contact.statutEffect,
+                            lastCallOutcome: issue,
+                          )
+                        else ...<Widget>[
+                          if (issue != null) CpiTag(libelleIssue(issue)),
+                          CpiTag(statut),
+                        ],
                       ],
                     ),
                   ],

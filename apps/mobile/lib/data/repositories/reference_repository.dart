@@ -221,9 +221,14 @@ class ReferenceRepository {
     )..where((Departements t) => t.id.equals(id))).getSingleOrNull();
   }
 
+  /// [statutId], [relation] et [dernierAppel] vides ne filtrent pas ; la
+  /// valeur `JAMAIS` cible les fiches sans statut ou jamais appelées.
   Stream<List<RepresentantSyncViewData>> watchRepresentants({
     String? search,
     String? moi,
+    String statutId = '',
+    String relation = '',
+    String dernierAppel = '',
   }) {
     final String terme = (search ?? '').trim();
     // ponytail: pas de LIMIT, le périmètre borne déjà la liste ; paginer si un
@@ -239,12 +244,20 @@ class ReferenceRepository {
           'WHERE deleted_at IS NULL '
           '  AND (lower(full_name) LIKE ?2 OR phone_e164 LIKE ?2 '
           '       OR (?3 <> \'\' AND phone_e164 LIKE ?3)) '
+          '  AND (?4 = \'\' OR (?4 = \'JAMAIS\' AND statut_qualification_id IS NULL) '
+          '       OR statut_qualification_id = ?4) '
+          '  AND (?5 = \'\' OR relation_status = ?5) '
+          '  AND (?6 = \'\' OR (?6 = \'JAMAIS\' AND last_call_at IS NULL) '
+          '       OR last_call_outcome = ?6) '
           '  ${_perimetre('representant')}'
           'ORDER BY client_created_at DESC',
           variables: <Variable<Object>>[
             Variable<String>(moi ?? ''),
             Variable<String>(pattern),
             Variable<String>(parNumero),
+            Variable<String>(statutId),
+            Variable<String>(relation),
+            Variable<String>(dernierAppel),
           ],
           readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
             _db.representants,
@@ -316,6 +329,8 @@ class ReferenceRepository {
     String? search,
     String? projet,
     String? moi,
+    String statut = '',
+    String dernierAppel = '',
   }) {
     final String pattern = '%${(search ?? '').trim().toLowerCase()}%';
     final String project = projet ?? '';
@@ -328,12 +343,17 @@ class ReferenceRepository {
           '        WHERE j.prospect_id = v.id AND j.projet = ?2)) '
           '  AND (?3 = \'%%\' OR lower(nom) LIKE ?3 OR lower(prenom) LIKE ?3 '
           '       OR phone_e164 LIKE ?3) '
+          '  AND (?4 = \'\' OR statut = ?4) '
+          '  AND (?5 = \'\' OR (?5 = \'JAMAIS\' AND last_call_at IS NULL) '
+          '       OR last_call_outcome = ?5) '
           '  ${_perimetre('prospect', alias: 'v')}'
           'ORDER BY client_created_at DESC LIMIT 500',
           variables: <Variable<Object>>[
             Variable<String>(moi ?? ''),
             Variable<String>(project),
             Variable<String>(pattern),
+            Variable<String>(statut),
+            Variable<String>(dernierAppel),
           ],
           readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
             _db.prospects,
