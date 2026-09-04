@@ -434,6 +434,8 @@ jobs:
             apps/api/openapi.json
             packages/api-client/src/generated
             packages/api-client-dart/lib
+            packages/api-client-chues/src/generated
+            packages/api-client-grand-public/src/generated
           )
           # Un chemin généré absent n'est pas « pas de dérive » : c'est une
           # génération qui n'a rien produit. `git add` échouerait de toute
