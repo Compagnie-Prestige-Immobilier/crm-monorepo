@@ -48,6 +48,14 @@
     "@crm/api-client-dart#build": {
       "dependsOn": ["generate"]
     },
+    "@crm/api-client-chues#build": {
+      "dependsOn": ["^build", "generate"],
+      "outputs": ["dist/**"]
+    },
+    "@crm/api-client-grand-public#build": {
+      "dependsOn": ["^build", "generate"],
+      "outputs": ["dist/**"]
+    },
     "@crm/database#lint": {
       "dependsOn": ["build"]
     },
@@ -151,6 +159,8 @@
         "../../apps/api/openapi.json",
         "../../openapitools.json",
         "../../tools/dev/generate-dart-client.mjs",
+        "../../tools/dev/generate-plateforme-client.mjs",
+        "openapi.json",
         "openapi-config.yaml",
         "build.yaml",
         "pubspec.yaml",

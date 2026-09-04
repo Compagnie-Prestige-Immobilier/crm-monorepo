@@ -31,7 +31,7 @@
     "openapi:generate": "pnpm --filter @crm/api openapi:generate",
     "mobile:client:generate": "node tools/dev/generate-dart-client.mjs",
     "codegen": "turbo run generate",
-    "codegen:check": "pnpm codegen && git add -A --intent-to-add && git diff --exit-code -- apps/api/openapi.json packages/api-client/src/generated packages/api-client-dart/lib",
+    "codegen:check": "pnpm codegen && git add -A --intent-to-add && git diff --exit-code -- apps/api/openapi.json packages/api-client/src/generated packages/api-client-dart/lib packages/api-client-chues/src/generated packages/api-client-grand-public/src/generated",
     "verify:local": "pnpm format:check && pnpm lint && pnpm dead-code && pnpm typecheck && pnpm test && pnpm codegen:check"
   },
   "devDependencies": {
