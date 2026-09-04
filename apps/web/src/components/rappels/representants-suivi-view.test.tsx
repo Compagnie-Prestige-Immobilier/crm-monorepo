@@ -41,6 +41,7 @@ function rep(over: Partial<RepresentantRow> & { id: string }): RepresentantRow {
     relationStatus: 'CONTACTE',
     statutQualificationId: null,
     statutQualificationLabel: null,
+    statutQualificationEffect: null,
     callAttemptCount: 0,
     whatsappStatus: 'NON_DEMANDE',
     whatsappE164: null,

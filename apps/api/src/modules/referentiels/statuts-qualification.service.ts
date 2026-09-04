@@ -71,6 +71,7 @@ const toDto = (row: StatutQualification): StatutQualificationDto => ({
   label: row.label,
   effect: row.effect,
   requiresCallback: row.requiresCallback,
+  retryAfterMinutes: row.retryAfterMinutes,
   priorite: row.priorite,
   relationStatus: row.relationStatus,
   isActive: row.isActive,
@@ -134,6 +135,7 @@ export class StatutsQualificationService {
         label,
         effect: input.effect,
         requiresCallback,
+        retryAfterMinutes: input.retryAfterMinutes ?? null,
         priorite: input.priorite ?? PrioriteTraitement.NORMALE,
         relationStatus: input.relationStatus ?? null,
         sortOrder: await this.rangSuivant(input.effect),
@@ -185,6 +187,9 @@ export class StatutsQualificationService {
           : { requiresCallback: input.requiresCallback }),
         ...(input.priorite === undefined ? {} : { priorite: input.priorite }),
         ...(input.relationStatus === undefined ? {} : { relationStatus: input.relationStatus }),
+        ...(input.retryAfterMinutes === undefined
+          ? {}
+          : { retryAfterMinutes: input.retryAfterMinutes }),
       },
     });
     return toDto(updated);

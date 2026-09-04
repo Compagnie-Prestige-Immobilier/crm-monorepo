@@ -214,7 +214,10 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(find.text('A accepté'), findsOneWidget);
+    // Sans statut ni appel, la pastille dit « Jamais appelé » ; la relation
+    // acceptée se voit à l'étoile.
+    expect(find.text('Jamais appelé'), findsOneWidget);
+    expect(find.byIcon(PhosphorIconsFill.star), findsOneWidget);
 
     await teardownTree(tester);
   });
@@ -291,7 +294,10 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(find.text('PARRAIN'), findsOneWidget);
+    // Une relation que ce client ignore ne casse rien : la pastille parle de
+    // l'appel, pas de la relation.
+    expect(find.text('Jamais appelé'), findsOneWidget);
+    expect(find.text('+221 77 000 00 01'), findsOneWidget);
 
     await teardownTree(tester);
   });

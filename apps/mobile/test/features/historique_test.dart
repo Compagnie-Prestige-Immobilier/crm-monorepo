@@ -181,8 +181,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(Dismissible), findsNothing);
-    expect(find.text('Ousmane Fall'), findsOneWidget);
     expect(find.text('Supprimer'), findsNothing);
+    // Le balayage change d'onglet, il ne retire rien : la fiche est toujours là.
+    await tester.tap(find.text('Représentants'));
+    await tester.pumpAndSettle();
+    expect(find.text('Ousmane Fall'), findsOneWidget);
 
     await teardownTree(tester);
   });
@@ -324,6 +327,91 @@ void main() {
     await mount(tester);
 
     expect(find.byType(CpiEmptyState), findsNothing);
+    expect(find.text('Ousmane Fall'), findsOneWidget);
+
+    await teardownTree(tester);
+  });
+
+  testWidgets('l\'onglet Prospects liste les prospects CHUES', (
+    WidgetTester tester,
+  ) async {
+    await insertRepresentant(db, id: 'rep-1', phone: '+221770000001');
+    await insertProspect(
+      db,
+      id: 'pros-1',
+      representantId: 'rep-1',
+      phone: '+221771234567',
+      nom: 'Diop',
+      prenom: 'Awa',
+    );
+    await db
+        .into(db.prospectJourneys)
+        .insert(
+          ProspectJourneysCompanion.insert(
+            prospectId: 'pros-1',
+            projet: 'CHUES',
+          ),
+        );
+    await mount(tester);
+
+    expect(find.text('Awa Diop'), findsNothing);
+    expect(find.text('Appeler un représentant'), findsOneWidget);
+    await tester.tap(find.text('Prospects'));
+    await tester.pumpAndSettle();
+    expect(find.text('Awa Diop'), findsOneWidget);
+    expect(find.text('1 prospect'), findsOneWidget);
+    // Le pied suit l'onglet : on n'appelle pas un représentant depuis la
+    // liste des prospects.
+    expect(find.text('Appeler un prospect'), findsOneWidget);
+    expect(find.text('Appeler un représentant'), findsNothing);
+
+    await teardownTree(tester);
+  });
+
+  testWidgets('le filtre par statut ne garde que les fiches qui le portent', (
+    WidgetTester tester,
+  ) async {
+    await db
+        .into(db.statutsQualification)
+        .insert(
+          StatutsQualificationCompanion.insert(
+            code: 'TRES_INTERESSE',
+            id: 'sq-1',
+            label: 'Très intéressé',
+            effect: 'REACHED',
+          ),
+        );
+    await insertRepresentant(
+      db,
+      id: 'rep-1',
+      phone: '+221770000001',
+      fullName: 'Ousmane Fall',
+      statutQualificationId: 'sq-1',
+      serverUpdatedAt: DateTime.utc(2026, 9, 1),
+    );
+    await insertRepresentant(
+      db,
+      id: 'rep-2',
+      phone: '+221770000002',
+      fullName: 'Aminata Sy',
+      serverUpdatedAt: DateTime.utc(2026, 9, 1),
+    );
+    await mount(tester);
+    expect(find.text('Aminata Sy'), findsOneWidget);
+
+    await tester.tap(find.byIcon(PhosphorIconsRegular.funnel).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Jamais qualifié'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Voir la liste'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Aminata Sy'), findsOneWidget);
+    expect(find.text('Ousmane Fall'), findsNothing);
+    expect(find.text('Jamais qualifié'), findsOneWidget);
+
+    await tester.tap(find.text('Effacer les filtres'));
+    await tester.pumpAndSettle();
     expect(find.text('Ousmane Fall'), findsOneWidget);
 
     await teardownTree(tester);

@@ -320,6 +320,8 @@ export function RepresentantsView({
                             <RelationBadge
                               status={representant.relationStatus}
                               label={representant.statutQualificationLabel}
+                              effect={representant.statutQualificationEffect}
+                              lastCallOutcome={representant.lastCallOutcome}
                             />
                           </TableCell>
                           <TableCell className="tabular-nums">
@@ -465,6 +467,8 @@ function RepresentantCard({
             <RelationBadge
               status={representant.relationStatus}
               label={representant.statutQualificationLabel}
+              effect={representant.statutQualificationEffect}
+              lastCallOutcome={representant.lastCallOutcome}
             />
           </div>
         </div>

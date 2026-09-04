@@ -259,6 +259,8 @@ function TableRepresentants({ items }: { items: RepresentantRow[] }) {
               <RelationBadge
                 status={representant.relationStatus}
                 label={representant.statutQualificationLabel}
+                effect={representant.statutQualificationEffect}
+                lastCallOutcome={representant.lastCallOutcome}
               />
             </TableCell>
           </TableRow>

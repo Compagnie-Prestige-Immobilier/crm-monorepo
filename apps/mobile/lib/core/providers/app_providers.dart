@@ -8,7 +8,7 @@ import 'package:drift/drift.dart'
         QueryRow,
         ResultSetImplementation,
         Variable;
-import 'package:flutter/material.dart' show DateUtils;
+import 'package:flutter/material.dart' show DateUtils, immutable;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -329,6 +329,96 @@ class HistoriqueSearch extends Notifier<String> {
   void set(String value) => state = value;
 }
 
+/// « Jamais appelé » et « Jamais qualifié » : des valeurs qui n'existent dans
+/// aucune colonne, lues par les requêtes comme des tests de nullité.
+const String filtreJamais = 'JAMAIS';
+
+/// Les filtres de la liste des représentants. Une clé vide ne filtre pas.
+@immutable
+class FiltresRepresentants {
+  const FiltresRepresentants({
+    this.statutId = '',
+    this.relation = '',
+    this.dernierAppel = '',
+  });
+
+  final String statutId;
+  final String relation;
+  final String dernierAppel;
+
+  int get actifs =>
+      (statutId.isEmpty ? 0 : 1) +
+      (relation.isEmpty ? 0 : 1) +
+      (dernierAppel.isEmpty ? 0 : 1);
+
+  FiltresRepresentants copyWith({
+    String? statutId,
+    String? relation,
+    String? dernierAppel,
+  }) => FiltresRepresentants(
+    statutId: statutId ?? this.statutId,
+    relation: relation ?? this.relation,
+    dernierAppel: dernierAppel ?? this.dernierAppel,
+  );
+}
+
+class FiltresRepresentantsNotifier extends Notifier<FiltresRepresentants> {
+  @override
+  FiltresRepresentants build() => const FiltresRepresentants();
+
+  void set(FiltresRepresentants value) => state = value;
+}
+
+final NotifierProvider<FiltresRepresentantsNotifier, FiltresRepresentants>
+filtresRepresentantsProvider =
+    NotifierProvider<FiltresRepresentantsNotifier, FiltresRepresentants>(
+      FiltresRepresentantsNotifier.new,
+    );
+
+@immutable
+class FiltresProspects {
+  const FiltresProspects({this.statut = '', this.dernierAppel = ''});
+
+  final String statut;
+  final String dernierAppel;
+
+  int get actifs => (statut.isEmpty ? 0 : 1) + (dernierAppel.isEmpty ? 0 : 1);
+
+  FiltresProspects copyWith({String? statut, String? dernierAppel}) =>
+      FiltresProspects(
+        statut: statut ?? this.statut,
+        dernierAppel: dernierAppel ?? this.dernierAppel,
+      );
+}
+
+class FiltresProspectsNotifier extends Notifier<FiltresProspects> {
+  @override
+  FiltresProspects build() => const FiltresProspects();
+
+  void set(FiltresProspects value) => state = value;
+}
+
+final NotifierProvider<FiltresProspectsNotifier, FiltresProspects>
+filtresProspectsProvider =
+    NotifierProvider<FiltresProspectsNotifier, FiltresProspects>(
+      FiltresProspectsNotifier.new,
+    );
+
+/// Les prospects CHUES du périmètre, pour l'onglet « Prospects » des fiches.
+final StreamProvider<List<ProspectSyncViewData>> chuesProspectListProvider =
+    StreamProvider<List<ProspectSyncViewData>>((Ref ref) {
+      final FiltresProspects filtres = ref.watch(filtresProspectsProvider);
+      return ref
+          .watch(referenceRepositoryProvider)
+          .watchAllProspects(
+            search: ref.watch(historiqueSearchProvider),
+            projet: 'CHUES',
+            moi: _moi(ref),
+            statut: filtres.statut,
+            dernierAppel: filtres.dernierAppel,
+          );
+    });
+
 /// L'identifiant du compte connecté, ou la chaîne vide : les requêtes qui
 /// bornent au périmètre d'appel s'en servent comme paramètre lié.
 String _moi(Ref ref) =>
@@ -349,11 +439,17 @@ final StreamProvider<bool> perimetreBorneProvider = StreamProvider<bool>((
 
 final StreamProvider<List<RepresentantSyncViewData>> representantListProvider =
     StreamProvider<List<RepresentantSyncViewData>>((Ref ref) {
+      final FiltresRepresentants filtres = ref.watch(
+        filtresRepresentantsProvider,
+      );
       return ref
           .watch(referenceRepositoryProvider)
           .watchRepresentants(
             search: ref.watch(historiqueSearchProvider),
             moi: _moi(ref),
+            statutId: filtres.statutId,
+            relation: filtres.relation,
+            dernierAppel: filtres.dernierAppel,
           );
     });
 
@@ -601,6 +697,8 @@ typedef Contact = ({
   String? issue,
   String statut,
   String? statutLabel,
+  String? statutEffect,
+  bool representant,
 });
 
 /// Les représentants que J'AI appelés, du plus récent au plus ancien.
@@ -631,6 +729,8 @@ final StreamProvider<List<Contact>> mesContactsRepresentantsProvider =
                     issue: r.lastCallOutcome,
                     statut: r.relationStatus,
                     statutLabel: r.statutQualificationLabel,
+                    statutEffect: r.statutQualificationEffect,
+                    representant: true,
                   ),
                 )
                 .toList(growable: false),
@@ -683,6 +783,8 @@ final mesContactsProspectsProvider = StreamProvider.family<List<Contact>, bool>(
                 issue: r.read<String?>('issue'),
                 statut: r.read<String>('statut'),
                 statutLabel: null,
+                statutEffect: null,
+                representant: false,
               ),
             )
             .toList(growable: false),

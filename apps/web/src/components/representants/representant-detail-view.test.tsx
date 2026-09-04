@@ -144,7 +144,8 @@ describe('RepresentantDetailView', () => {
     renderWithQuery(<RepresentantDetailView representantId="rep-1" author={AUTHOR} />);
 
     expect(await screen.findByText('Ndeye Fall')).toBeTruthy();
-    expect(screen.getByText('A accepté')).toBeTruthy();
+    // La pastille et la ligne « Dernier appel » disent la même chose.
+    expect(screen.getAllByText('Jamais appelé')).toHaveLength(2);
   });
 
   it('rend la chronologie dans l’ordre servi par l’API, du plus récent au plus ancien', async () => {
@@ -246,7 +247,7 @@ describe('RepresentantDetailView, ce que l’appel a appris', () => {
     });
     renderWithQuery(<RepresentantDetailView representantId="rep-1" author={AUTHOR} />);
 
-    expect(await screen.findByText('Joint')).toBeTruthy();
+    expect(await screen.findAllByText('Joint')).toHaveLength(2);
     expect(screen.getByText(/04 mars 2026/u)).toBeTruthy();
   });
 });
