@@ -41,7 +41,7 @@ function stopApps() {
     if (child.pid === undefined) continue;
     try {
       if (process.platform === 'win32') child.kill();
-      else process.kill(-child.pid, 'SIGTERM');
+      else process.kill(-child.pid, 'SIGINT');
     } catch {}
   }
   children.clear();
@@ -83,20 +83,46 @@ async function stopEnvironment() {
   console.log('[dx] environnement arrêté.');
 }
 
+function startApiAndWeb() {
+  if (isListening(3001)) console.log('[dx] API déjà active : http://localhost:3001');
+  else run('pnpm', ['--filter', '@crm/api', 'dev']);
+  if (isListening(3000)) console.log('[dx] web déjà actif : http://localhost:3000');
+  else run('pnpm', ['--filter', '@crm/web', 'dev']);
+}
+
 function startApps() {
   console.log('[dx] API : http://localhost:3001 · web : http://localhost:3000');
-  if (!isListening(3001)) run('pnpm', ['--filter', '@crm/api', 'dev']);
-  if (!isListening(3000)) run('pnpm', ['--filter', '@crm/web', 'dev']);
+  startApiAndWeb();
   flutterProcess = run('flutter', ['run', '-d', 'emulator-5554'], mobile, { interactive: true });
 }
 
+function runRequired(command, args, cwd = root) {
+  const result = spawnSync(command, args, { cwd, env: process.env, stdio: 'inherit' });
+  if (result.status !== 0) process.exit(result.status ?? 1);
+}
+
+function prepareDatabase() {
+  console.log('[dx] Postgres, migrations et seed…');
+  runRequired('docker', [
+    'compose',
+    '-f',
+    'infra/docker/docker-compose.yml',
+    'up',
+    '--wait',
+    '--wait-timeout',
+    '45',
+    'postgres',
+  ]);
+  runRequired('pnpm', ['db:deploy']);
+  runRequired('pnpm', ['db:seed']);
+  runRequired('pnpm', ['db:seed:dev-chues']);
+  runRequired('pnpm', ['db:seed:demo']);
+}
+
 function startApiDev() {
-  if (isListening(3001)) {
-    console.log('[dx] API déjà active : http://localhost:3001 · logs/api.log');
-    return;
-  }
-  console.log('[dx] démarrage de l’API : http://localhost:3001 · logs/api.log');
-  run('pnpm', ['--filter', '@crm/api', 'dev']);
+  prepareDatabase();
+  console.log('[dx] API : http://localhost:3001 · web : http://localhost:3000');
+  startApiAndWeb();
 }
 
 function isListening(port) {
@@ -128,15 +154,7 @@ function waitForAndroid() {
 }
 
 function startMobile() {
-  console.log('[dx] démarrage de Postgres, migrations et seed…');
-  for (const [command, args] of [
-    ['docker', ['compose', '-f', 'infra/docker/docker-compose.yml', 'up', '-d']],
-    ['pnpm', ['db:deploy']],
-    ['pnpm', ['db:seed']],
-  ]) {
-    const result = spawnSync(command, args, { cwd: root, env: process.env, stdio: 'inherit' });
-    if (result.status !== 0) process.exit(result.status ?? 1);
-  }
+  prepareDatabase();
 
   const devices = spawnSync('adb', ['devices'], {
     encoding: 'utf8',

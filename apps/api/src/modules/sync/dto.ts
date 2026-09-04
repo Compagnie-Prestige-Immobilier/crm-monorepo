@@ -57,6 +57,11 @@ import {
 } from '../prospects/dto.js';
 import { RepresentantDto } from '../representants/dto.js';
 import {
+  DEVICE_CALL_MAX_DURATION_SECONDS,
+  DEVICE_CALL_TYPES,
+  type DeviceCallType,
+} from '../../common/device-call.js';
+import {
   DATE_PATTERN as VISITE_DATE_PATTERN,
   TIME_PATTERN as VISITE_TIME_PATTERN,
   VISITE_REFERENTIEL_KINDS,
@@ -74,6 +79,7 @@ export enum SyncEntity {
   PROSPECT = 'prospect',
   CALL_ATTEMPT = 'call_attempt',
   VISITE = 'visite',
+  APPEL_DETECTE = 'appel_detecte',
 }
 
 export enum SyncOp {
@@ -482,6 +488,43 @@ export class SyncEntityDataDto {
   callbackAt?: string;
 
   @ApiPropertyOptional({
+    enum: DEVICE_CALL_TYPES,
+    description:
+      'Tentative d’appel : type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.',
+  })
+  @IsOptional()
+  @IsIn(DEVICE_CALL_TYPES)
+  deviceCallType?: DeviceCallType;
+
+  @ApiPropertyOptional({
+    minimum: 0,
+    maximum: DEVICE_CALL_MAX_DURATION_SECONDS,
+    description: 'Tentative d’appel : durée en secondes lue dans le journal d’appels Android.',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(DEVICE_CALL_MAX_DURATION_SECONDS)
+  deviceCallDurationSeconds?: number;
+
+  @ApiPropertyOptional({
+    format: 'date-time',
+    description: 'Tentative d’appel : heure de l’appel lue dans le journal d’appels Android.',
+  })
+  @IsOptional()
+  @IsISO8601()
+  deviceCallAt?: string;
+
+  @ApiPropertyOptional({
+    format: 'date-time',
+    description:
+      'Appel détecté : heure à laquelle le téléphone a retrouvé cet appel dans son journal.',
+  })
+  @IsOptional()
+  @IsISO8601()
+  detectedAt?: string;
+
+  @ApiPropertyOptional({
     maxLength: PHASE2_EMAIL_MAX_LENGTH,
     description: 'Tentative d’appel : adresse électronique recueillie pendant l’appel.',
   })
@@ -676,6 +719,16 @@ export function dependencyKeyOf(operation: {
   // Une visite ne dépend de rien : chaque inscription est sa propre partition.
   if (operation.entity === SyncEntity.VISITE) {
     return `visite:${operation.entityId}`;
+  }
+
+  // Un appel détecté suit SA fiche, comme la tentative qui le consignera. Le
+  // laisser tomber dans le repli lui donnerait une partition par appel, et une
+  // session d'appels dépasserait seule la limite de groupes du lot.
+  if (operation.entity === SyncEntity.APPEL_DETECTE) {
+    const fiche = operation.data?.representantId;
+    return fiche
+      ? `representant:${fiche}`
+      : `prospect:${operation.data?.prospectId ?? operation.entityId}`;
   }
 
   const parent = operation.data?.representantId;

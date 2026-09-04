@@ -68,6 +68,18 @@ export async function fetchProspectCallAttempts(
   return payload.items;
 }
 
+export type DeviceCallDetection = components['schemas']['DeviceCallDetectionDto'];
+
+export async function fetchProspectDeviceCalls(
+  id: string,
+  client: ApiClient = getApiClient(),
+): Promise<DeviceCallDetection[]> {
+  const payload = unwrap(
+    await client.GET('/api/v1/prospects/{id}/device-calls', { params: { path: { id } } }),
+  );
+  return payload.items;
+}
+
 export async function createProspect(
   input: CreateProspectInput,
   client: ApiClient = getApiClient(),

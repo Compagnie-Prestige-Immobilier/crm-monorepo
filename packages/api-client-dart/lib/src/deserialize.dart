@@ -76,6 +76,8 @@ import 'package:crm_api_client/src/model/demo_workspace_status_dto.dart';
 import 'package:crm_api_client/src/model/departement_dto.dart';
 import 'package:crm_api_client/src/model/departement_yield_dto.dart';
 import 'package:crm_api_client/src/model/departement_yield_list_dto.dart';
+import 'package:crm_api_client/src/model/device_call_detection_dto.dart';
+import 'package:crm_api_client/src/model/device_call_detection_list_dto.dart';
 import 'package:crm_api_client/src/model/directory_entry_dto.dart';
 import 'package:crm_api_client/src/model/directory_page_dto.dart';
 import 'package:crm_api_client/src/model/disposition_presentation_dto.dart';
@@ -538,6 +540,12 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'DepartementYieldListDto':
       return DepartementYieldListDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'DeviceCallDetectionDto':
+      return DeviceCallDetectionDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'DeviceCallDetectionListDto':
+      return DeviceCallDetectionListDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'DirectoryEntryDto':
       return DirectoryEntryDto.fromJson(value as Map<String, dynamic>)

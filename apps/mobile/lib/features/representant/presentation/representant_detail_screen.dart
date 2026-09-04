@@ -12,6 +12,7 @@ import '../../../core/providers/sync_coordinator.dart';
 import '../../../core/router/back_navigation.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/router/single_push.dart';
+import '../../../core/telephonie/appels_crm.dart';
 import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/phone.dart';
@@ -26,6 +27,7 @@ import '../../../ui/widgets/empty_state.dart';
 import '../../../ui/widgets/error_state.dart';
 import '../../../ui/widgets/sync_status_icon.dart';
 import '../../auth/auth_state.dart';
+import '../../telephonie/appels_a_consigner.dart';
 import '../../../ui/async_value_x.dart';
 
 class RepresentantDetailScreen extends ConsumerWidget {
@@ -119,7 +121,9 @@ class StatutTag extends StatelessWidget {
     final String libelle =
         statutLabel ??
         (issue == null ? 'Jamais appelé' : libelleIssueRepresentant(issue));
-    final CpiTone tone = toneDeLEffet(statutLabel == null ? issue : statutEffect);
+    final CpiTone tone = toneDeLEffet(
+      statutLabel == null ? issue : statutEffect,
+    );
     final bool etoile = relationStatus == 'AMBASSADEUR';
     final bool refus = relationStatus == 'REFUS';
     return Semantics(
@@ -171,7 +175,23 @@ class _PiedDeFiche extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         CpiButton(
+          'Appeler',
+          icon: PhosphorIconsRegular.phone,
+          onPressed: () => unawaited(
+            ref
+                .read(appelsCrmProvider.notifier)
+                .lancer(
+                  context,
+                  kind: 'representant',
+                  id: data.id,
+                  e164: data.phoneE164,
+                ),
+          ),
+        ),
+        const SizedBox(height: CpiSpacing.xs),
+        CpiButton(
           'Ajouter des prospects',
+          variant: CpiButtonVariant.secondary,
           icon: PhosphorIconsRegular.userPlus,
           onPressed: () => context.pushOnce(Routes.newProspectFor(data.id)),
         ),
@@ -288,6 +308,9 @@ class _Fiche extends ConsumerWidget {
 
     final String notes = (data.notes ?? '').trim();
     final String profession = (data.profession ?? '').trim();
+    final PreuvesAppelData? preuve = ref
+        .watch(dernierePreuveProvider((kind: 'representant', id: data.id)))
+        .value;
     final WhatsappStatus? whatsapp = WhatsappStatus.parse(data.whatsappStatus);
     final String? whatsappAutre = whatsapp == WhatsappStatus.autreNumero
         ? data.whatsappE164
@@ -321,8 +344,16 @@ class _Fiche extends ConsumerWidget {
             context,
             icon: PhosphorIconsRegular.phone,
             label: 'Téléphone',
-            value: Phone.format(data.phoneE164),
+            value: preuve == null
+                ? Phone.format(data.phoneE164)
+                : '${Phone.format(data.phoneE164)}\n${preuve.libelle}',
             copied: data.phoneE164,
+          ),
+          ?ligneAppelNonConsigne(
+            context,
+            ref,
+            kind: 'representant',
+            entityId: data.id,
           ),
           if (departement != null)
             _info(

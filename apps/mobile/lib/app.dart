@@ -8,6 +8,7 @@ import 'core/providers/app_providers.dart';
 import 'features/notifications/notifications_controller.dart';
 import 'features/notifications/push_deep_link_listener.dart';
 import 'features/notifications/rep_callback_due_listener.dart';
+import 'features/telephonie/appels_a_consigner.dart';
 import 'core/router/app_router.dart';
 import 'core/settings/display_settings.dart';
 import 'core/theme/app_theme.dart';
@@ -120,8 +121,10 @@ class CpiGoApp extends ConsumerWidget {
             ),
             child: FToaster(
               child: RepCallbackDueListener(
-                child: PushDeepLinkListener(
-                  child: child ?? const SizedBox.shrink(),
+                child: AppelsDetectesListener(
+                  child: PushDeepLinkListener(
+                    child: child ?? const SizedBox.shrink(),
+                  ),
                 ),
               ),
             ),

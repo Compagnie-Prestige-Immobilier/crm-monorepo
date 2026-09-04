@@ -1,8 +1,5 @@
 import 'dart:async';
-import 'dart:developer' as developer;
-import 'dart:io' show Platform;
 
-import 'package:android_intent_plus/android_intent.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,6 +11,7 @@ import '../../../core/providers/app_providers.dart';
 import '../../../core/router/back_navigation.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/router/single_push.dart';
+import '../../../core/telephonie/appels_crm.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/phone.dart';
 import '../../../data/local/database.dart';
@@ -25,6 +23,7 @@ import '../../../ui/widgets/error_state.dart';
 import '../../../ui/widgets/sync_status_icon.dart';
 import '../../phase2/phase2_controller.dart';
 import '../../shell/projects.dart';
+import '../../telephonie/appels_a_consigner.dart';
 import '../situation_labels.dart';
 
 /// La fiche d'un prospect, en LECTURE, pour préparer et consigner un appel.
@@ -80,37 +79,14 @@ class ProspectDetailScreen extends ConsumerWidget {
   }
 }
 
-/// Ouvre le clavier du téléphone avec le numéro déjà composé.
-///
-/// Sans `url_launcher` au projet : l'intent Android est déjà celui qu'utilise
-/// l'aide à la batterie. Hors Android, ou si aucune application ne répond, le
-/// numéro part au presse-papier : le téléconseiller le compose à la main plutôt
-/// que de toucher un bouton qui ne fait rien.
-Future<void> _appeler(BuildContext context, String phoneE164) async {
-  if (Platform.isAndroid) {
-    try {
-      await AndroidIntent(
-        action: 'android.intent.action.DIAL',
-        data: 'tel:$phoneE164',
-      ).launch();
-      return;
-    } on Object catch (e) {
-      developer.log('Clavier téléphonique inaccessible : $e', name: 'cpi.tel');
-    }
-  }
-  await Clipboard.setData(ClipboardData(text: phoneE164));
-  if (!context.mounted) return;
-  cpiToast(context, 'Numéro copié. Composez-le depuis le téléphone.');
-}
-
-class _Pied extends StatelessWidget {
+class _Pied extends ConsumerWidget {
   const _Pied({required this.data, required this.chues});
 
   final ProspectSyncViewData data;
   final bool chues;
 
   @override
-  Widget build(BuildContext context) => CpiActionBar(
+  Widget build(BuildContext context, WidgetRef ref) => CpiActionBar(
     child: Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -118,7 +94,16 @@ class _Pied extends StatelessWidget {
         CpiButton(
           'Appeler',
           icon: PhosphorIconsRegular.phoneCall,
-          onPressed: () => unawaited(_appeler(context, data.phoneE164)),
+          onPressed: () => unawaited(
+            ref
+                .read(appelsCrmProvider.notifier)
+                .lancer(
+                  context,
+                  kind: 'prospect',
+                  id: data.id,
+                  e164: data.phoneE164,
+                ),
+          ),
         ),
         const SizedBox(height: CpiSpacing.xs),
         CpiButton(
@@ -161,6 +146,7 @@ class _Fiche extends ConsumerWidget {
     final DateTime? rappel = appel?.callbackAt;
 
     final List<CpiRow> faits = <CpiRow>[
+      ?ligneAppelNonConsigne(context, ref, kind: 'prospect', entityId: data.id),
       if (representantId != null)
         CpiRow(
           leading: const Icon(
@@ -223,7 +209,7 @@ class _Fiche extends ConsumerWidget {
           ),
           const SizedBox(height: CpiSpacing.md),
         ],
-        _Numero(phoneE164: data.phoneE164),
+        _Numero(prospectId: data.id, phoneE164: data.phoneE164),
         if (faits.isNotEmpty) ...<Widget>[
           const SizedBox(height: CpiSpacing.md),
           CpiCard.rows(faits),
@@ -330,18 +316,23 @@ class _Situation extends ConsumerWidget {
 
 /// Le numéro en grand, et le geste qui le met dans le presse-papier. Le bouton
 /// « Appeler » est en pied : ici on lit, on dicte, on recopie.
-class _Numero extends StatelessWidget {
-  const _Numero({required this.phoneE164});
+class _Numero extends ConsumerWidget {
+  const _Numero({required this.prospectId, required this.phoneE164});
 
+  final String prospectId;
   final String phoneE164;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final ThemeData theme = Theme.of(context);
     final String affiche = Phone.format(phoneE164);
+    final PreuvesAppelData? preuve = ref
+        .watch(dernierePreuveProvider((kind: 'prospect', id: prospectId)))
+        .value;
+    final String? confirmation = preuve?.libelle;
     return Semantics(
       button: true,
-      label: 'Téléphone $affiche. Toucher pour copier.',
+      label: 'Téléphone $affiche. ${confirmation ?? ''} Toucher pour copier.',
       onTap: () => unawaited(_copier(context)),
       child: ExcludeSemantics(
         child: CpiCard(
@@ -361,6 +352,15 @@ class _Numero extends StatelessWidget {
                     ),
                     const SizedBox(height: CpiSpacing.xxs),
                     Text(affiche, style: theme.textTheme.titleMedium),
+                    if (confirmation != null) ...<Widget>[
+                      const SizedBox(height: CpiSpacing.xxs),
+                      Text(
+                        confirmation,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

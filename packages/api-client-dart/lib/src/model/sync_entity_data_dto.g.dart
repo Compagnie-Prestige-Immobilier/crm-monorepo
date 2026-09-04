@@ -97,6 +97,16 @@ abstract class _$SyncEntityDataDtoCWProxy {
 
   SyncEntityDataDto callbackAt(DateTime? callbackAt);
 
+  SyncEntityDataDto deviceCallType(
+    SyncEntityDataDtoDeviceCallTypeEnum? deviceCallType,
+  );
+
+  SyncEntityDataDto deviceCallDurationSeconds(num? deviceCallDurationSeconds);
+
+  SyncEntityDataDto deviceCallAt(DateTime? deviceCallAt);
+
+  SyncEntityDataDto detectedAt(DateTime? detectedAt);
+
   SyncEntityDataDto email(String? email);
 
   SyncEntityDataDto fonctionnaire(bool? fonctionnaire);
@@ -173,6 +183,10 @@ abstract class _$SyncEntityDataDtoCWProxy {
     EnrollmentMethod? method,
     String? comment,
     DateTime? callbackAt,
+    SyncEntityDataDtoDeviceCallTypeEnum? deviceCallType,
+    num? deviceCallDurationSeconds,
+    DateTime? deviceCallAt,
+    DateTime? detectedAt,
     String? email,
     bool? fonctionnaire,
     bool? engagementEnCours,
@@ -357,6 +371,23 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
       this(callbackAt: callbackAt);
 
   @override
+  SyncEntityDataDto deviceCallType(
+    SyncEntityDataDtoDeviceCallTypeEnum? deviceCallType,
+  ) => this(deviceCallType: deviceCallType);
+
+  @override
+  SyncEntityDataDto deviceCallDurationSeconds(num? deviceCallDurationSeconds) =>
+      this(deviceCallDurationSeconds: deviceCallDurationSeconds);
+
+  @override
+  SyncEntityDataDto deviceCallAt(DateTime? deviceCallAt) =>
+      this(deviceCallAt: deviceCallAt);
+
+  @override
+  SyncEntityDataDto detectedAt(DateTime? detectedAt) =>
+      this(detectedAt: detectedAt);
+
+  @override
   SyncEntityDataDto email(String? email) => this(email: email);
 
   @override
@@ -453,6 +484,10 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
     Object? method = const $CopyWithPlaceholder(),
     Object? comment = const $CopyWithPlaceholder(),
     Object? callbackAt = const $CopyWithPlaceholder(),
+    Object? deviceCallType = const $CopyWithPlaceholder(),
+    Object? deviceCallDurationSeconds = const $CopyWithPlaceholder(),
+    Object? deviceCallAt = const $CopyWithPlaceholder(),
+    Object? detectedAt = const $CopyWithPlaceholder(),
     Object? email = const $CopyWithPlaceholder(),
     Object? fonctionnaire = const $CopyWithPlaceholder(),
     Object? engagementEnCours = const $CopyWithPlaceholder(),
@@ -647,6 +682,23 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
           ? _value.callbackAt
           // ignore: cast_nullable_to_non_nullable
           : callbackAt as DateTime?,
+      deviceCallType: deviceCallType == const $CopyWithPlaceholder()
+          ? _value.deviceCallType
+          // ignore: cast_nullable_to_non_nullable
+          : deviceCallType as SyncEntityDataDtoDeviceCallTypeEnum?,
+      deviceCallDurationSeconds:
+          deviceCallDurationSeconds == const $CopyWithPlaceholder()
+          ? _value.deviceCallDurationSeconds
+          // ignore: cast_nullable_to_non_nullable
+          : deviceCallDurationSeconds as num?,
+      deviceCallAt: deviceCallAt == const $CopyWithPlaceholder()
+          ? _value.deviceCallAt
+          // ignore: cast_nullable_to_non_nullable
+          : deviceCallAt as DateTime?,
+      detectedAt: detectedAt == const $CopyWithPlaceholder()
+          ? _value.detectedAt
+          // ignore: cast_nullable_to_non_nullable
+          : detectedAt as DateTime?,
       email: email == const $CopyWithPlaceholder()
           ? _value.email
           // ignore: cast_nullable_to_non_nullable
@@ -839,6 +891,26 @@ SyncEntityDataDto _$SyncEntityDataDtoFromJson(
       'callbackAt',
       (v) => v == null ? null : DateTime.parse(v as String),
     ),
+    deviceCallType: $checkedConvert(
+      'deviceCallType',
+      (v) => $enumDecodeNullable(
+        _$SyncEntityDataDtoDeviceCallTypeEnumEnumMap,
+        v,
+        unknownValue: SyncEntityDataDtoDeviceCallTypeEnum.unknownDefaultOpenApi,
+      ),
+    ),
+    deviceCallDurationSeconds: $checkedConvert(
+      'deviceCallDurationSeconds',
+      (v) => v as num?,
+    ),
+    deviceCallAt: $checkedConvert(
+      'deviceCallAt',
+      (v) => v == null ? null : DateTime.parse(v as String),
+    ),
+    detectedAt: $checkedConvert(
+      'detectedAt',
+      (v) => v == null ? null : DateTime.parse(v as String),
+    ),
     email: $checkedConvert('email', (v) => v as String?),
     fonctionnaire: $checkedConvert('fonctionnaire', (v) => v as bool?),
     engagementEnCours: $checkedConvert('engagementEnCours', (v) => v as bool?),
@@ -919,6 +991,15 @@ Map<String, dynamic> _$SyncEntityDataDtoToJson(
   if (instance.comment case final value?) 'comment': value,
   if (instance.callbackAt?.toIso8601String() case final value?)
     'callbackAt': value,
+  if (_$SyncEntityDataDtoDeviceCallTypeEnumEnumMap[instance.deviceCallType]
+      case final value?)
+    'deviceCallType': value,
+  if (instance.deviceCallDurationSeconds case final value?)
+    'deviceCallDurationSeconds': value,
+  if (instance.deviceCallAt?.toIso8601String() case final value?)
+    'deviceCallAt': value,
+  if (instance.detectedAt?.toIso8601String() case final value?)
+    'detectedAt': value,
   if (instance.email case final value?) 'email': value,
   if (instance.fonctionnaire case final value?) 'fonctionnaire': value,
   if (instance.engagementEnCours case final value?) 'engagementEnCours': value,
@@ -1011,4 +1092,17 @@ const _$EnrollmentMethodEnumMap = {
       'VOICE_OR_ELECTRONIC_MESSAGING',
   EnrollmentMethod.APPOINTMENT: 'APPOINTMENT',
   EnrollmentMethod.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$SyncEntityDataDtoDeviceCallTypeEnumEnumMap = {
+  SyncEntityDataDtoDeviceCallTypeEnum.sortant: 'sortant',
+  SyncEntityDataDtoDeviceCallTypeEnum.entrant: 'entrant',
+  SyncEntityDataDtoDeviceCallTypeEnum.manque: 'manque',
+  SyncEntityDataDtoDeviceCallTypeEnum.rejete: 'rejete',
+  SyncEntityDataDtoDeviceCallTypeEnum.bloque: 'bloque',
+  SyncEntityDataDtoDeviceCallTypeEnum.messagerie: 'messagerie',
+  SyncEntityDataDtoDeviceCallTypeEnum.externe: 'externe',
+  SyncEntityDataDtoDeviceCallTypeEnum.inconnu: 'inconnu',
+  SyncEntityDataDtoDeviceCallTypeEnum.unknownDefaultOpenApi:
+      'unknown_default_open_api',
 };

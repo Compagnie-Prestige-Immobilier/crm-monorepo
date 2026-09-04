@@ -1759,9 +1759,10 @@ void main() {
       expect(find.text('prospects'), findsOneWidget);
     });
 
-    // Le commercial est celui qui sait qu'un représentant vient d'accepter :
-    // sans chemin d'écriture, l'information restait sur le terrain.
-    formTestWidgets('la bascule de relation part avec son lot', (
+    // La relation se décide pendant l'appel de qualification, avec le statut :
+    // la fiche affiche ce vocabulaire, le formulaire ne doit pas en avoir un
+    // autre.
+    formTestWidgets('la correction ne propose plus la relation', (
       WidgetTester tester,
     ) async {
       await insertRepresentant(
@@ -1776,17 +1777,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('A accepté'));
-      await tester.pumpAndSettle();
-      await jusquAuContact(tester);
-      await tester.tap(find.text('Enregistrer et saisir des prospects'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-
-      final List<OutboxData> file = await allOutbox(db);
-      final Map<String, Object?> envoi =
-          jsonDecode(file.last.payload) as Map<String, Object?>;
-      expect(envoi['relationStatus'], 'AMBASSADEUR');
+      expect(find.text('Relation'), findsNothing);
+      expect(find.text('A accepté'), findsNothing);
+      expect(find.text('Ce représentant existe déjà'), findsNothing);
     });
 
     // Un enregistrement qui ne touche pas à la relation ne doit pas la

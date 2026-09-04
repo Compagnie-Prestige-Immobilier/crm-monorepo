@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsc -p tsconfig.gen.json --watch --preserveWatchOutput & node --watch --enable-source-maps dist/main.js",
+    "dev": "tsc -p tsconfig.gen.json && (tsc -p tsconfig.gen.json --watch --preserveWatchOutput & node --watch --watch-preserve-output --enable-source-maps dist/main.js)",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
     "lint": "oxlint --config .oxlintrc.json --report-unused-disable-directives src",

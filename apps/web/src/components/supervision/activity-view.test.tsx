@@ -34,6 +34,10 @@ function payload(overrides: Partial<AdminModule.SupervisionActivity> = {}) {
         teleconseillerId: ALICE,
         teleconseillerName: 'Alice Diop',
         calls: 4,
+        confirmedCalls: 3,
+        detectedCalls: 5,
+        unloggedCalls: 2,
+        avgCallSeconds: 95,
         unreachable: 1,
         wrongNumber: 1,
         refused: 1,
@@ -44,6 +48,10 @@ function payload(overrides: Partial<AdminModule.SupervisionActivity> = {}) {
         prospectsCreated: 2,
         representantsContacted: 2,
         repCalls: 10,
+        repConfirmedCalls: 7,
+        repDetectedCalls: 9,
+        repUnloggedCalls: 2,
+        repAvgCallSeconds: 140,
         repReached: 6,
         repCallback: 2,
         repUnreachable: 2,
@@ -53,6 +61,14 @@ function payload(overrides: Partial<AdminModule.SupervisionActivity> = {}) {
         repQuestioned: 5,
         repQualified: 4,
         repQualificationRate: 80,
+        inboundCalls: 1,
+        missedCalls: 2,
+        callbacksHonored: 1,
+        callbacksLate: 1,
+        callbacksUpcoming: 2,
+        repCallbacksHonored: 3,
+        repCallbacksLate: 1,
+        repCallbacksUpcoming: 0,
       },
     ],
     teleconseillers: [
@@ -137,8 +153,8 @@ describe('tableau d’activité des téléconseillers', () => {
     await waitFor(() => {
       expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
     });
-    expect(within(rowOf('Alice Diop')).getAllByRole('cell')[5]?.textContent).toBe('0 %');
-    expect(within(rowOf('Bineta Fall')).getAllByRole('cell')[5]?.textContent).toBe('Sans objet');
+    expect(within(rowOf('Alice Diop')).getAllByRole('cell')[13]?.textContent).toBe('0 %');
+    expect(within(rowOf('Bineta Fall')).getAllByRole('cell')[13]?.textContent).toBe('Sans objet');
   });
 
   it('compte les appels aux représentants en CHUES, ceux aux prospects en Grand Public', async () => {
@@ -150,8 +166,8 @@ describe('tableau d’activité des téléconseillers', () => {
     });
     const chues = within(rowOf('Alice Diop')).getAllByRole('cell');
     expect(chues[0]?.textContent).toBe('10');
-    expect(chues[4]?.textContent).toBe('60 %');
-    expect(chues[5]?.textContent).toBe('80 %');
+    expect(chues[12]?.textContent).toBe('60 %');
+    expect(chues[13]?.textContent).toBe('80 %');
     expect(screen.queryByRole('button', { name: /Faux numéros/u })).toBeNull();
     unmount();
 
@@ -162,7 +178,7 @@ describe('tableau d’activité des téléconseillers', () => {
     const gp = within(rowOf('Alice Diop')).getAllByRole('cell');
     expect(gp[0]?.textContent).toBe('4');
     // Un faux numéro compte parmi les injoignables.
-    expect(gp[2]?.textContent).toBe('2');
+    expect(gp[7]?.textContent).toBe('2');
     expect(screen.queryByRole('button', { name: 'Appels prospects' })).toBeNull();
   });
 
@@ -173,12 +189,12 @@ describe('tableau d’activité des téléconseillers', () => {
     await waitFor(() => {
       expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
     });
-    expect(within(rowOf('Alice Diop')).getAllByRole('cell')).toHaveLength(8);
+    expect(within(rowOf('Alice Diop')).getAllByRole('cell')).toHaveLength(16);
 
     await userEvent.click(screen.getByRole('button', { name: 'Appels prospects' }));
 
     const cells = within(rowOf('Alice Diop')).getAllByRole('cell');
-    expect(cells).toHaveLength(7);
+    expect(cells).toHaveLength(15);
     expect(cells[0]?.textContent).toBe('4');
     expect(screen.queryByRole('button', { name: /Représentants contactés/u })).toBeNull();
 
@@ -186,6 +202,27 @@ describe('tableau d’activité des téléconseillers', () => {
     const csv = downloadMock.mock.calls.at(-1)?.[0] as string;
     expect(csv).toContain('Appels prospects');
     expect(downloadMock.mock.calls.at(-1)?.[1]).toContain('chues-prospects');
+  });
+
+  it('montre les appels confirmés par le journal du téléphone, et leur part', async () => {
+    fetchMock.mockResolvedValue(payload());
+
+    const { unmount } = renderWithQuery(<ActivityView projet="CHUES" />);
+    await waitFor(() => {
+      expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
+    });
+    const chues = within(rowOf('Alice Diop')).getAllByRole('cell');
+    expect(chues[1]?.textContent).toBe('7');
+    expect(chues[4]?.textContent).toBe('70 %');
+    unmount();
+
+    renderWithQuery(<ActivityView projet="GRAND_PUBLIC" />);
+    await waitFor(() => {
+      expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
+    });
+    const gp = within(rowOf('Alice Diop')).getAllByRole('cell');
+    expect(gp[1]?.textContent).toBe('3');
+    expect(gp[4]?.textContent).toBe('75 %');
   });
 
   it('affiche le total d’équipe et la moyenne par téléconseiller', async () => {
@@ -262,8 +299,8 @@ describe('tableau d’activité des téléconseillers', () => {
       expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
     });
     expect(screen.queryByRole('button', { name: /Représentants contactés/u })).toBeNull();
-    expect(within(rowOf('Alice Diop')).getAllByRole('cell')).toHaveLength(7);
-    expect(within(rowOf('Total équipe')).getAllByRole('cell')).toHaveLength(7);
+    expect(within(rowOf('Alice Diop')).getAllByRole('cell')).toHaveLength(15);
+    expect(within(rowOf('Total équipe')).getAllByRole('cell')).toHaveLength(15);
   });
 
   it('la garde en CHUES, et nomme le projet dans le CSV', async () => {
@@ -275,7 +312,7 @@ describe('tableau d’activité des téléconseillers', () => {
       expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
     });
     expect(screen.getByRole('button', { name: /Représentants contactés/u })).toBeTruthy();
-    expect(within(rowOf('Alice Diop')).getAllByRole('cell')).toHaveLength(8);
+    expect(within(rowOf('Alice Diop')).getAllByRole('cell')).toHaveLength(16);
 
     await userEvent.click(screen.getByRole('button', { name: 'Exporter en CSV' }));
 

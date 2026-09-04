@@ -3,6 +3,9 @@
 export const PURGE_STEP_ORDER = [
   'bankCaseTransitions',
   'bankCases',
+  // Avant `commercialAccounts` : une détection pointe son téléconseiller en
+  // Restrict, et sa fiche en cascade.
+  'deviceCallDetections',
   'callAttempts',
   'lotExportItems',
   'lotsExport',
@@ -93,8 +96,8 @@ export const PURGE_DOMAINS: readonly PurgeDomain[] = [
   {
     key: 'tentatives',
     label: 'Tentatives d’appel',
-    hint: 'Historique des appels passés.',
-    steps: ['repSuggestions', 'repCallAttempts', 'callAttempts'],
+    hint: 'Historique des appels passés, consignés ou seulement vus par le téléphone.',
+    steps: ['repSuggestions', 'repCallAttempts', 'callAttempts', 'deviceCallDetections'],
     requires: [],
   },
   {

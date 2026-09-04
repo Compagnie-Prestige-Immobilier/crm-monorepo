@@ -27,6 +27,14 @@ abstract class _$ProspectCallAttemptDtoCWProxy {
 
   ProspectCallAttemptDto rendezVousAt(DateTime? rendezVousAt);
 
+  ProspectCallAttemptDto deviceCallType(String? deviceCallType);
+
+  ProspectCallAttemptDto deviceCallDurationSeconds(
+    num? deviceCallDurationSeconds,
+  );
+
+  ProspectCallAttemptDto deviceCallAt(DateTime? deviceCallAt);
+
   ProspectCallAttemptDto performedById(String performedById);
 
   ProspectCallAttemptDto performedByName(String performedByName);
@@ -50,6 +58,9 @@ abstract class _$ProspectCallAttemptDtoCWProxy {
     bool? engagementEnCours,
     num? dureeEtablissementMois,
     DateTime? rendezVousAt,
+    String? deviceCallType,
+    num? deviceCallDurationSeconds,
+    DateTime? deviceCallAt,
     String performedById,
     String performedByName,
     DateTime clientCreatedAt,
@@ -100,6 +111,19 @@ class _$ProspectCallAttemptDtoCWProxyImpl
       this(rendezVousAt: rendezVousAt);
 
   @override
+  ProspectCallAttemptDto deviceCallType(String? deviceCallType) =>
+      this(deviceCallType: deviceCallType);
+
+  @override
+  ProspectCallAttemptDto deviceCallDurationSeconds(
+    num? deviceCallDurationSeconds,
+  ) => this(deviceCallDurationSeconds: deviceCallDurationSeconds);
+
+  @override
+  ProspectCallAttemptDto deviceCallAt(DateTime? deviceCallAt) =>
+      this(deviceCallAt: deviceCallAt);
+
+  @override
   ProspectCallAttemptDto performedById(String performedById) =>
       this(performedById: performedById);
 
@@ -129,6 +153,9 @@ class _$ProspectCallAttemptDtoCWProxyImpl
     Object? engagementEnCours = const $CopyWithPlaceholder(),
     Object? dureeEtablissementMois = const $CopyWithPlaceholder(),
     Object? rendezVousAt = const $CopyWithPlaceholder(),
+    Object? deviceCallType = const $CopyWithPlaceholder(),
+    Object? deviceCallDurationSeconds = const $CopyWithPlaceholder(),
+    Object? deviceCallAt = const $CopyWithPlaceholder(),
     Object? performedById = const $CopyWithPlaceholder(),
     Object? performedByName = const $CopyWithPlaceholder(),
     Object? clientCreatedAt = const $CopyWithPlaceholder(),
@@ -175,6 +202,19 @@ class _$ProspectCallAttemptDtoCWProxyImpl
           ? _value.rendezVousAt
           // ignore: cast_nullable_to_non_nullable
           : rendezVousAt as DateTime?,
+      deviceCallType: deviceCallType == const $CopyWithPlaceholder()
+          ? _value.deviceCallType
+          // ignore: cast_nullable_to_non_nullable
+          : deviceCallType as String?,
+      deviceCallDurationSeconds:
+          deviceCallDurationSeconds == const $CopyWithPlaceholder()
+          ? _value.deviceCallDurationSeconds
+          // ignore: cast_nullable_to_non_nullable
+          : deviceCallDurationSeconds as num?,
+      deviceCallAt: deviceCallAt == const $CopyWithPlaceholder()
+          ? _value.deviceCallAt
+          // ignore: cast_nullable_to_non_nullable
+          : deviceCallAt as DateTime?,
       performedById: performedById == const $CopyWithPlaceholder()
           ? _value.performedById
           // ignore: cast_nullable_to_non_nullable
@@ -218,6 +258,9 @@ ProspectCallAttemptDto _$ProspectCallAttemptDtoFromJson(
       'engagementEnCours',
       'dureeEtablissementMois',
       'rendezVousAt',
+      'deviceCallType',
+      'deviceCallDurationSeconds',
+      'deviceCallAt',
       'performedById',
       'performedByName',
       'clientCreatedAt',
@@ -254,6 +297,15 @@ ProspectCallAttemptDto _$ProspectCallAttemptDtoFromJson(
       'rendezVousAt',
       (v) => v == null ? null : DateTime.parse(v as String),
     ),
+    deviceCallType: $checkedConvert('deviceCallType', (v) => v as String?),
+    deviceCallDurationSeconds: $checkedConvert(
+      'deviceCallDurationSeconds',
+      (v) => v as num?,
+    ),
+    deviceCallAt: $checkedConvert(
+      'deviceCallAt',
+      (v) => v == null ? null : DateTime.parse(v as String),
+    ),
     performedById: $checkedConvert('performedById', (v) => v as String),
     performedByName: $checkedConvert('performedByName', (v) => v as String),
     clientCreatedAt: $checkedConvert(
@@ -277,6 +329,9 @@ Map<String, dynamic> _$ProspectCallAttemptDtoToJson(
   'engagementEnCours': instance.engagementEnCours,
   'dureeEtablissementMois': instance.dureeEtablissementMois,
   'rendezVousAt': instance.rendezVousAt?.toIso8601String(),
+  'deviceCallType': instance.deviceCallType,
+  'deviceCallDurationSeconds': instance.deviceCallDurationSeconds,
+  'deviceCallAt': instance.deviceCallAt?.toIso8601String(),
   'performedById': instance.performedById,
   'performedByName': instance.performedByName,
   'clientCreatedAt': instance.clientCreatedAt.toIso8601String(),

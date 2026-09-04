@@ -592,6 +592,9 @@ describe('historique des appels', () => {
         suggestion: { suggestedName: 'Fatou Sarr', suggestedPhoneE164: '+221771234567', note: null },
         performedById: COMMERCIAL.id,
         performedBy: { fullName: COMMERCIAL.fullName },
+        deviceCallType: 'sortant',
+        deviceCallDurationSeconds: 92,
+        deviceCallAt: new Date('2026-08-05T10:00:14.000Z'),
         clientCreatedAt: date,
       },
     ]);
@@ -617,6 +620,9 @@ describe('historique des appels', () => {
         suggestedNote: null,
         performedById: COMMERCIAL.id,
         performedByName: COMMERCIAL.fullName,
+        deviceCallType: 'sortant',
+        deviceCallDurationSeconds: 92,
+        deviceCallAt: '2026-08-05T10:00:14.000Z',
         clientCreatedAt: date.toISOString(),
       },
     ]);

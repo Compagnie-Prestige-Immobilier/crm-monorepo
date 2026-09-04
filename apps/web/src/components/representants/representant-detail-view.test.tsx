@@ -8,6 +8,7 @@ import { renderWithQuery } from '@/test/render-query';
 const fetchRepresentant = vi.hoisted(() => vi.fn());
 const fetchRelationHistory = vi.hoisted(() => vi.fn());
 const fetchCallAttempts = vi.hoisted(() => vi.fn());
+const fetchDeviceCalls = vi.hoisted(() => vi.fn());
 const fetchProspects = vi.hoisted(() => vi.fn());
 const fetchComments = vi.hoisted(() => vi.fn());
 
@@ -18,6 +19,7 @@ vi.mock('@/lib/data/representants', async () => {
     fetchRepresentant: () => fetchRepresentant() as unknown,
     fetchRepresentantRelationHistory: () => fetchRelationHistory() as unknown,
     fetchRepresentantCallAttempts: () => fetchCallAttempts() as unknown,
+    fetchRepresentantDeviceCalls: () => fetchDeviceCalls() as unknown,
     fetchRepresentantComments: () => fetchComments() as unknown,
   };
 });
@@ -91,6 +93,7 @@ beforeEach(() => {
   fetchRepresentant.mockResolvedValue(FICHE);
   fetchRelationHistory.mockResolvedValue([]);
   fetchCallAttempts.mockResolvedValue([]);
+  fetchDeviceCalls.mockResolvedValue([]);
   fetchProspects.mockResolvedValue({ items: [], total: 0, page: 1, pageCount: 0 });
   fetchComments.mockResolvedValue([]);
 });
@@ -116,6 +119,9 @@ describe('RepresentantDetailView, les appels', () => {
         suggestedNote: null,
         performedById: 'u-2',
         performedByName: 'Awa Sy',
+        deviceCallType: null,
+        deviceCallDurationSeconds: null,
+        deviceCallAt: null,
         clientCreatedAt: '2026-03-04T09:15:00.000Z',
       },
     ]);
@@ -130,6 +136,74 @@ describe('RepresentantDetailView, les appels', () => {
     expect(texte).toContain('Syndicat : SAEMSS');
     expect(texte).toContain('Fatou Sarr');
     expect(texte).toContain('Rappeler après les examens');
+    expect(texte).toContain('Téléphone : non confirmé');
+  });
+
+  it('montre la preuve du journal Android quand le téléphone a confirmé l’appel', async () => {
+    fetchCallAttempts.mockResolvedValue([
+      {
+        id: 'att-2',
+        outcome: 'REACHED',
+        statutQualificationId: null,
+        statutQualificationLabel: null,
+        comment: null,
+        callbackAt: null,
+        promisedProspects: null,
+        etablissementConfirme: null,
+        numeroConfirme: null,
+        contacte: null,
+        connaitUES: null,
+        syndicat: null,
+        suggestedName: null,
+        suggestedPhoneE164: null,
+        suggestedNote: null,
+        performedById: 'u-2',
+        performedByName: 'Awa Sy',
+        deviceCallType: 'sortant',
+        deviceCallDurationSeconds: 92,
+        deviceCallAt: '2026-03-04T14:02:00.000Z',
+        clientCreatedAt: '2026-03-04T14:03:00.000Z',
+      },
+    ]);
+    renderWithQuery(<RepresentantDetailView representantId="rep-1" author={AUTHOR} />);
+
+    const appels = await screen.findByRole('list', { name: 'Appels' });
+    const texte = within(appels).getAllByRole('listitem')[0]?.textContent ?? '';
+    expect(texte).toContain('Téléphone : Sortant · 1 min 32 · 14:02');
+  });
+
+  it('sort les relevés non consignés, et replie ceux qu’une tentative couvre déjà', async () => {
+    fetchDeviceCalls.mockResolvedValue([
+      {
+        id: 'd-1',
+        performedById: 'u-2',
+        performedByName: 'Awa Sy',
+        deviceCallType: 'sortant',
+        deviceCallDurationSeconds: 92,
+        deviceCallAt: '2026-03-04T14:02:00.000Z',
+        detectedAt: '2026-03-04T14:05:00.000Z',
+        attemptId: null,
+      },
+      {
+        id: 'd-2',
+        performedById: 'u-2',
+        performedByName: 'Awa Sy',
+        deviceCallType: 'manque',
+        deviceCallDurationSeconds: 0,
+        deviceCallAt: '2026-03-04T11:30:00.000Z',
+        detectedAt: '2026-03-04T11:31:00.000Z',
+        attemptId: 'att-9',
+      },
+    ]);
+    renderWithQuery(<RepresentantDetailView representantId="rep-1" author={AUTHOR} />);
+
+    const releves = await screen.findByRole('list', { name: 'Relevés par le téléphone' });
+    const lignes = within(releves).getAllByRole('listitem');
+    expect(lignes).toHaveLength(1);
+    expect(lignes[0]?.textContent).toContain('Non consigné');
+    expect(lignes[0]?.textContent).toContain('Sortant · 1 min 32 · 14:02');
+    expect(lignes[0]?.textContent).toContain('Awa Sy');
+    expect(screen.getByText(/1 appel consigné/u)).toBeTruthy();
   });
 
   it('dit quoi faire quand aucun appel n’est consigné', async () => {

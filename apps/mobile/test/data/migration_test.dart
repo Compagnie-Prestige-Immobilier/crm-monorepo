@@ -1,5 +1,5 @@
 import 'package:cpi_go/data/local/database.dart';
-import 'package:drift/drift.dart' show GeneratedDatabase, QueryRow;
+import 'package:drift/drift.dart' show GeneratedDatabase, QueryRow, Value;
 import 'package:drift/native.dart';
 import 'package:drift_dev/api/migrations_native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -29,6 +29,8 @@ import 'generated_migrations/schema_v24.dart' as v24schema;
 import 'generated_migrations/schema_v25.dart' as v25schema;
 import 'generated_migrations/schema_v26.dart' as v26schema;
 import 'generated_migrations/schema_v27.dart' as v27schema;
+import 'generated_migrations/schema_v28.dart' as v28schema;
+import 'generated_migrations/schema_v29.dart' as v29schema;
 
 /// Test doré de migration.
 ///
@@ -2608,7 +2610,10 @@ void main() {
           'SELECT statut_qualification_effect FROM representant_sync_view',
         )
         .getSingle();
-    expect(fiche.read<String?>('statut_qualification_effect'), 'SCHEDULE_CALLBACK');
+    expect(
+      fiche.read<String?>('statut_qualification_effect'),
+      'SCHEDULE_CALLBACK',
+    );
     await db.close();
   });
 
@@ -2631,6 +2636,126 @@ void main() {
         .customSelect('SELECT retry_after_minutes FROM statuts_qualification')
         .getSingle();
     expect(statut.read<int?>('retry_after_minutes'), isNull);
+    await db.close();
+  });
+
+  // La table est NEUVE : ce qui se vérifie ici, c'est qu'un appareil déjà en
+  // service la reçoive sans perdre ce qu'il porte, et qu'elle accepte une
+  // preuve dès la migration passée.
+  //
+  // La cible est la version COURANTE et non 29 : `createTable` engendre
+  // toujours la forme courante de la table, colonnes des paliers suivants
+  // comprises, et s'arrêter à 29 comparerait cette forme au golden de 29.
+  test(
+    'v28 -> courant ajoute les preuves d\'appel sans toucher au reste',
+    () async {
+      final schema = await verifier.schemaAt(28);
+      final v28schema.DatabaseAtV28 old = v28schema.DatabaseAtV28(
+        schema.newConnection(),
+      );
+      await old.customStatement(
+        'INSERT INTO representants '
+        '(id, full_name, phone_e164, departement_id, created_by_id, '
+        ' relation_status, client_created_at, local_updated_at) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        <Object?>[
+          'rep-28',
+          'Fiche d’avant',
+          '+221771234567',
+          'dep-1',
+          'me',
+          'INCONNU',
+          _iso,
+          _iso,
+        ],
+      );
+      await old.close();
+
+      final AppDatabase db = AppDatabase(schema.newConnection());
+      await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
+
+      expect(await db.select(db.preuvesAppel).get(), isEmpty);
+      await db
+          .into(db.preuvesAppel)
+          .insert(
+            PreuvesAppelCompanion.insert(
+              id: 'preuve-1',
+              kind: 'representant',
+              entityId: 'rep-28',
+              phoneE164: '+221771234567',
+              lanceAt: DateTime.parse(_iso),
+              mode: 'call',
+            ),
+          );
+      expect(
+        await db
+            .dernierePreuvePour(kind: 'representant', entityId: 'rep-28')
+            .getSingle()
+            .then((PreuvesAppelData p) => p.journalAt),
+        isNull,
+      );
+      expect(
+        await db
+            .customSelect('SELECT id FROM representants')
+            .getSingle()
+            .then((QueryRow row) => row.read<String>('id')),
+        'rep-28',
+      );
+      await db.close();
+    },
+  );
+
+  // Une preuve déjà posée par la v29 doit survivre : c'est un appel du jour
+  // qu'aucune tentative n'a encore consommé.
+  test('v29 -> v30 ouvre les preuves aux appels détectés', () async {
+    final schema = await verifier.schemaAt(29);
+    final v29schema.DatabaseAtV29 old = v29schema.DatabaseAtV29(
+      schema.newConnection(),
+    );
+    await old.customStatement(
+      'INSERT INTO preuves_appel '
+      '(id, kind, entity_id, phone_e164, lance_at, mode) '
+      'VALUES (?, ?, ?, ?, ?, ?)',
+      <Object?>[
+        'preuve-29',
+        'representant',
+        'rep-29',
+        '+221771234567',
+        _iso,
+        'call',
+      ],
+    );
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 30);
+
+    final PreuvesAppelData ancienne = await db
+        .select(db.preuvesAppel)
+        .getSingle();
+    expect(ancienne.id, 'preuve-29');
+    expect(ancienne.signaleAt, isNull);
+    expect(ancienne.ignoreAt, isNull);
+
+    await db
+        .into(db.preuvesAppel)
+        .insert(
+          PreuvesAppelCompanion.insert(
+            id: 'preuve-30',
+            kind: 'prospect',
+            entityId: 'pros-30',
+            phoneE164: '+221780000002',
+            lanceAt: DateTime.parse(_iso),
+            mode: 'detecte',
+            journalAt: Value<DateTime>(DateTime.parse(_iso)),
+          ),
+        );
+    expect(
+      await db.appelsAConsigner().get().then(
+        (List<AppelsAConsignerResult> l) => l.single.id,
+      ),
+      'preuve-30',
+    );
     await db.close();
   });
 

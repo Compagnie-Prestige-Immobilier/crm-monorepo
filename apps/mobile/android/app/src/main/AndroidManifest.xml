@@ -43,6 +43,25 @@
     <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
     <!--
+      Preuve d'appel. CALL_PHONE compose sans passer par le composeur, sinon
+      l'application retombe sur ACTION_DIAL. READ_CALL_LOG rapproche la
+      tentative saisie avec l'appel réellement passé, READ_PHONE_STATE suit
+      l'état de la ligne. Aucune n'est demandée au démarrage : le diagnostic
+      les demande une par une.
+
+      FOREGROUND_SERVICE_PHONE_CALL est déclarée mais Android 14 ne l'accorde
+      qu'aux applications qui gèrent leurs propres appels ; le service retombe
+      alors sur dataSync.
+    -->
+    <uses-permission android:name="android.permission.CALL_PHONE"/>
+    <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
+    <uses-permission android:name="android.permission.READ_CALL_LOG"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL"/>
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
+    <!--
       CONFIDENTIALITÉ AU REPOS : voir android:allowBackup ci-dessous.
 
       La base locale vit dans le stockage privé de l'application
@@ -114,6 +133,33 @@
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
             </intent-filter>
         </receiver>
+        <service
+            android:name=".SynchroService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync"/>
+        <service
+            android:name=".AppelService"
+            android:exported="false"
+            android:foregroundServiceType="phoneCall|dataSync"/>
+        <!--
+          Le rôle de filtrage n'appartient qu'à une application à la fois sur
+          l'appareil ; il se demande depuis le diagnostic, jamais au démarrage.
+        -->
+        <service
+            android:name=".CpiCallScreeningService"
+            android:exported="true"
+            android:permission="android.permission.BIND_SCREENING_SERVICE">
+            <intent-filter>
+                <action android:name="android.telecom.CallScreeningService"/>
+            </intent-filter>
+        </service>
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+            </intent-filter>
+        </receiver>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
@@ -129,6 +175,14 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.DIAL"/>
+            <data android:scheme="tel"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.CALL"/>
+            <data android:scheme="tel"/>
         </intent>
     </queries>
 </manifest>

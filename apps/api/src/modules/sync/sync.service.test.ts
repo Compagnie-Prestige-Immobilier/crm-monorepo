@@ -8,7 +8,7 @@ import { Phase2SyncService } from '../phase2/phase2-sync.service.js';
 import { VisitesService } from '../visites/visites.service.js';
 import { SyncBatchStore } from './batch-store.js';
 import { SyncService } from './sync.service.js';
-import { FakePrisma } from './fake-prisma.js';
+import { FakePrisma, fakeReminders } from './fake-prisma.js';
 import { SyncEntity, SyncOp, SyncOpStatus, dependencyKeyOf } from './dto.js';
 import type { SyncOperationDto, SyncPushDto } from './dto.js';
 
@@ -41,6 +41,7 @@ beforeEach(() => {
     new SyncBatchStore(prisma),
     new Phase2SyncService(),
     new VisitesService(prisma),
+    fakeReminders(),
   );
 });
 
@@ -783,6 +784,7 @@ describe('mode démonstration allumé, la remontée hors ligne reste du travail 
       new SyncBatchStore(prisma),
       new Phase2SyncService(),
       new VisitesService(prisma),
+      fakeReminders(),
     );
   });
 

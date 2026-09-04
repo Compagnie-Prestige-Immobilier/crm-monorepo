@@ -344,8 +344,10 @@ export function DashboardVisitesView({ role }: { role: Role }) {
             })
           )
             return <DashboardVisitesSkeleton />;
+          // Pas d'estompage pendant un rafraîchissement : il revenait toutes les
+          // dix secondes et faisait clignoter la page. Les nombres roulent, cela suffit.
           return (
-            <div className={isRefetching ? 'opacity-60' : undefined} aria-busy={isRefetching}>
+            <div aria-busy={isRefetching}>
               <WidgetGrid
                 widgets={widgets}
                 donnees={donneesParWidget}

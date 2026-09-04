@@ -23,6 +23,7 @@ import {
 } from '@nestjs/swagger';
 import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
 import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
+import { DeviceCallDetectionListDto } from '../../common/device-call.js';
 import { Role } from '@crm/database';
 import type { FastifyRequest } from 'fastify';
 
@@ -209,10 +210,24 @@ export class RepresentantsController {
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, type: RepresentantCallAttemptListDto })
   @ApiResponse({ status: 404, type: ApiErrorDto, description: 'REPRESENTANT_NOT_FOUND.' })
-  callHistory(
-    @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<RepresentantCallAttemptListDto> {
+  callHistory(@Param('id', ParseUUIDPipe) id: string): Promise<RepresentantCallAttemptListDto> {
     return this.representants.callHistory(id);
+  }
+
+  @Get(':id/device-calls')
+  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
+  @ApiOperation({
+    operationId: 'listRepresentantDeviceCalls',
+    summary: 'Les appels que le journal du téléphone a relevés sur une fiche.',
+    description:
+      'Une détection sans `attemptId` est un appel que personne n’a consigné : ' +
+      'c’est elle qui alimente l’alerte de supervision.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({ status: 200, type: DeviceCallDetectionListDto })
+  @ApiResponse({ status: 404, type: ApiErrorDto, description: 'REPRESENTANT_NOT_FOUND.' })
+  deviceCalls(@Param('id', ParseUUIDPipe) id: string): Promise<DeviceCallDetectionListDto> {
+    return this.representants.deviceCalls(id);
   }
 
   @Get(':id/comments')

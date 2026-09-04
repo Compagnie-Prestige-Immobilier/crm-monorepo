@@ -14,6 +14,7 @@ import 'package:cpi_go/features/auth/auth_state.dart';
 import 'package:cpi_go/features/representant/presentation/representant_detail_screen.dart';
 import 'package:cpi_go/features/representant/presentation/representant_form_screen.dart';
 import 'package:cpi_go/features/representant/presentation/representant_picker_screen.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -218,6 +219,55 @@ void main() {
     // acceptée se voit à l'étoile.
     expect(find.text('Jamais appelé'), findsOneWidget);
     expect(find.byIcon(PhosphorIconsFill.star), findsOneWidget);
+
+    await teardownTree(tester);
+  });
+
+  // Appeler est le geste principal de la fiche : saisir des prospects vient
+  // après l'appel, jamais à sa place.
+  testWidgets('la fiche appelle, et porte la preuve de l\'appel lancé', (
+    WidgetTester tester,
+  ) async {
+    await insertRepresentant(db, id: 'rep-1', phone: '+221770000001');
+    await db
+        .into(db.preuvesAppel)
+        .insert(
+          PreuvesAppelCompanion.insert(
+            id: 'preuve-1',
+            kind: 'representant',
+            entityId: 'rep-1',
+            phoneE164: '+221770000001',
+            lanceAt: t0,
+            mode: 'call',
+            journalType: const Value<String?>('sortant'),
+            journalDureeS: const Value<int?>(92),
+            journalAt: Value<DateTime?>(DateTime(2026, 8, 12, 14, 2)),
+            rapprocheAt: Value<DateTime?>(t0),
+          ),
+        );
+
+    final ProviderContainer container = await makeContainer(tester);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: AppTheme.light,
+          locale: const Locale('fr'),
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          supportedLocales: const <Locale>[Locale('fr')],
+          home: const RepresentantDetailScreen(representantId: 'rep-1'),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('Appeler'), findsOneWidget);
+    expect(find.text('Ajouter des prospects'), findsOneWidget);
+    expect(
+      find.text('+221 77 000 00 01\nSortant · 1 min 32 · 14:02'),
+      findsOneWidget,
+    );
 
     await teardownTree(tester);
   });

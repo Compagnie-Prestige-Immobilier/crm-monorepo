@@ -294,15 +294,16 @@ void main() {
       nom: 'Diop',
       prenom: 'Awa',
     );
-    await (db.update(db.prospects)..where((Prospects p) => p.id.equals('pros-1')))
-        .write(
-          ProspectsCompanion(
-            whatsappE164: const Value<String?>('+221771234568'),
-            lastCallOutcome: const Value<String?>('CALLBACK'),
-            lastCallAt: Value<DateTime?>(t0.subtract(const Duration(days: 1))),
-            callAttemptCount: const Value<int>(2),
-          ),
-        );
+    await (db.update(
+      db.prospects,
+    )..where((Prospects p) => p.id.equals('pros-1'))).write(
+      ProspectsCompanion(
+        whatsappE164: const Value<String?>('+221771234568'),
+        lastCallOutcome: const Value<String?>('CALLBACK'),
+        lastCallAt: Value<DateTime?>(t0.subtract(const Duration(days: 1))),
+        callAttemptCount: const Value<int>(2),
+      ),
+    );
 
     await tester.pumpWidget(host());
     await type(tester, '771234567');
@@ -312,6 +313,34 @@ void main() {
     expect(find.text('À rappeler'), findsOneWidget);
     expect(find.text('2 appels'), findsOneWidget);
     expect(find.text('À traiter'), findsOneWidget);
+  });
+
+  // Le script se remplit après avoir raccroché : la durée réelle de l'appel se
+  // lit ici plutôt qu'elle ne se devine.
+  phase2TestWidgets('la fiche d\'avant-script porte la preuve de l\'appel', (
+    WidgetTester tester,
+  ) async {
+    await db
+        .into(db.preuvesAppel)
+        .insert(
+          PreuvesAppelCompanion.insert(
+            id: 'preuve-1',
+            kind: 'prospect',
+            entityId: 'pros-1',
+            phoneE164: '+221771234567',
+            lanceAt: t0,
+            mode: 'call',
+            journalType: const Value<String?>('sortant'),
+            journalDureeS: const Value<int?>(92),
+            journalAt: Value<DateTime?>(DateTime(2026, 8, 12, 14, 2)),
+            rapprocheAt: Value<DateTime?>(t0),
+          ),
+        );
+
+    await tester.pumpWidget(host());
+    await type(tester, '771234567');
+
+    expect(find.text('Sortant · 1 min 32 · 14:02'), findsOneWidget);
   });
 
   phase2TestWidgets('un numéro connu sans fiche locale dit ce qu\'il sait', (

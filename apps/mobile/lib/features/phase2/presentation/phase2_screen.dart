@@ -11,6 +11,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/router/back_navigation.dart';
 import '../../../core/sync/phase2_directory_sync.dart';
+import '../../../core/telephonie/appels_crm.dart';
 import '../../../core/utils/relative_time.dart';
 import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
@@ -1227,7 +1228,7 @@ class _SearchHint extends StatelessWidget {
 /// avant de laisser passer à l'étape 2.
 /// La fiche telle qu'elle est, avant de dérouler le script : qui c'est, ce que
 /// le dernier appel a donné, combien de fois on a déjà essayé.
-class _Trouve extends StatelessWidget {
+class _Trouve extends ConsumerWidget {
   const _Trouve({required this.entry, this.prospect});
 
   final Phase2DirectoryData entry;
@@ -1237,7 +1238,7 @@ class _Trouve extends StatelessWidget {
   final Prospect? prospect;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final ThemeData theme = Theme.of(context);
     final CpiColors cpi = context.cpi;
     final Prospect? fiche = prospect;
@@ -1248,6 +1249,9 @@ class _Trouve extends StatelessWidget {
     final String? issue = fiche?.lastCallOutcome;
     final int tentatives = fiche?.callAttemptCount ?? 0;
     final String statut = Phase2Controller.labelForStatus(entry.phase2Status);
+    final PreuvesAppelData? preuve = ref
+        .watch(dernierePreuveProvider((kind: 'prospect', id: entry.prospectId)))
+        .value;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1294,6 +1298,8 @@ class _Trouve extends StatelessWidget {
         ),
         const SizedBox(height: CpiSpacing.sm),
         CpiCard.rows(<CpiRow>[
+          if (preuve != null)
+            CpiRow(title: 'Téléphone', subtitle: preuve.libelle),
           if (fiche?.whatsappE164 != null)
             CpiRow(
               title: 'WhatsApp',

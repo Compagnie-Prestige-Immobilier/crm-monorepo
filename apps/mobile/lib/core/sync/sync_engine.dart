@@ -23,6 +23,10 @@ import 'token_store.dart';
 
 const String repCallAttemptEntity = 'rep_call_attempt';
 
+/// Un appel du journal du téléphone rapproché d'une fiche, que personne n'a
+/// consigné. Poussé par la route de synchronisation ordinaire.
+const String appelDetecteEntity = 'appel_detecte';
+
 class SyncEngine {
   SyncEngine({
     required AppDatabase database,
@@ -362,9 +366,15 @@ class SyncEngine {
       return 'prospect:${prospectId is String ? prospectId : row.entityId}';
     }
     final Object? parent = data?['representantId'];
-    return parent is String && parent.isNotEmpty
-        ? 'representant:$parent'
-        : 'prospect:${row.entityId}';
+    if (parent is String && parent.isNotEmpty) return 'representant:$parent';
+    // Un appel détecté est identifié par sa PREUVE : sans le prospect qu'il
+    // vise, il partirait dans une partition à lui et pourrait doubler la
+    // tentative du même prospect.
+    final Object? prospect = data?['prospectId'];
+    if (row.entityType == appelDetecteEntity && prospect is String) {
+      return 'prospect:$prospect';
+    }
+    return 'prospect:${row.entityId}';
   }
 
   static Object? _tryDecode(String payload) {
@@ -428,11 +438,21 @@ class SyncEngine {
     return first;
   }
 
+  /// Ces entités ne portent NI `rev` NI `server_updated_at` en local : la
+  /// réponse du serveur n'a aucune ligne à estampiller, et l'estampiller quand
+  /// même toucherait une table qui ne les connaît pas.
+  static const Set<String> _sansRevLocale = <String>{
+    callAttemptEntity,
+    repCallAttemptEntity,
+    appelDetecteEntity,
+  };
+
   static SyncEntity _entityOf(String entityType) => switch (entityType) {
     'representant' => SyncEntity.representant,
     'representant_comment' => SyncEntity.representantComment,
     'prospect' => SyncEntity.prospect,
     callAttemptEntity => SyncEntity.callAttempt,
+    appelDetecteEntity => SyncEntity.appelDetecte,
     'visite' => SyncEntity.visite,
     _ => throw FormatException('entité inconnue', entityType),
   };
@@ -827,9 +847,7 @@ class SyncEngine {
     required int? rev,
   }) async {
     if (rev == null) return;
-    if (entityType == callAttemptEntity || entityType == repCallAttemptEntity) {
-      return;
-    }
+    if (_sansRevLocale.contains(entityType)) return;
     await (_db.update(_db.outbox)..where(
           (Outbox o) =>
               o.entityType.equals(entityType) &
@@ -850,9 +868,7 @@ class SyncEngine {
   }) async {
     final bool clearDeletion = op != 'delete';
     if (rev == null && serverUpdatedAt == null && !clearDeletion) return;
-    if (entityType == callAttemptEntity || entityType == repCallAttemptEntity) {
-      return;
-    }
+    if (_sansRevLocale.contains(entityType)) return;
     if (entityType == 'representant') {
       await (_db.update(
         _db.representants,

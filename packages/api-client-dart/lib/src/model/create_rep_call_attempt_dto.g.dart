@@ -51,6 +51,16 @@ abstract class _$CreateRepCallAttemptDtoCWProxy {
 
   CreateRepCallAttemptDto callbackAt(DateTime? callbackAt);
 
+  CreateRepCallAttemptDto deviceCallType(
+    CreateRepCallAttemptDtoDeviceCallTypeEnum? deviceCallType,
+  );
+
+  CreateRepCallAttemptDto deviceCallDurationSeconds(
+    num? deviceCallDurationSeconds,
+  );
+
+  CreateRepCallAttemptDto deviceCallAt(DateTime? deviceCallAt);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `CreateRepCallAttemptDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -80,6 +90,9 @@ abstract class _$CreateRepCallAttemptDtoCWProxy {
     String? syndicat,
     DateTime clientCreatedAt,
     DateTime? callbackAt,
+    CreateRepCallAttemptDtoDeviceCallTypeEnum? deviceCallType,
+    num? deviceCallDurationSeconds,
+    DateTime? deviceCallAt,
   });
 }
 
@@ -177,6 +190,20 @@ class _$CreateRepCallAttemptDtoCWProxyImpl
       this(callbackAt: callbackAt);
 
   @override
+  CreateRepCallAttemptDto deviceCallType(
+    CreateRepCallAttemptDtoDeviceCallTypeEnum? deviceCallType,
+  ) => this(deviceCallType: deviceCallType);
+
+  @override
+  CreateRepCallAttemptDto deviceCallDurationSeconds(
+    num? deviceCallDurationSeconds,
+  ) => this(deviceCallDurationSeconds: deviceCallDurationSeconds);
+
+  @override
+  CreateRepCallAttemptDto deviceCallAt(DateTime? deviceCallAt) =>
+      this(deviceCallAt: deviceCallAt);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `CreateRepCallAttemptDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -206,6 +233,9 @@ class _$CreateRepCallAttemptDtoCWProxyImpl
     Object? syndicat = const $CopyWithPlaceholder(),
     Object? clientCreatedAt = const $CopyWithPlaceholder(),
     Object? callbackAt = const $CopyWithPlaceholder(),
+    Object? deviceCallType = const $CopyWithPlaceholder(),
+    Object? deviceCallDurationSeconds = const $CopyWithPlaceholder(),
+    Object? deviceCallAt = const $CopyWithPlaceholder(),
   }) {
     return CreateRepCallAttemptDto(
       id: id == const $CopyWithPlaceholder()
@@ -298,6 +328,19 @@ class _$CreateRepCallAttemptDtoCWProxyImpl
           ? _value.callbackAt
           // ignore: cast_nullable_to_non_nullable
           : callbackAt as DateTime?,
+      deviceCallType: deviceCallType == const $CopyWithPlaceholder()
+          ? _value.deviceCallType
+          // ignore: cast_nullable_to_non_nullable
+          : deviceCallType as CreateRepCallAttemptDtoDeviceCallTypeEnum?,
+      deviceCallDurationSeconds:
+          deviceCallDurationSeconds == const $CopyWithPlaceholder()
+          ? _value.deviceCallDurationSeconds
+          // ignore: cast_nullable_to_non_nullable
+          : deviceCallDurationSeconds as num?,
+      deviceCallAt: deviceCallAt == const $CopyWithPlaceholder()
+          ? _value.deviceCallAt
+          // ignore: cast_nullable_to_non_nullable
+          : deviceCallAt as DateTime?,
     );
   }
 }
@@ -376,6 +419,23 @@ CreateRepCallAttemptDto _$CreateRepCallAttemptDtoFromJson(
       'callbackAt',
       (v) => v == null ? null : DateTime.parse(v as String),
     ),
+    deviceCallType: $checkedConvert(
+      'deviceCallType',
+      (v) => $enumDecodeNullable(
+        _$CreateRepCallAttemptDtoDeviceCallTypeEnumEnumMap,
+        v,
+        unknownValue:
+            CreateRepCallAttemptDtoDeviceCallTypeEnum.unknownDefaultOpenApi,
+      ),
+    ),
+    deviceCallDurationSeconds: $checkedConvert(
+      'deviceCallDurationSeconds',
+      (v) => v as num?,
+    ),
+    deviceCallAt: $checkedConvert(
+      'deviceCallAt',
+      (v) => v == null ? null : DateTime.parse(v as String),
+    ),
   );
   return val;
 });
@@ -410,6 +470,14 @@ Map<String, dynamic> _$CreateRepCallAttemptDtoToJson(
   'clientCreatedAt': instance.clientCreatedAt.toIso8601String(),
   if (instance.callbackAt?.toIso8601String() case final value?)
     'callbackAt': value,
+  if (_$CreateRepCallAttemptDtoDeviceCallTypeEnumEnumMap[instance
+          .deviceCallType]
+      case final value?)
+    'deviceCallType': value,
+  if (instance.deviceCallDurationSeconds case final value?)
+    'deviceCallDurationSeconds': value,
+  if (instance.deviceCallAt?.toIso8601String() case final value?)
+    'deviceCallAt': value,
 };
 
 const _$RepCallOutcomeEnumMap = {
@@ -437,4 +505,17 @@ const _$WhatsappStatusEnumMap = {
   WhatsappStatus.AUTRE_NUMERO: 'AUTRE_NUMERO',
   WhatsappStatus.AUCUN: 'AUCUN',
   WhatsappStatus.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$CreateRepCallAttemptDtoDeviceCallTypeEnumEnumMap = {
+  CreateRepCallAttemptDtoDeviceCallTypeEnum.sortant: 'sortant',
+  CreateRepCallAttemptDtoDeviceCallTypeEnum.entrant: 'entrant',
+  CreateRepCallAttemptDtoDeviceCallTypeEnum.manque: 'manque',
+  CreateRepCallAttemptDtoDeviceCallTypeEnum.rejete: 'rejete',
+  CreateRepCallAttemptDtoDeviceCallTypeEnum.bloque: 'bloque',
+  CreateRepCallAttemptDtoDeviceCallTypeEnum.messagerie: 'messagerie',
+  CreateRepCallAttemptDtoDeviceCallTypeEnum.externe: 'externe',
+  CreateRepCallAttemptDtoDeviceCallTypeEnum.inconnu: 'inconnu',
+  CreateRepCallAttemptDtoDeviceCallTypeEnum.unknownDefaultOpenApi:
+      'unknown_default_open_api',
 };

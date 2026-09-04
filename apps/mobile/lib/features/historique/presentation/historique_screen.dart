@@ -27,6 +27,7 @@ import '../../../ui/widgets/sync_status_icon.dart';
 import '../../../ui/async_value_x.dart';
 import '../../representant/presentation/representant_detail_screen.dart'
     show StatutTag, libelleIssueRepresentant, relationLabel;
+import '../../telephonie/appels_a_consigner.dart';
 import '../../shell/grand_public_fiches_screen.dart' show ProspectTile;
 
 /// La base des représentants vient du web : on ne les crée pas ici, on en
@@ -116,21 +117,66 @@ class _HistoriqueScreenState extends ConsumerState<HistoriqueScreen> {
       ),
     );
 
+    final List<AppelsAConsignerResult> aConsigner =
+        ref.watch(appelsAConsignerProvider).value ??
+        const <AppelsAConsignerResult>[];
+
+    // `CpiScaffold` fait paraître et disparaître son bandeau : une bande vide
+    // et permanente lui enlèverait sa transition.
+    final List<Widget> bandes = <Widget>[
+      if (network != CpiConnectivity.online)
+        const Padding(
+          padding: EdgeInsets.fromLTRB(
+            CpiSpacing.md,
+            0,
+            CpiSpacing.md,
+            CpiSpacing.sm,
+          ),
+          child: CpiStatusBand(
+            text: 'Hors ligne. Les fiches restent consultables.',
+            tone: CpiTone.warning,
+          ),
+        ),
+      if (aConsigner.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            CpiSpacing.md,
+            0,
+            CpiSpacing.md,
+            CpiSpacing.sm,
+          ),
+          child: CpiCard(
+            onTap: () =>
+                unawaited(ouvrirAppelsAConsigner(context, ref, aConsigner)),
+            child: Row(
+              children: <Widget>[
+                const Icon(PhosphorIconsRegular.phoneX, size: CpiIconSize.lg),
+                const SizedBox(width: CpiSpacing.sm),
+                Expanded(
+                  child: Text(
+                    aConsigner.length == 1
+                        ? '1 appel à consigner'
+                        : '${aConsigner.length} appels à consigner',
+                  ),
+                ),
+                const Icon(
+                  PhosphorIconsRegular.caretRight,
+                  size: CpiIconSize.md,
+                ),
+              ],
+            ),
+          ),
+        ),
+    ];
+
     return CpiScaffold(
       title: 'Fiches',
-      banner: network == CpiConnectivity.online
+      banner: bandes.isEmpty
           ? null
-          : const Padding(
-              padding: EdgeInsets.fromLTRB(
-                CpiSpacing.md,
-                0,
-                CpiSpacing.md,
-                CpiSpacing.sm,
-              ),
-              child: CpiStatusBand(
-                text: 'Hors ligne. Les fiches restent consultables.',
-                tone: CpiTone.warning,
-              ),
+          : Column(
+              key: ValueKey<int>(bandes.length),
+              mainAxisSize: MainAxisSize.min,
+              children: bandes,
             ),
       footer: CpiActionBar(
         child: _onglet == 0
@@ -205,9 +251,9 @@ class _OngletRepresentants extends ConsumerWidget {
       filtreJamais => 'Jamais qualifié',
       _ =>
         statuts
-            .where((StatutQualificationRow s) => s.id == id)
-            .map((StatutQualificationRow s) => s.label)
-            .firstOrNull ??
+                .where((StatutQualificationRow s) => s.id == id)
+                .map((StatutQualificationRow s) => s.label)
+                .firstOrNull ??
             id,
     };
     final List<String> actifs = <String>[
@@ -222,9 +268,8 @@ class _OngletRepresentants extends ConsumerWidget {
     return Column(
       children: <Widget>[
         recherche(
-          () => unawaited(
-            ouvrirFiltres(context, const _FiltresRepresentants()),
-          ),
+          () =>
+              unawaited(ouvrirFiltres(context, const _FiltresRepresentants())),
           filtres.actifs,
         ),
         if (actifs.isNotEmpty)
@@ -387,9 +432,7 @@ class _FiltresActifs extends StatelessWidget {
           child: Wrap(
             spacing: CpiSpacing.xs,
             runSpacing: CpiSpacing.xxs,
-            children: <Widget>[
-              for (final String l in libelles) CpiTag(l),
-            ],
+            children: <Widget>[for (final String l in libelles) CpiTag(l)],
           ),
         ),
         CpiButton(
@@ -456,7 +499,10 @@ class _FiltresRepresentants extends ConsumerWidget {
               notifier.set(filtres.copyWith(dernierAppel: v)),
           options: <CpiChoice<String>>[
             const CpiChoice<String>(value: '', label: 'Tous'),
-            const CpiChoice<String>(value: filtreJamais, label: 'Jamais appelé'),
+            const CpiChoice<String>(
+              value: filtreJamais,
+              label: 'Jamais appelé',
+            ),
             for (final String issue in <String>[
               'REACHED',
               'PROSPECTS_PROMISED',
@@ -514,7 +560,10 @@ class _FiltresProspects extends ConsumerWidget {
               notifier.set(filtres.copyWith(dernierAppel: v)),
           options: <CpiChoice<String>>[
             const CpiChoice<String>(value: '', label: 'Tous'),
-            const CpiChoice<String>(value: filtreJamais, label: 'Jamais appelé'),
+            const CpiChoice<String>(
+              value: filtreJamais,
+              label: 'Jamais appelé',
+            ),
             for (final CallReason m in motifs)
               CpiChoice<String>(value: m.code, label: m.label),
           ],
@@ -708,7 +757,8 @@ class _EmptyHistorique extends StatelessWidget {
       title: prospects
           ? 'Aucun prospect dans vos campagnes.'
           : 'Aucune fiche dans vos campagnes.',
-      message: 'La liste se remplit quand une campagne vous attribue des numéros.',
+      message:
+          'La liste se remplit quand une campagne vous attribue des numéros.',
     );
   }
 }

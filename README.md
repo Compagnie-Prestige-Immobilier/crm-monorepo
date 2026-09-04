@@ -199,7 +199,7 @@ pnpm dx -- --mobile
 
 Cette commande démarre PostgreSQL, applique les migrations, exécute le seed,
 lance l'émulateur configuré, puis démarre l'API, le web et Flutter. Sans
-`--mobile`, `pnpm dx` démarre seulement l'API si nécessaire.
+`--mobile`, `pnpm dx` fait la même chose sans l'émulateur ni Flutter.
 
 Pour arrêter l'API, le web et PostgreSQL lancés en développement:
 

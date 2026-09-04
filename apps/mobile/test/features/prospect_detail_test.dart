@@ -223,6 +223,58 @@ void main() {
     await unmount(tester);
   });
 
+  // Ce que le TÉLÉPHONE a fait de l'appel, sous le numéro : sans cette ligne,
+  // la fiche laisse croire qu'un appel lancé a forcément abouti.
+  testWidgets('la fiche montre ce que le journal du téléphone a confirmé', (
+    WidgetTester tester,
+  ) async {
+    await db
+        .into(db.preuvesAppel)
+        .insert(
+          PreuvesAppelCompanion.insert(
+            id: 'preuve-1',
+            kind: 'prospect',
+            entityId: 'gp-1',
+            phoneE164: '+221771234567',
+            lanceAt: t0,
+            mode: 'call',
+            journalType: const Value<String?>('sortant'),
+            journalDureeS: const Value<int?>(92),
+            journalAt: Value<DateTime?>(DateTime(2026, 8, 12, 14, 2)),
+            rapprocheAt: Value<DateTime?>(t0),
+          ),
+        );
+
+    await open(tester, 'gp-1');
+
+    expect(find.text('Sortant · 1 min 32 · 14:02'), findsOneWidget);
+
+    await unmount(tester);
+  });
+
+  testWidgets('un appel lancé sans confirmation du téléphone le dit', (
+    WidgetTester tester,
+  ) async {
+    await db
+        .into(db.preuvesAppel)
+        .insert(
+          PreuvesAppelCompanion.insert(
+            id: 'preuve-1',
+            kind: 'prospect',
+            entityId: 'gp-1',
+            phoneE164: '+221771234567',
+            lanceAt: t0,
+            mode: 'dial',
+          ),
+        );
+
+    await open(tester, 'gp-1');
+
+    expect(find.text('Non confirmé par le téléphone'), findsOneWidget);
+
+    await unmount(tester);
+  });
+
   testWidgets('le dernier appel et le rappel promis se lisent sur la fiche', (
     WidgetTester tester,
   ) async {

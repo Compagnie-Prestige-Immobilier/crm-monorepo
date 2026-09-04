@@ -13,6 +13,7 @@ import '../../features/auth/auth_state.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/contacts/presentation/mes_contacts_screen.dart';
 import '../../features/corrections/presentation/corrections_screen.dart';
+import '../../features/diagnostic/presentation/diagnostic_android_screen.dart';
 import '../../features/historique/presentation/historique_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
@@ -409,6 +410,14 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         name: 'batteryHelp',
         parentNavigatorKey: rootNavigatorKey,
         builder: _chues((GoRouterState state) => const BatteryHelpScreen()),
+      ),
+      GoRoute(
+        path: Routes.diagnosticAndroid,
+        name: 'diagnosticAndroid',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: _chues(
+          (GoRouterState state) => const DiagnosticAndroidScreen(),
+        ),
       ),
       GoRoute(
         path: Routes.about,

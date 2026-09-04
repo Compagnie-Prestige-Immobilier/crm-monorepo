@@ -8,11 +8,13 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../core/notifications/rep_callback_notifications.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/router/back_navigation.dart';
+import '../../../core/telephonie/appels_crm.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/phone.dart';
 import '../../../core/utils/relative_time.dart';
 import '../../../core/utils/whatsapp.dart';
 import '../../../data/local/database.dart';
+import '../../../data/repositories/reference_repository.dart';
 import '../../../ui/widgets/cpi_action_bar.dart';
 import '../../../ui/widgets/cpi_choice_group.dart';
 import '../../../ui/widgets/cpi_kit.dart';
@@ -25,13 +27,31 @@ import '../../phase2/presentation/callback_picker.dart';
 import '../../rappels/presentation/rappels_screen.dart' show quandRappeler;
 import 'representant_detail_screen.dart'
     show StatutTag, libelleIssueRepresentant;
+import 'representant_form_screen.dart' show kProfessionsFrequentes;
 
 /// L'appel a abouti, ou non. Ce qu'il a donné se dit ensuite, au statut.
 enum _Resultat { joignable, injoignable }
 
-/// La fiche avant d'appeler, le résultat et son statut, les renseignements si
-/// le statut les exige encore, puis le rappel, le commentaire et l'envoi.
-enum _Etape { fiche, resultat, renseignements, fin }
+/// La fiche avant d'appeler, le résultat et son statut, la vérification de ce
+/// qui a été importé puis les renseignements si le statut les exige encore, et
+/// enfin le rappel, le commentaire et l'envoi.
+enum _Etape { fiche, resultat, verification, renseignements, fin }
+
+/// La fiche importée, figée à l'ouverture. C'est l'écart avec elle qui fait
+/// une correction ; ce qui n'a pas bougé ne repart pas.
+typedef _Fiche = ({
+  String prenom,
+  String nom,
+  String phoneE164,
+  String etablissement,
+  String profession,
+  String syndicat,
+  String whatsappStatus,
+  String? whatsappE164,
+  String? notes,
+  String departementId,
+  String? iefId,
+});
 
 /// Les effets proposés par branche. `SCHEDULE_CALLBACK` est dans les DEUX : on
 /// rappelle aussi qui on n'a pas joint.
@@ -94,20 +114,33 @@ class _RepresentantQualificationScreenState
   final TextEditingController suggestionTelephone = TextEditingController();
   final TextEditingController suggestionNom = TextEditingController();
   final TextEditingController suggestionNote = TextEditingController();
-  final TextEditingController nouvelEtablissement = TextEditingController();
+  final TextEditingController etablissement = TextEditingController();
   final TextEditingController syndicatNom = TextEditingController();
+  final TextEditingController prenom = TextEditingController();
+  final TextEditingController nom = TextEditingController();
+  final TextEditingController telephone = TextEditingController();
+  final TextEditingController profession = TextEditingController();
+  final TextEditingController departement = TextEditingController();
+  final TextEditingController ief = TextEditingController();
   final FocusNode syndicatFocus = FocusNode();
+  final FocusNode professionFocus = FocusNode();
+  final FocusNode departementFocus = FocusNode();
+  final FocusNode iefFocus = FocusNode();
   _Resultat? resultat;
   StatutQualificationRow? statutChoisi;
-  bool? etablissementConfirme;
   bool? aEteContacte;
   bool? connaitUES;
   String? syndicatId;
+  String? professionId;
+  String? departementId;
+  String? iefId;
+  String whatsappStatus = WhatsappStatus.nonDemande.code;
   bool? ambassadeur;
-  bool? memeNumeroWhatsapp;
   DateTime? rappelAt;
   bool saving = false;
   String? echec;
+
+  _Fiche? fiche;
 
   _Etape etape = _Etape.fiche;
   bool enAvant = true;
@@ -115,9 +148,16 @@ class _RepresentantQualificationScreenState
   static const Map<_Etape, String> questions = <_Etape, String>{
     _Etape.fiche: 'Avant l\'appel',
     _Etape.resultat: 'Comment s\'est passé l\'appel ?',
+    _Etape.verification: 'Vérifier la fiche',
     _Etape.renseignements: 'Ce qu\'il vous a dit',
     _Etape.fin: 'Pour finir',
   };
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(semerLaFiche());
+  }
 
   @override
   void dispose() {
@@ -126,10 +166,67 @@ class _RepresentantQualificationScreenState
     suggestionTelephone.dispose();
     suggestionNom.dispose();
     suggestionNote.dispose();
-    nouvelEtablissement.dispose();
+    etablissement.dispose();
     syndicatNom.dispose();
+    prenom.dispose();
+    nom.dispose();
+    telephone.dispose();
+    profession.dispose();
+    departement.dispose();
+    ief.dispose();
     syndicatFocus.dispose();
+    professionFocus.dispose();
+    departementFocus.dispose();
+    iefFocus.dispose();
     super.dispose();
+  }
+
+  /// Une seule fois, à l'ouverture : une remontée du flux recouvrirait ce que
+  /// le téléconseiller vient de corriger pendant l'appel.
+  Future<void> semerLaFiche() async {
+    final ReferenceRepository refs = ref.read(referenceRepositoryProvider);
+    final Representant? row = await refs.representantById(
+      widget.representantId,
+    );
+    if (row == null || !mounted) return;
+    final Departement? dep = await refs.departementById(row.departementId);
+    final Ief? inspection = row.iefId == null
+        ? null
+        : await refs.iefById(row.iefId!);
+    if (!mounted) return;
+    final _Fiche importee = (
+      prenom: (row.prenom ?? '').trim(),
+      nom: row.fullName.trim(),
+      phoneE164: row.phoneE164,
+      etablissement: (row.etablissement ?? '').trim(),
+      profession: (row.profession ?? '').trim(),
+      syndicat: (row.syndicat ?? '').trim(),
+      whatsappStatus: row.whatsappStatus,
+      whatsappE164: row.whatsappE164,
+      notes: row.notes,
+      departementId: row.departementId,
+      iefId: row.iefId,
+    );
+    setState(() {
+      fiche = importee;
+      prenom.text = importee.prenom;
+      nom.text = importee.nom;
+      telephone.text = Phone.groupNational(Phone.digitsOf(importee.phoneE164));
+      etablissement.text = importee.etablissement;
+      profession.text = importee.profession;
+      professionId = kProfessionsFrequentes.contains(importee.profession)
+          ? importee.profession
+          : null;
+      syndicatNom.text = importee.syndicat;
+      whatsappStatus = importee.whatsappStatus;
+      whatsapp.text = Phone.groupNational(
+        Phone.digitsOf(importee.whatsappE164 ?? ''),
+      );
+      departementId = importee.departementId;
+      departement.text = dep?.name ?? '';
+      iefId = importee.iefId;
+      ief.text = inspection?.name ?? '';
+    });
   }
 
   /// Une personne proposée à la place de celle qu'on vient d'appeler : elle
@@ -144,12 +241,56 @@ class _RepresentantQualificationScreenState
   bool get renseignementsExiges =>
       resultat == _Resultat.joignable && _scriptExige(statutChoisi);
 
+  /// La vérification se fait AU TÉLÉPHONE, avec la personne au bout du fil :
+  /// elle suit donc le même sort que le script, jamais un injoignable ni un
+  /// rappel promis sans échange.
   List<_Etape> get parcours => <_Etape>[
     _Etape.fiche,
     _Etape.resultat,
-    if (renseignementsExiges) _Etape.renseignements,
+    if (renseignementsExiges) ...<_Etape>[
+      _Etape.verification,
+      _Etape.renseignements,
+    ],
     _Etape.fin,
   ];
+
+  /// Ce que le téléconseiller a corrigé, libellé et nouvelle valeur. Vide :
+  /// la fiche importée est exacte.
+  List<(String, String)> get corrections {
+    final _Fiche? avant = fiche;
+    if (avant == null || !renseignementsExiges) {
+      return const <(String, String)>[];
+    }
+    final String? numero = Phone.toE164(telephone.text);
+    final String? whatsappSaisi = Phone.toE164(whatsapp.text);
+    return <(String, String)>[
+      if (prenom.text.trim() != avant.prenom) ('Prénom', prenom.text.trim()),
+      if (nom.text.trim() != avant.nom) ('Nom', nom.text.trim()),
+      if (numero != null && numero != avant.phoneE164)
+        ('Téléphone', Phone.format(numero)),
+      if (whatsappCorrige(avant))
+        (
+          'WhatsApp',
+          whatsappStatus == WhatsappStatus.autreNumero.code &&
+                  whatsappSaisi != null
+              ? Phone.format(whatsappSaisi)
+              : WhatsappStatus.parse(whatsappStatus)?.label ?? whatsappStatus,
+        ),
+      if (etablissement.text.trim() != avant.etablissement)
+        ('Établissement', etablissement.text.trim()),
+      if (profession.text.trim() != avant.profession)
+        ('Profession', profession.text.trim()),
+      if (syndicatNom.text.trim() != avant.syndicat)
+        ('Syndicat', syndicatNom.text.trim()),
+      if (departementId != avant.departementId)
+        ('Département', departement.text.trim()),
+      if (iefId != avant.iefId) ('IEF', ief.text.trim()),
+    ];
+  }
+
+  String get compteurCorrections => corrections.length == 1
+      ? '1 champ corrigé'
+      : '${corrections.length} champs corrigés';
 
   /// Les statuts que la branche choisie propose, dans l'ordre servi. Lu SOUS
   /// `build` : `ref.watch` est ce qui fait reparaître la liste quand la
@@ -180,6 +321,7 @@ class _RepresentantQualificationScreenState
   String? manqueEtape(_Etape e) => switch (e) {
     _Etape.fiche => null,
     _Etape.resultat => manqueResultat,
+    _Etape.verification => manqueVerification,
     _Etape.renseignements => manqueRenseignements,
     _Etape.fin => manqueFin,
   };
@@ -196,7 +338,9 @@ class _RepresentantQualificationScreenState
 
   String? get manqueFin {
     if (dateDemandee && rappelAt == null) {
-      return reessai ? 'Choisissez quand réessayer' : 'Choisissez quand rappeler';
+      return reessai
+          ? 'Choisissez quand réessayer'
+          : 'Choisissez quand rappeler';
     }
     if (proposeQuelquUn &&
         suggestionCommencee &&
@@ -216,27 +360,30 @@ class _RepresentantQualificationScreenState
     return null;
   }
 
-  /// Les six questions de la branche joignable, dans l'ordre du script.
+  /// La fiche relue avec la personne au bout du fil. Ce qui est obligatoire
+  /// l'est comme au formulaire : sans nom, sans numéro ou sans département, la
+  /// fiche ne se synchronise plus.
+  String? get manqueVerification {
+    if (fiche == null) return 'Fiche pas encore chargée';
+    if (nom.text.trim().length < 2) return 'Écrivez le nom complet';
+    if (Phone.parse(telephone.text) is! PhoneValid) {
+      return 'Écrivez le numéro de téléphone';
+    }
+    if (whatsappStatus == WhatsappStatus.autreNumero.code &&
+        Phone.parse(whatsapp.text) is! PhoneValid) {
+      return 'Écrivez le numéro WhatsApp';
+    }
+    if (departementId == null) return 'Choisissez le département';
+    return null;
+  }
+
+  /// Les trois questions de la branche joignable, dans l'ordre du script. Ce
+  /// que la fiche portait déjà se relit à l'étape précédente, il ne se
+  /// redemande pas ici.
   String? get manqueRenseignements {
-    if (etablissementConfirme == null) {
-      return 'Confirmez l\'établissement';
-    }
-    if (etablissementConfirme == false &&
-        nouvelEtablissement.text.trim().isEmpty) {
-      return 'Écrivez le nouvel établissement';
-    }
     if (aEteContacte == null) return 'Dites s\'il a été contacté';
     if (connaitUES == null) return 'Dites s\'il connaît l\'UES';
     if (ambassadeur == null) return 'Dites s\'il est ambassadeur';
-    if (ambassadeur == true) {
-      if (memeNumeroWhatsapp == null) {
-        return 'Dites s\'il a WhatsApp sur ce numéro';
-      }
-      if (memeNumeroWhatsapp == false &&
-          Phone.parse(whatsapp.text) is! PhoneValid) {
-        return 'Écrivez le numéro WhatsApp';
-      }
-    }
     return null;
   }
 
@@ -244,59 +391,67 @@ class _RepresentantQualificationScreenState
   /// quand la réponse est complète : le bouton s'allume alors.
   String? get manque =>
       manqueResultat ??
-      (renseignementsExiges ? manqueRenseignements : null) ??
+      (renseignementsExiges ? manqueVerification ?? manqueRenseignements : null) ??
       manqueEtape(_Etape.fin);
 
   static String? _ouiNon(bool? value) =>
       value == null ? null : (value ? 'Oui' : 'Non');
 
-  List<CpiRecapLine> recapDe(
-    RepresentantSyncViewData? representant,
-  ) => <CpiRecapLine>[
-    CpiRecapLine('Personne appelée', representant?.fullName),
-    CpiRecapLine(
-      'Téléphone',
-      representant == null ? null : Phone.format(representant.phoneE164),
-    ),
-    CpiRecapLine('Résultat', switch (resultat) {
-      _Resultat.joignable => 'Joignable',
-      _Resultat.injoignable => 'Injoignable',
-      null => null,
-    }),
-    if (renseignementsExiges) ...<CpiRecapLine>[
-      CpiRecapLine('Établissement confirmé', _ouiNon(etablissementConfirme)),
-      if (etablissementConfirme == false &&
-          nouvelEtablissement.text.trim().isNotEmpty)
-        CpiRecapLine('Nouvel établissement', nouvelEtablissement.text.trim()),
-      CpiRecapLine('A été contacté', _ouiNon(aEteContacte)),
-      CpiRecapLine('Connaît l\'UES', _ouiNon(connaitUES)),
-      if (syndicatNom.text.trim().isNotEmpty)
-        CpiRecapLine('Syndicat', syndicatNom.text.trim()),
-      CpiRecapLine('Ambassadeur', _ouiNon(ambassadeur)),
-    ],
-    if (proposeQuelquUn && suggestionCommencee)
+  List<CpiRecapLine> recapDe(RepresentantSyncViewData? representant) {
+    final List<(String, String)> corrigees = corrections;
+    return <CpiRecapLine>[
       CpiRecapLine(
-        'Personne proposée',
-        <String>[
-          Phone.format(Phone.toE164(suggestionTelephone.text) ?? ''),
-          suggestionNom.text.trim(),
-        ].where((String s) => s.isNotEmpty).join(' · '),
+        'Personne appelée',
+        renseignementsExiges ? nom.text.trim() : representant?.fullName,
       ),
-    CpiRecapLine('Statut', statutChoisi?.label),
-    if (rappelAt != null)
       CpiRecapLine(
-        reessai ? 'Réessai' : 'Rappel',
-        quandRappeler(context, rappelAt!, DateTime.now()),
+        'Téléphone',
+        renseignementsExiges
+            ? Phone.format(Phone.toE164(telephone.text) ?? '')
+            : (representant == null
+                  ? null
+                  : Phone.format(representant.phoneE164)),
       ),
-    if (commentaire.text.trim().isNotEmpty)
-      CpiRecapLine('Commentaire', commentaire.text.trim()),
-  ];
+      CpiRecapLine('Résultat', switch (resultat) {
+        _Resultat.joignable => 'Joignable',
+        _Resultat.injoignable => 'Injoignable',
+        null => null,
+      }),
+      if (renseignementsExiges) ...<CpiRecapLine>[
+        if (corrigees.isEmpty)
+          const CpiRecapLine('Fiche vérifiée', 'Tout est exact')
+        else ...<CpiRecapLine>[
+          CpiRecapLine('Fiche vérifiée', compteurCorrections),
+          for (final (String libelle, String valeur) in corrigees)
+            CpiRecapLine(libelle, valeur),
+        ],
+        CpiRecapLine('A été contacté', _ouiNon(aEteContacte)),
+        CpiRecapLine('Connaît l\'UES', _ouiNon(connaitUES)),
+        CpiRecapLine('Ambassadeur', _ouiNon(ambassadeur)),
+      ],
+      if (proposeQuelquUn && suggestionCommencee)
+        CpiRecapLine(
+          'Personne proposée',
+          <String>[
+            Phone.format(Phone.toE164(suggestionTelephone.text) ?? ''),
+            suggestionNom.text.trim(),
+          ].where((String s) => s.isNotEmpty).join(' · '),
+        ),
+      CpiRecapLine('Statut', statutChoisi?.label),
+      if (rappelAt != null)
+        CpiRecapLine(
+          reessai ? 'Réessai' : 'Rappel',
+          quandRappeler(context, rappelAt!, DateTime.now()),
+        ),
+      if (commentaire.text.trim().isNotEmpty)
+        CpiRecapLine('Commentaire', commentaire.text.trim()),
+    ];
+  }
 
   bool get aSaisi =>
       resultat != null ||
       commentaire.text.trim().isNotEmpty ||
-      nouvelEtablissement.text.trim().isNotEmpty ||
-      syndicatNom.text.trim().isNotEmpty ||
+      corrections.isNotEmpty ||
       suggestionCommencee;
 
   Future<void> quitter() async {
@@ -338,6 +493,69 @@ class _RepresentantQualificationScreenState
     });
   }
 
+  bool whatsappCorrige(_Fiche avant) =>
+      whatsappStatus != avant.whatsappStatus ||
+      (whatsappStatus == WhatsappStatus.autreNumero.code &&
+          Phone.toE164(whatsapp.text) != avant.whatsappE164);
+
+  /// Les corrections que la tentative d'appel ne sait pas porter.
+  bool ficheACorriger(_Fiche avant) =>
+      prenom.text.trim() != avant.prenom ||
+      nom.text.trim() != avant.nom ||
+      profession.text.trim() != avant.profession ||
+      departementId != avant.departementId ||
+      iefId != avant.iefId;
+
+  /// Vrai : la fiche disait juste. Faux : la valeur corrigée part avec la
+  /// tentative. Nul : la fiche ne portait rien à confirmer.
+  bool? etablissementConfirmeDe(_Fiche avant) {
+    if (etablissement.text.trim() != avant.etablissement) return false;
+    return avant.etablissement.isEmpty ? null : true;
+  }
+
+  /// Une fiche déjà qualifiée se réenregistre sur confirmation : l'écran
+  /// s'ouvre aussi depuis une liste, et rien n'y dit qu'un collègue vient de
+  /// passer l'appel.
+  Future<bool> confirmerLaRequalification(BuildContext context) async {
+    final RepresentantSyncViewData? deja = ref
+        .read(representantDetailProvider(widget.representantId))
+        .value;
+    if (deja == null ||
+        (deja.statutQualificationId == null && deja.callAttemptCount == 0)) {
+      return true;
+    }
+    // Le bouton reste vivant pendant que la feuille est ouverte : sans ce
+    // verrou, un second appui ouvrirait une deuxième feuille.
+    setState(() => saving = true);
+    final bool? poursuivre = await cpiConfirm(
+      context,
+      title: 'Déjà qualifié',
+      message: messageDejaQualifie(deja),
+      confirmLabel: 'Enregistrer',
+      cancelLabel: 'Revenir',
+    );
+    if (!mounted) return false;
+    if (poursuivre == true) return true;
+    setState(() => saving = false);
+    return false;
+  }
+
+  static String messageDejaQualifie(RepresentantSyncViewData deja) {
+    final String? issue = deja.lastCallOutcome;
+    final String? quoi =
+        deja.statutQualificationLabel ??
+        (issue == null ? null : libelleIssueRepresentant(issue));
+    final DateTime? quand = deja.lastCallAt;
+    if (quand == null) {
+      return 'Cette fiche porte déjà une qualification. Enregistrer ce nouvel '
+          'appel ?';
+    }
+    final String entete = 'Dernier appel ${relativeTime(quand)}';
+    return quoi == null
+        ? '$entete. Enregistrer ce nouvel appel ?'
+        : '$entete : $quoi. Enregistrer ce nouvel appel ?';
+  }
+
   Future<void> enregistrer(BuildContext context) async {
     // Deux appuis rapprochés consignaient deux appels : l'attente
     // d'autorisation d'alarme laissait le bouton vivant entre les deux.
@@ -355,6 +573,9 @@ class _RepresentantQualificationScreenState
       erreur(context, manquant);
       return;
     }
+    if (!await confirmerLaRequalification(context)) return;
+    if (!context.mounted) return;
+
     final bool joignable = choix == _Resultat.joignable;
     final bool renseigne = renseignementsExiges;
     final bool ambassadeurOui = renseigne && ambassadeur == true;
@@ -367,11 +588,7 @@ class _RepresentantQualificationScreenState
         _issueSansStatut(joignable: joignable, ambassadeur: ambassadeurOui);
 
     final String? moi = ref.read(authControllerProvider).userId;
-
-    String? whatsappE164;
-    if (ambassadeurOui && memeNumeroWhatsapp == false) {
-      whatsappE164 = (Phone.parse(whatsapp.text) as PhoneValid).e164;
-    }
+    final _Fiche? avant = renseigne ? fiche : null;
 
     setState(() {
       saving = true;
@@ -386,6 +603,29 @@ class _RepresentantQualificationScreenState
     }
 
     try {
+      // Prénom, nom, département, IEF et profession : la tentative ne les
+      // porte pas, ils passent par l'opération `representant`, enfilée AVANT
+      // elle pour que le serveur les applique dans cet ordre.
+      if (avant != null && ficheACorriger(avant)) {
+        await ref
+            .read(writeRepositoryProvider)
+            .updateRepresentant(
+              id: widget.representantId,
+              fullName: nom.text.trim(),
+              phoneE164: Phone.toE164(telephone.text) ?? avant.phoneE164,
+              departementId: departementId ?? avant.departementId,
+              iefId: iefId,
+              notes: avant.notes,
+              // Le canal WhatsApp part avec la tentative : le redire ici
+              // écrirait deux fois la même bascule.
+              whatsappStatus: avant.whatsappStatus,
+              whatsappE164: avant.whatsappE164,
+              profession: profession.text.trim().isEmpty
+                  ? null
+                  : profession.text.trim(),
+              prenom: prenom.text.trim(),
+            );
+      }
       final String attemptId = await ref
           .read(writeRepositoryProvider)
           .recordRepCallAttempt(
@@ -398,17 +638,25 @@ class _RepresentantQualificationScreenState
             relationStatus: !renseigne || ambassadeur == null
                 ? null
                 : (ambassadeurOui ? 'AMBASSADEUR' : 'REFUS'),
-            whatsappStatus: ambassadeurOui
-                ? (memeNumeroWhatsapp! ? 'MEME_NUMERO' : 'AUTRE_NUMERO')
+            whatsappStatus: avant != null && whatsappCorrige(avant)
+                ? whatsappStatus
                 : null,
-            whatsappE164: whatsappE164,
+            whatsappE164: whatsappStatus == WhatsappStatus.autreNumero.code
+                ? Phone.toE164(whatsapp.text)
+                : null,
             comment: commentaire.text,
             callbackAt: rappelAt,
-            // Les renseignements 1–4 se prennent sur tout appel joignable qui
-            // les a exigés, ambassadeur ou non : ce sont des renseignements,
-            // pas une branche.
-            etablissementConfirme: renseigne ? etablissementConfirme : null,
-            etablissementSaisi: renseigne ? nouvelEtablissement.text : null,
+            // Ce que la vérification vient de relire avec la personne au bout
+            // du fil. Une valeur corrigée part avec un « non confirmé » : c'est
+            // à cette condition que le serveur la retient.
+            etablissementConfirme: avant == null
+                ? null
+                : etablissementConfirmeDe(avant),
+            etablissementSaisi: renseigne ? etablissement.text : null,
+            numeroConfirme: avant == null
+                ? null
+                : Phone.toE164(telephone.text) == avant.phoneE164,
+            numeroSaisi: renseigne ? telephone.text : null,
             contacte: renseigne ? aEteContacte : null,
             connaitUES: renseigne ? connaitUES : null,
             syndicat: renseigne ? syndicatNom.text : null,
@@ -507,6 +755,7 @@ class _RepresentantQualificationScreenState
               child: switch (etape) {
                 _Etape.fiche => _corpsFiche(theme, representant),
                 _Etape.resultat => _corpsResultat(theme, representant),
+                _Etape.verification => _corpsVerification(theme),
                 _Etape.renseignements => _corpsRenseignements(theme),
                 _Etape.fin => _corpsFin(theme, representant),
               },
@@ -529,27 +778,37 @@ class _RepresentantQualificationScreenState
       subtitle: manqueEtape(etape),
       onPressed: manqueEtape(etape) == null ? suivant : null,
     ),
+    // Rien à corriger se valide d'un geste ; dès qu'un champ bouge, le bouton
+    // redevient un simple passage à la suite.
+    _Etape.verification => CpiButton(
+      corrections.isEmpty ? 'Tout est exact' : 'Continuer',
+      icon: corrections.isEmpty
+          ? PhosphorIconsRegular.check
+          : PhosphorIconsRegular.arrowRight,
+      subtitle: manqueVerification,
+      onPressed: manqueVerification == null ? suivant : null,
+    ),
     _Etape.fin => Builder(
       builder: (BuildContext context) => CpiButton(
         'Enregistrer',
         loading: saving,
         subtitle: manque,
-        onPressed: manque == null ? () => unawaited(enregistrer(context)) : null,
+        onPressed: manque == null
+            ? () => unawaited(enregistrer(context))
+            : null,
       ),
     ),
   };
 
-  static EdgeInsets get _marge => const EdgeInsets.fromLTRB(
-    CpiSpacing.md,
-    0,
-    CpiSpacing.md,
-    CpiSpacing.md,
-  );
+  static EdgeInsets get _marge =>
+      const EdgeInsets.fromLTRB(CpiSpacing.md, 0, CpiSpacing.md, CpiSpacing.md);
 
   /// Étape 1 : la fiche telle qu'elle est, avant de composer le numéro.
   Widget _corpsFiche(ThemeData theme, RepresentantSyncViewData? representant) {
     if (representant == null) {
-      return const Center(child: FCircularProgress(semanticsLabel: 'Chargement'));
+      return const Center(
+        child: FCircularProgress(semanticsLabel: 'Chargement'),
+      );
     }
     // Le nom complet importé porte souvent déjà le prénom : ne pas le redire.
     final String prenom = (representant.prenom ?? '').trim();
@@ -568,6 +827,14 @@ class _RepresentantQualificationScreenState
     final DateTime? dernier = representant.lastCallAt;
     final String? issue = representant.lastCallOutcome;
     final int tentatives = representant.callAttemptCount;
+    final PreuvesAppelData? preuve = ref
+        .watch(
+          dernierePreuveProvider((
+            kind: 'representant',
+            id: widget.representantId,
+          )),
+        )
+        .value;
 
     return ListView(
       padding: _marge,
@@ -592,7 +859,9 @@ class _RepresentantQualificationScreenState
           CpiRow(title: 'Nom', subtitle: nom),
           CpiRow(
             title: 'Téléphone',
-            subtitle: Phone.format(representant.phoneE164),
+            subtitle: preuve == null
+                ? Phone.format(representant.phoneE164)
+                : '${Phone.format(representant.phoneE164)}\n${preuve.libelle}',
           ),
           if (whatsappLigne != null)
             CpiRow(title: 'WhatsApp', subtitle: whatsappLigne),
@@ -705,71 +974,74 @@ class _RepresentantQualificationScreenState
     ],
   );
 
-  /// Étape 3 : les six questions du script, et la personne proposée.
-  Widget _corpsRenseignements(ThemeData theme) => ListView(
-    padding: _marge,
-    children: <Widget>[
-      // 1. L'établissement en fiche est-il le bon ?
-      _OuiNon(
-        label: 'Confirmer l\'établissement ?',
-        value: etablissementConfirme,
-        onChanged: (bool value) =>
-            setState(() => etablissementConfirme = value),
-      ),
-      CpiReveal(
-        visible: etablissementConfirme == false,
-        child: Padding(
-          padding: const EdgeInsets.only(top: CpiSpacing.sm),
-          child: CpiField(
-            label: 'Nouvel établissement',
-            controller: nouvelEtablissement,
-            hint: 'Ex. Lycée Blaise Diagne',
-            onChanged: (String _) => setState(() {}),
-            textCapitalization: TextCapitalization.words,
+  /// Étape 3 : la fiche importée, relue avec la personne au bout du fil. Les
+  /// valeurs se corrigent directement, au lieu de répondre « oui » ou « non »
+  /// à leur sujet.
+  Widget _corpsVerification(ThemeData theme) {
+    final List<Departement> departements =
+        ref.watch(departementsProvider(null)).value ?? const <Departement>[];
+    final List<Ief> iefs =
+        ref.watch(iefsProvider(departementId)).value ?? const <Ief>[];
+    final int corrigees = corrections.length;
+
+    return ListView(
+      padding: _marge,
+      children: <Widget>[
+        if (corrigees > 0) ...<Widget>[
+          CpiStatusBand(
+            text: compteurCorrections,
+            tone: CpiTone.success,
+            padded: false,
           ),
+          const SizedBox(height: CpiSpacing.md),
+        ],
+        CpiField(
+          label: 'Prénom',
+          controller: prenom,
+          hint: 'Ex. Mamadou',
+          textCapitalization: TextCapitalization.words,
+          onChanged: (String _) => setState(() {}),
         ),
-      ),
-      // 2. A-t-il déjà été contacté ?
-      const SizedBox(height: CpiSpacing.md),
-      _OuiNon(
-        label: 'Avez-vous été contacté ?',
-        value: aEteContacte,
-        onChanged: (bool value) => setState(() => aEteContacte = value),
-      ),
-      // 3. Connaît-il l'UES ?
-      const SizedBox(height: CpiSpacing.md),
-      _OuiNon(
-        label: 'Connaissez-vous l\'UES ?',
-        value: connaitUES,
-        onChanged: (bool value) => setState(() => connaitUES = value),
-      ),
-      // 4. Sur quel syndicat ? Choisi dans le référentiel, FACULTATIF.
-      const SizedBox(height: CpiSpacing.md),
-      _champSyndicat(),
-      // 5. Ambassadeur : c'est l'ancien « représentant CPI CHUES », mapping
-      // outcome/relationStatus inchangé.
-      const SizedBox(height: CpiSpacing.md),
-      _OuiNon(
-        label: 'Ambassadeur ?',
-        value: ambassadeur,
-        onChanged: (bool value) => setState(() {
-          ambassadeur = value;
-          if (!value) memeNumeroWhatsapp = null;
-        }),
-      ),
-      // WhatsApp ne se pose qu'à un ambassadeur : sur un non, la fiche ferme
-      // en REFUS et l'on passe à la personne proposée.
-      if (ambassadeur == true) ...<Widget>[
-        // 6. WhatsApp sur le numéro en fiche ?
         const SizedBox(height: CpiSpacing.md),
-        _OuiNon(
-          label: 'A-t-il WhatsApp sur ce numéro ?',
-          value: memeNumeroWhatsapp,
-          onChanged: (bool value) =>
-              setState(() => memeNumeroWhatsapp = value),
+        CpiField(
+          label: 'Nom complet',
+          controller: nom,
+          hint: 'Ex. Mamadou Diallo',
+          textCapitalization: TextCapitalization.words,
+          onChanged: (String _) => setState(() {}),
+        ),
+        const SizedBox(height: CpiSpacing.md),
+        PhoneField(
+          controller: telephone,
+          onChanged: (String _) => setState(() {}),
+        ),
+        const SizedBox(height: CpiSpacing.md),
+        CpiChoiceGroup<String>(
+          label: 'WhatsApp',
+          description: whatsappStatus == WhatsappStatus.nonDemande.code
+              ? 'Question non posée.'
+              : null,
+          value: whatsappStatus,
+          options: <CpiChoice<String>>[
+            for (final String code in _codesWhatsapp)
+              CpiChoice<String>(
+                value: code,
+                label: WhatsappStatus.parse(code)?.label ?? code,
+              ),
+          ],
+          // Retoucher la puce choisie repose la question : c'est le seul
+          // chemin vers « non demandé » une fois qu'une réponse a été prise.
+          onChanged: (String code) => setState(() {
+            whatsappStatus = code == whatsappStatus
+                ? WhatsappStatus.nonDemande.code
+                : code;
+            if (whatsappStatus != WhatsappStatus.autreNumero.code) {
+              whatsapp.clear();
+            }
+          }),
         ),
         CpiReveal(
-          visible: memeNumeroWhatsapp == false,
+          visible: whatsappStatus == WhatsappStatus.autreNumero.code,
           child: Padding(
             padding: const EdgeInsets.only(top: CpiSpacing.sm),
             child: PhoneField(
@@ -779,7 +1051,123 @@ class _RepresentantQualificationScreenState
             ),
           ),
         ),
+        const SizedBox(height: CpiSpacing.md),
+        CpiField(
+          label: 'Établissement',
+          controller: etablissement,
+          hint: 'Ex. Lycée Blaise Diagne',
+          textCapitalization: TextCapitalization.words,
+          onChanged: (String _) => setState(() {}),
+        ),
+        const SizedBox(height: CpiSpacing.md),
+        LocalTypeahead(
+          controller: profession,
+          focusNode: professionFocus,
+          label: 'Profession',
+          hint: 'Instituteur, Proviseur, Inspecteur…',
+          selectedId: professionId,
+          freeText: true,
+          maxLength: kProfessionMaxLength,
+          options: kProfessionsFrequentes
+              .map((String m) => TypeaheadOption(id: m, label: m))
+              .toList(growable: false),
+          onChanged: (String _) => setState(() => professionId = null),
+          onSelected: (TypeaheadOption o) =>
+              setState(() => professionId = o.id),
+        ),
+        const SizedBox(height: CpiSpacing.md),
+        _champSyndicat(),
+        const SizedBox(height: CpiSpacing.md),
+        LocalTypeahead(
+          controller: departement,
+          focusNode: departementFocus,
+          label: 'Département',
+          hint: 'Dakar, Thiès, Mbour…',
+          selectedId: departementId,
+          emptyHint: departements.isEmpty
+              ? 'La liste n\'est pas encore arrivée.'
+              : 'Aucun résultat',
+          options: departements
+              .map(
+                (Departement d) => TypeaheadOption(
+                  id: d.id,
+                  label: d.name,
+                  secondary: d.code,
+                  keywords: <String>[d.code],
+                ),
+              )
+              .toList(growable: false),
+          onChanged: (String _) {
+            if (departementId != null) setState(() => departementId = null);
+          },
+          onSelected: (TypeaheadOption o) => setState(() {
+            departementId = o.id;
+            iefId = null;
+            ief.text = '';
+          }),
+        ),
+        const SizedBox(height: CpiSpacing.md),
+        LocalTypeahead(
+          controller: ief,
+          focusNode: iefFocus,
+          label: 'Inspection (facultatif)',
+          hint: 'Almadies, Grand Dakar, Thiaroye…',
+          selectedId: iefId,
+          textInputAction: TextInputAction.done,
+          emptyHint: iefs.isEmpty
+              ? 'Aucune inspection pour ce département.'
+              : 'Aucun résultat',
+          options: iefs
+              .map(
+                (Ief i) => TypeaheadOption(
+                  id: i.id,
+                  label: i.name,
+                  secondary: i.departementName,
+                  keywords: <String>[i.code, i.departementName],
+                ),
+              )
+              .toList(growable: false),
+          onChanged: (String _) {
+            if (iefId != null) setState(() => iefId = null);
+          },
+          onSelected: (TypeaheadOption o) => setState(() => iefId = o.id),
+        ),
       ],
+    );
+  }
+
+  /// Un état ajouté côté serveur garde sa puce : le faire disparaître le
+  /// rétrograderait en silence au premier enregistrement.
+  List<String> get _codesWhatsapp => <String>[
+    WhatsappStatus.memeNumero.code,
+    WhatsappStatus.autreNumero.code,
+    WhatsappStatus.aucun.code,
+    if (WhatsappStatus.parse(whatsappStatus) == null) whatsappStatus,
+  ];
+
+  /// Étape 4 : ce que l'appel apprend, et que la fiche ne portait pas.
+  Widget _corpsRenseignements(ThemeData theme) => ListView(
+    padding: _marge,
+    children: <Widget>[
+      _OuiNon(
+        label: 'Avez-vous été contacté ?',
+        value: aEteContacte,
+        onChanged: (bool value) => setState(() => aEteContacte = value),
+      ),
+      const SizedBox(height: CpiSpacing.md),
+      _OuiNon(
+        label: 'Connaissez-vous l\'UES ?',
+        value: connaitUES,
+        onChanged: (bool value) => setState(() => connaitUES = value),
+      ),
+      // Ambassadeur : c'est l'ancien « représentant CPI CHUES », mapping
+      // outcome/relationStatus inchangé.
+      const SizedBox(height: CpiSpacing.md),
+      _OuiNon(
+        label: 'Ambassadeur ?',
+        value: ambassadeur,
+        onChanged: (bool value) => setState(() => ambassadeur = value),
+      ),
     ],
   );
 

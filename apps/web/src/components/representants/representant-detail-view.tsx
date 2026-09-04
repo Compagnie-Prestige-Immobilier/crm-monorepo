@@ -10,14 +10,23 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EMPTY_FILTERS } from '@/lib/filters';
-import { formatDate, formatDateTime, formatNumber, formatPhone } from '@/lib/format';
+import {
+  formatDate,
+  formatDateTime,
+  formatDetectedCall,
+  formatDeviceCall,
+  formatNumber,
+  formatPhone,
+} from '@/lib/format';
 import { fetchProspects } from '@/lib/data/prospects';
 import {
   fetchRepresentant,
   fetchRepresentantCallAttempts,
+  fetchRepresentantDeviceCalls,
   fetchRepresentantRelationHistory,
   scriptOf,
   whatsappLabel,
+  type DeviceCallDetection,
   type RepresentantCallAttempt,
   type RepresentantRelationChange,
 } from '@/lib/data/representants';
@@ -58,6 +67,11 @@ export function RepresentantDetailView({
   const appels = useQuery({
     queryKey: [...queryKeys.representant(representantId), 'call-attempts'],
     queryFn: () => fetchRepresentantCallAttempts(representantId),
+  });
+
+  const releves = useQuery({
+    queryKey: [...queryKeys.representant(representantId), 'device-calls'],
+    queryFn: () => fetchRepresentantDeviceCalls(representantId),
   });
 
   const prospectFilters = { ...EMPTY_FILTERS, representantId };
@@ -237,6 +251,7 @@ export function RepresentantDetailView({
             />
           ) : null}
           {appels.isSuccess ? <Appels items={appels.data} /> : null}
+          {releves.isSuccess ? <RelevesTelephone items={releves.data} /> : null}
         </CardContent>
       </Card>
 
@@ -346,7 +361,9 @@ function Appels({ items }: { items: readonly RepresentantCallAttempt[] }) {
                 {appel.statutQualificationLabel ?? REP_CALL_OUTCOME_LABELS[appel.outcome]}
               </Badge>
               {appel.callbackAt === null ? null : (
-                <span className="text-[0.8125rem]">Rappel le {formatDateTime(appel.callbackAt)}</span>
+                <span className="text-[0.8125rem]">
+                  Rappel le {formatDateTime(appel.callbackAt)}
+                </span>
               )}
             </div>
             <p className="text-[0.75rem] text-muted-foreground">
@@ -355,6 +372,7 @@ function Appels({ items }: { items: readonly RepresentantCallAttempt[] }) {
               </time>{' '}
               · {appel.performedByName}
             </p>
+            <p className="text-[0.8125rem] text-muted-foreground">{formatDeviceCall(appel)}</p>
             {reponses.length === 0 ? null : (
               <p className="text-[0.8125rem] text-muted-foreground">{reponses.join(' · ')}</p>
             )}
@@ -374,6 +392,55 @@ function Appels({ items }: { items: readonly RepresentantCallAttempt[] }) {
         );
       })}
     </ol>
+  );
+}
+
+/** Ce que le journal du téléphone a relevé, consigné en tentative ou non. */
+function RelevesTelephone({ items }: { items: readonly DeviceCallDetection[] }) {
+  if (items.length === 0) return null;
+
+  const nonConsignes = items.filter((releve) => releve.attemptId === null);
+  const consignes = items.filter((releve) => releve.attemptId !== null);
+
+  return (
+    <section className="mt-4 border-t border-border pt-4">
+      <p className="text-[0.75rem] text-muted-foreground">Relevés par le téléphone</p>
+      {nonConsignes.length === 0 ? null : (
+        <ul
+          aria-label="Relevés par le téléphone"
+          className="mt-2 flex flex-col divide-y divide-border"
+        >
+          {nonConsignes.map((releve) => (
+            <ReleveTelephone key={releve.id} releve={releve} />
+          ))}
+        </ul>
+      )}
+      {consignes.length === 0 ? null : (
+        <details className="mt-2">
+          <summary className="w-fit cursor-pointer rounded-md py-1 text-[0.8125rem] font-[600] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+            {formatNumber(consignes.length)} appel{consignes.length === 1 ? '' : 's'} consigné
+            {consignes.length === 1 ? '' : 's'}
+          </summary>
+          <ul className="mt-1 flex flex-col divide-y divide-border">
+            {consignes.map((releve) => (
+              <ReleveTelephone key={releve.id} releve={releve} />
+            ))}
+          </ul>
+        </details>
+      )}
+    </section>
+  );
+}
+
+function ReleveTelephone({ releve }: { releve: DeviceCallDetection }) {
+  return (
+    <li className="flex flex-wrap items-center gap-2 py-2 first:pt-0 last:pb-0">
+      <Badge variant={releve.attemptId === null ? 'warning' : 'success'}>
+        {releve.attemptId === null ? 'Non consigné' : 'Consigné'}
+      </Badge>
+      <span className="text-[0.8125rem] tabular-nums">{formatDetectedCall(releve)}</span>
+      <span className="text-[0.75rem] text-muted-foreground">{releve.performedByName}</span>
+    </li>
   );
 }
 

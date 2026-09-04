@@ -1029,3 +1029,106 @@ CREATE INDEX visites_date_idx ON visites (date, time);
 -- Rien n'aide la RECHERCHE : `LIKE '%awa%'` porte un joker en tête, que SQLite
 -- ne peut indexer. Ne pas ajouter d'index dessus en croyant corriger un oubli.
 CREATE INDEX visites_entreprise_date_idx ON visites (entreprise_id, date);
+
+-- ── Preuves d'appel ──────────────────────────────────────────────────────────
+--
+-- Un appel LANCÉ depuis une fiche, et ce que le journal du téléphone en dit une
+-- fois raccroché. `mode = 'detecte'` est l'autre origine : un appel RETROUVÉ
+-- dans le journal du téléphone, passé ou reçu hors de l'application. Dans les
+-- deux cas la ligne part d'une entité du CRM : un numéro sans fiche n'est ni
+-- stocké ni compté.
+--
+-- `attempt_id` marque la preuve déjà attachée à une tentative envoyée : sans
+-- lui, deux appels consignés d'affilée porteraient la même preuve.
+--
+-- `signale_at` : la feuille « Appels à consigner » l'a montré, elle ne le
+-- remontrera pas d'elle-même. `ignore_at` : l'utilisateur a dit que cet appel
+-- n'est pas à consigner.
+CREATE TABLE preuves_appel (
+    id TEXT NOT NULL PRIMARY KEY,
+    kind TEXT NOT NULL CHECK (kind IN ('representant', 'prospect')),
+    entity_id TEXT NOT NULL,
+    phone_e164 TEXT NOT NULL,
+    lance_at DATETIME NOT NULL,
+    mode TEXT NOT NULL,
+    journal_type TEXT NULL,
+    journal_duree_s INTEGER NULL,
+    journal_at DATETIME NULL,
+    rapproche_at DATETIME NULL,
+    attempt_id TEXT NULL,
+    signale_at DATETIME NULL,
+    ignore_at DATETIME NULL
+);
+
+CREATE INDEX preuves_appel_entite_idx ON preuves_appel (kind, entity_id, lance_at);
+
+dernierePreuvePour:
+    SELECT * FROM preuves_appel
+    WHERE kind = :kind AND entity_id = :entityId
+    ORDER BY lance_at DESC
+    LIMIT 1;
+
+-- `unixepoch()` et non `>=` sur le texte : les horodatages sont stockés en
+-- ISO-8601 avec leur décalage (voir `build.yaml`), et deux décalages différents
+-- se compareraient dans le désordre. Le seuil voyage donc en secondes UNIX.
+preuvesEnAttente:
+    SELECT * FROM preuves_appel
+    WHERE unixepoch(lance_at) >= :seuilSecondes AND journal_at IS NULL
+    ORDER BY lance_at DESC;
+
+-- Une preuve détectée porte `lance_at = journal_at` : elle entre donc dans cette
+-- fenêtre par la même colonne qu'un appel lancé depuis la fiche, et la tentative
+-- consignée repart avec ce que le téléphone a inscrit.
+preuveAConsommer:
+    SELECT * FROM preuves_appel
+    WHERE kind = :kind AND entity_id = :entityId
+      AND rapproche_at IS NOT NULL AND attempt_id IS NULL
+      AND unixepoch(lance_at) >= :seuilSecondes
+    ORDER BY lance_at DESC
+    LIMIT 1;
+
+-- Les appels retrouvés dans le journal et pas encore consignés, avec de quoi
+-- nommer la fiche sans une requête par ligne. `ignore_at` sort la ligne pour de
+-- bon ; `signale_at` ne fait que dire que la feuille l'a déjà montrée.
+appelsAConsigner:
+    SELECT p.*,
+           r.full_name AS rep_nom,
+           r.relation_status AS rep_relation,
+           r.last_call_outcome AS rep_issue,
+           sq.label AS rep_statut_label,
+           sq.effect AS rep_statut_effect,
+           pr.prenom AS pros_prenom,
+           pr.nom AS pros_nom,
+           pr.projet AS pros_projet
+    FROM preuves_appel AS p
+    LEFT JOIN representants AS r
+        ON p.kind = 'representant' AND r.id = p.entity_id
+    LEFT JOIN statuts_qualification AS sq ON sq.id = r.statut_qualification_id
+    LEFT JOIN prospects AS pr
+        ON p.kind = 'prospect' AND pr.id = p.entity_id
+    WHERE p.mode = 'detecte' AND p.attempt_id IS NULL AND p.ignore_at IS NULL
+    ORDER BY p.journal_at DESC;
+
+-- Le même appel vu deux fois par deux balayages : les horloges du journal et de
+-- l'application ne sont pas la même, une minute d'écart reste le même appel.
+preuveExiste:
+    SELECT COUNT(*) FROM preuves_appel
+    WHERE kind = :kind AND entity_id = :entityId AND journal_at IS NOT NULL
+      AND abs(unixepoch(journal_at) - :journalAtSecondes) <= 60;
+
+-- La fiche qui porte ce numéro, représentant d'abord. `last_call_at` voyage
+-- avec elle : c'est ce qui dit qu'un appel du journal a DÉJÀ été consigné.
+ficheParTelephone:
+    SELECT 'representant' AS kind, id AS entity_id, full_name AS libelle,
+           last_call_at AS dernier_appel
+    FROM representants WHERE phone_e164 = :e164 AND deleted_at IS NULL
+    UNION ALL
+    SELECT 'prospect', id, prenom || ' ' || nom, last_call_at
+    FROM prospects WHERE phone_e164 = :e164 AND deleted_at IS NULL;
+
+-- Le prospect garde ses tentatives en local : `last_call_at` ne dit que la
+-- dernière, et une saisie plus ancienne peut couvrir l'appel du journal.
+appelSaisiEntre:
+    SELECT COUNT(*) FROM call_attempts
+    WHERE prospect_id = :prospectId
+      AND unixepoch(client_created_at) BETWEEN :debutSecondes AND :finSecondes;

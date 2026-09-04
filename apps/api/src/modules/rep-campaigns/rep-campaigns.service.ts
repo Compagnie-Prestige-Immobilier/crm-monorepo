@@ -7,6 +7,7 @@ import { outcomeOf } from '../referentiels/statuts-qualification.service.js';
 import { type AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { normalizePhone } from '../../common/phone.js';
 import { attributionScope } from '../../common/scope.js';
+import { rattacherDetections } from '../../common/device-call.js';
 import { REPRESENTANT_RELATION_TRANSITIONS, isLegalTransition } from '../../common/transitions.js';
 import { COMMENT_MAX_LENGTH } from '../phase2/attempt-rules.js';
 import { applyRelationChange } from '../representants/relation-change.js';
@@ -78,6 +79,14 @@ export class RepCampaignsService {
         skipDuplicates: true,
       });
       if (inserted.count === 0) return false;
+
+      await rattacherDetections(tx, {
+        performedById: user.id,
+        representantId: body.representantId,
+        attemptId: body.id,
+        clientCreatedAt: new Date(body.clientCreatedAt),
+        deviceCallAt: body.deviceCallAt ? new Date(body.deviceCallAt) : null,
+      });
 
       if (suggested) {
         await tx.representantSuggestion.create({
@@ -215,6 +224,9 @@ function attemptRow(body: CreateRepCallAttemptDto, performedById: string, commen
     connaitUES: body.connaitUES ?? null,
     syndicat: body.syndicat?.trim() || null,
     statutQualificationId: body.statutQualificationId ?? null,
+    deviceCallType: body.deviceCallType ?? null,
+    deviceCallDurationSeconds: body.deviceCallDurationSeconds ?? null,
+    deviceCallAt: body.deviceCallAt ? new Date(body.deviceCallAt) : null,
     clientCreatedAt: new Date(body.clientCreatedAt),
   };
 }

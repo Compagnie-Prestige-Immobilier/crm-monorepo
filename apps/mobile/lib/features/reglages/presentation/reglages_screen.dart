@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/background/background_sync.dart';
 import '../../../core/feedback/feedback.dart';
+import '../../../core/network/api_environment.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../auth/auth_controller.dart';
 import '../../../core/providers/sync_coordinator.dart';
@@ -254,6 +255,11 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
               title: 'L\'app s\'arrête toute seule ?',
               onTap: () => context.pushOnce(Routes.batteryHelp),
             ),
+            if (_diagnosticVisible)
+              CpiRow(
+                title: 'Diagnostic Android',
+                onTap: () => context.pushOnce(Routes.diagnosticAndroid),
+              ),
             CpiRow(
               title: 'À propos',
               onTap: () => context.pushOnce(Routes.about),
@@ -278,6 +284,12 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
 
   /// Un chevron promettrait un écran de plus : ces lignes AGISSENT.
   static const Widget _sansChevron = SizedBox.shrink();
+
+  /// Écran d'essai de la téléphonie : sur un APK de recette ou contre l'API de
+  /// développement, jamais sur le téléphone d'un téléconseiller.
+  static bool get _diagnosticVisible =>
+      const bool.fromEnvironment('CPI_RAD') ||
+      ApiEnvironment.isDevelopmentServer;
 
   static const Map<ThemeMode, String> _themeLabels = <ThemeMode, String>{
     ThemeMode.system: 'Système',

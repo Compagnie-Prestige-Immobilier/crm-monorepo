@@ -113,6 +113,8 @@ const MODULES: Record<string, string[]> = {
     'getRepresentant',
     'updateRepresentant',
     'listRepresentantRelationChanges',
+    'listRepresentantCallAttempts',
+    'listRepresentantDeviceCalls',
     'listRepresentantComments',
     'addRepresentantComment',
     'deleteRepresentantComment',
