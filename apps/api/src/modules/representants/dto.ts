@@ -13,7 +13,13 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { ChangeSource, RepCallOutcome, RepresentantRelation, WhatsappStatus } from '@crm/database';
+import {
+  ChangeSource,
+  RepCallOutcome,
+  RepresentantRelation,
+  StatutQualificationEffect,
+  WhatsappStatus,
+} from '@crm/database';
 
 import { PageMetaDto, SortOrder } from '../../common/dto/prospect-filter.dto.js';
 import { queryBoolean } from '../../common/dto/query-boolean.js';
@@ -209,6 +215,13 @@ export class RepresentantDto {
       'Libellé du statut de qualification, affiché à la place de `relationStatus`. Nul sur une fiche jamais qualifiée.',
   })
   statutQualificationLabel!: string | null;
+  @ApiProperty({
+    enum: StatutQualificationEffect,
+    enumName: 'StatutQualificationEffect',
+    nullable: true,
+    description: 'Effet du statut : c’est lui qui colore la pastille.',
+  })
+  statutQualificationEffect!: StatutQualificationEffect | null;
 
   @ApiProperty({ enum: WhatsappStatus, enumName: 'WhatsappStatus' })
   whatsappStatus!: WhatsappStatus;

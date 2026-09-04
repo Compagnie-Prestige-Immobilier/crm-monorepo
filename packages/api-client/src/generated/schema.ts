@@ -3527,6 +3527,8 @@ export interface components {
       effect: components['schemas']['StatutQualificationEffect'];
       /** @description La date du rappel est exigée par ce statut. */
       requiresCallback: boolean;
+      /** @description Délai, en minutes, du réessai que l’application propose d’elle-même. Nul : aucun réessai. */
+      retryAfterMinutes: number | null;
       /** @description Ordre de reprise : un « Très intéressé » se rappelle avant un « Non éligible ». */
       priorite: components['schemas']['PrioriteTraitement'];
       /** @description La relation posée sur la fiche. Nulle quand le statut ne tranche rien. */
@@ -3549,6 +3551,7 @@ export interface components {
       effect: components['schemas']['StatutQualificationEffect'];
       /** @default false */
       requiresCallback: boolean;
+      retryAfterMinutes?: number | null;
       /** @default NORMALE */
       priorite: components['schemas']['PrioriteTraitement'];
       /** @description Relation posée sur la fiche quand le client n’en envoie pas. */
@@ -3557,6 +3560,8 @@ export interface components {
     UpdateStatutQualificationDto: {
       label?: string;
       requiresCallback?: boolean;
+      /** @description Nul retire le réessai proposé. */
+      retryAfterMinutes?: number | null;
       priorite?: components['schemas']['PrioriteTraitement'];
       /** @description Nul retire la relation posée : le statut cesse alors de trancher. */
       relationStatus?: components['schemas']['RepresentantRelation'] | null;
@@ -3621,6 +3626,8 @@ export interface components {
       statutQualificationId: string | null;
       /** @description Libellé du statut de qualification, affiché à la place de `relationStatus`. Nul sur une fiche jamais qualifiée. */
       statutQualificationLabel: string | null;
+      /** @description Effet du statut : c’est lui qui colore la pastille. */
+      statutQualificationEffect: components['schemas']['StatutQualificationEffect'] | null;
       whatsappStatus: components['schemas']['WhatsappStatus'];
       /** @description Renseigné avec le seul statut AUTRE_NUMERO. */
       whatsappE164: string | null;

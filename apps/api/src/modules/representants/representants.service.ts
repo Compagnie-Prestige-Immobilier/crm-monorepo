@@ -44,7 +44,7 @@ export const REPRESENTANT_INCLUDE = {
   ief: { select: { name: true } },
   createdBy: { select: { id: true, fullName: true } },
   lastCallBy: { select: { fullName: true } },
-  statutQualification: { select: { label: true } },
+  statutQualification: { select: { label: true, effect: true } },
   _count: { select: { prospects: { where: { deletedAt: null } }, repCallAttempts: true } },
 } satisfies Prisma.RepresentantInclude;
 
@@ -137,6 +137,7 @@ export function toRepresentantDto(row: RepresentantRow): RepresentantDto {
     relationStatus: row.relationStatus,
     statutQualificationId: row.statutQualificationId,
     statutQualificationLabel: row.statutQualification?.label ?? null,
+    statutQualificationEffect: row.statutQualification?.effect ?? null,
     whatsappStatus: row.whatsappStatus,
     whatsappE164: row.whatsappE164,
     whatsappNumber: whatsappNumberOf(row),

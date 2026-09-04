@@ -328,7 +328,12 @@ function ResultatsAnnuaire({
                 {row.departementName === null ? '' : ` · ${row.departementName}`}
               </span>
             </span>
-            <RelationBadge status={row.relationStatus} label={row.statutQualificationLabel} />
+            <RelationBadge
+              status={row.relationStatus}
+              label={row.statutQualificationLabel}
+              effect={row.statutQualificationEffect}
+              lastCallOutcome={row.lastCallOutcome}
+            />
           </button>
         </li>
       ))}
@@ -852,6 +857,8 @@ function EnTeteRepresentant({ representant }: { representant: ScriptedRepresenta
         <RelationBadge
           status={representant.relationStatus}
           label={representant.statutQualificationLabel}
+          effect={representant.statutQualificationEffect}
+          lastCallOutcome={representant.lastCallOutcome}
         />
       </div>
 
@@ -920,7 +927,7 @@ function manqueDe(etat: EtatManque): string | null {
     });
     if (script !== null) return script;
   }
-  if (etat.statut.requiresCallback && etat.rappelAt === null) return 'Choisissez quand rappeler';
+  if (dateDemandee(etat.statut) && etat.rappelAt === null) return 'Choisissez quand rappeler';
   // Le serveur jette une suggestion sans numéro : plutôt que d'effacer en
   // silence ce qui vient d'être dicté, l'enregistrement attend le numéro.
   if (etat.proposeQuelquUn && etat.suggestionCommencee && digitsOf(etat.sugPhone) < 9) {
@@ -990,9 +997,7 @@ function reponseDe(etat: EtatReponse): RepAnswer {
     ...champsRelation(etat),
     ...champsJoignable(etat),
     ...champsWhatsapp(etat),
-    ...(etat.statut.requiresCallback && etat.rappelAt !== null
-      ? { callbackAt: etat.rappelAt }
-      : {}),
+    ...(dateDemandee(etat.statut) && etat.rappelAt !== null ? { callbackAt: etat.rappelAt } : {}),
     ...champsSuggestion(etat),
     ...(etat.commentaire.trim() === '' ? {} : { comment: etat.commentaire.trim() }),
   };
@@ -1109,6 +1114,19 @@ function Qualification({
     );
   };
 
+  // Un numéro qui n'a pas répondu se retente : le réessai arrive préréglé au
+  // délai du statut, le téléconseiller le déplace s'il veut.
+  const choisirStatut = (id: string | null): void => {
+    setStatutId(id);
+    const choisi = statuts.find((ligne) => ligne.id === id);
+    const reessai = choisi?.retryAfterMinutes ?? null;
+    setRappelAt(
+      reessai === null || choisi?.requiresCallback === true
+        ? null
+        : new Date(now + reessai * 60_000).toISOString(),
+    );
+  };
+
   const choisirResultat = (valeur: Resultat): void => {
     setResultat(valeur);
     // Chaque branche a ses propres statuts : celui d'en face ne vaut plus.
@@ -1184,8 +1202,8 @@ function Qualification({
           onResultat={choisirResultat}
           statuts={statuts}
           statutId={statutId}
-          onStatut={setStatutId}
-          exigeRappel={statut?.requiresCallback === true}
+          onStatut={choisirStatut}
+          exigeRappel={statut !== null && dateDemandee(statut)}
           joignable={joignable}
           proposeQuelquUn={proposeQuelquUn}
           questionsJoignable={{
@@ -1348,6 +1366,11 @@ function Choix<T extends string | boolean>({
  * navigateur, puis les demi-heures ouvrées du jour retenu. Même découpage que
  * la feuille du mobile, sans embarquer de bibliothèque de calendrier.
  */
+/** Le statut demande une date : rappel promis, ou réessai d'un numéro sans réponse. */
+function dateDemandee(statut: { requiresCallback: boolean; retryAfterMinutes: number | null }) {
+  return statut.requiresCallback || statut.retryAfterMinutes !== null;
+}
+
 function ChoixEcheance({
   now,
   value,

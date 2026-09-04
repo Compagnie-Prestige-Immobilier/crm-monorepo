@@ -206,9 +206,10 @@ void main() {
     expect(find.text('+221 77 000 00 01'), findsOneWidget);
     expect(find.text('Même numéro'), findsOneWidget);
     expect(find.text('Lycée de Bakel'), findsOneWidget);
-    expect(find.text('À rappeler'), findsOneWidget);
+    // Le résultat en ligne, et la pastille qui le reprend faute de statut.
+    expect(find.text('À rappeler'), findsNWidgets(2));
     expect(find.text('3 appels'), findsOneWidget);
-    expect(find.text('Pas encore contacté'), findsOneWidget);
+    expect(find.text('Pas encore contacté'), findsNothing);
     expect(find.text('Joignable'), findsNothing);
 
     await tester.tap(find.text('Consigner l\'appel'));
@@ -223,7 +224,8 @@ void main() {
   ) async {
     await ouvrir(tester, surLaFiche: true);
 
-    expect(find.text('Jamais appelé'), findsOneWidget);
+    // La ligne « Dernière interaction » et la pastille disent la même chose.
+    expect(find.text('Jamais appelé'), findsNWidgets(2));
     expect(find.text('Aucun appel'), findsOneWidget);
     expect(find.text('WhatsApp'), findsNothing);
 
@@ -712,6 +714,32 @@ void main() {
     await demonter(tester);
   });
 
+  // Un numéro qui n'a pas répondu se retente : le réessai arrive préréglé au
+  // délai du statut, s'enregistre comme un rappel et arme l'alarme.
+  testWidgets('« Pas de réponse » propose un réessai déjà réglé', (
+    WidgetTester tester,
+  ) async {
+    await ouvrir(tester);
+
+    await taper(tester, find.text('Injoignable'));
+    await statut(tester, 'Pas de réponse');
+    await etapeSuivante(tester);
+
+    expect(find.text('Réessayer quand ?'), findsOneWidget);
+    expect(find.text('Réessai'), findsOneWidget);
+    expect(enregistrer(tester).onPressed, isNotNull);
+
+    await envoyer(tester);
+
+    expect(writes.outcome, 'UNREACHABLE');
+    expect(writes.callbackAt, isNotNull);
+    final Duration delai = writes.callbackAt!.difference(DateTime.now());
+    expect(delai.inMinutes, inInclusiveRange(175, 180));
+    expect(alarmes.posees.single.phoneE164, '+221770000001');
+
+    await demonter(tester);
+  });
+
   testWidgets('la flèche recule d\'une étape et garde les réponses', (
     WidgetTester tester,
   ) async {
@@ -734,16 +762,16 @@ void main() {
 
 /// Le vocabulaire de qualification, tel qu'il descend de la route dédiée.
 Future<void> semerLesStatuts(AppDatabase db) async {
-  const List<(String, String, String, bool)> lignes =
-      <(String, String, String, bool)>[
-        ('INTERESSE', 'Intéressé', 'REACHED', false),
-        ('NON_INTERESSE', 'Non intéressé', 'REFUSED', false),
-        ('A_RAPPELER', 'À rappeler', 'SCHEDULE_CALLBACK', true),
-        ('PAS_DE_REPONSE', 'Pas de réponse', 'UNREACHABLE', false),
-        ('FAUX_NUMERO', 'Faux numéro', 'WRONG_NUMBER', false),
+  const List<(String, String, String, bool, int?)> lignes =
+      <(String, String, String, bool, int?)>[
+        ('INTERESSE', 'Intéressé', 'REACHED', false, null),
+        ('NON_INTERESSE', 'Non intéressé', 'REFUSED', false, null),
+        ('A_RAPPELER', 'À rappeler', 'SCHEDULE_CALLBACK', true, null),
+        ('PAS_DE_REPONSE', 'Pas de réponse', 'UNREACHABLE', false, 180),
+        ('FAUX_NUMERO', 'Faux numéro', 'WRONG_NUMBER', false, null),
       ];
   for (int rang = 0; rang < lignes.length; rang++) {
-    final (String code, String label, String effect, bool rappel) =
+    final (String code, String label, String effect, bool rappel, int? retry) =
         lignes[rang];
     await db
         .into(db.statutsQualification)
@@ -754,6 +782,7 @@ Future<void> semerLesStatuts(AppDatabase db) async {
             label: label,
             effect: effect,
             requiresCallback: Value<bool>(rappel),
+            retryAfterMinutes: Value<int?>(retry),
             position: Value<int>(rang),
           ),
         );

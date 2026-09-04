@@ -187,6 +187,7 @@ const fiche = (
   id,
   fullName,
   statutQualificationLabel,
+  statutQualificationEffect: null,
   callAttemptCount: 0,
   phoneE164: '+221771234567',
   departementId: 'd-1',
@@ -224,18 +225,15 @@ describe('RepresentantsView, état de la relation', () => {
     const table = (await screen.findAllByRole('table'))[0];
     if (table === undefined) throw new Error('Aucun tableau.');
 
-    for (const [nom, etat] of [
-      ['Ndeye Fall', 'Pas encore contacté'],
-      ['Moussa Sow', 'Contacté'],
-      ['Awa Ba', 'A accepté'],
-      ['Ibou Sy', 'Refus'],
-    ]) {
-      const ligne = within(table)
-        .getByText(nom as string)
-        .closest('tr');
-      if (ligne === null) throw new Error(`Ligne introuvable pour ${nom as string}.`);
-      expect(within(ligne).getByText(etat as string)).toBeTruthy();
+    // La relation ne se lit plus en toutes lettres : sans statut ni appel, la
+    // pastille dit « Jamais appelé », et l'étoile seule distingue l'accepté.
+    for (const nom of ['Ndeye Fall', 'Moussa Sow', 'Awa Ba', 'Ibou Sy']) {
+      const ligne = within(table).getByText(nom).closest('tr');
+      if (ligne === null) throw new Error(`Ligne introuvable pour ${nom}.`);
+      expect(within(ligne).getByText('Jamais appelé')).toBeTruthy();
     }
+    const acceptee = within(table).getByText('Awa Ba').closest('tr') as HTMLElement;
+    expect(within(acceptee).getByText('Jamais appelé').querySelector('svg')).not.toBeNull();
   });
 
   it('affiche le statut de qualification à la place de la relation, sans perdre l’étoile', async () => {

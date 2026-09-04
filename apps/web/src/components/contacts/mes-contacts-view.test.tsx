@@ -53,6 +53,7 @@ function rep(over: Partial<RepresentantRow> & { id: string }): RepresentantRow {
     relationStatus: 'AMBASSADEUR',
     statutQualificationId: null,
     statutQualificationLabel: null,
+    statutQualificationEffect: null,
     callAttemptCount: 0,
     whatsappStatus: 'NON_DEMANDE',
     whatsappE164: null,
@@ -133,8 +134,9 @@ describe('MesContactsView', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Représentants' }));
 
     const ligne = (await screen.findByText('Aminata Ndiaye')).closest('tr') as HTMLElement;
-    expect(within(ligne).getByText('Prospects promis')).toBeTruthy();
-    expect(within(ligne).getByText('A accepté')).toBeTruthy();
+    // L'issue en colonne, et la pastille qui la reprend faute de statut.
+    expect(within(ligne).getAllByText('Prospects promis')).toHaveLength(2);
+    expect(within(ligne).queryByText('A accepté')).toBeNull();
     expect(within(ligne).getByRole('link', { name: 'Aminata Ndiaye' }).getAttribute('href')).toBe(
       '/chues/representants/r-1',
     );

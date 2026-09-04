@@ -15,6 +15,8 @@ abstract class _$CreateStatutQualificationDtoCWProxy {
 
   CreateStatutQualificationDto requiresCallback(bool? requiresCallback);
 
+  CreateStatutQualificationDto retryAfterMinutes(num? retryAfterMinutes);
+
   CreateStatutQualificationDto priorite(PrioriteTraitement? priorite);
 
   CreateStatutQualificationDto relationStatus(
@@ -32,6 +34,7 @@ abstract class _$CreateStatutQualificationDtoCWProxy {
     String label,
     StatutQualificationEffect effect,
     bool? requiresCallback,
+    num? retryAfterMinutes,
     PrioriteTraitement? priorite,
     RepresentantRelation? relationStatus,
   });
@@ -59,6 +62,10 @@ class _$CreateStatutQualificationDtoCWProxyImpl
       this(requiresCallback: requiresCallback);
 
   @override
+  CreateStatutQualificationDto retryAfterMinutes(num? retryAfterMinutes) =>
+      this(retryAfterMinutes: retryAfterMinutes);
+
+  @override
   CreateStatutQualificationDto priorite(PrioriteTraitement? priorite) =>
       this(priorite: priorite);
 
@@ -79,6 +86,7 @@ class _$CreateStatutQualificationDtoCWProxyImpl
     Object? label = const $CopyWithPlaceholder(),
     Object? effect = const $CopyWithPlaceholder(),
     Object? requiresCallback = const $CopyWithPlaceholder(),
+    Object? retryAfterMinutes = const $CopyWithPlaceholder(),
     Object? priorite = const $CopyWithPlaceholder(),
     Object? relationStatus = const $CopyWithPlaceholder(),
   }) {
@@ -99,6 +107,10 @@ class _$CreateStatutQualificationDtoCWProxyImpl
           ? _value.requiresCallback
           // ignore: cast_nullable_to_non_nullable
           : requiresCallback as bool?,
+      retryAfterMinutes: retryAfterMinutes == const $CopyWithPlaceholder()
+          ? _value.retryAfterMinutes
+          // ignore: cast_nullable_to_non_nullable
+          : retryAfterMinutes as num?,
       priorite: priorite == const $CopyWithPlaceholder()
           ? _value.priorite
           // ignore: cast_nullable_to_non_nullable
@@ -142,6 +154,7 @@ CreateStatutQualificationDto _$CreateStatutQualificationDtoFromJson(
       'requiresCallback',
       (v) => v as bool? ?? false,
     ),
+    retryAfterMinutes: $checkedConvert('retryAfterMinutes', (v) => v as num?),
     priorite: $checkedConvert(
       'priorite',
       (v) =>
@@ -171,6 +184,7 @@ Map<String, dynamic> _$CreateStatutQualificationDtoToJson(
   'label': instance.label,
   'effect': _$StatutQualificationEffectEnumMap[instance.effect]!,
   if (instance.requiresCallback case final value?) 'requiresCallback': value,
+  if (instance.retryAfterMinutes case final value?) 'retryAfterMinutes': value,
   if (_$PrioriteTraitementEnumMap[instance.priorite] case final value?)
     'priorite': value,
   if (_$RepresentantRelationEnumMap[instance.relationStatus] case final value?)

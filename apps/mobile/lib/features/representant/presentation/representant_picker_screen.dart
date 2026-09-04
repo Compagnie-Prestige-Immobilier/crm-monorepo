@@ -198,6 +198,8 @@ class _RepresentantRow extends StatelessWidget {
             ? StatutTag(
                 relationStatus: data.relationStatus,
                 statutLabel: data.statutQualificationLabel,
+                statutEffect: data.statutQualificationEffect,
+                lastCallOutcome: data.lastCallOutcome,
               )
             : CpiTag(signal, tone: status.tone),
         onTap: () => context.pushOnce(

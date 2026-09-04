@@ -20544,6 +20544,11 @@
             "type": "boolean",
             "description": "La date du rappel est exigée par ce statut."
           },
+          "retryAfterMinutes": {
+            "type": "number",
+            "nullable": true,
+            "description": "Délai, en minutes, du réessai que l’application propose d’elle-même. Nul : aucun réessai."
+          },
           "priorite": {
             "description": "Ordre de reprise : un « Très intéressé » se rappelle avant un « Non éligible ».",
             "allOf": [
@@ -20583,6 +20588,7 @@
           "label",
           "effect",
           "requiresCallback",
+          "retryAfterMinutes",
           "priorite",
           "relationStatus",
           "isActive",
@@ -20626,6 +20632,12 @@
             "type": "boolean",
             "default": false
           },
+          "retryAfterMinutes": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 5,
+            "maximum": 10080
+          },
           "priorite": {
             "default": "NORMALE",
             "allOf": [
@@ -20655,6 +20667,13 @@
           },
           "requiresCallback": {
             "type": "boolean"
+          },
+          "retryAfterMinutes": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 5,
+            "maximum": 10080,
+            "description": "Nul retire le réessai proposé."
           },
           "priorite": {
             "allOf": [
@@ -20797,6 +20816,15 @@
             "nullable": true,
             "description": "Libellé du statut de qualification, affiché à la place de `relationStatus`. Nul sur une fiche jamais qualifiée."
           },
+          "statutQualificationEffect": {
+            "nullable": true,
+            "description": "Effet du statut : c’est lui qui colore la pastille.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StatutQualificationEffect"
+              }
+            ]
+          },
           "whatsappStatus": {
             "allOf": [
               {
@@ -20891,6 +20919,7 @@
           "relationStatus",
           "statutQualificationId",
           "statutQualificationLabel",
+          "statutQualificationEffect",
           "whatsappStatus",
           "whatsappE164",
           "whatsappNumber",
