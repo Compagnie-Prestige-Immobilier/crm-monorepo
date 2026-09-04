@@ -24,6 +24,19 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
     <!--
+      Le nom à la sonnerie. Le portefeuille du téléconseiller connecté est écrit
+      dans le répertoire du téléphone, sous le compte de
+      CpiAccountAuthenticatorService : le dialer natif, quel qu'il soit, résout
+      alors lui-même le numéro entrant. AUCUN rôle de téléphonie n'est demandé :
+      ROLE_CALL_SCREENING exige l'API 29 alors que le plancher est 24.
+
+      READ_CONTACTS n'est PAS déclarée. L'écriture remplace en entier les fiches
+      du compte, elle ne lit rien : demander la lecture donnerait accès au
+      carnet d'adresses PERSONNEL du téléconseiller, sur son téléphone
+      personnel, pour une capacité dont le code ne se sert pas.
+    -->
+    <uses-permission android:name="android.permission.WRITE_CONTACTS"/>
+    <!--
       Le rappel promis est une alarme, pas une annonce : il doit tomber à
       l'heure convenue, écran éteint et application fermée.
 
@@ -114,6 +127,33 @@
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
             </intent-filter>
         </receiver>
+        <!--
+          Les deux services du compte de contacts. `exported="true"` n'est pas
+          un choix : c'est le système qui s'y lie, depuis un autre processus, et
+          il n'existe aucune permission de liaison à leur opposer. Ni l'un ni
+          l'autre n'accepte de commande : l'authentificateur refuse toutes les
+          opérations d'AccountManager, l'adaptateur ne synchronise rien.
+        -->
+        <service
+            android:name=".CpiAccountAuthenticatorService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.accounts.AccountAuthenticator"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.accounts.AccountAuthenticator"
+                android:resource="@xml/authenticator"/>
+        </service>
+        <service
+            android:name=".CpiContactsSyncService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.content.SyncAdapter"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.content.SyncAdapter"
+                android:resource="@xml/syncadapter"/>
+        </service>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

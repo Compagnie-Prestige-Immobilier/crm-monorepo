@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/contacts/contacts_systeme.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/sync/api_port.dart';
 import '../../core/sync/token_store.dart';
@@ -92,6 +93,11 @@ class AuthController extends Notifier<AuthState> {
         email: tokens.email,
       );
       unawaited(ref.read(notificationInboxProvider).refresh(force: true));
+      unawaited(
+        ref
+            .read(contactsSystemeProvider)
+            .rafraichir(tokens.userId, demanderLaPermission: true),
+      );
       return true;
     } on ApiException catch (e) {
       state = AuthState.signedOut(errorMessage: _messageFor(e));
@@ -128,6 +134,7 @@ class AuthController extends Notifier<AuthState> {
   Future<void> signOut() async {
     await ref.read(pushInboxStoreProvider).purge();
     await ref.read(phase2DirectoryProvider).purge();
+    await ref.read(contactsSystemeProvider).oublier();
     final String? refresh = await _tokens.readRefreshToken();
     if (refresh != null) {
       try {

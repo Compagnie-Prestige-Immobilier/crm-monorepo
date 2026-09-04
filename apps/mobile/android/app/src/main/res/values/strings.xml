@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Le nom du compte tel que l'application Contacts du téléphone l'affiche. -->
+    <string name="compte_contacts">CPI GO</string>
+</resources>

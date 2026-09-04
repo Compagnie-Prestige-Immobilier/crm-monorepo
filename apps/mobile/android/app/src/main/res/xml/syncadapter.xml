@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Déclaré pour que le compte soit un compte de contacts aux yeux du fournisseur.
+  L'adaptateur ne synchronise rien : `userVisible="false"` le garde hors des
+  réglages de synchronisation, où il n'aurait rien à proposer.
+-->
+<sync-adapter xmlns:android="http://schemas.android.com/apk/res/android"
+    android:contentAuthority="com.android.contacts"
+    android:accountType="sn.cpi.go"
+    android:supportsUploading="false"
+    android:userVisible="false" />

@@ -5,6 +5,7 @@ import io.flutter.embedding.android.FlutterActivity
 
 class MainActivity : FlutterActivity() {
     private var updates: UpdatesChannel? = null
+    private var contacts: ContactsChannel? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -15,11 +16,25 @@ class MainActivity : FlutterActivity() {
         updates = UpdatesChannel(this).also {
             it.register(flutterEngine.dartExecutor.binaryMessenger)
         }
+        contacts = ContactsChannel(this).also {
+            it.register(flutterEngine.dartExecutor.binaryMessenger)
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        contacts?.onPermissionResult(requestCode, grantResults)
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
         updates?.dispose()
         updates = null
+        contacts?.dispose()
+        contacts = null
         super.cleanUpFlutterEngine(flutterEngine)
     }
 }

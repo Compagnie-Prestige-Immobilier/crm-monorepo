@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../background/background_sync.dart';
+import '../contacts/contacts_systeme.dart';
 import '../network/api_environment.dart';
 import '../sync/api_port.dart';
 import '../sync/sync_engine.dart';
@@ -284,6 +285,7 @@ class SyncCoordinator extends Notifier<SyncUiState> {
         unawaited(_connectPresence());
       }
       if (pull && outcome.isOk) await _pullDirectory();
+      if (outcome.isOk) unawaited(_rafraichirLeRepertoire());
       return outcome;
     } on Object catch (e) {
       if (ref.mounted) {
@@ -385,6 +387,31 @@ class SyncCoordinator extends Notifier<SyncUiState> {
     } on Object catch (e, stack) {
       developer.log(
         'Annuaire de phase 2 non rafraîchi',
+        name: 'cpi.sync',
+        error: e,
+        stackTrace: stack,
+      );
+    }
+  }
+
+  /// Le répertoire du téléphone suit le portefeuille : une fiche saisie ce matin
+  /// doit porter un nom quand elle rappelle l'après-midi. L'écriture ne part que
+  /// si le contenu a changé depuis la dernière.
+  ///
+  /// Son échec ne fait pas échouer le cycle, à la différence d'une page de
+  /// saisies perdue : le nom à la sonnerie est un confort, jamais un prérequis.
+  Future<void> _rafraichirLeRepertoire() async {
+    try {
+      if (!ref.mounted) return;
+      // L'identifiant est lu au coffre, pas à `authControllerProvider` : le lire
+      // au contrôleur le MONTE, et un cycle de synchronisation n'a pas à
+      // réveiller la restauration de session pour écrire un répertoire.
+      final String? moi = await ref.read(tokenStoreProvider).readUserId();
+      if (moi == null || !ref.mounted) return;
+      await ref.read(contactsSystemeProvider).rafraichir(moi);
+    } on Object catch (e, stack) {
+      developer.log(
+        'Répertoire du téléphone non rafraîchi',
         name: 'cpi.sync',
         error: e,
         stackTrace: stack,

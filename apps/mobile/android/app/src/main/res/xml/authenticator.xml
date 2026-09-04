@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<account-authenticator xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accountType="sn.cpi.go"
+    android:icon="@mipmap/launcher_icon"
+    android:smallIcon="@mipmap/launcher_icon"
+    android:label="@string/compte_contacts" />

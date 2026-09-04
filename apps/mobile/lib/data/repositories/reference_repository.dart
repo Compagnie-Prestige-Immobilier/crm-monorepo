@@ -6,6 +6,16 @@ import '../local/database.dart';
 
 typedef Region = ({String id, String name});
 
+/// Une ligne du portefeuille, telle que le répertoire du téléphone la reçoit.
+typedef FicheAppelant = ({String id, String nom, String tel});
+
+/// Plafond de [ReferenceRepository.portefeuilleAppelant]. Un compte
+/// d'encadrement ne pose pas le marqueur de périmètre : sans ce plafond, sa
+/// première synchronisation recopierait la base entière dans les contacts du
+/// téléphone, une opération qui se compte en minutes sur un appareil d'entrée
+/// de gamme.
+const int kPortefeuilleAppelantMax = 5000;
+
 class ReferenceRepository {
   ReferenceRepository(this._db);
 
@@ -440,6 +450,39 @@ class ReferenceRepository {
         )
         .map((QueryRow row) => row.read<int>('c'))
         .watchSingle();
+  }
+
+  /// Le portefeuille de [moi], réduit à ce qu'un répertoire téléphonique porte.
+  ///
+  /// Même périmètre que les listes de l'application : le pull est global, et
+  /// écrire la base entière dans les contacts du téléphone reviendrait à
+  /// distribuer l'annuaire nominatif complet à chaque terminal. Trié pour que
+  /// deux lectures identiques rendent la même empreinte.
+  Future<List<FicheAppelant>> portefeuilleAppelant(String moi) {
+    return _db
+        .customSelect(
+          'SELECT id, full_name AS nom, phone_e164 AS tel FROM representants '
+          'WHERE deleted_at IS NULL ${_perimetre('representant')}'
+          'UNION ALL '
+          'SELECT p.id, trim(p.prenom || \' \' || p.nom) AS nom, '
+          '       p.phone_e164 AS tel FROM prospects AS p '
+          'WHERE p.deleted_at IS NULL ${_perimetre('prospect', alias: 'p')}'
+          'ORDER BY tel, id LIMIT $kPortefeuilleAppelantMax',
+          variables: <Variable<Object>>[Variable<String>(moi)],
+          readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+            _db.representants,
+            _db.prospects,
+            _db.attributions,
+          },
+        )
+        .map(
+          (QueryRow row) => (
+            id: row.read<String>('id'),
+            nom: row.read<String>('nom').trim(),
+            tel: row.read<String>('tel'),
+          ),
+        )
+        .get();
   }
 
   Stream<int> watchProspectCountFor(String representantId) {
