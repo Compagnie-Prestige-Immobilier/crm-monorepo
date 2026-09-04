@@ -12,6 +12,7 @@ import {
 import { Role } from '@crm/database';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
+import { DeviceCallDetectionListDto } from '../../common/device-call.js';
 import { PARCOURS_ROLES, Roles } from '../../common/decorators/roles.decorator.js';
 
 import {
@@ -80,7 +81,8 @@ export class ProspectsController {
   @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiOperation({
     operationId: 'listProspectCallAttempts',
-    summary: 'Les tentatives d’appel consignées sur une fiche, de la plus récente à la plus ancienne.',
+    summary:
+      'Les tentatives d’appel consignées sur une fiche, de la plus récente à la plus ancienne.',
   })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, type: ProspectCallAttemptListDto })
@@ -90,6 +92,25 @@ export class ProspectsController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ProspectCallAttemptListDto> {
     return this.prospects.callHistory(user, id);
+  }
+
+  @Get(':id/device-calls')
+  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
+  @ApiOperation({
+    operationId: 'listProspectDeviceCalls',
+    summary: 'Les appels que le journal du téléphone a relevés sur une fiche.',
+    description:
+      'Une détection sans `attemptId` est un appel que personne n’a consigné : ' +
+      'c’est elle qui alimente l’alerte de supervision.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({ status: 200, type: DeviceCallDetectionListDto })
+  @ApiErrors({ 404: 'PROSPECT_NOT_FOUND · fiche absente ou supprimée.' })
+  deviceCalls(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<DeviceCallDetectionListDto> {
+    return this.prospects.deviceCalls(user, id);
   }
 
   @Post()

@@ -852,6 +852,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/representants/{id}/device-calls': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Les appels que le journal du téléphone a relevés sur une fiche.
+     * @description Une détection sans `attemptId` est un appel que personne n’a consigné : c’est elle qui alimente l’alerte de supervision.
+     */
+    get: operations['listRepresentantDeviceCalls'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/representants/{id}/comments': {
     parameters: {
       query?: never;
@@ -939,6 +959,26 @@ export interface paths {
     };
     /** Les tentatives d’appel consignées sur une fiche, de la plus récente à la plus ancienne. */
     get: operations['listProspectCallAttempts'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/prospects/{id}/device-calls': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Les appels que le journal du téléphone a relevés sur une fiche.
+     * @description Une détection sans `attemptId` est un appel que personne n’a consigné : c’est elle qui alimente l’alerte de supervision.
+     */
+    get: operations['listProspectDeviceCalls'];
     put?: never;
     post?: never;
     delete?: never;
@@ -1513,424 +1553,6 @@ export interface paths {
      * @description Remet le MÊME travail en file, en mode `APPLY`. Les compteurs et le rapport de la simulation sont remplacés par ceux de l’application. Refusé si le travail n’est pas une simulation terminée, ou si son échéance est passée — le classeur a alors été détruit.
      */
     post: operations['applyImportJob'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/phase2/callbacks': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Rappels promis encore dus.
-     * @description Un téléconseiller ne voit que les rappels qu’il a promis. Les rappels en retard remontent dans la journée courante : le retard se déduit de la date, il n’est jamais écrit.
-     */
-    get: operations['listScheduledCallbacks'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/phase2/callbacks/{id}/cancel': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Annule un rappel qui n’a plus lieu d’être.
-     * @description Idempotent : un rappel déjà clos ou annulé est rendu tel quel.
-     */
-    post: operations['cancelScheduledCallback'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/rep-campaigns/attempts': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Enregistre un appel passé à un représentant. */
-    post: operations['recordRepCallAttempt'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/suggestions': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Numéros donnés par des représentants qui ont refusé.
-     * @description Un numéro cité par deux représentants apparaît deux fois : c’est l’information, pas un doublon.
-     */
-    get: operations['listSuggestions'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/suggestions/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    /** Marque un numéro suggéré comme appelé ou abandonné. */
-    patch: operations['updateSuggestionStatus'];
-    trace?: never;
-  };
-  '/api/v1/bank-cases': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Liste filtrée, triée et paginée des dossiers bancaires.
-     * @description La recherche libre porte sur la référence, le nom du client et son téléphone. Le filtre est exactement celui des agrégats et de l’export.
-     */
-    get: operations['listBankCases'];
-    put?: never;
-    /**
-     * Ouvre un dossier sur un prospect enrôlé.
-     * @description Le prospect doit être en phase 2 METHOD_OBTAINED. L’identité du client est COPIÉE sur le dossier et n’est plus jamais réécrite : corriger le prospect ensuite ne change pas ce qui a été transmis à la banque.
-     */
-    post: operations['createBankCase'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/bank-cases/analytics': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Tableau de bord Banque & Finance, avec le filtre de la liste.
-     * @description Tout est agrégé en SQL. Les compteurs sont, par construction, ceux de la liste filtrée à l’identique.
-     */
-    get: operations['getBankCaseAnalytics'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/bank-cases/prospect-search': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Autocomplétion des prospects enrôlés, pour ouvrir un dossier.
-     * @description Projection VOLONTAIREMENT étroite : identité, téléphone et banque courante, rien d’autre. Un agent Banque & Finance n’a pas à voir le commercial propriétaire, le syndicat ni le statut de prospection.
-     */
-    get: operations['searchBankCaseProspects'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/bank-cases/rejection-reasons': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Référentiel des motifs de rejet. */
-    get: operations['listBankRejectionReasons'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/bank-cases/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Dossier, étape courante et historique complet. */
-    get: operations['getBankCase'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    /**
-     * Corrige la référence ou la banque de traitement d’un dossier ouvert.
-     * @description Ni l’étape, ni le montant, ni le motif : ceux-là ne changent que par une transition, qui laisse une trace. Refusé sur un dossier terminal.
-     */
-    patch: operations['updateBankCase'];
-    trace?: never;
-  };
-  '/api/v1/bank-cases/{id}/transitions': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Fait avancer le dossier vers l’étape suivante atteignable.
-     * @description L’encaissement exige un montant strictement positif et ne se déclare qu’à la dernière étape ouverte. Le rejet exige un motif ; son montant est forcé à zéro par le serveur. Le motif « AUTRE » exige en plus une précision.
-     */
-    post: operations['createBankCaseTransition'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/bank-cases/{id}/corrections': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Correction administrateur d’un dossier, y compris terminal.
-     * @description Contourne l’atteignabilité et le verrou terminal, RIEN d’autre : les règles financières de l’étape visée s’appliquent à l’identique et la justification est obligatoire. La correction s’inscrit dans le même historique append-only, marquée par `correctionReason`.
-     */
-    post: operations['createBankCaseCorrection'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/bank-case-stages': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Étapes du workflow bancaire, dans l’ordre du flux. */
-    get: operations['listBankCaseStages'];
-    put?: never;
-    /**
-     * Ajoute une étape OUVERTE intermédiaire.
-     * @description Le type n’est pas un paramètre : une seconde étape d’encaissement ou de rejet rendrait la règle financière ambiguë. Insérer au milieu décale les étapes suivantes.
-     */
-    post: operations['createBankCaseStage'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/bank-case-stages/reorder': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Réordonne les étapes ouvertes.
-     * @description La liste doit être EXHAUSTIVE (toutes les étapes ouvertes, actives ou non) et commencer par l’étape initiale. Le réordonnancement n’affecte que les transitions FUTURES : l’historique référence les étapes par identifiant et reste lisible tel quel.
-     */
-    post: operations['reorderBankCaseStages'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/bank-case-stages/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    /**
-     * Renomme ou recolorie une étape.
-     * @description Ni le code, ni le type, ni le drapeau initial : une étape déjà inscrite dans l’historique d’un dossier clos ne doit pas changer de nature rétroactivement.
-     */
-    patch: operations['updateBankCaseStage'];
-    trace?: never;
-  };
-  '/api/v1/bank-case-stages/{id}/active': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Active ou désactive une étape.
-     * @description Refusé sur une étape système, et refusé tant que des dossiers stationnent sur l’étape : ils deviendraient invisibles du flux sans que personne ne soit averti qu’ils existent toujours.
-     */
-    post: operations['setBankCaseStageActive'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/export/bank-cases.xlsx': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Export Excel des dossiers bancaires, avec le filtre de la liste.
-     * @description Trois feuilles : Dossiers (une ligne par dossier filtré), Historique (toutes les transitions de ces dossiers) et Synthèse (les mêmes agrégats que le tableau de bord).
-     */
-    get: operations['exportBankCasesXlsx'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/client-requests': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Demandes de création, filtrables par statut.
-     * @description Un agent Banque & Finance ne voit que ses propres demandes : l’identité des clients qu’une autre banque cherche à faire créer ne le regarde pas.
-     */
-    get: operations['listClientRequests'];
-    put?: never;
-    /**
-     * Demande la création d’un client absent de la base.
-     * @description Sortie de l’impasse « Aucun client ne correspond ». Le téléphone est normalisé en E.164 avant tout contrôle : un client déjà en base sous une autre présentation du même numéro est reconnu et la demande est refusée avec son numéro, plutôt que de créer un doublon.
-     */
-    post: operations['createClientRequest'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/client-requests/{id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Détail d’une demande. */
-    get: operations['getClientRequest'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/client-requests/{id}/approve': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Approuve la demande et crée le prospect, en une seule transaction.
-     * @description Le prospect naît avec sa provenance (origin=BANQUE, libellé = nom de la banque demandeuse), puis sa qualification CHUES continue côté panel.
-     */
-    post: operations['approveClientRequest'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/client-requests/{id}/reject': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Refuse la demande, motif obligatoire.
-     * @description Le motif remonte au demandeur par notification. Un refus muet le renverrait à l’impasse de départ.
-     */
-    post: operations['rejectClientRequest'];
     delete?: never;
     options?: never;
     head?: never;
@@ -2522,6 +2144,424 @@ export interface paths {
     /** Modifie les créneaux de travail. */
     put: operations['updateSupervisionCreneaux'];
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/phase2/callbacks': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Rappels promis encore dus.
+     * @description Un téléconseiller ne voit que les rappels qu’il a promis. Les rappels en retard remontent dans la journée courante : le retard se déduit de la date, il n’est jamais écrit.
+     */
+    get: operations['listScheduledCallbacks'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/phase2/callbacks/{id}/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Annule un rappel qui n’a plus lieu d’être.
+     * @description Idempotent : un rappel déjà clos ou annulé est rendu tel quel.
+     */
+    post: operations['cancelScheduledCallback'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/rep-campaigns/attempts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Enregistre un appel passé à un représentant. */
+    post: operations['recordRepCallAttempt'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/suggestions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Numéros donnés par des représentants qui ont refusé.
+     * @description Un numéro cité par deux représentants apparaît deux fois : c’est l’information, pas un doublon.
+     */
+    get: operations['listSuggestions'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/suggestions/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Marque un numéro suggéré comme appelé ou abandonné. */
+    patch: operations['updateSuggestionStatus'];
+    trace?: never;
+  };
+  '/api/v1/bank-cases': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Liste filtrée, triée et paginée des dossiers bancaires.
+     * @description La recherche libre porte sur la référence, le nom du client et son téléphone. Le filtre est exactement celui des agrégats et de l’export.
+     */
+    get: operations['listBankCases'];
+    put?: never;
+    /**
+     * Ouvre un dossier sur un prospect enrôlé.
+     * @description Le prospect doit être en phase 2 METHOD_OBTAINED. L’identité du client est COPIÉE sur le dossier et n’est plus jamais réécrite : corriger le prospect ensuite ne change pas ce qui a été transmis à la banque.
+     */
+    post: operations['createBankCase'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/bank-cases/analytics': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Tableau de bord Banque & Finance, avec le filtre de la liste.
+     * @description Tout est agrégé en SQL. Les compteurs sont, par construction, ceux de la liste filtrée à l’identique.
+     */
+    get: operations['getBankCaseAnalytics'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/bank-cases/prospect-search': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Autocomplétion des prospects enrôlés, pour ouvrir un dossier.
+     * @description Projection VOLONTAIREMENT étroite : identité, téléphone et banque courante, rien d’autre. Un agent Banque & Finance n’a pas à voir le commercial propriétaire, le syndicat ni le statut de prospection.
+     */
+    get: operations['searchBankCaseProspects'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/bank-cases/rejection-reasons': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Référentiel des motifs de rejet. */
+    get: operations['listBankRejectionReasons'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/bank-cases/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Dossier, étape courante et historique complet. */
+    get: operations['getBankCase'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Corrige la référence ou la banque de traitement d’un dossier ouvert.
+     * @description Ni l’étape, ni le montant, ni le motif : ceux-là ne changent que par une transition, qui laisse une trace. Refusé sur un dossier terminal.
+     */
+    patch: operations['updateBankCase'];
+    trace?: never;
+  };
+  '/api/v1/bank-cases/{id}/transitions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Fait avancer le dossier vers l’étape suivante atteignable.
+     * @description L’encaissement exige un montant strictement positif et ne se déclare qu’à la dernière étape ouverte. Le rejet exige un motif ; son montant est forcé à zéro par le serveur. Le motif « AUTRE » exige en plus une précision.
+     */
+    post: operations['createBankCaseTransition'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/bank-cases/{id}/corrections': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Correction administrateur d’un dossier, y compris terminal.
+     * @description Contourne l’atteignabilité et le verrou terminal, RIEN d’autre : les règles financières de l’étape visée s’appliquent à l’identique et la justification est obligatoire. La correction s’inscrit dans le même historique append-only, marquée par `correctionReason`.
+     */
+    post: operations['createBankCaseCorrection'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/bank-case-stages': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Étapes du workflow bancaire, dans l’ordre du flux. */
+    get: operations['listBankCaseStages'];
+    put?: never;
+    /**
+     * Ajoute une étape OUVERTE intermédiaire.
+     * @description Le type n’est pas un paramètre : une seconde étape d’encaissement ou de rejet rendrait la règle financière ambiguë. Insérer au milieu décale les étapes suivantes.
+     */
+    post: operations['createBankCaseStage'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/bank-case-stages/reorder': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Réordonne les étapes ouvertes.
+     * @description La liste doit être EXHAUSTIVE (toutes les étapes ouvertes, actives ou non) et commencer par l’étape initiale. Le réordonnancement n’affecte que les transitions FUTURES : l’historique référence les étapes par identifiant et reste lisible tel quel.
+     */
+    post: operations['reorderBankCaseStages'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/bank-case-stages/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Renomme ou recolorie une étape.
+     * @description Ni le code, ni le type, ni le drapeau initial : une étape déjà inscrite dans l’historique d’un dossier clos ne doit pas changer de nature rétroactivement.
+     */
+    patch: operations['updateBankCaseStage'];
+    trace?: never;
+  };
+  '/api/v1/bank-case-stages/{id}/active': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Active ou désactive une étape.
+     * @description Refusé sur une étape système, et refusé tant que des dossiers stationnent sur l’étape : ils deviendraient invisibles du flux sans que personne ne soit averti qu’ils existent toujours.
+     */
+    post: operations['setBankCaseStageActive'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/export/bank-cases.xlsx': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Export Excel des dossiers bancaires, avec le filtre de la liste.
+     * @description Trois feuilles : Dossiers (une ligne par dossier filtré), Historique (toutes les transitions de ces dossiers) et Synthèse (les mêmes agrégats que le tableau de bord).
+     */
+    get: operations['exportBankCasesXlsx'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/client-requests': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Demandes de création, filtrables par statut.
+     * @description Un agent Banque & Finance ne voit que ses propres demandes : l’identité des clients qu’une autre banque cherche à faire créer ne le regarde pas.
+     */
+    get: operations['listClientRequests'];
+    put?: never;
+    /**
+     * Demande la création d’un client absent de la base.
+     * @description Sortie de l’impasse « Aucun client ne correspond ». Le téléphone est normalisé en E.164 avant tout contrôle : un client déjà en base sous une autre présentation du même numéro est reconnu et la demande est refusée avec son numéro, plutôt que de créer un doublon.
+     */
+    post: operations['createClientRequest'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/client-requests/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Détail d’une demande. */
+    get: operations['getClientRequest'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/client-requests/{id}/approve': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Approuve la demande et crée le prospect, en une seule transaction.
+     * @description Le prospect naît avec sa provenance (origin=BANQUE, libellé = nom de la banque demandeuse), puis sa qualification CHUES continue côté panel.
+     */
+    post: operations['approveClientRequest'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/client-requests/{id}/reject': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Refuse la demande, motif obligatoire.
+     * @description Le motif remonte au demandeur par notification. Un refus muet le renverrait à l’impasse de départ.
+     */
+    post: operations['rejectClientRequest'];
     delete?: never;
     options?: never;
     head?: never;
@@ -3837,6 +3877,10 @@ export interface components {
       suggestedName: string | null;
       suggestedPhoneE164: string | null;
       suggestedNote: string | null;
+      deviceCallType: string | null;
+      deviceCallDurationSeconds: number | null;
+      /** Format: date-time */
+      deviceCallAt: string | null;
       /** Format: uuid */
       performedById: string;
       performedByName: string;
@@ -3846,6 +3890,48 @@ export interface components {
     RepresentantCallAttemptListDto: {
       /** @description Du plus récent au plus ancien. */
       items: components['schemas']['RepresentantCallAttemptDto'][];
+    };
+    DeviceCallDetectionDto: {
+      /** Format: uuid */
+      id: string;
+      /**
+       * Format: uuid
+       * @description Le compte dont le téléphone a relevé l’appel.
+       */
+      performedById: string;
+      /** @description Nom du téléconseiller. */
+      performedByName: string;
+      /** @enum {string} */
+      deviceCallType:
+        | 'sortant'
+        | 'entrant'
+        | 'manque'
+        | 'rejete'
+        | 'bloque'
+        | 'messagerie'
+        | 'externe'
+        | 'inconnu';
+      /** @description Durée en secondes lue au journal d’appels. */
+      deviceCallDurationSeconds: number;
+      /**
+       * Format: date-time
+       * @description Heure de l’appel, telle que le journal la donne.
+       */
+      deviceCallAt: string;
+      /**
+       * Format: date-time
+       * @description Heure à laquelle le téléphone a relevé l’appel.
+       */
+      detectedAt: string;
+      /**
+       * Format: uuid
+       * @description La tentative qui consigne cet appel. `null` : appel non consigné.
+       */
+      attemptId: string | null;
+    };
+    DeviceCallDetectionListDto: {
+      /** @description Du plus récent au plus ancien. */
+      items: components['schemas']['DeviceCallDetectionDto'][];
     };
     RepresentantCommentDto: {
       /** Format: uuid */
@@ -4035,6 +4121,10 @@ export interface components {
       dureeEtablissementMois: number | null;
       /** Format: date-time */
       rendezVousAt: string | null;
+      deviceCallType: string | null;
+      deviceCallDurationSeconds: number | null;
+      /** Format: date-time */
+      deviceCallAt: string | null;
       /** Format: uuid */
       performedById: string;
       performedByName: string;
@@ -4307,7 +4397,13 @@ export interface components {
       prospectIds: string[];
     };
     /** @enum {string} */
-    SyncEntity: 'representant' | 'representant_comment' | 'prospect' | 'call_attempt' | 'visite';
+    SyncEntity:
+      | 'representant'
+      | 'representant_comment'
+      | 'prospect'
+      | 'call_attempt'
+      | 'visite'
+      | 'appel_detecte';
     /** @enum {string} */
     SyncOp: 'create' | 'update' | 'delete';
     SyncEntityDataDto: {
@@ -4438,6 +4534,31 @@ export interface components {
        * @description Tentative d’appel : date du rappel promis. Obligatoire si et seulement si outcome vaut CALLBACK. Une version ancienne de l’application ne l’envoie pas.
        */
       callbackAt?: string;
+      /**
+       * @description Tentative d’appel : type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+       * @enum {string}
+       */
+      deviceCallType?:
+        | 'sortant'
+        | 'entrant'
+        | 'manque'
+        | 'rejete'
+        | 'bloque'
+        | 'messagerie'
+        | 'externe'
+        | 'inconnu';
+      /** @description Tentative d’appel : durée en secondes lue dans le journal d’appels Android. */
+      deviceCallDurationSeconds?: number;
+      /**
+       * Format: date-time
+       * @description Tentative d’appel : heure de l’appel lue dans le journal d’appels Android.
+       */
+      deviceCallAt?: string;
+      /**
+       * Format: date-time
+       * @description Appel détecté : heure à laquelle le téléphone a retrouvé cet appel dans son journal.
+       */
+      detectedAt?: string;
       /** @description Tentative d’appel : adresse électronique recueillie pendant l’appel. */
       email?: string;
       /** @description Tentative d’appel : le prospect est-il fonctionnaire. */
@@ -5000,484 +5121,6 @@ export interface components {
       meta: components['schemas']['PageMetaDto'];
     };
     /** @enum {string} */
-    CallbackScope: 'today' | 'overdue' | 'week';
-    CallbackDto: {
-      /** Format: uuid */
-      id: string;
-      /** Format: uuid */
-      prospectId: string;
-      /** @description Code court à six caractères du prospect. */
-      shortCode: string;
-      phoneE164: string;
-      /** Format: date-time */
-      scheduledAt: string;
-      comment: string | null;
-      /** Format: uuid */
-      assignedToId: string;
-      assignedToName: string;
-      /** @description Le rappel est passé. État DÉRIVÉ de scheduledAt et de l’heure du serveur, jamais stocké. */
-      overdue: boolean;
-    };
-    CallbackListDto: {
-      /** @description Du plus ancien au plus récent. */
-      items: components['schemas']['CallbackDto'][];
-      /**
-       * Format: date-time
-       * @description Heure du serveur ayant servi à décider du retard.
-       */
-      serverTime: string;
-    };
-    CreateRepCallAttemptDto: {
-      /**
-       * Format: uuid
-       * @description UUID v7 engendré par le client. Clé d’idempotence.
-       */
-      id: string;
-      /** Format: uuid */
-      representantId: string;
-      outcome: components['schemas']['RepCallOutcome'];
-      /**
-       * Format: uuid
-       * @description Statut de qualification recueilli. FACULTATIF : les versions déjà installées ne l’émettent pas, et un refus mettrait leur saisie en échec définitif. Quand il est présent, c’est lui qui commande l’issue enregistrée.
-       */
-      statutQualificationId?: string;
-      /** @description Fiches promises. Admis uniquement pour l’issue PROSPECTS_PROMISED. */
-      promisedProspects?: number;
-      /** @description Obligatoire et non vide si l’issue vaut OTHER. */
-      comment?: string;
-      /** @description État de la relation tel que l’appel vient de l’apprendre. Absent : le statut ne bouge pas. Identique au statut courant : rien n’est écrit. */
-      relationStatus?: components['schemas']['RepresentantRelation'];
-      /** @description Numéro qu’un représentant qui refuse propose d’appeler à sa place. Saisie libre, normalisé par le serveur. Un numéro illisible refuse la tentative entière : le téléconseiller est sur l’écran au moment où il le tape. */
-      suggestedPhone?: string;
-      /** @description Nom du contact suggéré, tel que dicté. Ignoré sans `suggestedPhone`. */
-      suggestedName?: string;
-      /** @description Ce que le représentant dit du contact. Ignoré sans `suggestedPhone`. */
-      suggestedNote?: string;
-      /** @description Ce que l’appel apprend du canal WhatsApp. La question ne se pose qu’APRÈS l’engagement : NON_DEMANDE reste donc la réponse honnête tant qu’elle n’a pas été posée. Absent : l’état ne bouge pas. */
-      whatsappStatus?: components['schemas']['WhatsappStatus'];
-      /** @description Numéro WhatsApp DISTINCT du téléphone. Saisie libre, normalisé par le serveur. Admis avec le seul statut AUTRE_NUMERO. */
-      whatsappE164?: string;
-      /** @description Profession, en texte libre. Chaîne vide : la valeur est effacée. */
-      profession?: string;
-      /** @description Script de qualification : l’établissement en fiche est-il confirmé. Faux avec `etablissement` renseigné remplace l’établissement courant. */
-      etablissementConfirme?: boolean;
-      /** @description Nouvel établissement, quand `etablissementConfirme` vaut faux. */
-      etablissement?: string;
-      /** @description Script de qualification : le numéro en fiche est-il confirmé. Faux avec `phone` renseigné remplace le numéro courant, clé de déduplication comprise. */
-      numeroConfirme?: boolean;
-      /** @description Nouveau numéro du représentant, quand `numeroConfirme` vaut faux. Saisie libre, normalisé en E.164 par le serveur. */
-      phone?: string;
-      /** @description Script de qualification : le représentant déclare avoir déjà été contacté. */
-      contacte?: boolean;
-      /** @description Script de qualification : le représentant déclare connaître l’UES. */
-      connaitUES?: boolean;
-      /** @description Script de qualification : niveau de syndicat déclaré. Texte libre. */
-      syndicat?: string;
-      /**
-       * Format: date-time
-       * @description Horodatage de l’appel sur le terrain, distinct de son arrivée en base.
-       */
-      clientCreatedAt: string;
-      /**
-       * Format: date-time
-       * @description Date du rappel promis. Obligatoire pour l’issue CALLBACK, admise avec toute autre : un représentant joint peut demander à être rappelé. C’est elle qui arme la notification côté mobile.
-       */
-      callbackAt?: string;
-    };
-    /** @enum {string} */
-    RepCallAttemptApplyStatus: 'applied' | 'duplicate';
-    RepCallAttemptResultDto: {
-      status: components['schemas']['RepCallAttemptApplyStatus'];
-      /** Format: uuid */
-      attemptId: string;
-      /** @description Ce que le numéro suggéré donne dans l’annuaire, dans la forme que la bannière de doublon du mobile sait déjà afficher. Nul si la tentative n’en portait pas. */
-      suggestion: components['schemas']['RepresentantLookupDto'] | null;
-    };
-    /** @enum {string} */
-    SuggestionStatus: 'A_APPELER' | 'APPELE' | 'ABANDONNE';
-    SuggestionDto: {
-      /** Format: uuid */
-      id: string;
-      /**
-       * Format: uuid
-       * @description Le représentant qui a donné le numéro.
-       */
-      sourceRepresentantId: string;
-      /** @description Code court à six caractères du représentant qui a donné le numéro. */
-      sourceRepresentantShortCode: string;
-      suggestedName: string | null;
-      /** @description Numéro normalisé par le serveur. */
-      suggestedPhoneE164: string;
-      note: string | null;
-      status: components['schemas']['SuggestionStatus'];
-      /**
-       * Format: uuid
-       * @description Téléconseiller qui a recueilli la suggestion.
-       */
-      suggestedById: string;
-      suggestedByName: string;
-      /**
-       * Format: uuid
-       * @description Fiche existante portant ce numéro au moment de la saisie. La piste est déjà connue.
-       */
-      resolvedRepresentantId: string | null;
-      /** Format: date-time */
-      clientCreatedAt: string;
-      /** Format: date-time */
-      createdAt: string;
-    };
-    SuggestionListDto: {
-      items: components['schemas']['SuggestionDto'][];
-      meta: components['schemas']['PageMetaDto'];
-    };
-    UpdateSuggestionStatusDto: {
-      status: components['schemas']['SuggestionStatus'];
-    };
-    /** @enum {string} */
-    BankStageType: 'OPEN' | 'CASHED' | 'REJECTED';
-    /** @enum {string} */
-    BankCaseSortField: 'createdAt' | 'updatedAt' | 'reference' | 'customerName' | 'amountXof';
-    BankCaseStageDto: {
-      /** Format: uuid */
-      id: string;
-      /** @description Code stable, jamais modifiable après création. */
-      code: string;
-      label: string;
-      position: number;
-      /** @description Rôle du design system (info, warning, success…), pas un hex. */
-      color: string;
-      type: components['schemas']['BankStageType'];
-      isActive: boolean;
-      isInitial: boolean;
-      /** @description Étape système : règles financières fixes, ni désactivable ni renommable en code. */
-      isSystem: boolean;
-    };
-    BankRejectionReasonDto: {
-      /** Format: uuid */
-      id: string;
-      code: string;
-      label: string;
-      sortOrder: number;
-      isActive: boolean;
-    };
-    BankCaseDto: {
-      /** Format: uuid */
-      id: string;
-      /** @description Référence telle que saisie par l’agent. */
-      reference: string;
-      /** @description Forme normalisée portant l’unicité globale. */
-      referenceKey: string;
-      /** Format: uuid */
-      prospectId: string;
-      /** @description Nom COPIÉ à la création. Immuable : corriger le prospect ne réécrit pas ce qui a été transmis à la banque. */
-      customerName: string;
-      /** @description Téléphone E.164 copié à la création. Immuable. */
-      customerPhoneE164: string;
-      /** Format: uuid */
-      processingBankId: string;
-      processingBankName: string;
-      currentStage: components['schemas']['BankCaseStageDto'];
-      /** @description Montant en francs CFA, entier, exposé en chaîne. XOF n’a pas de décimales et un nombre JSON perdrait de la précision au-delà de 2^53. */
-      amountXof: string | null;
-      rejectionReason: components['schemas']['BankRejectionReasonDto'] | null;
-      rejectionDetail: string | null;
-      /** @description Révision serveur. À renvoyer en `expectedRev` sur toute mutation. */
-      rev: number;
-      /** @description Dossier encaissé ou rejeté : verrouillé pour un agent BANQUE_FINANCE. */
-      isTerminal: boolean;
-      /** Format: uuid */
-      createdById: string;
-      createdByName: string;
-      /** Format: uuid */
-      updatedById: string | null;
-      updatedByName: string | null;
-      /** Format: date-time */
-      createdAt: string;
-      /** Format: date-time */
-      updatedAt: string;
-    };
-    BankCaseListDto: {
-      items: components['schemas']['BankCaseDto'][];
-      meta: components['schemas']['PageMetaDto'];
-    };
-    CreateBankCaseDto: {
-      /**
-       * Format: uuid
-       * @description Prospect actif dont `phase2Status` vaut METHOD_OBTAINED. Toute autre valeur est refusée.
-       */
-      prospectId: string;
-      /** @description Référence bancaire. Unicité globale sur sa forme normalisée. */
-      reference: string;
-      /**
-       * Format: uuid
-       * @description Défaut : la banque du prospect. L’agent peut en choisir une autre.
-       */
-      processingBankId?: string;
-    };
-    /** @enum {string} */
-    TimeGranularity: 'day' | 'week' | 'month';
-    BankAnalyticsTotalsDto: {
-      total: number;
-      /** @description Dossiers sur l’étape initiale. */
-      aTraiter: number;
-      /** @description Dossiers sur une étape ouverte non initiale. */
-      enTraitement: number;
-      encaisses: number;
-      rejetes: number;
-      /** @description Somme encaissée, en chaîne. FCFA entiers. */
-      totalAmountCashed: string;
-      /** @description Rejetés / (encaissés + rejetés), en pourcentage arrondi au dixième. 0 sans issue. */
-      rejectionRate: number;
-      /** @description Délai moyen en heures entre la création et l’entrée en étape terminale. Nul tant qu’aucun dossier n’est clos. */
-      meanDelayHours: number | null;
-    };
-    BankStageCountDto: {
-      /** Format: uuid */
-      stageId: string;
-      code: string;
-      label: string;
-      color: string;
-      type: components['schemas']['BankStageType'];
-      cases: number;
-      share: number;
-    };
-    BankTimeBucketDto: {
-      /** Format: date-time */
-      bucket: string;
-      cases: number;
-      /** @description Montant du seau, en chaîne. « 0 » hors encaissement. */
-      amountXof: string;
-    };
-    BankBankBreakdownDto: {
-      /** Format: uuid */
-      banqueId: string;
-      label: string;
-      cases: number;
-      cashed: number;
-      rejected: number;
-      amountXof: string;
-      share: number;
-      /** @description Durée moyenne de traitement en heures, création → étape terminale. */
-      meanProcessingHours: number | null;
-    };
-    BankRejectionBreakdownDto: {
-      /** Format: uuid */
-      reasonId: string;
-      code: string;
-      label: string;
-      cases: number;
-      share: number;
-    };
-    BankAgentActivityDto: {
-      /** Format: uuid */
-      agentId: string;
-      label: string;
-      /** @description Dossiers créés par l’agent. */
-      created: number;
-      /** @description Transitions écrites par l’agent. */
-      transitions: number;
-      /** @description Dossiers menés à l’encaissement par l’agent. */
-      cashed: number;
-      /** @description Montant encaissé par l’agent, en chaîne. */
-      amountXof: string;
-    };
-    BankCaseAnalyticsDto: {
-      totals: components['schemas']['BankAnalyticsTotalsDto'];
-      byStage: components['schemas']['BankStageCountDto'][];
-      /** @description Dossiers créés dans le temps. */
-      createdOverTime: components['schemas']['BankTimeBucketDto'][];
-      /** @description Encaissements dans le temps, en nombre et en montant. */
-      cashingsOverTime: components['schemas']['BankTimeBucketDto'][];
-      byBank: components['schemas']['BankBankBreakdownDto'][];
-      byRejectionReason: components['schemas']['BankRejectionBreakdownDto'][];
-      byAgent: components['schemas']['BankAgentActivityDto'][];
-    };
-    ProspectSearchItemDto: {
-      /** Format: uuid */
-      id: string;
-      nom: string;
-      prenom: string;
-      /** @description Nom complet, tel qu’il sera copié sur le dossier. */
-      fullName: string;
-      phoneE164: string;
-      /** Format: uuid */
-      banqueId: string;
-      banqueName: string;
-    };
-    ProspectSearchListDto: {
-      items: components['schemas']['ProspectSearchItemDto'][];
-      meta: components['schemas']['PageMetaDto'];
-    };
-    BankRejectionReasonListDto: {
-      items: components['schemas']['BankRejectionReasonDto'][];
-    };
-    BankCaseTransitionDto: {
-      /** Format: uuid */
-      id: string;
-      /** Format: uuid */
-      caseId: string;
-      /** @description Nul pour la transition de création. */
-      fromStage: components['schemas']['BankCaseStageDto'] | null;
-      toStage: components['schemas']['BankCaseStageDto'];
-      /** Format: uuid */
-      performedById: string;
-      performedByName: string;
-      /** @description Montant en francs CFA, entier, exposé en chaîne. XOF n’a pas de décimales et un nombre JSON perdrait de la précision au-delà de 2^53. */
-      amountXof: string | null;
-      rejectionReason: components['schemas']['BankRejectionReasonDto'] | null;
-      rejectionDetail: string | null;
-      comment: string | null;
-      /** @description Renseigné uniquement quand un ADMIN corrige un dossier terminal. Sa présence distingue une correction d’une avancée normale. */
-      correctionReason: string | null;
-      /** Format: date-time */
-      createdAt: string;
-    };
-    BankCaseDetailDto: {
-      bankCase: components['schemas']['BankCaseDto'];
-      /** @description Historique complet, du plus ancien au plus récent. Append-only. */
-      history: components['schemas']['BankCaseTransitionDto'][];
-    };
-    UpdateBankCaseDto: {
-      /** @description Révision attendue. Un écart renvoie BANK_CASE_REV_CONFLICT avec l’état courant. */
-      expectedRev: number;
-      reference?: string;
-      /** Format: uuid */
-      processingBankId?: string;
-    };
-    CreateBankCaseTransitionDto: {
-      /** Format: uuid */
-      targetStageId: string;
-      expectedRev: number;
-      /** @description Montant en francs CFA, entier, exposé en chaîne. XOF n’a pas de décimales et un nombre JSON perdrait de la précision au-delà de 2^53. Obligatoire et strictement positif vers l’étape d’encaissement, interdit ailleurs. Ignoré vers l’étape de rejet, où le serveur force 0. */
-      amountXof?: string;
-      /**
-       * Format: uuid
-       * @description Obligatoire vers l’étape de rejet.
-       */
-      rejectionReasonId?: string;
-      /** @description Obligatoire quand le motif de rejet est « AUTRE ». */
-      rejectionDetail?: string;
-      comment?: string;
-    };
-    CreateBankCaseCorrectionDto: {
-      /** Format: uuid */
-      targetStageId: string;
-      expectedRev: number;
-      /** @description Montant en francs CFA, entier, exposé en chaîne. XOF n’a pas de décimales et un nombre JSON perdrait de la précision au-delà de 2^53. Obligatoire et strictement positif vers l’étape d’encaissement, interdit ailleurs. Ignoré vers l’étape de rejet, où le serveur force 0. */
-      amountXof?: string;
-      /**
-       * Format: uuid
-       * @description Obligatoire vers l’étape de rejet.
-       */
-      rejectionReasonId?: string;
-      /** @description Obligatoire quand le motif de rejet est « AUTRE ». */
-      rejectionDetail?: string;
-      comment?: string;
-      /** @description Justification obligatoire. Elle est enregistrée sur la transition et distingue une correction d’une avancée normale. */
-      reason: string;
-    };
-    BankCaseStageListDto: {
-      items: components['schemas']['BankCaseStageDto'][];
-    };
-    CreateBankCaseStageDto: {
-      /** @description Code stable en majuscules. Ne change jamais après création. */
-      code: string;
-      label: string;
-      /** @description Rôle du design system, pas un hex. */
-      color: string;
-      /** @description Position dans le flux ouvert. Défaut : après la dernière étape ouverte. 100 et 101 sont réservées aux étapes système. */
-      position?: number;
-    };
-    ReorderBankCaseStagesDto: {
-      /** @description Liste ORDONNÉE de toutes les étapes OPEN, actives comme inactives. L’étape initiale doit venir en premier. */
-      stageIds: string[];
-    };
-    UpdateBankCaseStageDto: {
-      label?: string;
-      color?: string;
-    };
-    SetBankCaseStageActiveDto: {
-      isActive: boolean;
-    };
-    CreateClientRequestDto: {
-      nom: string;
-      prenom: string;
-      /**
-       * @description Téléphone en saisie libre. Normalisé en E.164 par le serveur.
-       * @example 77 123 45 67
-       */
-      phone: string;
-      /**
-       * Format: uuid
-       * @description Banque demandeuse. Elle devient la provenance lisible du prospect créé, pour que l’on puisse mesurer ce qui entre hors base.
-       */
-      banqueId: string;
-      /** @description Contexte laissé à l’administrateur : référence du dossier, agence, urgence. */
-      note?: string;
-    };
-    /** @enum {string} */
-    ClientRequestStatus: 'PENDING' | 'APPROVED' | 'REJECTED';
-    ClientRequestDto: {
-      /** Format: uuid */
-      id: string;
-      nom: string;
-      prenom: string;
-      /** @description Téléphone normalisé E.164. */
-      phoneE164: string;
-      note: string | null;
-      /** Format: uuid */
-      banqueId: string;
-      banqueName: string;
-      /** Format: uuid */
-      requestedById: string;
-      requestedByName: string;
-      status: components['schemas']['ClientRequestStatus'];
-      /** Format: uuid */
-      reviewedById: string | null;
-      reviewedByName: string | null;
-      /** Format: date-time */
-      reviewedAt: string | null;
-      rejectionNote: string | null;
-      /**
-       * Format: uuid
-       * @description Prospect issu de l’approbation. Nul tant que la demande n’a pas abouti.
-       */
-      createdProspectId: string | null;
-      /** Format: date-time */
-      createdAt: string;
-      /** Format: date-time */
-      updatedAt: string;
-    };
-    ClientRequestListDto: {
-      items: components['schemas']['ClientRequestDto'][];
-      meta: components['schemas']['PageMetaDto'];
-      /** @description Demandes encore en attente, TOUS filtres confondus. C’est ce nombre que porte la pastille du menu : filtré, il retomberait à zéro dès qu’un admin consulte l’onglet « approuvées ». */
-      pendingCount: number;
-    };
-    ApproveClientRequestDto: {
-      /**
-       * Format: uuid
-       * @description Représentant de rattachement du prospect créé.
-       */
-      representantId: string;
-      /** Format: uuid */
-      syndicatId: string;
-      /**
-       * Format: uuid
-       * @description Banque du prospect créé. Par défaut celle de la demande.
-       */
-      banqueId?: string;
-      /**
-       * Format: date-time
-       * @description Date de saisie à retenir. Par défaut celle de la demande.
-       */
-      clientCreatedAt?: string;
-    };
-    RejectClientRequestDto: {
-      /** @description Motif du refus, obligatoire et non vide. Un refus muet renvoie l’agent à son impasse de départ, ce que ce module existe précisément pour éviter. */
-      reason: string;
-    };
-    /** @enum {string} */
     NotificationCategory: 'ANNONCE' | 'RAPPEL' | 'CAMPAGNE' | 'DOSSIER' | 'SYSTEME';
     /** @enum {string} */
     NotificationAudience: 'ALL' | 'ROLE' | 'DEPARTEMENT' | 'USERS';
@@ -5694,6 +5337,8 @@ export interface components {
       /** @description Prospects saisis sur les 30 derniers jours. */
       prospects30Jours: number;
     };
+    /** @enum {string} */
+    TimeGranularity: 'day' | 'week' | 'month';
     TimeBucketDto: {
       /**
        * Format: date-time
@@ -6002,6 +5647,14 @@ export interface components {
     SupervisionActivityRowDto: {
       /** @description Appels passés à des prospects. */
       calls: number;
+      /** @description Parmi `calls`, ceux retrouvés dans le journal d’appels du téléphone Android. Un appel passé depuis un autre téléphone ou saisi après coup n’y est pas. */
+      confirmedCalls: number;
+      /** @description Appels vers un prospect que le journal du téléphone a relevés, consignés ou non. */
+      detectedCalls: number;
+      /** @description Parmi `detectedCalls`, ceux qu’aucune tentative ne consigne. C’est le chiffre qui déclenche l’alerte de supervision. */
+      unloggedCalls: number;
+      /** @description Durée moyenne, en secondes, des `confirmedCalls`. `null` quand aucun appel prospect n’a été retrouvé au journal du téléphone. */
+      avgCallSeconds: number | null;
       /** @description Issue UNREACHABLE : NRP ou injoignable. */
       unreachable: number;
       /** @description Issue WRONG_NUMBER : faux numéro. */
@@ -6022,6 +5675,14 @@ export interface components {
       representantsContacted: number;
       /** @description Appels à des représentants, issues encore saisissables : REACHED, REFUSED, CALLBACK, UNREACHABLE, WRONG_NUMBER. */
       repCalls: number;
+      /** @description Parmi `repCalls`, ceux retrouvés dans le journal d’appels du téléphone Android. */
+      repConfirmedCalls: number;
+      /** @description Appels vers un représentant que le journal du téléphone a relevés, consignés ou non. */
+      repDetectedCalls: number;
+      /** @description Parmi `repDetectedCalls`, ceux qu’aucune tentative ne consigne. */
+      repUnloggedCalls: number;
+      /** @description Durée moyenne, en secondes, des `repConfirmedCalls`. `null` quand aucun appel représentant n’a été retrouvé au journal du téléphone. */
+      repAvgCallSeconds: number | null;
       /** @description Issue WRONG_NUMBER : faux numéro parmi les appels représentants. */
       repWrongNumber: number;
       /** @description Représentants qui ont DÉCROCHÉ et répondu : REACHED ou REFUSED. Un refus est un contact ; un rappel promis n’en est pas encore un. */
@@ -6042,6 +5703,22 @@ export interface components {
       repQualified: number;
       /** @description Part des représentants interrogés qui ont dit oui, en pourcentage. `null` sans aucun représentant interrogé. */
       repQualificationRate: number | null;
+      /** @description Appels entrants relevés au journal du téléphone, les deux familles confondues. Une détection déjà consignée n’est comptée qu’une fois, par sa tentative. */
+      inboundCalls: number;
+      /** @description Appels manqués relevés au journal du téléphone, les deux familles confondues. */
+      missedCalls: number;
+      /** @description Rappels prospects promis pour cette période et tenus : une tentative les a clos. Comptés sur la date PROMISE, pas sur celle de l’appel qui les a posés. */
+      callbacksHonored: number;
+      /** @description Rappels prospects dont l’heure est passée et qu’aucune tentative n’a clos. */
+      callbacksLate: number;
+      /** @description Rappels prospects encore à venir. */
+      callbacksUpcoming: number;
+      /** @description Rappels représentants tenus : un appel a suivi l’heure promise, quel qu’en soit l’auteur. */
+      repCallbacksHonored: number;
+      /** @description Rappels représentants dont l’heure est passée sans qu’aucun appel ait suivi. */
+      repCallbacksLate: number;
+      /** @description Rappels représentants encore à venir. */
+      repCallbacksUpcoming: number;
       /** @description Début de la journée ou de la semaine, en AAAA-MM-JJ. */
       bucket: string;
       /** Format: uuid */
@@ -6051,6 +5728,14 @@ export interface components {
     SupervisionActivityCountsDto: {
       /** @description Appels passés à des prospects. */
       calls: number;
+      /** @description Parmi `calls`, ceux retrouvés dans le journal d’appels du téléphone Android. Un appel passé depuis un autre téléphone ou saisi après coup n’y est pas. */
+      confirmedCalls: number;
+      /** @description Appels vers un prospect que le journal du téléphone a relevés, consignés ou non. */
+      detectedCalls: number;
+      /** @description Parmi `detectedCalls`, ceux qu’aucune tentative ne consigne. C’est le chiffre qui déclenche l’alerte de supervision. */
+      unloggedCalls: number;
+      /** @description Durée moyenne, en secondes, des `confirmedCalls`. `null` quand aucun appel prospect n’a été retrouvé au journal du téléphone. */
+      avgCallSeconds: number | null;
       /** @description Issue UNREACHABLE : NRP ou injoignable. */
       unreachable: number;
       /** @description Issue WRONG_NUMBER : faux numéro. */
@@ -6071,6 +5756,14 @@ export interface components {
       representantsContacted: number;
       /** @description Appels à des représentants, issues encore saisissables : REACHED, REFUSED, CALLBACK, UNREACHABLE, WRONG_NUMBER. */
       repCalls: number;
+      /** @description Parmi `repCalls`, ceux retrouvés dans le journal d’appels du téléphone Android. */
+      repConfirmedCalls: number;
+      /** @description Appels vers un représentant que le journal du téléphone a relevés, consignés ou non. */
+      repDetectedCalls: number;
+      /** @description Parmi `repDetectedCalls`, ceux qu’aucune tentative ne consigne. */
+      repUnloggedCalls: number;
+      /** @description Durée moyenne, en secondes, des `repConfirmedCalls`. `null` quand aucun appel représentant n’a été retrouvé au journal du téléphone. */
+      repAvgCallSeconds: number | null;
       /** @description Issue WRONG_NUMBER : faux numéro parmi les appels représentants. */
       repWrongNumber: number;
       /** @description Représentants qui ont DÉCROCHÉ et répondu : REACHED ou REFUSED. Un refus est un contact ; un rappel promis n’en est pas encore un. */
@@ -6091,6 +5784,22 @@ export interface components {
       repQualified: number;
       /** @description Part des représentants interrogés qui ont dit oui, en pourcentage. `null` sans aucun représentant interrogé. */
       repQualificationRate: number | null;
+      /** @description Appels entrants relevés au journal du téléphone, les deux familles confondues. Une détection déjà consignée n’est comptée qu’une fois, par sa tentative. */
+      inboundCalls: number;
+      /** @description Appels manqués relevés au journal du téléphone, les deux familles confondues. */
+      missedCalls: number;
+      /** @description Rappels prospects promis pour cette période et tenus : une tentative les a clos. Comptés sur la date PROMISE, pas sur celle de l’appel qui les a posés. */
+      callbacksHonored: number;
+      /** @description Rappels prospects dont l’heure est passée et qu’aucune tentative n’a clos. */
+      callbacksLate: number;
+      /** @description Rappels prospects encore à venir. */
+      callbacksUpcoming: number;
+      /** @description Rappels représentants tenus : un appel a suivi l’heure promise, quel qu’en soit l’auteur. */
+      repCallbacksHonored: number;
+      /** @description Rappels représentants dont l’heure est passée sans qu’aucun appel ait suivi. */
+      repCallbacksLate: number;
+      /** @description Rappels représentants encore à venir. */
+      repCallbacksUpcoming: number;
     };
     SupervisionTeleconseillerDto: {
       /** Format: uuid */
@@ -6199,29 +5908,501 @@ export interface components {
       /** @example 18:00 */
       afternoonEnd: string;
     };
-    WorkShiftDto: {
-      /** @enum {string} */
-      key: 'morning' | 'afternoon';
-      label: string;
-      /** @example 09:00 */
-      start: string;
-      /** @example 14:00 */
-      end: string;
-    };
-    WorkShiftsDto: {
-      shifts: components['schemas']['WorkShiftDto'][];
+    /** @enum {string} */
+    CallbackScope: 'today' | 'overdue' | 'week';
+    CallbackDto: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      prospectId: string;
+      /** @description Code court à six caractères du prospect. */
+      shortCode: string;
+      phoneE164: string;
       /** Format: date-time */
-      updatedAt: string | null;
+      scheduledAt: string;
+      comment: string | null;
+      /** Format: uuid */
+      assignedToId: string;
+      assignedToName: string;
+      /** @description Le rappel est passé. État DÉRIVÉ de scheduledAt et de l’heure du serveur, jamais stocké. */
+      overdue: boolean;
     };
-    UpdateWorkShiftsDto: {
-      /** @example 09:00 */
-      morningStart: string;
-      /** @example 14:00 */
-      morningEnd: string;
-      /** @example 15:00 */
-      afternoonStart: string;
-      /** @example 18:00 */
-      afternoonEnd: string;
+    CallbackListDto: {
+      /** @description Du plus ancien au plus récent. */
+      items: components['schemas']['CallbackDto'][];
+      /**
+       * Format: date-time
+       * @description Heure du serveur ayant servi à décider du retard.
+       */
+      serverTime: string;
+    };
+    CreateRepCallAttemptDto: {
+      /**
+       * Format: uuid
+       * @description UUID v7 engendré par le client. Clé d’idempotence.
+       */
+      id: string;
+      /** Format: uuid */
+      representantId: string;
+      outcome: components['schemas']['RepCallOutcome'];
+      /**
+       * Format: uuid
+       * @description Statut de qualification recueilli. FACULTATIF : les versions déjà installées ne l’émettent pas, et un refus mettrait leur saisie en échec définitif. Quand il est présent, c’est lui qui commande l’issue enregistrée.
+       */
+      statutQualificationId?: string;
+      /** @description Fiches promises. Admis uniquement pour l’issue PROSPECTS_PROMISED. */
+      promisedProspects?: number;
+      /** @description Obligatoire et non vide si l’issue vaut OTHER. */
+      comment?: string;
+      /** @description État de la relation tel que l’appel vient de l’apprendre. Absent : le statut ne bouge pas. Identique au statut courant : rien n’est écrit. */
+      relationStatus?: components['schemas']['RepresentantRelation'];
+      /** @description Numéro qu’un représentant qui refuse propose d’appeler à sa place. Saisie libre, normalisé par le serveur. Un numéro illisible refuse la tentative entière : le téléconseiller est sur l’écran au moment où il le tape. */
+      suggestedPhone?: string;
+      /** @description Nom du contact suggéré, tel que dicté. Ignoré sans `suggestedPhone`. */
+      suggestedName?: string;
+      /** @description Ce que le représentant dit du contact. Ignoré sans `suggestedPhone`. */
+      suggestedNote?: string;
+      /** @description Ce que l’appel apprend du canal WhatsApp. La question ne se pose qu’APRÈS l’engagement : NON_DEMANDE reste donc la réponse honnête tant qu’elle n’a pas été posée. Absent : l’état ne bouge pas. */
+      whatsappStatus?: components['schemas']['WhatsappStatus'];
+      /** @description Numéro WhatsApp DISTINCT du téléphone. Saisie libre, normalisé par le serveur. Admis avec le seul statut AUTRE_NUMERO. */
+      whatsappE164?: string;
+      /** @description Profession, en texte libre. Chaîne vide : la valeur est effacée. */
+      profession?: string;
+      /** @description Script de qualification : l’établissement en fiche est-il confirmé. Faux avec `etablissement` renseigné remplace l’établissement courant. */
+      etablissementConfirme?: boolean;
+      /** @description Nouvel établissement, quand `etablissementConfirme` vaut faux. */
+      etablissement?: string;
+      /** @description Script de qualification : le numéro en fiche est-il confirmé. Faux avec `phone` renseigné remplace le numéro courant, clé de déduplication comprise. */
+      numeroConfirme?: boolean;
+      /** @description Nouveau numéro du représentant, quand `numeroConfirme` vaut faux. Saisie libre, normalisé en E.164 par le serveur. */
+      phone?: string;
+      /** @description Script de qualification : le représentant déclare avoir déjà été contacté. */
+      contacte?: boolean;
+      /** @description Script de qualification : le représentant déclare connaître l’UES. */
+      connaitUES?: boolean;
+      /** @description Script de qualification : niveau de syndicat déclaré. Texte libre. */
+      syndicat?: string;
+      /**
+       * Format: date-time
+       * @description Horodatage de l’appel sur le terrain, distinct de son arrivée en base.
+       */
+      clientCreatedAt: string;
+      /**
+       * Format: date-time
+       * @description Date du rappel promis. Obligatoire pour l’issue CALLBACK, admise avec toute autre : un représentant joint peut demander à être rappelé. C’est elle qui arme la notification côté mobile.
+       */
+      callbackAt?: string;
+      /**
+       * @description Type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+       * @enum {string}
+       */
+      deviceCallType?:
+        | 'sortant'
+        | 'entrant'
+        | 'manque'
+        | 'rejete'
+        | 'bloque'
+        | 'messagerie'
+        | 'externe'
+        | 'inconnu';
+      /** @description Durée en secondes lue dans le journal d’appels Android. */
+      deviceCallDurationSeconds?: number;
+      /**
+       * Format: date-time
+       * @description Heure de l’appel lue dans le journal d’appels Android.
+       */
+      deviceCallAt?: string;
+    };
+    /** @enum {string} */
+    RepCallAttemptApplyStatus: 'applied' | 'duplicate';
+    RepCallAttemptResultDto: {
+      status: components['schemas']['RepCallAttemptApplyStatus'];
+      /** Format: uuid */
+      attemptId: string;
+      /** @description Ce que le numéro suggéré donne dans l’annuaire, dans la forme que la bannière de doublon du mobile sait déjà afficher. Nul si la tentative n’en portait pas. */
+      suggestion: components['schemas']['RepresentantLookupDto'] | null;
+    };
+    /** @enum {string} */
+    SuggestionStatus: 'A_APPELER' | 'APPELE' | 'ABANDONNE';
+    SuggestionDto: {
+      /** Format: uuid */
+      id: string;
+      /**
+       * Format: uuid
+       * @description Le représentant qui a donné le numéro.
+       */
+      sourceRepresentantId: string;
+      /** @description Code court à six caractères du représentant qui a donné le numéro. */
+      sourceRepresentantShortCode: string;
+      suggestedName: string | null;
+      /** @description Numéro normalisé par le serveur. */
+      suggestedPhoneE164: string;
+      note: string | null;
+      status: components['schemas']['SuggestionStatus'];
+      /**
+       * Format: uuid
+       * @description Téléconseiller qui a recueilli la suggestion.
+       */
+      suggestedById: string;
+      suggestedByName: string;
+      /**
+       * Format: uuid
+       * @description Fiche existante portant ce numéro au moment de la saisie. La piste est déjà connue.
+       */
+      resolvedRepresentantId: string | null;
+      /** Format: date-time */
+      clientCreatedAt: string;
+      /** Format: date-time */
+      createdAt: string;
+    };
+    SuggestionListDto: {
+      items: components['schemas']['SuggestionDto'][];
+      meta: components['schemas']['PageMetaDto'];
+    };
+    UpdateSuggestionStatusDto: {
+      status: components['schemas']['SuggestionStatus'];
+    };
+    /** @enum {string} */
+    BankStageType: 'OPEN' | 'CASHED' | 'REJECTED';
+    /** @enum {string} */
+    BankCaseSortField: 'createdAt' | 'updatedAt' | 'reference' | 'customerName' | 'amountXof';
+    BankCaseStageDto: {
+      /** Format: uuid */
+      id: string;
+      /** @description Code stable, jamais modifiable après création. */
+      code: string;
+      label: string;
+      position: number;
+      /** @description Rôle du design system (info, warning, success…), pas un hex. */
+      color: string;
+      type: components['schemas']['BankStageType'];
+      isActive: boolean;
+      isInitial: boolean;
+      /** @description Étape système : règles financières fixes, ni désactivable ni renommable en code. */
+      isSystem: boolean;
+    };
+    BankRejectionReasonDto: {
+      /** Format: uuid */
+      id: string;
+      code: string;
+      label: string;
+      sortOrder: number;
+      isActive: boolean;
+    };
+    BankCaseDto: {
+      /** Format: uuid */
+      id: string;
+      /** @description Référence telle que saisie par l’agent. */
+      reference: string;
+      /** @description Forme normalisée portant l’unicité globale. */
+      referenceKey: string;
+      /** Format: uuid */
+      prospectId: string;
+      /** @description Nom COPIÉ à la création. Immuable : corriger le prospect ne réécrit pas ce qui a été transmis à la banque. */
+      customerName: string;
+      /** @description Téléphone E.164 copié à la création. Immuable. */
+      customerPhoneE164: string;
+      /** Format: uuid */
+      processingBankId: string;
+      processingBankName: string;
+      currentStage: components['schemas']['BankCaseStageDto'];
+      /** @description Montant en francs CFA, entier, exposé en chaîne. XOF n’a pas de décimales et un nombre JSON perdrait de la précision au-delà de 2^53. */
+      amountXof: string | null;
+      rejectionReason: components['schemas']['BankRejectionReasonDto'] | null;
+      rejectionDetail: string | null;
+      /** @description Révision serveur. À renvoyer en `expectedRev` sur toute mutation. */
+      rev: number;
+      /** @description Dossier encaissé ou rejeté : verrouillé pour un agent BANQUE_FINANCE. */
+      isTerminal: boolean;
+      /** Format: uuid */
+      createdById: string;
+      createdByName: string;
+      /** Format: uuid */
+      updatedById: string | null;
+      updatedByName: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    BankCaseListDto: {
+      items: components['schemas']['BankCaseDto'][];
+      meta: components['schemas']['PageMetaDto'];
+    };
+    CreateBankCaseDto: {
+      /**
+       * Format: uuid
+       * @description Prospect actif dont `phase2Status` vaut METHOD_OBTAINED. Toute autre valeur est refusée.
+       */
+      prospectId: string;
+      /** @description Référence bancaire. Unicité globale sur sa forme normalisée. */
+      reference: string;
+      /**
+       * Format: uuid
+       * @description Défaut : la banque du prospect. L’agent peut en choisir une autre.
+       */
+      processingBankId?: string;
+    };
+    BankAnalyticsTotalsDto: {
+      total: number;
+      /** @description Dossiers sur l’étape initiale. */
+      aTraiter: number;
+      /** @description Dossiers sur une étape ouverte non initiale. */
+      enTraitement: number;
+      encaisses: number;
+      rejetes: number;
+      /** @description Somme encaissée, en chaîne. FCFA entiers. */
+      totalAmountCashed: string;
+      /** @description Rejetés / (encaissés + rejetés), en pourcentage arrondi au dixième. 0 sans issue. */
+      rejectionRate: number;
+      /** @description Délai moyen en heures entre la création et l’entrée en étape terminale. Nul tant qu’aucun dossier n’est clos. */
+      meanDelayHours: number | null;
+    };
+    BankStageCountDto: {
+      /** Format: uuid */
+      stageId: string;
+      code: string;
+      label: string;
+      color: string;
+      type: components['schemas']['BankStageType'];
+      cases: number;
+      share: number;
+    };
+    BankTimeBucketDto: {
+      /** Format: date-time */
+      bucket: string;
+      cases: number;
+      /** @description Montant du seau, en chaîne. « 0 » hors encaissement. */
+      amountXof: string;
+    };
+    BankBankBreakdownDto: {
+      /** Format: uuid */
+      banqueId: string;
+      label: string;
+      cases: number;
+      cashed: number;
+      rejected: number;
+      amountXof: string;
+      share: number;
+      /** @description Durée moyenne de traitement en heures, création → étape terminale. */
+      meanProcessingHours: number | null;
+    };
+    BankRejectionBreakdownDto: {
+      /** Format: uuid */
+      reasonId: string;
+      code: string;
+      label: string;
+      cases: number;
+      share: number;
+    };
+    BankAgentActivityDto: {
+      /** Format: uuid */
+      agentId: string;
+      label: string;
+      /** @description Dossiers créés par l’agent. */
+      created: number;
+      /** @description Transitions écrites par l’agent. */
+      transitions: number;
+      /** @description Dossiers menés à l’encaissement par l’agent. */
+      cashed: number;
+      /** @description Montant encaissé par l’agent, en chaîne. */
+      amountXof: string;
+    };
+    BankCaseAnalyticsDto: {
+      totals: components['schemas']['BankAnalyticsTotalsDto'];
+      byStage: components['schemas']['BankStageCountDto'][];
+      /** @description Dossiers créés dans le temps. */
+      createdOverTime: components['schemas']['BankTimeBucketDto'][];
+      /** @description Encaissements dans le temps, en nombre et en montant. */
+      cashingsOverTime: components['schemas']['BankTimeBucketDto'][];
+      byBank: components['schemas']['BankBankBreakdownDto'][];
+      byRejectionReason: components['schemas']['BankRejectionBreakdownDto'][];
+      byAgent: components['schemas']['BankAgentActivityDto'][];
+    };
+    ProspectSearchItemDto: {
+      /** Format: uuid */
+      id: string;
+      nom: string;
+      prenom: string;
+      /** @description Nom complet, tel qu’il sera copié sur le dossier. */
+      fullName: string;
+      phoneE164: string;
+      /** Format: uuid */
+      banqueId: string;
+      banqueName: string;
+    };
+    ProspectSearchListDto: {
+      items: components['schemas']['ProspectSearchItemDto'][];
+      meta: components['schemas']['PageMetaDto'];
+    };
+    BankRejectionReasonListDto: {
+      items: components['schemas']['BankRejectionReasonDto'][];
+    };
+    BankCaseTransitionDto: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      caseId: string;
+      /** @description Nul pour la transition de création. */
+      fromStage: components['schemas']['BankCaseStageDto'] | null;
+      toStage: components['schemas']['BankCaseStageDto'];
+      /** Format: uuid */
+      performedById: string;
+      performedByName: string;
+      /** @description Montant en francs CFA, entier, exposé en chaîne. XOF n’a pas de décimales et un nombre JSON perdrait de la précision au-delà de 2^53. */
+      amountXof: string | null;
+      rejectionReason: components['schemas']['BankRejectionReasonDto'] | null;
+      rejectionDetail: string | null;
+      comment: string | null;
+      /** @description Renseigné uniquement quand un ADMIN corrige un dossier terminal. Sa présence distingue une correction d’une avancée normale. */
+      correctionReason: string | null;
+      /** Format: date-time */
+      createdAt: string;
+    };
+    BankCaseDetailDto: {
+      bankCase: components['schemas']['BankCaseDto'];
+      /** @description Historique complet, du plus ancien au plus récent. Append-only. */
+      history: components['schemas']['BankCaseTransitionDto'][];
+    };
+    UpdateBankCaseDto: {
+      /** @description Révision attendue. Un écart renvoie BANK_CASE_REV_CONFLICT avec l’état courant. */
+      expectedRev: number;
+      reference?: string;
+      /** Format: uuid */
+      processingBankId?: string;
+    };
+    CreateBankCaseTransitionDto: {
+      /** Format: uuid */
+      targetStageId: string;
+      expectedRev: number;
+      /** @description Montant en francs CFA, entier, exposé en chaîne. XOF n’a pas de décimales et un nombre JSON perdrait de la précision au-delà de 2^53. Obligatoire et strictement positif vers l’étape d’encaissement, interdit ailleurs. Ignoré vers l’étape de rejet, où le serveur force 0. */
+      amountXof?: string;
+      /**
+       * Format: uuid
+       * @description Obligatoire vers l’étape de rejet.
+       */
+      rejectionReasonId?: string;
+      /** @description Obligatoire quand le motif de rejet est « AUTRE ». */
+      rejectionDetail?: string;
+      comment?: string;
+    };
+    CreateBankCaseCorrectionDto: {
+      /** Format: uuid */
+      targetStageId: string;
+      expectedRev: number;
+      /** @description Montant en francs CFA, entier, exposé en chaîne. XOF n’a pas de décimales et un nombre JSON perdrait de la précision au-delà de 2^53. Obligatoire et strictement positif vers l’étape d’encaissement, interdit ailleurs. Ignoré vers l’étape de rejet, où le serveur force 0. */
+      amountXof?: string;
+      /**
+       * Format: uuid
+       * @description Obligatoire vers l’étape de rejet.
+       */
+      rejectionReasonId?: string;
+      /** @description Obligatoire quand le motif de rejet est « AUTRE ». */
+      rejectionDetail?: string;
+      comment?: string;
+      /** @description Justification obligatoire. Elle est enregistrée sur la transition et distingue une correction d’une avancée normale. */
+      reason: string;
+    };
+    BankCaseStageListDto: {
+      items: components['schemas']['BankCaseStageDto'][];
+    };
+    CreateBankCaseStageDto: {
+      /** @description Code stable en majuscules. Ne change jamais après création. */
+      code: string;
+      label: string;
+      /** @description Rôle du design system, pas un hex. */
+      color: string;
+      /** @description Position dans le flux ouvert. Défaut : après la dernière étape ouverte. 100 et 101 sont réservées aux étapes système. */
+      position?: number;
+    };
+    ReorderBankCaseStagesDto: {
+      /** @description Liste ORDONNÉE de toutes les étapes OPEN, actives comme inactives. L’étape initiale doit venir en premier. */
+      stageIds: string[];
+    };
+    UpdateBankCaseStageDto: {
+      label?: string;
+      color?: string;
+    };
+    SetBankCaseStageActiveDto: {
+      isActive: boolean;
+    };
+    CreateClientRequestDto: {
+      nom: string;
+      prenom: string;
+      /**
+       * @description Téléphone en saisie libre. Normalisé en E.164 par le serveur.
+       * @example 77 123 45 67
+       */
+      phone: string;
+      /**
+       * Format: uuid
+       * @description Banque demandeuse. Elle devient la provenance lisible du prospect créé, pour que l’on puisse mesurer ce qui entre hors base.
+       */
+      banqueId: string;
+      /** @description Contexte laissé à l’administrateur : référence du dossier, agence, urgence. */
+      note?: string;
+    };
+    /** @enum {string} */
+    ClientRequestStatus: 'PENDING' | 'APPROVED' | 'REJECTED';
+    ClientRequestDto: {
+      /** Format: uuid */
+      id: string;
+      nom: string;
+      prenom: string;
+      /** @description Téléphone normalisé E.164. */
+      phoneE164: string;
+      note: string | null;
+      /** Format: uuid */
+      banqueId: string;
+      banqueName: string;
+      /** Format: uuid */
+      requestedById: string;
+      requestedByName: string;
+      status: components['schemas']['ClientRequestStatus'];
+      /** Format: uuid */
+      reviewedById: string | null;
+      reviewedByName: string | null;
+      /** Format: date-time */
+      reviewedAt: string | null;
+      rejectionNote: string | null;
+      /**
+       * Format: uuid
+       * @description Prospect issu de l’approbation. Nul tant que la demande n’a pas abouti.
+       */
+      createdProspectId: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    ClientRequestListDto: {
+      items: components['schemas']['ClientRequestDto'][];
+      meta: components['schemas']['PageMetaDto'];
+      /** @description Demandes encore en attente, TOUS filtres confondus. C’est ce nombre que porte la pastille du menu : filtré, il retomberait à zéro dès qu’un admin consulte l’onglet « approuvées ». */
+      pendingCount: number;
+    };
+    ApproveClientRequestDto: {
+      /**
+       * Format: uuid
+       * @description Représentant de rattachement du prospect créé.
+       */
+      representantId: string;
+      /** Format: uuid */
+      syndicatId: string;
+      /**
+       * Format: uuid
+       * @description Banque du prospect créé. Par défaut celle de la demande.
+       */
+      banqueId?: string;
+      /**
+       * Format: date-time
+       * @description Date de saisie à retenir. Par défaut celle de la demande.
+       */
+      clientCreatedAt?: string;
+    };
+    RejectClientRequestDto: {
+      /** @description Motif du refus, obligatoire et non vide. Un refus muet renvoie l’agent à son impasse de départ, ce que ce module existe précisément pour éviter. */
+      reason: string;
     };
     /** @enum {string} */
     PurgeDomainKey:
@@ -9916,6 +10097,63 @@ export interface operations {
       };
     };
   };
+  listRepresentantDeviceCalls: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DeviceCallDetectionListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description REPRESENTANT_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
   listRepresentantComments: {
     parameters: {
       query?: {
@@ -10413,6 +10651,63 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ProspectCallAttemptListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description PROSPECT_NOT_FOUND · fiche absente ou supprimée. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listProspectDeviceCalls: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DeviceCallDetectionListDto'];
         };
       };
       /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
@@ -12499,1501 +12794,6 @@ export interface operations {
         };
       };
       /** @description IMPORT_NOT_APPLICABLE · le travail n’est pas une simulation terminée, ou son échéance est passée. */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  listScheduledCallbacks: {
-    parameters: {
-      query?: {
-        projet?: components['schemas']['Projet'];
-        /** @description today : tout ce qui est dû d’ici la fin de la journée, retards compris. overdue : les seuls retards. week : les sept prochaines journées. */
-        scope?: components['schemas']['CallbackScope'];
-        /** @description File d’un téléconseiller donné. Réservé à l’administration et à la supervision ; ignoré pour les autres, qui ne voient que la leur. */
-        assignedToId?: string;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['CallbackListDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  cancelScheduledCallback: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['CallbackDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description CALLBACK_NOT_FOUND. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  recordRepCallAttempt: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateRepCallAttemptDto'];
-      };
-    };
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['RepCallAttemptResultDto'];
-        };
-      };
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  listSuggestions: {
-    parameters: {
-      query?: {
-        status?: components['schemas']['SuggestionStatus'];
-        page?: number;
-        pageSize?: number;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['SuggestionListDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  updateSuggestionStatus: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateSuggestionStatusDto'];
-      };
-    };
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['SuggestionDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description SUGGESTION_NOT_FOUND. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  listBankCases: {
-    parameters: {
-      query?: {
-        /** @description Recherche libre sur la référence, le nom du client ou son téléphone. */
-        search?: string;
-        stageId?: string;
-        stageType?: components['schemas']['BankStageType'];
-        /** @description Banque de traitement du dossier. */
-        banqueId?: string;
-        /** @description Parcours suivi par la fiche liée. Sans filtre, les deux projets sortent. Un même numéro peut suivre les deux. */
-        projet?: components['schemas']['Projet'];
-        /** @description Agent créateur OU dernier intervenant sur le dossier. */
-        agentId?: string;
-        rejectionReasonId?: string;
-        /** @description Borne basse sur la création, incluse. */
-        dateFrom?: string;
-        /** @description Borne haute sur la création, incluse. */
-        dateTo?: string;
-        /** @description Borne basse de montant. Montant en francs CFA, entier, exposé en chaîne. XOF n’a pas de décimales et un nombre JSON perdrait de la précision au-delà de 2^53. */
-        amountMin?: string;
-        /** @description Borne haute de montant. Montant en francs CFA, entier, exposé en chaîne. XOF n’a pas de décimales et un nombre JSON perdrait de la précision au-delà de 2^53. */
-        amountMax?: string;
-        page?: number;
-        pageSize?: number;
-        sortBy?: components['schemas']['BankCaseSortField'];
-        sortOrder?: components['schemas']['SortOrder'];
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['BankCaseListDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  createBankCase: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateBankCaseDto'];
-      };
-    };
-    responses: {
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['BankCaseDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description BANK_CASE_REFERENCE_CONFLICT, la référence normalisée est déjà prise. */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description BANK_CASE_PROSPECT_NOT_ENROLLED, le prospect n’est pas en METHOD_OBTAINED. */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  getBankCaseAnalytics: {
-    parameters: {
-      query?: {
-        /** @description Recherche libre sur la référence, le nom du client ou son téléphone. */
-        search?: string;
-        stageId?: string;
-        stageType?: components['schemas']['BankStageType'];
-        /** @description Banque de traitement du dossier. */
-        banqueId?: string;
-        /** @description Parcours suivi par la fiche liée. Sans filtre, les deux projets sortent. Un même numéro peut suivre les deux. */
-        projet?: components['schemas']['Projet'];
-        /** @description Agent créateur OU dernier intervenant sur le dossier. */
-        agentId?: string;
-        rejectionReasonId?: string;
-        /** @description Borne basse sur la création, incluse. */
-        dateFrom?: string;
-        /** @description Borne haute sur la création, incluse. */
-        dateTo?: string;
-        /** @description Borne basse de montant. Montant en francs CFA, entier, exposé en chaîne. XOF n’a pas de décimales et un nombre JSON perdrait de la précision au-delà de 2^53. */
-        amountMin?: string;
-        /** @description Borne haute de montant. Montant en francs CFA, entier, exposé en chaîne. XOF n’a pas de décimales et un nombre JSON perdrait de la précision au-delà de 2^53. */
-        amountMax?: string;
-        granularity?: components['schemas']['TimeGranularity'];
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['BankCaseAnalyticsDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  searchBankCaseProspects: {
-    parameters: {
-      query: {
-        /** @description Nom (insensible à la casse et aux accents) ou téléphone sous n’importe quelle forme écrite. */
-        search: string;
-        page?: number;
-        pageSize?: number;
-        /** @description Ne propose que les fiches entrées par ce projet. Sans filtre, les deux. */
-        projet?: components['schemas']['Projet'];
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ProspectSearchListDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  listBankRejectionReasons: {
-    parameters: {
-      query?: {
-        /** @description Inclure les entrées désactivées. Utile à l’administration du workflow. */
-        includeInactive?: boolean;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['BankRejectionReasonListDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  getBankCase: {
-    parameters: {
-      query?: {
-        /** @description Restreint la lecture aux dossiers dont la fiche suit ce parcours. Un dossier hors parcours répond 404, comme un dossier inexistant. */
-        projet?: components['schemas']['Projet'];
-      };
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['BankCaseDetailDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description BANK_CASE_NOT_FOUND, y compris pour un dossier hors du `projet` demandé. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  updateBankCase: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateBankCaseDto'];
-      };
-    };
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['BankCaseDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description BANK_CASE_REV_CONFLICT (le corps porte l’état courant), BANK_CASE_TERMINAL ou BANK_CASE_REFERENCE_CONFLICT. */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  createBankCaseTransition: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateBankCaseTransitionDto'];
-      };
-    };
-    responses: {
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['BankCaseDetailDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description BANK_CASE_REV_CONFLICT, BANK_CASE_TERMINAL ou BANK_STAGE_INACTIVE. */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description BANK_STAGE_NOT_NEXT, BANK_STAGE_CASHED_NOT_LAST, BANK_CASE_AMOUNT_REQUIRED, BANK_CASE_REJECTION_REASON_REQUIRED, BANK_CASE_REJECTION_DETAIL_REQUIRED. */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  createBankCaseCorrection: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateBankCaseCorrectionDto'];
-      };
-    };
-    responses: {
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['BankCaseDetailDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Réservé à l’ADMIN. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  listBankCaseStages: {
-    parameters: {
-      query?: {
-        /** @description Inclure les entrées désactivées. Utile à l’administration du workflow. */
-        includeInactive?: boolean;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['BankCaseStageListDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  createBankCaseStage: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateBankCaseStageDto'];
-      };
-    };
-    responses: {
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['BankCaseStageDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description BANK_STAGE_CODE_CONFLICT. */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  reorderBankCaseStages: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['ReorderBankCaseStagesDto'];
-      };
-    };
-    responses: {
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['BankCaseStageListDto'];
-        };
-      };
-      /** @description BANK_STAGE_REORDER_INCOMPLETE ou BANK_STAGE_INITIAL_MUST_BE_FIRST. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  updateBankCaseStage: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateBankCaseStageDto'];
-      };
-    };
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['BankCaseStageDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description BANK_STAGE_NOT_FOUND. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  setBankCaseStageActive: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['SetBankCaseStageActiveDto'];
-      };
-    };
-    responses: {
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['BankCaseStageDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description BANK_STAGE_SYSTEM_IMMUTABLE ou BANK_STAGE_HAS_OPEN_CASES. */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  exportBankCasesXlsx: {
-    parameters: {
-      query?: {
-        /** @description Recherche libre sur la référence, le nom du client ou son téléphone. */
-        search?: string;
-        stageId?: string;
-        stageType?: components['schemas']['BankStageType'];
-        /** @description Banque de traitement du dossier. */
-        banqueId?: string;
-        /** @description Parcours suivi par la fiche liée. Sans filtre, les deux projets sortent. Un même numéro peut suivre les deux. */
-        projet?: components['schemas']['Projet'];
-        /** @description Agent créateur OU dernier intervenant sur le dossier. */
-        agentId?: string;
-        rejectionReasonId?: string;
-        /** @description Borne basse sur la création, incluse. */
-        dateFrom?: string;
-        /** @description Borne haute sur la création, incluse. */
-        dateTo?: string;
-        /** @description Borne basse de montant. Montant en francs CFA, entier, exposé en chaîne. XOF n’a pas de décimales et un nombre JSON perdrait de la précision au-delà de 2^53. */
-        amountMin?: string;
-        /** @description Borne haute de montant. Montant en francs CFA, entier, exposé en chaîne. XOF n’a pas de décimales et un nombre JSON perdrait de la précision au-delà de 2^53. */
-        amountMax?: string;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Classeur Excel à trois feuilles : Dossiers, Historique, Synthèse. */
-      200: {
-        headers: {
-          /** @description Vrai si le classeur a été produit en mode démonstration, donc s’il mêle des lignes fictives à des lignes réelles. */
-          'X-Demo-Mode'?: 'true' | 'false';
-          [name: string]: unknown;
-        };
-        content: {
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': string;
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  listClientRequests: {
-    parameters: {
-      query?: {
-        status?: components['schemas']['ClientRequestStatus'];
-        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
-        search?: string;
-        banqueId?: string;
-        page?: number;
-        pageSize?: number;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ClientRequestListDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  createClientRequest: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateClientRequestDto'];
-      };
-    };
-    responses: {
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ClientRequestDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description CLIENT_REQUEST_PROSPECT_EXISTS · CLIENT_REQUEST_ALREADY_PENDING. */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description CLIENT_REQUEST_BANQUE_NOT_FOUND. */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  getClientRequest: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ClientRequestDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description CLIENT_REQUEST_NOT_FOUND. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  approveClientRequest: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['ApproveClientRequestDto'];
-      };
-    };
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ClientRequestDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description CLIENT_REQUEST_NOT_FOUND. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description CLIENT_REQUEST_ALREADY_REVIEWED · CLIENT_REQUEST_PROSPECT_EXISTS. */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description CLIENT_REQUEST_REPRESENTANT_NOT_FOUND · CLIENT_REQUEST_SYNDICAT_NOT_FOUND · CLIENT_REQUEST_BANQUE_NOT_FOUND. */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  rejectClientRequest: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['RejectClientRequestDto'];
-      };
-    };
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ClientRequestDto'];
-        };
-      };
-      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton absent, expiré ou invalide. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description CLIENT_REQUEST_NOT_FOUND. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description CLIENT_REQUEST_ALREADY_REVIEWED. */
       409: {
         headers: {
           [name: string]: unknown;
@@ -16416,6 +15216,1501 @@ export interface operations {
       };
       /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
       403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listScheduledCallbacks: {
+    parameters: {
+      query?: {
+        projet?: components['schemas']['Projet'];
+        /** @description today : tout ce qui est dû d’ici la fin de la journée, retards compris. overdue : les seuls retards. week : les sept prochaines journées. */
+        scope?: components['schemas']['CallbackScope'];
+        /** @description File d’un téléconseiller donné. Réservé à l’administration et à la supervision ; ignoré pour les autres, qui ne voient que la leur. */
+        assignedToId?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CallbackListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  cancelScheduledCallback: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CallbackDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description CALLBACK_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  recordRepCallAttempt: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateRepCallAttemptDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RepCallAttemptResultDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listSuggestions: {
+    parameters: {
+      query?: {
+        status?: components['schemas']['SuggestionStatus'];
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SuggestionListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  updateSuggestionStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateSuggestionStatusDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SuggestionDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description SUGGESTION_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listBankCases: {
+    parameters: {
+      query?: {
+        /** @description Recherche libre sur la référence, le nom du client ou son téléphone. */
+        search?: string;
+        stageId?: string;
+        stageType?: components['schemas']['BankStageType'];
+        /** @description Banque de traitement du dossier. */
+        banqueId?: string;
+        /** @description Parcours suivi par la fiche liée. Sans filtre, les deux projets sortent. Un même numéro peut suivre les deux. */
+        projet?: components['schemas']['Projet'];
+        /** @description Agent créateur OU dernier intervenant sur le dossier. */
+        agentId?: string;
+        rejectionReasonId?: string;
+        /** @description Borne basse sur la création, incluse. */
+        dateFrom?: string;
+        /** @description Borne haute sur la création, incluse. */
+        dateTo?: string;
+        /** @description Borne basse de montant. Montant en francs CFA, entier, exposé en chaîne. XOF n’a pas de décimales et un nombre JSON perdrait de la précision au-delà de 2^53. */
+        amountMin?: string;
+        /** @description Borne haute de montant. Montant en francs CFA, entier, exposé en chaîne. XOF n’a pas de décimales et un nombre JSON perdrait de la précision au-delà de 2^53. */
+        amountMax?: string;
+        page?: number;
+        pageSize?: number;
+        sortBy?: components['schemas']['BankCaseSortField'];
+        sortOrder?: components['schemas']['SortOrder'];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BankCaseListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  createBankCase: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateBankCaseDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BankCaseDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description BANK_CASE_REFERENCE_CONFLICT, la référence normalisée est déjà prise. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description BANK_CASE_PROSPECT_NOT_ENROLLED, le prospect n’est pas en METHOD_OBTAINED. */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getBankCaseAnalytics: {
+    parameters: {
+      query?: {
+        /** @description Recherche libre sur la référence, le nom du client ou son téléphone. */
+        search?: string;
+        stageId?: string;
+        stageType?: components['schemas']['BankStageType'];
+        /** @description Banque de traitement du dossier. */
+        banqueId?: string;
+        /** @description Parcours suivi par la fiche liée. Sans filtre, les deux projets sortent. Un même numéro peut suivre les deux. */
+        projet?: components['schemas']['Projet'];
+        /** @description Agent créateur OU dernier intervenant sur le dossier. */
+        agentId?: string;
+        rejectionReasonId?: string;
+        /** @description Borne basse sur la création, incluse. */
+        dateFrom?: string;
+        /** @description Borne haute sur la création, incluse. */
+        dateTo?: string;
+        /** @description Borne basse de montant. Montant en francs CFA, entier, exposé en chaîne. XOF n’a pas de décimales et un nombre JSON perdrait de la précision au-delà de 2^53. */
+        amountMin?: string;
+        /** @description Borne haute de montant. Montant en francs CFA, entier, exposé en chaîne. XOF n’a pas de décimales et un nombre JSON perdrait de la précision au-delà de 2^53. */
+        amountMax?: string;
+        granularity?: components['schemas']['TimeGranularity'];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BankCaseAnalyticsDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  searchBankCaseProspects: {
+    parameters: {
+      query: {
+        /** @description Nom (insensible à la casse et aux accents) ou téléphone sous n’importe quelle forme écrite. */
+        search: string;
+        page?: number;
+        pageSize?: number;
+        /** @description Ne propose que les fiches entrées par ce projet. Sans filtre, les deux. */
+        projet?: components['schemas']['Projet'];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProspectSearchListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listBankRejectionReasons: {
+    parameters: {
+      query?: {
+        /** @description Inclure les entrées désactivées. Utile à l’administration du workflow. */
+        includeInactive?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BankRejectionReasonListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getBankCase: {
+    parameters: {
+      query?: {
+        /** @description Restreint la lecture aux dossiers dont la fiche suit ce parcours. Un dossier hors parcours répond 404, comme un dossier inexistant. */
+        projet?: components['schemas']['Projet'];
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BankCaseDetailDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description BANK_CASE_NOT_FOUND, y compris pour un dossier hors du `projet` demandé. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  updateBankCase: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateBankCaseDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BankCaseDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description BANK_CASE_REV_CONFLICT (le corps porte l’état courant), BANK_CASE_TERMINAL ou BANK_CASE_REFERENCE_CONFLICT. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  createBankCaseTransition: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateBankCaseTransitionDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BankCaseDetailDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description BANK_CASE_REV_CONFLICT, BANK_CASE_TERMINAL ou BANK_STAGE_INACTIVE. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description BANK_STAGE_NOT_NEXT, BANK_STAGE_CASHED_NOT_LAST, BANK_CASE_AMOUNT_REQUIRED, BANK_CASE_REJECTION_REASON_REQUIRED, BANK_CASE_REJECTION_DETAIL_REQUIRED. */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  createBankCaseCorrection: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateBankCaseCorrectionDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BankCaseDetailDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Réservé à l’ADMIN. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listBankCaseStages: {
+    parameters: {
+      query?: {
+        /** @description Inclure les entrées désactivées. Utile à l’administration du workflow. */
+        includeInactive?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BankCaseStageListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  createBankCaseStage: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateBankCaseStageDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BankCaseStageDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description BANK_STAGE_CODE_CONFLICT. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  reorderBankCaseStages: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ReorderBankCaseStagesDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BankCaseStageListDto'];
+        };
+      };
+      /** @description BANK_STAGE_REORDER_INCOMPLETE ou BANK_STAGE_INITIAL_MUST_BE_FIRST. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  updateBankCaseStage: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateBankCaseStageDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BankCaseStageDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description BANK_STAGE_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  setBankCaseStageActive: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SetBankCaseStageActiveDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BankCaseStageDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description BANK_STAGE_SYSTEM_IMMUTABLE ou BANK_STAGE_HAS_OPEN_CASES. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  exportBankCasesXlsx: {
+    parameters: {
+      query?: {
+        /** @description Recherche libre sur la référence, le nom du client ou son téléphone. */
+        search?: string;
+        stageId?: string;
+        stageType?: components['schemas']['BankStageType'];
+        /** @description Banque de traitement du dossier. */
+        banqueId?: string;
+        /** @description Parcours suivi par la fiche liée. Sans filtre, les deux projets sortent. Un même numéro peut suivre les deux. */
+        projet?: components['schemas']['Projet'];
+        /** @description Agent créateur OU dernier intervenant sur le dossier. */
+        agentId?: string;
+        rejectionReasonId?: string;
+        /** @description Borne basse sur la création, incluse. */
+        dateFrom?: string;
+        /** @description Borne haute sur la création, incluse. */
+        dateTo?: string;
+        /** @description Borne basse de montant. Montant en francs CFA, entier, exposé en chaîne. XOF n’a pas de décimales et un nombre JSON perdrait de la précision au-delà de 2^53. */
+        amountMin?: string;
+        /** @description Borne haute de montant. Montant en francs CFA, entier, exposé en chaîne. XOF n’a pas de décimales et un nombre JSON perdrait de la précision au-delà de 2^53. */
+        amountMax?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Classeur Excel à trois feuilles : Dossiers, Historique, Synthèse. */
+      200: {
+        headers: {
+          /** @description Vrai si le classeur a été produit en mode démonstration, donc s’il mêle des lignes fictives à des lignes réelles. */
+          'X-Demo-Mode'?: 'true' | 'false';
+          [name: string]: unknown;
+        };
+        content: {
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': string;
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listClientRequests: {
+    parameters: {
+      query?: {
+        status?: components['schemas']['ClientRequestStatus'];
+        /** @description Recherche libre sur le nom, le prénom ou le téléphone. */
+        search?: string;
+        banqueId?: string;
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ClientRequestListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  createClientRequest: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateClientRequestDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ClientRequestDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description CLIENT_REQUEST_PROSPECT_EXISTS · CLIENT_REQUEST_ALREADY_PENDING. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description CLIENT_REQUEST_BANQUE_NOT_FOUND. */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getClientRequest: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ClientRequestDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description CLIENT_REQUEST_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  approveClientRequest: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ApproveClientRequestDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ClientRequestDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description CLIENT_REQUEST_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description CLIENT_REQUEST_ALREADY_REVIEWED · CLIENT_REQUEST_PROSPECT_EXISTS. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description CLIENT_REQUEST_REPRESENTANT_NOT_FOUND · CLIENT_REQUEST_SYNDICAT_NOT_FOUND · CLIENT_REQUEST_BANQUE_NOT_FOUND. */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  rejectClientRequest: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RejectClientRequestDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ClientRequestDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description CLIENT_REQUEST_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description CLIENT_REQUEST_ALREADY_REVIEWED. */
+      409: {
         headers: {
           [name: string]: unknown;
         };

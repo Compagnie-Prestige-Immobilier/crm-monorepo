@@ -41,6 +41,14 @@ abstract class _$RepresentantCallAttemptDtoCWProxy {
 
   RepresentantCallAttemptDto suggestedNote(String? suggestedNote);
 
+  RepresentantCallAttemptDto deviceCallType(String? deviceCallType);
+
+  RepresentantCallAttemptDto deviceCallDurationSeconds(
+    num? deviceCallDurationSeconds,
+  );
+
+  RepresentantCallAttemptDto deviceCallAt(DateTime? deviceCallAt);
+
   RepresentantCallAttemptDto performedById(String performedById);
 
   RepresentantCallAttemptDto performedByName(String performedByName);
@@ -69,6 +77,9 @@ abstract class _$RepresentantCallAttemptDtoCWProxy {
     String? suggestedName,
     String? suggestedPhoneE164,
     String? suggestedNote,
+    String? deviceCallType,
+    num? deviceCallDurationSeconds,
+    DateTime? deviceCallAt,
     String performedById,
     String performedByName,
     DateTime clientCreatedAt,
@@ -144,6 +155,19 @@ class _$RepresentantCallAttemptDtoCWProxyImpl
       this(suggestedNote: suggestedNote);
 
   @override
+  RepresentantCallAttemptDto deviceCallType(String? deviceCallType) =>
+      this(deviceCallType: deviceCallType);
+
+  @override
+  RepresentantCallAttemptDto deviceCallDurationSeconds(
+    num? deviceCallDurationSeconds,
+  ) => this(deviceCallDurationSeconds: deviceCallDurationSeconds);
+
+  @override
+  RepresentantCallAttemptDto deviceCallAt(DateTime? deviceCallAt) =>
+      this(deviceCallAt: deviceCallAt);
+
+  @override
   RepresentantCallAttemptDto performedById(String performedById) =>
       this(performedById: performedById);
 
@@ -178,6 +202,9 @@ class _$RepresentantCallAttemptDtoCWProxyImpl
     Object? suggestedName = const $CopyWithPlaceholder(),
     Object? suggestedPhoneE164 = const $CopyWithPlaceholder(),
     Object? suggestedNote = const $CopyWithPlaceholder(),
+    Object? deviceCallType = const $CopyWithPlaceholder(),
+    Object? deviceCallDurationSeconds = const $CopyWithPlaceholder(),
+    Object? deviceCallAt = const $CopyWithPlaceholder(),
     Object? performedById = const $CopyWithPlaceholder(),
     Object? performedByName = const $CopyWithPlaceholder(),
     Object? clientCreatedAt = const $CopyWithPlaceholder(),
@@ -246,6 +273,19 @@ class _$RepresentantCallAttemptDtoCWProxyImpl
           ? _value.suggestedNote
           // ignore: cast_nullable_to_non_nullable
           : suggestedNote as String?,
+      deviceCallType: deviceCallType == const $CopyWithPlaceholder()
+          ? _value.deviceCallType
+          // ignore: cast_nullable_to_non_nullable
+          : deviceCallType as String?,
+      deviceCallDurationSeconds:
+          deviceCallDurationSeconds == const $CopyWithPlaceholder()
+          ? _value.deviceCallDurationSeconds
+          // ignore: cast_nullable_to_non_nullable
+          : deviceCallDurationSeconds as num?,
+      deviceCallAt: deviceCallAt == const $CopyWithPlaceholder()
+          ? _value.deviceCallAt
+          // ignore: cast_nullable_to_non_nullable
+          : deviceCallAt as DateTime?,
       performedById: performedById == const $CopyWithPlaceholder()
           ? _value.performedById
           // ignore: cast_nullable_to_non_nullable
@@ -294,6 +334,9 @@ RepresentantCallAttemptDto _$RepresentantCallAttemptDtoFromJson(
       'suggestedName',
       'suggestedPhoneE164',
       'suggestedNote',
+      'deviceCallType',
+      'deviceCallDurationSeconds',
+      'deviceCallAt',
       'performedById',
       'performedByName',
       'clientCreatedAt',
@@ -337,6 +380,15 @@ RepresentantCallAttemptDto _$RepresentantCallAttemptDtoFromJson(
       (v) => v as String?,
     ),
     suggestedNote: $checkedConvert('suggestedNote', (v) => v as String?),
+    deviceCallType: $checkedConvert('deviceCallType', (v) => v as String?),
+    deviceCallDurationSeconds: $checkedConvert(
+      'deviceCallDurationSeconds',
+      (v) => v as num?,
+    ),
+    deviceCallAt: $checkedConvert(
+      'deviceCallAt',
+      (v) => v == null ? null : DateTime.parse(v as String),
+    ),
     performedById: $checkedConvert('performedById', (v) => v as String),
     performedByName: $checkedConvert('performedByName', (v) => v as String),
     clientCreatedAt: $checkedConvert(
@@ -365,6 +417,9 @@ Map<String, dynamic> _$RepresentantCallAttemptDtoToJson(
   'suggestedName': instance.suggestedName,
   'suggestedPhoneE164': instance.suggestedPhoneE164,
   'suggestedNote': instance.suggestedNote,
+  'deviceCallType': instance.deviceCallType,
+  'deviceCallDurationSeconds': instance.deviceCallDurationSeconds,
+  'deviceCallAt': instance.deviceCallAt?.toIso8601String(),
   'performedById': instance.performedById,
   'performedByName': instance.performedByName,
   'clientCreatedAt': instance.clientCreatedAt.toIso8601String(),

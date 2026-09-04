@@ -25,8 +25,8 @@ export type Forme =
 export interface ScalaireDatum {
   libelle: string;
   valeur: number;
-  /** Texte affiché à la place du nombre brut (un taux : « 50,0 % », « Sans objet »). */
-  affichage?: string;
+  /** Au lieu du nombre brut : un texte figé, ou le nombre à rouler et sa mise en forme. */
+  affichage?: string | { valeur: number; format: (valeur: number) => string };
   serie?: NamedCount[];
 }
 

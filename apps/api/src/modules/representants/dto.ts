@@ -642,6 +642,9 @@ export class RepresentantCallAttemptDto {
   @ApiProperty({ type: String, nullable: true }) suggestedName!: string | null;
   @ApiProperty({ type: String, nullable: true }) suggestedPhoneE164!: string | null;
   @ApiProperty({ type: String, nullable: true }) suggestedNote!: string | null;
+  @ApiProperty({ type: String, nullable: true }) deviceCallType!: string | null;
+  @ApiProperty({ type: Number, nullable: true }) deviceCallDurationSeconds!: number | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) deviceCallAt!: string | null;
   @ApiProperty({ format: 'uuid' }) performedById!: string;
   @ApiProperty() performedByName!: string;
   @ApiProperty({ type: String, format: 'date-time' }) clientCreatedAt!: string;

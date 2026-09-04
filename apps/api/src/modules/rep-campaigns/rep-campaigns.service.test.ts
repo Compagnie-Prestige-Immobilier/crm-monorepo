@@ -30,6 +30,7 @@ interface Tx {
   representantSuggestion: { create: MockFn };
   representant: { findFirst: MockFn; update: MockFn; updateMany: MockFn };
   representantRelationChange: { create: MockFn };
+  deviceCallDetection: { updateMany: MockFn };
 }
 
 let tx: Tx;
@@ -59,6 +60,7 @@ beforeEach(() => {
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     representantRelationChange: { create: vi.fn() },
+    deviceCallDetection: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
   };
   db = {
     repCallAttempt: { findUnique: vi.fn().mockResolvedValue(null) },
@@ -154,6 +156,70 @@ describe('correction du numéro pendant la qualification', () => {
     const result = await service.recordAttempt(ALICE, body);
     expect(result.status).toBe(RepCallAttemptApplyStatus.DUPLICATE);
     expect(db.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+describe('preuve d’appel lue dans le journal Android', () => {
+  const trace = (): Record<string, unknown> =>
+    (tx.repCallAttempt.createMany.mock.calls[0] as [{ data: Record<string, unknown>[] }])[0]
+      .data[0] ?? {};
+
+  it('la tentative garde le type, la durée et l’heure du journal', async () => {
+    const body = baseBody();
+    body.deviceCallType = 'sortant';
+    body.deviceCallDurationSeconds = 92;
+    body.deviceCallAt = '2026-08-10T10:00:14.000Z';
+
+    await service.recordAttempt(ALICE, body);
+
+    expect(trace()).toMatchObject({
+      deviceCallType: 'sortant',
+      deviceCallDurationSeconds: 92,
+      deviceCallAt: new Date('2026-08-10T10:00:14.000Z'),
+    });
+  });
+
+  it('sans preuve, la tentative reste déclarative', async () => {
+    await service.recordAttempt(ALICE, baseBody());
+
+    expect(trace()).toMatchObject({
+      deviceCallType: null,
+      deviceCallDurationSeconds: null,
+      deviceCallAt: null,
+    });
+  });
+
+  // Le téléphone remonte souvent l'appel avant que la fiche soit consignée :
+  // sans ce rattrapage, la supervision compterait l'appel comme non consigné.
+  it('la tentative réclame les appels déjà détectés sur la même fiche', async () => {
+    const body = baseBody();
+    body.deviceCallAt = '2026-08-10T09:59:00.000Z';
+
+    await service.recordAttempt(ALICE, body);
+
+    const [args] = tx.deviceCallDetection.updateMany.mock.calls[0] as [
+      { where: Record<string, unknown>; data: Record<string, unknown> },
+    ];
+    expect(args.where).toMatchObject({
+      performedById: ALICE.id,
+      representantId: REP,
+      attemptId: null,
+    });
+    expect(args.data).toEqual({ attemptId: body.id });
+    expect(args.where.OR).toEqual([
+      {
+        deviceCallAt: {
+          gte: new Date('2026-08-10T08:00:00.000Z'),
+          lte: new Date('2026-08-10T10:00:00.000Z'),
+        },
+      },
+      {
+        deviceCallAt: {
+          gte: new Date('2026-08-10T09:57:00.000Z'),
+          lte: new Date('2026-08-10T10:01:00.000Z'),
+        },
+      },
+    ]);
   });
 });
 

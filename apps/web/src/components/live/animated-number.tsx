@@ -3,14 +3,19 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { formatNumber } from '@/lib/format';
-import { DUR_2_MS, interpolateCount } from '@/lib/motion';
+import { interpolateCount } from '@/lib/motion';
 import { usePrefersReducedMotion } from '@/lib/use-prefers-reduced-motion';
+
+/** Assez long pour qu'on voie le nombre rouler, assez court pour ne pas mentir sur la fraîcheur. */
+const COMPTAGE_MS = 700;
 
 export function AnimatedNumber({
   value,
+  format = formatNumber,
   className,
 }: {
   value: number;
+  format?: (valeur: number) => string;
   className?: string | undefined;
 }) {
   const reduced = usePrefersReducedMotion();
@@ -32,7 +37,7 @@ export function AnimatedNumber({
     const start = performance.now();
 
     const step = (now: number): void => {
-      const progress = Math.min(1, (now - start) / DUR_2_MS);
+      const progress = Math.min(1, (now - start) / COMPTAGE_MS);
       const next = interpolateCount(from, value, progress);
       shownRef.current = next;
       setShown(next);
@@ -45,5 +50,5 @@ export function AnimatedNumber({
     };
   }, [value, reduced]);
 
-  return <span className={className}>{formatNumber(shown)}</span>;
+  return <span className={className}>{format(shown)}</span>;
 }

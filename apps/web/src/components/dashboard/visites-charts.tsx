@@ -20,8 +20,10 @@ import type {
   DispositionPresentation,
   EquipeDatum,
   MatriceDatum,
+  ScalaireDatum,
 } from '@/components/accueil/tableau-de-bord/sources';
 import { EmptyChart } from '@/components/dashboard/empty-chart';
+import { AnimatedNumber } from '@/components/live/animated-number';
 import { seriesBorderColor, seriesColor, useChartTheme, type ChartTheme } from '@/lib/chart-theme';
 import { formatNumber } from '@/lib/format';
 import type { NamedCount } from '@/lib/types';
@@ -957,14 +959,19 @@ export function TuileWidget({
   detail,
 }: {
   valeur: number;
-  affichage?: string | undefined;
+  affichage?: ScalaireDatum['affichage'];
   libelle: string;
   detail?: string | undefined;
 }) {
+  const grand = affichage ?? { valeur, format: formatNumber };
   return (
     <div className="flex h-full flex-col justify-center">
       <p className="font-display text-[2.25rem] font-[800] leading-none tracking-[-0.02em] tabular-nums">
-        {affichage ?? formatNumber(valeur)}
+        {typeof grand === 'string' ? (
+          grand
+        ) : (
+          <AnimatedNumber value={grand.valeur} format={grand.format} />
+        )}
       </p>
       {detail === undefined ? null : (
         <p className="mt-2 text-[0.8125rem] text-muted-foreground">{detail}</p>
@@ -996,7 +1003,7 @@ export function TuileCourbeWidget({
   return (
     <div className="flex h-full flex-col justify-center gap-2">
       <p className="font-display text-[2.25rem] font-[800] leading-none tracking-[-0.02em] tabular-nums">
-        {formatNumber(valeur)}
+        <AnimatedNumber value={valeur} />
       </p>
       <div className="h-16">
         <Line

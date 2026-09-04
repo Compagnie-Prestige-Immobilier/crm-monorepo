@@ -57,6 +57,8 @@ abstract final class Routes {
   static const String reglages = '/reglages';
   static const String batteryHelp = '/reglages/autorisations';
 
+  static const String diagnosticAndroid = '/reglages/diagnostic-android';
+
   static const String about = '/reglages/a-propos';
 
   static const String nextParam = 'next';

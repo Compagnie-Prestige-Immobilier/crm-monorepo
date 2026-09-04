@@ -45,6 +45,9 @@ export interface SourceChiffre {
   extraire: (jeux: Jeux) => DonneesSource | null;
 }
 
+/** `formatXof` lit une suite de chiffres, pas un flottant de fin d'interpolation. */
+const francs = (montant: number): string => formatXof(String(Math.round(montant)));
+
 const taux = (valeur: number | null): string =>
   valeur === null ? 'Sans objet' : `${formatDecimal(valeur)} %`;
 
@@ -73,7 +76,7 @@ const scalaireTaux = (
   donnee: {
     libelle: valeur === null ? sansDenominateur : `${taux(valeur)} · ${libelle}`,
     valeur: valeur ?? 0,
-    affichage: valeur === null ? taux(valeur) : formatNumber(numerateur),
+    affichage: valeur === null ? taux(valeur) : { valeur: numerateur, format: formatNumber },
   },
 });
 
@@ -360,7 +363,7 @@ export const SOURCES_CHIFFRES = {
             donnee: {
               libelle: `sur ${formatNumber(entonnoir.finance.dossiersEncaisses)} dossiers`,
               valeur: Number(entonnoir.finance.montantEncaisse),
-              affichage: formatXof(entonnoir.finance.montantEncaisse),
+              affichage: { valeur: Number(entonnoir.finance.montantEncaisse), format: francs },
             },
           },
   },

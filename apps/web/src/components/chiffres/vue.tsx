@@ -378,7 +378,7 @@ export function ChiffresView({ ecran, role }: { ecran: DashboardEcran; role: Rol
           );
 
         return (
-          <div className={isRefetching ? 'opacity-60' : undefined} aria-busy={isRefetching}>
+          <div aria-busy={isRefetching}>
             <WidgetGrid
               widgets={widgets}
               donnees={donneesParWidget}

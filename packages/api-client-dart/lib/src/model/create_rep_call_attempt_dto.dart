@@ -65,6 +65,12 @@ class CreateRepCallAttemptDto {
     required this.clientCreatedAt,
 
     this.callbackAt,
+
+    this.deviceCallType,
+
+    this.deviceCallDurationSeconds,
+
+    this.deviceCallAt,
   });
 
   /// UUID v7 engendré par le client. Clé d’idempotence.
@@ -178,6 +184,30 @@ class CreateRepCallAttemptDto {
   @JsonKey(name: r'callbackAt', required: false, includeIfNull: false)
   final DateTime? callbackAt;
 
+  /// Type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+  @JsonKey(
+    name: r'deviceCallType',
+    required: false,
+    includeIfNull: false,
+    unknownEnumValue:
+        CreateRepCallAttemptDtoDeviceCallTypeEnum.unknownDefaultOpenApi,
+  )
+  final CreateRepCallAttemptDtoDeviceCallTypeEnum? deviceCallType;
+
+  /// Durée en secondes lue dans le journal d’appels Android.
+  // minimum: 0
+  // maximum: 86400
+  @JsonKey(
+    name: r'deviceCallDurationSeconds',
+    required: false,
+    includeIfNull: false,
+  )
+  final num? deviceCallDurationSeconds;
+
+  /// Heure de l’appel lue dans le journal d’appels Android.
+  @JsonKey(name: r'deviceCallAt', required: false, includeIfNull: false)
+  final DateTime? deviceCallAt;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is CreateRepCallAttemptDto &&
@@ -206,6 +236,9 @@ class CreateRepCallAttemptDto {
                 syndicat,
                 clientCreatedAt,
                 callbackAt,
+                deviceCallType,
+                deviceCallDurationSeconds,
+                deviceCallAt,
               ],
               [
                 other.id,
@@ -230,6 +263,9 @@ class CreateRepCallAttemptDto {
                 other.syndicat,
                 other.clientCreatedAt,
                 other.callbackAt,
+                other.deviceCallType,
+                other.deviceCallDurationSeconds,
+                other.deviceCallAt,
               ],
             );
   }
@@ -260,6 +296,9 @@ class CreateRepCallAttemptDto {
         syndicat,
         clientCreatedAt,
         callbackAt,
+        deviceCallType,
+        deviceCallDurationSeconds,
+        deviceCallAt,
       ]);
 
   factory CreateRepCallAttemptDto.fromJson(Map<String, dynamic> json) =>
@@ -271,4 +310,50 @@ class CreateRepCallAttemptDto {
   String toString() {
     return toJson().toString();
   }
+}
+
+/// Type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+enum CreateRepCallAttemptDtoDeviceCallTypeEnum {
+  /// Type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+  @JsonValue(r'sortant')
+  sortant(r'sortant'),
+
+  /// Type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+  @JsonValue(r'entrant')
+  entrant(r'entrant'),
+
+  /// Type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+  @JsonValue(r'manque')
+  manque(r'manque'),
+
+  /// Type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+  @JsonValue(r'rejete')
+  rejete(r'rejete'),
+
+  /// Type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+  @JsonValue(r'bloque')
+  bloque(r'bloque'),
+
+  /// Type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+  @JsonValue(r'messagerie')
+  messagerie(r'messagerie'),
+
+  /// Type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+  @JsonValue(r'externe')
+  externe(r'externe'),
+
+  /// Type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+  @JsonValue(r'inconnu')
+  inconnu(r'inconnu'),
+
+  /// Type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+  @JsonValue(r'unknown_default_open_api')
+  unknownDefaultOpenApi(r'unknown_default_open_api');
+
+  const CreateRepCallAttemptDtoDeviceCallTypeEnum(this.value);
+
+  final String value;
+
+  @override
+  String toString() => value;
 }

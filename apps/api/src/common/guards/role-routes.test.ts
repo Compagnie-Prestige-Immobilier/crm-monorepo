@@ -173,6 +173,8 @@ const ADMISES: readonly string[] = [
   // Lecture seule: un superviseur ecoute une note audio, il n'en televerse pas.
   'Phase2Controller.downloadRecording',
 
+  'ProspectsController.callHistory',
+  'ProspectsController.deviceCalls',
   'ProspectsController.get',
   'ProspectsController.list',
 
@@ -197,6 +199,8 @@ const ADMISES: readonly string[] = [
   'LotsExportController.programmesZip',
   'ExportController.representantsExport',
 
+  'RepresentantsController.callHistory',
+  'RepresentantsController.deviceCalls',
   'RepresentantsController.get',
   'RepresentantsController.list',
   'RepresentantsController.listComments',

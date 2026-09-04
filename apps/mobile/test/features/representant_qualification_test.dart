@@ -139,6 +139,14 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
   }
 
+  /// La feuille « Déjà qualifié », qui coiffe l'envoi sur une fiche qui porte
+  /// déjà un appel. Son bouton est le second « Enregistrer » de l'arbre.
+  Future<void> confirmerLeNouvelAppel(WidgetTester tester) async {
+    await tester.tap(find.text('Enregistrer').last);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+  }
+
   /// Le corps défile : une tuile hors du viewport ne reçoit aucun geste.
   Future<void> taper(WidgetTester tester, Finder cible) async {
     await tester.ensureVisible(cible);
@@ -165,22 +173,29 @@ void main() {
   Future<void> statut(WidgetTester tester, String label) =>
       taper(tester, tuile('Statut de qualification', label));
 
-  /// Renseignements 1 à 3 du script, posés quel que soit l'ambassadeur.
+  /// La fiche importée est exacte : l'étape de vérification se passe d'un
+  /// geste.
+  Future<void> ficheExacte(WidgetTester tester) async {
+    await tester.tap(find.text('Tout est exact'));
+    await pomper(tester);
+  }
+
+  /// Les deux premiers renseignements du script, posés quel que soit
+  /// l'ambassadeur.
   Future<void> renseignements(WidgetTester tester) async {
-    await taper(tester, tuile('Confirmer l\'établissement ?', 'Oui'));
     await taper(tester, tuile('Avez-vous été contacté ?', 'Oui'));
     await taper(tester, tuile('Connaissez-vous l\'UES ?', 'Oui'));
   }
 
-  /// Joignable, intéressé, ambassadeur avec WhatsApp : le chemin le plus long,
+  /// Joignable, intéressé, fiche exacte, ambassadeur : le chemin le plus long,
   /// jusqu'à la dernière étape.
   Future<void> ambassadeurComplet(WidgetTester tester) async {
     await taper(tester, find.text('Joignable'));
     await statut(tester, 'Intéressé');
     await etapeSuivante(tester);
+    await ficheExacte(tester);
     await renseignements(tester);
     await taper(tester, tuile('Ambassadeur ?', 'Oui'));
-    await taper(tester, tuile('A-t-il WhatsApp sur ce numéro ?', 'Oui'));
     await etapeSuivante(tester);
   }
 
@@ -219,6 +234,38 @@ void main() {
     await demonter(tester);
   });
 
+  // La fiche d'avant-appel est lue APRÈS avoir raccroché : ce que le téléphone
+  // a enregistré s'y lit, sinon la durée se saisit de mémoire.
+  testWidgets('la fiche d\'avant-appel montre la preuve du dernier appel', (
+    WidgetTester tester,
+  ) async {
+    await db
+        .into(db.preuvesAppel)
+        .insert(
+          PreuvesAppelCompanion.insert(
+            id: 'preuve-1',
+            kind: 'representant',
+            entityId: 'rep-1',
+            phoneE164: '+221770000001',
+            lanceAt: t0,
+            mode: 'call',
+            journalType: const Value<String?>('sortant'),
+            journalDureeS: const Value<int?>(92),
+            journalAt: Value<DateTime?>(DateTime(2026, 8, 12, 14, 2)),
+            rapprocheAt: Value<DateTime?>(t0),
+          ),
+        );
+
+    await ouvrir(tester, surLaFiche: true);
+
+    expect(
+      find.text('+221 77 000 00 01\nSortant · 1 min 32 · 14:02'),
+      findsOneWidget,
+    );
+
+    await demonter(tester);
+  });
+
   testWidgets('une fiche jamais appelée le dit, sans WhatsApp inventé', (
     WidgetTester tester,
   ) async {
@@ -248,10 +295,11 @@ void main() {
     expect(continuer(tester).subtitle, isNull);
 
     await etapeSuivante(tester);
-    expect(find.text('Ce qu\'il vous a dit'), findsOneWidget);
-    expect(continuer(tester).subtitle, 'Confirmez l\'établissement');
+    expect(find.text('Vérifier la fiche'), findsOneWidget);
+    expect(bouton(tester, 'Tout est exact').onPressed, isNotNull);
 
-    await taper(tester, tuile('Confirmer l\'établissement ?', 'Oui'));
+    await ficheExacte(tester);
+    expect(find.text('Ce qu\'il vous a dit'), findsOneWidget);
     expect(continuer(tester).subtitle, 'Dites s\'il a été contacté');
 
     await taper(tester, tuile('Avez-vous été contacté ?', 'Oui'));
@@ -261,9 +309,6 @@ void main() {
     expect(continuer(tester).subtitle, 'Dites s\'il est ambassadeur');
 
     await taper(tester, tuile('Ambassadeur ?', 'Oui'));
-    expect(continuer(tester).subtitle, 'Dites s\'il a WhatsApp sur ce numéro');
-
-    await taper(tester, tuile('A-t-il WhatsApp sur ce numéro ?', 'Oui'));
     expect(continuer(tester).onPressed, isNotNull);
 
     await etapeSuivante(tester);
@@ -285,7 +330,7 @@ void main() {
     await statut(tester, 'Non intéressé');
     await etapeSuivante(tester);
 
-    expect(find.text('Confirmer l\'établissement ?'), findsNothing);
+    expect(find.text('Vérifier la fiche'), findsNothing);
     expect(find.text('Pour finir'), findsOneWidget);
     expect(
       find.text('Il propose quelqu\'un d\'autre ? (facultatif)'),
@@ -328,9 +373,9 @@ void main() {
     await taper(tester, find.text('Joignable'));
     await statut(tester, 'Intéressé');
     await etapeSuivante(tester);
+    await ficheExacte(tester);
     await renseignements(tester);
     await taper(tester, tuile('Ambassadeur ?', 'Non'));
-    expect(find.text('A-t-il WhatsApp sur ce numéro ?'), findsNothing);
     await etapeSuivante(tester);
 
     expect(
@@ -415,7 +460,7 @@ void main() {
     expect(continuer(tester).onPressed, isNotNull);
 
     await etapeSuivante(tester);
-    expect(find.text('Confirmer l\'établissement ?'), findsNothing);
+    expect(find.text('Vérifier la fiche'), findsNothing);
     expect(enregistrer(tester).onPressed, isNull);
     expect(enregistrer(tester).subtitle, 'Choisissez quand rappeler');
 
@@ -468,16 +513,14 @@ void main() {
     await taper(tester, find.text('Joignable'));
     await statut(tester, 'Intéressé');
     await etapeSuivante(tester);
+    await ficheExacte(tester);
     expect(continuer(tester).onPressed, isNull);
-    expect(continuer(tester).subtitle, 'Confirmez l\'établissement');
+    expect(continuer(tester).subtitle, 'Dites s\'il a été contacté');
 
     await renseignements(tester);
     expect(continuer(tester).subtitle, 'Dites s\'il est ambassadeur');
 
     await taper(tester, tuile('Ambassadeur ?', 'Oui'));
-    expect(continuer(tester).subtitle, 'Dites s\'il a WhatsApp sur ce numéro');
-
-    await taper(tester, tuile('A-t-il WhatsApp sur ce numéro ?', 'Oui'));
     expect(continuer(tester).onPressed, isNotNull);
 
     await demonter(tester);
@@ -622,20 +665,17 @@ void main() {
     await taper(tester, find.text('Joignable'));
     await statut(tester, 'Intéressé');
     await etapeSuivante(tester);
-    await taper(tester, tuile('Confirmer l\'établissement ?', 'Non'));
-    await tester.enterText(
-      champ('Nouvel établissement'),
-      'Lycée Blaise Diagne',
-    );
+    await tester.enterText(champ('Établissement'), 'Lycée Blaise Diagne');
     await tester.pump();
-    await taper(tester, tuile('Avez-vous été contacté ?', 'Non'));
-    await taper(tester, tuile('Connaissez-vous l\'UES ?', 'Oui'));
     await tester.enterText(champ('Syndicat (facultatif)'), 'Syndicat');
     await tester.pump();
     await tester.tap(find.text('Syndicat Test').last);
     await tester.pump();
+    await taper(tester, tuile('WhatsApp', 'Même numéro'));
+    await etapeSuivante(tester);
+    await taper(tester, tuile('Avez-vous été contacté ?', 'Non'));
+    await taper(tester, tuile('Connaissez-vous l\'UES ?', 'Oui'));
     await taper(tester, tuile('Ambassadeur ?', 'Oui'));
-    await taper(tester, tuile('A-t-il WhatsApp sur ce numéro ?', 'Oui'));
     await etapeSuivante(tester);
     await envoyer(tester);
 
@@ -684,6 +724,8 @@ void main() {
     await ouvrir(tester);
     await ambassadeurComplet(tester);
     await envoyer(tester);
+    // La fiche porte déjà l'appel promis : l'envoi passe par la confirmation.
+    await confirmerLeNouvelAppel(tester);
 
     expect(await db.select(db.repCallbackReminders).get(), isEmpty);
     expect(alarmes.annulees, <String>[promis]);
@@ -740,6 +782,202 @@ void main() {
     await demonter(tester);
   });
 
+  // La fiche importée se relit AVEC la personne au bout du fil : les deux
+  // questions binaires d'avant ne disaient pas ce qui était faux.
+  testWidgets('la vérification s\'intercale entre le résultat et le script', (
+    WidgetTester tester,
+  ) async {
+    await db.customStatement('DELETE FROM representants');
+    await insertRepresentant(
+      db,
+      id: 'rep-1',
+      phone: '+221770000001',
+      fullName: 'Ousmane Fall',
+      etablissement: 'Lycée de Bakel',
+    );
+    await ouvrir(tester);
+
+    await taper(tester, find.text('Joignable'));
+    await statut(tester, 'Intéressé');
+    await etapeSuivante(tester);
+
+    expect(find.text('Vérifier la fiche'), findsOneWidget);
+    expect(find.text('Ce qu\'il vous a dit'), findsNothing);
+    // Rien n'a bougé : aucun compteur, et le bouton propose de tout valider.
+    expect(find.text('1 champ corrigé'), findsNothing);
+
+    await ficheExacte(tester);
+    expect(find.text('Ce qu\'il vous a dit'), findsOneWidget);
+
+    await renseignements(tester);
+    await taper(tester, tuile('Ambassadeur ?', 'Oui'));
+    await etapeSuivante(tester);
+    expect(find.text('Tout est exact'), findsOneWidget);
+    await envoyer(tester);
+
+    final OutboxData op = (await db.select(db.outbox).get()).singleWhere(
+      (OutboxData o) => o.entityType == 'rep_call_attempt',
+    );
+    final Map<String, Object?> payload =
+        jsonDecode(op.payload) as Map<String, Object?>;
+    expect(payload['etablissementConfirme'], true);
+    expect(payload['numeroConfirme'], true);
+    expect(payload['phone'], isNull);
+    expect(payload['etablissement'], isNull);
+    // Rien à corriger : aucune opération sur la fiche elle-même.
+    expect(writes.fichesCorrigees, 0);
+
+    await demonter(tester);
+  });
+
+  // Le numéro part avec la tentative, le prénom et le nom par l'opération
+  // `representant` : la tentative ne sait pas les porter.
+  testWidgets('les corrections partent, comptées et récapitulées', (
+    WidgetTester tester,
+  ) async {
+    await ouvrir(tester);
+
+    await taper(tester, find.text('Joignable'));
+    await statut(tester, 'Intéressé');
+    await etapeSuivante(tester);
+
+    await tester.enterText(champ('Téléphone'), '77 123 45 67');
+    await tester.pump();
+    await tester.enterText(champ('Prénom'), 'Ousmane');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('2 champs corrigés'), findsOneWidget);
+    expect(find.text('Tout est exact'), findsNothing);
+
+    await etapeSuivante(tester);
+    await renseignements(tester);
+    await taper(tester, tuile('Ambassadeur ?', 'Oui'));
+    await etapeSuivante(tester);
+
+    // Le récapitulatif nomme ce qui a changé, pas seulement combien.
+    expect(find.text('2 champs corrigés'), findsOneWidget);
+    expect(find.text('+221 77 123 45 67'), findsWidgets);
+
+    await envoyer(tester);
+
+    final List<OutboxData> ops = await db.select(db.outbox).get();
+    final Map<String, Object?> tentative =
+        jsonDecode(
+              ops
+                  .singleWhere(
+                    (OutboxData o) => o.entityType == 'rep_call_attempt',
+                  )
+                  .payload,
+            )
+            as Map<String, Object?>;
+    expect(tentative['numeroConfirme'], false);
+    expect(tentative['phone'], '+221771234567');
+
+    final Map<String, Object?> fiche =
+        jsonDecode(
+              ops
+                  .singleWhere((OutboxData o) => o.entityType == 'representant')
+                  .payload,
+            )
+            as Map<String, Object?>;
+    expect(fiche['prenom'], 'Ousmane');
+    expect(fiche['fullName'], 'Ousmane Fall');
+    expect(fiche['phone'], '+221771234567');
+
+    final Representant rep = await (db.select(
+      db.representants,
+    )..where((Representants r) => r.id.equals('rep-1'))).getSingle();
+    expect(rep.prenom, 'Ousmane');
+    expect(rep.phoneE164, '+221771234567');
+
+    await demonter(tester);
+  });
+
+  // Un numéro qui n'a pas répondu ne se vérifie avec personne : l'étape
+  // n'aurait aucune source.
+  testWidgets('un injoignable ne passe pas par la vérification', (
+    WidgetTester tester,
+  ) async {
+    await ouvrir(tester);
+
+    await taper(tester, find.text('Injoignable'));
+    await statut(tester, 'Pas de réponse');
+    await etapeSuivante(tester);
+
+    expect(find.text('Vérifier la fiche'), findsNothing);
+    expect(find.text('Pour finir'), findsOneWidget);
+
+    await envoyer(tester);
+
+    final OutboxData op = (await db.select(db.outbox).get()).singleWhere(
+      (OutboxData o) => o.entityType == 'rep_call_attempt',
+    );
+    final Map<String, Object?> payload =
+        jsonDecode(op.payload) as Map<String, Object?>;
+    expect(payload['numeroConfirme'], isNull);
+    expect(payload['etablissementConfirme'], isNull);
+
+    await demonter(tester);
+  });
+
+  // Une fiche déjà qualifiée s'ouvre aussi depuis une liste : rien n'y dit
+  // qu'un collègue vient de passer l'appel.
+  testWidgets('une fiche déjà qualifiée demande confirmation avant d\'écrire', (
+    WidgetTester tester,
+  ) async {
+    await db.customStatement('DELETE FROM representants');
+    await insertRepresentant(
+      db,
+      id: 'rep-1',
+      phone: '+221770000001',
+      fullName: 'Ousmane Fall',
+      statutQualificationId: 'sq-interesse',
+      lastCallOutcome: 'REACHED',
+      lastCallAt: t0.subtract(const Duration(days: 2)),
+      callAttemptCount: 3,
+    );
+    await ouvrir(tester);
+
+    await taper(tester, find.text('Injoignable'));
+    await statut(tester, 'Pas de réponse');
+    await etapeSuivante(tester);
+    await envoyer(tester);
+
+    expect(find.text('Déjà qualifié'), findsOneWidget);
+    expect(find.textContaining('Intéressé'), findsWidgets);
+
+    await tester.tap(find.text('Revenir'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(writes.appels, 0);
+    expect(await db.select(db.outbox).get(), isEmpty);
+
+    await envoyer(tester);
+    await confirmerLeNouvelAppel(tester);
+
+    expect(writes.appels, 1);
+
+    await demonter(tester);
+  });
+
+  testWidgets('une fiche jamais appelée s\'enregistre sans confirmation', (
+    WidgetTester tester,
+  ) async {
+    await ouvrir(tester);
+
+    await taper(tester, find.text('Injoignable'));
+    await statut(tester, 'Pas de réponse');
+    await etapeSuivante(tester);
+    await envoyer(tester);
+
+    expect(find.text('Déjà qualifié'), findsNothing);
+    expect(writes.appels, 1);
+
+    await demonter(tester);
+  });
+
   testWidgets('la flèche recule d\'une étape et garde les réponses', (
     WidgetTester tester,
   ) async {
@@ -747,12 +985,13 @@ void main() {
     await taper(tester, find.text('Joignable'));
     await statut(tester, 'Intéressé');
     await etapeSuivante(tester);
+    await ficheExacte(tester);
     await renseignements(tester);
 
     await etapePrecedente(tester);
-    expect(find.text('Comment s\'est passé l\'appel ?'), findsOneWidget);
+    expect(find.text('Vérifier la fiche'), findsOneWidget);
 
-    await etapeSuivante(tester);
+    await ficheExacte(tester);
     expect(continuer(tester).subtitle, 'Dites s\'il est ambassadeur');
     expect(find.byIcon(PhosphorIconsRegular.arrowLeft), findsOneWidget);
 
@@ -801,6 +1040,7 @@ class _WritesEspion extends WriteRepository {
   String? suggestedName;
   String? suggestedNote;
   DateTime? callbackAt;
+  int fichesCorrigees = 0;
 
   @override
   Future<String> recordRepCallAttempt({
@@ -854,6 +1094,40 @@ class _WritesEspion extends WriteRepository {
       numeroSaisi: numeroSaisi,
       statutQualificationId: statutQualificationId,
       id: id,
+    );
+  }
+
+  @override
+  Future<void> updateRepresentant({
+    required String id,
+    required String fullName,
+    required String phoneE164,
+    required String departementId,
+    String? iefId,
+    String? notes,
+    String whatsappStatus = 'NON_DEMANDE',
+    String? whatsappE164,
+    String? profession,
+    String? prenom,
+    String? relationStatus,
+    String? relationReason,
+    String? draftId,
+  }) async {
+    fichesCorrigees++;
+    return super.updateRepresentant(
+      id: id,
+      fullName: fullName,
+      phoneE164: phoneE164,
+      departementId: departementId,
+      iefId: iefId,
+      notes: notes,
+      whatsappStatus: whatsappStatus,
+      whatsappE164: whatsappE164,
+      profession: profession,
+      prenom: prenom,
+      relationStatus: relationStatus,
+      relationReason: relationReason,
+      draftId: draftId,
     );
   }
 }

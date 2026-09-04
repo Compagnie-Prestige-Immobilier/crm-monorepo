@@ -74,6 +74,38 @@ export class SupervisionQueryDto {
  */
 export class SupervisionActivityCountsDto {
   @ApiProperty({ type: Number, description: 'Appels passés à des prospects.' }) calls!: number;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      'Parmi `calls`, ceux retrouvés dans le journal d’appels du téléphone Android. ' +
+      'Un appel passé depuis un autre téléphone ou saisi après coup n’y est pas.',
+  })
+  confirmedCalls!: number;
+
+  @ApiProperty({
+    type: Number,
+    description: 'Appels vers un prospect que le journal du téléphone a relevés, consignés ou non.',
+  })
+  detectedCalls!: number;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      'Parmi `detectedCalls`, ceux qu’aucune tentative ne consigne. C’est le chiffre ' +
+      'qui déclenche l’alerte de supervision.',
+  })
+  unloggedCalls!: number;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description:
+      'Durée moyenne, en secondes, des `confirmedCalls`. `null` quand aucun appel ' +
+      'prospect n’a été retrouvé au journal du téléphone.',
+  })
+  avgCallSeconds!: number | null;
+
   @ApiProperty({ type: Number, description: 'Issue UNREACHABLE : NRP ou injoignable.' })
   unreachable!: number;
 
@@ -107,6 +139,34 @@ export class SupervisionActivityCountsDto {
       'REFUSED, CALLBACK, UNREACHABLE, WRONG_NUMBER.',
   })
   repCalls!: number;
+
+  @ApiProperty({
+    type: Number,
+    description: 'Parmi `repCalls`, ceux retrouvés dans le journal d’appels du téléphone Android.',
+  })
+  repConfirmedCalls!: number;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      'Appels vers un représentant que le journal du téléphone a relevés, consignés ou non.',
+  })
+  repDetectedCalls!: number;
+
+  @ApiProperty({
+    type: Number,
+    description: 'Parmi `repDetectedCalls`, ceux qu’aucune tentative ne consigne.',
+  })
+  repUnloggedCalls!: number;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description:
+      'Durée moyenne, en secondes, des `repConfirmedCalls`. `null` quand aucun appel ' +
+      'représentant n’a été retrouvé au journal du téléphone.',
+  })
+  repAvgCallSeconds!: number | null;
 
   @ApiProperty({
     type: Number,
@@ -178,6 +238,53 @@ export class SupervisionActivityCountsDto {
       'aucun représentant interrogé.',
   })
   repQualificationRate!: number | null;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      'Appels entrants relevés au journal du téléphone, les deux familles confondues. ' +
+      'Une détection déjà consignée n’est comptée qu’une fois, par sa tentative.',
+  })
+  inboundCalls!: number;
+
+  @ApiProperty({
+    type: Number,
+    description: 'Appels manqués relevés au journal du téléphone, les deux familles confondues.',
+  })
+  missedCalls!: number;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      'Rappels prospects promis pour cette période et tenus : une tentative les a clos. ' +
+      'Comptés sur la date PROMISE, pas sur celle de l’appel qui les a posés.',
+  })
+  callbacksHonored!: number;
+
+  @ApiProperty({
+    type: Number,
+    description: 'Rappels prospects dont l’heure est passée et qu’aucune tentative n’a clos.',
+  })
+  callbacksLate!: number;
+
+  @ApiProperty({ type: Number, description: 'Rappels prospects encore à venir.' })
+  callbacksUpcoming!: number;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      'Rappels représentants tenus : un appel a suivi l’heure promise, quel qu’en soit l’auteur.',
+  })
+  repCallbacksHonored!: number;
+
+  @ApiProperty({
+    type: Number,
+    description: 'Rappels représentants dont l’heure est passée sans qu’aucun appel ait suivi.',
+  })
+  repCallbacksLate!: number;
+
+  @ApiProperty({ type: Number, description: 'Rappels représentants encore à venir.' })
+  repCallbacksUpcoming!: number;
 }
 
 export class SupervisionActivityRowDto extends SupervisionActivityCountsDto {
@@ -259,7 +366,10 @@ export class SupervisionRepStatutDto {
 }
 
 export class SupervisionRepStatutsDto {
-  @ApiProperty({ type: Number, description: 'Représentants distincts comptés dans la répartition.' })
+  @ApiProperty({
+    type: Number,
+    description: 'Représentants distincts comptés dans la répartition.',
+  })
   total!: number;
 
   @ApiProperty({ type: () => [SupervisionRepStatutDto] })

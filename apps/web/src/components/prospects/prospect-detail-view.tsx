@@ -9,8 +9,20 @@ import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { fetchProspect, fetchProspectCallAttempts } from '@/lib/data/prospects';
-import { formatDate, formatDateTime, formatNumber, formatPhone } from '@/lib/format';
+import {
+  fetchProspect,
+  fetchProspectCallAttempts,
+  fetchProspectDeviceCalls,
+  type DeviceCallDetection,
+} from '@/lib/data/prospects';
+import {
+  formatDate,
+  formatDateTime,
+  formatDetectedCall,
+  formatDeviceCall,
+  formatNumber,
+  formatPhone,
+} from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
 import {
   CALL_OUTCOME_LABELS,
@@ -47,6 +59,10 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
   const appels = useQuery({
     queryKey: ['prospects', 'call-attempts', prospectId],
     queryFn: () => fetchProspectCallAttempts(prospectId),
+  });
+  const releves = useQuery({
+    queryKey: ['prospects', 'device-calls', prospectId],
+    queryFn: () => fetchProspectDeviceCalls(prospectId),
   });
 
   if (fiche.isPending) {
@@ -145,6 +161,7 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
             />
           ) : null}
           {appels.isSuccess ? <AppelsProspect items={appels.data} /> : null}
+          {releves.isSuccess ? <RelevesTelephone items={releves.data} /> : null}
         </CardContent>
       </Card>
 
@@ -159,6 +176,55 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
         </Card>
       ) : null}
     </div>
+  );
+}
+
+/** Ce que le journal du téléphone a relevé, consigné en tentative ou non. */
+function RelevesTelephone({ items }: { items: readonly DeviceCallDetection[] }) {
+  if (items.length === 0) return null;
+
+  const nonConsignes = items.filter((releve) => releve.attemptId === null);
+  const consignes = items.filter((releve) => releve.attemptId !== null);
+
+  return (
+    <section className="mt-4 border-t border-border pt-4">
+      <p className="text-[0.75rem] text-muted-foreground">Relevés par le téléphone</p>
+      {nonConsignes.length === 0 ? null : (
+        <ul
+          aria-label="Relevés par le téléphone"
+          className="mt-2 flex flex-col divide-y divide-border"
+        >
+          {nonConsignes.map((releve) => (
+            <ReleveTelephone key={releve.id} releve={releve} />
+          ))}
+        </ul>
+      )}
+      {consignes.length === 0 ? null : (
+        <details className="mt-2">
+          <summary className="w-fit cursor-pointer rounded-md py-1 text-[0.8125rem] font-[600] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+            {formatNumber(consignes.length)} appel{consignes.length === 1 ? '' : 's'} consigné
+            {consignes.length === 1 ? '' : 's'}
+          </summary>
+          <ul className="mt-1 flex flex-col divide-y divide-border">
+            {consignes.map((releve) => (
+              <ReleveTelephone key={releve.id} releve={releve} />
+            ))}
+          </ul>
+        </details>
+      )}
+    </section>
+  );
+}
+
+function ReleveTelephone({ releve }: { releve: DeviceCallDetection }) {
+  return (
+    <li className="flex flex-wrap items-center gap-2 py-2 first:pt-0 last:pb-0">
+      <Badge variant={releve.attemptId === null ? 'warning' : 'success'}>
+        {releve.attemptId === null ? 'Non consigné' : 'Consigné'}
+      </Badge>
+      <span className="text-[0.8125rem] tabular-nums">{formatDetectedCall(releve)}</span>
+      <span className="text-[0.75rem] text-muted-foreground">{releve.performedByName}</span>
+    </li>
   );
 }
 
@@ -177,7 +243,9 @@ function AppelsProspect({ items }: { items: readonly Appel[] }) {
       {items.map((appel) => (
         <li key={appel.id} className="flex flex-col gap-1 py-3 first:pt-0 last:pb-0">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline">{appel.reasonLabel ?? CALL_OUTCOME_LABELS[appel.outcome]}</Badge>
+            <Badge variant="outline">
+              {appel.reasonLabel ?? CALL_OUTCOME_LABELS[appel.outcome]}
+            </Badge>
             {appel.method === null ? null : (
               <span className="text-[0.8125rem]">{ENROLLMENT_METHOD_LABELS[appel.method]}</span>
             )}
@@ -188,6 +256,7 @@ function AppelsProspect({ items }: { items: readonly Appel[] }) {
             </time>{' '}
             · {appel.performedByName}
           </p>
+          <p className="text-[0.8125rem] text-muted-foreground">{formatDeviceCall(appel)}</p>
           <p className="text-[0.8125rem] text-muted-foreground">
             Fonctionnaire : {ouiNon(appel.fonctionnaire)} · Engagement en cours :{' '}
             {ouiNon(appel.engagementEnCours)}

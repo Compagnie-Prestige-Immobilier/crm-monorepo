@@ -128,6 +128,8 @@ export 'package:crm_api_client/src/model/demo_workspace_status_dto.dart';
 export 'package:crm_api_client/src/model/departement_dto.dart';
 export 'package:crm_api_client/src/model/departement_yield_dto.dart';
 export 'package:crm_api_client/src/model/departement_yield_list_dto.dart';
+export 'package:crm_api_client/src/model/device_call_detection_dto.dart';
+export 'package:crm_api_client/src/model/device_call_detection_list_dto.dart';
 export 'package:crm_api_client/src/model/directory_entry_dto.dart';
 export 'package:crm_api_client/src/model/directory_page_dto.dart';
 export 'package:crm_api_client/src/model/disposition_presentation_dto.dart';

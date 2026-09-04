@@ -16,6 +16,8 @@ enum SyncEntity {
   callAttempt(r'call_attempt'),
   @JsonValue(r'visite')
   visite(r'visite'),
+  @JsonValue(r'appel_detecte')
+  appelDetecte(r'appel_detecte'),
   @JsonValue(r'unknown_default_open_api')
   unknownDefaultOpenApi(r'unknown_default_open_api');
 

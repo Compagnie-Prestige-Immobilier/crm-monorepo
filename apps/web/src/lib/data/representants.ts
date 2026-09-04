@@ -197,6 +197,18 @@ export async function fetchRepresentantCallAttempts(
   return payload.items;
 }
 
+export type DeviceCallDetection = components['schemas']['DeviceCallDetectionDto'];
+
+export async function fetchRepresentantDeviceCalls(
+  id: string,
+  client: ApiClient = getApiClient(),
+): Promise<DeviceCallDetection[]> {
+  const payload = unwrap(
+    await client.GET('/api/v1/representants/{id}/device-calls', { params: { path: { id } } }),
+  );
+  return payload.items;
+}
+
 export async function fetchRepresentantRelationHistory(
   id: string,
   client: ApiClient = getApiClient(),

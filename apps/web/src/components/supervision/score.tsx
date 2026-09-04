@@ -3,9 +3,10 @@
 import { ChevronRightIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
+import { AnimatedNumber } from '@/components/live/animated-number';
 import { Badge } from '@/components/ui/badge';
 import type { PerformanceScore } from '@/lib/data/admin';
-import { formatDecimal, formatNumber, formatRate } from '@/lib/format';
+import { formatDecimal, formatRate } from '@/lib/format';
 
 const SCORE_REASONS: Record<NonNullable<PerformanceScore['reason']>, string> = {
   journee_non_commencee: 'Journée pas commencée',
@@ -33,7 +34,7 @@ export function ScoreBadge({ score }: { score: PerformanceScore }) {
 
   return (
     <Badge variant={scoreVariant(score.value)} className="tabular-nums">
-      {formatNumber(Math.round(score.value))}
+      <AnimatedNumber value={Math.round(score.value)} />
     </Badge>
   );
 }

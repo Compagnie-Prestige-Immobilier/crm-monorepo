@@ -119,6 +119,14 @@ class SyncEntityDataDto {
 
     this.callbackAt,
 
+    this.deviceCallType,
+
+    this.deviceCallDurationSeconds,
+
+    this.deviceCallAt,
+
+    this.detectedAt,
+
     this.email,
 
     this.fonctionnaire,
@@ -376,6 +384,33 @@ class SyncEntityDataDto {
   @JsonKey(name: r'callbackAt', required: false, includeIfNull: false)
   final DateTime? callbackAt;
 
+  /// Tentative d’appel : type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+  @JsonKey(
+    name: r'deviceCallType',
+    required: false,
+    includeIfNull: false,
+    unknownEnumValue: SyncEntityDataDtoDeviceCallTypeEnum.unknownDefaultOpenApi,
+  )
+  final SyncEntityDataDtoDeviceCallTypeEnum? deviceCallType;
+
+  /// Tentative d’appel : durée en secondes lue dans le journal d’appels Android.
+  // minimum: 0
+  // maximum: 86400
+  @JsonKey(
+    name: r'deviceCallDurationSeconds',
+    required: false,
+    includeIfNull: false,
+  )
+  final num? deviceCallDurationSeconds;
+
+  /// Tentative d’appel : heure de l’appel lue dans le journal d’appels Android.
+  @JsonKey(name: r'deviceCallAt', required: false, includeIfNull: false)
+  final DateTime? deviceCallAt;
+
+  /// Appel détecté : heure à laquelle le téléphone a retrouvé cet appel dans son journal.
+  @JsonKey(name: r'detectedAt', required: false, includeIfNull: false)
+  final DateTime? detectedAt;
+
   /// Tentative d’appel : adresse électronique recueillie pendant l’appel.
   @JsonKey(name: r'email', required: false, includeIfNull: false)
   final String? email;
@@ -481,6 +516,10 @@ class SyncEntityDataDto {
                 method,
                 comment,
                 callbackAt,
+                deviceCallType,
+                deviceCallDurationSeconds,
+                deviceCallAt,
+                detectedAt,
                 email,
                 fonctionnaire,
                 engagementEnCours,
@@ -540,6 +579,10 @@ class SyncEntityDataDto {
                 other.method,
                 other.comment,
                 other.callbackAt,
+                other.deviceCallType,
+                other.deviceCallDurationSeconds,
+                other.deviceCallAt,
+                other.detectedAt,
                 other.email,
                 other.fonctionnaire,
                 other.engagementEnCours,
@@ -605,6 +648,10 @@ class SyncEntityDataDto {
         method,
         comment,
         callbackAt,
+        deviceCallType,
+        deviceCallDurationSeconds,
+        deviceCallAt,
+        detectedAt,
         email,
         fonctionnaire,
         engagementEnCours,
@@ -628,4 +675,50 @@ class SyncEntityDataDto {
   String toString() {
     return toJson().toString();
   }
+}
+
+/// Tentative d’appel : type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+enum SyncEntityDataDtoDeviceCallTypeEnum {
+  /// Tentative d’appel : type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+  @JsonValue(r'sortant')
+  sortant(r'sortant'),
+
+  /// Tentative d’appel : type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+  @JsonValue(r'entrant')
+  entrant(r'entrant'),
+
+  /// Tentative d’appel : type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+  @JsonValue(r'manque')
+  manque(r'manque'),
+
+  /// Tentative d’appel : type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+  @JsonValue(r'rejete')
+  rejete(r'rejete'),
+
+  /// Tentative d’appel : type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+  @JsonValue(r'bloque')
+  bloque(r'bloque'),
+
+  /// Tentative d’appel : type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+  @JsonValue(r'messagerie')
+  messagerie(r'messagerie'),
+
+  /// Tentative d’appel : type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+  @JsonValue(r'externe')
+  externe(r'externe'),
+
+  /// Tentative d’appel : type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+  @JsonValue(r'inconnu')
+  inconnu(r'inconnu'),
+
+  /// Tentative d’appel : type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+  @JsonValue(r'unknown_default_open_api')
+  unknownDefaultOpenApi(r'unknown_default_open_api');
+
+  const SyncEntityDataDtoDeviceCallTypeEnum(this.value);
+
+  final String value;
+
+  @override
+  String toString() => value;
 }

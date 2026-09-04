@@ -16,6 +16,7 @@ import { v7 as uuidv7 } from 'uuid';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { normalizePhone } from '../../common/phone.js';
 import { assertOwnership, attributionScope, isAdmin } from '../../common/scope.js';
+import { listerDetections, type DeviceCallDetectionListDto } from '../../common/device-call.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { OkDto } from '../../common/dto/ok.dto.js';
 import { RepresentantSortField, RepresentantSuivi } from './dto.js';
@@ -432,6 +433,21 @@ export class RepresentantsService {
     return { items: rows.map(toRelationChangeDto) };
   }
 
+  /** Les appels que le journal du téléphone a relevés sur cette fiche. */
+  async deviceCalls(id: string): Promise<DeviceCallDetectionListDto> {
+    const representant = await this.prisma.representant.findFirst({
+      where: { id, deletedAt: null },
+      select: { id: true },
+    });
+    if (!representant) {
+      throw new NotFoundException({
+        code: 'REPRESENTANT_NOT_FOUND',
+        message: 'Représentant introuvable.',
+      });
+    }
+    return listerDetections(this.prisma, { representantId: id });
+  }
+
   /** Même lecture globale que `relationHistory` : un appel suit sa fiche. */
   async callHistory(id: string): Promise<RepresentantCallAttemptListDto> {
     const representant = await this.prisma.representant.findFirst({
@@ -472,6 +488,9 @@ export class RepresentantsService {
         suggestedName: row.suggestion?.suggestedName ?? null,
         suggestedPhoneE164: row.suggestion?.suggestedPhoneE164 ?? null,
         suggestedNote: row.suggestion?.note ?? null,
+        deviceCallType: row.deviceCallType,
+        deviceCallDurationSeconds: row.deviceCallDurationSeconds,
+        deviceCallAt: row.deviceCallAt?.toISOString() ?? null,
         performedById: row.performedById,
         performedByName: row.performedBy.fullName,
         clientCreatedAt: row.clientCreatedAt.toISOString(),

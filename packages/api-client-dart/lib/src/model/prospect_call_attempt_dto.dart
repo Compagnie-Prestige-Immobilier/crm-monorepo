@@ -41,6 +41,12 @@ class ProspectCallAttemptDto {
 
     required this.rendezVousAt,
 
+    required this.deviceCallType,
+
+    required this.deviceCallDurationSeconds,
+
+    required this.deviceCallAt,
+
     required this.performedById,
 
     required this.performedByName,
@@ -89,6 +95,19 @@ class ProspectCallAttemptDto {
   @JsonKey(name: r'rendezVousAt', required: true, includeIfNull: true)
   final DateTime? rendezVousAt;
 
+  @JsonKey(name: r'deviceCallType', required: true, includeIfNull: true)
+  final String? deviceCallType;
+
+  @JsonKey(
+    name: r'deviceCallDurationSeconds',
+    required: true,
+    includeIfNull: true,
+  )
+  final num? deviceCallDurationSeconds;
+
+  @JsonKey(name: r'deviceCallAt', required: true, includeIfNull: true)
+  final DateTime? deviceCallAt;
+
   @JsonKey(name: r'performedById', required: true, includeIfNull: false)
   final String performedById;
 
@@ -114,6 +133,9 @@ class ProspectCallAttemptDto {
                 engagementEnCours,
                 dureeEtablissementMois,
                 rendezVousAt,
+                deviceCallType,
+                deviceCallDurationSeconds,
+                deviceCallAt,
                 performedById,
                 performedByName,
                 clientCreatedAt,
@@ -129,6 +151,9 @@ class ProspectCallAttemptDto {
                 other.engagementEnCours,
                 other.dureeEtablissementMois,
                 other.rendezVousAt,
+                other.deviceCallType,
+                other.deviceCallDurationSeconds,
+                other.deviceCallAt,
                 other.performedById,
                 other.performedByName,
                 other.clientCreatedAt,
@@ -150,6 +175,9 @@ class ProspectCallAttemptDto {
         engagementEnCours,
         dureeEtablissementMois,
         rendezVousAt,
+        deviceCallType,
+        deviceCallDurationSeconds,
+        deviceCallAt,
         performedById,
         performedByName,
         clientCreatedAt,

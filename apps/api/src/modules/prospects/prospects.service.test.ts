@@ -681,6 +681,9 @@ describe('lecture du SUPERVISEUR', () => {
         rendezVousAt: null,
         performedById: bob.id,
         performedBy: { fullName: 'Bob Sarr' },
+        deviceCallType: 'sortant',
+        deviceCallDurationSeconds: 92,
+        deviceCallAt: new Date('2026-08-05T10:00:14.000Z'),
         clientCreatedAt: DATE,
       },
     ]);
@@ -701,6 +704,9 @@ describe('lecture du SUPERVISEUR', () => {
         rendezVousAt: null,
         performedById: bob.id,
         performedByName: 'Bob Sarr',
+        deviceCallType: 'sortant',
+        deviceCallDurationSeconds: 92,
+        deviceCallAt: '2026-08-05T10:00:14.000Z',
         clientCreatedAt: DATE.toISOString(),
       },
     ]);

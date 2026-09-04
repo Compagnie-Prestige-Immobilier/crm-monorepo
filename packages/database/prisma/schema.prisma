@@ -289,6 +289,7 @@ model User {
   conversionsConfirmed ProspectConversion[] @relation("ProspectConversionConfirmedBy")
 
   repCallAttempts         RepCallAttempt[]         @relation("RepCallAttemptPerformedBy")
+  deviceCallDetections    DeviceCallDetection[]    @relation("DeviceCallDetectionPerformedBy")
   representantsLastCalled Representant[]           @relation("RepresentantLastCallBy")
   prospectsLastCalled     Prospect[]               @relation("ProspectLastCallBy")
   repSuggestions          RepresentantSuggestion[] @relation("RepresentantSuggestionSuggestedBy")
@@ -545,6 +546,7 @@ model Representant {
 
   prospects           Prospect[]
   repCallAttempts     RepCallAttempt[]
+  deviceCallDetections DeviceCallDetection[]
   relationChanges     RepresentantRelationChange[]
   comments            RepresentantComment[]
   suggestionsGiven    RepresentantSuggestion[]     @relation("RepresentantSuggestionSource")
@@ -829,6 +831,7 @@ model Prospect {
   deletedAt DateTime?
 
   callAttempts       CallAttempt[]
+  deviceCallDetections DeviceCallDetection[]
   scheduledCallbacks ScheduledCallback[]
   lotItems           LotExportItem[]
   bankCases          BankCase[]
@@ -1114,6 +1117,12 @@ model CallAttempt {
   /// APPOINTMENT. Contrainte CHECK.
   rendezVousAt           DateTime?
 
+  /// Preuve lue dans le journal d'appels Android pour l'appel lancé depuis la
+  /// fiche. Nulle si la permission manque ou si l'appel n'a pas été retrouvé.
+  deviceCallType            String?
+  deviceCallDurationSeconds Int?
+  deviceCallAt              DateTime?
+
   clientCreatedAt DateTime
   createdAt       DateTime @default(now())
 
@@ -1206,6 +1215,11 @@ model RepCallAttempt {
   statutQualificationId String?
   statutQualification   StatutQualification? @relation(fields: [statutQualificationId], references: [id], onDelete: Restrict)
 
+  /// Preuve lue dans le journal d'appels Android. Voir `CallAttempt`.
+  deviceCallType            String?
+  deviceCallDurationSeconds Int?
+  deviceCallAt              DateTime?
+
   clientCreatedAt DateTime
   createdAt       DateTime @default(now())
 
@@ -1215,6 +1229,32 @@ model RepCallAttempt {
   @@index([performedById, createdAt])
   @@index([performedById, clientCreatedAt])
   @@map("rep_call_attempts")
+}
+
+/// Un appel retrouvé dans le journal Android d'un téléconseiller avec un
+/// numéro de fiche, sans avoir été lancé depuis l'app. `attemptId` pointe la
+/// tentative (prospect ou représentant) qui l'a consigné ensuite, sans clé
+/// étrangère : deux tables cibles.
+model DeviceCallDetection {
+  id             String        @id
+  performedById  String
+  performedBy    User          @relation("DeviceCallDetectionPerformedBy", fields: [performedById], references: [id], onDelete: Restrict)
+  representantId String?
+  representant   Representant? @relation(fields: [representantId], references: [id], onDelete: Cascade)
+  prospectId     String?
+  prospect       Prospect?     @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+
+  deviceCallType            String
+  deviceCallDurationSeconds Int
+  deviceCallAt              DateTime
+  detectedAt                DateTime
+  attemptId                 String?
+  createdAt                 DateTime @default(now())
+
+  @@index([performedById, deviceCallAt])
+  @@index([representantId, deviceCallAt])
+  @@index([prospectId, deviceCallAt])
+  @@map("device_call_detections")
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

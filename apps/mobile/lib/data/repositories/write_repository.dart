@@ -7,6 +7,7 @@ import '../../core/sync/clock.dart';
 import '../../core/sync/outbox_status.dart';
 import '../../core/sync/phase2_directory_sync.dart';
 import '../../core/sync/sync_engine.dart';
+import '../../core/telephonie/preuve_appel.dart';
 import '../../core/utils/ids.dart';
 import '../../core/utils/phone.dart';
 import '../../core/utils/whatsapp.dart';
@@ -357,12 +358,16 @@ class WriteRepository {
     String whatsappStatus = 'NON_DEMANDE',
     String? whatsappE164,
     String? profession,
+    // Nul : inchangé. Vide : effacé. Le serveur lit la même distinction, et
+    // sans elle un prénom retiré sur le terrain revenait au pull suivant.
+    String? prenom,
     String? relationStatus,
     String? relationReason,
     String? draftId,
   }) async {
     final DateTime now = _clock.now();
     final String? whatsapp = _whatsappE164For(whatsappStatus, whatsappE164);
+    final String? prenomSaisi = prenom?.trim();
     await _db.transaction(() async {
       final Representant current = await (_db.select(
         _db.representants,
@@ -379,6 +384,9 @@ class WriteRepository {
           whatsappStatus: Value<String>(whatsappStatus),
           whatsappE164: Value<String?>(whatsapp),
           profession: Value<String?>(profession),
+          prenom: prenomSaisi == null
+              ? const Value<String?>.absent()
+              : Value<String?>(prenomSaisi.isEmpty ? null : prenomSaisi),
           relationStatus: relationStatus == null
               ? const Value<String>.absent()
               : Value<String>(relationStatus),
@@ -401,6 +409,7 @@ class WriteRepository {
           'whatsappStatus': whatsappStatus,
           'whatsappE164': whatsapp,
           'profession': profession,
+          'prenom': ?prenomSaisi,
           // Absent tant que rien n'a bougé : le serveur ne rejoue une bascule
           // que sur une demande explicite, un renvoi systematique remplirait la
           // chronologie de la relation de lignes sans geste derriere.
@@ -942,6 +951,12 @@ class WriteRepository {
         'WHERE id = ?',
         <Object>[prospectId],
       );
+      final PreuvesAppelData? preuve = await _consommerPreuve(
+        kind: 'prospect',
+        entityId: prospectId,
+        attemptId: entityId,
+        now: now,
+      );
       await _enqueue(
         dependencyKey: 'phase2:$prospectId',
         entityType: callAttemptEntity,
@@ -970,6 +985,9 @@ class WriteRepository {
           'rendezVousAt': ?rendezVousAt?.toUtc().toIso8601String(),
           'clientCreatedAt': now.toUtc().toIso8601String(),
           '_recordingPath': ?recordingPath,
+          'deviceCallType': ?preuve?.journalType,
+          'deviceCallDurationSeconds': ?preuve?.journalDureeS,
+          'deviceCallAt': ?preuve?.journalAt?.toUtc().toIso8601String(),
         },
         now: now,
       );
@@ -1110,6 +1128,12 @@ class WriteRepository {
               ),
             );
       }
+      final PreuvesAppelData? preuve = await _consommerPreuve(
+        kind: 'representant',
+        entityId: representantId,
+        attemptId: entityId,
+        now: now,
+      );
       await _enqueue(
         dependencyKey: representantId,
         entityType: repCallAttemptEntity,
@@ -1139,11 +1163,91 @@ class WriteRepository {
           'phone': ?nouveauNumero,
           'statutQualificationId': ?statutQualificationId,
           'clientCreatedAt': now.toUtc().toIso8601String(),
+          'deviceCallType': ?preuve?.journalType,
+          'deviceCallDurationSeconds': ?preuve?.journalDureeS,
+          'deviceCallAt': ?preuve?.journalAt?.toUtc().toIso8601String(),
         },
         now: now,
       );
     });
     return entityId;
+  }
+
+  /// Un appel retrouvé dans le journal du téléphone : la preuve reste locale
+  /// tant qu'il n'est pas consigné, et l'opération part au serveur pour que le
+  /// superviseur voie l'appel non consigné. Rend l'identifiant de la preuve.
+  Future<String> enregistrerAppelDetecte({
+    required String kind,
+    required String entityId,
+    required String phoneE164,
+    required String journalType,
+    required int dureeSecondes,
+    required DateTime journalAt,
+  }) async {
+    final DateTime now = _clock.now();
+    final String preuveId = Ids.newId();
+    await _db.transaction(() async {
+      await _db
+          .into(_db.preuvesAppel)
+          .insert(
+            PreuvesAppelCompanion.insert(
+              id: preuveId,
+              kind: kind,
+              entityId: entityId,
+              phoneE164: phoneE164,
+              // L'appel n'a pas été lancé d'ici : son heure de départ est celle
+              // que le journal a inscrite.
+              lanceAt: journalAt,
+              mode: 'detecte',
+              journalType: Value<String?>(journalType),
+              journalDureeS: Value<int?>(dureeSecondes),
+              journalAt: Value<DateTime?>(journalAt),
+              rapprocheAt: Value<DateTime?>(now),
+            ),
+          );
+      await _enqueue(
+        dependencyKey: kind == 'representant' ? entityId : 'phase2:$entityId',
+        entityType: appelDetecteEntity,
+        entityId: preuveId,
+        op: 'create',
+        payload: <String, Object?>{
+          if (kind == 'representant')
+            'representantId': entityId
+          else
+            'prospectId': entityId,
+          'deviceCallType': journalType,
+          'deviceCallDurationSeconds': dureeSecondes,
+          'deviceCallAt': journalAt.toUtc().toIso8601String(),
+          'detectedAt': now.toUtc().toIso8601String(),
+        },
+        now: now,
+      );
+    });
+    return preuveId;
+  }
+
+  /// La preuve du dernier appel LANCÉ depuis la fiche, ou RETROUVÉ dans le
+  /// journal, marquée comme consommée par cette tentative. Nulle quand le
+  /// numéro a été composé ailleurs, ou quand le journal n'a rien confirmé.
+  Future<PreuvesAppelData?> _consommerPreuve({
+    required String kind,
+    required String entityId,
+    required String attemptId,
+    required DateTime now,
+  }) async {
+    final PreuvesAppelData? preuve = await _db
+        .preuveAConsommer(
+          kind: kind,
+          entityId: entityId,
+          seuilSecondes:
+              now.subtract(kFenetrePreuve).millisecondsSinceEpoch ~/ 1000,
+        )
+        .getSingleOrNull();
+    if (preuve == null) return null;
+    await (_db.update(_db.preuvesAppel)
+          ..where((PreuvesAppel row) => row.id.equals(preuve.id)))
+        .write(PreuvesAppelCompanion(attemptId: Value<String?>(attemptId)));
+    return preuve;
   }
 
   /// Efface les rappels promis à ce représentant : l'appel qui vient d'être

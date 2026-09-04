@@ -50,6 +50,12 @@ class RepresentantCallAttemptDto {
 
     required this.suggestedNote,
 
+    required this.deviceCallType,
+
+    required this.deviceCallDurationSeconds,
+
+    required this.deviceCallAt,
+
     required this.performedById,
 
     required this.performedByName,
@@ -111,6 +117,19 @@ class RepresentantCallAttemptDto {
   @JsonKey(name: r'suggestedNote', required: true, includeIfNull: true)
   final String? suggestedNote;
 
+  @JsonKey(name: r'deviceCallType', required: true, includeIfNull: true)
+  final String? deviceCallType;
+
+  @JsonKey(
+    name: r'deviceCallDurationSeconds',
+    required: true,
+    includeIfNull: true,
+  )
+  final num? deviceCallDurationSeconds;
+
+  @JsonKey(name: r'deviceCallAt', required: true, includeIfNull: true)
+  final DateTime? deviceCallAt;
+
   @JsonKey(name: r'performedById', required: true, includeIfNull: false)
   final String performedById;
 
@@ -141,6 +160,9 @@ class RepresentantCallAttemptDto {
                 suggestedName,
                 suggestedPhoneE164,
                 suggestedNote,
+                deviceCallType,
+                deviceCallDurationSeconds,
+                deviceCallAt,
                 performedById,
                 performedByName,
                 clientCreatedAt,
@@ -161,6 +183,9 @@ class RepresentantCallAttemptDto {
                 other.suggestedName,
                 other.suggestedPhoneE164,
                 other.suggestedNote,
+                other.deviceCallType,
+                other.deviceCallDurationSeconds,
+                other.deviceCallAt,
                 other.performedById,
                 other.performedByName,
                 other.clientCreatedAt,
@@ -187,6 +212,9 @@ class RepresentantCallAttemptDto {
         suggestedName,
         suggestedPhoneE164,
         suggestedNote,
+        deviceCallType,
+        deviceCallDurationSeconds,
+        deviceCallAt,
         performedById,
         performedByName,
         clientCreatedAt,

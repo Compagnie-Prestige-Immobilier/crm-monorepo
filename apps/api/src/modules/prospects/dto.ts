@@ -620,6 +620,9 @@ export class ProspectCallAttemptDto {
   @ApiProperty({ type: Boolean, nullable: true }) engagementEnCours!: boolean | null;
   @ApiProperty({ type: Number, nullable: true }) dureeEtablissementMois!: number | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) rendezVousAt!: string | null;
+  @ApiProperty({ type: String, nullable: true }) deviceCallType!: string | null;
+  @ApiProperty({ type: Number, nullable: true }) deviceCallDurationSeconds!: number | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) deviceCallAt!: string | null;
   @ApiProperty({ format: 'uuid' }) performedById!: string;
   @ApiProperty() performedByName!: string;
   @ApiProperty({ type: String, format: 'date-time' }) clientCreatedAt!: string;
