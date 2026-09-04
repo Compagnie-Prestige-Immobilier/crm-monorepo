@@ -30,6 +30,8 @@ class CreateStatutQualificationDto {
 
     this.requiresCallback = false,
 
+    this.retryAfterMinutes,
+
     this.priorite = PrioriteTraitement.NORMALE,
 
     this.relationStatus,
@@ -58,6 +60,11 @@ class CreateStatutQualificationDto {
   )
   final bool? requiresCallback;
 
+  // minimum: 5
+  // maximum: 10080
+  @JsonKey(name: r'retryAfterMinutes', required: false, includeIfNull: false)
+  final num? retryAfterMinutes;
+
   @JsonKey(
     defaultValue: PrioriteTraitement.NORMALE,
     name: r'priorite',
@@ -81,12 +88,21 @@ class CreateStatutQualificationDto {
         other is CreateStatutQualificationDto &&
             runtimeType == other.runtimeType &&
             equals(
-              [code, label, effect, requiresCallback, priorite, relationStatus],
+              [
+                code,
+                label,
+                effect,
+                requiresCallback,
+                retryAfterMinutes,
+                priorite,
+                relationStatus,
+              ],
               [
                 other.code,
                 other.label,
                 other.effect,
                 other.requiresCallback,
+                other.retryAfterMinutes,
                 other.priorite,
                 other.relationStatus,
               ],
@@ -101,6 +117,7 @@ class CreateStatutQualificationDto {
         label,
         effect,
         requiresCallback,
+        retryAfterMinutes,
         priorite,
         relationStatus,
       ]);

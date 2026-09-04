@@ -27,6 +27,8 @@ import 'generated_migrations/schema_v22.dart' as v22schema;
 import 'generated_migrations/schema_v23.dart' as v23schema;
 import 'generated_migrations/schema_v24.dart' as v24schema;
 import 'generated_migrations/schema_v25.dart' as v25schema;
+import 'generated_migrations/schema_v26.dart' as v26schema;
+import 'generated_migrations/schema_v27.dart' as v27schema;
 
 /// Test doré de migration.
 ///
@@ -2419,7 +2421,7 @@ void main() {
     await old.close();
 
     final AppDatabase db = AppDatabase(schema.newConnection());
-    await verifier.migrateAndValidate(db, 24);
+    await verifier.migrateAndValidate(db, 28);
 
     // La table s'ÉCRIT : « elle existe » se vérifierait aussi sur des colonnes
     // au mauvais type. Un effet que ce client ignore passe, comme pour les
@@ -2480,8 +2482,10 @@ void main() {
       );
       await old.close();
 
+      // Jusqu'au bout : une vue recréée prend toujours sa forme courante, la
+      // valider à un palier intermédiaire échouerait sur ses colonnes neuves.
       final AppDatabase db = AppDatabase(schema.newConnection());
-      await verifier.migrateAndValidate(db, 25);
+      await verifier.migrateAndValidate(db, 27);
 
       // Le curseur de pull est effacé, et lui seul : les fiches déjà en base
       // redescendent avec leur statut au prochain pull.
@@ -2556,13 +2560,77 @@ void main() {
     await old.close();
 
     final AppDatabase db = AppDatabase(schema.newConnection());
-    await verifier.migrateAndValidate(db, 26);
+    await verifier.migrateAndValidate(db, 27);
 
     expect(await db.customSelect('SELECT 1 FROM sync_state').get(), isEmpty);
     final QueryRow fiche = await db
         .customSelect('SELECT call_attempt_count FROM representant_sync_view')
         .getSingle();
     expect(fiche.read<int>('call_attempt_count'), 0);
+    await db.close();
+  });
+
+  test('v26 -> v27 donne à la vue l\'effet du statut', () async {
+    final schema = await verifier.schemaAt(26);
+    final v26schema.DatabaseAtV26 old = v26schema.DatabaseAtV26(
+      schema.newConnection(),
+    );
+    await old.customStatement(
+      'INSERT INTO statuts_qualification (code, id, label, effect) '
+      'VALUES (?, ?, ?, ?)',
+      <Object?>['A_RAPPELER', 'sq-1', 'À rappeler', 'SCHEDULE_CALLBACK'],
+    );
+    await old.customStatement(
+      'INSERT INTO representants '
+      '(id, full_name, phone_e164, departement_id, created_by_id, '
+      ' relation_status, statut_qualification_id, client_created_at, '
+      ' local_updated_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      <Object?>[
+        'rep-26',
+        'Fiche d’avant',
+        '+221771234567',
+        'dep-1',
+        'me',
+        'INCONNU',
+        'sq-1',
+        _iso,
+        _iso,
+      ],
+    );
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 27);
+
+    final QueryRow fiche = await db
+        .customSelect(
+          'SELECT statut_qualification_effect FROM representant_sync_view',
+        )
+        .getSingle();
+    expect(fiche.read<String?>('statut_qualification_effect'), 'SCHEDULE_CALLBACK');
+    await db.close();
+  });
+
+  test('v27 -> v28 donne aux statuts leur délai de réessai', () async {
+    final schema = await verifier.schemaAt(27);
+    final v27schema.DatabaseAtV27 old = v27schema.DatabaseAtV27(
+      schema.newConnection(),
+    );
+    await old.customStatement(
+      'INSERT INTO statuts_qualification (code, id, label, effect) '
+      'VALUES (?, ?, ?, ?)',
+      <Object?>['PAS_DE_REPONSE', 'sq-1', 'Pas de réponse', 'UNREACHABLE'],
+    );
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 28);
+
+    final QueryRow statut = await db
+        .customSelect('SELECT retry_after_minutes FROM statuts_qualification')
+        .getSingle();
+    expect(statut.read<int?>('retry_after_minutes'), isNull);
     await db.close();
   });
 

@@ -118,6 +118,8 @@ export function RepresentantDetailView({
               <RelationBadge
                 status={representant.relationStatus}
                 label={representant.statutQualificationLabel}
+                effect={representant.statutQualificationEffect}
+                lastCallOutcome={representant.lastCallOutcome}
               />
               <p className="text-right">
                 <span className="block font-display text-[1.5rem] font-[800] leading-none tabular-nums">

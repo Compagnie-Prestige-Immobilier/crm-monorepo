@@ -184,9 +184,19 @@ class _RepresentantQualificationScreenState
     _Etape.fin => manqueFin,
   };
 
+  /// Le statut demande une date : rappel promis, ou réessai d'un numéro qui
+  /// n'a pas répondu.
+  bool get dateDemandee =>
+      (statutChoisi?.requiresCallback ?? false) ||
+      statutChoisi?.retryAfterMinutes != null;
+
+  bool get reessai =>
+      statutChoisi?.retryAfterMinutes != null &&
+      !(statutChoisi?.requiresCallback ?? false);
+
   String? get manqueFin {
-    if ((statutChoisi?.requiresCallback ?? false) && rappelAt == null) {
-      return 'Choisissez quand rappeler';
+    if (dateDemandee && rappelAt == null) {
+      return reessai ? 'Choisissez quand réessayer' : 'Choisissez quand rappeler';
     }
     if (proposeQuelquUn &&
         suggestionCommencee &&
@@ -274,7 +284,10 @@ class _RepresentantQualificationScreenState
       ),
     CpiRecapLine('Statut', statutChoisi?.label),
     if (rappelAt != null)
-      CpiRecapLine('Rappel', quandRappeler(context, rappelAt!, DateTime.now())),
+      CpiRecapLine(
+        reessai ? 'Réessai' : 'Rappel',
+        quandRappeler(context, rappelAt!, DateTime.now()),
+      ),
     if (commentaire.text.trim().isNotEmpty)
       CpiRecapLine('Commentaire', commentaire.text.trim()),
   ];
@@ -569,6 +582,8 @@ class _RepresentantQualificationScreenState
             StatutTag(
               relationStatus: representant.relationStatus,
               statutLabel: representant.statutQualificationLabel,
+              statutEffect: representant.statutQualificationEffect,
+              lastCallOutcome: representant.lastCallOutcome,
             ),
           ],
         ),
@@ -674,7 +689,12 @@ class _RepresentantQualificationScreenState
           value: statutChoisi,
           onChanged: (StatutQualificationRow statut) => setState(() {
             statutChoisi = statut;
-            rappelAt = null;
+            // Un numéro occupé se retente : le réessai arrive préréglé au
+            // délai du statut, l'appelant le déplace s'il veut.
+            final int? reessai = statut.retryAfterMinutes;
+            rappelAt = reessai == null
+                ? null
+                : DateTime.now().add(Duration(minutes: reessai));
           }),
           options: <(StatutQualificationRow, String)>[
             for (final StatutQualificationRow s in statutsProposes)
@@ -803,10 +823,12 @@ class _RepresentantQualificationScreenState
   ) => ListView(
     padding: _marge,
     children: <Widget>[
-      if (statutChoisi?.requiresCallback ?? false) ...<Widget>[
+      if (dateDemandee) ...<Widget>[
         CallbackPicker(
           now: DateTime.now(),
           required: true,
+          title: reessai ? 'Réessayer quand ?' : null,
+          initial: rappelAt,
           onChanged: (DateTime? at) => setState(() => rappelAt = at),
         ),
         const SizedBox(height: CpiSpacing.lg),

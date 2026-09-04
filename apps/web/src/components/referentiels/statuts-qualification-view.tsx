@@ -60,8 +60,22 @@ interface Draft {
   label: string;
   effect: StatutQualificationEffect;
   requiresCallback: boolean;
+  /** Minutes, en chaîne pour le `Select` ; vide = aucun réessai. */
+  reessai: string;
   priorite: PrioriteTraitement;
   relation: RelationChoisie;
+}
+
+/** Les délais proposés d'office après un numéro qui n'a pas répondu. */
+const REESSAIS: readonly { value: string; label: string }[] = [
+  { value: '', label: 'Aucun' },
+  { value: '60', label: 'Dans 1 h' },
+  { value: '180', label: 'Dans 3 h' },
+  { value: '1440', label: 'Le lendemain' },
+];
+
+function libelleReessai(minutes: number): string {
+  return REESSAIS.find((r) => r.value === String(minutes))?.label ?? `${String(minutes)} min`;
 }
 
 /**
@@ -84,6 +98,7 @@ const EMPTY: Draft = {
   label: '',
   effect: 'REACHED',
   requiresCallback: false,
+  reessai: '',
   priorite: 'NORMALE',
   relation: AUCUNE,
 };
@@ -231,6 +246,11 @@ function Branche({
                     date exigée
                   </Badge>
                 ) : null}
+                {statut.retryAfterMinutes === null ? null : (
+                  <Badge variant="outline" className="ml-2">
+                    réessai {libelleReessai(statut.retryAfterMinutes).toLowerCase()}
+                  </Badge>
+                )}
               </TableCell>
               <TableCell className="text-muted-foreground">{statut.code}</TableCell>
               <TableCell>{STATUT_QUALIFICATION_EFFECT_LABELS[statut.effect]}</TableCell>
@@ -319,6 +339,7 @@ function FormulaireStatut({
             label: statut.label,
             effect: statut.effect,
             requiresCallback: statut.requiresCallback,
+            reessai: statut.retryAfterMinutes === null ? '' : String(statut.retryAfterMinutes),
             priorite: statut.priorite,
             relation: statut.relationStatus ?? AUCUNE,
           },
@@ -329,6 +350,7 @@ function FormulaireStatut({
   const effect = watch('effect');
   const priorite = watch('priorite');
   const relation = watch('relation');
+  const reessai = watch('reessai');
 
   const save = useMutation({
     mutationFn: (values: Draft) =>
@@ -337,6 +359,7 @@ function FormulaireStatut({
             label: values.label.trim(),
             priorite: values.priorite,
             relationStatus: relationPosee(values.relation),
+            retryAfterMinutes: values.reessai === '' ? null : Number(values.reessai),
             ...(regleFigee ? {} : { requiresCallback: values.requiresCallback }),
           })
         : createStatutQualification({
@@ -344,6 +367,7 @@ function FormulaireStatut({
             label: values.label.trim(),
             effect: values.effect,
             requiresCallback: values.requiresCallback,
+            retryAfterMinutes: values.reessai === '' ? null : Number(values.reessai),
             priorite: values.priorite,
             relationStatus: relationPosee(values.relation),
           }),
@@ -500,6 +524,32 @@ function FormulaireStatut({
             />
             Exige la date du rappel
           </label>
+
+          <Field
+            label="Réessai proposé"
+            description="L’application propose ce délai d’elle-même après l’appel. Le téléconseiller peut le déplacer."
+          >
+            {(props) => (
+              <Select
+                items={REESSAIS}
+                value={reessai}
+                onValueChange={(value) => {
+                  setValue('reessai', value ?? '');
+                }}
+              >
+                <SelectTrigger id={props.id}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {REESSAIS.map((r) => (
+                    <SelectItem key={r.value} value={r.value}>
+                      {r.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </Field>
 
           <DialogFooter>
             <Button type="submit" disabled={save.isPending}>
