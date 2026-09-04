@@ -14,6 +14,7 @@ import '../../../core/router/route_paths.dart';
 import '../../../core/router/single_push.dart';
 import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
+import '../../../core/utils/appel.dart';
 import '../../../core/utils/phone.dart';
 import '../../../core/utils/relative_time.dart';
 import '../../../core/utils/whatsapp.dart';
@@ -171,7 +172,14 @@ class _PiedDeFiche extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         CpiButton(
+          'Appeler',
+          icon: PhosphorIconsRegular.phoneCall,
+          onPressed: () => unawaited(appelerNumero(context, data.phoneE164)),
+        ),
+        const SizedBox(height: CpiSpacing.xs),
+        CpiButton(
           'Ajouter des prospects',
+          variant: CpiButtonVariant.secondary,
           icon: PhosphorIconsRegular.userPlus,
           onPressed: () => context.pushOnce(Routes.newProspectFor(data.id)),
         ),
@@ -179,7 +187,7 @@ class _PiedDeFiche extends ConsumerWidget {
         Builder(
           builder: (BuildContext context) => CpiButton(
             'Autres actions',
-            variant: CpiButtonVariant.secondary,
+            variant: CpiButtonVariant.ghost,
             icon: PhosphorIconsRegular.dotsThree,
             onPressed: () => unawaited(_autresActions(context, ref, data)),
           ),

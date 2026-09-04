@@ -1,9 +1,11 @@
+import 'package:android_intent_plus/android_intent.dart';
 import 'package:cpi_go/core/feedback/feedback.dart';
 import 'package:cpi_go/core/notifications/rep_callback_notifications.dart';
 import 'package:cpi_go/core/providers/app_providers.dart';
 import 'package:cpi_go/core/providers/sync_coordinator.dart';
 import 'package:cpi_go/core/sync/clock.dart';
 import 'package:cpi_go/core/theme/app_theme.dart';
+import 'package:cpi_go/core/utils/appel.dart';
 import 'package:cpi_go/data/local/database.dart';
 import 'package:cpi_go/data/repositories/write_repository.dart';
 import 'package:cpi_go/features/auth/auth_controller.dart';
@@ -294,6 +296,34 @@ void main() {
       expect(find.text('Awa Sy'), findsOneWidget);
       // Le geste « Appeler maintenant » ne désignerait personne.
       expect(find.text('Appeler maintenant'), findsNothing);
+
+      await demonter(tester);
+    });
+
+    // Le bouton portait « Appeler maintenant » et ne faisait qu'ouvrir la
+    // fiche : le libellé promettait un geste que personne ne déclenchait.
+    testWidgets('« Appeler maintenant » compose le numéro du rappel', (
+      WidgetTester tester,
+    ) async {
+      final List<AndroidIntent> composes = <AndroidIntent>[];
+      lancerAppel = (AndroidIntent intent) async {
+        composes.add(intent);
+        return true;
+      };
+      addTearDown(() {
+        lancerAppel = lancerAppelParIntent;
+      });
+
+      await promettre(id: 'rap-1', at: t0);
+      await monter(tester, const RepCallbackDueListener(child: SizedBox()));
+      await tester.pump(const Duration(seconds: 21));
+      await battre(tester);
+
+      await tester.tap(find.text('Appeler maintenant'));
+      await battre(tester);
+
+      expect(composes.single.action, 'android.intent.action.DIAL');
+      expect(composes.single.data, 'tel:+221770000001');
 
       await demonter(tester);
     });

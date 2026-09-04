@@ -216,7 +216,7 @@ class RepCallbackNotifications {
       <AndroidNotificationAction>[
         AndroidNotificationAction(
           _actionOuvrir,
-          'Appeler maintenant',
+          'Ouvrir la fiche',
           showsUserInterface: true,
         ),
         AndroidNotificationAction(

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:android_intent_plus/android_intent.dart';
 import 'package:cpi_go/core/providers/app_providers.dart';
 import 'package:cpi_go/core/providers/sync_coordinator.dart';
 import 'package:cpi_go/core/router/app_router.dart';
@@ -7,6 +8,7 @@ import 'package:cpi_go/core/router/route_paths.dart';
 import 'package:cpi_go/core/router/single_push.dart';
 import 'package:cpi_go/core/sync/clock.dart';
 import 'package:cpi_go/core/theme/app_theme.dart';
+import 'package:cpi_go/core/utils/appel.dart';
 import 'package:cpi_go/data/local/database.dart';
 import 'package:cpi_go/data/repositories/write_repository.dart';
 import 'package:cpi_go/features/auth/auth_controller.dart';
@@ -15,6 +17,7 @@ import 'package:cpi_go/features/representant/presentation/representant_detail_sc
 import 'package:cpi_go/features/representant/presentation/representant_form_screen.dart';
 import 'package:cpi_go/features/representant/presentation/representant_picker_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -431,6 +434,105 @@ void main() {
       await mountFiche(tester);
 
       expect(find.text('NUMERO_PROFESSIONNEL'), findsOneWidget);
+
+      await teardownTree(tester);
+    });
+  });
+
+  /// La fiche est le seul endroit où le numéro se lit avant l'appel : sans ce
+  /// bouton, le téléconseiller recopiait à la main les neuf chiffres qu'il
+  /// venait de lire.
+  group('appeler', () {
+    late List<AndroidIntent> composes;
+    late List<String> copies;
+    late bool clavierRepond;
+
+    setUp(() {
+      composes = <AndroidIntent>[];
+      copies = <String>[];
+      clavierRepond = true;
+      lancerAppel = (AndroidIntent intent) async {
+        composes.add(intent);
+        return clavierRepond;
+      };
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, (
+            MethodCall call,
+          ) async {
+            if (call.method == 'Clipboard.setData') {
+              final Map<Object?, Object?> args =
+                  call.arguments as Map<Object?, Object?>;
+              copies.add(args['text']! as String);
+            }
+            return null;
+          });
+    });
+
+    tearDown(() {
+      lancerAppel = lancerAppelParIntent;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null);
+    });
+
+    Future<void> mountFiche(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(1200, 3000);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await insertRepresentant(
+        db,
+        id: 'rep-1',
+        phone: '+221771521162',
+        fullName: 'Ousmane Fall',
+      );
+
+      final ProviderContainer container = await makeContainer(tester);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: AppTheme.light,
+            locale: const Locale('fr'),
+            localizationsDelegates: GlobalMaterialLocalizations.delegates,
+            supportedLocales: const <Locale>[Locale('fr')],
+            home: const RepresentantDetailScreen(representantId: 'rep-1'),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+
+    testWidgets('le bouton ouvre le clavier sur le numéro de la fiche', (
+      WidgetTester tester,
+    ) async {
+      await mountFiche(tester);
+
+      await tester.tap(find.text('Appeler'));
+      await tester.pump();
+
+      // `ACTION_DIAL` : l'appui sur vert reste au téléconseiller, l'app n'a
+      // pas `CALL_PHONE`.
+      expect(composes.single.action, 'android.intent.action.DIAL');
+      expect(composes.single.data, 'tel:+221771521162');
+      expect(copies, isEmpty);
+
+      await teardownTree(tester);
+    });
+
+    testWidgets('sans clavier joignable, le numéro part au presse-papier', (
+      WidgetTester tester,
+    ) async {
+      clavierRepond = false;
+      await mountFiche(tester);
+
+      await tester.tap(find.text('Appeler'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(copies, <String>['+221771521162']);
+      expect(find.textContaining('Numéro copié'), findsOneWidget);
 
       await teardownTree(tester);
     });

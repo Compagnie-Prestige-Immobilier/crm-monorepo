@@ -1,8 +1,5 @@
 import 'dart:async';
-import 'dart:developer' as developer;
-import 'dart:io' show Platform;
 
-import 'package:android_intent_plus/android_intent.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,6 +12,7 @@ import '../../../core/router/back_navigation.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/router/single_push.dart';
 import '../../../core/theme/cpi_tokens.dart';
+import '../../../core/utils/appel.dart';
 import '../../../core/utils/phone.dart';
 import '../../../data/local/database.dart';
 import '../../../ui/async_value_x.dart';
@@ -80,29 +78,6 @@ class ProspectDetailScreen extends ConsumerWidget {
   }
 }
 
-/// Ouvre le clavier du téléphone avec le numéro déjà composé.
-///
-/// Sans `url_launcher` au projet : l'intent Android est déjà celui qu'utilise
-/// l'aide à la batterie. Hors Android, ou si aucune application ne répond, le
-/// numéro part au presse-papier : le téléconseiller le compose à la main plutôt
-/// que de toucher un bouton qui ne fait rien.
-Future<void> _appeler(BuildContext context, String phoneE164) async {
-  if (Platform.isAndroid) {
-    try {
-      await AndroidIntent(
-        action: 'android.intent.action.DIAL',
-        data: 'tel:$phoneE164',
-      ).launch();
-      return;
-    } on Object catch (e) {
-      developer.log('Clavier téléphonique inaccessible : $e', name: 'cpi.tel');
-    }
-  }
-  await Clipboard.setData(ClipboardData(text: phoneE164));
-  if (!context.mounted) return;
-  cpiToast(context, 'Numéro copié. Composez-le depuis le téléphone.');
-}
-
 class _Pied extends StatelessWidget {
   const _Pied({required this.data, required this.chues});
 
@@ -118,7 +93,7 @@ class _Pied extends StatelessWidget {
         CpiButton(
           'Appeler',
           icon: PhosphorIconsRegular.phoneCall,
-          onPressed: () => unawaited(_appeler(context, data.phoneE164)),
+          onPressed: () => unawaited(appelerNumero(context, data.phoneE164)),
         ),
         const SizedBox(height: CpiSpacing.xs),
         CpiButton(

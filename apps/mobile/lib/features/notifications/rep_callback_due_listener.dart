@@ -11,6 +11,7 @@ import '../../core/providers/app_providers.dart';
 import '../../core/router/app_router.dart';
 import '../../core/router/route_paths.dart';
 import '../../core/theme/cpi_tokens.dart';
+import '../../core/utils/appel.dart';
 import '../../core/utils/phone.dart';
 import '../../data/local/database.dart';
 import '../../data/repositories/write_repository.dart';
@@ -149,6 +150,16 @@ class _RepCallbackDueListenerState
           Navigator.of(sheet).pop();
           _openRepresentant(representantId);
         },
+        onAppeler: (RepCallbackReminder rappel) {
+          Navigator.of(sheet).pop();
+          _openRepresentant(rappel.representantId);
+          unawaited(
+            appelerNumero(
+              rootNavigatorKey.currentContext ?? context,
+              rappel.phoneE164,
+            ),
+          );
+        },
         onReporter: () {
           Navigator.of(sheet).pop();
           unawaited(
@@ -184,12 +195,14 @@ class _FeuilleRappels extends StatefulWidget {
     required this.rappels,
     required this.maintenant,
     required this.onOuvrir,
+    required this.onAppeler,
     required this.onReporter,
   });
 
   final List<RepCallbackReminder> rappels;
   final DateTime maintenant;
   final ValueChanged<String> onOuvrir;
+  final ValueChanged<RepCallbackReminder> onAppeler;
   final VoidCallback onReporter;
 
   @override
@@ -243,8 +256,7 @@ class _FeuilleRappelsState extends State<_FeuilleRappels> {
           CpiButton(
             'Appeler maintenant',
             icon: PhosphorIconsRegular.phoneCall,
-            onPressed: () =>
-                widget.onOuvrir(widget.rappels.single.representantId),
+            onPressed: () => widget.onAppeler(widget.rappels.single),
           ),
         if (seul) const SizedBox(height: CpiSpacing.xs),
         CpiButton(
