@@ -21,6 +21,8 @@ abstract class _$OuvertureFicheDtoCWProxy {
 
   OuvertureFicheDto openedAt(DateTime openedAt);
 
+  OuvertureFicheDto firstInputAt(DateTime? firstInputAt);
+
   OuvertureFicheDto closedAt(DateTime? closedAt);
 
   OuvertureFicheDto dureeSecondes(num? dureeSecondes);
@@ -47,6 +49,7 @@ abstract class _$OuvertureFicheDtoCWProxy {
     String? prospectId,
     String ficheNom,
     DateTime openedAt,
+    DateTime? firstInputAt,
     DateTime? closedAt,
     num? dureeSecondes,
     String? closingAttemptId,
@@ -88,6 +91,10 @@ class _$OuvertureFicheDtoCWProxyImpl implements _$OuvertureFicheDtoCWProxy {
   OuvertureFicheDto openedAt(DateTime openedAt) => this(openedAt: openedAt);
 
   @override
+  OuvertureFicheDto firstInputAt(DateTime? firstInputAt) =>
+      this(firstInputAt: firstInputAt);
+
+  @override
   OuvertureFicheDto closedAt(DateTime? closedAt) => this(closedAt: closedAt);
 
   @override
@@ -124,6 +131,7 @@ class _$OuvertureFicheDtoCWProxyImpl implements _$OuvertureFicheDtoCWProxy {
     Object? prospectId = const $CopyWithPlaceholder(),
     Object? ficheNom = const $CopyWithPlaceholder(),
     Object? openedAt = const $CopyWithPlaceholder(),
+    Object? firstInputAt = const $CopyWithPlaceholder(),
     Object? closedAt = const $CopyWithPlaceholder(),
     Object? dureeSecondes = const $CopyWithPlaceholder(),
     Object? closingAttemptId = const $CopyWithPlaceholder(),
@@ -160,6 +168,10 @@ class _$OuvertureFicheDtoCWProxyImpl implements _$OuvertureFicheDtoCWProxy {
           ? _value.openedAt
           // ignore: cast_nullable_to_non_nullable
           : openedAt as DateTime,
+      firstInputAt: firstInputAt == const $CopyWithPlaceholder()
+          ? _value.firstInputAt
+          // ignore: cast_nullable_to_non_nullable
+          : firstInputAt as DateTime?,
       closedAt: closedAt == const $CopyWithPlaceholder()
           ? _value.closedAt
           // ignore: cast_nullable_to_non_nullable
@@ -212,6 +224,7 @@ OuvertureFicheDto _$OuvertureFicheDtoFromJson(
       'prospectId',
       'ficheNom',
       'openedAt',
+      'firstInputAt',
       'closedAt',
       'dureeSecondes',
       'closingAttemptId',
@@ -228,6 +241,10 @@ OuvertureFicheDto _$OuvertureFicheDtoFromJson(
     prospectId: $checkedConvert('prospectId', (v) => v as String?),
     ficheNom: $checkedConvert('ficheNom', (v) => v as String),
     openedAt: $checkedConvert('openedAt', (v) => DateTime.parse(v as String)),
+    firstInputAt: $checkedConvert(
+      'firstInputAt',
+      (v) => v == null ? null : DateTime.parse(v as String),
+    ),
     closedAt: $checkedConvert(
       'closedAt',
       (v) => v == null ? null : DateTime.parse(v as String),
@@ -257,6 +274,7 @@ Map<String, dynamic> _$OuvertureFicheDtoToJson(OuvertureFicheDto instance) =>
       'prospectId': instance.prospectId,
       'ficheNom': instance.ficheNom,
       'openedAt': instance.openedAt.toIso8601String(),
+      'firstInputAt': instance.firstInputAt?.toIso8601String(),
       'closedAt': instance.closedAt?.toIso8601String(),
       'dureeSecondes': instance.dureeSecondes,
       'closingAttemptId': instance.closingAttemptId,

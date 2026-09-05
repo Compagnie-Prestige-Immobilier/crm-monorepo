@@ -43,7 +43,7 @@ class ComptageOuverturesJourDto {
   @JsonKey(name: r'ouvertures', required: true, includeIfNull: false)
   final num ouvertures;
 
-  /// DMT du jour, en secondes. Nulle tant qu’aucune ouverture n’est fermée.
+  /// DMT du jour, en secondes, lue entre la première saisie et la qualification. Les ouvertures fermées sans aucune saisie n’entrent pas au dénominateur. Nulle tant qu’aucune ne s’y prête.
   @JsonKey(name: r'dureeMoyenneSecondes', required: true, includeIfNull: true)
   final num? dureeMoyenneSecondes;
 

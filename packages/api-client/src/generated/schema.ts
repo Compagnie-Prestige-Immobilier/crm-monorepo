@@ -961,7 +961,10 @@ export interface paths {
       cookie?: never;
     };
     get?: never;
-    /** Remplace le brouillon d’une fiche ouverte. */
+    /**
+     * Remplace le brouillon d’une fiche ouverte.
+     * @description La première requête démarre le chronomètre : elle pose `firstInputAt`, une seule fois. Les suivantes ne le déplacent pas, même si elles le renvoient.
+     */
     put: operations['enregistrerBrouillonOuverture'];
     post?: never;
     delete?: never;
@@ -1016,7 +1019,7 @@ export interface paths {
     };
     /**
      * Fiches ouvertes par téléconseiller et par jour.
-     * @description Porte aussi la durée moyenne de traitement, lue entre l’ouverture et la qualification. Un téléconseiller ne lit que son propre compte.
+     * @description Porte aussi la durée moyenne de traitement, lue entre la première saisie et la qualification. Une fiche ouverte sans rien saisir n’entre pas au dénominateur. Un téléconseiller ne lit que son propre compte.
      */
     get: operations['compterOuvertures'];
     put?: never;
@@ -4105,6 +4108,8 @@ export interface components {
       performedByName: string;
       /** Format: date-time */
       clientCreatedAt: string;
+      /** @description Temps de traitement de la fiche pour cet appel, en secondes : de la première saisie à la qualification. Nul quand l’appel a été consigné hors du parcours de fiche ouverte, ou sans aucune saisie. Distinct de `deviceCallDurationSeconds`, qui est la durée de communication. */
+      dureeTraitementSecondes: number | null;
     };
     RepresentantCallAttemptListDto: {
       /** @description Du plus récent au plus ancien. */
@@ -4226,10 +4231,15 @@ export interface components {
       openedAt: string;
       /**
        * Format: date-time
+       * @description Première saisie, le départ du chronomètre. Nulle tant que rien n’a été saisi ; posée une seule fois.
+       */
+      firstInputAt: string | null;
+      /**
+       * Format: date-time
        * @description Nul tant que la fiche est verrouillée.
        */
       closedAt: string | null;
-      /** @description Durée de traitement, lue entre les deux bornes et jamais stockée. Distincte de la durée de communication du journal d’appels. */
+      /** @description Durée de traitement, lue entre `firstInputAt` et `closedAt` et jamais stockée. Nulle tant que l’une des deux manque : un chronomètre qui n’a pas démarré n’affiche pas zéro. Distincte de la durée de communication du journal d’appels. */
       dureeSecondes: number | null;
       /** Format: uuid */
       closingAttemptId: string | null;
@@ -4246,6 +4256,11 @@ export interface components {
       draft: {
         [key: string]: unknown;
       };
+      /**
+       * Format: date-time
+       * @description Heure du terrain de la première saisie. Le serveur ne la retient qu’une fois, à la première requête ; les suivantes ne la déplacent pas. Absente, l’heure du serveur en tient lieu.
+       */
+      firstInputAt?: string;
     };
     OuvertureFicheListDto: {
       /** @description De la plus ancienne à la plus récente. */
@@ -4261,7 +4276,7 @@ export interface components {
        */
       jour: string;
       ouvertures: number;
-      /** @description DMT du jour, en secondes. Nulle tant qu’aucune ouverture n’est fermée. */
+      /** @description DMT du jour, en secondes, lue entre la première saisie et la qualification. Les ouvertures fermées sans aucune saisie n’entrent pas au dénominateur. Nulle tant qu’aucune ne s’y prête. */
       dureeMoyenneSecondes: number | null;
     };
     ComptageOuverturesDto: {
@@ -4433,6 +4448,8 @@ export interface components {
       performedByName: string;
       /** Format: date-time */
       clientCreatedAt: string;
+      /** @description Temps de traitement de la fiche pour cet appel, en secondes : de la première saisie à la qualification. Nul quand l’appel a été consigné hors du parcours de fiche ouverte, ou sans aucune saisie. Distinct de `deviceCallDurationSeconds`, qui est la durée de communication. */
+      dureeTraitementSecondes: number | null;
     };
     ProspectCallAttemptListDto: {
       /** @description Du plus récent au plus ancien. */

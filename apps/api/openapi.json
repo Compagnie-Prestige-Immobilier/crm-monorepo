@@ -4923,6 +4923,7 @@
     },
     "/api/v1/ouvertures/{id}/brouillon": {
       "put": {
+        "description": "La première requête démarre le chronomètre : elle pose `firstInputAt`, une seule fois. Les suivantes ne le déplacent pas, même si elles le renvoient.",
         "operationId": "enregistrerBrouillonOuverture",
         "parameters": [
           {
@@ -5159,7 +5160,7 @@
     },
     "/api/v1/ouvertures/comptage": {
       "get": {
-        "description": "Porte aussi la durée moyenne de traitement, lue entre l’ouverture et la qualification. Un téléconseiller ne lit que son propre compte.",
+        "description": "Porte aussi la durée moyenne de traitement, lue entre la première saisie et la qualification. Une fiche ouverte sans rien saisir n’entre pas au dénominateur. Un téléconseiller ne lit que son propre compte.",
         "operationId": "compterOuvertures",
         "parameters": [
           {
@@ -22714,6 +22715,11 @@
           "clientCreatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "dureeTraitementSecondes": {
+            "type": "number",
+            "nullable": true,
+            "description": "Temps de traitement de la fiche pour cet appel, en secondes : de la première saisie à la qualification. Nul quand l’appel a été consigné hors du parcours de fiche ouverte, ou sans aucune saisie. Distinct de `deviceCallDurationSeconds`, qui est la durée de communication."
           }
         },
         "required": [
@@ -22738,7 +22744,8 @@
           "deviceCallAt",
           "performedById",
           "performedByName",
-          "clientCreatedAt"
+          "clientCreatedAt",
+          "dureeTraitementSecondes"
         ]
       },
       "RepresentantCallAttemptListDto": {
@@ -22967,6 +22974,12 @@
             "type": "string",
             "format": "date-time"
           },
+          "firstInputAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Première saisie, le départ du chronomètre. Nulle tant que rien n’a été saisi ; posée une seule fois."
+          },
           "closedAt": {
             "type": "string",
             "format": "date-time",
@@ -22976,7 +22989,7 @@
           "dureeSecondes": {
             "type": "number",
             "nullable": true,
-            "description": "Durée de traitement, lue entre les deux bornes et jamais stockée. Distincte de la durée de communication du journal d’appels."
+            "description": "Durée de traitement, lue entre `firstInputAt` et `closedAt` et jamais stockée. Nulle tant que l’une des deux manque : un chronomètre qui n’a pas démarré n’affiche pas zéro. Distincte de la durée de communication du journal d’appels."
           },
           "closingAttemptId": {
             "type": "string",
@@ -23007,6 +23020,7 @@
           "prospectId",
           "ficheNom",
           "openedAt",
+          "firstInputAt",
           "closedAt",
           "dureeSecondes",
           "closingAttemptId",
@@ -23022,6 +23036,11 @@
             "type": "object",
             "additionalProperties": true,
             "description": "Remplace le brouillon précédent en entier."
+          },
+          "firstInputAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Heure du terrain de la première saisie. Le serveur ne la retient qu’une fois, à la première requête ; les suivantes ne la déplacent pas. Absente, l’heure du serveur en tient lieu."
           }
         },
         "required": ["draft"]
@@ -23060,7 +23079,7 @@
           "dureeMoyenneSecondes": {
             "type": "number",
             "nullable": true,
-            "description": "DMT du jour, en secondes. Nulle tant qu’aucune ouverture n’est fermée."
+            "description": "DMT du jour, en secondes, lue entre la première saisie et la qualification. Les ouvertures fermées sans aucune saisie n’entrent pas au dénominateur. Nulle tant qu’aucune ne s’y prête."
           }
         },
         "required": ["openedById", "openedByName", "jour", "ouvertures", "dureeMoyenneSecondes"]
@@ -23636,6 +23655,11 @@
           "clientCreatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "dureeTraitementSecondes": {
+            "type": "number",
+            "nullable": true,
+            "description": "Temps de traitement de la fiche pour cet appel, en secondes : de la première saisie à la qualification. Nul quand l’appel a été consigné hors du parcours de fiche ouverte, ou sans aucune saisie. Distinct de `deviceCallDurationSeconds`, qui est la durée de communication."
           }
         },
         "required": [
@@ -23654,7 +23678,8 @@
           "deviceCallAt",
           "performedById",
           "performedByName",
-          "clientCreatedAt"
+          "clientCreatedAt",
+          "dureeTraitementSecondes"
         ]
       },
       "ProspectCallAttemptListDto": {
