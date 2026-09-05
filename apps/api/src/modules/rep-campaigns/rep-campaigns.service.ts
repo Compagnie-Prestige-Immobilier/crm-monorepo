@@ -10,6 +10,7 @@ import { attributionScope } from '../../common/scope.js';
 import { rattacherDetections } from '../../common/device-call.js';
 import { REPRESENTANT_RELATION_TRANSITIONS, isLegalTransition } from '../../common/transitions.js';
 import { COMMENT_MAX_LENGTH } from '../phase2/attempt-rules.js';
+import { fermerOuverture } from '../ouvertures/ouvertures.service.js';
 import { applyRelationChange } from '../representants/relation-change.js';
 import { resolveWhatsappPatch, type WhatsappPatch } from '../representants/whatsapp.js';
 import { RepresentantsService } from '../representants/representants.service.js';
@@ -124,6 +125,14 @@ export class RepCampaignsService {
         await tx.representant.update({
           where: { id: body.representantId },
           data: { ...state, rev: { increment: 1 } },
+        });
+      }
+      if (body.ouvertureId) {
+        await fermerOuverture(tx, {
+          ouvertureId: body.ouvertureId,
+          openedById: user.id,
+          attemptId: body.id,
+          at: new Date(body.clientCreatedAt),
         });
       }
       if (relation !== null) {
