@@ -251,6 +251,8 @@ describe('le sélecteur de statut', () => {
     );
 
     expect((await screen.findAllByRole('option')).map((option) => option.textContent)).toEqual([
+      'Accepté',
+      'Refusé',
       'À rappeler',
       'Faux numéro',
       'Décédé',
@@ -507,6 +509,25 @@ describe('la question « Souhaite-t-il être représentant CHUES ? »', () => {
       outcome: 'REACHED',
       statutQualificationId: 's-1',
       relationStatus: 'AMBASSADEUR',
+    });
+  });
+
+  // Le serveur refuse une relation qui contredit le statut pose
+  // (REP_RELATION_STATUT_MISMATCH) : choisir le statut dans la liste doit donc
+  // repondre a la question, jamais la laisser diverger.
+  it('répond à la question quand le statut se choisit dans la liste', async () => {
+    await scriptJusquAuSouhait();
+    await choisirStatut('Refusé');
+    await userEvent.click(screen.getByRole('button', { name: 'Continuer' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(() => {
+      expect(pushRepCallAttempt).toHaveBeenCalledTimes(1);
+    });
+    expect(pushRepCallAttempt.mock.calls[0]?.[0]).toMatchObject({
+      outcome: 'REFUSED',
+      statutQualificationId: 's-2',
+      relationStatus: 'REFUS',
     });
   });
 
