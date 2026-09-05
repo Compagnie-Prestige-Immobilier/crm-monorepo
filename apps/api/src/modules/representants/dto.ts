@@ -641,6 +641,12 @@ export class RepresentantCallAttemptDto {
   @ApiProperty({ type: String, format: 'uuid', nullable: true })
   statutQualificationId!: string | null;
   @ApiProperty({ type: String, nullable: true }) statutQualificationLabel!: string | null;
+  @ApiProperty({
+    type: Boolean,
+    description:
+      'Le statut exigeait un motif : `comment` porte alors ce motif, et non un commentaire libre.',
+  })
+  statutQualificationRequiresComment!: boolean;
   @ApiProperty({ type: String, nullable: true }) comment!: string | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) callbackAt!: string | null;
   @ApiProperty({ type: Number, nullable: true }) promisedProspects!: number | null;
