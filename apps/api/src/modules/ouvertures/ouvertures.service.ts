@@ -327,6 +327,8 @@ export class OuverturesService {
         u."fullName"                                            AS "openedByName",
         to_char(date_trunc('day', o."openedAt"), 'YYYY-MM-DD')   AS jour,
         COUNT(*)::int                                           AS ouvertures,
+        COUNT(*) FILTER (WHERE o."closingAttemptId" IS NOT NULL)::int AS qualifiees,
+        COUNT(*) FILTER (WHERE o."releasedById" IS NOT NULL)::int     AS liberees,
         -- AVG ignore les NULL : une ouverture sans saisie sort du denominateur
         -- au lieu d'y entrer avec une duree de zero.
         AVG(EXTRACT(EPOCH FROM (o."closedAt" - o."firstInputAt")))::int AS "dureeMoyenneSecondes"
