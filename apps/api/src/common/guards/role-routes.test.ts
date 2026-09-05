@@ -205,9 +205,18 @@ const ADMISES: readonly string[] = [
 
   'LotsExportController.list',
   'LotsExportController.get',
+  'LotsExportController.fiches',
   'LotsExportController.xlsx',
   'LotsExportController.programme',
   'LotsExportController.programmesZip',
+  // EB-15 : le superviseur cree, previsualise et lance une campagne, et il en
+  // regle la repartition. La SUPPRESSION reste a l'administrateur seul : elle
+  // emporte le programme que le terrain a deja en main.
+  'LotsExportController.create',
+  'LotsExportController.preview',
+  'LotsExportController.update',
+  'LotsExportController.reaffecter',
+  'LotsExportController.retirer',
   'ExportController.representantsExport',
 
   'RepresentantsController.callHistory',
@@ -300,12 +309,26 @@ const ADMISES_ACCUEIL: readonly string[] = [
  * l'alimentent et exporte ce qu'elle lit. Elle n'ouvre aucun compte et ne purge
  * rien.
  */
+/**
+ * EB-15 et EB-16 : creer une campagne, la regler et deplacer les fiches d'un
+ * teleconseiller sont des gestes d'ENCADREMENT du travail d'autrui. La
+ * direction lit les campagnes, elle ne les conduit pas.
+ */
+const ENCADREMENT_DES_CAMPAGNES: readonly string[] = [
+  'LotsExportController.create',
+  'LotsExportController.preview',
+  'LotsExportController.update',
+  'LotsExportController.reaffecter',
+  'LotsExportController.retirer',
+];
+
 const ADMISES_DIRECTION: readonly string[] = [
   ...ADMISES.filter(
     (route) =>
       route !== 'AnalyticsController.bankAging' &&
       route !== 'OuverturesController.ouvertes' &&
-      route !== 'OuverturesController.liberer',
+      route !== 'OuverturesController.liberer' &&
+      !ENCADREMENT_DES_CAMPAGNES.includes(route),
   ),
   ...REGISTRE,
   'ExportController.prospects',
@@ -488,11 +511,9 @@ describe('ce qu’une DIRECTION atteint, route par route', () => {
   // a l'administrateur, et la direction n'y est pas.
   it('lit tout ce que lit la supervision, hors dossiers bancaires et fiches a liberer', () => {
     const direction = new Set(ouvertesDe(Role.DIRECTION));
-    expect(ouvertesDe(Role.SUPERVISEUR).filter((route) => !direction.has(route))).toEqual([
-      'AnalyticsController.bankAging',
-      'OuverturesController.liberer',
-      'OuverturesController.ouvertes',
-    ]);
+    expect(ouvertesDe(Role.SUPERVISEUR).filter((route) => !direction.has(route))).toEqual(
+      ['AnalyticsController.bankAging', ...ENCADREMENT_DES_CAMPAGNES, 'OuverturesController.liberer', 'OuverturesController.ouvertes'].sort(),
+    );
   });
 
   it('reste hors du domaine bancaire', () => {
