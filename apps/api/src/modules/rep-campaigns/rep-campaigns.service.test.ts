@@ -565,3 +565,104 @@ describe('la relation que le statut pose sur la fiche', () => {
     });
   });
 });
+
+describe('EB-06 : la fiche non jointe repasse d’elle-même en file', () => {
+  const STATUT = '0198c000-0000-7000-8000-000000000003';
+
+  const statut = (retryAfterMinutes: number | null, over: Record<string, unknown> = {}) => ({
+    id: STATUT,
+    code: 'PAS_DE_REPONSE',
+    label: 'Pas de réponse',
+    effect: StatutQualificationEffect.UNREACHABLE,
+    requiresCallback: false,
+    retryAfterMinutes,
+    relationStatus: null,
+    isActive: true,
+    ...over,
+  });
+
+  const fiche = (): Record<string, unknown> | undefined =>
+    (tx.representant.update.mock.calls[0] as [{ data: Record<string, unknown> }] | undefined)?.[0]
+      .data;
+
+  const nonJoint = (): CreateRepCallAttemptDto => {
+    const body = baseBody();
+    body.outcome = RepCallOutcome.UNREACHABLE;
+    body.statutQualificationId = STATUT;
+    return body;
+  };
+
+  it('arme l’échéance à partir du délai du statut, comptée depuis l’heure du terrain', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(statut(120));
+
+    await service.recordAttempt(ALICE, nonJoint());
+
+    expect(fiche()).toMatchObject({
+      nextCallbackAt: new Date('2026-08-10T12:00:00.000Z'),
+      nextCallbackOrigine: 'AUTOMATIQUE',
+    });
+  });
+
+  it('n’arme rien quand le délai est nul : « Injoignable définitif » ne revient jamais', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(
+      statut(null, { code: 'INJOIGNABLE_DEFINITIF', label: 'Injoignable définitif' }),
+    );
+
+    await service.recordAttempt(ALICE, nonJoint());
+
+    expect(fiche()).toMatchObject({ nextCallbackAt: null, nextCallbackOrigine: null });
+  });
+
+  it('garde la date convenue et la marque PROMIS, délai de réessai ou non', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(
+      statut(null, {
+        code: 'A_RAPPELER',
+        label: 'À rappeler',
+        effect: StatutQualificationEffect.SCHEDULE_CALLBACK,
+        requiresCallback: true,
+      }),
+    );
+    const body = nonJoint();
+    body.outcome = RepCallOutcome.CALLBACK;
+    body.callbackAt = '2026-08-12T09:00:00.000Z';
+
+    await service.recordAttempt(ALICE, body);
+
+    expect(fiche()).toMatchObject({
+      nextCallbackAt: new Date('2026-08-12T09:00:00.000Z'),
+      nextCallbackOrigine: 'PROMIS',
+    });
+  });
+
+  it('efface l’échéance quand la fiche est enfin jointe', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(
+      statut(null, {
+        code: 'ACCEPTE',
+        label: 'Accepté',
+        effect: StatutQualificationEffect.REACHED,
+      }),
+    );
+    const body = nonJoint();
+    body.outcome = RepCallOutcome.REACHED;
+
+    await service.recordAttempt(ALICE, body);
+
+    expect(fiche()).toMatchObject({ nextCallbackAt: null, nextCallbackOrigine: null });
+  });
+
+  it('n’écrase pas l’échéance quand une tentative plus ancienne remonte après coup', async () => {
+    db.representant.findFirst.mockResolvedValue({
+      id: REP,
+      relationStatus: 'INCONNU',
+      whatsappStatus: 'NON_DEMANDE',
+      whatsappE164: null,
+      phoneE164: '+221771234567',
+      lastCallAt: new Date('2026-08-11T10:00:00.000Z'),
+    });
+    db.statutQualification.findUnique.mockResolvedValue(statut(120));
+
+    await service.recordAttempt(ALICE, nonJoint());
+
+    expect(fiche()).not.toHaveProperty('nextCallbackAt');
+  });
+});

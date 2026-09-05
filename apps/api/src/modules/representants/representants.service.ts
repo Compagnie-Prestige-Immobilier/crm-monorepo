@@ -154,6 +154,7 @@ export function toRepresentantDto(row: RepresentantRow): RepresentantDto {
     lastCallById: row.lastCallById,
     lastCallByName: row.lastCallBy?.fullName ?? null,
     nextCallbackAt: row.nextCallbackAt?.toISOString() ?? null,
+    nextCallbackOrigine: row.nextCallbackOrigine,
   };
 }
 

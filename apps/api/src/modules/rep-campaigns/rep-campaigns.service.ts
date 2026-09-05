@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { ChangeSource, RepCallOutcome, RepresentantRelation } from '@crm/database';
+import { ChangeSource, RappelOrigine, RepCallOutcome, RepresentantRelation } from '@crm/database';
 import type { StatutQualification } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
@@ -118,7 +118,7 @@ export class RepCampaignsService {
 
       const state = {
         ...representantPatch(body, whatsapp, changesPhone ? newPhone : undefined),
-        ...dernierAppel(body, user.id, representant.lastCallAt),
+        ...dernierAppel(body, user.id, representant.lastCallAt, statut),
       };
       if (Object.keys(state).length > 0) {
         await tx.representant.update({
@@ -284,14 +284,50 @@ function representantPatch(
 
 // Une tentative arrivée hors ligne peut être plus ancienne que le dernier appel
 // connu : elle ne réécrit pas la fiche.
-function dernierAppel(body: CreateRepCallAttemptDto, userId: string, lastCallAt: Date | null) {
+function dernierAppel(
+  body: CreateRepCallAttemptDto,
+  userId: string,
+  lastCallAt: Date | null,
+  statut: StatutQualification | null,
+) {
   const at = new Date(body.clientCreatedAt);
   if (lastCallAt !== null && at < lastCallAt) return {};
   return {
     lastCallOutcome: body.outcome,
     lastCallAt: at,
     lastCallById: userId,
-    nextCallbackAt: body.callbackAt ? new Date(body.callbackAt) : null,
+    ...prochainRappel(body, at, statut),
+  };
+}
+
+/**
+ * L'échéance et son origine s'écrivent ENSEMBLE : une contrainte CHECK refuse
+ * l'une sans l'autre.
+ *
+ * Le délai vient de `retryAfterMinutes`, réglable par l'administrateur, et un
+ * délai nul dit « ne revient jamais » : c'est ce qui distingue « Injoignable
+ * définitif » sans que son code soit écrit ici. Les statuts joints le portent
+ * nul, ils ne repassent donc pas, sauf « À rappeler » qui vient avec sa date.
+ *
+ * Compté depuis l'horloge du TERRAIN : une qualification faite hors ligne lundi
+ * et remontée jeudi est déjà en retard, ce qui est la vérité.
+ */
+function prochainRappel(
+  body: CreateRepCallAttemptDto,
+  at: Date,
+  statut: StatutQualification | null,
+) {
+  if (body.callbackAt) {
+    return {
+      nextCallbackAt: new Date(body.callbackAt),
+      nextCallbackOrigine: RappelOrigine.PROMIS,
+    };
+  }
+  const delai = statut?.retryAfterMinutes ?? null;
+  if (delai === null) return { nextCallbackAt: null, nextCallbackOrigine: null };
+  return {
+    nextCallbackAt: new Date(at.getTime() + delai * 60_000),
+    nextCallbackOrigine: RappelOrigine.AUTOMATIQUE,
   };
 }
 
