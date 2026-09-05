@@ -31,7 +31,7 @@ export const STATUT_QUALIFICATION_EFFECT_LABELS: Record<StatutQualificationEffec
   REFUSED: 'Appel abouti, refus',
   SCHEDULE_CALLBACK: 'Appel abouti, rappel daté',
   UNREACHABLE: 'Appel non abouti',
-  WRONG_NUMBER: 'Appel non abouti, mauvais numéro',
+  WRONG_NUMBER: 'Appel abouti, mauvais numéro',
 };
 
 /** Du plus urgent au moins urgent : le serveur trie l'annuaire dans cet ordre. */
@@ -59,18 +59,31 @@ export type StatutRelationPosee = StatutQualification['relationStatus'];
  * fait la même déduction : une colonne « joignable » divergerait de l'effet à
  * la première correction.
  */
-const ABOUTI: readonly StatutQualificationEffect[] = ['REACHED', 'REFUSED', 'SCHEDULE_CALLBACK'];
+const ABOUTI: readonly StatutQualificationEffect[] = [
+  'REACHED',
+  'REFUSED',
+  'SCHEDULE_CALLBACK',
+  'WRONG_NUMBER',
+];
 
 export const estAbouti = (effect: StatutQualificationEffect): boolean => ABOUTI.includes(effect);
 
-/** Le rappel se propose des deux côtés : on rappelle aussi qui on n'a pas joint. */
 export const statutsDeLaBranche = (
   statuts: readonly StatutQualification[],
   abouti: boolean,
-): StatutQualification[] =>
-  statuts.filter(
-    (statut) => estAbouti(statut.effect) === abouti || statut.effect === 'SCHEDULE_CALLBACK',
-  );
+): StatutQualification[] => statuts.filter((statut) => estAbouti(statut.effect) === abouti);
+
+/**
+ * En base, le libellé porte sa famille parce qu'il y est unique. À l'écran,
+ * l'en-tête de branche la dit déjà.
+ */
+const LIBELLES_ABREGES: Record<string, string> = {
+  AUTRE_JOINT: 'Autre',
+  AUTRE_NON_JOINT: 'Autre',
+};
+
+export const libelleStatut = (statut: Pick<StatutQualification, 'code' | 'label'>): string =>
+  LIBELLES_ABREGES[statut.code] ?? statut.label;
 
 /** Vocabulaire de SAISIE : actifs seulement, servis dans l'ordre dicté. */
 export async function fetchStatutsQualification(

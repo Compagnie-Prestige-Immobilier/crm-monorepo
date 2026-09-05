@@ -81,6 +81,12 @@ const STATUTS: StatutQualification[] = [
     retryAfterMinutes: 180,
   }),
   statut({ id: 's-5', code: 'FAUX_NUMERO', label: 'Faux numéro', effect: 'WRONG_NUMBER' }),
+  statut({
+    id: 's-6',
+    code: 'INJOIGNABLE_DEFINITIF',
+    label: 'Injoignable définitif',
+    effect: 'UNREACHABLE',
+  }),
 ];
 
 const REPRESENTANT: ScriptedRepresentant = {
@@ -193,10 +199,11 @@ describe('le sélecteur de statut', () => {
       'Intéressé',
       'Non intéressé',
       'À rappeler',
+      'Faux numéro',
     ]);
   });
 
-  it('ne propose que les statuts de la branche non aboutie, plus le rappel', async () => {
+  it('ne propose que les statuts de la branche non aboutie', async () => {
     await ouvrirQualification();
     await repondre('Injoignable');
     await userEvent.click(
@@ -204,9 +211,8 @@ describe('le sélecteur de statut', () => {
     );
 
     expect((await screen.findAllByRole('option')).map((option) => option.textContent)).toEqual([
-      'À rappeler',
       'Pas de réponse',
-      'Faux numéro',
+      'Injoignable définitif',
     ]);
   });
 });
@@ -251,18 +257,10 @@ describe('la date de rappel suit le statut, pas le résultat', () => {
     expect(screen.getByRole('button', { name: 'Continuer' }).hasAttribute('disabled')).toBe(true);
   });
 
-  it('s’ouvre sur un appel non abouti quand le rappel est retenu', async () => {
+  it('ne s’ouvre pas sur un statut non abouti qui ne se retente jamais', async () => {
     await ouvrirQualification();
     await repondre('Injoignable');
-    await choisirStatut('À rappeler');
-
-    expect(screen.getByText('Quand rappeler ?')).toBeTruthy();
-  });
-
-  it('ne s’ouvre sur aucun statut d’appel non abouti', async () => {
-    await ouvrirQualification();
-    await repondre('Injoignable');
-    await choisirStatut('Faux numéro');
+    await choisirStatut('Injoignable définitif');
 
     expect(screen.queryByText('Quand rappeler ?')).toBeNull();
     expect(screen.queryByText(/Le rappeler plus tard/u)).toBeNull();
@@ -300,9 +298,11 @@ describe('l’enregistrement attend le statut', () => {
     expect(screen.getByRole('button', { name: 'Continuer' }).hasAttribute('disabled')).toBe(true);
   });
 
-  it('envoie le statut retenu et l’issue qu’il dérive', async () => {
+  // Un faux numéro est joint : la fiche est traitée, et le script qui suppose
+  // qu'on parle à la bonne personne n'a plus rien à demander.
+  it('envoie le statut retenu et l’issue qu’il dérive, script vierge', async () => {
     await ouvrirQualification();
-    await repondre('Injoignable');
+    await repondre('Joignable');
     await choisirStatut('Faux numéro');
     await userEvent.click(screen.getByRole('button', { name: 'Continuer' }));
     await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
