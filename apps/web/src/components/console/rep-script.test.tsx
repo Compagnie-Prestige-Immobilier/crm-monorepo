@@ -793,6 +793,8 @@ describe('RepScript : l’ouverture confirmée d’une fiche', () => {
   // ce rattrapage, le téléconseiller reste devant un refus qu'il ne peut pas lever.
   it('rouvre la fiche déjà en main quand le verrou du serveur refuse', async () => {
     ouvrirFiche.mockRejectedValue(new Error('OUVERTURE_FICHE_DEJA_OUVERTE'));
+    // Rien de tenu au montage : c'est le refus du serveur qu'on éprouve ici.
+    fetchOuvertureCourante.mockResolvedValueOnce(null);
     fetchOuvertureCourante.mockResolvedValue(
       ouverture({ id: 'ouv-9', representantId: 'r-2', ficheNom: 'Ousmane Fall' }),
     );
@@ -1087,5 +1089,50 @@ describe('RepScript : filtrer et parcourir ses fiches', () => {
     expect(GET.mock.calls[0]?.[1]).toMatchObject({
       params: { query: { relationStatus: 'CONTACTE,AMBASSADEUR,REFUS' } },
     });
+  });
+});
+
+// EB-08 : le verrou vit sur le serveur, l'écran non. Ctrl+R, une URL retapée ou
+// un plantage laissaient le téléconseiller devant l'annuaire, fiche tenue.
+describe('RepScript : la fiche tenue au rechargement', () => {
+  it('rouvre au montage la fiche que le serveur tient encore', async () => {
+    fetchOuvertureCourante.mockResolvedValue(
+      ouverture({ id: 'ouv-7', representantId: 'r-2', ficheNom: 'Ousmane Fall' }),
+    );
+    fetchRepresentant.mockResolvedValue(SECOND);
+
+    await renderListe();
+
+    expect((await screen.findByRole('heading', { level: 2 })).textContent).toBe('Ousmane Fall');
+    expect(screen.getByText(/Fiche ouverte depuis/u)).toBeTruthy();
+    // Rouvrir n'est pas ouvrir : la fiche est déjà comptée, EB-07.
+    expect(ouvrirFiche).not.toHaveBeenCalled();
+  });
+
+  it('remet le chronomètre à l’heure de l’ouverture, pas à zéro', async () => {
+    fetchOuvertureCourante.mockResolvedValue(
+      ouverture({ openedAt: new Date(Date.now() - 125_000).toISOString() }),
+    );
+    fetchRepresentant.mockResolvedValue(PREMIER);
+
+    await renderListe();
+
+    expect((await screen.findByText(/Fiche ouverte depuis/u)).textContent).toContain('02:0');
+  });
+
+  // La fiche tenue est sur l'autre console : l'ignorer laisserait chercher.
+  it('dit où est la fiche quand elle est tenue sur un prospect', async () => {
+    fetchOuvertureCourante.mockResolvedValue(
+      ouverture({ representantId: null, prospectId: 'p-2', ficheNom: 'Rappel Fiche' }),
+    );
+
+    await renderListe();
+
+    await waitFor(() => {
+      expect(toastError.mock.calls.at(-1)?.[0]).toBe(
+        'Vous avez Rappel Fiche en main sur « Convertir un prospect ». Consignez l’appel avant d’ouvrir une fiche ici.',
+      );
+    });
+    expect(screen.queryByText(/Fiche ouverte depuis/u)).toBeNull();
   });
 });

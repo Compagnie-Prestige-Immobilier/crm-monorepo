@@ -36,4 +36,26 @@ describe('verrou de navigation', () => {
 
     expect(prevenir).toHaveBeenCalledTimes(1);
   });
+
+  // Ctrl+R et Ctrl+Maj+R ne passent que par la : Safari, et Chrome avant la
+  // 119, ignorent `preventDefault()` sans `returnValue`.
+  it('reclame l’avertissement du navigateur avant un rechargement', () => {
+    render(<SousVerrou prevenir={vi.fn()} />);
+
+    const rechargement = new Event('beforeunload', { cancelable: true });
+    // jsdom n'a que le `returnValue` historique, qui ne rend qu'un booleen :
+    // on observe donc ce que le gestionnaire y pose.
+    let pose: unknown = null;
+    Object.defineProperty(rechargement, 'returnValue', {
+      get: () => pose,
+      set: (valeur: unknown) => {
+        pose = valeur;
+      },
+    });
+
+    window.dispatchEvent(rechargement);
+
+    expect(rechargement.defaultPrevented).toBe(true);
+    expect(pose).toBe('');
+  });
 });
