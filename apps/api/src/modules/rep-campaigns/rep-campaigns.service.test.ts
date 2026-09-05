@@ -31,6 +31,7 @@ interface Tx {
   representant: { findFirst: MockFn; update: MockFn; updateMany: MockFn };
   representantRelationChange: { create: MockFn };
   deviceCallDetection: { updateMany: MockFn };
+  ouvertureFiche: { findUnique: MockFn; updateMany: MockFn };
 }
 
 let tx: Tx;
@@ -61,6 +62,10 @@ beforeEach(() => {
     },
     representantRelationChange: { create: vi.fn() },
     deviceCallDetection: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    ouvertureFiche: {
+      findUnique: vi.fn().mockResolvedValue({ openedAt: new Date('2026-08-10T09:50:00.000Z') }),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
   };
   db = {
     repCallAttempt: { findUnique: vi.fn().mockResolvedValue(null) },
@@ -664,5 +669,31 @@ describe('EB-06 : la fiche non jointe repasse d’elle-même en file', () => {
     await service.recordAttempt(ALICE, nonJoint());
 
     expect(fiche()).not.toHaveProperty('nextCallbackAt');
+  });
+});
+
+describe('EB-09 : la qualification ferme l’ouverture qui la chronométrait', () => {
+  const OUVERTURE = '0198d000-0000-7000-8000-000000000001';
+
+  it('attache la tentative à l’ouverture, dans la MÊME transaction', async () => {
+    const body = baseBody();
+    body.ouvertureId = OUVERTURE;
+
+    await service.recordAttempt(ALICE, body);
+
+    const [args] = tx.ouvertureFiche.updateMany.mock.calls[0] as [
+      { where: Record<string, unknown>; data: Record<string, unknown> },
+    ];
+    expect(args.where).toMatchObject({ id: OUVERTURE, openedById: ALICE.id, closedAt: null });
+    expect(args.data).toEqual({
+      closedAt: new Date('2026-08-10T10:00:00.000Z'),
+      closingAttemptId: body.id,
+    });
+  });
+
+  it('ne touche à rien quand la tentative ne porte pas d’ouverture', async () => {
+    await service.recordAttempt(ALICE, baseBody());
+
+    expect(tx.ouvertureFiche.updateMany).not.toHaveBeenCalled();
   });
 });

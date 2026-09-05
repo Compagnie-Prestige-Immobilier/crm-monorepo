@@ -51,6 +51,15 @@ export class CreateRepCallAttemptDto {
   statutQualificationId?: string;
 
   @ApiPropertyOptional({
+    format: 'uuid',
+    description:
+      'Ouverture de fiche que cette qualification ferme. Le chronomètre se lit entre son `openedAt` et cette fermeture. Une ouverture inconnue, déjà fermée ou ouverte par un autre est ignorée : la tentative vient du terrain et ne se perd pas pour un verrou.',
+  })
+  @IsOptional()
+  @IsUUID()
+  ouvertureId?: string;
+
+  @ApiPropertyOptional({
     type: Number,
     minimum: 0,
     maximum: 10_000,

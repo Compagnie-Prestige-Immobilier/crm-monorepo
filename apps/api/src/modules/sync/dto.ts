@@ -443,6 +443,15 @@ export class SyncEntityDataDto {
   @IsUUID()
   prospectId?: string;
 
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description:
+      'Tentative d’appel : ouverture de fiche que cette qualification ferme. Une ouverture inconnue, déjà fermée ou ouverte par un autre est ignorée : la tentative vient du terrain et ne se perd pas pour un verrou.',
+  })
+  @IsOptional()
+  @IsUUID()
+  ouvertureId?: string;
+
   @ApiPropertyOptional({ enum: CallOutcome, enumName: 'CallOutcome' })
   @IsOptional()
   @IsEnum(CallOutcome)
