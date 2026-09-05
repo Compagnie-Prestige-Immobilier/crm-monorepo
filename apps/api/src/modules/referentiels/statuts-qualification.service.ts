@@ -1,8 +1,14 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrioriteTraitement, RepCallOutcome, StatutQualificationEffect } from '@crm/database';
 import type { StatutQualification } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { sansAccents } from '../../common/texte.js';
 import type {
   CreateStatutQualificationDto,
   SetStatutQualificationActiveDto,
@@ -15,6 +21,7 @@ export const StatutQualificationError = {
   NOT_FOUND: 'STATUT_QUALIFICATION_NOT_FOUND',
   CODE_CONFLICT: 'STATUT_QUALIFICATION_CODE_CONFLICT',
   LABEL_CONFLICT: 'STATUT_QUALIFICATION_LABEL_CONFLICT',
+  LABEL_UNUSABLE: 'STATUT_QUALIFICATION_LABEL_UNUSABLE',
   SYSTEM_IMMUTABLE: 'STATUT_QUALIFICATION_SYSTEM_IMMUTABLE',
   CALLBACK_NOT_ALLOWED: 'STATUT_QUALIFICATION_CALLBACK_NOT_ALLOWED',
   LAST_OF_BRANCH: 'STATUT_QUALIFICATION_LAST_OF_BRANCH',
@@ -44,26 +51,33 @@ export function outcomeOf(effect: StatutQualificationEffect): RepCallOutcome {
 }
 
 /**
- * Les branches du script où le statut se propose. Déduites de l'effet et non
- * stockées : une colonne « joignable » divergerait à la première correction.
- * SCHEDULE_CALLBACK est dans les deux : on rappelle aussi qui on n'a pas joint.
+ * La famille du statut, déduite de l'effet et non stockée : une colonne
+ * « joignable » divergerait à la première correction. Un faux numéro est JOINT,
+ * la fiche est traitée ; un rappel convenu l'est aussi, et il est le seul joint
+ * qui repasse. Les deux familles PARTITIONNENT les effets : un statut se
+ * propose sous une seule branche du script.
  */
-const ABOUTI: readonly StatutQualificationEffect[] = [
+const JOINT: readonly StatutQualificationEffect[] = [
   StatutQualificationEffect.REACHED,
   StatutQualificationEffect.REFUSED,
   StatutQualificationEffect.SCHEDULE_CALLBACK,
-];
-
-const NON_ABOUTI: readonly StatutQualificationEffect[] = [
-  StatutQualificationEffect.UNREACHABLE,
   StatutQualificationEffect.WRONG_NUMBER,
-  StatutQualificationEffect.SCHEDULE_CALLBACK,
 ];
 
-export const branchesDe = (
+const NON_JOINT: readonly StatutQualificationEffect[] = [StatutQualificationEffect.UNREACHABLE];
+
+export const brancheDe = (
   effect: StatutQualificationEffect,
-): readonly (readonly StatutQualificationEffect[])[] =>
-  [ABOUTI, NON_ABOUTI].filter((branche) => branche.includes(effect));
+): readonly StatutQualificationEffect[] => (JOINT.includes(effect) ? JOINT : NON_JOINT);
+
+/**
+ * Le code se lit dans le libellé : l'administrateur n'en saisit plus. Il ne se
+ * dérive qu'A LA CREATION, jamais en renommant, car l'historique le référence.
+ */
+const codeDepuisLibelle = (label: string): string =>
+  sansAccents(label).toUpperCase().replace(/\s+/gu, '_');
+
+const CODE_UTILISABLE = /^[A-Za-z][A-Za-z0-9_]*$/u;
 
 const toDto = (row: StatutQualification): StatutQualificationDto => ({
   id: row.id,
@@ -71,6 +85,7 @@ const toDto = (row: StatutQualification): StatutQualificationDto => ({
   label: row.label,
   effect: row.effect,
   requiresCallback: row.requiresCallback,
+  requiresComment: row.requiresComment,
   retryAfterMinutes: row.retryAfterMinutes,
   priorite: row.priorite,
   relationStatus: row.relationStatus,
@@ -105,15 +120,13 @@ export class StatutsQualificationService {
   }
 
   async create(input: CreateStatutQualificationDto): Promise<StatutQualificationDto> {
-    const code = input.code.trim().toUpperCase();
     const label = input.label.trim();
+    const code = codeDepuisLibelle(label);
 
-    const clash = await this.prisma.statutQualification.findUnique({ where: { code } });
-    if (clash) {
-      throw new ConflictException({
-        code: StatutQualificationError.CODE_CONFLICT,
-        message: `Le code « ${code} » est déjà utilisé par le statut « ${clash.label} ».`,
-        existingId: clash.id,
+    if (!CODE_UTILISABLE.test(code)) {
+      throw new BadRequestException({
+        code: StatutQualificationError.LABEL_UNUSABLE,
+        message: `« ${label} » ne donne aucun code utilisable : commencez par une lettre et n’employez que des lettres, des chiffres et des espaces.`,
       });
     }
 
@@ -121,8 +134,17 @@ export class StatutsQualificationService {
     if (sameLabel) {
       throw new ConflictException({
         code: StatutQualificationError.LABEL_CONFLICT,
-        message: `Le libellé « ${label} » est déjà porté par le statut « ${sameLabel.code} ».`,
+        message: `Le libellé « ${label} » est déjà porté par un autre statut.`,
         existingId: sameLabel.id,
+      });
+    }
+
+    const clash = await this.prisma.statutQualification.findUnique({ where: { code } });
+    if (clash) {
+      throw new ConflictException({
+        code: StatutQualificationError.CODE_CONFLICT,
+        message: `« ${label} » donne le même code que « ${clash.label} » : distinguez-les autrement que par les accents ou la casse.`,
+        existingId: clash.id,
       });
     }
 
@@ -135,6 +157,7 @@ export class StatutsQualificationService {
         label,
         effect: input.effect,
         requiresCallback,
+        requiresComment: input.requiresComment ?? false,
         retryAfterMinutes: input.retryAfterMinutes ?? null,
         priorite: input.priorite ?? PrioriteTraitement.NORMALE,
         relationStatus: input.relationStatus ?? null,
@@ -154,7 +177,9 @@ export class StatutsQualificationService {
     // système compris : ce sont des arbitrages du métier. La RÈGLE, elle, ne se
     // reconfigure pas : le script s'appuie dessus, et les clients déployés
     // l'ont compilée.
-    if (existing.isSystem && input.requiresCallback !== undefined) {
+    const regleTouchee =
+      input.requiresCallback !== undefined || input.requiresComment !== undefined;
+    if (existing.isSystem && regleTouchee) {
       throw new ConflictException({
         code: StatutQualificationError.SYSTEM_IMMUTABLE,
         message: `« ${existing.label} » est un statut système : sa règle est celle du script et ne se reconfigure pas ici.`,
@@ -172,7 +197,7 @@ export class StatutsQualificationService {
       if (sameLabel && sameLabel.id !== id) {
         throw new ConflictException({
           code: StatutQualificationError.LABEL_CONFLICT,
-          message: `Le libellé « ${label} » est déjà porté par le statut « ${sameLabel.code} ».`,
+          message: `Le libellé « ${label} » est déjà porté par un autre statut.`,
           existingId: sameLabel.id,
         });
       }
@@ -185,6 +210,7 @@ export class StatutsQualificationService {
         ...(input.requiresCallback === undefined
           ? {}
           : { requiresCallback: input.requiresCallback }),
+        ...(input.requiresComment === undefined ? {} : { requiresComment: input.requiresComment }),
         ...(input.priorite === undefined ? {} : { priorite: input.priorite }),
         ...(input.relationStatus === undefined ? {} : { relationStatus: input.relationStatus }),
         ...(input.retryAfterMinutes === undefined
@@ -208,14 +234,14 @@ export class StatutsQualificationService {
     const existing = await this.statut(id);
 
     if (!input.isActive && existing.isActive) {
-      const restants = await Promise.all(
-        branchesDe(existing.effect).map((branche) =>
-          this.prisma.statutQualification.count({
-            where: { isActive: true, effect: { in: [...branche] }, id: { not: id } },
-          }),
-        ),
-      );
-      if (restants.includes(0)) {
+      const restants = await this.prisma.statutQualification.count({
+        where: {
+          isActive: true,
+          effect: { in: [...brancheDe(existing.effect)] },
+          id: { not: id },
+        },
+      });
+      if (restants === 0) {
         throw new ConflictException({
           code: StatutQualificationError.LAST_OF_BRANCH,
           message: `« ${existing.label} » est le dernier statut actif de sa branche : la retirer laisserait le script sans issue possible.`,
@@ -238,9 +264,8 @@ export class StatutsQualificationService {
    * l'autre.
    */
   private async rangSuivant(effect: StatutQualificationEffect): Promise<number> {
-    const branche = ABOUTI.includes(effect) ? ABOUTI : NON_ABOUTI;
     const dernier = await this.prisma.statutQualification.findFirst({
-      where: { effect: { in: [...branche] } },
+      where: { effect: { in: [...brancheDe(effect)] } },
       orderBy: { sortOrder: 'desc' },
       select: { sortOrder: true },
     });

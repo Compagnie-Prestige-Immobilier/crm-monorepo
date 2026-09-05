@@ -60,6 +60,7 @@ class DioApi implements ApiPort {
   CallOutcomeReasonsApi get _reasons => _client.getCallOutcomeReasonsApi();
   StatutsQualificationApi get _statuts => _client.getStatutsQualificationApi();
   VisitesApi get _visites => _client.getVisitesApi();
+  OuverturesApi get _ouvertures => _client.getOuverturesApi();
 
   @override
   Future<AuthTokens> login({
@@ -214,6 +215,38 @@ class DioApi implements ApiPort {
             extra: TimeoutProfile.push.extra,
           );
       return _body('repCallAttempt', response);
+    });
+  }
+
+  @override
+  Future<OuvertureFicheDto> ouvrirFiche(OuvrirFicheDto corps) async {
+    return _guard('ouvrirFiche', () async {
+      final Response<OuvertureFicheDto> response = await _ouvertures
+          .ouvrirFiche(ouvrirFicheDto: corps, extra: TimeoutProfile.push.extra);
+      return _body('ouvrirFiche', response);
+    });
+  }
+
+  @override
+  Future<OuvertureFicheDto?> ouvertureCourante() async {
+    return _guard('ouvertureCourante', () async {
+      final Response<OuvertureFicheDto> response = await _ouvertures
+          .ouvertureCourante(extra: TimeoutProfile.read.extra);
+      return response.data;
+    });
+  }
+
+  @override
+  Future<void> enregistrerBrouillonOuverture({
+    required String id,
+    required EnregistrerBrouillonDto corps,
+  }) async {
+    await _guard('brouillonOuverture', () async {
+      await _ouvertures.enregistrerBrouillonOuverture(
+        id: id,
+        enregistrerBrouillonDto: corps,
+        extra: TimeoutProfile.push.extra,
+      );
     });
   }
 

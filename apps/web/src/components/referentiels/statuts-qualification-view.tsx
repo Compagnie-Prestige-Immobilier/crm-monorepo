@@ -43,6 +43,7 @@ import {
   STATUT_QUALIFICATION_EFFECT_LABELS,
   createStatutQualification,
   estAbouti,
+  exigeMotif,
   fetchAllStatutsQualification,
   setStatutQualificationActive,
   updateStatutQualification,
@@ -56,7 +57,6 @@ import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 
 interface Draft {
-  code: string;
   label: string;
   effect: StatutQualificationEffect;
   requiresCallback: boolean;
@@ -94,7 +94,6 @@ const RELATIONS_POSEES: readonly { value: RelationChoisie; label: string }[] = [
 ];
 
 const EMPTY: Draft = {
-  code: '',
   label: '',
   effect: 'REACHED',
   requiresCallback: false,
@@ -251,6 +250,11 @@ function Branche({
                     réessai {libelleReessai(statut.retryAfterMinutes).toLowerCase()}
                   </Badge>
                 )}
+                {exigeMotif(statut) ? (
+                  <Badge variant="outline" className="ml-2">
+                    motif exigé
+                  </Badge>
+                ) : null}
               </TableCell>
               <TableCell className="text-muted-foreground">{statut.code}</TableCell>
               <TableCell>{STATUT_QUALIFICATION_EFFECT_LABELS[statut.effect]}</TableCell>
@@ -335,7 +339,6 @@ function FormulaireStatut({
       statut === null
         ? EMPTY
         : {
-            code: statut.code,
             label: statut.label,
             effect: statut.effect,
             requiresCallback: statut.requiresCallback,
@@ -363,7 +366,6 @@ function FormulaireStatut({
             ...(regleFigee ? {} : { requiresCallback: values.requiresCallback }),
           })
         : createStatutQualification({
-            code: values.code.trim(),
             label: values.label.trim(),
             effect: values.effect,
             requiresCallback: values.requiresCallback,
@@ -388,7 +390,7 @@ function FormulaireStatut({
           <DialogDescription>
             {modification
               ? 'Le code ne se change pas : les appels déjà consignés le désignent.'
-              : 'Le code sera figé après enregistrement : les appels consignés le désigneront.'}
+              : 'Le code se déduit du libellé, puis se fige : les appels consignés le désigneront.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -405,27 +407,6 @@ function FormulaireStatut({
                 {...register('label', {
                   required: 'Le libellé est obligatoire.',
                   maxLength: { value: 120, message: 'Libellé trop long.' },
-                })}
-              />
-            )}
-          </Field>
-
-          <Field
-            label="Code"
-            required={!modification}
-            description="Lettres, chiffres et soulignés. Immuable."
-            error={formState.errors.code?.message}
-          >
-            {(props) => (
-              <Input
-                {...props}
-                disabled={modification}
-                {...register('code', {
-                  required: modification ? false : 'Le code est obligatoire.',
-                  pattern: {
-                    value: /^[A-Za-z][A-Za-z0-9_]*$/u,
-                    message: 'Lettres, chiffres et soulignés seulement.',
-                  },
                 })}
               />
             )}

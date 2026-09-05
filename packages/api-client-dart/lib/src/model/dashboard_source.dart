@@ -60,6 +60,8 @@ enum DashboardSource {
   adhesions(r'adhesions'),
   @JsonValue(r'reste-a-appeler')
   resteAAppeler(r'reste-a-appeler'),
+  @JsonValue(r'fiches-ouvertes')
+  fichesOuvertes(r'fiches-ouvertes'),
   @JsonValue(r'par-teleconseiller')
   parTeleconseiller(r'par-teleconseiller'),
   @JsonValue(r'couverture-derniere-campagne')

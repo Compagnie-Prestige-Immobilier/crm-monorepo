@@ -145,7 +145,8 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
         </CardContent>
       </Card>
 
-      <Card>
+      {/* « Mes contacts » ouvre la fiche sur cette ancre. */}
+      <Card id="appels">
         <CardHeader>
           <CardTitle>Appels</CardTitle>
         </CardHeader>
@@ -269,7 +270,13 @@ function AppelsProspect({ items }: { items: readonly Appel[] }) {
             <p className="text-[0.8125rem]">Rendez-vous le {formatDateTime(appel.rendezVousAt)}</p>
           )}
           {appel.comment === null || appel.comment === '' ? null : (
-            <p className="max-w-prose text-[0.875rem]">{appel.comment}</p>
+            <p className="max-w-prose text-[0.875rem]">
+              {/* L'issue « Autre » exige le commentaire : c'est un motif. */}
+              <span className="text-muted-foreground">
+                {appel.outcome === 'OTHER' ? 'Motif' : 'Commentaire'} :{' '}
+              </span>
+              {appel.comment}
+            </p>
           )}
         </li>
       ))}

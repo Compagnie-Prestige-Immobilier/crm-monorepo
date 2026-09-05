@@ -16,7 +16,7 @@ export type UpdateStatutQualificationInput = Schemas['UpdateStatutQualificationD
  * appelant de cette version sait renvoyer ; le panel les sait tous, mais il
  * déclare quand même la sienne, comme le fera le terrain.
  */
-export const PANEL_PAYLOAD_VERSION = 6;
+export const PANEL_PAYLOAD_VERSION = 7;
 
 export const STATUT_QUALIFICATION_EFFECTS = [
   'REACHED',
@@ -31,7 +31,7 @@ export const STATUT_QUALIFICATION_EFFECT_LABELS: Record<StatutQualificationEffec
   REFUSED: 'Appel abouti, refus',
   SCHEDULE_CALLBACK: 'Appel abouti, rappel daté',
   UNREACHABLE: 'Appel non abouti',
-  WRONG_NUMBER: 'Appel non abouti, mauvais numéro',
+  WRONG_NUMBER: 'Appel abouti, mauvais numéro',
 };
 
 /** Du plus urgent au moins urgent : le serveur trie l'annuaire dans cet ordre. */
@@ -59,18 +59,65 @@ export type StatutRelationPosee = StatutQualification['relationStatus'];
  * fait la même déduction : une colonne « joignable » divergerait de l'effet à
  * la première correction.
  */
-const ABOUTI: readonly StatutQualificationEffect[] = ['REACHED', 'REFUSED', 'SCHEDULE_CALLBACK'];
+const ABOUTI: readonly StatutQualificationEffect[] = [
+  'REACHED',
+  'REFUSED',
+  'SCHEDULE_CALLBACK',
+  'WRONG_NUMBER',
+];
 
 export const estAbouti = (effect: StatutQualificationEffect): boolean => ABOUTI.includes(effect);
 
-/** Le rappel se propose des deux côtés : on rappelle aussi qui on n'a pas joint. */
 export const statutsDeLaBranche = (
   statuts: readonly StatutQualification[],
   abouti: boolean,
-): StatutQualification[] =>
-  statuts.filter(
-    (statut) => estAbouti(statut.effect) === abouti || statut.effect === 'SCHEDULE_CALLBACK',
-  );
+): StatutQualification[] => statuts.filter((statut) => estAbouti(statut.effect) === abouti);
+
+/**
+ * En base, le libellé porte sa famille parce qu'il y est unique. À l'écran,
+ * l'en-tête de branche la dit déjà.
+ */
+const LIBELLES_ABREGES: Record<string, string> = {
+  AUTRE_JOINT: 'Autre',
+  AUTRE_NON_JOINT: 'Autre',
+};
+
+export const libelleStatut = (statut: Pick<StatutQualification, 'code' | 'label'>): string =>
+  LIBELLES_ABREGES[statut.code] ?? statut.label;
+
+/**
+ * Le statut réclame un motif écrit. Le client généré est encore en retard sur
+ * la colonne : sans elle, aucun statut n'en exige.
+ */
+export const exigeMotif = (statut: StatutQualification): boolean =>
+  (statut as { requiresComment?: boolean }).requiresComment === true;
+
+/** Les deux statuts que la question du script pose seule : ils ne se choisissent plus. */
+export const STATUTS_DE_LA_QUESTION = { oui: 'ACCEPTE', non: 'REFUSE' } as const;
+
+export const statutDuSouhait = (
+  statuts: readonly StatutQualification[],
+  souhaite: boolean | null,
+): StatutQualification | null => {
+  if (souhaite === null) return null;
+  const code = souhaite ? STATUTS_DE_LA_QUESTION.oui : STATUTS_DE_LA_QUESTION.non;
+  return statuts.find((statut) => statut.code === code) ?? null;
+};
+
+/**
+ * La réponse que ce statut vaut, nulle quand il ne répond pas à la question.
+ * Le serveur refuse une relation qui contredit le statut pose
+ * (`REP_RELATION_STATUT_MISMATCH`) : choisir le statut doit donc poser la
+ * réponse, jamais la laisser diverger.
+ */
+export const souhaitDuStatut = (
+  statut: Pick<StatutQualification, 'code'> | null,
+): boolean | null => {
+  if (statut === null) return null;
+  if (statut.code === STATUTS_DE_LA_QUESTION.oui) return true;
+  if (statut.code === STATUTS_DE_LA_QUESTION.non) return false;
+  return null;
+};
 
 /** Vocabulaire de SAISIE : actifs seulement, servis dans l'ordre dicté. */
 export async function fetchStatutsQualification(

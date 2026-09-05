@@ -15,7 +15,8 @@ import type {
   ChiffresRendement,
   ChiffresTotaux,
 } from '@/lib/data/chiffres';
-import { formatDecimal, formatNumber } from '@/lib/format';
+import type { ComptageOuvertures } from '@/lib/data/ouvertures';
+import { formatDecimal, formatNumber, formatShortDate } from '@/lib/format';
 import { formatXof } from '@/lib/money';
 import type { Role } from '@/lib/types';
 
@@ -23,7 +24,14 @@ export type ChiffreSource = components['schemas']['DashboardSource'];
 
 /** Une requête, et les cartes qui en vivent. Rien d'autre n'est lancé. */
 export type Jeu =
-  'activite' | 'entonnoir' | 'delais' | 'rendement' | 'methodes' | 'banques' | 'campagne';
+  | 'activite'
+  | 'entonnoir'
+  | 'delais'
+  | 'rendement'
+  | 'methodes'
+  | 'banques'
+  | 'campagne'
+  | 'ouvertures';
 
 export interface Jeux {
   activite?: ChiffresActivite;
@@ -33,6 +41,7 @@ export interface Jeux {
   methodes?: ChiffresMethodes;
   banques?: ChiffresBanques;
   campagne?: ChiffresCampagne;
+  ouvertures?: ComptageOuvertures[];
 }
 
 export interface SourceChiffre {
@@ -172,6 +181,30 @@ function tableauEquipe(activite: ChiffresActivite, chues: boolean): DonneesSourc
   };
 }
 
+/** EB-13 : le compte se lit par téléconseiller ET par jour, jamais cumulé. */
+function matriceOuvertures(lignes: readonly ComptageOuvertures[]): DonneesSource {
+  const jours = [...new Set(lignes.map((ligne) => ligne.jour))].sort();
+  const noms = new Map(lignes.map((ligne) => [ligne.openedById, ligne.openedByName]));
+  const comptes = new Map(
+    lignes.map((ligne) => [`${ligne.openedById}|${ligne.jour}`, ligne.ouvertures]),
+  );
+
+  return {
+    forme: 'matrice',
+    donnee: {
+      lignes: [...noms.values()],
+      colonnes: jours.map((jour) => formatShortDate(jour)),
+      cellules: [...noms.entries()].flatMap(([id, nom]) =>
+        jours.map((jour) => ({
+          ligne: nom,
+          colonne: formatShortDate(jour),
+          value: comptes.get(`${id}|${jour}`) ?? 0,
+        })),
+      ),
+    },
+  };
+}
+
 /** Les colonnes suivent le projet : sans représentant, aucun des taux CHUES n'a de sujet. */
 const parTeleconseiller = (chues: boolean): SourceChiffre => ({
   label: 'Par téléconseiller',
@@ -305,6 +338,15 @@ export const SOURCES_CHIFFRES = {
           ),
   },
   'par-teleconseiller': parTeleconseiller(false),
+  'fiches-ouvertes': {
+    label: 'Fiches ouvertes',
+    forme: 'matrice',
+    jeu: 'ouvertures',
+    description:
+      'Les fiches ouvertes depuis la liste, téléconseiller par téléconseiller et jour par jour. Prospects et représentants confondus. Une fiche rouverte compte à chaque fois.',
+    groupe: 'Équipe',
+    extraire: ({ ouvertures }) => (ouvertures === undefined ? null : matriceOuvertures(ouvertures)),
+  },
   'couverture-derniere-campagne': {
     label: 'Couverture de la dernière campagne',
     forme: 'composition',

@@ -1,7 +1,9 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
+
+import { formatChrono, secondesEcoulees } from '@/lib/data/ouvertures';
 
 export function Kbd({ children }: { children: ReactNode }) {
   return (
@@ -23,5 +25,26 @@ export function copyPhone(phoneE164: string): void {
     () => {
       toast.error('Copie refusée par le navigateur.');
     },
+  );
+}
+
+/** Le temps passé sur la fiche, depuis l'ouverture confirmée jusqu'au statut. */
+export function Chrono({ openedAt }: { openedAt: string }) {
+  const [secondes, setSecondes] = useState(() => secondesEcoulees(openedAt, Date.now()));
+
+  useEffect(() => {
+    const battement = setInterval(() => {
+      setSecondes(secondesEcoulees(openedAt, Date.now()));
+    }, 1000);
+    return () => {
+      clearInterval(battement);
+    };
+  }, [openedAt]);
+
+  return (
+    <p className="text-[0.8125rem] text-muted-foreground">
+      Fiche ouverte depuis{' '}
+      <span className="font-[600] tabular-nums text-foreground">{formatChrono(secondes)}</span>
+    </p>
   );
 }

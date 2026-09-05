@@ -121,8 +121,9 @@ export class SupervisionActivityCountsDto {
     type: Number,
     nullable: true,
     description:
-      'Part des appels dont le numéro s’est révélé exploitable, en pourcentage. ' +
-      '`null` sans aucun appel : « personne appelé » n’est pas « personne joint ».',
+      'Part des appels joints, en pourcentage. Seule l’issue UNREACHABLE en est ' +
+      'exclue : un faux numéro est une fiche traitée. `null` sans aucun appel : ' +
+      '« personne appelé » n’est pas « personne joint ».',
   })
   reachRate!: number | null;
 
@@ -177,8 +178,9 @@ export class SupervisionActivityCountsDto {
   @ApiProperty({
     type: Number,
     description:
-      'Représentants qui ont DÉCROCHÉ et répondu : REACHED ou REFUSED. Un refus est ' +
-      'un contact ; un rappel promis n’en est pas encore un.',
+      'Appels de la famille jointe : REACHED, REFUSED, CALLBACK, WRONG_NUMBER. Un ' +
+      'refus est un contact, un rappel promis aussi. Recoupe `repCallback` et ' +
+      '`repWrongNumber`, qui en détaillent deux issues.',
   })
   repReached!: number;
 
@@ -200,7 +202,7 @@ export class SupervisionActivityCountsDto {
     type: Number,
     nullable: true,
     description:
-      'Part des appels représentants où quelqu’un a répondu, en pourcentage. ' +
+      'Part des appels représentants de la famille jointe, en pourcentage. ' +
       '`null` sans aucun appel.',
   })
   repContactRate!: number | null;
@@ -217,16 +219,19 @@ export class SupervisionActivityCountsDto {
   @ApiProperty({
     type: Number,
     description:
-      'Représentants DISTINCTS dont la dernière réponse de la fenêtre a été obtenue ' +
-      'par ce téléconseiller. Attribué à qui a obtenu la réponse, pas à qui a appelé ' +
-      'le premier. NON SOMMABLE entre périodes ni entre téléconseillers.',
+      'Représentants DISTINCTS dont la dernière réponse TRANCHÉE de la fenêtre a été ' +
+      'obtenue par ce téléconseiller. Tranche celui dont le statut pose AMBASSADEUR ou ' +
+      'REFUS : « Décédé », « Hors cible » ou « Autre » ferment la fiche sans trancher. ' +
+      'Attribué à qui a obtenu la réponse, pas à qui a appelé le premier. NON SOMMABLE ' +
+      'entre périodes ni entre téléconseillers.',
   })
   repQuestioned!: number;
 
   @ApiProperty({
     type: Number,
     description:
-      'Parmi `repQuestioned`, ceux dont cette dernière réponse est REACHED. NON SOMMABLE.',
+      'Parmi `repQuestioned`, ceux dont cette dernière réponse pose AMBASSADEUR. ' +
+      'NON SOMMABLE.',
   })
   repQualified!: number;
 

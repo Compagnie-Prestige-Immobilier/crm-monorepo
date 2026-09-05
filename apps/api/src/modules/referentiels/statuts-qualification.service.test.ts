@@ -20,6 +20,8 @@ interface Row {
   label: string;
   effect: StatutQualificationEffect;
   requiresCallback: boolean;
+  requiresComment: boolean;
+  retryAfterMinutes: number | null;
   priorite: PrioriteTraitement;
   relationStatus: RepresentantRelation | null;
   isActive: boolean;
@@ -32,6 +34,8 @@ interface Row {
 
 const ligne = (over: Partial<Row> & Pick<Row, 'id' | 'code' | 'label' | 'effect'>): Row => ({
   requiresCallback: false,
+  requiresComment: false,
+  retryAfterMinutes: null,
   priorite: PrioriteTraitement.NORMALE,
   relationStatus: null,
   isActive: true,
@@ -233,29 +237,35 @@ describe('ce que la saisie reçoit', () => {
 });
 
 describe('création', () => {
-  it('refuse un code déjà pris', async () => {
+  it('dérive le code du libellé : majuscules, sans accents, espaces en tirets bas', async () => {
+    const cree = await service.create({
+      label: '  Affecté ailleurs  ',
+      effect: StatutQualificationEffect.REFUSED,
+    });
+
+    expect([cree.code, cree.label]).toEqual(['AFFECTE_AILLEURS', 'Affecté ailleurs']);
+  });
+
+  it('refuse deux libellés qui donnent le même code', async () => {
     await expect(
-      service.create({
-        code: 'interesse',
-        label: 'Autre',
-        effect: StatutQualificationEffect.REACHED,
-      }),
+      service.create({ label: 'Interesse', effect: StatutQualificationEffect.REACHED }),
     ).rejects.toMatchObject({ response: { code: StatutQualificationError.CODE_CONFLICT } });
   });
 
   it('refuse un libellé déjà porté', async () => {
     await expect(
-      service.create({
-        code: 'AUTRE',
-        label: 'Intéressé',
-        effect: StatutQualificationEffect.REACHED,
-      }),
+      service.create({ label: 'Intéressé', effect: StatutQualificationEffect.REACHED }),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it.each(['2 rappels', '?!', '4'])('refuse « %s », qui ne donne aucun code', async (label) => {
+    await expect(
+      service.create({ label, effect: StatutQualificationEffect.REACHED }),
+    ).rejects.toMatchObject({ response: { code: StatutQualificationError.LABEL_UNUSABLE } });
   });
 
   it('pose le nouveau statut à la fin de SA branche, jamais au milieu de l’autre', async () => {
     const cree = await service.create({
-      code: 'MESSAGERIE_PLEINE',
       label: 'Messagerie pleine',
       effect: StatutQualificationEffect.UNREACHABLE,
     });
@@ -264,27 +274,59 @@ describe('création', () => {
     expect(prisma.rows.find((row) => row.id === cree.id)?.sortOrder).toBe(120);
   });
 
-  it('normalise le code en majuscules et n’est jamais système', async () => {
+  it('n’est jamais système : le script ne s’appuie que sur les lignes semées', async () => {
     const cree = await service.create({
-      code: ' curieux ',
-      label: ' Curieux ',
+      label: 'Curieux',
       effect: StatutQualificationEffect.REACHED,
     });
 
-    expect(cree.code).toBe('CURIEUX');
-    expect(cree.label).toBe('Curieux');
     expect(cree.isSystem).toBe(false);
   });
 
   it('refuse d’exiger une date sur un effet qui ne planifie aucun rappel', async () => {
     await expect(
       service.create({
-        code: 'CURIEUX',
         label: 'Curieux',
         effect: StatutQualificationEffect.REACHED,
         requiresCallback: true,
       }),
     ).rejects.toMatchObject({ response: { code: StatutQualificationError.CALLBACK_NOT_ALLOWED } });
+  });
+});
+
+describe('le motif que le statut exige', () => {
+  it('parvient au terrain : c’est la saisie qui refuse la qualification sans motif', async () => {
+    prisma.rows = [{ ...INTERESSE, requiresComment: true }];
+
+    const { items } = await service.listForField(6);
+
+    expect(items[0]?.requiresComment).toBe(true);
+  });
+
+  it('se pose à la création, et vaut faux quand elle n’en demande pas', async () => {
+    const exigeant = await service.create({
+      label: 'Autre joint',
+      effect: StatutQualificationEffect.REACHED,
+      requiresComment: true,
+    });
+    const muet = await service.create({
+      label: 'Sans motif',
+      effect: StatutQualificationEffect.REACHED,
+    });
+
+    expect([exigeant.requiresComment, muet.requiresComment]).toEqual([true, false]);
+  });
+
+  it('est une RÈGLE : elle se verrouille sur un statut système comme le rappel', async () => {
+    await expect(service.update('1', { requiresComment: true })).rejects.toMatchObject({
+      response: { code: StatutQualificationError.SYSTEM_IMMUTABLE },
+    });
+
+    const libre = await service.create({
+      label: 'Sans motif',
+      effect: StatutQualificationEffect.REACHED,
+    });
+    expect((await service.update(libre.id, { requiresComment: true })).requiresComment).toBe(true);
   });
 });
 
@@ -298,6 +340,12 @@ describe('modification', () => {
     await expect(service.update('2', { requiresCallback: false })).rejects.toMatchObject({
       response: { code: StatutQualificationError.SYSTEM_IMMUTABLE },
     });
+  });
+
+  it('ne regénère pas le code en renommant : l’historique le référence', async () => {
+    const renomme = await service.update('3', { label: 'Occupé' });
+
+    expect([renomme.code, renomme.label]).toEqual(['PAS_DE_REPONSE', 'Occupé']);
   });
 
   it('refuse un statut inconnu', async () => {
@@ -330,8 +378,38 @@ describe('activation', () => {
     });
   });
 
-  it('laisse retirer le dernier non abouti tant que le rappel reste proposable', async () => {
-    expect((await service.setActive('3', { isActive: false })).isActive).toBe(false);
+  it('ne compte NI le rappel NI le faux numéro dans la branche non jointe', async () => {
+    prisma.rows.push(
+      ligne({
+        id: '5',
+        code: 'FAUX_NUMERO',
+        label: 'Faux numéro',
+        effect: StatutQualificationEffect.WRONG_NUMBER,
+        isSystem: true,
+      }),
+    );
+
+    await expect(service.setActive('3', { isActive: false })).rejects.toMatchObject({
+      response: { code: StatutQualificationError.LAST_OF_BRANCH },
+    });
+  });
+
+  it('refuse de retirer le faux numéro quand il est le dernier joint proposable', async () => {
+    prisma.rows[0]!.isActive = false;
+    prisma.rows[1]!.isActive = false;
+    prisma.rows.push(
+      ligne({
+        id: '5',
+        code: 'FAUX_NUMERO',
+        label: 'Faux numéro',
+        effect: StatutQualificationEffect.WRONG_NUMBER,
+        isSystem: true,
+      }),
+    );
+
+    await expect(service.setActive('5', { isActive: false })).rejects.toMatchObject({
+      response: { code: StatutQualificationError.LAST_OF_BRANCH },
+    });
   });
 
   it('refuse de retirer le rappel quand il est le dernier statut de l’appel abouti', async () => {
@@ -364,7 +442,6 @@ describe('priorité de traitement', () => {
 
   it('pose NORMALE quand la création n’en demande aucune', async () => {
     const cree = await service.create({
-      code: 'RELANCE_TARDIVE',
       label: 'Relance tardive',
       effect: StatutQualificationEffect.REACHED,
     });
@@ -374,7 +451,6 @@ describe('priorité de traitement', () => {
 
   it('retient la priorité demandée à la création', async () => {
     const cree = await service.create({
-      code: 'RELANCE_TARDIVE',
       label: 'Relance tardive',
       effect: StatutQualificationEffect.REACHED,
       priorite: PrioriteTraitement.HAUTE,
@@ -413,7 +489,6 @@ describe('la relation que le statut pose', () => {
 
   it('se pose à la création', async () => {
     const cree = await service.create({
-      code: 'DEJA_MEMBRE',
       label: 'Déjà membre',
       effect: StatutQualificationEffect.REACHED,
       relationStatus: RepresentantRelation.AMBASSADEUR,
@@ -424,7 +499,6 @@ describe('la relation que le statut pose', () => {
 
   it('reste nulle quand la création ne la donne pas : un statut qui ne tranche rien ne pose rien', async () => {
     const cree = await service.create({
-      code: 'A_REVOIR',
       label: 'À revoir',
       effect: StatutQualificationEffect.REACHED,
     });

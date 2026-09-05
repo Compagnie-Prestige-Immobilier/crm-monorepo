@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { DetailBackLink } from '@/components/detail-back-link';
 import { QueryErrorState } from '@/components/query-error-state';
+import { AppelsRepresentant } from '@/components/representants/appels-representant';
 import { RelationBadge } from '@/components/representants/relation-badge';
 import { RepresentantComments } from '@/components/representants/representant-comments';
 import { Badge } from '@/components/ui/badge';
@@ -14,7 +15,6 @@ import {
   formatDate,
   formatDateTime,
   formatDetectedCall,
-  formatDeviceCall,
   formatNumber,
   formatPhone,
 } from '@/lib/format';
@@ -27,7 +27,6 @@ import {
   scriptOf,
   whatsappLabel,
   type DeviceCallDetection,
-  type RepresentantCallAttempt,
   type RepresentantRelationChange,
 } from '@/lib/data/representants';
 import { queryKeys } from '@/lib/query-keys';
@@ -235,7 +234,8 @@ export function RepresentantDetailView({
         </CardContent>
       </Card>
 
-      <Card>
+      {/* « Mes contacts » ouvre la fiche sur cette ancre. */}
+      <Card id="appels">
         <CardHeader>
           <CardTitle>Appels</CardTitle>
         </CardHeader>
@@ -250,7 +250,7 @@ export function RepresentantDetailView({
               fallback="Les appels n’ont pas pu être chargés."
             />
           ) : null}
-          {appels.isSuccess ? <Appels items={appels.data} /> : null}
+          {appels.isSuccess ? <AppelsRepresentant items={appels.data} /> : null}
           {releves.isSuccess ? <RelevesTelephone items={releves.data} /> : null}
         </CardContent>
       </Card>
@@ -331,67 +331,6 @@ export function RepresentantDetailView({
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-/** Chaque appel avec les réponses du script telles qu'elles ont été dites ce jour-là. */
-function Appels({ items }: { items: readonly RepresentantCallAttempt[] }) {
-  if (items.length === 0) {
-    return (
-      <p className="text-[0.875rem] text-muted-foreground">
-        Aucun appel consigné. Le premier se note depuis la console ou le téléphone.
-      </p>
-    );
-  }
-  return (
-    <ol aria-label="Appels" className="flex flex-col divide-y divide-border">
-      {items.map((appel) => {
-        const reponses = [
-          appel.etablissementConfirme === null
-            ? null
-            : `Établissement confirmé : ${ouiNonNsp(appel.etablissementConfirme)}`,
-          appel.contacte === null ? null : `Contacté : ${ouiNonNsp(appel.contacte)}`,
-          appel.connaitUES === null ? null : `Connaît l’UES : ${ouiNonNsp(appel.connaitUES)}`,
-          appel.syndicat === null || appel.syndicat === '' ? null : `Syndicat : ${appel.syndicat}`,
-        ].filter((ligne) => ligne !== null);
-        return (
-          <li key={appel.id} className="flex flex-col gap-1 py-3 first:pt-0 last:pb-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline">
-                {appel.statutQualificationLabel ?? REP_CALL_OUTCOME_LABELS[appel.outcome]}
-              </Badge>
-              {appel.callbackAt === null ? null : (
-                <span className="text-[0.8125rem]">
-                  Rappel le {formatDateTime(appel.callbackAt)}
-                </span>
-              )}
-            </div>
-            <p className="text-[0.75rem] text-muted-foreground">
-              <time dateTime={appel.clientCreatedAt} className="tabular-nums">
-                {formatDateTime(appel.clientCreatedAt)}
-              </time>{' '}
-              · {appel.performedByName}
-            </p>
-            <p className="text-[0.8125rem] text-muted-foreground">{formatDeviceCall(appel)}</p>
-            {reponses.length === 0 ? null : (
-              <p className="text-[0.8125rem] text-muted-foreground">{reponses.join(' · ')}</p>
-            )}
-            {appel.suggestedPhoneE164 === null ? null : (
-              <p className="text-[0.8125rem]">
-                Personne proposée : {appel.suggestedName ?? 'sans nom'},{' '}
-                {formatPhone(appel.suggestedPhoneE164)}
-                {appel.suggestedNote === null || appel.suggestedNote === ''
-                  ? ''
-                  : ` · ${appel.suggestedNote}`}
-              </p>
-            )}
-            {appel.comment === null || appel.comment === '' ? null : (
-              <p className="max-w-prose text-[0.875rem]">{appel.comment}</p>
-            )}
-          </li>
-        );
-      })}
-    </ol>
   );
 }
 

@@ -18,7 +18,7 @@ export default async function SupervisionPage() {
 
   return (
     <Suspense fallback={<SupervisionSkeleton />}>
-      <SupervisionTabs projet="CHUES" />
+      <SupervisionTabs projet="CHUES" role={guard.user.role} />
     </Suspense>
   );
 }

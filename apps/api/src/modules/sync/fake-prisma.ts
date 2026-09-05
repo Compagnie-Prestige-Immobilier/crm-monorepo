@@ -215,6 +215,7 @@ export class FakePrisma {
   callAttempts = new Map<string, CallAttemptRow>();
   repCallAttempts = new Map<string, RepCallAttemptRow>();
   deviceCallDetections = new Map<string, DeviceCallDetectionRow>();
+  ouverturesFiche = new Map<string, Row>();
   representantComments = new Map<string, RepresentantCommentRow>();
   callOutcomeReasons = new Map<string, CallOutcomeReasonRow>();
   visites = new Map<string, VisiteRow>();
@@ -523,6 +524,20 @@ export class FakePrisma {
   scheduledCallback = {
     updateMany: () => Promise.resolve({ count: 0 }),
     createMany: () => Promise.resolve({ count: 1 }),
+  };
+
+  ouvertureFiche = {
+    findUnique: (args: { where: { id: string } }) =>
+      Promise.resolve(this.ouverturesFiche.get(args.where.id) ?? null),
+    updateMany: (args: { where?: Row; data: Row }) => {
+      let count = 0;
+      for (const row of this.ouverturesFiche.values()) {
+        if (!matches(row, args.where)) continue;
+        Object.assign(row, args.data);
+        count += 1;
+      }
+      return Promise.resolve({ count });
+    },
   };
 
   prospect = {

@@ -109,6 +109,8 @@ class SyncEntityDataDto {
 
     this.prospectId,
 
+    this.ouvertureId,
+
     this.outcome,
 
     this.reasonCode,
@@ -355,6 +357,10 @@ class SyncEntityDataDto {
   @JsonKey(name: r'prospectId', required: false, includeIfNull: false)
   final String? prospectId;
 
+  /// Tentative d’appel : ouverture de fiche que cette qualification ferme. Une ouverture inconnue, déjà fermée ou ouverte par un autre est ignorée : la tentative vient du terrain et ne se perd pas pour un verrou.
+  @JsonKey(name: r'ouvertureId', required: false, includeIfNull: false)
+  final String? ouvertureId;
+
   @JsonKey(
     name: r'outcome',
     required: false,
@@ -511,6 +517,7 @@ class SyncEntityDataDto {
                 relaisPhoneE164,
                 clientCreatedAt,
                 prospectId,
+                ouvertureId,
                 outcome,
                 reasonCode,
                 method,
@@ -574,6 +581,7 @@ class SyncEntityDataDto {
                 other.relaisPhoneE164,
                 other.clientCreatedAt,
                 other.prospectId,
+                other.ouvertureId,
                 other.outcome,
                 other.reasonCode,
                 other.method,
@@ -643,6 +651,7 @@ class SyncEntityDataDto {
         relaisPhoneE164,
         clientCreatedAt,
         prospectId,
+        ouvertureId,
         outcome,
         reasonCode,
         method,

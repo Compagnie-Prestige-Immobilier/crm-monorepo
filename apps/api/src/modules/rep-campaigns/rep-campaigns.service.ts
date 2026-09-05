@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { ChangeSource, RepCallOutcome } from '@crm/database';
-import type { RepresentantRelation, StatutQualification } from '@crm/database';
+import { ChangeSource, RappelOrigine, RepCallOutcome, RepresentantRelation } from '@crm/database';
+import type { StatutQualification } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { outcomeOf } from '../referentiels/statuts-qualification.service.js';
@@ -10,6 +10,7 @@ import { attributionScope } from '../../common/scope.js';
 import { rattacherDetections } from '../../common/device-call.js';
 import { REPRESENTANT_RELATION_TRANSITIONS, isLegalTransition } from '../../common/transitions.js';
 import { COMMENT_MAX_LENGTH } from '../phase2/attempt-rules.js';
+import { fermerOuverture } from '../ouvertures/ouvertures.service.js';
 import { applyRelationChange } from '../representants/relation-change.js';
 import { resolveWhatsappPatch, type WhatsappPatch } from '../representants/whatsapp.js';
 import { RepresentantsService } from '../representants/representants.service.js';
@@ -25,7 +26,9 @@ import {
   statutInactif,
   statutInconnu,
   commentRequired,
+  motifRequis,
   phoneConflict,
+  relationContreditStatut,
   promisedNotAllowed,
   representantNotAssigned,
   representantNotFound,
@@ -70,7 +73,7 @@ export class RepCampaignsService {
 
     // Le statut commande l'issue. Résolu AVANT la transaction : c'est une
     // lecture, et la faire dedans allongerait le verrou pour rien.
-    const statut = await this.statutCoherent(body);
+    const statut = await this.statutCoherent(body, comment);
     const relation = relationAPoser(body, statut, representant.relationStatus);
 
     const applied = await this.prisma.$transaction(async (tx) => {
@@ -116,12 +119,20 @@ export class RepCampaignsService {
 
       const state = {
         ...representantPatch(body, whatsapp, changesPhone ? newPhone : undefined),
-        ...dernierAppel(body, user.id, representant.lastCallAt),
+        ...dernierAppel(body, user.id, representant.lastCallAt, statut),
       };
       if (Object.keys(state).length > 0) {
         await tx.representant.update({
           where: { id: body.representantId },
           data: { ...state, rev: { increment: 1 } },
+        });
+      }
+      if (body.ouvertureId) {
+        await fermerOuverture(tx, {
+          ouvertureId: body.ouvertureId,
+          openedById: user.id,
+          attemptId: body.id,
+          at: new Date(body.clientCreatedAt),
         });
       }
       if (relation !== null) {
@@ -148,7 +159,10 @@ export class RepCampaignsService {
    * qui la contredit est refusée plutôt qu'enregistrée. Sans statut, l'issue
    * envoyée fait foi, comme le font les versions déjà installées.
    */
-  private async statutCoherent(body: CreateRepCallAttemptDto): Promise<StatutQualification | null> {
+  private async statutCoherent(
+    body: CreateRepCallAttemptDto,
+    comment: string | null,
+  ): Promise<StatutQualification | null> {
     if (body.statutQualificationId === undefined) return null;
 
     const statut = await this.prisma.statutQualification.findUnique({
@@ -160,10 +174,15 @@ export class RepCampaignsService {
     const attendue = outcomeOf(statut.effect);
     if (body.outcome !== attendue) throw issueContreditStatut(attendue, body.outcome);
 
-    // Pas de garde sur `requiresCallback` ici : `assertCallbackAllowed` ne
-    // l'autorise que sur l'effet SCHEDULE_CALLBACK, dont l'issue dérivée est
-    // CALLBACK, que `validatedComment` refuse déjà sans date. Un second garde
-    // serait une branche que rien ne peut atteindre.
+    if (contreditLeRattachement(body.relationStatus, statut.relationStatus)) {
+      throw relationContreditStatut(statut.label);
+    }
+
+    // `validatedComment` n'exige un commentaire que sur l'issue OTHER, qu'aucun
+    // effet ne dérive : la garde du motif est donc atteignable, contrairement à
+    // celle de `requiresCallback`, que l'issue CALLBACK couvre déjà.
+    if (statut.requiresComment && comment === null) throw motifRequis(statut.label);
+
     return statut;
   }
 
@@ -198,6 +217,27 @@ export class RepCampaignsService {
  * la perdrait définitivement. Celle que le client affirme garde la garde
  * stricte de `applyRelationChange` : c'est une contradiction, pas un silence.
  */
+/**
+ * « Souhaite-t-il être représentant CHUES ? » n'a que deux réponses, et le
+ * statut dit la même : oui vaut Accepté, non vaut Refusé. Les autres états de
+ * relation ne répondent pas à cette question et gardent la garde de transition
+ * d'`applyRelationChange`.
+ */
+const REPONSES_AU_RATTACHEMENT: readonly RepresentantRelation[] = [
+  RepresentantRelation.AMBASSADEUR,
+  RepresentantRelation.REFUS,
+];
+
+function contreditLeRattachement(
+  repondue: RepresentantRelation | undefined,
+  posee: RepresentantRelation | null,
+): boolean {
+  if (repondue === undefined || posee === null) return false;
+  if (!REPONSES_AU_RATTACHEMENT.includes(repondue)) return false;
+  if (!REPONSES_AU_RATTACHEMENT.includes(posee)) return false;
+  return repondue !== posee;
+}
+
 function relationAPoser(
   body: CreateRepCallAttemptDto,
   statut: StatutQualification | null,
@@ -253,14 +293,50 @@ function representantPatch(
 
 // Une tentative arrivée hors ligne peut être plus ancienne que le dernier appel
 // connu : elle ne réécrit pas la fiche.
-function dernierAppel(body: CreateRepCallAttemptDto, userId: string, lastCallAt: Date | null) {
+function dernierAppel(
+  body: CreateRepCallAttemptDto,
+  userId: string,
+  lastCallAt: Date | null,
+  statut: StatutQualification | null,
+) {
   const at = new Date(body.clientCreatedAt);
   if (lastCallAt !== null && at < lastCallAt) return {};
   return {
     lastCallOutcome: body.outcome,
     lastCallAt: at,
     lastCallById: userId,
-    nextCallbackAt: body.callbackAt ? new Date(body.callbackAt) : null,
+    ...prochainRappel(body, at, statut),
+  };
+}
+
+/**
+ * L'échéance et son origine s'écrivent ENSEMBLE : une contrainte CHECK refuse
+ * l'une sans l'autre.
+ *
+ * Le délai vient de `retryAfterMinutes`, réglable par l'administrateur, et un
+ * délai nul dit « ne revient jamais » : c'est ce qui distingue « Injoignable
+ * définitif » sans que son code soit écrit ici. Les statuts joints le portent
+ * nul, ils ne repassent donc pas, sauf « À rappeler » qui vient avec sa date.
+ *
+ * Compté depuis l'horloge du TERRAIN : une qualification faite hors ligne lundi
+ * et remontée jeudi est déjà en retard, ce qui est la vérité.
+ */
+function prochainRappel(
+  body: CreateRepCallAttemptDto,
+  at: Date,
+  statut: StatutQualification | null,
+) {
+  if (body.callbackAt) {
+    return {
+      nextCallbackAt: new Date(body.callbackAt),
+      nextCallbackOrigine: RappelOrigine.PROMIS,
+    };
+  }
+  const delai = statut?.retryAfterMinutes ?? null;
+  if (delai === null) return { nextCallbackAt: null, nextCallbackOrigine: null };
+  return {
+    nextCallbackAt: new Date(at.getTime() + delai * 60_000),
+    nextCallbackOrigine: RappelOrigine.AUTOMATIQUE,
   };
 }
 

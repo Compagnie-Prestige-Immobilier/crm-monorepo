@@ -62,7 +62,7 @@ export const CALL_OUTCOME_REASONS: readonly CallOutcomeReasonSeed[] = [
     effect: 'CLOSE_WRONG_NUMBER',
     requiresComment: false,
     requiresCallback: false,
-    countsAsReached: false,
+    countsAsReached: true,
     color: 'danger',
     sortOrder: 50,
   },

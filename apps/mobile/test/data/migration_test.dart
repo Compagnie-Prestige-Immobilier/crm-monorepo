@@ -31,6 +31,8 @@ import 'generated_migrations/schema_v26.dart' as v26schema;
 import 'generated_migrations/schema_v27.dart' as v27schema;
 import 'generated_migrations/schema_v28.dart' as v28schema;
 import 'generated_migrations/schema_v29.dart' as v29schema;
+import 'generated_migrations/schema_v30.dart' as v30schema;
+import 'generated_migrations/schema_v31.dart' as v31schema;
 
 /// Test doré de migration.
 ///
@@ -2423,7 +2425,11 @@ void main() {
     await old.close();
 
     final AppDatabase db = AppDatabase(schema.newConnection());
-    await verifier.migrateAndValidate(db, 28);
+    // La cible est la version COURANTE : `createTable` engendre la forme
+    // courante de `statuts_qualification`, colonnes des paliers suivants
+    // comprises, et s'arrêter plus tôt comparerait cette forme à un golden
+    // qui ne les a pas.
+    await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
 
     // La table s'ÉCRIT : « elle existe » se vérifierait aussi sur des colonnes
     // au mauvais type. Un effet que ce client ignore passe, comme pour les
@@ -2755,6 +2761,104 @@ void main() {
         (List<AppelsAConsignerResult> l) => l.single.id,
       ),
       'preuve-30',
+    );
+    await db.close();
+  });
+
+  // Le statut descendu avant la v31 n'exige aucun motif et ne pose aucune
+  // relation : les deux colonnes arrivent vides et le prochain pull les remplit.
+  test('v30 -> v31 laisse les statuts déjà descendus utilisables', () async {
+    final schema = await verifier.schemaAt(30);
+    final v30schema.DatabaseAtV30 old = v30schema.DatabaseAtV30(
+      schema.newConnection(),
+    );
+    await old.customStatement(
+      'INSERT INTO statuts_qualification (code, id, label, effect) '
+      'VALUES (?, ?, ?, ?)',
+      <Object?>['A_RAPPELER', 'sq-30', 'À rappeler', 'SCHEDULE_CALLBACK'],
+    );
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 31);
+
+    final StatutQualificationRow statut = await db
+        .select(db.statutsQualification)
+        .getSingle();
+    expect(statut.code, 'A_RAPPELER');
+    expect(statut.requiresComment, isFalse);
+    expect(statut.relationStatus, isNull);
+    await db.close();
+  });
+
+  // Le verrou d'ouverture de fiche n'est pas une règle d'écran : c'est l'index
+  // partiel qui refuse la seconde. Un palier qui créerait la table sans lui
+  // passerait le doré et laisserait deux fiches ouvertes sur le terrain.
+  test('v31 -> v32 pose le verrou d\'ouverture de fiche', () async {
+    final schema = await verifier.schemaAt(31);
+    final v31schema.DatabaseAtV31 old = v31schema.DatabaseAtV31(
+      schema.newConnection(),
+    );
+    await old.customStatement(
+      'INSERT INTO outbox '
+      '(id, entity_type, entity_id, op, payload, next_attempt_at, created_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?)',
+      <Object?>[
+        'op-v31',
+        'rep_call_attempt',
+        'att-31',
+        'create',
+        '{}',
+        _iso,
+        _iso,
+      ],
+    );
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 32);
+
+    expect(
+      await db
+          .customSelect('SELECT id FROM outbox')
+          .getSingle()
+          .then((QueryRow row) => row.read<String>('id')),
+      'op-v31',
+    );
+
+    await db
+        .into(db.ouverturesFiche)
+        .insert(
+          OuverturesFicheCompanion.insert(
+            id: 'ouv-32',
+            openedById: 'user-32',
+            representantId: const Value<String?>('rep-32'),
+            openedAt: DateTime.parse(_iso),
+          ),
+        );
+    await expectLater(
+      db
+          .into(db.ouverturesFiche)
+          .insert(
+            OuverturesFicheCompanion.insert(
+              id: 'ouv-32-bis',
+              openedById: 'user-32',
+              prospectId: const Value<String?>('pros-32'),
+              openedAt: DateTime.parse(_iso),
+            ),
+          ),
+      throwsA(isA<SqliteException>()),
+    );
+
+    // Exactement une cible : une ligne qui en porte deux ne décrit aucune fiche.
+    await expectLater(
+      db.customStatement(
+        'INSERT INTO ouvertures_fiche '
+        '(id, opened_by_id, representant_id, prospect_id, opened_at) '
+        'VALUES (?, ?, ?, ?, ?)',
+        <Object?>['ouv-32-ter', 'user-33', 'rep-32', 'pros-32', _iso],
+      ),
+      throwsA(isA<SqliteException>()),
     );
     await db.close();
   });

@@ -8,6 +8,7 @@ import 'package:cpi_go/core/sync/phase2_directory_sync.dart';
 import 'package:cpi_go/core/theme/app_theme.dart';
 import 'package:cpi_go/core/theme/cpi_tokens.dart';
 import 'package:cpi_go/data/local/database.dart';
+import 'package:cpi_go/data/repositories/draft_repository.dart';
 import 'package:cpi_go/features/auth/auth_controller.dart';
 import 'package:cpi_go/features/auth/auth_state.dart';
 import 'package:cpi_go/features/phase2/presentation/call_audio_recorder.dart';
@@ -126,10 +127,28 @@ void main() {
     );
   }
 
+  /// EB-07 : une fiche identifiée demande confirmation avant de s'ouvrir. La
+  /// boîte ne se pose que là, et rien ne s'ouvre tant qu'aucune personne n'est
+  /// désignée.
+  Future<void> confirmerLOuverture(
+    WidgetTester tester, {
+    bool ouvrir = true,
+  }) async {
+    final Finder bouton = find.text(ouvrir ? 'Ouvrir' : 'Annuler');
+    if (bouton.evaluate().isEmpty) return;
+    await tester.tap(bouton);
+    await tester.pumpAndSettle();
+  }
+
   /// Tape un numéro dans le champ et laisse la recherche s'exécuter.
-  Future<void> type(WidgetTester tester, String digits) async {
+  Future<void> type(
+    WidgetTester tester,
+    String digits, {
+    bool ouvrir = true,
+  }) async {
     await tester.enterText(find.byType(TextField).first, digits);
     await tester.pumpAndSettle();
+    await confirmerLOuverture(tester, ouvrir: ouvrir);
   }
 
   /// Passe l'étape courante. Le bouton porte le même libellé aux étapes 1 et 2.
@@ -393,6 +412,7 @@ void main() {
 
       await tester.pumpWidget(host(prefillPhone: '+221780000001'));
       await tester.pumpAndSettle();
+      await confirmerLOuverture(tester);
 
       expect(find.text('Ce numéro n\'est pas dans la liste.'), findsNothing);
 
@@ -409,6 +429,134 @@ void main() {
       expect(attempt.method, EnrollmentMethods.platform);
     },
   );
+
+  // ═══ EB-07 À EB-09 : LA CONFIRMATION, LE VERROU, LE CHRONOMÈTRE ═══
+  //
+  // Cet écran n'a pas d'identité de fiche avant la recherche : la confirmation
+  // se pose donc une fois la personne DÉSIGNÉE, jamais avant. Taper un numéro
+  // et chercher reste libre.
+
+  phase2TestWidgets(
+    'rien ne s\'ouvre tant qu\'aucune fiche à qualifier n\'est désignée',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(host());
+      // Hors annuaire : personne n'est désignée, il n'y a rien à ouvrir.
+      await tester.enterText(find.byType(TextField).first, '779999999');
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Ouvrir la fiche de'), findsNothing);
+
+      // Dossier déjà clos : la fiche existe, mais il n'y a plus rien à
+      // qualifier, donc rien à verrouiller ni à chronométrer.
+      await tester.enterText(find.byType(TextField).first, '781234567');
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Ouvrir la fiche de'), findsNothing);
+
+      expect(await db.select(db.ouverturesFiche).get(), isEmpty);
+    },
+  );
+
+  phase2TestWidgets('la fiche identifiée se nomme avant de s\'ouvrir', (
+    WidgetTester tester,
+  ) async {
+    await insertRepresentant(db, id: 'rep-1', phone: '+221770000009');
+    await insertProspect(
+      db,
+      id: 'pros-1',
+      representantId: 'rep-1',
+      phone: '+221771234567',
+      nom: 'Ndiaye',
+      prenom: 'Awa',
+    );
+    await tester.pumpWidget(host());
+    await tester.enterText(find.byType(TextField).first, '771234567');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ouvrir la fiche de Awa Ndiaye ?'), findsOneWidget);
+    expect(
+      find.text('Vous ne pourrez pas la quitter sans la qualifier.'),
+      findsOneWidget,
+    );
+    expect(await db.select(db.ouverturesFiche).get(), isEmpty);
+
+    await confirmerLOuverture(tester);
+    final OuverturesFicheData ouverte =
+        (await db.select(db.ouverturesFiche).get()).single;
+    expect(ouverte.prospectId, 'pros-1');
+    expect(ouverte.openedById, 'commercial-test');
+    expect(ouverte.closedAt, isNull);
+    // EB-09 : le chronomètre court dès l'ouverture confirmée.
+    expect(find.text('00:00'), findsOneWidget);
+  });
+
+  phase2TestWidgets('la confirmation refusée n\'ouvre rien et rend le champ', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(host());
+    await type(tester, '771234567', ouvrir: false);
+
+    expect(await db.select(db.ouverturesFiche).get(), isEmpty);
+    expect(
+      tester.widget<TextField>(find.byType(TextField).first).controller?.text,
+      isEmpty,
+    );
+  });
+
+  // EB-08 : une fiche ouverte ne se quitte pas, elle se qualifie. Sans ce
+  // refus, le bouton retour du téléphone l'abandonnait sans statut.
+  phase2TestWidgets(
+    'le retour est refusé tant que l\'appel n\'est pas consigné',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(host());
+      await type(tester, '771234567');
+
+      // `popRoute` est exactement ce que déclenche le bouton système d'Android,
+      // celui qui suffisait à abandonner une fiche à moitié qualifiée.
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Consignez cet appel avant de quitter la fiche.'),
+        findsOneWidget,
+      );
+      expect(find.text('Qui avez-vous appelé ?'), findsOneWidget);
+
+      // La flèche du bandeau refuse pareillement : les deux gestes mènent au
+      // même endroit.
+      await tester.tap(find.byType(CpiHeaderAction).first);
+      await tester.pumpAndSettle();
+      expect(find.text('Qui avez-vous appelé ?'), findsOneWidget);
+      expect(
+        (await db.select(db.ouverturesFiche).get()).single.closedAt,
+        isNull,
+      );
+    },
+  );
+
+  // EB-09 : la durée se lit entre l'ouverture et la qualification, et c'est la
+  // tentative qui l'arrête, ici comme au serveur.
+  phase2TestWidgets('la qualification ferme l\'ouverture et lève le verrou', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(host());
+    await resultat(tester, '771234567');
+    await tester.ensureVisible(find.text('Plateforme'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Plateforme'));
+    await tester.pumpAndSettle();
+
+    final OuverturesFicheData fermee =
+        (await db.select(db.ouverturesFiche).get()).single;
+    final CallAttempt attempt = (await db.select(db.callAttempts).get()).single;
+    expect(fermee.closedAt, isNotNull);
+    expect(fermee.closingAttemptId, attempt.id);
+    // La fermeture voyage avec la tentative : le serveur arrête le même
+    // chronomètre.
+    final OutboxData enFile = (await db.select(db.outbox).get()).single;
+    expect(
+      (jsonDecode(enFile.payload) as Map<String, Object?>)['ouvertureId'],
+      fermee.id,
+    );
+    expect(find.text('00:00'), findsNothing);
+  });
 
   // ═══ L'ÉTAPE 2 : LES RENSEIGNEMENTS ═══
   //
@@ -723,29 +871,41 @@ void main() {
     expect(find.text('Plateforme'), findsNothing);
   });
 
-  phase2TestWidgets('changer de numéro efface la note vocale non enregistrée', (
-    WidgetTester tester,
-  ) async {
-    final Directory temp = Directory.systemTemp.createTempSync(
-      'cpi-recording-',
-    );
-    addTearDown(() {
-      if (temp.existsSync()) temp.deleteSync(recursive: true);
-    });
-    final File recording = File('${temp.path}/attempt.m4a');
-    recording.writeAsBytesSync(<int>[1, 2, 3]);
-    await tester.pumpWidget(host());
-    await resultat(tester, '771234567');
-    await ouvrirNote(tester);
-    tester
-        .widget<CallAudioRecorder>(find.byType(CallAudioRecorder))
-        .onChanged(recording.path);
+  // EB-08 : le numéro ne change plus sous une fiche ouverte, c'est la seule
+  // façon de la quitter depuis cet écran. La note qui n'est pas partie s'efface
+  // donc au démontage, et non plus au changement de numéro.
+  phase2TestWidgets(
+    'la note vocale non enregistrée ne reste pas sur le disque',
+    (WidgetTester tester) async {
+      final Directory temp = Directory.systemTemp.createTempSync(
+        'cpi-recording-',
+      );
+      addTearDown(() {
+        if (temp.existsSync()) temp.deleteSync(recursive: true);
+      });
+      final File recording = File('${temp.path}/attempt.m4a');
+      recording.writeAsBytesSync(<int>[1, 2, 3]);
+      await tester.pumpWidget(host());
+      await resultat(tester, '771234567');
+      await ouvrirNote(tester);
+      tester
+          .widget<CallAudioRecorder>(find.byType(CallAudioRecorder))
+          .onChanged(recording.path);
 
-    await revenirAuNumero(tester);
-    await tester.enterText(find.byType(TextField).first, '781234567');
+      await revenirAuNumero(tester);
+      await tester.enterText(find.byType(TextField).first, '781234567');
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<TextField>(find.byType(TextField).first).controller?.text,
+        isNot(contains('78')),
+        reason: 'le champ est verrouillé tant que l\'appel n\'est pas consigné',
+      );
 
-    expect(recording.existsSync(), isFalse);
-  });
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 1));
+      expect(recording.existsSync(), isFalse);
+    },
+  );
 
   phase2TestWidgets(
     'une note enregistrée reste disponible pour la synchronisation',
@@ -1161,8 +1321,10 @@ void main() {
     expect(haptics, isEmpty);
 
     // Numéro complet et connu : la recherche aboutit sans rien faire vibrer.
-    await type(tester, '771234567');
+    await tester.enterText(find.byType(TextField).first, '771234567');
+    await tester.pumpAndSettle();
     expect(haptics, isEmpty);
+    await confirmerLOuverture(tester);
 
     // Les « Continuer » du parcours : un retour LÉGER par appui, celui que
     // `CpiButton` donne à toute action primaire. Les choix du dossier, eux,
@@ -1499,6 +1661,73 @@ void main() {
 
     expect(find.textContaining('commentaire est obligatoire'), findsOneWidget);
     expect(await db.countMyAttempts().getSingle(), 0);
+  });
+
+  // EB-10 : changer de numéro effaçait la saisie. Elle est désormais écrite
+  // SOUS LE NUMÉRO qu'on quitte, avant que la clé ne change : après, elle se
+  // rangerait sous le numéro suivant, ou nulle part.
+  phase2TestWidgets('la saisie survit au changement de numéro', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(host());
+    await renseignements(tester, '771234567');
+    await remplir(tester, 'Nom', 'Sow');
+    await remplir(tester, 'Prénom', 'Awa');
+    // Le champ du numéro ne vit qu'à l'étape 1 : y revenir est le seul moyen
+    // d'appeler quelqu'un d'autre.
+    await reculer(tester);
+
+    await type(tester, '781234567');
+    await tester.pumpAndSettle();
+
+    // Même horloge que l'écran : lue avec l'horloge réelle, la ligne
+    // paraîtrait vieille de trois semaines et la lecture la supprimerait.
+    final DraftSnapshot? garde = await DraftRepository(
+      db,
+      clock: FakeClock(t0),
+    ).read('phase2:+221771234567');
+    expect(garde?.values['nom'], 'Sow');
+    expect(garde?.values['prenom'], 'Awa');
+    // L'autre numéro part d'un formulaire vide : c'est une autre personne.
+    expect(find.text('Sow'), findsNothing);
+  });
+
+  // Les clés du brouillon sont un contrat avec lui-même d'une version à
+  // l'autre : relues sous un autre nom, les réponses reviendraient vides.
+  test('le brouillon se relit champ par champ', () {
+    final Phase2FormFields fields = Phase2FormFields();
+    addTearDown(fields.dispose);
+    fields.applyDraft(<String, Object?>{
+      'nom': 'Sow',
+      'prenom': 'Awa',
+      'email': 'awa@exemple.sn',
+      'profession': 'Institutrice',
+      'duree': '36',
+      'banque': 'Banque Test',
+      'banqueId': 'bq-1',
+      'syndicat': 'Syndicat Test',
+      'syndicatId': 'sy-1',
+      'revenu': 'Revenu Test',
+      'incomeBandId': 'rev-1',
+      'dureeSystemeMois': 24,
+      'fonctionnaire': 'oui',
+      'engagementEnCours': 'non',
+    });
+
+    expect(fields.nom.text, 'Sow');
+    expect(fields.prenom.text, 'Awa');
+    expect(fields.email.text, 'awa@exemple.sn');
+    expect(fields.profession.text, 'Institutrice');
+    expect(fields.duree.text, '36');
+    expect(fields.banqueId, 'bq-1');
+    expect(fields.syndicatId, 'sy-1');
+    expect(fields.incomeBandId, 'rev-1');
+    expect(fields.dureeSystemeMois, 24);
+    expect(fields.fonctionnaire, Tri.oui);
+    expect(fields.engagementEnCours, Tri.non);
+    // Une valeur absente ne se devine pas : elle reste « non demandé ».
+    fields.applyDraft(const <String, Object?>{});
+    expect(fields.fonctionnaire, Tri.nonDemande);
   });
 }
 

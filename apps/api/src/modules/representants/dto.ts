@@ -15,6 +15,7 @@ import {
 } from 'class-validator';
 import {
   ChangeSource,
+  RappelOrigine,
   RepCallOutcome,
   RepresentantRelation,
   StatutQualificationEffect,
@@ -265,9 +266,18 @@ export class RepresentantDto {
     type: String,
     format: 'date-time',
     nullable: true,
-    description: 'Rappel promis par le dernier appel, tant qu’aucun appel ne l’a honoré.',
+    description: 'Rappel dû, tant qu’aucun appel ne l’a honoré.',
   })
   nextCallbackAt!: string | null;
+
+  @ApiProperty({
+    enum: RappelOrigine,
+    enumName: 'RappelOrigine',
+    nullable: true,
+    description:
+      'PROMIS : la date convenue avec la personne. AUTOMATIQUE : le délai de réessai du dernier statut non joint. Nul en même temps que `nextCallbackAt`.',
+  })
+  nextCallbackOrigine!: RappelOrigine | null;
 }
 
 export class RepresentantListDto {
@@ -367,7 +377,7 @@ export class RepresentantExportQueryDto {
     enum: RepresentantSuivi,
     enumName: 'RepresentantSuivi',
     description:
-      'A_RAPPELER : un rappel promis reste dû (`nextCallbackAt`), tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien.',
+      'A_RAPPELER : un rappel reste dû (`nextCallbackAt`), promis ou automatique, tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien.',
   })
   @IsOptional()
   @IsEnum(RepresentantSuivi)
@@ -631,6 +641,12 @@ export class RepresentantCallAttemptDto {
   @ApiProperty({ type: String, format: 'uuid', nullable: true })
   statutQualificationId!: string | null;
   @ApiProperty({ type: String, nullable: true }) statutQualificationLabel!: string | null;
+  @ApiProperty({
+    type: Boolean,
+    description:
+      'Le statut exigeait un motif : `comment` porte alors ce motif, et non un commentaire libre.',
+  })
+  statutQualificationRequiresComment!: boolean;
   @ApiProperty({ type: String, nullable: true }) comment!: string | null;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) callbackAt!: string | null;
   @ApiProperty({ type: Number, nullable: true }) promisedProspects!: number | null;

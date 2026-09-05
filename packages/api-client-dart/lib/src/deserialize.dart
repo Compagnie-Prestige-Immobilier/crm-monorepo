@@ -41,6 +41,8 @@ import 'package:crm_api_client/src/model/change_my_password_dto.dart';
 import 'package:crm_api_client/src/model/change_prospect_segment_dto.dart';
 import 'package:crm_api_client/src/model/client_request_dto.dart';
 import 'package:crm_api_client/src/model/client_request_list_dto.dart';
+import 'package:crm_api_client/src/model/comptage_ouvertures_dto.dart';
+import 'package:crm_api_client/src/model/comptage_ouvertures_jour_dto.dart';
 import 'package:crm_api_client/src/model/confirm_grand_public_conversion_dto.dart';
 import 'package:crm_api_client/src/model/create_bank_case_correction_dto.dart';
 import 'package:crm_api_client/src/model/create_bank_case_dto.dart';
@@ -84,6 +86,7 @@ import 'package:crm_api_client/src/model/disposition_presentation_dto.dart';
 import 'package:crm_api_client/src/model/disposition_response_dto.dart';
 import 'package:crm_api_client/src/model/disposition_widget_dto.dart';
 import 'package:crm_api_client/src/model/employeur_dto.dart';
+import 'package:crm_api_client/src/model/enregistrer_brouillon_dto.dart';
 import 'package:crm_api_client/src/model/enrollment_method_count_dto.dart';
 import 'package:crm_api_client/src/model/enrollment_method_list_dto.dart';
 import 'package:crm_api_client/src/model/funnel_stage_dto.dart';
@@ -127,6 +130,9 @@ import 'package:crm_api_client/src/model/ok_dto.dart';
 import 'package:crm_api_client/src/model/origin_breakdown_dto.dart';
 import 'package:crm_api_client/src/model/origin_count_dto.dart';
 import 'package:crm_api_client/src/model/origin_label_count_dto.dart';
+import 'package:crm_api_client/src/model/ouverture_fiche_dto.dart';
+import 'package:crm_api_client/src/model/ouverture_fiche_list_dto.dart';
+import 'package:crm_api_client/src/model/ouvrir_fiche_dto.dart';
 import 'package:crm_api_client/src/model/page_meta_dto.dart';
 import 'package:crm_api_client/src/model/pays_dto.dart';
 import 'package:crm_api_client/src/model/performance_score.dart';
@@ -423,6 +429,12 @@ ReturnType deserialize<ReturnType, BaseType>(
       return ClientRequestListDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'ClientRequestStatus':
+    case 'ComptageOuverturesDto':
+      return ComptageOuverturesDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'ComptageOuverturesJourDto':
+      return ComptageOuverturesJourDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'ConfirmGrandPublicConversionDto':
       return ConfirmGrandPublicConversionDto.fromJson(
             value as Map<String, dynamic>,
@@ -565,6 +577,9 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'EmployeurDto':
       return EmployeurDto.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'EmployeurType':
+    case 'EnregistrerBrouillonDto':
+      return EnregistrerBrouillonDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'EnrollmentMethod':
     case 'EnrollmentMethodCountDto':
       return EnrollmentMethodCountDto.fromJson(value as Map<String, dynamic>)
@@ -703,6 +718,15 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'OriginLabelCountDto':
       return OriginLabelCountDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'OuvertureFicheDto':
+      return OuvertureFicheDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'OuvertureFicheListDto':
+      return OuvertureFicheListDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'OuvrirFicheDto':
+      return OuvrirFicheDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'PageMetaDto':
       return PageMetaDto.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'PaymentMode':
@@ -772,6 +796,7 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'PurgeResultDto':
       return PurgeResultDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'RappelOrigine':
     case 'ReassignProspectsDto':
       return ReassignProspectsDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;

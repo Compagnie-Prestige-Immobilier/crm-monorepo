@@ -22,13 +22,13 @@ part 'create_statut_qualification_dto.g.dart';
 class CreateStatutQualificationDto {
   /// Returns a new [CreateStatutQualificationDto] instance.
   CreateStatutQualificationDto({
-    required this.code,
-
     required this.label,
 
     required this.effect,
 
     this.requiresCallback = false,
+
+    this.requiresComment = false,
 
     this.retryAfterMinutes,
 
@@ -37,10 +37,7 @@ class CreateStatutQualificationDto {
     this.relationStatus,
   });
 
-  /// Immuable : l’historique le référence.
-  @JsonKey(name: r'code', required: true, includeIfNull: false)
-  final String code;
-
+  /// Le code en est déduit, puis figé : majuscules, sans accents, espaces en tirets bas.
   @JsonKey(name: r'label', required: true, includeIfNull: false)
   final String label;
 
@@ -59,6 +56,14 @@ class CreateStatutQualificationDto {
     includeIfNull: false,
   )
   final bool? requiresCallback;
+
+  @JsonKey(
+    defaultValue: false,
+    name: r'requiresComment',
+    required: false,
+    includeIfNull: false,
+  )
+  final bool? requiresComment;
 
   // minimum: 5
   // maximum: 10080
@@ -89,19 +94,19 @@ class CreateStatutQualificationDto {
             runtimeType == other.runtimeType &&
             equals(
               [
-                code,
                 label,
                 effect,
                 requiresCallback,
+                requiresComment,
                 retryAfterMinutes,
                 priorite,
                 relationStatus,
               ],
               [
-                other.code,
                 other.label,
                 other.effect,
                 other.requiresCallback,
+                other.requiresComment,
                 other.retryAfterMinutes,
                 other.priorite,
                 other.relationStatus,
@@ -113,10 +118,10 @@ class CreateStatutQualificationDto {
   int get hashCode =>
       runtimeType.hashCode ^
       mapPropsToHashCode([
-        code,
         label,
         effect,
         requiresCallback,
+        requiresComment,
         retryAfterMinutes,
         priorite,
         relationStatus,

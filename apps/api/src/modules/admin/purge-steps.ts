@@ -44,6 +44,11 @@ export const PURGE_STEPS: Readonly<Record<PurgeStepKey, PurgeStep>> = {
     count: (db) => db.deviceCallDetection.count(),
     remove: async (db) => (await db.deviceCallDetection.deleteMany({})).count,
   },
+  ouverturesFiche: {
+    table: 'ouvertures_fiche',
+    count: (db) => db.ouvertureFiche.count(),
+    remove: async (db) => (await db.ouvertureFiche.deleteMany({})).count,
+  },
   callAttempts: {
     table: 'call_attempts',
     count: (db) => db.callAttempt.count(),

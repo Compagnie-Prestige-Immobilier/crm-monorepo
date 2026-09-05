@@ -5,9 +5,11 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import { inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
 import { performanceScore } from '../admin/performance-score.js';
 import {
-  UNUSABLE_OUTCOMES,
-  REP_ANSWERED_OUTCOMES,
+  NOT_REACHED_OUTCOMES,
+  REP_ARBITRAGE,
+  REP_JOINT_OUTCOMES,
   REP_LIVE_OUTCOMES,
+  REP_STATUT_JOIN,
   ALL_ROWS,
   rate,
 } from './pilotage.sql.js';
@@ -271,7 +273,7 @@ export class SupervisionActivityService {
             (ca."outcome" = 'OTHER')::int                   AS autre,
             (ca."outcome" = 'METHOD_OBTAINED')::int         AS methode,
             (ca."outcome" = 'CALLBACK')::int                AS rappel,
-            (ca."outcome" NOT IN ${UNUSABLE_OUTCOMES})::int AS joignable,
+            (ca."outcome" NOT IN ${NOT_REACHED_OUTCOMES})::int AS joignable,
             0                                               AS prospect,
             NULL::text                                      AS representant
           FROM "call_attempts" ca
@@ -315,7 +317,7 @@ export class SupervisionActivityService {
             (rca."outcome" IN ${REP_LIVE_OUTCOMES})::int AS appel,
             (rca."outcome" IN ${REP_LIVE_OUTCOMES} AND rca."deviceCallAt" IS NOT NULL)::int AS confirme,
             (rca."outcome" = 'WRONG_NUMBER')::int             AS faux,
-            (rca."outcome" IN ${REP_ANSWERED_OUTCOMES})::int  AS joint,
+            (rca."outcome" IN ${REP_JOINT_OUTCOMES})::int     AS joint,
             (rca."outcome" = 'CALLBACK')::int                AS rappel,
             (rca."outcome" = 'UNREACHABLE')::int             AS injoignable,
             (rca."outcome" NOT IN ${REP_LIVE_OUTCOMES})::int AS autre
@@ -414,9 +416,10 @@ export class SupervisionActivityService {
           SELECT DISTINCT ON (rca."representantId")
             rca."performedById"                        AS "userId",
             date_trunc(${unit}, rca."clientCreatedAt") AS bucket,
-            (rca."outcome" = 'REACHED')::int           AS qualifie
+            (${REP_ARBITRAGE} = 'AMBASSADEUR')::int    AS qualifie
           FROM "rep_call_attempts" rca
-          WHERE rca."outcome" IN ${REP_ANSWERED_OUTCOMES} AND ${repScope} AND ${repWindow}
+          ${REP_STATUT_JOIN}
+          WHERE ${REP_ARBITRAGE} IS NOT NULL AND ${repScope} AND ${repWindow}
           ORDER BY rca."representantId", rca."clientCreatedAt" DESC, rca."id" DESC
     `;
 
@@ -439,7 +442,7 @@ export class SupervisionActivityService {
             ca."clientCreatedAt"                            AS quand,
             'prospect'                                      AS famille,
             ca."prospectId"::text                           AS cible,
-            (ca."outcome" NOT IN ${UNUSABLE_OUTCOMES})::int AS joint,
+            (ca."outcome" NOT IN ${NOT_REACHED_OUTCOMES})::int AS joint,
             (ca."outcome" = 'METHOD_OBTAINED')::int         AS qualifie
           FROM "call_attempts" ca
           WHERE ${projetScope(Prisma.sql`ca."prospectId"`)}
@@ -449,7 +452,7 @@ export class SupervisionActivityService {
           SELECT
             rca."performedById", rca."clientCreatedAt", 'representant',
             rca."representantId"::text,
-            (rca."outcome" IN ${REP_ANSWERED_OUTCOMES})::int, 0
+            (rca."outcome" IN ${REP_JOINT_OUTCOMES})::int, 0
           FROM "rep_call_attempts" rca
           WHERE ${repScope} AND ${repWindow}
     `;

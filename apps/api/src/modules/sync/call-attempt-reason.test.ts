@@ -381,3 +381,41 @@ describe('preuve d’appel remontée par le téléphone', () => {
     expect(ligne?.deviceCallAt).toBeNull();
   });
 });
+
+describe('la tentative d’un prospect ferme l’ouverture qui la chronométrait', () => {
+  const OUVERTURE = '0198d000-0000-7000-8000-000000000001';
+
+  const seedOuverture = (openedById: string): void => {
+    db.ouverturesFiche.set(OUVERTURE, {
+      id: OUVERTURE,
+      openedById,
+      prospectId: PROSPECT_A,
+      openedAt: new Date('2026-08-10T10:00:00.000Z'),
+      closedAt: null,
+      closingAttemptId: null,
+    });
+  };
+
+  it('attache la tentative et lève le verrou dans la transaction du groupe', async () => {
+    seedOuverture(alice.id);
+    const operation = attempt(PROSPECT_A, { ouvertureId: OUVERTURE });
+
+    const result = await sync.push(alice, push([operation]));
+
+    expect(statuses(result.body.results)).toEqual([SyncOpStatus.APPLIED]);
+    expect(db.ouverturesFiche.get(OUVERTURE)).toMatchObject({
+      closedAt: new Date('2026-08-10T10:05:00.000Z'),
+      closingAttemptId: operation.entityId,
+    });
+  });
+
+  // Un verrou tenu par quelqu'un d'autre ne condamne pas une saisie du terrain.
+  it('enregistre la tentative même quand l’ouverture appartient à un autre', async () => {
+    seedOuverture('com-omar');
+
+    const result = await sync.push(alice, push([attempt(PROSPECT_A, { ouvertureId: OUVERTURE })]));
+
+    expect(statuses(result.body.results)).toEqual([SyncOpStatus.APPLIED]);
+    expect(db.ouverturesFiche.get(OUVERTURE)?.closedAt).toBeNull();
+  });
+});

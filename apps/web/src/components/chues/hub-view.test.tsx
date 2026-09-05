@@ -40,31 +40,38 @@ beforeEach(() => {
     Promise.resolve(page(filters.hasProspects === false ? 7 : 42)),
   );
   countPendingProspects.mockResolvedValue(310);
-  fetchCallbacks.mockResolvedValue({
-    items: [{ id: 'c-1' }, { id: 'c-2' }],
-    serverTime: '2026-08-27T09:00:00.000Z',
-  });
+  fetchCallbacks.mockImplementation((scope: string) =>
+    Promise.resolve({
+      items: scope === 'overdue' ? [{ id: 'c-9' }] : [{ id: 'c-1' }, { id: 'c-2' }],
+      serverTime: '2026-08-27T09:00:00.000Z',
+    }),
+  );
 });
 
 const etapes = (): HTMLElement[] => within(screen.getByRole('list')).getAllByRole('listitem');
 
-describe('HubView : les trois étapes, dans l’ordre', () => {
+describe('HubView : les trois étapes, dans l’ordre, puis ce qui revient', () => {
   it('salue et compte les étapes une fois les chiffres arrivés', async () => {
     renderWithQuery(<HubView prenom="Fatou" />);
 
-    expect(screen.getByText('Bonjour Fatou. Trois étapes, dans l’ordre.')).toBeTruthy();
+    expect(
+      screen.getByText('Bonjour Fatou. Trois étapes, dans l’ordre, puis ce qui revient.'),
+    ).toBeTruthy();
 
     await waitFor(() => {
       expect(screen.getByText('42')).toBeTruthy();
     });
-    const [une, deux, trois] = etapes();
+    const [une, deux, trois, quatre] = etapes();
     expect(une?.textContent).toContain('Qualifier un représentant');
     expect(une?.textContent).toContain('pas encore qualifiés');
     expect(deux?.textContent).toContain('7');
     expect(deux?.textContent).toContain('ont dit oui, sans contacts notés');
     expect(trois?.textContent).toContain('310');
     expect(trois?.textContent).toContain('pas encore convertis');
-    expect(trois?.textContent).toContain('2 rappels dus');
+    // EB-13 : la file de rappel a sa propre tuile, son compte et son geste.
+    expect(quatre?.textContent).toContain('À rappeler');
+    expect(quatre?.textContent).toContain('2 dus aujourd’hui');
+    expect(quatre?.textContent).toContain('1 en retard');
   });
 
   // Les trois étapes se lisent dans l'ordre ; rien n'y désigne une file à vider.
@@ -95,7 +102,7 @@ describe('HubView : les trois étapes, dans l’ordre', () => {
     renderWithQuery(<HubView prenom="Fatou" />);
 
     expect(screen.queryByText('0')).toBeNull();
-    expect(document.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(3);
+    expect(document.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(4);
   });
 
   it('ne propose qu’UN geste par étape, et c’est un lien', async () => {
@@ -114,6 +121,7 @@ describe('HubView : les trois étapes, dans l’ordre', () => {
       '/chues/appels-representants',
       '/chues/prospects/nouveau',
       '/chues/console',
+      '/chues/rappels',
     ]);
   });
 

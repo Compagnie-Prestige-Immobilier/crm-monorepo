@@ -57,3 +57,21 @@ export const issueContreditStatut = (attendue: string, recue: string): BadReques
     'REP_OUTCOME_STATUT_MISMATCH',
     `Le statut choisi impose l’issue « ${attendue} », or « ${recue} » a été envoyée.`,
   );
+
+/**
+ * La réponse à « Souhaite-t-il être représentant CHUES ? » et le statut posent
+ * la MÊME chose : oui vaut Accepté, non vaut Refusé. Les statuts qui ne
+ * tranchent rien (à rappeler, décédé, faux numéro, autre) portent une relation
+ * nulle et ne peuvent donc pas entrer ici.
+ */
+export const relationContreditStatut = (label: string): BadRequestException =>
+  error(
+    'REP_RELATION_STATUT_MISMATCH',
+    `Le statut « ${label} » contredit la réponse au rattachement comme représentant.`,
+  );
+
+export const motifRequis = (label: string): BadRequestException =>
+  error(
+    'REP_STATUT_MOTIF_REQUIRED',
+    `Le statut « ${label} » exige un motif : sans lui, la case ne dit rien.`,
+  );
