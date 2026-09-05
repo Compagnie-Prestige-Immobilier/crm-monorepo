@@ -50,6 +50,7 @@ import { fetchReferenceData } from '@/lib/data/reference';
 import { fetchRepresentantsAQualifier, type ScriptedRepresentant } from '@/lib/data/representants';
 import {
   fetchStatutsQualification,
+  libelleStatut,
   statutsDeLaBranche,
   type StatutQualification,
   type StatutQualificationEffect,
@@ -86,7 +87,11 @@ export const outcomeDuStatut = (effect: StatutQualificationEffect): RepAnswer['o
   OUTCOME_PAR_EFFET[effect];
 
 /** Ces effets closent l'appel : le script reste posé, plus rien n'y est exigé. */
-const EFFETS_SANS_SCRIPT: readonly StatutQualificationEffect[] = ['REFUSED', 'SCHEDULE_CALLBACK'];
+const EFFETS_SANS_SCRIPT: readonly StatutQualificationEffect[] = [
+  'REFUSED',
+  'SCHEDULE_CALLBACK',
+  'WRONG_NUMBER',
+];
 
 const scriptExige = (effect: StatutQualificationEffect): boolean =>
   !EFFETS_SANS_SCRIPT.includes(effect);
@@ -647,7 +652,7 @@ function ChoixStatut({
       {/* `items` n'est pas décoratif : sans lui, le déclencheur affiche la
           VALEUR, donc l'identifiant, au lieu du libellé de la ligne choisie. */}
       <Select
-        items={statuts.map((statut) => ({ value: statut.id, label: statut.label }))}
+        items={statuts.map((statut) => ({ value: statut.id, label: libelleStatut(statut) }))}
         value={value}
         onValueChange={onChange}
       >
@@ -657,7 +662,7 @@ function ChoixStatut({
         <SelectContent>
           {statuts.map((statut) => (
             <SelectItem key={statut.id} value={statut.id}>
-              {statut.label}
+              {libelleStatut(statut)}
             </SelectItem>
           ))}
         </SelectContent>
@@ -1239,7 +1244,7 @@ function Qualification({
           <RecapAppel
             representant={representant}
             resultat={resultat}
-            statutLabel={statut?.label ?? null}
+            statutLabel={statut === null ? null : libelleStatut(statut)}
             joignable={joignable}
             etablissementConfirme={etablissementConfirme}
             nouvelEtablissement={nouvelEtablissement}
