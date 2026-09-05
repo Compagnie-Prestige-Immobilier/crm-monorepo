@@ -466,7 +466,7 @@ export class RepresentantsService {
       where: { representantId: id },
       include: {
         performedBy: { select: { fullName: true } },
-        statutQualification: { select: { label: true } },
+        statutQualification: { select: { label: true, requiresComment: true } },
         suggestion: { select: { suggestedName: true, suggestedPhoneE164: true, note: true } },
       },
       orderBy: [{ clientCreatedAt: 'desc' }, { id: 'desc' }],
@@ -478,6 +478,7 @@ export class RepresentantsService {
         outcome: row.outcome,
         statutQualificationId: row.statutQualificationId,
         statutQualificationLabel: row.statutQualification?.label ?? null,
+        statutQualificationRequiresComment: row.statutQualification?.requiresComment ?? false,
         comment: row.comment,
         callbackAt: row.callbackAt?.toISOString() ?? null,
         promisedProspects: row.promisedProspects,
