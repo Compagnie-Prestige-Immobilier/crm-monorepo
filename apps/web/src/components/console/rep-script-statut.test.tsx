@@ -48,8 +48,8 @@ vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
 function statut(over: Partial<StatutQualification> & { id: string }): StatutQualification {
   return {
-    code: 'INTERESSE',
-    label: 'Intéressé',
+    code: 'ACCEPTE',
+    label: 'Accepté',
     effect: 'REACHED',
     requiresCallback: false,
     priorite: 'NORMALE',
@@ -65,7 +65,7 @@ function statut(over: Partial<StatutQualification> & { id: string }): StatutQual
 
 const STATUTS: StatutQualification[] = [
   statut({ id: 's-1' }),
-  statut({ id: 's-2', code: 'NON_INTERESSE', label: 'Non intéressé', effect: 'REFUSED' }),
+  statut({ id: 's-2', code: 'REFUSE', label: 'Refusé', effect: 'REFUSED' }),
   statut({
     id: 's-3',
     code: 'A_RAPPELER',
@@ -87,6 +87,9 @@ const STATUTS: StatutQualification[] = [
     label: 'Injoignable définitif',
     effect: 'UNREACHABLE',
   }),
+  statut({ id: 's-7', code: 'DECEDE', label: 'Décédé', effect: 'REFUSED' }),
+  statut({ id: 's-8', code: 'AUTRE_JOINT', label: 'Autre joint', effect: 'REACHED' }),
+  statut({ id: 's-9', code: 'AUTRE_NON_JOINT', label: 'Autre non joint', effect: 'UNREACHABLE' }),
 ];
 
 const REPRESENTANT: ScriptedRepresentant = {
@@ -196,10 +199,10 @@ describe('le sélecteur de statut', () => {
     );
 
     expect((await screen.findAllByRole('option')).map((option) => option.textContent)).toEqual([
-      'Intéressé',
-      'Non intéressé',
       'À rappeler',
       'Faux numéro',
+      'Décédé',
+      'Autre',
     ]);
   });
 
@@ -213,6 +216,7 @@ describe('le sélecteur de statut', () => {
     expect((await screen.findAllByRole('option')).map((option) => option.textContent)).toEqual([
       'Pas de réponse',
       'Injoignable définitif',
+      'Autre',
     ]);
   });
 });
@@ -221,11 +225,11 @@ describe('ce que le déclencheur affiche', () => {
   it('montre le LIBELLÉ du statut retenu, jamais son identifiant', async () => {
     await ouvrirQualification();
     await repondre('Joignable');
-    await choisirStatut('Intéressé');
+    await choisirStatut('Décédé');
 
     const declencheur = screen.getByRole('combobox', { name: /Statut de qualification/u });
 
-    expect(declencheur.textContent).toContain('Intéressé');
+    expect(declencheur.textContent).toContain('Décédé');
     // L'identifiant est un UUID : le lire à l'écran ne dit rien à personne.
     expect(declencheur.textContent).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}/u);
   });
@@ -235,7 +239,7 @@ describe('la date de rappel suit le statut, pas le résultat', () => {
   it('n’est exigée que par le statut qui la réclame', async () => {
     await ouvrirQualification();
     await repondre('Joignable');
-    await choisirStatut('Intéressé');
+    await choisirStatut('Décédé');
 
     expect(screen.queryByText('Quand rappeler ?')).toBeNull();
 
@@ -251,7 +255,7 @@ describe('la date de rappel suit le statut, pas le résultat', () => {
     await repondreA('L’établissement de la fiche est-il confirmé ?', 'Oui');
     await repondreA('A-t-il déjà été contacté ?', 'Oui');
     await repondreA('Connaît-il l’UES ?', 'Oui');
-    await repondreA('Est-il représentant CPI CHUES ?', 'Non');
+    await repondreA('Souhaite-t-il être représentant CHUES ?', 'Non');
 
     expect(screen.getByText('Choisissez quand rappeler')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Continuer' }).hasAttribute('disabled')).toBe(true);
@@ -349,7 +353,7 @@ describe('l’effet du statut décide si le script est exigé', () => {
   it('garde les questions du script affichées, facultatives et répondables', async () => {
     await ouvrirQualification();
     await repondre('Joignable');
-    await choisirStatut('Non intéressé');
+    await choisirStatut('Décédé');
 
     expect(screen.getByText('L’établissement de la fiche est-il confirmé ?')).toBeTruthy();
 
@@ -366,7 +370,7 @@ describe('l’effet du statut décide si le script est exigé', () => {
   it('laisse un statut d’effet REFUSED enregistrer sans réponse ni date', async () => {
     await ouvrirQualification();
     await repondre('Joignable');
-    await choisirStatut('Non intéressé');
+    await choisirStatut('Décédé');
 
     expect(screen.queryByText('Quand rappeler ?')).toBeNull();
 
@@ -377,14 +381,14 @@ describe('l’effet du statut décide si le script est exigé', () => {
       expect(pushRepCallAttempt).toHaveBeenCalledTimes(1);
     });
     const envoi = pushRepCallAttempt.mock.calls[0]?.[0] as Record<string, unknown>;
-    expect(envoi).toMatchObject({ outcome: 'REFUSED', statutQualificationId: 's-2' });
+    expect(envoi).toMatchObject({ outcome: 'REFUSED', statutQualificationId: 's-7' });
     expect(envoi['callbackAt']).toBeUndefined();
   });
 
-  it('n’envoie aucune relation quand la question CPI CHUES reste sans réponse', async () => {
+  it('n’envoie aucune relation quand la question CHUES reste sans réponse', async () => {
     await ouvrirQualification();
     await repondre('Joignable');
-    await choisirStatut('Non intéressé');
+    await choisirStatut('Décédé');
     await userEvent.click(screen.getByRole('button', { name: 'Continuer' }));
     await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
 
@@ -395,10 +399,10 @@ describe('l’effet du statut décide si le script est exigé', () => {
     expect(envoi['relationStatus']).toBeUndefined();
   });
 
-  it('exige le script en entier sous un statut d’effet REACHED', async () => {
+  it('exige le script jusqu’à l’UES sous un statut d’effet REACHED', async () => {
     await ouvrirQualification();
     await repondre('Joignable');
-    await choisirStatut('Intéressé');
+    await choisirStatut('Autre');
 
     expect(screen.getByText('Dites si l’établissement est confirmé')).toBeTruthy();
 
@@ -407,17 +411,84 @@ describe('l’effet du statut décide si le script est exigé', () => {
     expect(screen.getByText('Dites s’il a déjà été contacté')).toBeTruthy();
 
     await repondreA('A-t-il déjà été contacté ?', 'Oui');
-    await repondreA('Connaît-il l’UES ?', 'Oui');
 
-    expect(screen.getByText('Dites s’il est représentant CPI CHUES')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Continuer' }).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByText('Dites s’il connaît l’UES')).toBeTruthy();
   });
 
-  it('demande le statut avant le script, puisque c’est lui qui l’exige', async () => {
+  it('ouvre sur le script, dont la dernière réponse pose le statut', async () => {
     await ouvrirQualification();
     await repondre('Joignable');
 
-    expect(screen.getByText('Choisissez un statut de qualification')).toBeTruthy();
+    expect(screen.getByText('Dites si l’établissement est confirmé')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Continuer' }).hasAttribute('disabled')).toBe(true);
+  });
+});
+
+/** EB-02 : la question pose le statut ; il ne se choisit plus à part. */
+describe('la question « Souhaite-t-il être représentant CHUES ? »', () => {
+  const scriptJusquAuSouhait = async (): Promise<void> => {
+    await ouvrirQualification();
+    await repondre('Joignable');
+    await repondreA('L’établissement de la fiche est-il confirmé ?', 'Oui');
+    await repondreA('A-t-il déjà été contacté ?', 'Oui');
+    await repondreA('Connaît-il l’UES ?', 'Oui');
+  };
+
+  it('retient l’enregistrement tant qu’elle est sans réponse, et le dit', async () => {
+    await scriptJusquAuSouhait();
+
+    expect(screen.getByText('Dites s’il souhaite être représentant CHUES')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Continuer' }).hasAttribute('disabled')).toBe(true);
+  });
+
+  it('pose « Accepté » et rattache sur un oui', async () => {
+    await scriptJusquAuSouhait();
+    await repondreA('Souhaite-t-il être représentant CHUES ?', 'Oui');
+    await repondreA('A-t-il WhatsApp sur ce numéro ?', 'Oui');
+    await userEvent.click(screen.getByRole('button', { name: 'Continuer' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(() => {
+      expect(pushRepCallAttempt).toHaveBeenCalledTimes(1);
+    });
+    expect(pushRepCallAttempt.mock.calls[0]?.[0]).toMatchObject({
+      outcome: 'REACHED',
+      statutQualificationId: 's-1',
+      relationStatus: 'AMBASSADEUR',
+    });
+  });
+
+  it('pose « Refusé » sur un non', async () => {
+    await scriptJusquAuSouhait();
+    await repondreA('Souhaite-t-il être représentant CHUES ?', 'Non');
+    await userEvent.click(screen.getByRole('button', { name: 'Continuer' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(() => {
+      expect(pushRepCallAttempt).toHaveBeenCalledTimes(1);
+    });
+    expect(pushRepCallAttempt.mock.calls[0]?.[0]).toMatchObject({
+      outcome: 'REFUSED',
+      statutQualificationId: 's-2',
+      relationStatus: 'REFUS',
+    });
+  });
+
+  it('laisse un autre statut de la branche jointe l’emporter', async () => {
+    await scriptJusquAuSouhait();
+    await repondreA('Souhaite-t-il être représentant CHUES ?', 'Non');
+    await choisirStatut('À rappeler');
+    await repondre('Demain 9 h');
+    await userEvent.click(screen.getByRole('button', { name: 'Continuer' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(() => {
+      expect(pushRepCallAttempt).toHaveBeenCalledTimes(1);
+    });
+    expect(pushRepCallAttempt.mock.calls[0]?.[0]).toMatchObject({
+      outcome: 'CALLBACK',
+      statutQualificationId: 's-3',
+      relationStatus: 'REFUS',
+    });
   });
 });

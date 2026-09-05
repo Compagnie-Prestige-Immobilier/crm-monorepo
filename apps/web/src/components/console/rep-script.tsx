@@ -51,7 +51,9 @@ import { fetchRepresentantsAQualifier, type ScriptedRepresentant } from '@/lib/d
 import {
   fetchStatutsQualification,
   libelleStatut,
+  statutDuSouhait,
   statutsDeLaBranche,
+  statutsHorsQuestion,
   type StatutQualification,
   type StatutQualificationEffect,
 } from '@/lib/data/statuts-qualification';
@@ -113,31 +115,6 @@ function recapEtablissement(confirme: boolean | null, nouvel: string): string | 
   if (confirme === null) return null;
   if (confirme) return 'Confirmé';
   return nouvel.trim() === '' ? 'À corriger' : nouvel.trim();
-}
-
-interface JoignableState {
-  etablissementConfirme: boolean | null;
-  nouvelEtablissement: string;
-  contacte: boolean | null;
-  connaitUES: boolean | null;
-  ambassadeur: boolean | null;
-  memeWhatsapp: boolean | null;
-  whatsapp: string;
-}
-
-/** Le script joignable, dans l'ordre : chaque réponse manquante bloque la suivante. */
-function manqueJoignable(s: JoignableState): string | null {
-  if (s.etablissementConfirme === null) return 'Dites si l’établissement est confirmé';
-  if (s.etablissementConfirme === false && s.nouvelEtablissement.trim() === '') {
-    return 'Écrivez le nouvel établissement';
-  }
-  if (s.contacte === null) return 'Dites s’il a déjà été contacté';
-  if (s.connaitUES === null) return 'Dites s’il connaît l’UES';
-  if (s.ambassadeur === null) return 'Dites s’il est représentant CPI CHUES';
-  if (s.ambassadeur !== true) return null;
-  if (s.memeWhatsapp === null) return 'Dites s’il a WhatsApp sur ce numéro';
-  if (s.memeWhatsapp === false && digitsOf(s.whatsapp) < 9) return 'Écrivez le numéro WhatsApp';
-  return null;
 }
 
 /** Confirmation de l'établissement, et sa nouvelle valeur seulement si infirmée. */
@@ -529,7 +506,7 @@ function QuestionsJoignable(props: QuestionsJoignableProps) {
         />
       </Question>
 
-      <Question titre="Est-il représentant CPI CHUES ?" anime>
+      <Question titre="Souhaite-t-il être représentant CHUES ?" anime>
         <Choix
           options={OUI_NON}
           value={props.ambassadeur}
@@ -639,10 +616,12 @@ function ChoixStatut({
   statuts,
   value,
   onChange,
+  pose,
 }: {
   statuts: readonly StatutQualification[];
   value: string | null;
   onChange: (valeur: string | null) => void;
+  pose: StatutQualification | null;
 }) {
   return (
     <div className={cn('flex max-w-80 flex-col gap-1.5', REVELE)}>
@@ -657,7 +636,7 @@ function ChoixStatut({
         onValueChange={onChange}
       >
         <SelectTrigger id="rep-statut">
-          <SelectValue placeholder="Choisir un statut" />
+          <SelectValue placeholder={pose === null ? 'Choisir un statut' : libelleStatut(pose)} />
         </SelectTrigger>
         <SelectContent>
           {statuts.map((statut) => (
@@ -667,6 +646,11 @@ function ChoixStatut({
           ))}
         </SelectContent>
       </Select>
+      {pose === null || value !== null ? null : (
+        <p className="text-[0.8125rem] text-muted-foreground">
+          Posé par votre réponse. Choisissez-en un autre s’il y a lieu.
+        </p>
+      )}
     </div>
   );
 }
@@ -677,6 +661,7 @@ interface EtapeQuestionsProps {
   statuts: readonly StatutQualification[];
   statutId: string | null;
   onStatut: (valeur: string | null) => void;
+  statutPose: StatutQualification | null;
   exigeRappel: boolean;
   joignable: boolean;
   proposeQuelquUn: boolean;
@@ -706,7 +691,12 @@ function EtapeQuestions(props: EtapeQuestionsProps) {
       {props.proposeQuelquUn ? <QuestionSuggestion {...props.suggestion} /> : null}
 
       {props.resultat === null ? null : (
-        <ChoixStatut statuts={props.statuts} value={props.statutId} onChange={props.onStatut} />
+        <ChoixStatut
+          statuts={props.statuts}
+          value={props.statutId}
+          onChange={props.onStatut}
+          pose={props.statutPose}
+        />
       )}
 
       {/* L'échéance ne se demande qu'au statut qui la réclame. Proposée sur
@@ -792,7 +782,10 @@ function RecapAppel(props: RecapAppelProps) {
           {props.syndicatName === '' ? null : (
             <Recap intitule="Syndicat" valeur={props.syndicatName} />
           )}
-          <Recap intitule="Représentant CPI CHUES" valeur={recapOuiNon(props.ambassadeur)} />
+          <Recap
+            intitule="Souhaite être représentant CHUES"
+            valeur={recapOuiNon(props.ambassadeur)}
+          />
         </>
       ) : null}
       {props.rappelAt === null ? null : (
@@ -902,6 +895,7 @@ function syndicatsDe(
 interface EtatManque {
   resultat: Resultat | null;
   statut: StatutQualification | null;
+  statutChoisi: StatutQualification | null;
   joignable: boolean;
   etablissementConfirme: boolean | null;
   nouvelEtablissement: string;
@@ -916,22 +910,42 @@ interface EtatManque {
   sugPhone: string;
 }
 
+/** Les questions qui précèdent, exigées par le seul statut qui n'a pas clos l'appel. */
+function manqueScript(etat: EtatManque): string | null {
+  if (etat.statut !== null && !scriptExige(etat.statut.effect)) return null;
+  if (etat.etablissementConfirme === null) return 'Dites si l’établissement est confirmé';
+  if (etat.etablissementConfirme === false && etat.nouvelEtablissement.trim() === '') {
+    return 'Écrivez le nouvel établissement';
+  }
+  if (etat.contacte === null) return 'Dites s’il a déjà été contacté';
+  if (etat.connaitUES === null) return 'Dites s’il connaît l’UES';
+  return null;
+}
+
+/** Le script joignable, dans l'ordre : chaque réponse manquante bloque la suivante. */
+function manqueJoignable(etat: EtatManque): string | null {
+  const script = manqueScript(etat);
+  if (script !== null) return script;
+  // Sans statut retenu à part, c'est la réponse à la question qui le pose.
+  if (etat.statutChoisi === null && etat.ambassadeur === null) {
+    return 'Dites s’il souhaite être représentant CHUES';
+  }
+  if (etat.ambassadeur !== true) return null;
+  if (etat.memeWhatsapp === null) return 'Dites s’il a WhatsApp sur ce numéro';
+  if (etat.memeWhatsapp === false && digitsOf(etat.whatsapp) < 9) {
+    return 'Écrivez le numéro WhatsApp';
+  }
+  return null;
+}
+
 /** Ce qui empêche encore d'enregistrer, en une phrase, ou rien. */
 function manqueDe(etat: EtatManque): string | null {
   if (etat.resultat === null) return 'Choisissez d’abord le résultat';
-  if (etat.statut === null) return 'Choisissez un statut de qualification';
-  if (etat.joignable && scriptExige(etat.statut.effect)) {
-    const script = manqueJoignable({
-      etablissementConfirme: etat.etablissementConfirme,
-      nouvelEtablissement: etat.nouvelEtablissement,
-      contacte: etat.contacte,
-      connaitUES: etat.connaitUES,
-      ambassadeur: etat.ambassadeur,
-      memeWhatsapp: etat.memeWhatsapp,
-      whatsapp: etat.whatsapp,
-    });
+  if (etat.joignable) {
+    const script = manqueJoignable(etat);
     if (script !== null) return script;
   }
+  if (etat.statut === null) return 'Choisissez un statut de qualification';
   if (dateDemandee(etat.statut) && etat.rappelAt === null) return 'Choisissez quand rappeler';
   // Le serveur jette une suggestion sans numéro : plutôt que d'effacer en
   // silence ce qui vient d'être dicté, l'enregistrement attend le numéro.
@@ -1070,8 +1084,12 @@ function Qualification({
   });
 
   const joignable = resultat === 'JOIGNABLE';
-  const statuts = statutsDeLaBranche(referentielStatuts.data ?? [], joignable);
-  const statut = statuts.find((ligne) => ligne.id === statutId) ?? null;
+  const branche = statutsDeLaBranche(referentielStatuts.data ?? [], joignable);
+  // Accepté et Refusé découlent de la réponse : ils ne se choisissent plus à part.
+  const statuts = joignable ? statutsHorsQuestion(branche) : branche;
+  const statutPose = joignable ? statutDuSouhait(branche, ambassadeur) : null;
+  const statutChoisi = statuts.find((ligne) => ligne.id === statutId) ?? null;
+  const statut = statutChoisi ?? statutPose;
   /** Une personne proposée n'a de sens que si l'appelé a dit non. */
   const proposeQuelquUn = joignable && ambassadeur === false;
   const suggestionCommencee =
@@ -1080,6 +1098,7 @@ function Qualification({
   const manque = manqueDe({
     resultat,
     statut,
+    statutChoisi,
     joignable,
     etablissementConfirme,
     nouvelEtablissement,
@@ -1208,6 +1227,7 @@ function Qualification({
           statuts={statuts}
           statutId={statutId}
           onStatut={choisirStatut}
+          statutPose={statutPose}
           exigeRappel={statut !== null && dateDemandee(statut)}
           joignable={joignable}
           proposeQuelquUn={proposeQuelquUn}
