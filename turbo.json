@@ -89,8 +89,11 @@
     "test": {
       "dependsOn": ["^build"]
     },
+    // Mode strict, defaut de turbo 2 : la tache ne voit QUE ce qui est declare
+    // ici. Sans ces trois, deux suites echouaient en CI et nulle part ailleurs.
     "test:integration": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      "env": ["JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET", "REDIS_URL"]
     },
     "test:coverage": {
       "dependsOn": ["^build"],

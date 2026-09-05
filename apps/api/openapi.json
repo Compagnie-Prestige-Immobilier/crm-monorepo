@@ -19866,6 +19866,79 @@
         ],
         "summary": "Les inscriptions lues sur la plateforme du projet.",
         "tags": ["enrolement"]
+      },
+      "delete": {
+        "description": "Rien n’est touché sur la plateforme : le tirage suivant relit tout. Vider puis tirer sert à vérifier la conformité de ce que montre le CRM.",
+        "operationId": "purgeEnrolementInscriptions",
+        "parameters": [
+          {
+            "name": "projet",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuppressionDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ressource introuvable, ou supprimée.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vide le miroir du projet.",
+        "tags": ["enrolement"]
       }
     },
     "/api/v1/enrolement/{projet}/inscriptions/{id}": {
@@ -19947,6 +20020,86 @@
           }
         ],
         "summary": "Une inscription, charge utile brute comprise.",
+        "tags": ["enrolement"]
+      },
+      "delete": {
+        "operationId": "deleteEnrolementInscription",
+        "parameters": [
+          {
+            "name": "projet",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuppressionDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ressource introuvable, ou supprimée.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retire une inscription du miroir.",
         "tags": ["enrolement"]
       }
     },
@@ -31771,6 +31924,15 @@
           "disparues",
           "erreur"
         ]
+      },
+      "SuppressionDto": {
+        "type": "object",
+        "properties": {
+          "supprimees": {
+            "type": "number"
+          }
+        },
+        "required": ["supprimees"]
       }
     }
   }

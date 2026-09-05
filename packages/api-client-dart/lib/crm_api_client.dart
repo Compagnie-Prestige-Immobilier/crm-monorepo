@@ -304,6 +304,7 @@ export 'package:crm_api_client/src/model/supervision_rep_statut_dto.dart';
 export 'package:crm_api_client/src/model/supervision_rep_statuts_dto.dart';
 export 'package:crm_api_client/src/model/supervision_score_dto.dart';
 export 'package:crm_api_client/src/model/supervision_teleconseiller_dto.dart';
+export 'package:crm_api_client/src/model/suppression_dto.dart';
 export 'package:crm_api_client/src/model/switch_workspace_dto.dart';
 export 'package:crm_api_client/src/model/sync_changes_dto.dart';
 export 'package:crm_api_client/src/model/sync_deletion_dto.dart';

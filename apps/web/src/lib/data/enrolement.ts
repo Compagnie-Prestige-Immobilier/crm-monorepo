@@ -11,6 +11,7 @@ export type InscriptionsPage = Schemas['InscriptionsPageDto'];
 export type EnrolementReglages = Schemas['EnrolementReglagesDto'];
 export type EnrolementIndicateurs = Schemas['EnrolementIndicateursDto'];
 export type Tirage = Schemas['TirageDto'];
+export type Suppression = Schemas['SuppressionDto'];
 
 /** L'onglet de l'écran, et le projet qu'il tire. Les deux ne se mélangent jamais. */
 export const ONGLETS_ENROLEMENT = ['chues', 'grand-public'] as const;
@@ -79,6 +80,29 @@ export async function saveReglagesEnrolement(
     await client.PUT('/api/v1/enrolement/{projet}/reglages', {
       params: { path: { projet } },
       body,
+    }),
+  );
+}
+
+export async function purgerInscriptions(
+  projet: Projet,
+  client: ApiClient = getApiClient(),
+): Promise<Suppression> {
+  return unwrap(
+    await client.DELETE('/api/v1/enrolement/{projet}/inscriptions', {
+      params: { path: { projet } },
+    }),
+  );
+}
+
+export async function supprimerInscription(
+  projet: Projet,
+  id: string,
+  client: ApiClient = getApiClient(),
+): Promise<Suppression> {
+  return unwrap(
+    await client.DELETE('/api/v1/enrolement/{projet}/inscriptions/{id}', {
+      params: { path: { projet, id } },
     }),
   );
 }

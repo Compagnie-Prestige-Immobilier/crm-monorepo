@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseEnumPipe,
@@ -26,6 +27,7 @@ import {
   InscriptionPlateformeDetailDto,
   InscriptionsPageDto,
   InscriptionsQueryDto,
+  SuppressionDto,
   TirageDto,
   UpdateEnrolementReglagesDto,
 } from './dto.js';
@@ -132,5 +134,32 @@ export class EnrolementController {
   @ApiResponse({ status: 201, type: TirageDto })
   tirer(@Param('projet', new ParseEnumPipe(Projet)) projet: Projet): Promise<TirageDto> {
     return this.enrolement.tirer(projet);
+  }
+
+  @Delete('inscriptions')
+  @ApiOperation({
+    operationId: 'purgeEnrolementInscriptions',
+    summary: 'Vide le miroir du projet.',
+    description:
+      'Rien n’est touché sur la plateforme : le tirage suivant relit tout. Vider puis tirer sert à vérifier la conformité de ce que montre le CRM.',
+  })
+  @ApiResponse({ status: 200, type: SuppressionDto })
+  async purger(
+    @Param('projet', new ParseEnumPipe(Projet)) projet: Projet,
+  ): Promise<SuppressionDto> {
+    return { supprimees: await this.enrolement.purger(projet) };
+  }
+
+  @Delete('inscriptions/:id')
+  @ApiOperation({
+    operationId: 'deleteEnrolementInscription',
+    summary: 'Retire une inscription du miroir.',
+  })
+  @ApiResponse({ status: 200, type: SuppressionDto })
+  async supprimer(
+    @Param('projet', new ParseEnumPipe(Projet)) projet: Projet,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<SuppressionDto> {
+    return { supprimees: await this.enrolement.supprimer(projet, id) };
   }
 }
