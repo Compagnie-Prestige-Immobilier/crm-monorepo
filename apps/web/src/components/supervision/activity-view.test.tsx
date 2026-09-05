@@ -140,8 +140,8 @@ describe('tableau d’activité des téléconseillers', () => {
           {
             ...payload().items[0],
             calls: 3,
-            unreachable: 2,
-            wrongNumber: 1,
+            unreachable: 3,
+            wrongNumber: 0,
             reachRate: 0,
           } as AdminModule.ActivityRow,
         ],
@@ -153,8 +153,8 @@ describe('tableau d’activité des téléconseillers', () => {
     await waitFor(() => {
       expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
     });
-    expect(within(rowOf('Alice Diop')).getAllByRole('cell')[13]?.textContent).toBe('0 %');
-    expect(within(rowOf('Bineta Fall')).getAllByRole('cell')[13]?.textContent).toBe('Sans objet');
+    expect(within(rowOf('Alice Diop')).getAllByRole('cell')[14]?.textContent).toBe('0 %');
+    expect(within(rowOf('Bineta Fall')).getAllByRole('cell')[14]?.textContent).toBe('Sans objet');
   });
 
   it('compte les appels aux représentants en CHUES, ceux aux prospects en Grand Public', async () => {
@@ -177,8 +177,11 @@ describe('tableau d’activité des téléconseillers', () => {
     });
     const gp = within(rowOf('Alice Diop')).getAllByRole('cell');
     expect(gp[0]?.textContent).toBe('4');
-    // Un faux numéro compte parmi les injoignables.
-    expect(gp[7]?.textContent).toBe('2');
+    // Un faux numéro est une fiche traitée : sa colonne est à part, et il ne
+    // sort plus la joignabilité comme le faisait un numéro qui n'a pas décroché.
+    expect(gp[7]?.textContent).toBe('1');
+    expect(gp[8]?.textContent).toBe('1');
+    expect(gp[14]?.textContent).toBe('75 %');
     expect(screen.queryByRole('button', { name: 'Appels prospects' })).toBeNull();
   });
 
@@ -194,7 +197,7 @@ describe('tableau d’activité des téléconseillers', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Appels prospects' }));
 
     const cells = within(rowOf('Alice Diop')).getAllByRole('cell');
-    expect(cells).toHaveLength(15);
+    expect(cells).toHaveLength(16);
     expect(cells[0]?.textContent).toBe('4');
     expect(screen.queryByRole('button', { name: /Représentants contactés/u })).toBeNull();
 
@@ -299,8 +302,8 @@ describe('tableau d’activité des téléconseillers', () => {
       expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
     });
     expect(screen.queryByRole('button', { name: /Représentants contactés/u })).toBeNull();
-    expect(within(rowOf('Alice Diop')).getAllByRole('cell')).toHaveLength(15);
-    expect(within(rowOf('Total équipe')).getAllByRole('cell')).toHaveLength(15);
+    expect(within(rowOf('Alice Diop')).getAllByRole('cell')).toHaveLength(16);
+    expect(within(rowOf('Total équipe')).getAllByRole('cell')).toHaveLength(16);
   });
 
   it('la garde en CHUES, et nomme le projet dans le CSV', async () => {
