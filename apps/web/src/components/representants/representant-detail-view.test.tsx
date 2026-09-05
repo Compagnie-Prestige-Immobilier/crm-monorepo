@@ -211,6 +211,18 @@ describe('RepresentantDetailView, les appels', () => {
 
     expect(await screen.findByText(/Aucun appel consigné/u)).toBeTruthy();
   });
+
+  // « Mes contacts » ouvre la fiche sur cette ancre. La retirer laisserait le
+  // lien valide et l'écran ouvert ailleurs, sans que rien ne le signale.
+  it('porte l’ancre « appels » que « Mes contacts » vise', async () => {
+    const { container } = renderWithQuery(
+      <RepresentantDetailView representantId="rep-1" author={AUTHOR} />,
+    );
+
+    await screen.findByText('Appels');
+    const ancre = container.querySelector('#appels');
+    expect(ancre?.textContent).toContain('Appels');
+  });
 });
 
 describe('RepresentantDetailView', () => {
