@@ -353,14 +353,13 @@ class FakeApi implements ApiPort {
 
   @override
   Future<RepCallAttemptResultDto> recordRepCallAttempt(
-    CreateRepCallAttemptDto attempt, {
-    String? ouvertureId,
-  }) async {
+    CreateRepCallAttemptDto attempt,
+  ) async {
     final ApiException? failure = failNextRepCallAttempt;
     failNextRepCallAttempt = null;
     if (failure != null) throw failure;
     repCallAttempts.add(attempt);
-    fermeturesRecues.add(ouvertureId);
+    fermeturesRecues.add(attempt.ouvertureId);
     return RepCallAttemptResultDto(
       status: RepCallAttemptApplyStatus.applied,
       attemptId: attempt.id,
@@ -380,27 +379,20 @@ class FakeApi implements ApiPort {
   /// Ce que `GET /v1/ouvertures/courante` rend.
   OuvertureFicheDto? courante;
 
-  final Map<String, Map<String, Object?>> brouillons =
-      <String, Map<String, Object?>>{};
+  final Map<String, Map<String, Object>> brouillons =
+      <String, Map<String, Object>>{};
 
   @override
-  Future<OuvertureFicheDto> ouvrirFiche({
-    required String id,
-    required DateTime openedAt,
-    String? representantId,
-    String? prospectId,
-    Map<String, Object?>? draft,
-  }) async {
+  Future<OuvertureFicheDto> ouvrirFiche(OuvrirFicheDto corps) async {
     final ApiException? failure = failNextOuvrirFiche;
     failNextOuvrirFiche = null;
     if (failure != null) throw failure;
-    final OuvertureFicheDto dto = OuvertureFicheDto(
-      id: id,
-      openedById: 'user-1',
-      openedAt: openedAt,
-      representantId: representantId,
-      prospectId: prospectId,
-      draft: draft,
+    final OuvertureFicheDto dto = ouvertureFicheDto(
+      id: corps.id,
+      openedAt: corps.openedAt,
+      representantId: corps.representantId,
+      prospectId: corps.prospectId,
+      draft: corps.draft,
     );
     ouvertures.add(dto);
     courante = dto;
@@ -421,9 +413,9 @@ class FakeApi implements ApiPort {
   @override
   Future<void> enregistrerBrouillonOuverture({
     required String id,
-    required Map<String, Object?> draft,
+    required EnregistrerBrouillonDto corps,
   }) async {
-    brouillons[id] = draft;
+    brouillons[id] = corps.draft;
   }
 
   @override
@@ -696,6 +688,34 @@ class VisiteCorrigee {
   final String? comment;
 }
 
+/// Une ouverture telle que la route la rend : le contrat exige les treize
+/// champs, un test n'en énonce que deux ou trois.
+OuvertureFicheDto ouvertureFicheDto({
+  required String id,
+  required DateTime openedAt,
+  String openedById = 'user-1',
+  String openedByName = 'Awa Sy',
+  String? representantId,
+  String? prospectId,
+  String ficheNom = '',
+  DateTime? closedAt,
+  Map<String, Object>? draft,
+}) => OuvertureFicheDto(
+  id: id,
+  openedById: openedById,
+  openedByName: openedByName,
+  representantId: representantId,
+  prospectId: prospectId,
+  ficheNom: ficheNom,
+  openedAt: openedAt,
+  closedAt: closedAt,
+  dureeSecondes: null,
+  closingAttemptId: null,
+  draft: draft,
+  releasedByName: null,
+  releasedAt: null,
+);
+
 /// Fiche serveur minimale, pour les réponses de lookup.
 RepresentantDto representantDto({
   required String id,
@@ -720,6 +740,7 @@ RepresentantDto representantDto({
   String? lastCallById,
   String? lastCallByName,
   DateTime? nextCallbackAt,
+  RappelOrigine? nextCallbackOrigine,
   int callAttemptCount = 0,
 }) => RepresentantDto(
   id: id,
@@ -743,6 +764,7 @@ RepresentantDto representantDto({
   lastCallByName: lastCallByName,
   callAttemptCount: callAttemptCount,
   nextCallbackAt: nextCallbackAt,
+  nextCallbackOrigine: nextCallbackOrigine,
   // Calcule par le SERVEUR: la fabrique reproduit sa regle plutot que d'en
   // inventer une autre.
   whatsappNumber: whatsappStatus == WhatsappStatus.MEME_NUMERO
@@ -805,18 +827,11 @@ class ExplodingApi implements ApiPort {
 
   @override
   Future<RepCallAttemptResultDto> recordRepCallAttempt(
-    CreateRepCallAttemptDto attempt, {
-    String? ouvertureId,
-  }) => _boom();
+    CreateRepCallAttemptDto attempt,
+  ) => _boom();
 
   @override
-  Future<OuvertureFicheDto> ouvrirFiche({
-    required String id,
-    required DateTime openedAt,
-    String? representantId,
-    String? prospectId,
-    Map<String, Object?>? draft,
-  }) => _boom();
+  Future<OuvertureFicheDto> ouvrirFiche(OuvrirFicheDto corps) => _boom();
 
   @override
   Future<OuvertureFicheDto?> ouvertureCourante() => _boom();
@@ -824,7 +839,7 @@ class ExplodingApi implements ApiPort {
   @override
   Future<void> enregistrerBrouillonOuverture({
     required String id,
-    required Map<String, Object?> draft,
+    required EnregistrerBrouillonDto corps,
   }) => _boom();
 
   @override

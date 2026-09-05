@@ -10,7 +10,6 @@ import '../../../core/notifications/rep_callback_notifications.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/router/back_navigation.dart';
 import '../../../core/router/route_paths.dart';
-import '../../../core/sync/api_port.dart' show OuvertureFicheDto;
 import '../../../core/telephonie/appels_crm.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/phone.dart';
@@ -398,7 +397,7 @@ class _RepresentantQualificationScreenState
     }
     if (!mounted) return;
 
-    final OuvertureFicheDto? tenue = resultat.tenue;
+    final FicheTenue? tenue = resultat.tenue;
     if (tenue != null) {
       await proposerLaFicheTenue(tenue);
       return;
@@ -414,7 +413,7 @@ class _RepresentantQualificationScreenState
   /// Le serveur refuse la seconde fiche sans dire laquelle il tient. Sans
   /// cette issue, le téléconseiller reste devant un refus qu'il ne peut pas
   /// lever.
-  Future<void> proposerLaFicheTenue(OuvertureFicheDto tenue) async {
+  Future<void> proposerLaFicheTenue(FicheTenue tenue) async {
     final String? autre = tenue.representantId;
     final String? nom = autre == null
         ? tenue.ficheNom

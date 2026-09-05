@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
 
+import 'package:crm_api_client/crm_api_client.dart';
 import 'package:drift/drift.dart';
 
 import '../../core/sync/api_port.dart';
@@ -11,15 +12,28 @@ import '../../core/sync/sync_engine.dart';
 import '../../core/utils/ids.dart';
 import '../local/database.dart';
 
+/// La fiche qu'un compte tient déjà. [ficheNom] est nul quand elle vient de la
+/// base locale, qui ne porte pas le nom : l'écran le retrouve au référentiel.
+typedef FicheTenue = ({
+  String id,
+  String? representantId,
+  String? prospectId,
+  String? ficheNom,
+});
+
 /// Ce que l'ouverture a donné.
 ///
 /// [tenue] non nulle : le compte tient DÉJÀ une autre fiche, et c'est elle que
 /// l'écran doit proposer de rouvrir. Le serveur refuse sans la nommer, seule
 /// `GET /v1/ouvertures/courante` la dit.
-typedef OuvertureResultat = ({
-  OuverturesFicheData? ouverte,
-  OuvertureFicheDto? tenue,
-});
+typedef OuvertureResultat = ({OuverturesFicheData? ouverte, FicheTenue? tenue});
+
+/// Le brouillon part sans ses réponses nulles : le contrat les type `Object`,
+/// et une réponse absente se relit de toute façon comme nulle.
+Map<String, Object> _sansNuls(Map<String, Object?> draft) => <String, Object>{
+  for (final MapEntry<String, Object?> reponse in draft.entries)
+    if (reponse.value != null) reponse.key: reponse.value!,
+};
 
 class OuvertureRepository {
   OuvertureRepository(this._db, this._api, {Clock clock = const SystemClock()})
@@ -55,7 +69,7 @@ class OuvertureRepository {
       final bool memeFiche =
           deja.representantId == representantId &&
           deja.prospectId == prospectId;
-      if (!memeFiche) return (ouverte: null, tenue: _versDto(deja));
+      if (!memeFiche) return (ouverte: null, tenue: _versFicheTenue(deja));
       return (ouverte: deja, tenue: null);
     }
 
@@ -64,14 +78,18 @@ class OuvertureRepository {
     bool enFile = false;
     try {
       await _api.ouvrirFiche(
-        id: id,
-        openedAt: openedAt,
-        representantId: representantId,
-        prospectId: prospectId,
+        OuvrirFicheDto(
+          id: id,
+          // `toJson` sérialise l'instant tel quel : sans `toUtc`, la chaîne
+          // part sans fuseau et le serveur la relit dans le sien.
+          openedAt: openedAt.toUtc(),
+          representantId: representantId,
+          prospectId: prospectId,
+        ),
       );
     } on ApiException catch (error) {
       if (error.code == ouvertureFicheDejaOuverteCode) {
-        final OuvertureFicheDto? tenue = await _tenueParLeServeur();
+        final FicheTenue? tenue = await _tenueParLeServeur();
         if (tenue != null) return (ouverte: null, tenue: tenue);
       }
       if (!error.retryable) rethrow;
@@ -117,7 +135,10 @@ class OuvertureRepository {
       OuverturesFicheCompanion(draft: Value<String?>(jsonEncode(draft))),
     );
     try {
-      await _api.enregistrerBrouillonOuverture(id: id, draft: draft);
+      await _api.enregistrerBrouillonOuverture(
+        id: id,
+        corps: EnregistrerBrouillonDto(draft: _sansNuls(draft)),
+      );
     } on ApiException catch (error) {
       developer.log(
         'Brouillon d\'ouverture $id non remonté : ${error.code}',
@@ -163,22 +184,27 @@ class OuvertureRepository {
     return null;
   }
 
-  Future<OuvertureFicheDto?> _tenueParLeServeur() async {
+  Future<FicheTenue?> _tenueParLeServeur() async {
     try {
-      return await _api.ouvertureCourante();
+      final OuvertureFicheDto? distante = await _api.ouvertureCourante();
+      if (distante == null) return null;
+      return (
+        id: distante.id,
+        representantId: distante.representantId,
+        prospectId: distante.prospectId,
+        ficheNom: distante.ficheNom,
+      );
     } on ApiException {
       return null;
     }
   }
 
-  static OuvertureFicheDto _versDto(OuverturesFicheData ligne) =>
-      OuvertureFicheDto(
-        id: ligne.id,
-        openedById: ligne.openedById,
-        openedAt: ligne.openedAt,
-        representantId: ligne.representantId,
-        prospectId: ligne.prospectId,
-      );
+  static FicheTenue _versFicheTenue(OuverturesFicheData ligne) => (
+    id: ligne.id,
+    representantId: ligne.representantId,
+    prospectId: ligne.prospectId,
+    ficheNom: null,
+  );
 
   Future<void> _enfiler({
     required String id,

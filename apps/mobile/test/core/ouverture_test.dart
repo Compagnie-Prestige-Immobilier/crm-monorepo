@@ -87,9 +87,8 @@ void main() {
   // Le serveur refuse sans dire quelle fiche il tient : l'écran doit pouvoir
   // proposer de la rouvrir, sinon le téléconseiller est bloqué sans issue.
   test('le verrou du serveur nomme la fiche déjà tenue', () async {
-    api.courante = OuvertureFicheDto(
+    api.courante = ouvertureFicheDto(
       id: 'ouv-ailleurs',
-      openedById: 'user-1',
       openedAt: t0,
       representantId: 'rep-9',
       ficheNom: 'Awa Ndiaye',

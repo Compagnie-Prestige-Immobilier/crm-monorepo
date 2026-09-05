@@ -26,6 +26,7 @@ void main() {
     String code, {
     StatutQualificationEffect effect = StatutQualificationEffect.REACHED,
     bool requiresCallback = false,
+    bool requiresComment = false,
     bool isActive = true,
   }) => StatutQualificationDto(
     id: 'sq-$code',
@@ -33,6 +34,7 @@ void main() {
     label: code,
     effect: effect,
     requiresCallback: requiresCallback,
+    requiresComment: requiresComment,
     retryAfterMinutes: null,
     priorite: PrioriteTraitement.NORMALE,
     relationStatus: null,

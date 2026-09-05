@@ -139,99 +139,9 @@ class RepresentantLookup {
   final String? ownedByCommercialName;
 }
 
-/// Une fiche prise en main, telle que la route la rend.
-///
-/// Écrit à la main : le client engendré ne connaît pas encore les routes
-/// d'ouverture. À supprimer au profit du type engendré à la prochaine passe de
-/// `pnpm codegen`.
-class OuvertureFicheDto {
-  const OuvertureFicheDto({
-    required this.id,
-    required this.openedById,
-    required this.openedAt,
-    this.representantId,
-    this.prospectId,
-    this.closedAt,
-    this.dureeSecondes,
-    this.ficheNom,
-    this.draft,
-    this.releasedById,
-    this.releasedByName,
-    this.releasedAt,
-  });
-
-  /// Le corps vient du réseau : chaque champ est vérifié, un type inattendu
-  /// lève plutôt que de produire une ouverture à moitié lue.
-  factory OuvertureFicheDto.fromJson(Map<String, Object?> json) {
-    return OuvertureFicheDto(
-      id: _texteExige(json, 'id'),
-      openedById: _texteExige(json, 'openedById'),
-      openedAt: _instantExige(json, 'openedAt'),
-      representantId: _texte(json, 'representantId'),
-      prospectId: _texte(json, 'prospectId'),
-      closedAt: _instant(json, 'closedAt'),
-      dureeSecondes: switch (json['dureeSecondes']) {
-        final num n => n.toInt(),
-        _ => null,
-      },
-      ficheNom: _texte(json, 'ficheNom'),
-      draft: switch (json['draft']) {
-        final Map<String, Object?> m => m,
-        final Map<Object?, Object?> m => m.cast<String, Object?>(),
-        _ => null,
-      },
-      releasedById: _texte(json, 'releasedById'),
-      releasedByName: _texte(json, 'releasedByName'),
-      releasedAt: _instant(json, 'releasedAt'),
-    );
-  }
-
-  final String id;
-  final String openedById;
-  final DateTime openedAt;
-  final String? representantId;
-  final String? prospectId;
-  final DateTime? closedAt;
-
-  /// Dérivée par le serveur entre les deux bornes : la durée ne se stocke pas.
-  final int? dureeSecondes;
-
-  final String? ficheNom;
-  final Map<String, Object?>? draft;
-  final String? releasedById;
-  final String? releasedByName;
-  final DateTime? releasedAt;
-
-  static String? _texte(Map<String, Object?> json, String cle) =>
-      json[cle] is String ? json[cle]! as String : null;
-
-  static String _texteExige(Map<String, Object?> json, String cle) {
-    final String? valeur = _texte(json, cle);
-    if (valeur == null) throw FormatException('ouverture sans $cle');
-    return valeur;
-  }
-
-  static DateTime? _instant(Map<String, Object?> json, String cle) {
-    final String? brut = _texte(json, cle);
-    return brut == null ? null : DateTime.tryParse(brut);
-  }
-
-  static DateTime _instantExige(Map<String, Object?> json, String cle) {
-    final DateTime? valeur = _instant(json, cle);
-    if (valeur == null) throw FormatException('ouverture sans $cle lisible');
-    return valeur;
-  }
-}
-
 /// Le verrou : ce compte tient déjà une fiche. La route ne dit pas laquelle,
 /// c'est `GET /v1/ouvertures/courante` qui la nomme.
 const String ouvertureFicheDejaOuverteCode = 'OUVERTURE_FICHE_DEJA_OUVERTE';
-
-const String ouvertureIdPrisCode = 'OUVERTURE_ID_PRIS';
-
-const String ouvertureIntrouvableCode = 'OUVERTURE_INTROUVABLE';
-
-const String ouvertureDejaFermeeCode = 'OUVERTURE_DEJA_FERMEE';
 
 enum FailureKind {
   retryable,
@@ -323,27 +233,20 @@ abstract interface class ApiPort {
     required List<SyncOperationDto> operations,
   });
 
-  /// [ouvertureId] ferme l'ouverture qui a lancé cette qualification, et c'est
+  /// `ouvertureId` ferme l'ouverture qui a lancé cette qualification, et c'est
   /// ce qui arrête le chronomètre. Une ouverture inconnue, déjà fermée ou tenue
   /// par un autre est ignorée EN SILENCE : aucune erreur ne peut en venir.
   Future<RepCallAttemptResultDto> recordRepCallAttempt(
-    CreateRepCallAttemptDto attempt, {
-    String? ouvertureId,
-  });
+    CreateRepCallAttemptDto attempt,
+  );
 
   /// `POST /v1/ouvertures`. Exactement une des deux cibles.
   ///
-  /// Le rejeu du même [id] par le même compte rend la ligne existante, sans
-  /// compter de seconde ouverture : c'est ce qui rend la file rejouable.
+  /// Le rejeu du même identifiant par le même compte rend la ligne existante,
+  /// sans compter de seconde ouverture : c'est ce qui rend la file rejouable.
   /// Lève un [ApiException] de code [ouvertureFicheDejaOuverteCode] quand ce
   /// compte tient déjà une autre fiche.
-  Future<OuvertureFicheDto> ouvrirFiche({
-    required String id,
-    required DateTime openedAt,
-    String? representantId,
-    String? prospectId,
-    Map<String, Object?>? draft,
-  });
+  Future<OuvertureFicheDto> ouvrirFiche(OuvrirFicheDto corps);
 
   /// `GET /v1/ouvertures/courante`. Null : ce compte ne tient aucune fiche.
   Future<OuvertureFicheDto?> ouvertureCourante();
@@ -351,7 +254,7 @@ abstract interface class ApiPort {
   /// `PUT /v1/ouvertures/:id/brouillon`. Remplace le brouillon EN ENTIER.
   Future<void> enregistrerBrouillonOuverture({
     required String id,
-    required Map<String, Object?> draft,
+    required EnregistrerBrouillonDto corps,
   });
 
   Future<void> uploadCallRecording({
