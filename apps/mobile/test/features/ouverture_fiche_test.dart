@@ -196,6 +196,42 @@ void main() {
     await demonter(tester);
   });
 
+  // EB-11 : l'historique complet, en lecture seule, à l'ouverture d'une fiche
+  // déjà appelée. Il vient de la base locale : hors ligne, rien ne le
+  // redescend.
+  testWidgets(
+    'l\'historique des appels précédents s\'affiche en lecture seule',
+    (WidgetTester tester) async {
+      await db
+          .into(db.repCallAttempts)
+          .insert(
+            RepCallAttemptsCompanion.insert(
+              id: 'att-1',
+              representantId: 'rep-1',
+              createdByName: const Value<String?>('Moussa Diop'),
+              outcome: 'REACHED',
+              statutQualificationId: const Value<String?>('sq-hors-cible'),
+              relationStatus: const Value<String?>('REFUS'),
+              comment: const Value<String?>('Il part à la retraite'),
+              contacte: const Value<bool?>(true),
+              connaitUes: const Value<bool?>(false),
+              clientCreatedAt: t0.subtract(const Duration(days: 2)),
+            ),
+          );
+
+      await monter(tester);
+
+      expect(find.text('Historique'), findsOneWidget);
+      expect(find.text('Moussa Diop'), findsOneWidget);
+      expect(find.text('Hors cible'), findsOneWidget);
+      expect(find.text('Il part à la retraite'), findsOneWidget);
+      expect(find.text(kQuestionCHUES), findsOneWidget);
+      // Rien n'est modifiable : l'historique n'expose aucun champ de saisie.
+      expect(find.byType(TextField), findsNothing);
+      await demonter(tester);
+    },
+  );
+
   // Le verrou refuse la seconde fiche SANS dire laquelle il tient : l'écran
   // doit nommer celle qui est en main et proposer de la reprendre.
   testWidgets('une autre fiche en cours se propose à la reprise', (
