@@ -698,6 +698,7 @@ OuvertureFicheDto ouvertureFicheDto({
   String? representantId,
   String? prospectId,
   String ficheNom = '',
+  DateTime? firstInputAt,
   DateTime? closedAt,
   Map<String, Object>? draft,
 }) => OuvertureFicheDto(
@@ -708,6 +709,7 @@ OuvertureFicheDto ouvertureFicheDto({
   prospectId: prospectId,
   ficheNom: ficheNom,
   openedAt: openedAt,
+  firstInputAt: firstInputAt,
   closedAt: closedAt,
   dureeSecondes: null,
   closingAttemptId: null,
