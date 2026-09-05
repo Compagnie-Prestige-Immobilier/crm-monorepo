@@ -109,6 +109,10 @@ export class OuverturesService {
 
     await this.assertFicheOuvrable(user, body);
 
+    const draft = body.draft
+      ? (body.draft as Prisma.InputJsonObject)
+      : await this.brouillonPrecedent(user, body);
+
     try {
       const cree = await this.prisma.ouvertureFiche.create({
         data: {
@@ -117,7 +121,7 @@ export class OuverturesService {
           representantId: body.representantId ?? null,
           prospectId: body.prospectId ?? null,
           openedAt: new Date(body.openedAt),
-          draft: body.draft ? (body.draft as Prisma.InputJsonObject) : Prisma.DbNull,
+          draft: draft ?? Prisma.DbNull,
         },
         include: OUVERTURE_INCLUDE,
       });
@@ -290,6 +294,39 @@ export class OuverturesService {
       select: { id: true },
     });
     if (!prospect) throw ficheIntrouvable();
+  }
+
+  /**
+   * EB-10 : au rappel, le formulaire se rouvre pré-rempli. La reprise se limite
+   * à l'ouverture précédente du MÊME téléconseiller : le commentaire hérité
+   * repart dans l'historique sous le nom de celui qui enregistre, et signer
+   * quelqu'un d'autre serait pire que ressaisir.
+   */
+  private async brouillonPrecedent(
+    user: AuthenticatedUser,
+    body: OuvrirFicheDto,
+  ): Promise<Prisma.InputJsonObject | null> {
+    const precedente = await this.prisma.ouvertureFiche.findFirst({
+      where: {
+        openedById: user.id,
+        closedAt: { not: null },
+        representantId: body.representantId ?? null,
+        prospectId: body.prospectId ?? null,
+      },
+      orderBy: [{ openedAt: 'desc' }, { id: 'desc' }],
+      select: { draft: true },
+    });
+
+    const draft = precedente?.draft;
+    if (
+      draft === undefined ||
+      draft === null ||
+      typeof draft !== 'object' ||
+      Array.isArray(draft)
+    ) {
+      return null;
+    }
+    return draft as Prisma.InputJsonObject;
   }
 
   /** « Pas à vous » ne se confond pas avec « déjà qualifiée ». */
