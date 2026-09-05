@@ -1097,6 +1097,8 @@ describe('ConsoleView : l’ouverture confirmée d’une fiche', () => {
     await userEvent.keyboard('1');
     await userEvent.type(await screen.findByLabelText(/Durée dans l’établissement/u), '36');
     await userEvent.type(screen.getByLabelText(/Commentaire/u), 'il rappelle après 17 h');
+    // Les deux boutons voisins n'ont pas le même effet : l'écran doit le dire.
+    expect(screen.getByText(/« Annuler » l’efface/u)).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: /À rappeler/u }));
     await userEvent.click(await screen.findByRole('button', { name: /Demain 9 h/u }));
 
@@ -1128,6 +1130,7 @@ describe('ConsoleView : l’ouverture confirmée d’une fiche', () => {
     await screen.findByText('Phase 3 · Conversion');
     await userEvent.keyboard('2');
     expect(await screen.findByText('Demain 9 h')).toBeTruthy();
+    expect(screen.getByText(/retrouverez le dossier déjà rempli/u)).toBeTruthy();
 
     await userEvent.keyboard('{Escape}');
 
