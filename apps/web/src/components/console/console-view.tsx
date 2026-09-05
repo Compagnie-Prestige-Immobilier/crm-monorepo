@@ -53,6 +53,7 @@ import {
   type ProspectFilters,
   type ProspectRow,
 } from '@/lib/types';
+import { useBrouillonAuto } from '@/lib/use-brouillon-auto';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { navigationRetenue, useVerrouNavigation } from '@/lib/use-verrou-navigation';
 import { cn } from '@/lib/utils';
@@ -264,6 +265,15 @@ interface Ouverte {
 }
 
 const nomDe = (prospect: ProspectRow): string => `${prospect.nom} ${prospect.prenom}`;
+
+/** Ce que `lireBrouillon` sait relire, et rien d'autre. */
+const brouillonDe = (
+  comment: string,
+  conversion: ConversionDraft | null,
+): Record<string, unknown> => ({
+  comment,
+  ...(conversion === null ? {} : { conversion }),
+});
 
 const aQualifier = (prospect: ProspectRow): boolean => prospect.phase2Status === 'PENDING';
 
@@ -479,18 +489,19 @@ function Consignation({
   const [now] = useState(() => Date.now());
   const verrouille = ouverture !== null && !closed;
 
+  useBrouillonAuto(ouverture, brouillonDe(comment, conversion));
+
   const send = useMutation({
     mutationFn: async (draft: AttemptDraft) => {
       // EB-10 : le brouillon part AVANT la tentative, qui referme l'ouverture et
       // ferait refuser toute écriture postérieure. Le dossier passe par lui et
       // non par la tentative : incomplet, le serveur la refuserait en 400.
       if (draft.outcome === 'CALLBACK' && ouverture !== null) {
-        await enregistrerBrouillon(ouverture.id, {
-          comment: draft.comment,
-          ...(conversion === null ? {} : { conversion }),
-        }).catch(() => {
-          toast.error('Les réponses saisies n’ont pas pu être conservées. L’appel, lui, part.');
-        });
+        await enregistrerBrouillon(ouverture.id, brouillonDe(draft.comment, conversion)).catch(
+          () => {
+            toast.error('Les réponses saisies n’ont pas pu être conservées. L’appel, lui, part.');
+          },
+        );
       }
       return pushCallAttempt(newAttemptInput(prospect.id, draft));
     },
