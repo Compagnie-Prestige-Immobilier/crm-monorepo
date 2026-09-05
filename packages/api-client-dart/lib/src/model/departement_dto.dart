@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'departement_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,136 +19,64 @@ part 'departement_dto.g.dart';
 class DepartementDto {
   /// Returns a new [DepartementDto] instance.
   DepartementDto({
+    required this.id,
 
-    required  this.id,
+    required this.code,
 
-    required  this.code,
+    required this.name,
 
-    required  this.name,
+    required this.regionId,
 
-    required  this.regionId,
+    required this.regionName,
 
-    required  this.regionName,
+    required this.isActive,
 
-    required  this.isActive,
-
-    required  this.updatedAt,
+    required this.updatedAt,
   });
 
-  @JsonKey(
-    
-    name: r'id',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'id', required: true, includeIfNull: false)
   final String id;
 
-
-
-  @JsonKey(
-    
-    name: r'code',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'code', required: true, includeIfNull: false)
   final String code;
 
-
-
-  @JsonKey(
-    
-    name: r'name',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'name', required: true, includeIfNull: false)
   final String name;
 
-
-
-  @JsonKey(
-    
-    name: r'regionId',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'regionId', required: true, includeIfNull: false)
   final String regionId;
 
-
-
-  @JsonKey(
-    
-    name: r'regionName',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'regionName', required: true, includeIfNull: false)
   final String regionName;
 
-
-
-  @JsonKey(
-    
-    name: r'isActive',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'isActive', required: true, includeIfNull: false)
   final bool isActive;
 
-
-
-  @JsonKey(
-    
-    name: r'updatedAt',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'updatedAt', required: true, includeIfNull: false)
   final DateTime updatedAt;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is DepartementDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [id, code, name, regionId, regionName, isActive, updatedAt],
+              [
+                other.id,
+                other.code,
+                other.name,
+                other.regionId,
+                other.regionName,
+                other.isActive,
+                other.updatedAt,
+              ],
+            );
+  }
 
-
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is DepartementDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            id,
-            code,
-            name,
-            regionId,
-            regionName,
-            isActive,
-            updatedAt,
-        ],
-        [
-            other.id,
-            other.code,
-            other.name,
-            other.regionId,
-            other.regionName,
-            other.isActive,
-            other.updatedAt,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([
         id,
         code,
         name,
@@ -157,9 +84,10 @@ class DepartementDto {
         regionName,
         isActive,
         updatedAt,
-    ],);
+      ]);
 
-  factory DepartementDto.fromJson(Map<String, dynamic> json) => _$DepartementDtoFromJson(json);
+  factory DepartementDto.fromJson(Map<String, dynamic> json) =>
+      _$DepartementDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$DepartementDtoToJson(this);
 
@@ -167,6 +95,4 @@ class DepartementDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

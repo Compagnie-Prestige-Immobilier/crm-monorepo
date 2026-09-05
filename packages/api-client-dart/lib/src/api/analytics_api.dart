@@ -37,7 +37,6 @@ import 'package:crm_api_client/src/model/top_representant_list_dto.dart';
 import 'package:crm_api_client/src/model/weekly_cohort_list_dto.dart';
 
 class AnalyticsApi {
-
   final Dio _dio;
 
   const AnalyticsApi(this._dio);
@@ -47,15 +46,15 @@ class AnalyticsApi {
   ///
   /// Parameters:
   /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
-  /// * [representantId] 
-  /// * [banqueId] 
-  /// * [syndicatId] 
-  /// * [departementId] 
+  /// * [representantId]
+  /// * [banqueId]
+  /// * [syndicatId]
+  /// * [departementId]
   /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
   /// * [projet] - Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.
   /// * [type] - Grand Public : fonctionnaire, secteur privé, informel, diaspora.
   /// * [canalProvenanceId] - Grand Public : canal de provenance.
-  /// * [statut] 
+  /// * [statut]
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
@@ -75,7 +74,7 @@ class AnalyticsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [AmbassadorConversionDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<AmbassadorConversionDto>> getAmbassadorConversion({ 
+  Future<Response<AmbassadorConversionDto>> getAmbassadorConversion({
     String? search,
     String? representantId,
     String? banqueId,
@@ -106,16 +105,10 @@ class AnalyticsApi {
     final _path = r'/api/v1/analytics/ambassador-conversion';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -138,7 +131,8 @@ class AnalyticsApi {
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (appelePar != null) r'appelePar': appelePar,
       if (lastCallById != null) r'lastCallById': lastCallById,
-      if (enrollmentCapturedById != null) r'enrollmentCapturedById': enrollmentCapturedById,
+      if (enrollmentCapturedById != null)
+        r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
@@ -157,9 +151,14 @@ class AnalyticsApi {
     AmbassadorConversionDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<AmbassadorConversionDto, AmbassadorConversionDto>(rawData, 'AmbassadorConversionDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<AmbassadorConversionDto, AmbassadorConversionDto>(
+              rawData,
+              'AmbassadorConversionDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -187,15 +186,15 @@ _responseData = rawData == null ? null : deserialize<AmbassadorConversionDto, Am
   ///
   /// Parameters:
   /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
-  /// * [representantId] 
-  /// * [banqueId] 
-  /// * [syndicatId] 
-  /// * [departementId] 
+  /// * [representantId]
+  /// * [banqueId]
+  /// * [syndicatId]
+  /// * [departementId]
   /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
   /// * [projet] - Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.
   /// * [type] - Grand Public : fonctionnaire, secteur privé, informel, diaspora.
   /// * [canalProvenanceId] - Grand Public : canal de provenance.
-  /// * [statut] 
+  /// * [statut]
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
@@ -215,7 +214,7 @@ _responseData = rawData == null ? null : deserialize<AmbassadorConversionDto, Am
   ///
   /// Returns a [Future] containing a [Response] with a [AnalyticsDelaysDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<AnalyticsDelaysDto>> getAnalyticsDelays({ 
+  Future<Response<AnalyticsDelaysDto>> getAnalyticsDelays({
     String? search,
     String? representantId,
     String? banqueId,
@@ -246,16 +245,10 @@ _responseData = rawData == null ? null : deserialize<AmbassadorConversionDto, Am
     final _path = r'/api/v1/analytics/delays';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -278,7 +271,8 @@ _responseData = rawData == null ? null : deserialize<AmbassadorConversionDto, Am
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (appelePar != null) r'appelePar': appelePar,
       if (lastCallById != null) r'lastCallById': lastCallById,
-      if (enrollmentCapturedById != null) r'enrollmentCapturedById': enrollmentCapturedById,
+      if (enrollmentCapturedById != null)
+        r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
@@ -297,9 +291,14 @@ _responseData = rawData == null ? null : deserialize<AmbassadorConversionDto, Am
     AnalyticsDelaysDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<AnalyticsDelaysDto, AnalyticsDelaysDto>(rawData, 'AnalyticsDelaysDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<AnalyticsDelaysDto, AnalyticsDelaysDto>(
+              rawData,
+              'AnalyticsDelaysDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -327,15 +326,15 @@ _responseData = rawData == null ? null : deserialize<AnalyticsDelaysDto, Analyti
   ///
   /// Parameters:
   /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
-  /// * [representantId] 
-  /// * [banqueId] 
-  /// * [syndicatId] 
-  /// * [departementId] 
+  /// * [representantId]
+  /// * [banqueId]
+  /// * [syndicatId]
+  /// * [departementId]
   /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
   /// * [projet] - Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.
   /// * [type] - Grand Public : fonctionnaire, secteur privé, informel, diaspora.
   /// * [canalProvenanceId] - Grand Public : canal de provenance.
-  /// * [statut] 
+  /// * [statut]
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
@@ -355,7 +354,7 @@ _responseData = rawData == null ? null : deserialize<AnalyticsDelaysDto, Analyti
   ///
   /// Returns a [Future] containing a [Response] with a [AnalyticsFunnelDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<AnalyticsFunnelDto>> getAnalyticsFunnel({ 
+  Future<Response<AnalyticsFunnelDto>> getAnalyticsFunnel({
     String? search,
     String? representantId,
     String? banqueId,
@@ -386,16 +385,10 @@ _responseData = rawData == null ? null : deserialize<AnalyticsDelaysDto, Analyti
     final _path = r'/api/v1/analytics/funnel';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -418,7 +411,8 @@ _responseData = rawData == null ? null : deserialize<AnalyticsDelaysDto, Analyti
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (appelePar != null) r'appelePar': appelePar,
       if (lastCallById != null) r'lastCallById': lastCallById,
-      if (enrollmentCapturedById != null) r'enrollmentCapturedById': enrollmentCapturedById,
+      if (enrollmentCapturedById != null)
+        r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
@@ -437,9 +431,14 @@ _responseData = rawData == null ? null : deserialize<AnalyticsDelaysDto, Analyti
     AnalyticsFunnelDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<AnalyticsFunnelDto, AnalyticsFunnelDto>(rawData, 'AnalyticsFunnelDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<AnalyticsFunnelDto, AnalyticsFunnelDto>(
+              rawData,
+              'AnalyticsFunnelDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -463,19 +462,19 @@ _responseData = rawData == null ? null : deserialize<AnalyticsFunnelDto, Analyti
   }
 
   /// Compteurs de tête.
-  /// 
+  ///
   ///
   /// Parameters:
   /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
-  /// * [representantId] 
-  /// * [banqueId] 
-  /// * [syndicatId] 
-  /// * [departementId] 
+  /// * [representantId]
+  /// * [banqueId]
+  /// * [syndicatId]
+  /// * [departementId]
   /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
   /// * [projet] - Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.
   /// * [type] - Grand Public : fonctionnaire, secteur privé, informel, diaspora.
   /// * [canalProvenanceId] - Grand Public : canal de provenance.
-  /// * [statut] 
+  /// * [statut]
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
@@ -495,7 +494,7 @@ _responseData = rawData == null ? null : deserialize<AnalyticsFunnelDto, Analyti
   ///
   /// Returns a [Future] containing a [Response] with a [AnalyticsTotalsDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<AnalyticsTotalsDto>> getAnalyticsTotals({ 
+  Future<Response<AnalyticsTotalsDto>> getAnalyticsTotals({
     String? search,
     String? representantId,
     String? banqueId,
@@ -526,16 +525,10 @@ _responseData = rawData == null ? null : deserialize<AnalyticsFunnelDto, Analyti
     final _path = r'/api/v1/analytics/totals';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -558,7 +551,8 @@ _responseData = rawData == null ? null : deserialize<AnalyticsFunnelDto, Analyti
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (appelePar != null) r'appelePar': appelePar,
       if (lastCallById != null) r'lastCallById': lastCallById,
-      if (enrollmentCapturedById != null) r'enrollmentCapturedById': enrollmentCapturedById,
+      if (enrollmentCapturedById != null)
+        r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
@@ -577,9 +571,14 @@ _responseData = rawData == null ? null : deserialize<AnalyticsFunnelDto, Analyti
     AnalyticsTotalsDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<AnalyticsTotalsDto, AnalyticsTotalsDto>(rawData, 'AnalyticsTotalsDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<AnalyticsTotalsDto, AnalyticsTotalsDto>(
+              rawData,
+              'AnalyticsTotalsDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -607,15 +606,15 @@ _responseData = rawData == null ? null : deserialize<AnalyticsTotalsDto, Analyti
   ///
   /// Parameters:
   /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
-  /// * [representantId] 
-  /// * [banqueId] 
-  /// * [syndicatId] 
-  /// * [departementId] 
+  /// * [representantId]
+  /// * [banqueId]
+  /// * [syndicatId]
+  /// * [departementId]
   /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
   /// * [projet] - Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.
   /// * [type] - Grand Public : fonctionnaire, secteur privé, informel, diaspora.
   /// * [canalProvenanceId] - Grand Public : canal de provenance.
-  /// * [statut] 
+  /// * [statut]
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
@@ -635,7 +634,7 @@ _responseData = rawData == null ? null : deserialize<AnalyticsTotalsDto, Analyti
   ///
   /// Returns a [Future] containing a [Response] with a [BankAgingDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<BankAgingDto>> getBankAging({ 
+  Future<Response<BankAgingDto>> getBankAging({
     String? search,
     String? representantId,
     String? banqueId,
@@ -666,16 +665,10 @@ _responseData = rawData == null ? null : deserialize<AnalyticsTotalsDto, Analyti
     final _path = r'/api/v1/analytics/bank-aging';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -698,7 +691,8 @@ _responseData = rawData == null ? null : deserialize<AnalyticsTotalsDto, Analyti
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (appelePar != null) r'appelePar': appelePar,
       if (lastCallById != null) r'lastCallById': lastCallById,
-      if (enrollmentCapturedById != null) r'enrollmentCapturedById': enrollmentCapturedById,
+      if (enrollmentCapturedById != null)
+        r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
@@ -717,9 +711,14 @@ _responseData = rawData == null ? null : deserialize<AnalyticsTotalsDto, Analyti
     BankAgingDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<BankAgingDto, BankAgingDto>(rawData, 'BankAgingDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<BankAgingDto, BankAgingDto>(
+              rawData,
+              'BankAgingDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -747,15 +746,15 @@ _responseData = rawData == null ? null : deserialize<BankAgingDto, BankAgingDto>
   ///
   /// Parameters:
   /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
-  /// * [representantId] 
-  /// * [banqueId] 
-  /// * [syndicatId] 
-  /// * [departementId] 
+  /// * [representantId]
+  /// * [banqueId]
+  /// * [syndicatId]
+  /// * [departementId]
   /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
   /// * [projet] - Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.
   /// * [type] - Grand Public : fonctionnaire, secteur privé, informel, diaspora.
   /// * [canalProvenanceId] - Grand Public : canal de provenance.
-  /// * [statut] 
+  /// * [statut]
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
@@ -775,7 +774,7 @@ _responseData = rawData == null ? null : deserialize<BankAgingDto, BankAgingDto>
   ///
   /// Returns a [Future] containing a [Response] with a [DataQualityDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<DataQualityDto>> getDataQuality({ 
+  Future<Response<DataQualityDto>> getDataQuality({
     String? search,
     String? representantId,
     String? banqueId,
@@ -806,16 +805,10 @@ _responseData = rawData == null ? null : deserialize<BankAgingDto, BankAgingDto>
     final _path = r'/api/v1/analytics/data-quality';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -838,7 +831,8 @@ _responseData = rawData == null ? null : deserialize<BankAgingDto, BankAgingDto>
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (appelePar != null) r'appelePar': appelePar,
       if (lastCallById != null) r'lastCallById': lastCallById,
-      if (enrollmentCapturedById != null) r'enrollmentCapturedById': enrollmentCapturedById,
+      if (enrollmentCapturedById != null)
+        r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
@@ -857,9 +851,14 @@ _responseData = rawData == null ? null : deserialize<BankAgingDto, BankAgingDto>
     DataQualityDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<DataQualityDto, DataQualityDto>(rawData, 'DataQualityDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<DataQualityDto, DataQualityDto>(
+              rawData,
+              'DataQualityDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -883,19 +882,19 @@ _responseData = rawData == null ? null : deserialize<DataQualityDto, DataQuality
   }
 
   /// Rendement par département : taux, et pas seulement volume.
-  /// 
+  ///
   ///
   /// Parameters:
   /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
-  /// * [representantId] 
-  /// * [banqueId] 
-  /// * [syndicatId] 
-  /// * [departementId] 
+  /// * [representantId]
+  /// * [banqueId]
+  /// * [syndicatId]
+  /// * [departementId]
   /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
   /// * [projet] - Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.
   /// * [type] - Grand Public : fonctionnaire, secteur privé, informel, diaspora.
   /// * [canalProvenanceId] - Grand Public : canal de provenance.
-  /// * [statut] 
+  /// * [statut]
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
@@ -915,7 +914,7 @@ _responseData = rawData == null ? null : deserialize<DataQualityDto, DataQuality
   ///
   /// Returns a [Future] containing a [Response] with a [DepartementYieldListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<DepartementYieldListDto>> getDepartementYield({ 
+  Future<Response<DepartementYieldListDto>> getDepartementYield({
     String? search,
     String? representantId,
     String? banqueId,
@@ -946,16 +945,10 @@ _responseData = rawData == null ? null : deserialize<DataQualityDto, DataQuality
     final _path = r'/api/v1/analytics/departement-yield';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -978,7 +971,8 @@ _responseData = rawData == null ? null : deserialize<DataQualityDto, DataQuality
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (appelePar != null) r'appelePar': appelePar,
       if (lastCallById != null) r'lastCallById': lastCallById,
-      if (enrollmentCapturedById != null) r'enrollmentCapturedById': enrollmentCapturedById,
+      if (enrollmentCapturedById != null)
+        r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
@@ -997,9 +991,14 @@ _responseData = rawData == null ? null : deserialize<DataQualityDto, DataQuality
     DepartementYieldListDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<DepartementYieldListDto, DepartementYieldListDto>(rawData, 'DepartementYieldListDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<DepartementYieldListDto, DepartementYieldListDto>(
+              rawData,
+              'DepartementYieldListDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1027,15 +1026,15 @@ _responseData = rawData == null ? null : deserialize<DepartementYieldListDto, De
   ///
   /// Parameters:
   /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
-  /// * [representantId] 
-  /// * [banqueId] 
-  /// * [syndicatId] 
-  /// * [departementId] 
+  /// * [representantId]
+  /// * [banqueId]
+  /// * [syndicatId]
+  /// * [departementId]
   /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
   /// * [projet] - Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.
   /// * [type] - Grand Public : fonctionnaire, secteur privé, informel, diaspora.
   /// * [canalProvenanceId] - Grand Public : canal de provenance.
-  /// * [statut] 
+  /// * [statut]
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
@@ -1055,7 +1054,7 @@ _responseData = rawData == null ? null : deserialize<DepartementYieldListDto, De
   ///
   /// Returns a [Future] containing a [Response] with a [OriginBreakdownDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<OriginBreakdownDto>> getOriginBreakdown({ 
+  Future<Response<OriginBreakdownDto>> getOriginBreakdown({
     String? search,
     String? representantId,
     String? banqueId,
@@ -1086,16 +1085,10 @@ _responseData = rawData == null ? null : deserialize<DepartementYieldListDto, De
     final _path = r'/api/v1/analytics/origin-breakdown';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -1118,7 +1111,8 @@ _responseData = rawData == null ? null : deserialize<DepartementYieldListDto, De
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (appelePar != null) r'appelePar': appelePar,
       if (lastCallById != null) r'lastCallById': lastCallById,
-      if (enrollmentCapturedById != null) r'enrollmentCapturedById': enrollmentCapturedById,
+      if (enrollmentCapturedById != null)
+        r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
@@ -1137,9 +1131,14 @@ _responseData = rawData == null ? null : deserialize<DepartementYieldListDto, De
     OriginBreakdownDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<OriginBreakdownDto, OriginBreakdownDto>(rawData, 'OriginBreakdownDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<OriginBreakdownDto, OriginBreakdownDto>(
+              rawData,
+              'OriginBreakdownDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1163,19 +1162,19 @@ _responseData = rawData == null ? null : deserialize<OriginBreakdownDto, OriginB
   }
 
   /// Répartition par banque.
-  /// 
+  ///
   ///
   /// Parameters:
   /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
-  /// * [representantId] 
-  /// * [banqueId] 
-  /// * [syndicatId] 
-  /// * [departementId] 
+  /// * [representantId]
+  /// * [banqueId]
+  /// * [syndicatId]
+  /// * [departementId]
   /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
   /// * [projet] - Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.
   /// * [type] - Grand Public : fonctionnaire, secteur privé, informel, diaspora.
   /// * [canalProvenanceId] - Grand Public : canal de provenance.
-  /// * [statut] 
+  /// * [statut]
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
@@ -1195,7 +1194,7 @@ _responseData = rawData == null ? null : deserialize<OriginBreakdownDto, OriginB
   ///
   /// Returns a [Future] containing a [Response] with a [NamedCountListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<NamedCountListDto>> getProspectsByBanque({ 
+  Future<Response<NamedCountListDto>> getProspectsByBanque({
     String? search,
     String? representantId,
     String? banqueId,
@@ -1226,16 +1225,10 @@ _responseData = rawData == null ? null : deserialize<OriginBreakdownDto, OriginB
     final _path = r'/api/v1/analytics/by-banque';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -1258,7 +1251,8 @@ _responseData = rawData == null ? null : deserialize<OriginBreakdownDto, OriginB
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (appelePar != null) r'appelePar': appelePar,
       if (lastCallById != null) r'lastCallById': lastCallById,
-      if (enrollmentCapturedById != null) r'enrollmentCapturedById': enrollmentCapturedById,
+      if (enrollmentCapturedById != null)
+        r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
@@ -1277,9 +1271,14 @@ _responseData = rawData == null ? null : deserialize<OriginBreakdownDto, OriginB
     NamedCountListDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<NamedCountListDto, NamedCountListDto>(rawData, 'NamedCountListDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<NamedCountListDto, NamedCountListDto>(
+              rawData,
+              'NamedCountListDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1303,19 +1302,19 @@ _responseData = rawData == null ? null : deserialize<NamedCountListDto, NamedCou
   }
 
   /// Répartition par département.
-  /// 
+  ///
   ///
   /// Parameters:
   /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
-  /// * [representantId] 
-  /// * [banqueId] 
-  /// * [syndicatId] 
-  /// * [departementId] 
+  /// * [representantId]
+  /// * [banqueId]
+  /// * [syndicatId]
+  /// * [departementId]
   /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
   /// * [projet] - Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.
   /// * [type] - Grand Public : fonctionnaire, secteur privé, informel, diaspora.
   /// * [canalProvenanceId] - Grand Public : canal de provenance.
-  /// * [statut] 
+  /// * [statut]
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
@@ -1335,7 +1334,7 @@ _responseData = rawData == null ? null : deserialize<NamedCountListDto, NamedCou
   ///
   /// Returns a [Future] containing a [Response] with a [NamedCountListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<NamedCountListDto>> getProspectsByDepartement({ 
+  Future<Response<NamedCountListDto>> getProspectsByDepartement({
     String? search,
     String? representantId,
     String? banqueId,
@@ -1366,16 +1365,10 @@ _responseData = rawData == null ? null : deserialize<NamedCountListDto, NamedCou
     final _path = r'/api/v1/analytics/by-departement';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -1398,7 +1391,8 @@ _responseData = rawData == null ? null : deserialize<NamedCountListDto, NamedCou
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (appelePar != null) r'appelePar': appelePar,
       if (lastCallById != null) r'lastCallById': lastCallById,
-      if (enrollmentCapturedById != null) r'enrollmentCapturedById': enrollmentCapturedById,
+      if (enrollmentCapturedById != null)
+        r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
@@ -1417,9 +1411,14 @@ _responseData = rawData == null ? null : deserialize<NamedCountListDto, NamedCou
     NamedCountListDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<NamedCountListDto, NamedCountListDto>(rawData, 'NamedCountListDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<NamedCountListDto, NamedCountListDto>(
+              rawData,
+              'NamedCountListDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1447,15 +1446,15 @@ _responseData = rawData == null ? null : deserialize<NamedCountListDto, NamedCou
   ///
   /// Parameters:
   /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
-  /// * [representantId] 
-  /// * [banqueId] 
-  /// * [syndicatId] 
-  /// * [departementId] 
+  /// * [representantId]
+  /// * [banqueId]
+  /// * [syndicatId]
+  /// * [departementId]
   /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
   /// * [projet] - Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.
   /// * [type] - Grand Public : fonctionnaire, secteur privé, informel, diaspora.
   /// * [canalProvenanceId] - Grand Public : canal de provenance.
-  /// * [statut] 
+  /// * [statut]
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
@@ -1475,7 +1474,7 @@ _responseData = rawData == null ? null : deserialize<NamedCountListDto, NamedCou
   ///
   /// Returns a [Future] containing a [Response] with a [EnrollmentMethodListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<EnrollmentMethodListDto>> getProspectsByEnrollmentMethod({ 
+  Future<Response<EnrollmentMethodListDto>> getProspectsByEnrollmentMethod({
     String? search,
     String? representantId,
     String? banqueId,
@@ -1506,16 +1505,10 @@ _responseData = rawData == null ? null : deserialize<NamedCountListDto, NamedCou
     final _path = r'/api/v1/analytics/by-enrollment-method';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -1538,7 +1531,8 @@ _responseData = rawData == null ? null : deserialize<NamedCountListDto, NamedCou
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (appelePar != null) r'appelePar': appelePar,
       if (lastCallById != null) r'lastCallById': lastCallById,
-      if (enrollmentCapturedById != null) r'enrollmentCapturedById': enrollmentCapturedById,
+      if (enrollmentCapturedById != null)
+        r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
@@ -1557,9 +1551,14 @@ _responseData = rawData == null ? null : deserialize<NamedCountListDto, NamedCou
     EnrollmentMethodListDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<EnrollmentMethodListDto, EnrollmentMethodListDto>(rawData, 'EnrollmentMethodListDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<EnrollmentMethodListDto, EnrollmentMethodListDto>(
+              rawData,
+              'EnrollmentMethodListDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1587,15 +1586,15 @@ _responseData = rawData == null ? null : deserialize<EnrollmentMethodListDto, En
   ///
   /// Parameters:
   /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
-  /// * [representantId] 
-  /// * [banqueId] 
-  /// * [syndicatId] 
-  /// * [departementId] 
+  /// * [representantId]
+  /// * [banqueId]
+  /// * [syndicatId]
+  /// * [departementId]
   /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
   /// * [projet] - Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.
   /// * [type] - Grand Public : fonctionnaire, secteur privé, informel, diaspora.
   /// * [canalProvenanceId] - Grand Public : canal de provenance.
-  /// * [statut] 
+  /// * [statut]
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
@@ -1615,7 +1614,7 @@ _responseData = rawData == null ? null : deserialize<EnrollmentMethodListDto, En
   ///
   /// Returns a [Future] containing a [Response] with a [Phase2StatusListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<Phase2StatusListDto>> getProspectsByPhase2Status({ 
+  Future<Response<Phase2StatusListDto>> getProspectsByPhase2Status({
     String? search,
     String? representantId,
     String? banqueId,
@@ -1646,16 +1645,10 @@ _responseData = rawData == null ? null : deserialize<EnrollmentMethodListDto, En
     final _path = r'/api/v1/analytics/by-phase2-status';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -1678,7 +1671,8 @@ _responseData = rawData == null ? null : deserialize<EnrollmentMethodListDto, En
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (appelePar != null) r'appelePar': appelePar,
       if (lastCallById != null) r'lastCallById': lastCallById,
-      if (enrollmentCapturedById != null) r'enrollmentCapturedById': enrollmentCapturedById,
+      if (enrollmentCapturedById != null)
+        r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
@@ -1697,9 +1691,14 @@ _responseData = rawData == null ? null : deserialize<EnrollmentMethodListDto, En
     Phase2StatusListDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<Phase2StatusListDto, Phase2StatusListDto>(rawData, 'Phase2StatusListDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<Phase2StatusListDto, Phase2StatusListDto>(
+              rawData,
+              'Phase2StatusListDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1727,15 +1726,15 @@ _responseData = rawData == null ? null : deserialize<Phase2StatusListDto, Phase2
   ///
   /// Parameters:
   /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
-  /// * [representantId] 
-  /// * [banqueId] 
-  /// * [syndicatId] 
-  /// * [departementId] 
+  /// * [representantId]
+  /// * [banqueId]
+  /// * [syndicatId]
+  /// * [departementId]
   /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
   /// * [projet] - Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.
   /// * [type] - Grand Public : fonctionnaire, secteur privé, informel, diaspora.
   /// * [canalProvenanceId] - Grand Public : canal de provenance.
-  /// * [statut] 
+  /// * [statut]
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
@@ -1755,7 +1754,7 @@ _responseData = rawData == null ? null : deserialize<Phase2StatusListDto, Phase2
   ///
   /// Returns a [Future] containing a [Response] with a [SegmentListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<SegmentListDto>> getProspectsBySegment({ 
+  Future<Response<SegmentListDto>> getProspectsBySegment({
     String? search,
     String? representantId,
     String? banqueId,
@@ -1786,16 +1785,10 @@ _responseData = rawData == null ? null : deserialize<Phase2StatusListDto, Phase2
     final _path = r'/api/v1/analytics/by-segment';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -1818,7 +1811,8 @@ _responseData = rawData == null ? null : deserialize<Phase2StatusListDto, Phase2
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (appelePar != null) r'appelePar': appelePar,
       if (lastCallById != null) r'lastCallById': lastCallById,
-      if (enrollmentCapturedById != null) r'enrollmentCapturedById': enrollmentCapturedById,
+      if (enrollmentCapturedById != null)
+        r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
@@ -1837,9 +1831,14 @@ _responseData = rawData == null ? null : deserialize<Phase2StatusListDto, Phase2
     SegmentListDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<SegmentListDto, SegmentListDto>(rawData, 'SegmentListDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<SegmentListDto, SegmentListDto>(
+              rawData,
+              'SegmentListDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1863,19 +1862,19 @@ _responseData = rawData == null ? null : deserialize<SegmentListDto, SegmentList
   }
 
   /// Répartition par syndicat.
-  /// 
+  ///
   ///
   /// Parameters:
   /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
-  /// * [representantId] 
-  /// * [banqueId] 
-  /// * [syndicatId] 
-  /// * [departementId] 
+  /// * [representantId]
+  /// * [banqueId]
+  /// * [syndicatId]
+  /// * [departementId]
   /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
   /// * [projet] - Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.
   /// * [type] - Grand Public : fonctionnaire, secteur privé, informel, diaspora.
   /// * [canalProvenanceId] - Grand Public : canal de provenance.
-  /// * [statut] 
+  /// * [statut]
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
@@ -1895,7 +1894,7 @@ _responseData = rawData == null ? null : deserialize<SegmentListDto, SegmentList
   ///
   /// Returns a [Future] containing a [Response] with a [NamedCountListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<NamedCountListDto>> getProspectsBySyndicat({ 
+  Future<Response<NamedCountListDto>> getProspectsBySyndicat({
     String? search,
     String? representantId,
     String? banqueId,
@@ -1926,16 +1925,10 @@ _responseData = rawData == null ? null : deserialize<SegmentListDto, SegmentList
     final _path = r'/api/v1/analytics/by-syndicat';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -1958,7 +1951,8 @@ _responseData = rawData == null ? null : deserialize<SegmentListDto, SegmentList
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (appelePar != null) r'appelePar': appelePar,
       if (lastCallById != null) r'lastCallById': lastCallById,
-      if (enrollmentCapturedById != null) r'enrollmentCapturedById': enrollmentCapturedById,
+      if (enrollmentCapturedById != null)
+        r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
@@ -1977,9 +1971,14 @@ _responseData = rawData == null ? null : deserialize<SegmentListDto, SegmentList
     NamedCountListDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<NamedCountListDto, NamedCountListDto>(rawData, 'NamedCountListDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<NamedCountListDto, NamedCountListDto>(
+              rawData,
+              'NamedCountListDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -2003,19 +2002,19 @@ _responseData = rawData == null ? null : deserialize<NamedCountListDto, NamedCou
   }
 
   /// Série temporelle des saisies, par jour, semaine ou mois.
-  /// 
+  ///
   ///
   /// Parameters:
   /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
-  /// * [representantId] 
-  /// * [banqueId] 
-  /// * [syndicatId] 
-  /// * [departementId] 
+  /// * [representantId]
+  /// * [banqueId]
+  /// * [syndicatId]
+  /// * [departementId]
   /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
   /// * [projet] - Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.
   /// * [type] - Grand Public : fonctionnaire, secteur privé, informel, diaspora.
   /// * [canalProvenanceId] - Grand Public : canal de provenance.
-  /// * [statut] 
+  /// * [statut]
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
@@ -2026,7 +2025,7 @@ _responseData = rawData == null ? null : deserialize<NamedCountListDto, NamedCou
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
-  /// * [granularity] 
+  /// * [granularity]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -2036,7 +2035,7 @@ _responseData = rawData == null ? null : deserialize<NamedCountListDto, NamedCou
   ///
   /// Returns a [Future] containing a [Response] with a [AnalyticsSeriesDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<AnalyticsSeriesDto>> getProspectsOverTime({ 
+  Future<Response<AnalyticsSeriesDto>> getProspectsOverTime({
     String? search,
     String? representantId,
     String? banqueId,
@@ -2068,16 +2067,10 @@ _responseData = rawData == null ? null : deserialize<NamedCountListDto, NamedCou
     final _path = r'/api/v1/analytics/prospects-over-time';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -2100,7 +2093,8 @@ _responseData = rawData == null ? null : deserialize<NamedCountListDto, NamedCou
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (appelePar != null) r'appelePar': appelePar,
       if (lastCallById != null) r'lastCallById': lastCallById,
-      if (enrollmentCapturedById != null) r'enrollmentCapturedById': enrollmentCapturedById,
+      if (enrollmentCapturedById != null)
+        r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
@@ -2120,9 +2114,14 @@ _responseData = rawData == null ? null : deserialize<NamedCountListDto, NamedCou
     AnalyticsSeriesDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<AnalyticsSeriesDto, AnalyticsSeriesDto>(rawData, 'AnalyticsSeriesDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<AnalyticsSeriesDto, AnalyticsSeriesDto>(
+              rawData,
+              'AnalyticsSeriesDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -2150,15 +2149,15 @@ _responseData = rawData == null ? null : deserialize<AnalyticsSeriesDto, Analyti
   ///
   /// Parameters:
   /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
-  /// * [representantId] 
-  /// * [banqueId] 
-  /// * [syndicatId] 
-  /// * [departementId] 
+  /// * [representantId]
+  /// * [banqueId]
+  /// * [syndicatId]
+  /// * [departementId]
   /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
   /// * [projet] - Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.
   /// * [type] - Grand Public : fonctionnaire, secteur privé, informel, diaspora.
   /// * [canalProvenanceId] - Grand Public : canal de provenance.
-  /// * [statut] 
+  /// * [statut]
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
@@ -2169,7 +2168,7 @@ _responseData = rawData == null ? null : deserialize<AnalyticsSeriesDto, Analyti
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
-  /// * [limit] 
+  /// * [limit]
   /// * [dormantDays] - Ancienneté, en jours, au delà de laquelle un représentant sans nouvel apport est déclaré dormant. Le seuil est un paramètre parce qu’il dépend du rythme de la zone : trois mois de silence n’ont pas le même sens partout.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
@@ -2180,7 +2179,8 @@ _responseData = rawData == null ? null : deserialize<AnalyticsSeriesDto, Analyti
   ///
   /// Returns a [Future] containing a [Response] with a [RepresentantProductivityListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<RepresentantProductivityListDto>> getRepresentantProductivity({ 
+  Future<Response<RepresentantProductivityListDto>>
+  getRepresentantProductivity({
     String? search,
     String? representantId,
     String? banqueId,
@@ -2213,16 +2213,10 @@ _responseData = rawData == null ? null : deserialize<AnalyticsSeriesDto, Analyti
     final _path = r'/api/v1/analytics/representant-productivity';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -2245,7 +2239,8 @@ _responseData = rawData == null ? null : deserialize<AnalyticsSeriesDto, Analyti
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (appelePar != null) r'appelePar': appelePar,
       if (lastCallById != null) r'lastCallById': lastCallById,
-      if (enrollmentCapturedById != null) r'enrollmentCapturedById': enrollmentCapturedById,
+      if (enrollmentCapturedById != null)
+        r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
@@ -2266,9 +2261,13 @@ _responseData = rawData == null ? null : deserialize<AnalyticsSeriesDto, Analyti
     RepresentantProductivityListDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<RepresentantProductivityListDto, RepresentantProductivityListDto>(rawData, 'RepresentantProductivityListDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<
+              RepresentantProductivityListDto,
+              RepresentantProductivityListDto
+            >(rawData, 'RepresentantProductivityListDto', growable: true);
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -2300,8 +2299,8 @@ _responseData = rawData == null ? null : deserialize<RepresentantProductivityLis
   /// * [fromSegment] - Segment de DÉPART. « Combien de BDD3 avons-nous fait basculer. »
   /// * [toSegment] - Segment d’ARRIVÉE. « Combien de conversions vers BDD1. »
   /// * [changedById] - Auteur de la bascule. Réservé à l’ADMIN : un COMMERCIAL ne voit que les siennes.
-  /// * [page] 
-  /// * [pageSize] 
+  /// * [page]
+  /// * [pageSize]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -2311,7 +2310,7 @@ _responseData = rawData == null ? null : deserialize<RepresentantProductivityLis
   ///
   /// Returns a [Future] containing a [Response] with a [SegmentConversionListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<SegmentConversionListDto>> getSegmentConversions({ 
+  Future<Response<SegmentConversionListDto>> getSegmentConversions({
     DateTime? dateFrom,
     DateTime? dateTo,
     BddSegment? fromSegment,
@@ -2329,16 +2328,10 @@ _responseData = rawData == null ? null : deserialize<RepresentantProductivityLis
     final _path = r'/api/v1/analytics/segment-conversions';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -2367,9 +2360,14 @@ _responseData = rawData == null ? null : deserialize<RepresentantProductivityLis
     SegmentConversionListDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<SegmentConversionListDto, SegmentConversionListDto>(rawData, 'SegmentConversionListDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<SegmentConversionListDto, SegmentConversionListDto>(
+              rawData,
+              'SegmentConversionListDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -2393,19 +2391,19 @@ _responseData = rawData == null ? null : deserialize<SegmentConversionListDto, S
   }
 
   /// Classement des commerciaux.
-  /// 
+  ///
   ///
   /// Parameters:
   /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
-  /// * [representantId] 
-  /// * [banqueId] 
-  /// * [syndicatId] 
-  /// * [departementId] 
+  /// * [representantId]
+  /// * [banqueId]
+  /// * [syndicatId]
+  /// * [departementId]
   /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
   /// * [projet] - Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.
   /// * [type] - Grand Public : fonctionnaire, secteur privé, informel, diaspora.
   /// * [canalProvenanceId] - Grand Public : canal de provenance.
-  /// * [statut] 
+  /// * [statut]
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
@@ -2416,7 +2414,7 @@ _responseData = rawData == null ? null : deserialize<SegmentConversionListDto, S
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
-  /// * [limit] 
+  /// * [limit]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -2426,7 +2424,7 @@ _responseData = rawData == null ? null : deserialize<SegmentConversionListDto, S
   ///
   /// Returns a [Future] containing a [Response] with a [TopCommercialListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<TopCommercialListDto>> getTopCommercials({ 
+  Future<Response<TopCommercialListDto>> getTopCommercials({
     String? search,
     String? representantId,
     String? banqueId,
@@ -2458,16 +2456,10 @@ _responseData = rawData == null ? null : deserialize<SegmentConversionListDto, S
     final _path = r'/api/v1/analytics/top-commercials';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -2490,7 +2482,8 @@ _responseData = rawData == null ? null : deserialize<SegmentConversionListDto, S
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (appelePar != null) r'appelePar': appelePar,
       if (lastCallById != null) r'lastCallById': lastCallById,
-      if (enrollmentCapturedById != null) r'enrollmentCapturedById': enrollmentCapturedById,
+      if (enrollmentCapturedById != null)
+        r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
@@ -2510,9 +2503,14 @@ _responseData = rawData == null ? null : deserialize<SegmentConversionListDto, S
     TopCommercialListDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<TopCommercialListDto, TopCommercialListDto>(rawData, 'TopCommercialListDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<TopCommercialListDto, TopCommercialListDto>(
+              rawData,
+              'TopCommercialListDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -2536,19 +2534,19 @@ _responseData = rawData == null ? null : deserialize<TopCommercialListDto, TopCo
   }
 
   /// Représentants ayant apporté le plus de prospects.
-  /// 
+  ///
   ///
   /// Parameters:
   /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
-  /// * [representantId] 
-  /// * [banqueId] 
-  /// * [syndicatId] 
-  /// * [departementId] 
+  /// * [representantId]
+  /// * [banqueId]
+  /// * [syndicatId]
+  /// * [departementId]
   /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
   /// * [projet] - Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.
   /// * [type] - Grand Public : fonctionnaire, secteur privé, informel, diaspora.
   /// * [canalProvenanceId] - Grand Public : canal de provenance.
-  /// * [statut] 
+  /// * [statut]
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
@@ -2559,7 +2557,7 @@ _responseData = rawData == null ? null : deserialize<TopCommercialListDto, TopCo
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
-  /// * [limit] 
+  /// * [limit]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -2569,7 +2567,7 @@ _responseData = rawData == null ? null : deserialize<TopCommercialListDto, TopCo
   ///
   /// Returns a [Future] containing a [Response] with a [TopRepresentantListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<TopRepresentantListDto>> getTopRepresentants({ 
+  Future<Response<TopRepresentantListDto>> getTopRepresentants({
     String? search,
     String? representantId,
     String? banqueId,
@@ -2601,16 +2599,10 @@ _responseData = rawData == null ? null : deserialize<TopCommercialListDto, TopCo
     final _path = r'/api/v1/analytics/top-representants';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -2633,7 +2625,8 @@ _responseData = rawData == null ? null : deserialize<TopCommercialListDto, TopCo
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (appelePar != null) r'appelePar': appelePar,
       if (lastCallById != null) r'lastCallById': lastCallById,
-      if (enrollmentCapturedById != null) r'enrollmentCapturedById': enrollmentCapturedById,
+      if (enrollmentCapturedById != null)
+        r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
@@ -2653,9 +2646,14 @@ _responseData = rawData == null ? null : deserialize<TopCommercialListDto, TopCo
     TopRepresentantListDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<TopRepresentantListDto, TopRepresentantListDto>(rawData, 'TopRepresentantListDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<TopRepresentantListDto, TopRepresentantListDto>(
+              rawData,
+              'TopRepresentantListDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -2683,15 +2681,15 @@ _responseData = rawData == null ? null : deserialize<TopRepresentantListDto, Top
   ///
   /// Parameters:
   /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
-  /// * [representantId] 
-  /// * [banqueId] 
-  /// * [syndicatId] 
-  /// * [departementId] 
+  /// * [representantId]
+  /// * [banqueId]
+  /// * [syndicatId]
+  /// * [departementId]
   /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
   /// * [projet] - Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.
   /// * [type] - Grand Public : fonctionnaire, secteur privé, informel, diaspora.
   /// * [canalProvenanceId] - Grand Public : canal de provenance.
-  /// * [statut] 
+  /// * [statut]
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
@@ -2711,7 +2709,7 @@ _responseData = rawData == null ? null : deserialize<TopRepresentantListDto, Top
   ///
   /// Returns a [Future] containing a [Response] with a [WeeklyCohortListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<WeeklyCohortListDto>> getWeeklyCohorts({ 
+  Future<Response<WeeklyCohortListDto>> getWeeklyCohorts({
     String? search,
     String? representantId,
     String? banqueId,
@@ -2742,16 +2740,10 @@ _responseData = rawData == null ? null : deserialize<TopRepresentantListDto, Top
     final _path = r'/api/v1/analytics/weekly-cohorts';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -2774,7 +2766,8 @@ _responseData = rawData == null ? null : deserialize<TopRepresentantListDto, Top
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (appelePar != null) r'appelePar': appelePar,
       if (lastCallById != null) r'lastCallById': lastCallById,
-      if (enrollmentCapturedById != null) r'enrollmentCapturedById': enrollmentCapturedById,
+      if (enrollmentCapturedById != null)
+        r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
@@ -2793,9 +2786,14 @@ _responseData = rawData == null ? null : deserialize<TopRepresentantListDto, Top
     WeeklyCohortListDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<WeeklyCohortListDto, WeeklyCohortListDto>(rawData, 'WeeklyCohortListDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<WeeklyCohortListDto, WeeklyCohortListDto>(
+              rawData,
+              'WeeklyCohortListDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -2817,5 +2815,4 @@ _responseData = rawData == null ? null : deserialize<WeeklyCohortListDto, Weekly
       extra: _response.extra,
     );
   }
-
 }

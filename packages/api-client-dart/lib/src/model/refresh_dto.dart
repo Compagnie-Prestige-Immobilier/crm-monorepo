@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'refresh_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,46 +18,24 @@ part 'refresh_dto.g.dart';
 )
 class RefreshDto {
   /// Returns a new [RefreshDto] instance.
-  RefreshDto({
+  RefreshDto({required this.refreshToken});
 
-    required  this.refreshToken,
-  });
-
-      /// Le refresh token reçu au login ou au refresh précédent.
-  @JsonKey(
-    
-    name: r'refreshToken',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Le refresh token reçu au login ou au refresh précédent.
+  @JsonKey(name: r'refreshToken', required: true, includeIfNull: false)
   final String refreshToken;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is RefreshDto &&
+            runtimeType == other.runtimeType &&
+            equals([refreshToken], [other.refreshToken]);
+  }
 
+  @override
+  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([refreshToken]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is RefreshDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            refreshToken,
-        ],
-        [
-            other.refreshToken,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        refreshToken,
-    ],);
-
-  factory RefreshDto.fromJson(Map<String, dynamic> json) => _$RefreshDtoFromJson(json);
+  factory RefreshDto.fromJson(Map<String, dynamic> json) =>
+      _$RefreshDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$RefreshDtoToJson(this);
 
@@ -66,6 +43,4 @@ class RefreshDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

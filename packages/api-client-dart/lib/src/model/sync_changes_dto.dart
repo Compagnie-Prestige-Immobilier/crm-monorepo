@@ -22,7 +22,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'sync_changes_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -33,236 +32,118 @@ part 'sync_changes_dto.g.dart';
 class SyncChangesDto {
   /// Returns a new [SyncChangesDto] instance.
   SyncChangesDto({
+    required this.departements,
 
-    required  this.departements,
+    required this.iefs,
 
-    required  this.iefs,
+    required this.banques,
 
-    required  this.banques,
+    required this.syndicats,
 
-    required  this.syndicats,
+    required this.incomeBands,
 
-    required  this.incomeBands,
+    required this.canauxProvenance,
 
-    required  this.canauxProvenance,
+    required this.professions,
 
-    required  this.professions,
+    required this.employeurs,
 
-    required  this.employeurs,
+    required this.pays,
 
-    required  this.pays,
+    required this.visiteReferentiels,
 
-    required  this.visiteReferentiels,
+    required this.representants,
 
-    required  this.representants,
+    required this.prospects,
 
-    required  this.prospects,
-
-    required  this.visites,
+    required this.visites,
   });
 
-  @JsonKey(
-    
-    name: r'departements',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'departements', required: true, includeIfNull: false)
   final List<DepartementDto> departements;
 
-
-
-  @JsonKey(
-    
-    name: r'iefs',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'iefs', required: true, includeIfNull: false)
   final List<IefDto> iefs;
 
-
-
-  @JsonKey(
-    
-    name: r'banques',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'banques', required: true, includeIfNull: false)
   final List<BanqueDto> banques;
 
-
-
-  @JsonKey(
-    
-    name: r'syndicats',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'syndicats', required: true, includeIfNull: false)
   final List<SyndicatDto> syndicats;
 
-
-
-      /// Tranches de revenu mensuel : la conversion les demande hors réseau.
-  @JsonKey(
-    
-    name: r'incomeBands',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Tranches de revenu mensuel : la conversion les demande hors réseau.
+  @JsonKey(name: r'incomeBands', required: true, includeIfNull: false)
   final List<IncomeBandDto> incomeBands;
 
-
-
-  @JsonKey(
-    
-    name: r'canauxProvenance',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'canauxProvenance', required: true, includeIfNull: false)
   final List<CanalProvenanceDto> canauxProvenance;
 
-
-
-      /// Professions : sans elles, le mobile ne pouvait qu’écrire du texte libre.
-  @JsonKey(
-    
-    name: r'professions',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Professions : sans elles, le mobile ne pouvait qu’écrire du texte libre.
+  @JsonKey(name: r'professions', required: true, includeIfNull: false)
   final List<ProfessionDto> professions;
 
-
-
-      /// Employeurs : la situation du Grand Public se saisit hors réseau.
-  @JsonKey(
-    
-    name: r'employeurs',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Employeurs : la situation du Grand Public se saisit hors réseau.
+  @JsonKey(name: r'employeurs', required: true, includeIfNull: false)
   final List<EmployeurDto> employeurs;
 
-
-
-  @JsonKey(
-    
-    name: r'pays',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'pays', required: true, includeIfNull: false)
   final List<PaysDto> pays;
 
-
-
-      /// Les quatre listes du registre des visites, réunies : chaque entrée porte sa nature.
-  @JsonKey(
-    
-    name: r'visiteReferentiels',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Les quatre listes du registre des visites, réunies : chaque entrée porte sa nature.
+  @JsonKey(name: r'visiteReferentiels', required: true, includeIfNull: false)
   final List<SyncVisiteReferentielDto> visiteReferentiels;
 
-
-
-  @JsonKey(
-    
-    name: r'representants',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'representants', required: true, includeIfNull: false)
   final List<RepresentantDto> representants;
 
-
-
-  @JsonKey(
-    
-    name: r'prospects',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'prospects', required: true, includeIfNull: false)
   final List<ProspectDto> prospects;
 
-
-
-  @JsonKey(
-    
-    name: r'visites',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'visites', required: true, includeIfNull: false)
   final List<SyncVisiteDto> visites;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is SyncChangesDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [
+                departements,
+                iefs,
+                banques,
+                syndicats,
+                incomeBands,
+                canauxProvenance,
+                professions,
+                employeurs,
+                pays,
+                visiteReferentiels,
+                representants,
+                prospects,
+                visites,
+              ],
+              [
+                other.departements,
+                other.iefs,
+                other.banques,
+                other.syndicats,
+                other.incomeBands,
+                other.canauxProvenance,
+                other.professions,
+                other.employeurs,
+                other.pays,
+                other.visiteReferentiels,
+                other.representants,
+                other.prospects,
+                other.visites,
+              ],
+            );
+  }
 
-
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is SyncChangesDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            departements,
-            iefs,
-            banques,
-            syndicats,
-            incomeBands,
-            canauxProvenance,
-            professions,
-            employeurs,
-            pays,
-            visiteReferentiels,
-            representants,
-            prospects,
-            visites,
-        ],
-        [
-            other.departements,
-            other.iefs,
-            other.banques,
-            other.syndicats,
-            other.incomeBands,
-            other.canauxProvenance,
-            other.professions,
-            other.employeurs,
-            other.pays,
-            other.visiteReferentiels,
-            other.representants,
-            other.prospects,
-            other.visites,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([
         departements,
         iefs,
         banques,
@@ -276,9 +157,10 @@ class SyncChangesDto {
         representants,
         prospects,
         visites,
-    ],);
+      ]);
 
-  factory SyncChangesDto.fromJson(Map<String, dynamic> json) => _$SyncChangesDtoFromJson(json);
+  factory SyncChangesDto.fromJson(Map<String, dynamic> json) =>
+      _$SyncChangesDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$SyncChangesDtoToJson(this);
 
@@ -286,6 +168,4 @@ class SyncChangesDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

@@ -10,7 +10,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'create_call_outcome_reason_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -21,60 +20,36 @@ part 'create_call_outcome_reason_dto.g.dart';
 class CreateCallOutcomeReasonDto {
   /// Returns a new [CreateCallOutcomeReasonDto] instance.
   CreateCallOutcomeReasonDto({
+    required this.code,
 
-    required  this.code,
+    required this.label,
 
-    required  this.label,
+    required this.effect,
 
-    required  this.effect,
+    this.requiresComment = false,
 
-     this.requiresComment = false,
+    this.requiresCallback = false,
 
-     this.requiresCallback = false,
+    this.countsAsReached = true,
 
-     this.countsAsReached = true,
+    this.color,
 
-     this.color,
-
-     this.sortOrder = 100,
+    this.sortOrder = 100,
   });
 
-  @JsonKey(
-    
-    name: r'code',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'code', required: true, includeIfNull: false)
   final String code;
 
-
-
-  @JsonKey(
-    
-    name: r'label',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'label', required: true, includeIfNull: false)
   final String label;
 
-
-
   @JsonKey(
-    
     name: r'effect',
     required: true,
     includeIfNull: false,
-  unknownEnumValue: CallOutcomeEffect.unknownDefaultOpenApi,
+    unknownEnumValue: CallOutcomeEffect.unknownDefaultOpenApi,
   )
-
-
   final CallOutcomeEffect effect;
-
-
 
   @JsonKey(
     defaultValue: false,
@@ -82,24 +57,16 @@ class CreateCallOutcomeReasonDto {
     required: false,
     includeIfNull: false,
   )
-
-
   final bool? requiresComment;
 
-
-
-      /// Réservé à l’effet SCHEDULE_CALLBACK.
+  /// Réservé à l’effet SCHEDULE_CALLBACK.
   @JsonKey(
     defaultValue: false,
     name: r'requiresCallback',
     required: false,
     includeIfNull: false,
   )
-
-
   final bool? requiresCallback;
-
-
 
   @JsonKey(
     defaultValue: true,
@@ -107,24 +74,11 @@ class CreateCallOutcomeReasonDto {
     required: false,
     includeIfNull: false,
   )
-
-
   final bool? countsAsReached;
 
-
-
-      /// Rôle du design system.
-  @JsonKey(
-    
-    name: r'color',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  /// Rôle du design system.
+  @JsonKey(name: r'color', required: false, includeIfNull: false)
   final String? color;
-
-
 
   @JsonKey(
     defaultValue: 100,
@@ -132,44 +86,40 @@ class CreateCallOutcomeReasonDto {
     required: false,
     includeIfNull: false,
   )
-
-
   final num? sortOrder;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is CreateCallOutcomeReasonDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [
+                code,
+                label,
+                effect,
+                requiresComment,
+                requiresCallback,
+                countsAsReached,
+                color,
+                sortOrder,
+              ],
+              [
+                other.code,
+                other.label,
+                other.effect,
+                other.requiresComment,
+                other.requiresCallback,
+                other.countsAsReached,
+                other.color,
+                other.sortOrder,
+              ],
+            );
+  }
 
-
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is CreateCallOutcomeReasonDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            code,
-            label,
-            effect,
-            requiresComment,
-            requiresCallback,
-            countsAsReached,
-            color,
-            sortOrder,
-        ],
-        [
-            other.code,
-            other.label,
-            other.effect,
-            other.requiresComment,
-            other.requiresCallback,
-            other.countsAsReached,
-            other.color,
-            other.sortOrder,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([
         code,
         label,
         effect,
@@ -178,9 +128,10 @@ class CreateCallOutcomeReasonDto {
         countsAsReached,
         color,
         sortOrder,
-    ],);
+      ]);
 
-  factory CreateCallOutcomeReasonDto.fromJson(Map<String, dynamic> json) => _$CreateCallOutcomeReasonDtoFromJson(json);
+  factory CreateCallOutcomeReasonDto.fromJson(Map<String, dynamic> json) =>
+      _$CreateCallOutcomeReasonDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$CreateCallOutcomeReasonDtoToJson(this);
 
@@ -188,6 +139,4 @@ class CreateCallOutcomeReasonDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

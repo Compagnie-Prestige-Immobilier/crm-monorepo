@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'create_syndicat_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,53 +19,25 @@ part 'create_syndicat_dto.g.dart';
 class CreateSyndicatDto {
   /// Returns a new [CreateSyndicatDto] instance.
   CreateSyndicatDto({
+    required this.name,
 
-    required  this.name,
+    required this.sigle,
 
-    required  this.sigle,
+    this.secteur,
 
-     this.secteur,
+    this.isActive = true,
 
-     this.isActive = true,
-
-     this.sortOrder = 100,
+    this.sortOrder = 100,
   });
 
-  @JsonKey(
-    
-    name: r'name',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'name', required: true, includeIfNull: false)
   final String name;
 
-
-
-  @JsonKey(
-    
-    name: r'sigle',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'sigle', required: true, includeIfNull: false)
   final String sigle;
 
-
-
-  @JsonKey(
-    
-    name: r'secteur',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'secteur', required: false, includeIfNull: false)
   final String? secteur;
-
-
 
   @JsonKey(
     defaultValue: true,
@@ -74,11 +45,7 @@ class CreateSyndicatDto {
     required: false,
     includeIfNull: false,
   )
-
-
   final bool? isActive;
-
-
 
   @JsonKey(
     defaultValue: 100,
@@ -86,46 +53,31 @@ class CreateSyndicatDto {
     required: false,
     includeIfNull: false,
   )
-
-
   final num? sortOrder;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is CreateSyndicatDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [name, sigle, secteur, isActive, sortOrder],
+              [
+                other.name,
+                other.sigle,
+                other.secteur,
+                other.isActive,
+                other.sortOrder,
+              ],
+            );
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([name, sigle, secteur, isActive, sortOrder]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is CreateSyndicatDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            name,
-            sigle,
-            secteur,
-            isActive,
-            sortOrder,
-        ],
-        [
-            other.name,
-            other.sigle,
-            other.secteur,
-            other.isActive,
-            other.sortOrder,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        name,
-        sigle,
-        secteur,
-        isActive,
-        sortOrder,
-    ],);
-
-  factory CreateSyndicatDto.fromJson(Map<String, dynamic> json) => _$CreateSyndicatDtoFromJson(json);
+  factory CreateSyndicatDto.fromJson(Map<String, dynamic> json) =>
+      _$CreateSyndicatDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$CreateSyndicatDtoToJson(this);
 
@@ -133,6 +85,4 @@ class CreateSyndicatDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

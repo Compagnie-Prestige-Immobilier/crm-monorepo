@@ -10,7 +10,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'purge_catalog_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -21,80 +20,41 @@ part 'purge_catalog_dto.g.dart';
 class PurgeCatalogDto {
   /// Returns a new [PurgeCatalogDto] instance.
   PurgeCatalogDto({
+    required this.allowed,
 
-    required  this.allowed,
+    required this.confirmationHint,
 
-    required  this.confirmationHint,
-
-    required  this.domains,
+    required this.domains,
   });
 
-      /// Vrai si le compte appelant est le premier administrateur, seul habilité à purger.
-  @JsonKey(
-    
-    name: r'allowed',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Vrai si le compte appelant est le premier administrateur, seul habilité à purger.
+  @JsonKey(name: r'allowed', required: true, includeIfNull: false)
   final bool allowed;
 
-
-
-      /// Identifiant de connexion à ressaisir pour confirmer.
-  @JsonKey(
-    
-    name: r'confirmationHint',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Identifiant de connexion à ressaisir pour confirmer.
+  @JsonKey(name: r'confirmationHint', required: true, includeIfNull: false)
   final String confirmationHint;
 
-
-
-  @JsonKey(
-    
-    name: r'domains',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'domains', required: true, includeIfNull: false)
   final List<PurgeDomainDto> domains;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is PurgeCatalogDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [allowed, confirmationHint, domains],
+              [other.allowed, other.confirmationHint, other.domains],
+            );
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([allowed, confirmationHint, domains]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is PurgeCatalogDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            allowed,
-            confirmationHint,
-            domains,
-        ],
-        [
-            other.allowed,
-            other.confirmationHint,
-            other.domains,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        allowed,
-        confirmationHint,
-        domains,
-    ],);
-
-  factory PurgeCatalogDto.fromJson(Map<String, dynamic> json) => _$PurgeCatalogDtoFromJson(json);
+  factory PurgeCatalogDto.fromJson(Map<String, dynamic> json) =>
+      _$PurgeCatalogDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$PurgeCatalogDtoToJson(this);
 
@@ -102,6 +62,4 @@ class PurgeCatalogDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

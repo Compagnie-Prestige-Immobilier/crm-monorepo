@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'visite_stat_jour_semaine_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,65 +18,30 @@ part 'visite_stat_jour_semaine_dto.g.dart';
 )
 class VisiteStatJourSemaineDto {
   /// Returns a new [VisiteStatJourSemaineDto] instance.
-  VisiteStatJourSemaineDto({
+  VisiteStatJourSemaineDto({required this.weekday, required this.count});
 
-    required  this.weekday,
-
-    required  this.count,
-  });
-
-      /// ISO : lundi = 1.
-          // minimum: 1
-          // maximum: 7
-  @JsonKey(
-    
-    name: r'weekday',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// ISO : lundi = 1.
+  // minimum: 1
+  // maximum: 7
+  @JsonKey(name: r'weekday', required: true, includeIfNull: false)
   final num weekday;
 
-
-
-  @JsonKey(
-    
-    name: r'count',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'count', required: true, includeIfNull: false)
   final num count;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is VisiteStatJourSemaineDto &&
+            runtimeType == other.runtimeType &&
+            equals([weekday, count], [other.weekday, other.count]);
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^ mapPropsToHashCode([weekday, count]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is VisiteStatJourSemaineDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            weekday,
-            count,
-        ],
-        [
-            other.weekday,
-            other.count,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        weekday,
-        count,
-    ],);
-
-  factory VisiteStatJourSemaineDto.fromJson(Map<String, dynamic> json) => _$VisiteStatJourSemaineDtoFromJson(json);
+  factory VisiteStatJourSemaineDto.fromJson(Map<String, dynamic> json) =>
+      _$VisiteStatJourSemaineDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$VisiteStatJourSemaineDtoToJson(this);
 
@@ -85,6 +49,4 @@ class VisiteStatJourSemaineDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

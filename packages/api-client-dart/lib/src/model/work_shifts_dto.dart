@@ -10,7 +10,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'work_shifts_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,62 +19,27 @@ part 'work_shifts_dto.g.dart';
 )
 class WorkShiftsDto {
   /// Returns a new [WorkShiftsDto] instance.
-  WorkShiftsDto({
+  WorkShiftsDto({required this.shifts, required this.updatedAt});
 
-    required  this.shifts,
-
-    required  this.updatedAt,
-  });
-
-  @JsonKey(
-    
-    name: r'shifts',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'shifts', required: true, includeIfNull: false)
   final List<WorkShiftDto> shifts;
 
-
-
-  @JsonKey(
-    
-    name: r'updatedAt',
-    required: true,
-    includeIfNull: true,
-  )
-
-
+  @JsonKey(name: r'updatedAt', required: true, includeIfNull: true)
   final DateTime? updatedAt;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is WorkShiftsDto &&
+            runtimeType == other.runtimeType &&
+            equals([shifts, updatedAt], [other.shifts, other.updatedAt]);
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^ mapPropsToHashCode([shifts, updatedAt]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is WorkShiftsDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            shifts,
-            updatedAt,
-        ],
-        [
-            other.shifts,
-            other.updatedAt,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        shifts,
-        updatedAt,
-    ],);
-
-  factory WorkShiftsDto.fromJson(Map<String, dynamic> json) => _$WorkShiftsDtoFromJson(json);
+  factory WorkShiftsDto.fromJson(Map<String, dynamic> json) =>
+      _$WorkShiftsDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$WorkShiftsDtoToJson(this);
 
@@ -83,6 +47,4 @@ class WorkShiftsDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

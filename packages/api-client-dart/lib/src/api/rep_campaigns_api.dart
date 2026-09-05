@@ -14,16 +14,15 @@ import 'package:crm_api_client/src/model/create_rep_call_attempt_dto.dart';
 import 'package:crm_api_client/src/model/rep_call_attempt_result_dto.dart';
 
 class RepCampaignsApi {
-
   final Dio _dio;
 
   const RepCampaignsApi(this._dio);
 
   /// Enregistre un appel passé à un représentant.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [createRepCallAttemptDto] 
+  /// * [createRepCallAttemptDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -33,7 +32,7 @@ class RepCampaignsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [RepCallAttemptResultDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<RepCallAttemptResultDto>> recordRepCallAttempt({ 
+  Future<Response<RepCallAttemptResultDto>> recordRepCallAttempt({
     required CreateRepCallAttemptDto createRepCallAttemptDto,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -45,16 +44,10 @@ class RepCampaignsApi {
     final _path = r'/api/v1/rep-campaigns/attempts';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -66,13 +59,9 @@ class RepCampaignsApi {
 
     try {
       _bodyData = jsonEncode(createRepCallAttemptDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -91,9 +80,14 @@ class RepCampaignsApi {
     RepCallAttemptResultDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<RepCallAttemptResultDto, RepCallAttemptResultDto>(rawData, 'RepCallAttemptResultDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<RepCallAttemptResultDto, RepCallAttemptResultDto>(
+              rawData,
+              'RepCallAttemptResultDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -115,5 +109,4 @@ _responseData = rawData == null ? null : deserialize<RepCallAttemptResultDto, Re
       extra: _response.extra,
     );
   }
-
 }

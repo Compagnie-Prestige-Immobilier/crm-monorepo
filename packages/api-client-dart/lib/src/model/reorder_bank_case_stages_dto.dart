@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'reorder_bank_case_stages_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,46 +18,24 @@ part 'reorder_bank_case_stages_dto.g.dart';
 )
 class ReorderBankCaseStagesDto {
   /// Returns a new [ReorderBankCaseStagesDto] instance.
-  ReorderBankCaseStagesDto({
+  ReorderBankCaseStagesDto({required this.stageIds});
 
-    required  this.stageIds,
-  });
-
-      /// Liste ORDONNÉE de toutes les étapes OPEN, actives comme inactives. L’étape initiale doit venir en premier.
-  @JsonKey(
-    
-    name: r'stageIds',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Liste ORDONNÉE de toutes les étapes OPEN, actives comme inactives. L’étape initiale doit venir en premier.
+  @JsonKey(name: r'stageIds', required: true, includeIfNull: false)
   final List<String> stageIds;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is ReorderBankCaseStagesDto &&
+            runtimeType == other.runtimeType &&
+            equals([stageIds], [other.stageIds]);
+  }
 
+  @override
+  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([stageIds]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is ReorderBankCaseStagesDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            stageIds,
-        ],
-        [
-            other.stageIds,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        stageIds,
-    ],);
-
-  factory ReorderBankCaseStagesDto.fromJson(Map<String, dynamic> json) => _$ReorderBankCaseStagesDtoFromJson(json);
+  factory ReorderBankCaseStagesDto.fromJson(Map<String, dynamic> json) =>
+      _$ReorderBankCaseStagesDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$ReorderBankCaseStagesDtoToJson(this);
 
@@ -66,6 +43,4 @@ class ReorderBankCaseStagesDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

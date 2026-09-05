@@ -10,7 +10,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'update_user_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -21,115 +20,63 @@ part 'update_user_dto.g.dart';
 class UpdateUserDto {
   /// Returns a new [UpdateUserDto] instance.
   UpdateUserDto({
+    this.email,
 
-     this.email,
+    this.username,
 
-     this.username,
+    this.fullName,
 
-     this.fullName,
+    this.role = Role.COMMERCIAL,
 
-     this.role = Role.COMMERCIAL,
-
-     this.phone,
+    this.phone,
   });
 
-  @JsonKey(
-    
-    name: r'email',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'email', required: false, includeIfNull: false)
   final String? email;
 
-
-
-      /// Identifiant de connexion alternatif : lettres, chiffres, point, tiret bas.
-  @JsonKey(
-    
-    name: r'username',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  /// Identifiant de connexion alternatif : lettres, chiffres, point, tiret bas.
+  @JsonKey(name: r'username', required: false, includeIfNull: false)
   final String? username;
 
-
-
-  @JsonKey(
-    
-    name: r'fullName',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'fullName', required: false, includeIfNull: false)
   final String? fullName;
-
-
 
   @JsonKey(
     defaultValue: Role.COMMERCIAL,
     name: r'role',
     required: false,
     includeIfNull: false,
-  unknownEnumValue: Role.unknownDefaultOpenApi,
+    unknownEnumValue: Role.unknownDefaultOpenApi,
   )
-
-
   final Role? role;
 
-
-
-      /// Téléphone, normalisé en E.164 par le serveur.
-  @JsonKey(
-    
-    name: r'phone',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  /// Téléphone, normalisé en E.164 par le serveur.
+  @JsonKey(name: r'phone', required: false, includeIfNull: false)
   final String? phone;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is UpdateUserDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [email, username, fullName, role, phone],
+              [
+                other.email,
+                other.username,
+                other.fullName,
+                other.role,
+                other.phone,
+              ],
+            );
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([email, username, fullName, role, phone]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is UpdateUserDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            email,
-            username,
-            fullName,
-            role,
-            phone,
-        ],
-        [
-            other.email,
-            other.username,
-            other.fullName,
-            other.role,
-            other.phone,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        email,
-        username,
-        fullName,
-        role,
-        phone,
-    ],);
-
-  factory UpdateUserDto.fromJson(Map<String, dynamic> json) => _$UpdateUserDtoFromJson(json);
+  factory UpdateUserDto.fromJson(Map<String, dynamic> json) =>
+      _$UpdateUserDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$UpdateUserDtoToJson(this);
 
@@ -137,6 +84,4 @@ class UpdateUserDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

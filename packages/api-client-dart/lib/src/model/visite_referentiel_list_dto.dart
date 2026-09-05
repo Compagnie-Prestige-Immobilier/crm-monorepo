@@ -10,7 +10,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'visite_referentiel_list_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,45 +19,23 @@ part 'visite_referentiel_list_dto.g.dart';
 )
 class VisiteReferentielListDto {
   /// Returns a new [VisiteReferentielListDto] instance.
-  VisiteReferentielListDto({
+  VisiteReferentielListDto({required this.items});
 
-    required  this.items,
-  });
-
-  @JsonKey(
-    
-    name: r'items',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'items', required: true, includeIfNull: false)
   final List<VisiteReferentielDto> items;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is VisiteReferentielListDto &&
+            runtimeType == other.runtimeType &&
+            equals([items], [other.items]);
+  }
 
+  @override
+  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([items]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is VisiteReferentielListDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            items,
-        ],
-        [
-            other.items,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        items,
-    ],);
-
-  factory VisiteReferentielListDto.fromJson(Map<String, dynamic> json) => _$VisiteReferentielListDtoFromJson(json);
+  factory VisiteReferentielListDto.fromJson(Map<String, dynamic> json) =>
+      _$VisiteReferentielListDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$VisiteReferentielListDtoToJson(this);
 
@@ -66,6 +43,4 @@ class VisiteReferentielListDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

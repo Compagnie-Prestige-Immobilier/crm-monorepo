@@ -12,7 +12,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'statut_qualification_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -23,242 +22,136 @@ part 'statut_qualification_dto.g.dart';
 class StatutQualificationDto {
   /// Returns a new [StatutQualificationDto] instance.
   StatutQualificationDto({
+    required this.id,
 
-    required  this.id,
+    required this.code,
 
-    required  this.code,
+    required this.label,
 
-    required  this.label,
+    required this.effect,
 
-    required  this.effect,
+    required this.requiresCallback,
 
-    required  this.requiresCallback,
+    required this.requiresComment,
 
-    required  this.requiresComment,
+    required this.retryAfterMinutes,
 
-    required  this.retryAfterMinutes,
+    required this.priorite,
 
-    required  this.priorite,
+    required this.relationStatus,
 
-    required  this.relationStatus,
+    required this.isActive,
 
-    required  this.isActive,
+    required this.isSystem,
 
-    required  this.isSystem,
+    required this.minPayloadVersion,
 
-    required  this.minPayloadVersion,
-
-    required  this.updatedAt,
+    required this.updatedAt,
   });
 
-  @JsonKey(
-    
-    name: r'id',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'id', required: true, includeIfNull: false)
   final String id;
 
-
-
-  @JsonKey(
-    
-    name: r'code',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'code', required: true, includeIfNull: false)
   final String code;
 
-
-
-  @JsonKey(
-    
-    name: r'label',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'label', required: true, includeIfNull: false)
   final String label;
 
-
-
   @JsonKey(
-    
     name: r'effect',
     required: true,
     includeIfNull: false,
-  unknownEnumValue: StatutQualificationEffect.unknownDefaultOpenApi,
+    unknownEnumValue: StatutQualificationEffect.unknownDefaultOpenApi,
   )
-
-
   final StatutQualificationEffect effect;
 
-
-
-      /// La date du rappel est exigée par ce statut.
-  @JsonKey(
-    
-    name: r'requiresCallback',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// La date du rappel est exigée par ce statut.
+  @JsonKey(name: r'requiresCallback', required: true, includeIfNull: false)
   final bool requiresCallback;
 
-
-
-      /// Le motif est exigé par ce statut : « Autre » ne dit rien seul.
-  @JsonKey(
-    
-    name: r'requiresComment',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Le motif est exigé par ce statut : « Autre » ne dit rien seul.
+  @JsonKey(name: r'requiresComment', required: true, includeIfNull: false)
   final bool requiresComment;
 
-
-
-      /// Délai, en minutes, du réessai que l’application propose d’elle-même. Nul : aucun réessai.
-  @JsonKey(
-    
-    name: r'retryAfterMinutes',
-    required: true,
-    includeIfNull: true,
-  )
-
-
+  /// Délai, en minutes, du réessai que l’application propose d’elle-même. Nul : aucun réessai.
+  @JsonKey(name: r'retryAfterMinutes', required: true, includeIfNull: true)
   final num? retryAfterMinutes;
 
-
-
-      /// Ordre de reprise : un « Très intéressé » se rappelle avant un « Non éligible ».
+  /// Ordre de reprise : un « Très intéressé » se rappelle avant un « Non éligible ».
   @JsonKey(
-    
     name: r'priorite',
     required: true,
     includeIfNull: false,
-  unknownEnumValue: PrioriteTraitement.unknownDefaultOpenApi,
+    unknownEnumValue: PrioriteTraitement.unknownDefaultOpenApi,
   )
-
-
   final PrioriteTraitement priorite;
 
-
-
-      /// La relation posée sur la fiche. Nulle quand le statut ne tranche rien.
+  /// La relation posée sur la fiche. Nulle quand le statut ne tranche rien.
   @JsonKey(
-    
     name: r'relationStatus',
     required: true,
     includeIfNull: true,
-  unknownEnumValue: RepresentantRelation.unknownDefaultOpenApi,
+    unknownEnumValue: RepresentantRelation.unknownDefaultOpenApi,
   )
-
-
   final RepresentantRelation? relationStatus;
 
-
-
-  @JsonKey(
-    
-    name: r'isActive',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'isActive', required: true, includeIfNull: false)
   final bool isActive;
 
-
-
-      /// Le script s’appuie dessus : sa règle ne se reconfigure pas.
-  @JsonKey(
-    
-    name: r'isSystem',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Le script s’appuie dessus : sa règle ne se reconfigure pas.
+  @JsonKey(name: r'isSystem', required: true, includeIfNull: false)
   final bool isSystem;
 
-
-
-      /// Version de charge utile minimale sachant émettre ce code.
-  @JsonKey(
-    
-    name: r'minPayloadVersion',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Version de charge utile minimale sachant émettre ce code.
+  @JsonKey(name: r'minPayloadVersion', required: true, includeIfNull: false)
   final num minPayloadVersion;
 
-
-
-  @JsonKey(
-    
-    name: r'updatedAt',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'updatedAt', required: true, includeIfNull: false)
   final DateTime updatedAt;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is StatutQualificationDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [
+                id,
+                code,
+                label,
+                effect,
+                requiresCallback,
+                requiresComment,
+                retryAfterMinutes,
+                priorite,
+                relationStatus,
+                isActive,
+                isSystem,
+                minPayloadVersion,
+                updatedAt,
+              ],
+              [
+                other.id,
+                other.code,
+                other.label,
+                other.effect,
+                other.requiresCallback,
+                other.requiresComment,
+                other.retryAfterMinutes,
+                other.priorite,
+                other.relationStatus,
+                other.isActive,
+                other.isSystem,
+                other.minPayloadVersion,
+                other.updatedAt,
+              ],
+            );
+  }
 
-
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is StatutQualificationDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            id,
-            code,
-            label,
-            effect,
-            requiresCallback,
-            requiresComment,
-            retryAfterMinutes,
-            priorite,
-            relationStatus,
-            isActive,
-            isSystem,
-            minPayloadVersion,
-            updatedAt,
-        ],
-        [
-            other.id,
-            other.code,
-            other.label,
-            other.effect,
-            other.requiresCallback,
-            other.requiresComment,
-            other.retryAfterMinutes,
-            other.priorite,
-            other.relationStatus,
-            other.isActive,
-            other.isSystem,
-            other.minPayloadVersion,
-            other.updatedAt,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([
         id,
         code,
         label,
@@ -272,9 +165,10 @@ class StatutQualificationDto {
         isSystem,
         minPayloadVersion,
         updatedAt,
-    ],);
+      ]);
 
-  factory StatutQualificationDto.fromJson(Map<String, dynamic> json) => _$StatutQualificationDtoFromJson(json);
+  factory StatutQualificationDto.fromJson(Map<String, dynamic> json) =>
+      _$StatutQualificationDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$StatutQualificationDtoToJson(this);
 
@@ -282,6 +176,4 @@ class StatutQualificationDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

@@ -12,7 +12,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'prospect_journey_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -23,132 +22,76 @@ part 'prospect_journey_dto.g.dart';
 class ProspectJourneyDto {
   /// Returns a new [ProspectJourneyDto] instance.
   ProspectJourneyDto({
+    required this.id,
 
-    required  this.id,
+    required this.projet,
 
-    required  this.projet,
+    required this.statut,
 
-    required  this.statut,
+    required this.consent,
 
-    required  this.consent,
+    required this.consentAt,
 
-    required  this.consentAt,
-
-    required  this.convertedAt,
+    required this.convertedAt,
   });
 
-  @JsonKey(
-    
-    name: r'id',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'id', required: true, includeIfNull: false)
   final String id;
 
-
-
   @JsonKey(
-    
     name: r'projet',
     required: true,
     includeIfNull: false,
-  unknownEnumValue: Projet.unknownDefaultOpenApi,
+    unknownEnumValue: Projet.unknownDefaultOpenApi,
   )
-
-
   final Projet projet;
 
-
-
   @JsonKey(
-    
     name: r'statut',
     required: true,
     includeIfNull: false,
-  unknownEnumValue: ProspectStatut.unknownDefaultOpenApi,
+    unknownEnumValue: ProspectStatut.unknownDefaultOpenApi,
   )
-
-
   final ProspectStatut statut;
 
-
-
   @JsonKey(
-    
     name: r'consent',
     required: true,
     includeIfNull: false,
-  unknownEnumValue: GrandPublicConsent.unknownDefaultOpenApi,
+    unknownEnumValue: GrandPublicConsent.unknownDefaultOpenApi,
   )
-
-
   final GrandPublicConsent consent;
 
-
-
-  @JsonKey(
-    
-    name: r'consentAt',
-    required: true,
-    includeIfNull: true,
-  )
-
-
+  @JsonKey(name: r'consentAt', required: true, includeIfNull: true)
   final DateTime? consentAt;
 
-
-
-  @JsonKey(
-    
-    name: r'convertedAt',
-    required: true,
-    includeIfNull: true,
-  )
-
-
+  @JsonKey(name: r'convertedAt', required: true, includeIfNull: true)
   final DateTime? convertedAt;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is ProspectJourneyDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [id, projet, statut, consent, consentAt, convertedAt],
+              [
+                other.id,
+                other.projet,
+                other.statut,
+                other.consent,
+                other.consentAt,
+                other.convertedAt,
+              ],
+            );
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([id, projet, statut, consent, consentAt, convertedAt]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is ProspectJourneyDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            id,
-            projet,
-            statut,
-            consent,
-            consentAt,
-            convertedAt,
-        ],
-        [
-            other.id,
-            other.projet,
-            other.statut,
-            other.consent,
-            other.consentAt,
-            other.convertedAt,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        id,
-        projet,
-        statut,
-        consent,
-        consentAt,
-        convertedAt,
-    ],);
-
-  factory ProspectJourneyDto.fromJson(Map<String, dynamic> json) => _$ProspectJourneyDtoFromJson(json);
+  factory ProspectJourneyDto.fromJson(Map<String, dynamic> json) =>
+      _$ProspectJourneyDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$ProspectJourneyDtoToJson(this);
 
@@ -156,6 +99,4 @@ class ProspectJourneyDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

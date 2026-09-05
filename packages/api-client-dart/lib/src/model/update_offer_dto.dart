@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'update_offer_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,67 +19,30 @@ part 'update_offer_dto.g.dart';
 class UpdateOfferDto {
   /// Returns a new [UpdateOfferDto] instance.
   UpdateOfferDto({
+    this.code,
 
-     this.code,
+    this.label,
 
-     this.label,
+    this.description,
 
-     this.description,
+    this.position,
 
-     this.position,
-
-     this.isActive = true,
+    this.isActive = true,
   });
 
-  @JsonKey(
-    
-    name: r'code',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'code', required: false, includeIfNull: false)
   final String? code;
 
-
-
-  @JsonKey(
-    
-    name: r'label',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'label', required: false, includeIfNull: false)
   final String? label;
 
-
-
-  @JsonKey(
-    
-    name: r'description',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'description', required: false, includeIfNull: false)
   final String? description;
 
-
-
-          // minimum: 0
-          // maximum: 9999
-  @JsonKey(
-    
-    name: r'position',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  // minimum: 0
+  // maximum: 9999
+  @JsonKey(name: r'position', required: false, includeIfNull: false)
   final num? position;
-
-
 
   @JsonKey(
     defaultValue: true,
@@ -88,46 +50,31 @@ class UpdateOfferDto {
     required: false,
     includeIfNull: false,
   )
-
-
   final bool? isActive;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is UpdateOfferDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [code, label, description, position, isActive],
+              [
+                other.code,
+                other.label,
+                other.description,
+                other.position,
+                other.isActive,
+              ],
+            );
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([code, label, description, position, isActive]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is UpdateOfferDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            code,
-            label,
-            description,
-            position,
-            isActive,
-        ],
-        [
-            other.code,
-            other.label,
-            other.description,
-            other.position,
-            other.isActive,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        code,
-        label,
-        description,
-        position,
-        isActive,
-    ],);
-
-  factory UpdateOfferDto.fromJson(Map<String, dynamic> json) => _$UpdateOfferDtoFromJson(json);
+  factory UpdateOfferDto.fromJson(Map<String, dynamic> json) =>
+      _$UpdateOfferDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$UpdateOfferDtoToJson(this);
 
@@ -135,6 +82,4 @@ class UpdateOfferDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

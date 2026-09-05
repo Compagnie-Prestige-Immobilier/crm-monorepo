@@ -27,7 +27,6 @@ import 'package:crm_api_client/src/model/time_granularity.dart';
 import 'package:crm_api_client/src/model/update_bank_case_dto.dart';
 
 class BankCasesApi {
-
   final Dio _dio;
 
   const BankCasesApi(this._dio);
@@ -36,7 +35,7 @@ class BankCasesApi {
   /// Le prospect doit être en phase 2 METHOD_OBTAINED. L’identité du client est COPIÉE sur le dossier et n’est plus jamais réécrite : corriger le prospect ensuite ne change pas ce qui a été transmis à la banque.
   ///
   /// Parameters:
-  /// * [createBankCaseDto] 
+  /// * [createBankCaseDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -46,7 +45,7 @@ class BankCasesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [BankCaseDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<BankCaseDto>> createBankCase({ 
+  Future<Response<BankCaseDto>> createBankCase({
     required CreateBankCaseDto createBankCaseDto,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -58,16 +57,10 @@ class BankCasesApi {
     final _path = r'/api/v1/bank-cases';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -79,13 +72,9 @@ class BankCasesApi {
 
     try {
       _bodyData = jsonEncode(createBankCaseDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -104,9 +93,14 @@ class BankCasesApi {
     BankCaseDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<BankCaseDto, BankCaseDto>(rawData, 'BankCaseDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<BankCaseDto, BankCaseDto>(
+              rawData,
+              'BankCaseDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -133,8 +127,8 @@ _responseData = rawData == null ? null : deserialize<BankCaseDto, BankCaseDto>(r
   /// Contourne l’atteignabilité et le verrou terminal, RIEN d’autre : les règles financières de l’étape visée s’appliquent à l’identique et la justification est obligatoire. La correction s’inscrit dans le même historique append-only, marquée par &#x60;correctionReason&#x60;.
   ///
   /// Parameters:
-  /// * [id] 
-  /// * [createBankCaseCorrectionDto] 
+  /// * [id]
+  /// * [createBankCaseCorrectionDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -144,7 +138,7 @@ _responseData = rawData == null ? null : deserialize<BankCaseDto, BankCaseDto>(r
   ///
   /// Returns a [Future] containing a [Response] with a [BankCaseDetailDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<BankCaseDetailDto>> createBankCaseCorrection({ 
+  Future<Response<BankCaseDetailDto>> createBankCaseCorrection({
     required String id,
     required CreateBankCaseCorrectionDto createBankCaseCorrectionDto,
     CancelToken? cancelToken,
@@ -154,19 +148,18 @@ _responseData = rawData == null ? null : deserialize<BankCaseDto, BankCaseDto>(r
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/bank-cases/{id}/corrections'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/api/v1/bank-cases/{id}/corrections'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -178,13 +171,9 @@ _responseData = rawData == null ? null : deserialize<BankCaseDto, BankCaseDto>(r
 
     try {
       _bodyData = jsonEncode(createBankCaseCorrectionDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -203,9 +192,14 @@ _responseData = rawData == null ? null : deserialize<BankCaseDto, BankCaseDto>(r
     BankCaseDetailDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<BankCaseDetailDto, BankCaseDetailDto>(rawData, 'BankCaseDetailDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<BankCaseDetailDto, BankCaseDetailDto>(
+              rawData,
+              'BankCaseDetailDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -232,8 +226,8 @@ _responseData = rawData == null ? null : deserialize<BankCaseDetailDto, BankCase
   /// L’encaissement exige un montant strictement positif et ne se déclare qu’à la dernière étape ouverte. Le rejet exige un motif ; son montant est forcé à zéro par le serveur. Le motif « AUTRE » exige en plus une précision.
   ///
   /// Parameters:
-  /// * [id] 
-  /// * [createBankCaseTransitionDto] 
+  /// * [id]
+  /// * [createBankCaseTransitionDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -243,7 +237,7 @@ _responseData = rawData == null ? null : deserialize<BankCaseDetailDto, BankCase
   ///
   /// Returns a [Future] containing a [Response] with a [BankCaseDetailDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<BankCaseDetailDto>> createBankCaseTransition({ 
+  Future<Response<BankCaseDetailDto>> createBankCaseTransition({
     required String id,
     required CreateBankCaseTransitionDto createBankCaseTransitionDto,
     CancelToken? cancelToken,
@@ -253,19 +247,18 @@ _responseData = rawData == null ? null : deserialize<BankCaseDetailDto, BankCase
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/bank-cases/{id}/transitions'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/api/v1/bank-cases/{id}/transitions'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -277,13 +270,9 @@ _responseData = rawData == null ? null : deserialize<BankCaseDetailDto, BankCase
 
     try {
       _bodyData = jsonEncode(createBankCaseTransitionDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -302,9 +291,14 @@ _responseData = rawData == null ? null : deserialize<BankCaseDetailDto, BankCase
     BankCaseDetailDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<BankCaseDetailDto, BankCaseDetailDto>(rawData, 'BankCaseDetailDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<BankCaseDetailDto, BankCaseDetailDto>(
+              rawData,
+              'BankCaseDetailDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -328,10 +322,10 @@ _responseData = rawData == null ? null : deserialize<BankCaseDetailDto, BankCase
   }
 
   /// Dossier, étape courante et historique complet.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [id] 
+  /// * [id]
   /// * [projet] - Restreint la lecture aux dossiers dont la fiche suit ce parcours. Un dossier hors parcours répond 404, comme un dossier inexistant.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
@@ -342,7 +336,7 @@ _responseData = rawData == null ? null : deserialize<BankCaseDetailDto, BankCase
   ///
   /// Returns a [Future] containing a [Response] with a [BankCaseDetailDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<BankCaseDetailDto>> getBankCase({ 
+  Future<Response<BankCaseDetailDto>> getBankCase({
     required String id,
     Projet? projet,
     CancelToken? cancelToken,
@@ -352,19 +346,18 @@ _responseData = rawData == null ? null : deserialize<BankCaseDetailDto, BankCase
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/bank-cases/{id}'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/api/v1/bank-cases/{id}'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -387,9 +380,14 @@ _responseData = rawData == null ? null : deserialize<BankCaseDetailDto, BankCase
     BankCaseDetailDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<BankCaseDetailDto, BankCaseDetailDto>(rawData, 'BankCaseDetailDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<BankCaseDetailDto, BankCaseDetailDto>(
+              rawData,
+              'BankCaseDetailDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -417,17 +415,17 @@ _responseData = rawData == null ? null : deserialize<BankCaseDetailDto, BankCase
   ///
   /// Parameters:
   /// * [search] - Recherche libre sur la référence, le nom du client ou son téléphone.
-  /// * [stageId] 
-  /// * [stageType] 
+  /// * [stageId]
+  /// * [stageType]
   /// * [banqueId] - Banque de traitement du dossier.
   /// * [projet] - Parcours suivi par la fiche liée. Sans filtre, les deux projets sortent. Un même numéro peut suivre les deux.
   /// * [agentId] - Agent créateur OU dernier intervenant sur le dossier.
-  /// * [rejectionReasonId] 
+  /// * [rejectionReasonId]
   /// * [dateFrom] - Borne basse sur la création, incluse.
   /// * [dateTo] - Borne haute sur la création, incluse.
   /// * [amountMin] - Borne basse de montant. Montant en francs CFA, entier, exposé en chaîne. XOF n’a pas de décimales et un nombre JSON perdrait de la précision au-delà de 2^53.
   /// * [amountMax] - Borne haute de montant. Montant en francs CFA, entier, exposé en chaîne. XOF n’a pas de décimales et un nombre JSON perdrait de la précision au-delà de 2^53.
-  /// * [granularity] 
+  /// * [granularity]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -437,7 +435,7 @@ _responseData = rawData == null ? null : deserialize<BankCaseDetailDto, BankCase
   ///
   /// Returns a [Future] containing a [Response] with a [BankCaseAnalyticsDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<BankCaseAnalyticsDto>> getBankCaseAnalytics({ 
+  Future<Response<BankCaseAnalyticsDto>> getBankCaseAnalytics({
     String? search,
     String? stageId,
     BankStageType? stageType,
@@ -460,16 +458,10 @@ _responseData = rawData == null ? null : deserialize<BankCaseDetailDto, BankCase
     final _path = r'/api/v1/bank-cases/analytics';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -503,9 +495,14 @@ _responseData = rawData == null ? null : deserialize<BankCaseDetailDto, BankCase
     BankCaseAnalyticsDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<BankCaseAnalyticsDto, BankCaseAnalyticsDto>(rawData, 'BankCaseAnalyticsDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<BankCaseAnalyticsDto, BankCaseAnalyticsDto>(
+              rawData,
+              'BankCaseAnalyticsDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -533,20 +530,20 @@ _responseData = rawData == null ? null : deserialize<BankCaseAnalyticsDto, BankC
   ///
   /// Parameters:
   /// * [search] - Recherche libre sur la référence, le nom du client ou son téléphone.
-  /// * [stageId] 
-  /// * [stageType] 
+  /// * [stageId]
+  /// * [stageType]
   /// * [banqueId] - Banque de traitement du dossier.
   /// * [projet] - Parcours suivi par la fiche liée. Sans filtre, les deux projets sortent. Un même numéro peut suivre les deux.
   /// * [agentId] - Agent créateur OU dernier intervenant sur le dossier.
-  /// * [rejectionReasonId] 
+  /// * [rejectionReasonId]
   /// * [dateFrom] - Borne basse sur la création, incluse.
   /// * [dateTo] - Borne haute sur la création, incluse.
   /// * [amountMin] - Borne basse de montant. Montant en francs CFA, entier, exposé en chaîne. XOF n’a pas de décimales et un nombre JSON perdrait de la précision au-delà de 2^53.
   /// * [amountMax] - Borne haute de montant. Montant en francs CFA, entier, exposé en chaîne. XOF n’a pas de décimales et un nombre JSON perdrait de la précision au-delà de 2^53.
-  /// * [page] 
-  /// * [pageSize] 
-  /// * [sortBy] 
-  /// * [sortOrder] 
+  /// * [page]
+  /// * [pageSize]
+  /// * [sortBy]
+  /// * [sortOrder]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -556,7 +553,7 @@ _responseData = rawData == null ? null : deserialize<BankCaseAnalyticsDto, BankC
   ///
   /// Returns a [Future] containing a [Response] with a [BankCaseListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<BankCaseListDto>> listBankCases({ 
+  Future<Response<BankCaseListDto>> listBankCases({
     String? search,
     String? stageId,
     BankStageType? stageType,
@@ -582,16 +579,10 @@ _responseData = rawData == null ? null : deserialize<BankCaseAnalyticsDto, BankC
     final _path = r'/api/v1/bank-cases';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -628,9 +619,14 @@ _responseData = rawData == null ? null : deserialize<BankCaseAnalyticsDto, BankC
     BankCaseListDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<BankCaseListDto, BankCaseListDto>(rawData, 'BankCaseListDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<BankCaseListDto, BankCaseListDto>(
+              rawData,
+              'BankCaseListDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -654,7 +650,7 @@ _responseData = rawData == null ? null : deserialize<BankCaseListDto, BankCaseLi
   }
 
   /// Référentiel des motifs de rejet.
-  /// 
+  ///
   ///
   /// Parameters:
   /// * [includeInactive] - Inclure les entrées désactivées. Utile à l’administration du workflow.
@@ -667,7 +663,7 @@ _responseData = rawData == null ? null : deserialize<BankCaseListDto, BankCaseLi
   ///
   /// Returns a [Future] containing a [Response] with a [BankRejectionReasonListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<BankRejectionReasonListDto>> listBankRejectionReasons({ 
+  Future<Response<BankRejectionReasonListDto>> listBankRejectionReasons({
     bool? includeInactive = false,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -679,16 +675,10 @@ _responseData = rawData == null ? null : deserialize<BankCaseListDto, BankCaseLi
     final _path = r'/api/v1/bank-cases/rejection-reasons';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -711,9 +701,14 @@ _responseData = rawData == null ? null : deserialize<BankCaseListDto, BankCaseLi
     BankRejectionReasonListDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<BankRejectionReasonListDto, BankRejectionReasonListDto>(rawData, 'BankRejectionReasonListDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<BankRejectionReasonListDto, BankRejectionReasonListDto>(
+              rawData,
+              'BankRejectionReasonListDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -741,8 +736,8 @@ _responseData = rawData == null ? null : deserialize<BankRejectionReasonListDto,
   ///
   /// Parameters:
   /// * [search] - Nom (insensible à la casse et aux accents) ou téléphone sous n’importe quelle forme écrite.
-  /// * [page] 
-  /// * [pageSize] 
+  /// * [page]
+  /// * [pageSize]
   /// * [projet] - Ne propose que les fiches entrées par ce projet. Sans filtre, les deux.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
@@ -753,7 +748,7 @@ _responseData = rawData == null ? null : deserialize<BankRejectionReasonListDto,
   ///
   /// Returns a [Future] containing a [Response] with a [ProspectSearchListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<ProspectSearchListDto>> searchBankCaseProspects({ 
+  Future<Response<ProspectSearchListDto>> searchBankCaseProspects({
     required String search,
     num? page = 1,
     num? pageSize = 20,
@@ -768,16 +763,10 @@ _responseData = rawData == null ? null : deserialize<BankRejectionReasonListDto,
     final _path = r'/api/v1/bank-cases/prospect-search';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -803,9 +792,14 @@ _responseData = rawData == null ? null : deserialize<BankRejectionReasonListDto,
     ProspectSearchListDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<ProspectSearchListDto, ProspectSearchListDto>(rawData, 'ProspectSearchListDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<ProspectSearchListDto, ProspectSearchListDto>(
+              rawData,
+              'ProspectSearchListDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -832,8 +826,8 @@ _responseData = rawData == null ? null : deserialize<ProspectSearchListDto, Pros
   /// Ni l’étape, ni le montant, ni le motif : ceux-là ne changent que par une transition, qui laisse une trace. Refusé sur un dossier terminal.
   ///
   /// Parameters:
-  /// * [id] 
-  /// * [updateBankCaseDto] 
+  /// * [id]
+  /// * [updateBankCaseDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -843,7 +837,7 @@ _responseData = rawData == null ? null : deserialize<ProspectSearchListDto, Pros
   ///
   /// Returns a [Future] containing a [Response] with a [BankCaseDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<BankCaseDto>> updateBankCase({ 
+  Future<Response<BankCaseDto>> updateBankCase({
     required String id,
     required UpdateBankCaseDto updateBankCaseDto,
     CancelToken? cancelToken,
@@ -853,19 +847,18 @@ _responseData = rawData == null ? null : deserialize<ProspectSearchListDto, Pros
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/bank-cases/{id}'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/api/v1/bank-cases/{id}'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
     final _options = Options(
       method: r'PATCH',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -877,13 +870,9 @@ _responseData = rawData == null ? null : deserialize<ProspectSearchListDto, Pros
 
     try {
       _bodyData = jsonEncode(updateBankCaseDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -902,9 +891,14 @@ _responseData = rawData == null ? null : deserialize<ProspectSearchListDto, Pros
     BankCaseDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<BankCaseDto, BankCaseDto>(rawData, 'BankCaseDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<BankCaseDto, BankCaseDto>(
+              rawData,
+              'BankCaseDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -926,5 +920,4 @@ _responseData = rawData == null ? null : deserialize<BankCaseDto, BankCaseDto>(r
       extra: _response.extra,
     );
   }
-
 }

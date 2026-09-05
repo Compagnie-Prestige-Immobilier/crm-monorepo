@@ -10,7 +10,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'device_call_detection_list_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,46 +19,24 @@ part 'device_call_detection_list_dto.g.dart';
 )
 class DeviceCallDetectionListDto {
   /// Returns a new [DeviceCallDetectionListDto] instance.
-  DeviceCallDetectionListDto({
+  DeviceCallDetectionListDto({required this.items});
 
-    required  this.items,
-  });
-
-      /// Du plus récent au plus ancien.
-  @JsonKey(
-    
-    name: r'items',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Du plus récent au plus ancien.
+  @JsonKey(name: r'items', required: true, includeIfNull: false)
   final List<DeviceCallDetectionDto> items;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is DeviceCallDetectionListDto &&
+            runtimeType == other.runtimeType &&
+            equals([items], [other.items]);
+  }
 
+  @override
+  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([items]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is DeviceCallDetectionListDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            items,
-        ],
-        [
-            other.items,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        items,
-    ],);
-
-  factory DeviceCallDetectionListDto.fromJson(Map<String, dynamic> json) => _$DeviceCallDetectionListDtoFromJson(json);
+  factory DeviceCallDetectionListDto.fromJson(Map<String, dynamic> json) =>
+      _$DeviceCallDetectionListDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$DeviceCallDetectionListDtoToJson(this);
 
@@ -67,6 +44,4 @@ class DeviceCallDetectionListDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

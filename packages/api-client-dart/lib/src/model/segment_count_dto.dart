@@ -10,7 +10,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'segment_count_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -21,115 +20,62 @@ part 'segment_count_dto.g.dart';
 class SegmentCountDto {
   /// Returns a new [SegmentCountDto] instance.
   SegmentCountDto({
+    required this.segment,
 
-    required  this.segment,
+    required this.label,
 
-    required  this.label,
+    required this.prospects,
 
-    required  this.prospects,
+    required this.share,
 
-    required  this.share,
-
-    required  this.methodObtained,
+    required this.methodObtained,
   });
 
   @JsonKey(
-    
     name: r'segment',
     required: true,
     includeIfNull: false,
-  unknownEnumValue: BddSegment.unknownDefaultOpenApi,
+    unknownEnumValue: BddSegment.unknownDefaultOpenApi,
   )
-
-
   final BddSegment segment;
 
-
-
-      /// Libellé partagé, issu de SEGMENT_LABELS.
-  @JsonKey(
-    
-    name: r'label',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Libellé partagé, issu de SEGMENT_LABELS.
+  @JsonKey(name: r'label', required: true, includeIfNull: false)
   final String label;
 
-
-
-  @JsonKey(
-    
-    name: r'prospects',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'prospects', required: true, includeIfNull: false)
   final num prospects;
 
-
-
-  @JsonKey(
-    
-    name: r'share',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'share', required: true, includeIfNull: false)
   final num share;
 
-
-
-      /// Prospects du segment avec une méthode obtenue.
-  @JsonKey(
-    
-    name: r'methodObtained',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Prospects du segment avec une méthode obtenue.
+  @JsonKey(name: r'methodObtained', required: true, includeIfNull: false)
   final num methodObtained;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is SegmentCountDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [segment, label, prospects, share, methodObtained],
+              [
+                other.segment,
+                other.label,
+                other.prospects,
+                other.share,
+                other.methodObtained,
+              ],
+            );
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([segment, label, prospects, share, methodObtained]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is SegmentCountDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            segment,
-            label,
-            prospects,
-            share,
-            methodObtained,
-        ],
-        [
-            other.segment,
-            other.label,
-            other.prospects,
-            other.share,
-            other.methodObtained,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        segment,
-        label,
-        prospects,
-        share,
-        methodObtained,
-    ],);
-
-  factory SegmentCountDto.fromJson(Map<String, dynamic> json) => _$SegmentCountDtoFromJson(json);
+  factory SegmentCountDto.fromJson(Map<String, dynamic> json) =>
+      _$SegmentCountDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$SegmentCountDtoToJson(this);
 
@@ -137,6 +83,4 @@ class SegmentCountDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

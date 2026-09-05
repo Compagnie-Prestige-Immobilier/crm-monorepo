@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'audience_preview_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,46 +18,25 @@ part 'audience_preview_dto.g.dart';
 )
 class AudiencePreviewDto {
   /// Returns a new [AudiencePreviewDto] instance.
-  AudiencePreviewDto({
+  AudiencePreviewDto({required this.recipientCount});
 
-    required  this.recipientCount,
-  });
-
-      /// Comptes actifs visés. Tous liront la notification dans l’application : il n’y a plus de « joignable » distinct de « visé ».
-  @JsonKey(
-    
-    name: r'recipientCount',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Comptes actifs visés. Tous liront la notification dans l’application : il n’y a plus de « joignable » distinct de « visé ».
+  @JsonKey(name: r'recipientCount', required: true, includeIfNull: false)
   final num recipientCount;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is AudiencePreviewDto &&
+            runtimeType == other.runtimeType &&
+            equals([recipientCount], [other.recipientCount]);
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^ mapPropsToHashCode([recipientCount]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is AudiencePreviewDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            recipientCount,
-        ],
-        [
-            other.recipientCount,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        recipientCount,
-    ],);
-
-  factory AudiencePreviewDto.fromJson(Map<String, dynamic> json) => _$AudiencePreviewDtoFromJson(json);
+  factory AudiencePreviewDto.fromJson(Map<String, dynamic> json) =>
+      _$AudiencePreviewDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$AudiencePreviewDtoToJson(this);
 
@@ -66,6 +44,4 @@ class AudiencePreviewDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

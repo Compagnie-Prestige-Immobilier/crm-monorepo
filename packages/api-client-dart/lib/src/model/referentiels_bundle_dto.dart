@@ -18,7 +18,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'referentiels_bundle_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -29,168 +28,86 @@ part 'referentiels_bundle_dto.g.dart';
 class ReferentielsBundleDto {
   /// Returns a new [ReferentielsBundleDto] instance.
   ReferentielsBundleDto({
+    required this.banques,
 
-    required  this.banques,
+    required this.syndicats,
 
-    required  this.syndicats,
+    required this.departements,
 
-    required  this.departements,
+    required this.regions,
 
-    required  this.regions,
+    required this.professions,
 
-    required  this.professions,
+    required this.incomeBands,
 
-    required  this.incomeBands,
+    required this.offers,
 
-    required  this.offers,
+    required this.employeurs,
 
-    required  this.employeurs,
-
-    required  this.pays,
+    required this.pays,
   });
 
-  @JsonKey(
-    
-    name: r'banques',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'banques', required: true, includeIfNull: false)
   final List<BanqueDto> banques;
 
-
-
-  @JsonKey(
-    
-    name: r'syndicats',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'syndicats', required: true, includeIfNull: false)
   final List<SyndicatDto> syndicats;
 
-
-
-  @JsonKey(
-    
-    name: r'departements',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'departements', required: true, includeIfNull: false)
   final List<DepartementDto> departements;
 
-
-
-  @JsonKey(
-    
-    name: r'regions',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'regions', required: true, includeIfNull: false)
   final List<RegionDto> regions;
 
-
-
-  @JsonKey(
-    
-    name: r'professions',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'professions', required: true, includeIfNull: false)
   final List<ProfessionDto> professions;
 
-
-
-  @JsonKey(
-    
-    name: r'incomeBands',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'incomeBands', required: true, includeIfNull: false)
   final List<IncomeBandDto> incomeBands;
 
-
-
-  @JsonKey(
-    
-    name: r'offers',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'offers', required: true, includeIfNull: false)
   final List<OfferDto> offers;
 
-
-
-  @JsonKey(
-    
-    name: r'employeurs',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'employeurs', required: true, includeIfNull: false)
   final List<EmployeurDto> employeurs;
 
-
-
-  @JsonKey(
-    
-    name: r'pays',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'pays', required: true, includeIfNull: false)
   final List<PaysDto> pays;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is ReferentielsBundleDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [
+                banques,
+                syndicats,
+                departements,
+                regions,
+                professions,
+                incomeBands,
+                offers,
+                employeurs,
+                pays,
+              ],
+              [
+                other.banques,
+                other.syndicats,
+                other.departements,
+                other.regions,
+                other.professions,
+                other.incomeBands,
+                other.offers,
+                other.employeurs,
+                other.pays,
+              ],
+            );
+  }
 
-
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is ReferentielsBundleDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            banques,
-            syndicats,
-            departements,
-            regions,
-            professions,
-            incomeBands,
-            offers,
-            employeurs,
-            pays,
-        ],
-        [
-            other.banques,
-            other.syndicats,
-            other.departements,
-            other.regions,
-            other.professions,
-            other.incomeBands,
-            other.offers,
-            other.employeurs,
-            other.pays,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([
         banques,
         syndicats,
         departements,
@@ -200,9 +117,10 @@ class ReferentielsBundleDto {
         offers,
         employeurs,
         pays,
-    ],);
+      ]);
 
-  factory ReferentielsBundleDto.fromJson(Map<String, dynamic> json) => _$ReferentielsBundleDtoFromJson(json);
+  factory ReferentielsBundleDto.fromJson(Map<String, dynamic> json) =>
+      _$ReferentielsBundleDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$ReferentielsBundleDtoToJson(this);
 
@@ -210,6 +128,4 @@ class ReferentielsBundleDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

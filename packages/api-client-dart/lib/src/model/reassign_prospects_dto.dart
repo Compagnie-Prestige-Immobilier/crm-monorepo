@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'reassign_prospects_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,81 +19,42 @@ part 'reassign_prospects_dto.g.dart';
 class ReassignProspectsDto {
   /// Returns a new [ReassignProspectsDto] instance.
   ReassignProspectsDto({
+    required this.prospectIds,
 
-    required  this.prospectIds,
+    this.representantId,
 
-     this.representantId,
-
-     this.commercialId,
+    this.commercialId,
   });
 
-      /// Identifiants des prospects à réaffecter.
-  @JsonKey(
-    
-    name: r'prospectIds',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Identifiants des prospects à réaffecter.
+  @JsonKey(name: r'prospectIds', required: true, includeIfNull: false)
   final List<String> prospectIds;
 
-
-
-      /// Nouveau représentant de rattachement.
-  @JsonKey(
-    
-    name: r'representantId',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  /// Nouveau représentant de rattachement.
+  @JsonKey(name: r'representantId', required: false, includeIfNull: false)
   final String? representantId;
 
-
-
-      /// Nouveau commercial propriétaire. Réservé à l’ADMIN.
-  @JsonKey(
-    
-    name: r'commercialId',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  /// Nouveau commercial propriétaire. Réservé à l’ADMIN.
+  @JsonKey(name: r'commercialId', required: false, includeIfNull: false)
   final String? commercialId;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is ReassignProspectsDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [prospectIds, representantId, commercialId],
+              [other.prospectIds, other.representantId, other.commercialId],
+            );
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([prospectIds, representantId, commercialId]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is ReassignProspectsDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            prospectIds,
-            representantId,
-            commercialId,
-        ],
-        [
-            other.prospectIds,
-            other.representantId,
-            other.commercialId,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        prospectIds,
-        representantId,
-        commercialId,
-    ],);
-
-  factory ReassignProspectsDto.fromJson(Map<String, dynamic> json) => _$ReassignProspectsDtoFromJson(json);
+  factory ReassignProspectsDto.fromJson(Map<String, dynamic> json) =>
+      _$ReassignProspectsDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$ReassignProspectsDtoToJson(this);
 
@@ -102,6 +62,4 @@ class ReassignProspectsDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

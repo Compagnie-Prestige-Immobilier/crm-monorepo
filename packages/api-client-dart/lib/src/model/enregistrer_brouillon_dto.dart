@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'enregistrer_brouillon_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,46 +18,24 @@ part 'enregistrer_brouillon_dto.g.dart';
 )
 class EnregistrerBrouillonDto {
   /// Returns a new [EnregistrerBrouillonDto] instance.
-  EnregistrerBrouillonDto({
+  EnregistrerBrouillonDto({required this.draft});
 
-    required  this.draft,
-  });
-
-      /// Remplace le brouillon précédent en entier.
-  @JsonKey(
-    
-    name: r'draft',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Remplace le brouillon précédent en entier.
+  @JsonKey(name: r'draft', required: true, includeIfNull: false)
   final Map<String, Object> draft;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is EnregistrerBrouillonDto &&
+            runtimeType == other.runtimeType &&
+            equals([draft], [other.draft]);
+  }
 
+  @override
+  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([draft]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is EnregistrerBrouillonDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            draft,
-        ],
-        [
-            other.draft,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        draft,
-    ],);
-
-  factory EnregistrerBrouillonDto.fromJson(Map<String, dynamic> json) => _$EnregistrerBrouillonDtoFromJson(json);
+  factory EnregistrerBrouillonDto.fromJson(Map<String, dynamic> json) =>
+      _$EnregistrerBrouillonDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$EnregistrerBrouillonDtoToJson(this);
 
@@ -66,6 +43,4 @@ class EnregistrerBrouillonDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

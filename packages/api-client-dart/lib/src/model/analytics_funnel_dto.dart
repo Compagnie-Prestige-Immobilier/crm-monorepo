@@ -11,7 +11,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'analytics_funnel_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -21,63 +20,28 @@ part 'analytics_funnel_dto.g.dart';
 )
 class AnalyticsFunnelDto {
   /// Returns a new [AnalyticsFunnelDto] instance.
-  AnalyticsFunnelDto({
+  AnalyticsFunnelDto({required this.etapes, required this.finance});
 
-    required  this.etapes,
-
-    required  this.finance,
-  });
-
-      /// Les quatre étapes, du prospect saisi au dossier encaissé.
-  @JsonKey(
-    
-    name: r'etapes',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Les quatre étapes, du prospect saisi au dossier encaissé.
+  @JsonKey(name: r'etapes', required: true, includeIfNull: false)
   final List<FunnelStageDto> etapes;
 
-
-
-  @JsonKey(
-    
-    name: r'finance',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'finance', required: true, includeIfNull: false)
   final AnalyticsFinanceDto finance;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is AnalyticsFunnelDto &&
+            runtimeType == other.runtimeType &&
+            equals([etapes, finance], [other.etapes, other.finance]);
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^ mapPropsToHashCode([etapes, finance]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is AnalyticsFunnelDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            etapes,
-            finance,
-        ],
-        [
-            other.etapes,
-            other.finance,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        etapes,
-        finance,
-    ],);
-
-  factory AnalyticsFunnelDto.fromJson(Map<String, dynamic> json) => _$AnalyticsFunnelDtoFromJson(json);
+  factory AnalyticsFunnelDto.fromJson(Map<String, dynamic> json) =>
+      _$AnalyticsFunnelDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$AnalyticsFunnelDtoToJson(this);
 
@@ -85,6 +49,4 @@ class AnalyticsFunnelDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

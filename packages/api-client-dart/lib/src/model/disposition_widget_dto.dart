@@ -13,7 +13,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'disposition_widget_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -24,98 +23,59 @@ part 'disposition_widget_dto.g.dart';
 class DispositionWidgetDto {
   /// Returns a new [DispositionWidgetDto] instance.
   DispositionWidgetDto({
+    required this.source_,
 
-    required  this.source_,
+    this.marque,
 
-     this.marque,
+    this.taille,
 
-     this.taille,
-
-     this.presentation,
+    this.presentation,
   });
 
   @JsonKey(
-    
     name: r'source',
     required: true,
     includeIfNull: false,
-  unknownEnumValue: DashboardSource.unknownDefaultOpenApi,
+    unknownEnumValue: DashboardSource.unknownDefaultOpenApi,
   )
-
-
   final DashboardSource source_;
 
-
-
   @JsonKey(
-    
     name: r'marque',
     required: false,
     includeIfNull: false,
-  unknownEnumValue: DashboardMarque.unknownDefaultOpenApi,
+    unknownEnumValue: DashboardMarque.unknownDefaultOpenApi,
   )
-
-
   final DashboardMarque? marque;
 
-
-
   @JsonKey(
-    
     name: r'taille',
     required: false,
     includeIfNull: false,
-  unknownEnumValue: DashboardTaille.unknownDefaultOpenApi,
+    unknownEnumValue: DashboardTaille.unknownDefaultOpenApi,
   )
-
-
   final DashboardTaille? taille;
 
-
-
-  @JsonKey(
-    
-    name: r'presentation',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'presentation', required: false, includeIfNull: false)
   final DispositionPresentationDto? presentation;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is DispositionWidgetDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [source_, marque, taille, presentation],
+              [other.source_, other.marque, other.taille, other.presentation],
+            );
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([source_, marque, taille, presentation]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is DispositionWidgetDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            source_,
-            marque,
-            taille,
-            presentation,
-        ],
-        [
-            other.source_,
-            other.marque,
-            other.taille,
-            other.presentation,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        source_,
-        marque,
-        taille,
-        presentation,
-    ],);
-
-  factory DispositionWidgetDto.fromJson(Map<String, dynamic> json) => _$DispositionWidgetDtoFromJson(json);
+  factory DispositionWidgetDto.fromJson(Map<String, dynamic> json) =>
+      _$DispositionWidgetDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$DispositionWidgetDtoToJson(this);
 
@@ -123,6 +83,4 @@ class DispositionWidgetDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

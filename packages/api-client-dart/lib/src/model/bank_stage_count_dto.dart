@@ -10,7 +10,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'bank_stage_count_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -21,147 +20,72 @@ part 'bank_stage_count_dto.g.dart';
 class BankStageCountDto {
   /// Returns a new [BankStageCountDto] instance.
   BankStageCountDto({
+    required this.stageId,
 
-    required  this.stageId,
+    required this.code,
 
-    required  this.code,
+    required this.label,
 
-    required  this.label,
+    required this.color,
 
-    required  this.color,
+    required this.type,
 
-    required  this.type,
+    required this.cases,
 
-    required  this.cases,
-
-    required  this.share,
+    required this.share,
   });
 
-  @JsonKey(
-    
-    name: r'stageId',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'stageId', required: true, includeIfNull: false)
   final String stageId;
 
-
-
-  @JsonKey(
-    
-    name: r'code',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'code', required: true, includeIfNull: false)
   final String code;
 
-
-
-  @JsonKey(
-    
-    name: r'label',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'label', required: true, includeIfNull: false)
   final String label;
 
-
-
-  @JsonKey(
-    
-    name: r'color',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'color', required: true, includeIfNull: false)
   final String color;
 
-
-
   @JsonKey(
-    
     name: r'type',
     required: true,
     includeIfNull: false,
-  unknownEnumValue: BankStageType.unknownDefaultOpenApi,
+    unknownEnumValue: BankStageType.unknownDefaultOpenApi,
   )
-
-
   final BankStageType type;
 
-
-
-  @JsonKey(
-    
-    name: r'cases',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'cases', required: true, includeIfNull: false)
   final num cases;
 
-
-
-  @JsonKey(
-    
-    name: r'share',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'share', required: true, includeIfNull: false)
   final num share;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is BankStageCountDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [stageId, code, label, color, type, cases, share],
+              [
+                other.stageId,
+                other.code,
+                other.label,
+                other.color,
+                other.type,
+                other.cases,
+                other.share,
+              ],
+            );
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([stageId, code, label, color, type, cases, share]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is BankStageCountDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            stageId,
-            code,
-            label,
-            color,
-            type,
-            cases,
-            share,
-        ],
-        [
-            other.stageId,
-            other.code,
-            other.label,
-            other.color,
-            other.type,
-            other.cases,
-            other.share,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        stageId,
-        code,
-        label,
-        color,
-        type,
-        cases,
-        share,
-    ],);
-
-  factory BankStageCountDto.fromJson(Map<String, dynamic> json) => _$BankStageCountDtoFromJson(json);
+  factory BankStageCountDto.fromJson(Map<String, dynamic> json) =>
+      _$BankStageCountDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$BankStageCountDtoToJson(this);
 
@@ -169,6 +93,4 @@ class BankStageCountDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

@@ -10,7 +10,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'android_release_list_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,62 +19,30 @@ part 'android_release_list_dto.g.dart';
 )
 class AndroidReleaseListDto {
   /// Returns a new [AndroidReleaseListDto] instance.
-  AndroidReleaseListDto({
+  AndroidReleaseListDto({required this.items, required this.minVersionCode});
 
-    required  this.items,
-
-    required  this.minVersionCode,
-  });
-
-  @JsonKey(
-    
-    name: r'items',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'items', required: true, includeIfNull: false)
   final List<AndroidReleaseDto> items;
 
-
-
-  @JsonKey(
-    
-    name: r'minVersionCode',
-    required: true,
-    includeIfNull: true,
-  )
-
-
+  @JsonKey(name: r'minVersionCode', required: true, includeIfNull: true)
   final num? minVersionCode;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is AndroidReleaseListDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [items, minVersionCode],
+              [other.items, other.minVersionCode],
+            );
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^ mapPropsToHashCode([items, minVersionCode]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is AndroidReleaseListDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            items,
-            minVersionCode,
-        ],
-        [
-            other.items,
-            other.minVersionCode,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        items,
-        minVersionCode,
-    ],);
-
-  factory AndroidReleaseListDto.fromJson(Map<String, dynamic> json) => _$AndroidReleaseListDtoFromJson(json);
+  factory AndroidReleaseListDto.fromJson(Map<String, dynamic> json) =>
+      _$AndroidReleaseListDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$AndroidReleaseListDtoToJson(this);
 
@@ -83,6 +50,4 @@ class AndroidReleaseListDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

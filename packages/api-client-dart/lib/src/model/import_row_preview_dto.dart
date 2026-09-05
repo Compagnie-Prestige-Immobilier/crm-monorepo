@@ -11,7 +11,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'import_row_preview_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -22,188 +21,105 @@ part 'import_row_preview_dto.g.dart';
 class ImportRowPreviewDto {
   /// Returns a new [ImportRowPreviewDto] instance.
   ImportRowPreviewDto({
+    required this.line,
 
-    required  this.line,
+    required this.fullName,
 
-    required  this.fullName,
+    required this.phoneE164,
 
-    required  this.phoneE164,
+    required this.departementName,
 
-    required  this.departementName,
+    required this.iefName,
 
-    required  this.iefName,
+    required this.notes,
 
-    required  this.notes,
+    required this.etablissement,
 
-    required  this.etablissement,
+    required this.relationStatus,
 
-    required  this.relationStatus,
+    required this.whatsappStatus,
 
-    required  this.whatsappStatus,
-
-    required  this.calledAt,
+    required this.calledAt,
   });
 
-  @JsonKey(
-    
-    name: r'line',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'line', required: true, includeIfNull: false)
   final num line;
 
-
-
-  @JsonKey(
-    
-    name: r'fullName',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'fullName', required: true, includeIfNull: false)
   final String fullName;
 
-
-
-      /// Téléphone normalisé E.164 par le serveur.
-  @JsonKey(
-    
-    name: r'phoneE164',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Téléphone normalisé E.164 par le serveur.
+  @JsonKey(name: r'phoneE164', required: true, includeIfNull: false)
   final String phoneE164;
 
-
-
-  @JsonKey(
-    
-    name: r'departementName',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'departementName', required: true, includeIfNull: false)
   final String departementName;
 
-
-
-  @JsonKey(
-    
-    name: r'iefName',
-    required: true,
-    includeIfNull: true,
-  )
-
-
+  @JsonKey(name: r'iefName', required: true, includeIfNull: true)
   final String? iefName;
 
-
-
-  @JsonKey(
-    
-    name: r'notes',
-    required: true,
-    includeIfNull: true,
-  )
-
-
+  @JsonKey(name: r'notes', required: true, includeIfNull: true)
   final String? notes;
 
-
-
-  @JsonKey(
-    
-    name: r'etablissement',
-    required: true,
-    includeIfNull: true,
-  )
-
-
+  @JsonKey(name: r'etablissement', required: true, includeIfNull: true)
   final String? etablissement;
 
-
-
   @JsonKey(
-    
     name: r'relationStatus',
     required: true,
     includeIfNull: false,
-  unknownEnumValue: RepresentantRelation.unknownDefaultOpenApi,
+    unknownEnumValue: RepresentantRelation.unknownDefaultOpenApi,
   )
-
-
   final RepresentantRelation relationStatus;
 
-
-
   @JsonKey(
-    
     name: r'whatsappStatus',
     required: true,
     includeIfNull: false,
-  unknownEnumValue: WhatsappStatus.unknownDefaultOpenApi,
+    unknownEnumValue: WhatsappStatus.unknownDefaultOpenApi,
   )
-
-
   final WhatsappStatus whatsappStatus;
 
-
-
-      /// Date de l’appel déjà passé que la ligne enregistrera, s’il y en a un.
-  @JsonKey(
-    
-    name: r'calledAt',
-    required: true,
-    includeIfNull: true,
-  )
-
-
+  /// Date de l’appel déjà passé que la ligne enregistrera, s’il y en a un.
+  @JsonKey(name: r'calledAt', required: true, includeIfNull: true)
   final DateTime? calledAt;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is ImportRowPreviewDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [
+                line,
+                fullName,
+                phoneE164,
+                departementName,
+                iefName,
+                notes,
+                etablissement,
+                relationStatus,
+                whatsappStatus,
+                calledAt,
+              ],
+              [
+                other.line,
+                other.fullName,
+                other.phoneE164,
+                other.departementName,
+                other.iefName,
+                other.notes,
+                other.etablissement,
+                other.relationStatus,
+                other.whatsappStatus,
+                other.calledAt,
+              ],
+            );
+  }
 
-
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is ImportRowPreviewDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            line,
-            fullName,
-            phoneE164,
-            departementName,
-            iefName,
-            notes,
-            etablissement,
-            relationStatus,
-            whatsappStatus,
-            calledAt,
-        ],
-        [
-            other.line,
-            other.fullName,
-            other.phoneE164,
-            other.departementName,
-            other.iefName,
-            other.notes,
-            other.etablissement,
-            other.relationStatus,
-            other.whatsappStatus,
-            other.calledAt,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([
         line,
         fullName,
         phoneE164,
@@ -214,9 +130,10 @@ class ImportRowPreviewDto {
         relationStatus,
         whatsappStatus,
         calledAt,
-    ],);
+      ]);
 
-  factory ImportRowPreviewDto.fromJson(Map<String, dynamic> json) => _$ImportRowPreviewDtoFromJson(json);
+  factory ImportRowPreviewDto.fromJson(Map<String, dynamic> json) =>
+      _$ImportRowPreviewDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$ImportRowPreviewDtoToJson(this);
 
@@ -224,6 +141,4 @@ class ImportRowPreviewDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

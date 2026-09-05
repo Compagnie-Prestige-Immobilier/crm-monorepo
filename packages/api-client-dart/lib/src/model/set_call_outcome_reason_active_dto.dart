@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'set_call_outcome_reason_active_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,45 +18,23 @@ part 'set_call_outcome_reason_active_dto.g.dart';
 )
 class SetCallOutcomeReasonActiveDto {
   /// Returns a new [SetCallOutcomeReasonActiveDto] instance.
-  SetCallOutcomeReasonActiveDto({
+  SetCallOutcomeReasonActiveDto({required this.isActive});
 
-    required  this.isActive,
-  });
-
-  @JsonKey(
-    
-    name: r'isActive',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'isActive', required: true, includeIfNull: false)
   final bool isActive;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is SetCallOutcomeReasonActiveDto &&
+            runtimeType == other.runtimeType &&
+            equals([isActive], [other.isActive]);
+  }
 
+  @override
+  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([isActive]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is SetCallOutcomeReasonActiveDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            isActive,
-        ],
-        [
-            other.isActive,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        isActive,
-    ],);
-
-  factory SetCallOutcomeReasonActiveDto.fromJson(Map<String, dynamic> json) => _$SetCallOutcomeReasonActiveDtoFromJson(json);
+  factory SetCallOutcomeReasonActiveDto.fromJson(Map<String, dynamic> json) =>
+      _$SetCallOutcomeReasonActiveDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$SetCallOutcomeReasonActiveDtoToJson(this);
 
@@ -65,6 +42,4 @@ class SetCallOutcomeReasonActiveDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

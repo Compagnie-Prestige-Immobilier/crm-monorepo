@@ -10,7 +10,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'segment_change_list_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,46 +19,24 @@ part 'segment_change_list_dto.g.dart';
 )
 class SegmentChangeListDto {
   /// Returns a new [SegmentChangeListDto] instance.
-  SegmentChangeListDto({
+  SegmentChangeListDto({required this.items});
 
-    required  this.items,
-  });
-
-      /// De la plus récente à la plus ancienne.
-  @JsonKey(
-    
-    name: r'items',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// De la plus récente à la plus ancienne.
+  @JsonKey(name: r'items', required: true, includeIfNull: false)
   final List<SegmentChangeDto> items;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is SegmentChangeListDto &&
+            runtimeType == other.runtimeType &&
+            equals([items], [other.items]);
+  }
 
+  @override
+  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([items]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is SegmentChangeListDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            items,
-        ],
-        [
-            other.items,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        items,
-    ],);
-
-  factory SegmentChangeListDto.fromJson(Map<String, dynamic> json) => _$SegmentChangeListDtoFromJson(json);
+  factory SegmentChangeListDto.fromJson(Map<String, dynamic> json) =>
+      _$SegmentChangeListDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$SegmentChangeListDtoToJson(this);
 
@@ -67,6 +44,4 @@ class SegmentChangeListDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

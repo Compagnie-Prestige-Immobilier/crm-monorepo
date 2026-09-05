@@ -10,7 +10,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'visite_referentiel_usage_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -21,95 +20,49 @@ part 'visite_referentiel_usage_dto.g.dart';
 class VisiteReferentielUsageDto {
   /// Returns a new [VisiteReferentielUsageDto] instance.
   VisiteReferentielUsageDto({
+    required this.entreprises,
 
-    required  this.entreprises,
+    required this.directions,
 
-    required  this.directions,
+    required this.destinataires,
 
-    required  this.destinataires,
-
-    required  this.objets,
+    required this.objets,
   });
 
-  @JsonKey(
-    
-    name: r'entreprises',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'entreprises', required: true, includeIfNull: false)
   final List<VisiteReferentielUsageEntryDto> entreprises;
 
-
-
-  @JsonKey(
-    
-    name: r'directions',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'directions', required: true, includeIfNull: false)
   final List<VisiteReferentielUsageEntryDto> directions;
 
-
-
-  @JsonKey(
-    
-    name: r'destinataires',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'destinataires', required: true, includeIfNull: false)
   final List<VisiteReferentielUsageEntryDto> destinataires;
 
-
-
-  @JsonKey(
-    
-    name: r'objets',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'objets', required: true, includeIfNull: false)
   final List<VisiteReferentielUsageEntryDto> objets;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is VisiteReferentielUsageDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [entreprises, directions, destinataires, objets],
+              [
+                other.entreprises,
+                other.directions,
+                other.destinataires,
+                other.objets,
+              ],
+            );
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([entreprises, directions, destinataires, objets]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is VisiteReferentielUsageDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            entreprises,
-            directions,
-            destinataires,
-            objets,
-        ],
-        [
-            other.entreprises,
-            other.directions,
-            other.destinataires,
-            other.objets,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        entreprises,
-        directions,
-        destinataires,
-        objets,
-    ],);
-
-  factory VisiteReferentielUsageDto.fromJson(Map<String, dynamic> json) => _$VisiteReferentielUsageDtoFromJson(json);
+  factory VisiteReferentielUsageDto.fromJson(Map<String, dynamic> json) =>
+      _$VisiteReferentielUsageDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$VisiteReferentielUsageDtoToJson(this);
 
@@ -117,6 +70,4 @@ class VisiteReferentielUsageDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

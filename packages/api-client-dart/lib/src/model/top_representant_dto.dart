@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'top_representant_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,129 +19,75 @@ part 'top_representant_dto.g.dart';
 class TopRepresentantDto {
   /// Returns a new [TopRepresentantDto] instance.
   TopRepresentantDto({
+    required this.id,
 
-    required  this.id,
+    required this.label,
 
-    required  this.label,
+    required this.phoneE164,
 
-    required  this.phoneE164,
+    required this.departementName,
 
-    required  this.departementName,
+    required this.commercialName,
 
-    required  this.commercialName,
-
-    required  this.prospects,
+    required this.prospects,
   });
 
-  @JsonKey(
-    
-    name: r'id',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'id', required: true, includeIfNull: false)
   final String id;
 
-
-
-  @JsonKey(
-    
-    name: r'label',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'label', required: true, includeIfNull: false)
   final String label;
 
-
-
-  @JsonKey(
-    
-    name: r'phoneE164',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'phoneE164', required: true, includeIfNull: false)
   final String phoneE164;
 
-
-
-  @JsonKey(
-    
-    name: r'departementName',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'departementName', required: true, includeIfNull: false)
   final String departementName;
 
-
-
-  @JsonKey(
-    
-    name: r'commercialName',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'commercialName', required: true, includeIfNull: false)
   final String commercialName;
 
-
-
-  @JsonKey(
-    
-    name: r'prospects',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'prospects', required: true, includeIfNull: false)
   final num prospects;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is TopRepresentantDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [
+                id,
+                label,
+                phoneE164,
+                departementName,
+                commercialName,
+                prospects,
+              ],
+              [
+                other.id,
+                other.label,
+                other.phoneE164,
+                other.departementName,
+                other.commercialName,
+                other.prospects,
+              ],
+            );
+  }
 
-
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is TopRepresentantDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            id,
-            label,
-            phoneE164,
-            departementName,
-            commercialName,
-            prospects,
-        ],
-        [
-            other.id,
-            other.label,
-            other.phoneE164,
-            other.departementName,
-            other.commercialName,
-            other.prospects,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([
         id,
         label,
         phoneE164,
         departementName,
         commercialName,
         prospects,
-    ],);
+      ]);
 
-  factory TopRepresentantDto.fromJson(Map<String, dynamic> json) => _$TopRepresentantDtoFromJson(json);
+  factory TopRepresentantDto.fromJson(Map<String, dynamic> json) =>
+      _$TopRepresentantDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$TopRepresentantDtoToJson(this);
 
@@ -150,6 +95,4 @@ class TopRepresentantDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

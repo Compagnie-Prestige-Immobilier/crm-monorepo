@@ -16,7 +16,6 @@ import 'package:crm_api_client/src/model/import_kind.dart';
 import 'package:crm_api_client/src/model/import_status.dart';
 
 class ImportsApi {
-
   final Dio _dio;
 
   const ImportsApi(this._dio);
@@ -25,7 +24,7 @@ class ImportsApi {
   /// Remet le MÊME travail en file, en mode &#x60;APPLY&#x60;. Les compteurs et le rapport de la simulation sont remplacés par ceux de l’application. Refusé si le travail n’est pas une simulation terminée, ou si son échéance est passée — le classeur a alors été détruit.
   ///
   /// Parameters:
-  /// * [id] 
+  /// * [id]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -35,7 +34,7 @@ class ImportsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [ImportJobDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<ImportJobDto>> applyImportJob({ 
+  Future<Response<ImportJobDto>> applyImportJob({
     required String id,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -44,19 +43,18 @@ class ImportsApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/imports/{id}/apply'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/api/v1/imports/{id}/apply'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -74,9 +72,14 @@ class ImportsApi {
     ImportJobDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>(rawData, 'ImportJobDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<ImportJobDto, ImportJobDto>(
+              rawData,
+              'ImportJobDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -103,7 +106,7 @@ _responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>
   /// NE BLOQUE PAS : le classeur est écrit sur le volume, un travail &#x60;queued&#x60; est inscrit, et la réponse part. Le travail naît TOUJOURS en &#x60;DRY_RUN&#x60; : rien n’est écrit tant que &#x60;POST /imports/{id}/apply&#x60; n’a pas été appelé. Les colonnes sont retrouvées par le TEXTE de leur en-tête, en ligne 1, jamais par leur rang. SEULS le nom et le téléphone sont exigés : profession, syndicat, banque, fonctionnaire, durée du système et canal de provenance se lisent vides sans faire refuser la ligne, et leur colonne peut même manquer du fichier. « Fonctionnaire » à « oui » range la fiche en FONCTIONNAIRE ; à « non », le type reste vide, car le fichier ne dit pas lequel des trois autres il serait. Le modèle de classeur se télécharge par &#x60;GET /export/prospects-grand-public-modele.xlsx&#x60;.
   ///
   /// Parameters:
-  /// * [file] 
+  /// * [file]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -113,7 +116,7 @@ _responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>
   ///
   /// Returns a [Future] containing a [Response] with a [ImportJobDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<ImportJobDto>> createProspectsGrandPublicImport({ 
+  Future<Response<ImportJobDto>> createProspectsGrandPublicImport({
     required MultipartFile file,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -125,16 +128,10 @@ _responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>
     final _path = r'/api/v1/imports/prospects-grand-public';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -145,16 +142,10 @@ _responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>
     dynamic _bodyData;
 
     try {
-      _bodyData = FormData.fromMap(<String, dynamic>{
-        r'file': file,
-      });
-
-    } catch(error, stackTrace) {
+      _bodyData = FormData.fromMap(<String, dynamic>{r'file': file});
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -173,9 +164,14 @@ _responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>
     ImportJobDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>(rawData, 'ImportJobDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<ImportJobDto, ImportJobDto>(
+              rawData,
+              'ImportJobDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -202,7 +198,7 @@ _responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>
   /// NE BLOQUE PAS : le classeur est écrit sur le volume, un travail &#x60;queued&#x60; est inscrit, et la réponse part. Le travail court en arrière-plan ; l’écran sonde &#x60;GET /imports/{id}&#x60;, dont &#x60;processedRows&#x60; sur &#x60;totalRows&#x60; donne l’avancement. Le travail naît TOUJOURS en &#x60;DRY_RUN&#x60; : rien n’est écrit tant que &#x60;POST /imports/{id}/apply&#x60; n’a pas été appelé. Le modèle de classeur se télécharge par &#x60;GET /export/prospects-modele.xlsx&#x60;, dont les colonnes Banque et Syndicat sont des listes déroulantes tirées des référentiels vivants. CET IMPORT NE CRÉE AUCUN REPRÉSENTANT : chaque ligne doit désigner, par son numéro, un représentant déjà en base.
   ///
   /// Parameters:
-  /// * [file] 
+  /// * [file]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -212,7 +208,7 @@ _responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>
   ///
   /// Returns a [Future] containing a [Response] with a [ImportJobDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<ImportJobDto>> createProspectsImport({ 
+  Future<Response<ImportJobDto>> createProspectsImport({
     required MultipartFile file,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -224,16 +220,10 @@ _responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>
     final _path = r'/api/v1/imports/prospects';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -244,16 +234,10 @@ _responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>
     dynamic _bodyData;
 
     try {
-      _bodyData = FormData.fromMap(<String, dynamic>{
-        r'file': file,
-      });
-
-    } catch(error, stackTrace) {
+      _bodyData = FormData.fromMap(<String, dynamic>{r'file': file});
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -272,9 +256,14 @@ _responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>
     ImportJobDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>(rawData, 'ImportJobDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<ImportJobDto, ImportJobDto>(
+              rawData,
+              'ImportJobDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -301,7 +290,7 @@ _responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>
   /// NE BLOQUE PAS : le classeur est écrit sur le volume, un travail &#x60;queued&#x60; est inscrit, et la réponse part. Le travail court en arrière-plan ; l’écran sonde &#x60;GET /imports/{id}&#x60;, dont &#x60;processedRows&#x60; sur &#x60;totalRows&#x60; donne l’avancement. Le travail naît TOUJOURS en &#x60;DRY_RUN&#x60; : rien n’est écrit tant que &#x60;POST /imports/{id}/apply&#x60; n’a pas été appelé. Le modèle de classeur se télécharge par &#x60;GET /export/representants-template.xlsx&#x60;.
   ///
   /// Parameters:
-  /// * [file] 
+  /// * [file]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -311,7 +300,7 @@ _responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>
   ///
   /// Returns a [Future] containing a [Response] with a [ImportJobDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<ImportJobDto>> createRepresentantsImport({ 
+  Future<Response<ImportJobDto>> createRepresentantsImport({
     required MultipartFile file,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -323,16 +312,10 @@ _responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>
     final _path = r'/api/v1/imports/representants';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -343,16 +326,10 @@ _responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>
     dynamic _bodyData;
 
     try {
-      _bodyData = FormData.fromMap(<String, dynamic>{
-        r'file': file,
-      });
-
-    } catch(error, stackTrace) {
+      _bodyData = FormData.fromMap(<String, dynamic>{r'file': file});
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -371,9 +348,14 @@ _responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>
     ImportJobDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>(rawData, 'ImportJobDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<ImportJobDto, ImportJobDto>(
+              rawData,
+              'ImportJobDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -400,7 +382,7 @@ _responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>
   /// NE BLOQUE PAS : le classeur est écrit sur le volume, un travail &#x60;queued&#x60; est inscrit, et la réponse part. Le travail naît TOUJOURS en &#x60;DRY_RUN&#x60; : rien n’est écrit tant que &#x60;POST /imports/{id}/apply&#x60; n’a pas été appelé. Seuls les onglets « BDD VISITES » sont lus, en-tête en ligne 3, données à partir de la colonne C. La colonne « N° » n’est pas reprise : elle repart à 1 chaque mois. CET IMPORT NE CRÉE AUCUNE ENTRÉE DE RÉFÉRENTIEL : une entreprise, une direction, un destinataire ou un objet absent des quatre listes fait refuser la ligne, avec sa valeur exacte, son onglet et son numéro de ligne au rapport.
   ///
   /// Parameters:
-  /// * [file] 
+  /// * [file]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -410,7 +392,7 @@ _responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>
   ///
   /// Returns a [Future] containing a [Response] with a [ImportJobDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<ImportJobDto>> createVisitesImport({ 
+  Future<Response<ImportJobDto>> createVisitesImport({
     required MultipartFile file,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -422,16 +404,10 @@ _responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>
     final _path = r'/api/v1/imports/visites';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -442,16 +418,10 @@ _responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>
     dynamic _bodyData;
 
     try {
-      _bodyData = FormData.fromMap(<String, dynamic>{
-        r'file': file,
-      });
-
-    } catch(error, stackTrace) {
+      _bodyData = FormData.fromMap(<String, dynamic>{r'file': file});
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -470,9 +440,14 @@ _responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>
     ImportJobDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>(rawData, 'ImportJobDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<ImportJobDto, ImportJobDto>(
+              rawData,
+              'ImportJobDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -499,7 +474,7 @@ _responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>
   /// Route de SONDAGE. &#x60;processedRows&#x60; avance à chaque tranche écrite, sans qu’aucun mécanisme de progression n’ait eu à être inventé : c’est le compteur que la transaction de la tranche avance elle-même.
   ///
   /// Parameters:
-  /// * [id] 
+  /// * [id]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -509,7 +484,7 @@ _responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>
   ///
   /// Returns a [Future] containing a [Response] with a [ImportJobDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<ImportJobDto>> getImportJob({ 
+  Future<Response<ImportJobDto>> getImportJob({
     required String id,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -518,19 +493,18 @@ _responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/imports/{id}'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/api/v1/imports/{id}'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -548,9 +522,14 @@ _responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>
     ImportJobDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>(rawData, 'ImportJobDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<ImportJobDto, ImportJobDto>(
+              rawData,
+              'ImportJobDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -574,13 +553,13 @@ _responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>
   }
 
   /// Liste paginée des travaux d’import, filtrable par entité et par état.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [kind] 
-  /// * [status] 
-  /// * [page] 
-  /// * [pageSize] 
+  /// * [kind]
+  /// * [status]
+  /// * [page]
+  /// * [pageSize]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -590,7 +569,7 @@ _responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>
   ///
   /// Returns a [Future] containing a [Response] with a [ImportJobListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<ImportJobListDto>> listImportJobs({ 
+  Future<Response<ImportJobListDto>> listImportJobs({
     ImportKind? kind,
     ImportStatus? status,
     num? page = 1,
@@ -605,16 +584,10 @@ _responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>
     final _path = r'/api/v1/imports';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -640,9 +613,14 @@ _responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>
     ImportJobListDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<ImportJobListDto, ImportJobListDto>(rawData, 'ImportJobListDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<ImportJobListDto, ImportJobListDto>(
+              rawData,
+              'ImportJobListDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -664,5 +642,4 @@ _responseData = rawData == null ? null : deserialize<ImportJobListDto, ImportJob
       extra: _response.extra,
     );
   }
-
 }

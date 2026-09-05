@@ -16,7 +16,6 @@ import 'package:crm_api_client/src/model/suggestion_status.dart';
 import 'package:crm_api_client/src/model/update_suggestion_status_dto.dart';
 
 class SuggestionsApi {
-
   final Dio _dio;
 
   const SuggestionsApi(this._dio);
@@ -25,9 +24,9 @@ class SuggestionsApi {
   /// Un numéro cité par deux représentants apparaît deux fois : c’est l’information, pas un doublon.
   ///
   /// Parameters:
-  /// * [status] 
-  /// * [page] 
-  /// * [pageSize] 
+  /// * [status]
+  /// * [page]
+  /// * [pageSize]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -37,7 +36,7 @@ class SuggestionsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [SuggestionListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<SuggestionListDto>> listSuggestions({ 
+  Future<Response<SuggestionListDto>> listSuggestions({
     SuggestionStatus? status,
     num? page = 1,
     num? pageSize = 25,
@@ -51,16 +50,10 @@ class SuggestionsApi {
     final _path = r'/api/v1/suggestions';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -85,9 +78,14 @@ class SuggestionsApi {
     SuggestionListDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<SuggestionListDto, SuggestionListDto>(rawData, 'SuggestionListDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<SuggestionListDto, SuggestionListDto>(
+              rawData,
+              'SuggestionListDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -111,11 +109,11 @@ _responseData = rawData == null ? null : deserialize<SuggestionListDto, Suggesti
   }
 
   /// Marque un numéro suggéré comme appelé ou abandonné.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [id] 
-  /// * [updateSuggestionStatusDto] 
+  /// * [id]
+  /// * [updateSuggestionStatusDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -125,7 +123,7 @@ _responseData = rawData == null ? null : deserialize<SuggestionListDto, Suggesti
   ///
   /// Returns a [Future] containing a [Response] with a [SuggestionDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<SuggestionDto>> updateSuggestionStatus({ 
+  Future<Response<SuggestionDto>> updateSuggestionStatus({
     required String id,
     required UpdateSuggestionStatusDto updateSuggestionStatusDto,
     CancelToken? cancelToken,
@@ -135,19 +133,18 @@ _responseData = rawData == null ? null : deserialize<SuggestionListDto, Suggesti
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/suggestions/{id}'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/api/v1/suggestions/{id}'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
     final _options = Options(
       method: r'PATCH',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -159,13 +156,9 @@ _responseData = rawData == null ? null : deserialize<SuggestionListDto, Suggesti
 
     try {
       _bodyData = jsonEncode(updateSuggestionStatusDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -184,9 +177,14 @@ _responseData = rawData == null ? null : deserialize<SuggestionListDto, Suggesti
     SuggestionDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<SuggestionDto, SuggestionDto>(rawData, 'SuggestionDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<SuggestionDto, SuggestionDto>(
+              rawData,
+              'SuggestionDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -208,5 +206,4 @@ _responseData = rawData == null ? null : deserialize<SuggestionDto, SuggestionDt
       extra: _response.extra,
     );
   }
-
 }

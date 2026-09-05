@@ -11,7 +11,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'update_disposition_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -21,64 +20,33 @@ part 'update_disposition_dto.g.dart';
 )
 class UpdateDispositionDto {
   /// Returns a new [UpdateDispositionDto] instance.
-  UpdateDispositionDto({
-
-     this.preset,
-
-    required  this.widgets,
-  });
+  UpdateDispositionDto({this.preset, required this.widgets});
 
   @JsonKey(
-    
     name: r'preset',
     required: false,
     includeIfNull: false,
-  unknownEnumValue: DashboardPreset.unknownDefaultOpenApi,
+    unknownEnumValue: DashboardPreset.unknownDefaultOpenApi,
   )
-
-
   final DashboardPreset? preset;
 
-
-
-      /// Les éléments du tableau de bord. `version` est fixé par le serveur et refusé s’il est transmis.
-  @JsonKey(
-    
-    name: r'widgets',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Les éléments du tableau de bord. `version` est fixé par le serveur et refusé s’il est transmis.
+  @JsonKey(name: r'widgets', required: true, includeIfNull: false)
   final List<DispositionWidgetDto> widgets;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is UpdateDispositionDto &&
+            runtimeType == other.runtimeType &&
+            equals([preset, widgets], [other.preset, other.widgets]);
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^ mapPropsToHashCode([preset, widgets]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is UpdateDispositionDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            preset,
-            widgets,
-        ],
-        [
-            other.preset,
-            other.widgets,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        preset,
-        widgets,
-    ],);
-
-  factory UpdateDispositionDto.fromJson(Map<String, dynamic> json) => _$UpdateDispositionDtoFromJson(json);
+  factory UpdateDispositionDto.fromJson(Map<String, dynamic> json) =>
+      _$UpdateDispositionDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$UpdateDispositionDtoToJson(this);
 
@@ -86,6 +54,4 @@ class UpdateDispositionDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

@@ -18,7 +18,6 @@ import 'package:crm_api_client/src/model/create_client_request_dto.dart';
 import 'package:crm_api_client/src/model/reject_client_request_dto.dart';
 
 class ClientRequestsApi {
-
   final Dio _dio;
 
   const ClientRequestsApi(this._dio);
@@ -27,8 +26,8 @@ class ClientRequestsApi {
   /// Le prospect naît avec sa provenance (origin&#x3D;BANQUE, libellé &#x3D; nom de la banque demandeuse), puis sa qualification CHUES continue côté panel.
   ///
   /// Parameters:
-  /// * [id] 
-  /// * [approveClientRequestDto] 
+  /// * [id]
+  /// * [approveClientRequestDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -38,7 +37,7 @@ class ClientRequestsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [ClientRequestDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<ClientRequestDto>> approveClientRequest({ 
+  Future<Response<ClientRequestDto>> approveClientRequest({
     required String id,
     required ApproveClientRequestDto approveClientRequestDto,
     CancelToken? cancelToken,
@@ -48,19 +47,18 @@ class ClientRequestsApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/client-requests/{id}/approve'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/api/v1/client-requests/{id}/approve'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -72,13 +70,9 @@ class ClientRequestsApi {
 
     try {
       _bodyData = jsonEncode(approveClientRequestDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -97,9 +91,14 @@ class ClientRequestsApi {
     ClientRequestDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<ClientRequestDto, ClientRequestDto>(rawData, 'ClientRequestDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<ClientRequestDto, ClientRequestDto>(
+              rawData,
+              'ClientRequestDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -126,7 +125,7 @@ _responseData = rawData == null ? null : deserialize<ClientRequestDto, ClientReq
   /// Sortie de l’impasse « Aucun client ne correspond ». Le téléphone est normalisé en E.164 avant tout contrôle : un client déjà en base sous une autre présentation du même numéro est reconnu et la demande est refusée avec son numéro, plutôt que de créer un doublon.
   ///
   /// Parameters:
-  /// * [createClientRequestDto] 
+  /// * [createClientRequestDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -136,7 +135,7 @@ _responseData = rawData == null ? null : deserialize<ClientRequestDto, ClientReq
   ///
   /// Returns a [Future] containing a [Response] with a [ClientRequestDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<ClientRequestDto>> createClientRequest({ 
+  Future<Response<ClientRequestDto>> createClientRequest({
     required CreateClientRequestDto createClientRequestDto,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -148,16 +147,10 @@ _responseData = rawData == null ? null : deserialize<ClientRequestDto, ClientReq
     final _path = r'/api/v1/client-requests';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -169,13 +162,9 @@ _responseData = rawData == null ? null : deserialize<ClientRequestDto, ClientReq
 
     try {
       _bodyData = jsonEncode(createClientRequestDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -194,9 +183,14 @@ _responseData = rawData == null ? null : deserialize<ClientRequestDto, ClientReq
     ClientRequestDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<ClientRequestDto, ClientRequestDto>(rawData, 'ClientRequestDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<ClientRequestDto, ClientRequestDto>(
+              rawData,
+              'ClientRequestDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -220,10 +214,10 @@ _responseData = rawData == null ? null : deserialize<ClientRequestDto, ClientReq
   }
 
   /// Détail d’une demande.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [id] 
+  /// * [id]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -233,7 +227,7 @@ _responseData = rawData == null ? null : deserialize<ClientRequestDto, ClientReq
   ///
   /// Returns a [Future] containing a [Response] with a [ClientRequestDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<ClientRequestDto>> getClientRequest({ 
+  Future<Response<ClientRequestDto>> getClientRequest({
     required String id,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -242,19 +236,18 @@ _responseData = rawData == null ? null : deserialize<ClientRequestDto, ClientReq
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/client-requests/{id}'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/api/v1/client-requests/{id}'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -272,9 +265,14 @@ _responseData = rawData == null ? null : deserialize<ClientRequestDto, ClientReq
     ClientRequestDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<ClientRequestDto, ClientRequestDto>(rawData, 'ClientRequestDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<ClientRequestDto, ClientRequestDto>(
+              rawData,
+              'ClientRequestDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -301,11 +299,11 @@ _responseData = rawData == null ? null : deserialize<ClientRequestDto, ClientReq
   /// Un agent Banque &amp; Finance ne voit que ses propres demandes : l’identité des clients qu’une autre banque cherche à faire créer ne le regarde pas.
   ///
   /// Parameters:
-  /// * [status] 
+  /// * [status]
   /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
-  /// * [banqueId] 
-  /// * [page] 
-  /// * [pageSize] 
+  /// * [banqueId]
+  /// * [page]
+  /// * [pageSize]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -315,7 +313,7 @@ _responseData = rawData == null ? null : deserialize<ClientRequestDto, ClientReq
   ///
   /// Returns a [Future] containing a [Response] with a [ClientRequestListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<ClientRequestListDto>> listClientRequests({ 
+  Future<Response<ClientRequestListDto>> listClientRequests({
     ClientRequestStatus? status,
     String? search,
     String? banqueId,
@@ -331,16 +329,10 @@ _responseData = rawData == null ? null : deserialize<ClientRequestDto, ClientReq
     final _path = r'/api/v1/client-requests';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -367,9 +359,14 @@ _responseData = rawData == null ? null : deserialize<ClientRequestDto, ClientReq
     ClientRequestListDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<ClientRequestListDto, ClientRequestListDto>(rawData, 'ClientRequestListDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<ClientRequestListDto, ClientRequestListDto>(
+              rawData,
+              'ClientRequestListDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -396,8 +393,8 @@ _responseData = rawData == null ? null : deserialize<ClientRequestListDto, Clien
   /// Le motif remonte au demandeur par notification. Un refus muet le renverrait à l’impasse de départ.
   ///
   /// Parameters:
-  /// * [id] 
-  /// * [rejectClientRequestDto] 
+  /// * [id]
+  /// * [rejectClientRequestDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -407,7 +404,7 @@ _responseData = rawData == null ? null : deserialize<ClientRequestListDto, Clien
   ///
   /// Returns a [Future] containing a [Response] with a [ClientRequestDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<ClientRequestDto>> rejectClientRequest({ 
+  Future<Response<ClientRequestDto>> rejectClientRequest({
     required String id,
     required RejectClientRequestDto rejectClientRequestDto,
     CancelToken? cancelToken,
@@ -417,19 +414,18 @@ _responseData = rawData == null ? null : deserialize<ClientRequestListDto, Clien
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/client-requests/{id}/reject'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/api/v1/client-requests/{id}/reject'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -441,13 +437,9 @@ _responseData = rawData == null ? null : deserialize<ClientRequestListDto, Clien
 
     try {
       _bodyData = jsonEncode(rejectClientRequestDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -466,9 +458,14 @@ _responseData = rawData == null ? null : deserialize<ClientRequestListDto, Clien
     ClientRequestDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<ClientRequestDto, ClientRequestDto>(rawData, 'ClientRequestDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<ClientRequestDto, ClientRequestDto>(
+              rawData,
+              'ClientRequestDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -490,5 +487,4 @@ _responseData = rawData == null ? null : deserialize<ClientRequestDto, ClientReq
       extra: _response.extra,
     );
   }
-
 }

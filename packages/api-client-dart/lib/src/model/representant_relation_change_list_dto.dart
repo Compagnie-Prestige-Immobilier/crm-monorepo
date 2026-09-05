@@ -10,7 +10,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'representant_relation_change_list_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,53 +19,31 @@ part 'representant_relation_change_list_dto.g.dart';
 )
 class RepresentantRelationChangeListDto {
   /// Returns a new [RepresentantRelationChangeListDto] instance.
-  RepresentantRelationChangeListDto({
+  RepresentantRelationChangeListDto({required this.items});
 
-    required  this.items,
-  });
-
-      /// De la plus récente à la plus ancienne.
-  @JsonKey(
-    
-    name: r'items',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// De la plus récente à la plus ancienne.
+  @JsonKey(name: r'items', required: true, includeIfNull: false)
   final List<RepresentantRelationChangeDto> items;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is RepresentantRelationChangeListDto &&
+            runtimeType == other.runtimeType &&
+            equals([items], [other.items]);
+  }
 
+  @override
+  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([items]);
 
+  factory RepresentantRelationChangeListDto.fromJson(
+    Map<String, dynamic> json,
+  ) => _$RepresentantRelationChangeListDtoFromJson(json);
 
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is RepresentantRelationChangeListDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            items,
-        ],
-        [
-            other.items,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        items,
-    ],);
-
-  factory RepresentantRelationChangeListDto.fromJson(Map<String, dynamic> json) => _$RepresentantRelationChangeListDtoFromJson(json);
-
-  Map<String, dynamic> toJson() => _$RepresentantRelationChangeListDtoToJson(this);
+  Map<String, dynamic> toJson() =>
+      _$RepresentantRelationChangeListDtoToJson(this);
 
   @override
   String toString() {
     return toJson().toString();
   }
-
 }
-

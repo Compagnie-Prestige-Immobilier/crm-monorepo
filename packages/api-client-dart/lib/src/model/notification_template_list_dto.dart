@@ -10,7 +10,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'notification_template_list_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,45 +19,23 @@ part 'notification_template_list_dto.g.dart';
 )
 class NotificationTemplateListDto {
   /// Returns a new [NotificationTemplateListDto] instance.
-  NotificationTemplateListDto({
+  NotificationTemplateListDto({required this.items});
 
-    required  this.items,
-  });
-
-  @JsonKey(
-    
-    name: r'items',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'items', required: true, includeIfNull: false)
   final List<NotificationTemplateDto> items;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is NotificationTemplateListDto &&
+            runtimeType == other.runtimeType &&
+            equals([items], [other.items]);
+  }
 
+  @override
+  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([items]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is NotificationTemplateListDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            items,
-        ],
-        [
-            other.items,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        items,
-    ],);
-
-  factory NotificationTemplateListDto.fromJson(Map<String, dynamic> json) => _$NotificationTemplateListDtoFromJson(json);
+  factory NotificationTemplateListDto.fromJson(Map<String, dynamic> json) =>
+      _$NotificationTemplateListDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$NotificationTemplateListDtoToJson(this);
 
@@ -66,6 +43,4 @@ class NotificationTemplateListDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

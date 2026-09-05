@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'lot_export_distribution_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,62 +18,27 @@ part 'lot_export_distribution_dto.g.dart';
 )
 class LotExportDistributionDto {
   /// Returns a new [LotExportDistributionDto] instance.
-  LotExportDistributionDto({
+  LotExportDistributionDto({required this.fichesParJour, required this.jours});
 
-    required  this.fichesParJour,
-
-    required  this.jours,
-  });
-
-  @JsonKey(
-    
-    name: r'fichesParJour',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'fichesParJour', required: true, includeIfNull: false)
   final num fichesParJour;
 
-
-
-  @JsonKey(
-    
-    name: r'jours',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'jours', required: true, includeIfNull: false)
   final num jours;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is LotExportDistributionDto &&
+            runtimeType == other.runtimeType &&
+            equals([fichesParJour, jours], [other.fichesParJour, other.jours]);
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^ mapPropsToHashCode([fichesParJour, jours]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is LotExportDistributionDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            fichesParJour,
-            jours,
-        ],
-        [
-            other.fichesParJour,
-            other.jours,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        fichesParJour,
-        jours,
-    ],);
-
-  factory LotExportDistributionDto.fromJson(Map<String, dynamic> json) => _$LotExportDistributionDtoFromJson(json);
+  factory LotExportDistributionDto.fromJson(Map<String, dynamic> json) =>
+      _$LotExportDistributionDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$LotExportDistributionDtoToJson(this);
 
@@ -82,6 +46,4 @@ class LotExportDistributionDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

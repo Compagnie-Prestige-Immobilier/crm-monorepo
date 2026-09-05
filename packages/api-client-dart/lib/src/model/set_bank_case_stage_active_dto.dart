@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'set_bank_case_stage_active_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,45 +18,23 @@ part 'set_bank_case_stage_active_dto.g.dart';
 )
 class SetBankCaseStageActiveDto {
   /// Returns a new [SetBankCaseStageActiveDto] instance.
-  SetBankCaseStageActiveDto({
+  SetBankCaseStageActiveDto({required this.isActive});
 
-    required  this.isActive,
-  });
-
-  @JsonKey(
-    
-    name: r'isActive',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'isActive', required: true, includeIfNull: false)
   final bool isActive;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is SetBankCaseStageActiveDto &&
+            runtimeType == other.runtimeType &&
+            equals([isActive], [other.isActive]);
+  }
 
+  @override
+  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([isActive]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is SetBankCaseStageActiveDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            isActive,
-        ],
-        [
-            other.isActive,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        isActive,
-    ],);
-
-  factory SetBankCaseStageActiveDto.fromJson(Map<String, dynamic> json) => _$SetBankCaseStageActiveDtoFromJson(json);
+  factory SetBankCaseStageActiveDto.fromJson(Map<String, dynamic> json) =>
+      _$SetBankCaseStageActiveDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$SetBankCaseStageActiveDtoToJson(this);
 
@@ -65,6 +42,4 @@ class SetBankCaseStageActiveDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

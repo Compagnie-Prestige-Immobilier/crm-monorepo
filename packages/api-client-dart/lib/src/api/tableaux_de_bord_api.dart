@@ -16,16 +16,15 @@ import 'package:crm_api_client/src/model/ok_dto.dart';
 import 'package:crm_api_client/src/model/update_disposition_dto.dart';
 
 class TableauxDeBordApi {
-
   final Dio _dio;
 
   const TableauxDeBordApi(this._dio);
 
   /// Efface sa propre disposition ; retombe sur celle par défaut, puis celle d’usine.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [ecran] 
+  /// * [ecran]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -35,7 +34,7 @@ class TableauxDeBordApi {
   ///
   /// Returns a [Future] containing a [Response] with a [OkDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<OkDto>> deleteDashboardLayout({ 
+  Future<Response<OkDto>> deleteDashboardLayout({
     required DashboardEcran ecran,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -44,19 +43,18 @@ class TableauxDeBordApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/tableaux-de-bord/{ecran}/disposition'.replaceAll('{' r'ecran' '}', ecran.toString());
+    final _path = r'/api/v1/tableaux-de-bord/{ecran}/disposition'.replaceAll(
+      '{'
+      r'ecran'
+      '}',
+      ecran.toString(),
+    );
     final _options = Options(
       method: r'DELETE',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -74,9 +72,10 @@ class TableauxDeBordApi {
     OkDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<OkDto, OkDto>(rawData, 'OkDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<OkDto, OkDto>(rawData, 'OkDto', growable: true);
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -100,10 +99,10 @@ _responseData = rawData == null ? null : deserialize<OkDto, OkDto>(rawData, 'OkD
   }
 
   /// La disposition d’un écran : la sienne, sinon celle par défaut, sinon celle d’usine.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [ecran] 
+  /// * [ecran]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -113,7 +112,7 @@ _responseData = rawData == null ? null : deserialize<OkDto, OkDto>(rawData, 'OkD
   ///
   /// Returns a [Future] containing a [Response] with a [DispositionResponseDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<DispositionResponseDto>> getDashboardLayout({ 
+  Future<Response<DispositionResponseDto>> getDashboardLayout({
     required DashboardEcran ecran,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -122,19 +121,18 @@ _responseData = rawData == null ? null : deserialize<OkDto, OkDto>(rawData, 'OkD
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/tableaux-de-bord/{ecran}/disposition'.replaceAll('{' r'ecran' '}', ecran.toString());
+    final _path = r'/api/v1/tableaux-de-bord/{ecran}/disposition'.replaceAll(
+      '{'
+      r'ecran'
+      '}',
+      ecran.toString(),
+    );
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -152,9 +150,14 @@ _responseData = rawData == null ? null : deserialize<OkDto, OkDto>(rawData, 'OkD
     DispositionResponseDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<DispositionResponseDto, DispositionResponseDto>(rawData, 'DispositionResponseDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<DispositionResponseDto, DispositionResponseDto>(
+              rawData,
+              'DispositionResponseDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -181,8 +184,8 @@ _responseData = rawData == null ? null : deserialize<DispositionResponseDto, Dis
   /// La version de la disposition est fixée par le serveur ; la transmettre est refusé.
   ///
   /// Parameters:
-  /// * [ecran] 
-  /// * [updateDispositionDto] 
+  /// * [ecran]
+  /// * [updateDispositionDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -192,7 +195,7 @@ _responseData = rawData == null ? null : deserialize<DispositionResponseDto, Dis
   ///
   /// Returns a [Future] containing a [Response] with a [DispositionResponseDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<DispositionResponseDto>> putDashboardDefaultLayout({ 
+  Future<Response<DispositionResponseDto>> putDashboardDefaultLayout({
     required DashboardEcran ecran,
     required UpdateDispositionDto updateDispositionDto,
     CancelToken? cancelToken,
@@ -202,19 +205,19 @@ _responseData = rawData == null ? null : deserialize<DispositionResponseDto, Dis
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/tableaux-de-bord/{ecran}/disposition/par-defaut'.replaceAll('{' r'ecran' '}', ecran.toString());
+    final _path = r'/api/v1/tableaux-de-bord/{ecran}/disposition/par-defaut'
+        .replaceAll(
+          '{'
+          r'ecran'
+          '}',
+          ecran.toString(),
+        );
     final _options = Options(
       method: r'PUT',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -226,13 +229,9 @@ _responseData = rawData == null ? null : deserialize<DispositionResponseDto, Dis
 
     try {
       _bodyData = jsonEncode(updateDispositionDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -251,9 +250,14 @@ _responseData = rawData == null ? null : deserialize<DispositionResponseDto, Dis
     DispositionResponseDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<DispositionResponseDto, DispositionResponseDto>(rawData, 'DispositionResponseDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<DispositionResponseDto, DispositionResponseDto>(
+              rawData,
+              'DispositionResponseDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -280,8 +284,8 @@ _responseData = rawData == null ? null : deserialize<DispositionResponseDto, Dis
   /// La version de la disposition est fixée par le serveur ; la transmettre est refusé.
   ///
   /// Parameters:
-  /// * [ecran] 
-  /// * [updateDispositionDto] 
+  /// * [ecran]
+  /// * [updateDispositionDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -291,7 +295,7 @@ _responseData = rawData == null ? null : deserialize<DispositionResponseDto, Dis
   ///
   /// Returns a [Future] containing a [Response] with a [DispositionResponseDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<DispositionResponseDto>> putDashboardLayout({ 
+  Future<Response<DispositionResponseDto>> putDashboardLayout({
     required DashboardEcran ecran,
     required UpdateDispositionDto updateDispositionDto,
     CancelToken? cancelToken,
@@ -301,19 +305,18 @@ _responseData = rawData == null ? null : deserialize<DispositionResponseDto, Dis
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/tableaux-de-bord/{ecran}/disposition'.replaceAll('{' r'ecran' '}', ecran.toString());
+    final _path = r'/api/v1/tableaux-de-bord/{ecran}/disposition'.replaceAll(
+      '{'
+      r'ecran'
+      '}',
+      ecran.toString(),
+    );
     final _options = Options(
       method: r'PUT',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -325,13 +328,9 @@ _responseData = rawData == null ? null : deserialize<DispositionResponseDto, Dis
 
     try {
       _bodyData = jsonEncode(updateDispositionDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -350,9 +349,14 @@ _responseData = rawData == null ? null : deserialize<DispositionResponseDto, Dis
     DispositionResponseDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<DispositionResponseDto, DispositionResponseDto>(rawData, 'DispositionResponseDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<DispositionResponseDto, DispositionResponseDto>(
+              rawData,
+              'DispositionResponseDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -374,5 +378,4 @@ _responseData = rawData == null ? null : deserialize<DispositionResponseDto, Dis
       extra: _response.extra,
     );
   }
-
 }

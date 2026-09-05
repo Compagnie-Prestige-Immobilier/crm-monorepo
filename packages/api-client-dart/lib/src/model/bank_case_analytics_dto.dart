@@ -15,7 +15,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'bank_case_analytics_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -26,138 +25,74 @@ part 'bank_case_analytics_dto.g.dart';
 class BankCaseAnalyticsDto {
   /// Returns a new [BankCaseAnalyticsDto] instance.
   BankCaseAnalyticsDto({
+    required this.totals,
 
-    required  this.totals,
+    required this.byStage,
 
-    required  this.byStage,
+    required this.createdOverTime,
 
-    required  this.createdOverTime,
+    required this.cashingsOverTime,
 
-    required  this.cashingsOverTime,
+    required this.byBank,
 
-    required  this.byBank,
+    required this.byRejectionReason,
 
-    required  this.byRejectionReason,
-
-    required  this.byAgent,
+    required this.byAgent,
   });
 
-  @JsonKey(
-    
-    name: r'totals',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'totals', required: true, includeIfNull: false)
   final BankAnalyticsTotalsDto totals;
 
-
-
-  @JsonKey(
-    
-    name: r'byStage',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'byStage', required: true, includeIfNull: false)
   final List<BankStageCountDto> byStage;
 
-
-
-      /// Dossiers créés dans le temps.
-  @JsonKey(
-    
-    name: r'createdOverTime',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Dossiers créés dans le temps.
+  @JsonKey(name: r'createdOverTime', required: true, includeIfNull: false)
   final List<BankTimeBucketDto> createdOverTime;
 
-
-
-      /// Encaissements dans le temps, en nombre et en montant.
-  @JsonKey(
-    
-    name: r'cashingsOverTime',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Encaissements dans le temps, en nombre et en montant.
+  @JsonKey(name: r'cashingsOverTime', required: true, includeIfNull: false)
   final List<BankTimeBucketDto> cashingsOverTime;
 
-
-
-  @JsonKey(
-    
-    name: r'byBank',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'byBank', required: true, includeIfNull: false)
   final List<BankBankBreakdownDto> byBank;
 
-
-
-  @JsonKey(
-    
-    name: r'byRejectionReason',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'byRejectionReason', required: true, includeIfNull: false)
   final List<BankRejectionBreakdownDto> byRejectionReason;
 
-
-
-  @JsonKey(
-    
-    name: r'byAgent',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'byAgent', required: true, includeIfNull: false)
   final List<BankAgentActivityDto> byAgent;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is BankCaseAnalyticsDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [
+                totals,
+                byStage,
+                createdOverTime,
+                cashingsOverTime,
+                byBank,
+                byRejectionReason,
+                byAgent,
+              ],
+              [
+                other.totals,
+                other.byStage,
+                other.createdOverTime,
+                other.cashingsOverTime,
+                other.byBank,
+                other.byRejectionReason,
+                other.byAgent,
+              ],
+            );
+  }
 
-
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is BankCaseAnalyticsDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            totals,
-            byStage,
-            createdOverTime,
-            cashingsOverTime,
-            byBank,
-            byRejectionReason,
-            byAgent,
-        ],
-        [
-            other.totals,
-            other.byStage,
-            other.createdOverTime,
-            other.cashingsOverTime,
-            other.byBank,
-            other.byRejectionReason,
-            other.byAgent,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([
         totals,
         byStage,
         createdOverTime,
@@ -165,9 +100,10 @@ class BankCaseAnalyticsDto {
         byBank,
         byRejectionReason,
         byAgent,
-    ],);
+      ]);
 
-  factory BankCaseAnalyticsDto.fromJson(Map<String, dynamic> json) => _$BankCaseAnalyticsDtoFromJson(json);
+  factory BankCaseAnalyticsDto.fromJson(Map<String, dynamic> json) =>
+      _$BankCaseAnalyticsDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$BankCaseAnalyticsDtoToJson(this);
 
@@ -175,6 +111,4 @@ class BankCaseAnalyticsDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

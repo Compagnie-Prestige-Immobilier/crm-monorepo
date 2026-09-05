@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'page_meta_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,95 +19,44 @@ part 'page_meta_dto.g.dart';
 class PageMetaDto {
   /// Returns a new [PageMetaDto] instance.
   PageMetaDto({
+    required this.total,
 
-    required  this.total,
+    required this.page,
 
-    required  this.page,
+    required this.pageSize,
 
-    required  this.pageSize,
-
-    required  this.pageCount,
+    required this.pageCount,
   });
 
-  @JsonKey(
-    
-    name: r'total',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'total', required: true, includeIfNull: false)
   final num total;
 
-
-
-  @JsonKey(
-    
-    name: r'page',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'page', required: true, includeIfNull: false)
   final num page;
 
-
-
-  @JsonKey(
-    
-    name: r'pageSize',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'pageSize', required: true, includeIfNull: false)
   final num pageSize;
 
-
-
-  @JsonKey(
-    
-    name: r'pageCount',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'pageCount', required: true, includeIfNull: false)
   final num pageCount;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is PageMetaDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [total, page, pageSize, pageCount],
+              [other.total, other.page, other.pageSize, other.pageCount],
+            );
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([total, page, pageSize, pageCount]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is PageMetaDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            total,
-            page,
-            pageSize,
-            pageCount,
-        ],
-        [
-            other.total,
-            other.page,
-            other.pageSize,
-            other.pageCount,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        total,
-        page,
-        pageSize,
-        pageCount,
-    ],);
-
-  factory PageMetaDto.fromJson(Map<String, dynamic> json) => _$PageMetaDtoFromJson(json);
+  factory PageMetaDto.fromJson(Map<String, dynamic> json) =>
+      _$PageMetaDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$PageMetaDtoToJson(this);
 
@@ -116,6 +64,4 @@ class PageMetaDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

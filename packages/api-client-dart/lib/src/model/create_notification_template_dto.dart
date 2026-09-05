@@ -10,7 +10,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'create_notification_template_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -21,114 +20,61 @@ part 'create_notification_template_dto.g.dart';
 class CreateNotificationTemplateDto {
   /// Returns a new [CreateNotificationTemplateDto] instance.
   CreateNotificationTemplateDto({
+    required this.name,
 
-    required  this.name,
+    this.category,
 
-     this.category,
+    required this.titleTemplate,
 
-    required  this.titleTemplate,
+    required this.bodyTemplate,
 
-    required  this.bodyTemplate,
-
-     this.route,
+    this.route,
   });
 
-  @JsonKey(
-    
-    name: r'name',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'name', required: true, includeIfNull: false)
   final String name;
 
-
-
   @JsonKey(
-    
     name: r'category',
     required: false,
     includeIfNull: false,
-  unknownEnumValue: NotificationCategory.unknownDefaultOpenApi,
+    unknownEnumValue: NotificationCategory.unknownDefaultOpenApi,
   )
-
-
   final NotificationCategory? category;
 
-
-
-      /// Peut contenir des `{{variables}}`.
-  @JsonKey(
-    
-    name: r'titleTemplate',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Peut contenir des `{{variables}}`.
+  @JsonKey(name: r'titleTemplate', required: true, includeIfNull: false)
   final String titleTemplate;
 
-
-
-  @JsonKey(
-    
-    name: r'bodyTemplate',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'bodyTemplate', required: true, includeIfNull: false)
   final String bodyTemplate;
 
-
-
-  @JsonKey(
-    
-    name: r'route',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'route', required: false, includeIfNull: false)
   final String? route;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is CreateNotificationTemplateDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [name, category, titleTemplate, bodyTemplate, route],
+              [
+                other.name,
+                other.category,
+                other.titleTemplate,
+                other.bodyTemplate,
+                other.route,
+              ],
+            );
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([name, category, titleTemplate, bodyTemplate, route]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is CreateNotificationTemplateDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            name,
-            category,
-            titleTemplate,
-            bodyTemplate,
-            route,
-        ],
-        [
-            other.name,
-            other.category,
-            other.titleTemplate,
-            other.bodyTemplate,
-            other.route,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        name,
-        category,
-        titleTemplate,
-        bodyTemplate,
-        route,
-    ],);
-
-  factory CreateNotificationTemplateDto.fromJson(Map<String, dynamic> json) => _$CreateNotificationTemplateDtoFromJson(json);
+  factory CreateNotificationTemplateDto.fromJson(Map<String, dynamic> json) =>
+      _$CreateNotificationTemplateDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$CreateNotificationTemplateDtoToJson(this);
 
@@ -136,6 +82,4 @@ class CreateNotificationTemplateDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

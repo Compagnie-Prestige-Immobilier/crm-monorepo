@@ -17,7 +17,6 @@ import 'package:crm_api_client/src/model/ouverture_fiche_list_dto.dart';
 import 'package:crm_api_client/src/model/ouvrir_fiche_dto.dart';
 
 class OuverturesApi {
-
   final Dio _dio;
 
   const OuverturesApi(this._dio);
@@ -38,7 +37,7 @@ class OuverturesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [ComptageOuverturesDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<ComptageOuverturesDto>> compterOuvertures({ 
+  Future<Response<ComptageOuverturesDto>> compterOuvertures({
     DateTime? from,
     DateTime? to,
     String? openedById,
@@ -52,16 +51,10 @@ class OuverturesApi {
     final _path = r'/api/v1/ouvertures/comptage';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -86,9 +79,14 @@ class OuverturesApi {
     ComptageOuverturesDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<ComptageOuverturesDto, ComptageOuverturesDto>(rawData, 'ComptageOuverturesDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<ComptageOuverturesDto, ComptageOuverturesDto>(
+              rawData,
+              'ComptageOuverturesDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -112,11 +110,11 @@ _responseData = rawData == null ? null : deserialize<ComptageOuverturesDto, Comp
   }
 
   /// Remplace le brouillon d’une fiche ouverte.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [id] 
-  /// * [enregistrerBrouillonDto] 
+  /// * [id]
+  /// * [enregistrerBrouillonDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -126,7 +124,7 @@ _responseData = rawData == null ? null : deserialize<ComptageOuverturesDto, Comp
   ///
   /// Returns a [Future] containing a [Response] with a [OuvertureFicheDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<OuvertureFicheDto>> enregistrerBrouillonOuverture({ 
+  Future<Response<OuvertureFicheDto>> enregistrerBrouillonOuverture({
     required String id,
     required EnregistrerBrouillonDto enregistrerBrouillonDto,
     CancelToken? cancelToken,
@@ -136,19 +134,18 @@ _responseData = rawData == null ? null : deserialize<ComptageOuverturesDto, Comp
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/ouvertures/{id}/brouillon'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/api/v1/ouvertures/{id}/brouillon'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
     final _options = Options(
       method: r'PUT',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -160,13 +157,9 @@ _responseData = rawData == null ? null : deserialize<ComptageOuverturesDto, Comp
 
     try {
       _bodyData = jsonEncode(enregistrerBrouillonDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -185,9 +178,14 @@ _responseData = rawData == null ? null : deserialize<ComptageOuverturesDto, Comp
     OuvertureFicheDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<OuvertureFicheDto, OuvertureFicheDto>(rawData, 'OuvertureFicheDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<OuvertureFicheDto, OuvertureFicheDto>(
+              rawData,
+              'OuvertureFicheDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -214,7 +212,7 @@ _responseData = rawData == null ? null : deserialize<OuvertureFicheDto, Ouvertur
   /// Réservé au superviseur et à l’administrateur, jamais automatique. La libération est tracée et la fiche repasse en file de rappel.
   ///
   /// Parameters:
-  /// * [id] 
+  /// * [id]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -224,7 +222,7 @@ _responseData = rawData == null ? null : deserialize<OuvertureFicheDto, Ouvertur
   ///
   /// Returns a [Future] containing a [Response] with a [OuvertureFicheDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<OuvertureFicheDto>> libererOuverture({ 
+  Future<Response<OuvertureFicheDto>> libererOuverture({
     required String id,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -233,19 +231,18 @@ _responseData = rawData == null ? null : deserialize<OuvertureFicheDto, Ouvertur
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/ouvertures/{id}/liberation'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/api/v1/ouvertures/{id}/liberation'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -263,9 +260,14 @@ _responseData = rawData == null ? null : deserialize<OuvertureFicheDto, Ouvertur
     OuvertureFicheDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<OuvertureFicheDto, OuvertureFicheDto>(rawData, 'OuvertureFicheDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<OuvertureFicheDto, OuvertureFicheDto>(
+              rawData,
+              'OuvertureFicheDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -289,7 +291,7 @@ _responseData = rawData == null ? null : deserialize<OuvertureFicheDto, Ouvertur
   }
 
   /// Les fiches restées ouvertes, à libérer.
-  /// 
+  ///
   ///
   /// Parameters:
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
@@ -301,7 +303,7 @@ _responseData = rawData == null ? null : deserialize<OuvertureFicheDto, Ouvertur
   ///
   /// Returns a [Future] containing a [Response] with a [OuvertureFicheListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<OuvertureFicheListDto>> listOuverturesOuvertes({ 
+  Future<Response<OuvertureFicheListDto>> listOuverturesOuvertes({
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -312,16 +314,10 @@ _responseData = rawData == null ? null : deserialize<OuvertureFicheDto, Ouvertur
     final _path = r'/api/v1/ouvertures/ouvertes';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -339,9 +335,14 @@ _responseData = rawData == null ? null : deserialize<OuvertureFicheDto, Ouvertur
     OuvertureFicheListDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<OuvertureFicheListDto, OuvertureFicheListDto>(rawData, 'OuvertureFicheListDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<OuvertureFicheListDto, OuvertureFicheListDto>(
+              rawData,
+              'OuvertureFicheListDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -377,7 +378,7 @@ _responseData = rawData == null ? null : deserialize<OuvertureFicheListDto, Ouve
   ///
   /// Returns a [Future] containing a [Response] with a [OuvertureFicheDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<OuvertureFicheDto>> ouvertureCourante({ 
+  Future<Response<OuvertureFicheDto>> ouvertureCourante({
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -388,16 +389,10 @@ _responseData = rawData == null ? null : deserialize<OuvertureFicheListDto, Ouve
     final _path = r'/api/v1/ouvertures/courante';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -415,9 +410,14 @@ _responseData = rawData == null ? null : deserialize<OuvertureFicheListDto, Ouve
     OuvertureFicheDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<OuvertureFicheDto, OuvertureFicheDto>(rawData, 'OuvertureFicheDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<OuvertureFicheDto, OuvertureFicheDto>(
+              rawData,
+              'OuvertureFicheDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -444,7 +444,7 @@ _responseData = rawData == null ? null : deserialize<OuvertureFicheDto, Ouvertur
   /// Chaque ouverture confirmée compte, même répétée le même jour sur la même fiche. La consultation en lecture seule ne passe pas par ici. Un téléconseiller n’a qu’une fiche ouverte à la fois : la seconde sort en 409 OUVERTURE_FICHE_DEJA_OUVERTE.
   ///
   /// Parameters:
-  /// * [ouvrirFicheDto] 
+  /// * [ouvrirFicheDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -454,7 +454,7 @@ _responseData = rawData == null ? null : deserialize<OuvertureFicheDto, Ouvertur
   ///
   /// Returns a [Future] containing a [Response] with a [OuvertureFicheDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<OuvertureFicheDto>> ouvrirFiche({ 
+  Future<Response<OuvertureFicheDto>> ouvrirFiche({
     required OuvrirFicheDto ouvrirFicheDto,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -466,16 +466,10 @@ _responseData = rawData == null ? null : deserialize<OuvertureFicheDto, Ouvertur
     final _path = r'/api/v1/ouvertures';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -487,13 +481,9 @@ _responseData = rawData == null ? null : deserialize<OuvertureFicheDto, Ouvertur
 
     try {
       _bodyData = jsonEncode(ouvrirFicheDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -512,9 +502,14 @@ _responseData = rawData == null ? null : deserialize<OuvertureFicheDto, Ouvertur
     OuvertureFicheDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<OuvertureFicheDto, OuvertureFicheDto>(rawData, 'OuvertureFicheDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<OuvertureFicheDto, OuvertureFicheDto>(
+              rawData,
+              'OuvertureFicheDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -536,5 +531,4 @@ _responseData = rawData == null ? null : deserialize<OuvertureFicheDto, Ouvertur
       extra: _response.extra,
     );
   }
-
 }

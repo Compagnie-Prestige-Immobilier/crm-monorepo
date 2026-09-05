@@ -15,7 +15,6 @@ import 'package:crm_api_client/src/model/sync_push_dto.dart';
 import 'package:crm_api_client/src/model/sync_push_response_dto.dart';
 
 class SyncApi {
-
   final Dio _dio;
 
   const SyncApi(this._dio);
@@ -26,7 +25,7 @@ class SyncApi {
   /// Parameters:
   /// * [xCPIPayloadVersion] - Format de données que le client sait lire. En dessous de 5, le tirage est refusé au lieu d’être servi : les liens banque, syndicat et représentant d’un prospect peuvent être nuls, et un client plus ancien échoue à les décoder.
   /// * [since] - Curseur opaque renvoyé par l’appel précédent. Absent : synchronisation complète.
-  /// * [limit] 
+  /// * [limit]
   /// * [pendingOps] - Opérations en attente de remontée dans l’appareil. Le serveur ne peut pas la deviner. Facultatif sans limite de temps.
   /// * [appVersion] - Version de l’application mobile, telle qu’elle s’annonce. Facultative.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
@@ -38,7 +37,7 @@ class SyncApi {
   ///
   /// Returns a [Future] containing a [Response] with a [SyncPullResponseDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<SyncPullResponseDto>> pullSyncChanges({ 
+  Future<Response<SyncPullResponseDto>> pullSyncChanges({
     required int xCPIPayloadVersion,
     String? since,
     num? limit = 200,
@@ -60,11 +59,7 @@ class SyncApi {
       },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -90,9 +85,14 @@ class SyncApi {
     SyncPullResponseDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<SyncPullResponseDto, SyncPullResponseDto>(rawData, 'SyncPullResponseDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<SyncPullResponseDto, SyncPullResponseDto>(
+              rawData,
+              'SyncPullResponseDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -116,11 +116,11 @@ _responseData = rawData == null ? null : deserialize<SyncPullResponseDto, SyncPu
   }
 
   /// Envoie un lot d’opérations hors ligne.
-  /// 
+  ///
   ///
   /// Parameters:
   /// * [idempotencyKey] - Doit valoir exactement clientBatchId.
-  /// * [syncPushDto] 
+  /// * [syncPushDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -130,7 +130,7 @@ _responseData = rawData == null ? null : deserialize<SyncPullResponseDto, SyncPu
   ///
   /// Returns a [Future] containing a [Response] with a [SyncPushResponseDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<SyncPushResponseDto>> pushSyncBatch({ 
+  Future<Response<SyncPushResponseDto>> pushSyncBatch({
     required String idempotencyKey,
     required SyncPushDto syncPushDto,
     CancelToken? cancelToken,
@@ -149,11 +149,7 @@ _responseData = rawData == null ? null : deserialize<SyncPullResponseDto, SyncPu
       },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -165,13 +161,9 @@ _responseData = rawData == null ? null : deserialize<SyncPullResponseDto, SyncPu
 
     try {
       _bodyData = jsonEncode(syncPushDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -190,9 +182,14 @@ _responseData = rawData == null ? null : deserialize<SyncPullResponseDto, SyncPu
     SyncPushResponseDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<SyncPushResponseDto, SyncPushResponseDto>(rawData, 'SyncPushResponseDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<SyncPushResponseDto, SyncPushResponseDto>(
+              rawData,
+              'SyncPushResponseDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -214,5 +211,4 @@ _responseData = rawData == null ? null : deserialize<SyncPushResponseDto, SyncPu
       extra: _response.extra,
     );
   }
-
 }

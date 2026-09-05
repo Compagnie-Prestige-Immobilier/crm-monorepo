@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'reassign_result_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,63 +18,28 @@ part 'reassign_result_dto.g.dart';
 )
 class ReassignResultDto {
   /// Returns a new [ReassignResultDto] instance.
-  ReassignResultDto({
+  ReassignResultDto({required this.updated, required this.prospectIds});
 
-    required  this.updated,
-
-    required  this.prospectIds,
-  });
-
-  @JsonKey(
-    
-    name: r'updated',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'updated', required: true, includeIfNull: false)
   final num updated;
 
-
-
-      /// Identifiants effectivement réaffectés.
-  @JsonKey(
-    
-    name: r'prospectIds',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Identifiants effectivement réaffectés.
+  @JsonKey(name: r'prospectIds', required: true, includeIfNull: false)
   final List<String> prospectIds;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is ReassignResultDto &&
+            runtimeType == other.runtimeType &&
+            equals([updated, prospectIds], [other.updated, other.prospectIds]);
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^ mapPropsToHashCode([updated, prospectIds]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is ReassignResultDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            updated,
-            prospectIds,
-        ],
-        [
-            other.updated,
-            other.prospectIds,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        updated,
-        prospectIds,
-    ],);
-
-  factory ReassignResultDto.fromJson(Map<String, dynamic> json) => _$ReassignResultDtoFromJson(json);
+  factory ReassignResultDto.fromJson(Map<String, dynamic> json) =>
+      _$ReassignResultDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$ReassignResultDtoToJson(this);
 
@@ -83,6 +47,4 @@ class ReassignResultDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

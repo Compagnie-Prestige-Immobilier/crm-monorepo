@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'lot_export_distribution_input_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,82 +19,53 @@ part 'lot_export_distribution_input_dto.g.dart';
 class LotExportDistributionInputDto {
   /// Returns a new [LotExportDistributionInputDto] instance.
   LotExportDistributionInputDto({
+    required this.teleconseillerIds,
 
-    required  this.teleconseillerIds,
+    this.fichesParJour = 50,
 
-     this.fichesParJour = 50,
-
-     this.jours = 1,
+    this.jours = 1,
   });
 
-  @JsonKey(
-    
-    name: r'teleconseillerIds',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'teleconseillerIds', required: true, includeIfNull: false)
   final List<String> teleconseillerIds;
 
-
-
-          // minimum: 1
-          // maximum: 500
+  // minimum: 1
+  // maximum: 500
   @JsonKey(
     defaultValue: 50,
     name: r'fichesParJour',
     required: false,
     includeIfNull: false,
   )
-
-
   final num? fichesParJour;
 
-
-
-          // minimum: 1
-          // maximum: 10
+  // minimum: 1
+  // maximum: 10
   @JsonKey(
     defaultValue: 1,
     name: r'jours',
     required: false,
     includeIfNull: false,
   )
-
-
   final num? jours;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is LotExportDistributionInputDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [teleconseillerIds, fichesParJour, jours],
+              [other.teleconseillerIds, other.fichesParJour, other.jours],
+            );
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([teleconseillerIds, fichesParJour, jours]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is LotExportDistributionInputDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            teleconseillerIds,
-            fichesParJour,
-            jours,
-        ],
-        [
-            other.teleconseillerIds,
-            other.fichesParJour,
-            other.jours,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        teleconseillerIds,
-        fichesParJour,
-        jours,
-    ],);
-
-  factory LotExportDistributionInputDto.fromJson(Map<String, dynamic> json) => _$LotExportDistributionInputDtoFromJson(json);
+  factory LotExportDistributionInputDto.fromJson(Map<String, dynamic> json) =>
+      _$LotExportDistributionInputDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$LotExportDistributionInputDtoToJson(this);
 
@@ -103,6 +73,4 @@ class LotExportDistributionInputDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

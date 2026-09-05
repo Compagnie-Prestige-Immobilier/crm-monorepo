@@ -11,7 +11,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'directory_entry_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -22,134 +21,88 @@ part 'directory_entry_dto.g.dart';
 class DirectoryEntryDto {
   /// Returns a new [DirectoryEntryDto] instance.
   DirectoryEntryDto({
+    required this.prospectId,
 
-    required  this.prospectId,
+    required this.phoneE164,
 
-    required  this.phoneE164,
+    required this.phase2Status,
 
-    required  this.phase2Status,
+    required this.enrollmentMethod,
 
-    required  this.enrollmentMethod,
+    required this.rev,
 
-    required  this.rev,
-
-    required  this.updatedAt,
+    required this.updatedAt,
   });
 
-  @JsonKey(
-    
-    name: r'prospectId',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'prospectId', required: true, includeIfNull: false)
   final String prospectId;
 
-
-
-      /// Numéro normalisé E.164.
-  @JsonKey(
-    
-    name: r'phoneE164',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Numéro normalisé E.164.
+  @JsonKey(name: r'phoneE164', required: true, includeIfNull: false)
   final String phoneE164;
 
-
-
   @JsonKey(
-    
     name: r'phase2Status',
     required: true,
     includeIfNull: false,
-  unknownEnumValue: Phase2Status.unknownDefaultOpenApi,
+    unknownEnumValue: Phase2Status.unknownDefaultOpenApi,
   )
-
-
   final Phase2Status phase2Status;
 
-
-
-      /// Non nulle si et seulement si phase2Status vaut METHOD_OBTAINED.
+  /// Non nulle si et seulement si phase2Status vaut METHOD_OBTAINED.
   @JsonKey(
-    
     name: r'enrollmentMethod',
     required: true,
     includeIfNull: true,
-  unknownEnumValue: EnrollmentMethod.unknownDefaultOpenApi,
+    unknownEnumValue: EnrollmentMethod.unknownDefaultOpenApi,
   )
-
-
   final EnrollmentMethod? enrollmentMethod;
 
-
-
-      /// Révision serveur, pour la résolution de conflits.
-  @JsonKey(
-    
-    name: r'rev',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Révision serveur, pour la résolution de conflits.
+  @JsonKey(name: r'rev', required: true, includeIfNull: false)
   final num rev;
 
-
-
-  @JsonKey(
-    
-    name: r'updatedAt',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'updatedAt', required: true, includeIfNull: false)
   final DateTime updatedAt;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is DirectoryEntryDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [
+                prospectId,
+                phoneE164,
+                phase2Status,
+                enrollmentMethod,
+                rev,
+                updatedAt,
+              ],
+              [
+                other.prospectId,
+                other.phoneE164,
+                other.phase2Status,
+                other.enrollmentMethod,
+                other.rev,
+                other.updatedAt,
+              ],
+            );
+  }
 
-
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is DirectoryEntryDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            prospectId,
-            phoneE164,
-            phase2Status,
-            enrollmentMethod,
-            rev,
-            updatedAt,
-        ],
-        [
-            other.prospectId,
-            other.phoneE164,
-            other.phase2Status,
-            other.enrollmentMethod,
-            other.rev,
-            other.updatedAt,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([
         prospectId,
         phoneE164,
         phase2Status,
         enrollmentMethod,
         rev,
         updatedAt,
-    ],);
+      ]);
 
-  factory DirectoryEntryDto.fromJson(Map<String, dynamic> json) => _$DirectoryEntryDtoFromJson(json);
+  factory DirectoryEntryDto.fromJson(Map<String, dynamic> json) =>
+      _$DirectoryEntryDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$DirectoryEntryDtoToJson(this);
 
@@ -157,6 +110,4 @@ class DirectoryEntryDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-
