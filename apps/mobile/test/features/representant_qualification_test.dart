@@ -180,22 +180,21 @@ void main() {
     await pomper(tester);
   }
 
-  /// Les deux premiers renseignements du script, posés quel que soit
-  /// l'ambassadeur.
+  /// Les deux premiers renseignements du script, posés quelle que soit la
+  /// réponse à la question CHUES.
   Future<void> renseignements(WidgetTester tester) async {
     await taper(tester, tuile('Avez-vous été contacté ?', 'Oui'));
     await taper(tester, tuile('Connaissez-vous l\'UES ?', 'Oui'));
   }
 
-  /// Joignable, intéressé, fiche exacte, ambassadeur : le chemin le plus long,
+  /// Joignable, fiche exacte, question CHUES à oui : le chemin le plus long,
   /// jusqu'à la dernière étape.
-  Future<void> ambassadeurComplet(WidgetTester tester) async {
+  Future<void> accepteComplet(WidgetTester tester) async {
     await taper(tester, find.text('Joignable'));
-    await statut(tester, 'Intéressé');
     await etapeSuivante(tester);
     await ficheExacte(tester);
     await renseignements(tester);
-    await taper(tester, tuile('Ambassadeur ?', 'Oui'));
+    await taper(tester, tuile(kQuestionCHUES, 'Oui'));
     await etapeSuivante(tester);
   }
 
@@ -288,9 +287,6 @@ void main() {
     expect(continuer(tester).subtitle, 'Choisissez d\'abord le résultat');
 
     await taper(tester, find.text('Joignable'));
-    expect(continuer(tester).subtitle, 'Choisissez un statut');
-
-    await statut(tester, 'Intéressé');
     expect(continuer(tester).onPressed, isNotNull);
     expect(continuer(tester).subtitle, isNull);
 
@@ -306,9 +302,9 @@ void main() {
     expect(continuer(tester).subtitle, 'Dites s\'il connaît l\'UES');
 
     await taper(tester, tuile('Connaissez-vous l\'UES ?', 'Oui'));
-    expect(continuer(tester).subtitle, 'Dites s\'il est ambassadeur');
+    expect(continuer(tester).subtitle, kQuestionManquante);
 
-    await taper(tester, tuile('Ambassadeur ?', 'Oui'));
+    await taper(tester, tuile(kQuestionCHUES, 'Oui'));
     expect(continuer(tester).onPressed, isNotNull);
 
     await etapeSuivante(tester);
@@ -327,7 +323,7 @@ void main() {
     await ouvrir(tester);
 
     await taper(tester, find.text('Joignable'));
-    await statut(tester, 'Non intéressé');
+    await statut(tester, 'Hors cible');
     await etapeSuivante(tester);
 
     expect(find.text('Vérifier la fiche'), findsNothing);
@@ -356,26 +352,25 @@ void main() {
     expect(writes.suggestedName, 'Fatou Sarr');
     expect(writes.suggestedNote, 'Elle est déléguée du personnel.');
     expect(writes.outcome, 'REFUSED');
-    expect(writes.statutQualificationId, 'sq-non-interesse');
+    expect(writes.statutQualificationId, 'sq-hors-cible');
     // Aucune question posée : c'est le statut qui tranche, côté serveur.
     expect(writes.relationStatus, isNull);
 
     await demonter(tester);
   });
 
-  // Un ambassadeur qui dit non pendant le script reste un refus, avec la
-  // personne proposée en fin de parcours.
-  testWidgets('un « non » à l\'ambassadeur propose aussi quelqu\'un', (
+  // Un « non » à la question CHUES est un refus, avec la personne proposée en
+  // fin de parcours.
+  testWidgets('un « non » à la question CHUES propose aussi quelqu\'un', (
     WidgetTester tester,
   ) async {
     await ouvrir(tester);
 
     await taper(tester, find.text('Joignable'));
-    await statut(tester, 'Intéressé');
     await etapeSuivante(tester);
     await ficheExacte(tester);
     await renseignements(tester);
-    await taper(tester, tuile('Ambassadeur ?', 'Non'));
+    await taper(tester, tuile(kQuestionCHUES, 'Non'));
     await etapeSuivante(tester);
 
     expect(
@@ -384,8 +379,10 @@ void main() {
     );
     await envoyer(tester);
 
+    // Le « non » pose Refusé : c'est lui, et non le script, qui donne l'issue.
     expect(writes.relationStatus, 'REFUS');
-    expect(writes.outcome, 'REACHED');
+    expect(writes.outcome, 'REFUSED');
+    expect(writes.statutQualificationId, 'sq-refuse');
 
     await demonter(tester);
   });
@@ -398,7 +395,7 @@ void main() {
     await ouvrir(tester);
 
     await taper(tester, find.text('Joignable'));
-    await statut(tester, 'Non intéressé');
+    await statut(tester, 'Hors cible');
     await etapeSuivante(tester);
 
     expect(find.text('Son numéro'), findsOneWidget);
@@ -422,29 +419,115 @@ void main() {
   ) async {
     await ouvrir(tester);
 
-    await ambassadeurComplet(tester);
+    await accepteComplet(tester);
     expect(find.text('Demain 9 h'), findsNothing);
     expect(find.text('Rappel'), findsNothing);
 
     await demonter(tester);
   });
 
-  // On rappelle aussi qui on n'a pas joint : « À rappeler » est le seul statut
-  // que les deux branches partagent.
-  testWidgets('« À rappeler » se propose des deux côtés', (
+  // Un numéro faux a été composé et a répondu : il est joint. Un rappel promis
+  // se prend en parlant : il ne se propose plus à qui n'a pas décroché. Le
+  // serveur dérive les mêmes familles et refuse une issue qui les contredit.
+  testWidgets('les deux familles suivent l\'effet du statut', (
     WidgetTester tester,
   ) async {
     await ouvrir(tester);
 
     await taper(tester, find.text('Injoignable'));
-    expect(tuile('Statut de qualification', 'À rappeler'), findsOneWidget);
     expect(tuile('Statut de qualification', 'Pas de réponse'), findsOneWidget);
-    expect(tuile('Statut de qualification', 'Intéressé'), findsNothing);
+    expect(
+      tuile('Statut de qualification', 'Injoignable définitif'),
+      findsOneWidget,
+    );
+    expect(tuile('Statut de qualification', 'À rappeler'), findsNothing);
+    expect(tuile('Statut de qualification', 'Faux numéro'), findsNothing);
 
     await taper(tester, find.text('Joignable'));
     expect(tuile('Statut de qualification', 'À rappeler'), findsOneWidget);
-    expect(tuile('Statut de qualification', 'Intéressé'), findsOneWidget);
+    expect(tuile('Statut de qualification', 'Faux numéro'), findsOneWidget);
+    expect(tuile('Statut de qualification', 'Hors cible'), findsOneWidget);
     expect(tuile('Statut de qualification', 'Pas de réponse'), findsNothing);
+
+    await demonter(tester);
+  });
+
+  // EB-02 : le statut découle de la réponse, il ne se choisit plus à part.
+  testWidgets('Accepté et Refusé ne se proposent pas en tuile', (
+    WidgetTester tester,
+  ) async {
+    await ouvrir(tester);
+
+    await taper(tester, find.text('Joignable'));
+    expect(tuile('Statut de qualification', 'Accepté'), findsNothing);
+    expect(tuile('Statut de qualification', 'Refusé'), findsNothing);
+
+    await demonter(tester);
+  });
+
+  // Les deux « Autre » portent leur famille en base parce que le libellé y est
+  // unique ; sous une branche déjà choisie, la répéter serait redondant.
+  testWidgets('les deux « Autre » s\'affichent sans leur famille', (
+    WidgetTester tester,
+  ) async {
+    await ouvrir(tester);
+
+    await taper(tester, find.text('Joignable'));
+    expect(tuile('Statut de qualification', 'Autre'), findsOneWidget);
+    expect(tuile('Statut de qualification', 'Autre joint'), findsNothing);
+
+    await taper(tester, find.text('Injoignable'));
+    expect(tuile('Statut de qualification', 'Autre'), findsOneWidget);
+    expect(tuile('Statut de qualification', 'Autre non joint'), findsNothing);
+
+    await demonter(tester);
+  });
+
+  // EB-02 : le statut découle de la réponse. Le poser au vu du seul script
+  // laisserait la fiche sans le vocabulaire que la campagne exploite.
+  testWidgets('un oui à la question CHUES pose le statut Accepté', (
+    WidgetTester tester,
+  ) async {
+    await ouvrir(tester);
+    await accepteComplet(tester);
+
+    expect(find.text('Accepté'), findsOneWidget);
+
+    await envoyer(tester);
+
+    expect(writes.statutQualificationId, 'sq-accepte');
+    expect(writes.relationStatus, 'AMBASSADEUR');
+    expect(writes.outcome, 'REACHED');
+
+    await demonter(tester);
+  });
+
+  // EB-04 : le serveur refuse la tentative sans motif, et un refus hors ligne
+  // est définitif. Le bouton doit donc retenir la saisie ici.
+  testWidgets('« Autre » retient l\'enregistrement tant que le motif manque', (
+    WidgetTester tester,
+  ) async {
+    await ouvrir(tester);
+
+    await taper(tester, find.text('Joignable'));
+    await statut(tester, 'Autre');
+    await etapeSuivante(tester);
+
+    expect(champ('Motif'), findsOneWidget);
+    expect(find.text('Commentaire (facultatif)'), findsNothing);
+    expect(enregistrer(tester).onPressed, isNull);
+    expect(enregistrer(tester).subtitle, 'Écrivez le motif');
+
+    await tester.enterText(champ('Motif'), 'Il rappellera lui-même.');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(enregistrer(tester).onPressed, isNotNull);
+
+    await envoyer(tester);
+
+    expect(writes.statutQualificationId, 'sq-autre-joint');
+    expect(writes.outcome, 'REACHED');
 
     await demonter(tester);
   });
@@ -477,9 +560,9 @@ void main() {
     await demonter(tester);
   });
 
-  // La question de l'ambassadeur sans réponse ne vaut pas un refus : marquer
-  // REFUS quelqu'un à qui l'on n'a rien demandé ferme sa fiche pour de bon.
-  testWidgets('sans réponse à l\'ambassadeur, aucune relation ne part', (
+  // La question CHUES sans réponse ne vaut pas un refus : marquer REFUS
+  // quelqu'un à qui l'on n'a rien demandé ferme sa fiche pour de bon.
+  testWidgets('sans réponse à la question CHUES, aucune relation ne part', (
     WidgetTester tester,
   ) async {
     await ouvrir(tester);
@@ -503,24 +586,23 @@ void main() {
     await demonter(tester);
   });
 
-  // Un statut qui ouvre la relation garde le script entier : c'est là que se
-  // prennent les renseignements.
-  testWidgets('un statut joignable exige encore tout le script', (
+  // Aucun statut choisi à part : c'est le script qui tranche, et sa dernière
+  // question pose le statut.
+  testWidgets('sans statut choisi, la branche jointe pose tout le script', (
     WidgetTester tester,
   ) async {
     await ouvrir(tester);
 
     await taper(tester, find.text('Joignable'));
-    await statut(tester, 'Intéressé');
     await etapeSuivante(tester);
     await ficheExacte(tester);
     expect(continuer(tester).onPressed, isNull);
     expect(continuer(tester).subtitle, 'Dites s\'il a été contacté');
 
     await renseignements(tester);
-    expect(continuer(tester).subtitle, 'Dites s\'il est ambassadeur');
+    expect(continuer(tester).subtitle, kQuestionManquante);
 
-    await taper(tester, tuile('Ambassadeur ?', 'Oui'));
+    await taper(tester, tuile(kQuestionCHUES, 'Oui'));
     expect(continuer(tester).onPressed, isNotNull);
 
     await demonter(tester);
@@ -570,7 +652,7 @@ void main() {
   ) async {
     await ouvrir(tester);
 
-    await taper(tester, find.text('Injoignable'));
+    await taper(tester, find.text('Joignable'));
     await statut(tester, 'À rappeler');
     await etapeSuivante(tester);
     await taper(tester, find.text('Demain 9 h'));
@@ -593,14 +675,14 @@ void main() {
     await ouvrir(tester);
 
     await taper(tester, find.text('Injoignable'));
-    await statut(tester, 'À rappeler');
+    await statut(tester, 'Pas de réponse');
     await etapeSuivante(tester);
     await taper(tester, find.text('Demain 9 h'));
 
     // Revenir changer de résultat rouvre la question du statut : l'heure du
     // statut qu'on quitte ne doit pas suivre.
     await etapePrecedente(tester);
-    await ambassadeurComplet(tester);
+    await accepteComplet(tester);
     expect(find.text('Rappel'), findsNothing);
 
     await envoyer(tester);
@@ -617,7 +699,7 @@ void main() {
     await ouvrir(tester);
 
     await taper(tester, find.text('Joignable'));
-    await statut(tester, 'Non intéressé');
+    await statut(tester, 'Hors cible');
     await etapeSuivante(tester);
     expect(enregistrer(tester).onPressed, isNotNull);
 
@@ -633,12 +715,12 @@ void main() {
     await demonter(tester);
   });
 
-  testWidgets('un ambassadeur n\'envoie aucune suggestion', (
+  testWidgets('un oui à la question CHUES n\'envoie aucune suggestion', (
     WidgetTester tester,
   ) async {
     await ouvrir(tester);
 
-    await ambassadeurComplet(tester);
+    await accepteComplet(tester);
     expect(
       find.text('Il propose quelqu\'un d\'autre ? (facultatif)'),
       findsNothing,
@@ -663,7 +745,6 @@ void main() {
     await ouvrir(tester);
 
     await taper(tester, find.text('Joignable'));
-    await statut(tester, 'Intéressé');
     await etapeSuivante(tester);
     await tester.enterText(champ('Établissement'), 'Lycée Blaise Diagne');
     await tester.pump();
@@ -675,7 +756,7 @@ void main() {
     await etapeSuivante(tester);
     await taper(tester, tuile('Avez-vous été contacté ?', 'Non'));
     await taper(tester, tuile('Connaissez-vous l\'UES ?', 'Oui'));
-    await taper(tester, tuile('Ambassadeur ?', 'Oui'));
+    await taper(tester, tuile(kQuestionCHUES, 'Oui'));
     await etapeSuivante(tester);
     await envoyer(tester);
 
@@ -692,7 +773,7 @@ void main() {
     expect(payload['connaitUES'], true);
     expect(payload['syndicat'], 'Syndicat Test');
     expect(payload['whatsappStatus'], 'MEME_NUMERO');
-    expect(payload['statutQualificationId'], 'sq-interesse');
+    expect(payload['statutQualificationId'], 'sq-accepte');
 
     // La fiche locale a suivi : nouvel établissement, syndicat, et un appel de
     // plus au compteur.
@@ -722,7 +803,7 @@ void main() {
     );
 
     await ouvrir(tester);
-    await ambassadeurComplet(tester);
+    await accepteComplet(tester);
     await envoyer(tester);
     // La fiche porte déjà l'appel promis : l'envoi passe par la confirmation.
     await confirmerLeNouvelAppel(tester);
@@ -744,7 +825,7 @@ void main() {
     WidgetTester tester,
   ) async {
     await ouvrir(tester);
-    await taper(tester, find.text('Injoignable'));
+    await taper(tester, find.text('Joignable'));
     await statut(tester, 'À rappeler');
     await etapeSuivante(tester);
     await taper(tester, find.text('Demain 9 h'));
@@ -798,7 +879,6 @@ void main() {
     await ouvrir(tester);
 
     await taper(tester, find.text('Joignable'));
-    await statut(tester, 'Intéressé');
     await etapeSuivante(tester);
 
     expect(find.text('Vérifier la fiche'), findsOneWidget);
@@ -810,7 +890,7 @@ void main() {
     expect(find.text('Ce qu\'il vous a dit'), findsOneWidget);
 
     await renseignements(tester);
-    await taper(tester, tuile('Ambassadeur ?', 'Oui'));
+    await taper(tester, tuile(kQuestionCHUES, 'Oui'));
     await etapeSuivante(tester);
     expect(find.text('Tout est exact'), findsOneWidget);
     await envoyer(tester);
@@ -838,7 +918,6 @@ void main() {
     await ouvrir(tester);
 
     await taper(tester, find.text('Joignable'));
-    await statut(tester, 'Intéressé');
     await etapeSuivante(tester);
 
     await tester.enterText(champ('Téléphone'), '77 123 45 67');
@@ -852,7 +931,7 @@ void main() {
 
     await etapeSuivante(tester);
     await renseignements(tester);
-    await taper(tester, tuile('Ambassadeur ?', 'Oui'));
+    await taper(tester, tuile(kQuestionCHUES, 'Oui'));
     await etapeSuivante(tester);
 
     // Le récapitulatif nomme ce qui a changé, pas seulement combien.
@@ -932,7 +1011,7 @@ void main() {
       id: 'rep-1',
       phone: '+221770000001',
       fullName: 'Ousmane Fall',
-      statutQualificationId: 'sq-interesse',
+      statutQualificationId: 'sq-accepte',
       lastCallOutcome: 'REACHED',
       lastCallAt: t0.subtract(const Duration(days: 2)),
       callAttemptCount: 3,
@@ -945,7 +1024,7 @@ void main() {
     await envoyer(tester);
 
     expect(find.text('Déjà qualifié'), findsOneWidget);
-    expect(find.textContaining('Intéressé'), findsWidgets);
+    expect(find.textContaining('Accepté'), findsWidgets);
 
     await tester.tap(find.text('Revenir'));
     await tester.pump();
@@ -983,7 +1062,6 @@ void main() {
   ) async {
     await ouvrir(tester);
     await taper(tester, find.text('Joignable'));
-    await statut(tester, 'Intéressé');
     await etapeSuivante(tester);
     await ficheExacte(tester);
     await renseignements(tester);
@@ -992,36 +1070,70 @@ void main() {
     expect(find.text('Vérifier la fiche'), findsOneWidget);
 
     await ficheExacte(tester);
-    expect(continuer(tester).subtitle, 'Dites s\'il est ambassadeur');
+    expect(continuer(tester).subtitle, kQuestionManquante);
     expect(find.byIcon(PhosphorIconsRegular.arrowLeft), findsOneWidget);
 
     await demonter(tester);
   });
 }
 
-/// Le vocabulaire de qualification, tel qu'il descend de la route dédiée.
+typedef _Semis = ({
+  String code,
+  String label,
+  String effect,
+  bool rappel,
+  int? retry,
+  bool motif,
+  String? relation,
+});
+
+_Semis _statut(
+  String code,
+  String label,
+  String effect, {
+  bool rappel = false,
+  int? retry,
+  bool motif = false,
+  String? relation,
+}) => (
+  code: code,
+  label: label,
+  effect: effect,
+  rappel: rappel,
+  retry: retry,
+  motif: motif,
+  relation: relation,
+);
+
+/// Le vocabulaire de qualification du Lot 1, tel qu'il descend de la route
+/// dédiée. Accepté et Refusé portent la relation : c'est elle qui les désigne
+/// quand la question CHUES reçoit sa réponse.
 Future<void> semerLesStatuts(AppDatabase db) async {
-  const List<(String, String, String, bool, int?)> lignes =
-      <(String, String, String, bool, int?)>[
-        ('INTERESSE', 'Intéressé', 'REACHED', false, null),
-        ('NON_INTERESSE', 'Non intéressé', 'REFUSED', false, null),
-        ('A_RAPPELER', 'À rappeler', 'SCHEDULE_CALLBACK', true, null),
-        ('PAS_DE_REPONSE', 'Pas de réponse', 'UNREACHABLE', false, 180),
-        ('FAUX_NUMERO', 'Faux numéro', 'WRONG_NUMBER', false, null),
-      ];
+  final List<_Semis> lignes = <_Semis>[
+    _statut('ACCEPTE', 'Accepté', 'REACHED', relation: 'AMBASSADEUR'),
+    _statut('REFUSE', 'Refusé', 'REFUSED', relation: 'REFUS'),
+    _statut('A_RAPPELER', 'À rappeler', 'SCHEDULE_CALLBACK', rappel: true),
+    _statut('HORS_CIBLE', 'Hors cible', 'REFUSED'),
+    _statut('FAUX_NUMERO', 'Faux numéro', 'WRONG_NUMBER'),
+    _statut('AUTRE_JOINT', 'Autre joint', 'REACHED', motif: true),
+    _statut('PAS_DE_REPONSE', 'Pas de réponse', 'UNREACHABLE', retry: 180),
+    _statut('INJOIGNABLE_DEFINITIF', 'Injoignable définitif', 'UNREACHABLE'),
+    _statut('AUTRE_NON_JOINT', 'Autre non joint', 'UNREACHABLE', motif: true),
+  ];
   for (int rang = 0; rang < lignes.length; rang++) {
-    final (String code, String label, String effect, bool rappel, int? retry) =
-        lignes[rang];
+    final _Semis ligne = lignes[rang];
     await db
         .into(db.statutsQualification)
         .insert(
           StatutsQualificationCompanion.insert(
-            code: code,
-            id: 'sq-${code.toLowerCase().replaceAll('_', '-')}',
-            label: label,
-            effect: effect,
-            requiresCallback: Value<bool>(rappel),
-            retryAfterMinutes: Value<int?>(retry),
+            code: ligne.code,
+            id: 'sq-${ligne.code.toLowerCase().replaceAll('_', '-')}',
+            label: ligne.label,
+            effect: ligne.effect,
+            requiresCallback: Value<bool>(ligne.rappel),
+            requiresComment: Value<bool>(ligne.motif),
+            retryAfterMinutes: Value<int?>(ligne.retry),
+            relationStatus: Value<String?>(ligne.relation),
             position: Value<int>(rang),
           ),
         );

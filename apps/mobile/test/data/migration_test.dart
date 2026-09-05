@@ -31,6 +31,7 @@ import 'generated_migrations/schema_v26.dart' as v26schema;
 import 'generated_migrations/schema_v27.dart' as v27schema;
 import 'generated_migrations/schema_v28.dart' as v28schema;
 import 'generated_migrations/schema_v29.dart' as v29schema;
+import 'generated_migrations/schema_v30.dart' as v30schema;
 
 /// Test doré de migration.
 ///
@@ -2423,7 +2424,11 @@ void main() {
     await old.close();
 
     final AppDatabase db = AppDatabase(schema.newConnection());
-    await verifier.migrateAndValidate(db, 28);
+    // La cible est la version COURANTE : `createTable` engendre la forme
+    // courante de `statuts_qualification`, colonnes des paliers suivants
+    // comprises, et s'arrêter plus tôt comparerait cette forme à un golden
+    // qui ne les a pas.
+    await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
 
     // La table s'ÉCRIT : « elle existe » se vérifierait aussi sur des colonnes
     // au mauvais type. Un effet que ce client ignore passe, comme pour les
@@ -2756,6 +2761,32 @@ void main() {
       ),
       'preuve-30',
     );
+    await db.close();
+  });
+
+  // Le statut descendu avant la v31 n'exige aucun motif et ne pose aucune
+  // relation : les deux colonnes arrivent vides et le prochain pull les remplit.
+  test('v30 -> v31 laisse les statuts déjà descendus utilisables', () async {
+    final schema = await verifier.schemaAt(30);
+    final v30schema.DatabaseAtV30 old = v30schema.DatabaseAtV30(
+      schema.newConnection(),
+    );
+    await old.customStatement(
+      'INSERT INTO statuts_qualification (code, id, label, effect) '
+      'VALUES (?, ?, ?, ?)',
+      <Object?>['A_RAPPELER', 'sq-30', 'À rappeler', 'SCHEDULE_CALLBACK'],
+    );
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 31);
+
+    final StatutQualificationRow statut = await db
+        .select(db.statutsQualification)
+        .getSingle();
+    expect(statut.code, 'A_RAPPELER');
+    expect(statut.requiresComment, isFalse);
+    expect(statut.relationStatus, isNull);
     await db.close();
   });
 
