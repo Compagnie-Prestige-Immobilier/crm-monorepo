@@ -51,12 +51,14 @@ export class StatutsQualificationController {
   @ApiOperation({
     operationId: 'createStatutQualification',
     summary: 'Ajouter un statut de qualification.',
+    description:
+      'Le code est déduit du libellé, puis figé : l’historique le référence. Deux libellés qui ne se distinguent que par les accents ou la casse donnent le même code et le second est refusé.',
   })
   @ApiResponse({ status: 201, type: StatutQualificationDto })
   @ApiResponse({
     status: 409,
     type: ApiErrorDto,
-    description: 'STATUT_QUALIFICATION_CODE_CONFLICT, _LABEL_CONFLICT, _CALLBACK_NOT_ALLOWED.',
+    description: 'STATUT_QUALIFICATION_LABEL_CONFLICT, _CODE_CONFLICT, _CALLBACK_NOT_ALLOWED.',
   })
   create(@Body() body: CreateStatutQualificationDto): Promise<StatutQualificationDto> {
     return this.statuts.create(body);

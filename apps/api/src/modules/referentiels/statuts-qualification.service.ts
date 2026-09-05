@@ -1,8 +1,14 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrioriteTraitement, RepCallOutcome, StatutQualificationEffect } from '@crm/database';
 import type { StatutQualification } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { sansAccents } from '../../common/texte.js';
 import type {
   CreateStatutQualificationDto,
   SetStatutQualificationActiveDto,
@@ -15,6 +21,7 @@ export const StatutQualificationError = {
   NOT_FOUND: 'STATUT_QUALIFICATION_NOT_FOUND',
   CODE_CONFLICT: 'STATUT_QUALIFICATION_CODE_CONFLICT',
   LABEL_CONFLICT: 'STATUT_QUALIFICATION_LABEL_CONFLICT',
+  LABEL_UNUSABLE: 'STATUT_QUALIFICATION_LABEL_UNUSABLE',
   SYSTEM_IMMUTABLE: 'STATUT_QUALIFICATION_SYSTEM_IMMUTABLE',
   CALLBACK_NOT_ALLOWED: 'STATUT_QUALIFICATION_CALLBACK_NOT_ALLOWED',
   LAST_OF_BRANCH: 'STATUT_QUALIFICATION_LAST_OF_BRANCH',
@@ -63,6 +70,15 @@ export const brancheDe = (
   effect: StatutQualificationEffect,
 ): readonly StatutQualificationEffect[] => (JOINT.includes(effect) ? JOINT : NON_JOINT);
 
+/**
+ * Le code se lit dans le libellé : l'administrateur n'en saisit plus. Il ne se
+ * dérive qu'A LA CREATION, jamais en renommant, car l'historique le référence.
+ */
+const codeDepuisLibelle = (label: string): string =>
+  sansAccents(label).toUpperCase().replace(/\s+/gu, '_');
+
+const CODE_UTILISABLE = /^[A-Za-z][A-Za-z0-9_]*$/u;
+
 const toDto = (row: StatutQualification): StatutQualificationDto => ({
   id: row.id,
   code: row.code,
@@ -104,15 +120,13 @@ export class StatutsQualificationService {
   }
 
   async create(input: CreateStatutQualificationDto): Promise<StatutQualificationDto> {
-    const code = input.code.trim().toUpperCase();
     const label = input.label.trim();
+    const code = codeDepuisLibelle(label);
 
-    const clash = await this.prisma.statutQualification.findUnique({ where: { code } });
-    if (clash) {
-      throw new ConflictException({
-        code: StatutQualificationError.CODE_CONFLICT,
-        message: `Le code « ${code} » est déjà utilisé par le statut « ${clash.label} ».`,
-        existingId: clash.id,
+    if (!CODE_UTILISABLE.test(code)) {
+      throw new BadRequestException({
+        code: StatutQualificationError.LABEL_UNUSABLE,
+        message: `« ${label} » ne donne aucun code utilisable : commencez par une lettre et n’employez que des lettres, des chiffres et des espaces.`,
       });
     }
 
@@ -120,8 +134,17 @@ export class StatutsQualificationService {
     if (sameLabel) {
       throw new ConflictException({
         code: StatutQualificationError.LABEL_CONFLICT,
-        message: `Le libellé « ${label} » est déjà porté par le statut « ${sameLabel.code} ».`,
+        message: `Le libellé « ${label} » est déjà porté par un autre statut.`,
         existingId: sameLabel.id,
+      });
+    }
+
+    const clash = await this.prisma.statutQualification.findUnique({ where: { code } });
+    if (clash) {
+      throw new ConflictException({
+        code: StatutQualificationError.CODE_CONFLICT,
+        message: `« ${label} » donne le même code que « ${clash.label} » : distinguez-les autrement que par les accents ou la casse.`,
+        existingId: clash.id,
       });
     }
 
@@ -174,7 +197,7 @@ export class StatutsQualificationService {
       if (sameLabel && sameLabel.id !== id) {
         throw new ConflictException({
           code: StatutQualificationError.LABEL_CONFLICT,
-          message: `Le libellé « ${label} » est déjà porté par le statut « ${sameLabel.code} ».`,
+          message: `Le libellé « ${label} » est déjà porté par un autre statut.`,
           existingId: sameLabel.id,
         });
       }

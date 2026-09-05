@@ -655,16 +655,11 @@ export class StatutQualificationFieldQueryDto {
 }
 
 export class CreateStatutQualificationDto {
-  @ApiProperty({ maxLength: 64, description: 'Immuable : l’historique le référence.' })
-  @IsString()
-  @MinLength(2)
-  @MaxLength(64)
-  @Matches(/^[A-Za-z][A-Za-z0-9_]*$/u, {
-    message: 'Le code ne contient que des lettres, des chiffres et des soulignés.',
+  @ApiProperty({
+    maxLength: 120,
+    description:
+      'Le code en est déduit, puis figé : majuscules, sans accents, espaces en tirets bas.',
   })
-  code!: string;
-
-  @ApiProperty({ maxLength: 120 })
   @IsString()
   @MinLength(2)
   @MaxLength(120)

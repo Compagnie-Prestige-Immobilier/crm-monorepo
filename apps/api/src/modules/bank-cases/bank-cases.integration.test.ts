@@ -16,7 +16,8 @@ import { v7 as uuidv7 } from 'uuid';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
-import { BankCasesService, sansAccents } from './bank-cases.service.js';
+import { sansAccents } from '../../common/texte.js';
+import { BankCasesService } from './bank-cases.service.js';
 import { BankCaseAnalyticsService } from './bank-cases-analytics.service.js';
 import { BankCaseStagesService } from './bank-case-stages.service.js';
 import { BankCaseError } from './errors.js';
