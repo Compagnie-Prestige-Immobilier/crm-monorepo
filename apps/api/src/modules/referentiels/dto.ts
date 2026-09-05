@@ -608,6 +608,8 @@ export class StatutQualificationDto {
   effect!: StatutQualificationEffect;
   @ApiProperty({ description: 'La date du rappel est exigée par ce statut.' })
   requiresCallback!: boolean;
+  @ApiProperty({ description: 'Le motif est exigé par ce statut : « Autre » ne dit rien seul.' })
+  requiresComment!: boolean;
   @ApiProperty({
     type: Number,
     nullable: true,
@@ -677,6 +679,11 @@ export class CreateStatutQualificationDto {
   @IsBoolean()
   requiresCallback?: boolean;
 
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @IsBoolean()
+  requiresComment?: boolean;
+
   @ApiPropertyOptional({ type: Number, nullable: true, minimum: 5, maximum: 10080 })
   @IsOptional()
   @IsInt()
@@ -716,6 +723,11 @@ export class UpdateStatutQualificationDto {
   @IsOptional()
   @IsBoolean()
   requiresCallback?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  requiresComment?: boolean;
 
   @ApiPropertyOptional({
     type: Number,

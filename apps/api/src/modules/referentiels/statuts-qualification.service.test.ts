@@ -20,6 +20,8 @@ interface Row {
   label: string;
   effect: StatutQualificationEffect;
   requiresCallback: boolean;
+  requiresComment: boolean;
+  retryAfterMinutes: number | null;
   priorite: PrioriteTraitement;
   relationStatus: RepresentantRelation | null;
   isActive: boolean;
@@ -32,6 +34,8 @@ interface Row {
 
 const ligne = (over: Partial<Row> & Pick<Row, 'id' | 'code' | 'label' | 'effect'>): Row => ({
   requiresCallback: false,
+  requiresComment: false,
+  retryAfterMinutes: null,
   priorite: PrioriteTraitement.NORMALE,
   relationStatus: null,
   isActive: true,
@@ -285,6 +289,45 @@ describe('création', () => {
         requiresCallback: true,
       }),
     ).rejects.toMatchObject({ response: { code: StatutQualificationError.CALLBACK_NOT_ALLOWED } });
+  });
+});
+
+describe('le motif que le statut exige', () => {
+  it('parvient au terrain : c’est la saisie qui refuse la qualification sans motif', async () => {
+    prisma.rows = [{ ...INTERESSE, requiresComment: true }];
+
+    const { items } = await service.listForField(6);
+
+    expect(items[0]?.requiresComment).toBe(true);
+  });
+
+  it('se pose à la création, et vaut faux quand elle n’en demande pas', async () => {
+    const exigeant = await service.create({
+      code: 'AUTRE_JOINT',
+      label: 'Autre joint',
+      effect: StatutQualificationEffect.REACHED,
+      requiresComment: true,
+    });
+    const muet = await service.create({
+      code: 'SANS_MOTIF',
+      label: 'Sans motif',
+      effect: StatutQualificationEffect.REACHED,
+    });
+
+    expect([exigeant.requiresComment, muet.requiresComment]).toEqual([true, false]);
+  });
+
+  it('est une RÈGLE : elle se verrouille sur un statut système comme le rappel', async () => {
+    await expect(service.update('1', { requiresComment: true })).rejects.toMatchObject({
+      response: { code: StatutQualificationError.SYSTEM_IMMUTABLE },
+    });
+
+    const libre = await service.create({
+      code: 'SANS_MOTIF',
+      label: 'Sans motif',
+      effect: StatutQualificationEffect.REACHED,
+    });
+    expect((await service.update(libre.id, { requiresComment: true })).requiresComment).toBe(true);
   });
 });
 

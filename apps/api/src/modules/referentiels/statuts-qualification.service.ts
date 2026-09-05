@@ -69,6 +69,7 @@ const toDto = (row: StatutQualification): StatutQualificationDto => ({
   label: row.label,
   effect: row.effect,
   requiresCallback: row.requiresCallback,
+  requiresComment: row.requiresComment,
   retryAfterMinutes: row.retryAfterMinutes,
   priorite: row.priorite,
   relationStatus: row.relationStatus,
@@ -133,6 +134,7 @@ export class StatutsQualificationService {
         label,
         effect: input.effect,
         requiresCallback,
+        requiresComment: input.requiresComment ?? false,
         retryAfterMinutes: input.retryAfterMinutes ?? null,
         priorite: input.priorite ?? PrioriteTraitement.NORMALE,
         relationStatus: input.relationStatus ?? null,
@@ -152,7 +154,9 @@ export class StatutsQualificationService {
     // système compris : ce sont des arbitrages du métier. La RÈGLE, elle, ne se
     // reconfigure pas : le script s'appuie dessus, et les clients déployés
     // l'ont compilée.
-    if (existing.isSystem && input.requiresCallback !== undefined) {
+    const regleTouchee =
+      input.requiresCallback !== undefined || input.requiresComment !== undefined;
+    if (existing.isSystem && regleTouchee) {
       throw new ConflictException({
         code: StatutQualificationError.SYSTEM_IMMUTABLE,
         message: `« ${existing.label} » est un statut système : sa règle est celle du script et ne se reconfigure pas ici.`,
@@ -183,6 +187,7 @@ export class StatutsQualificationService {
         ...(input.requiresCallback === undefined
           ? {}
           : { requiresCallback: input.requiresCallback }),
+        ...(input.requiresComment === undefined ? {} : { requiresComment: input.requiresComment }),
         ...(input.priorite === undefined ? {} : { priorite: input.priorite }),
         ...(input.relationStatus === undefined ? {} : { relationStatus: input.relationStatus }),
         ...(input.retryAfterMinutes === undefined
