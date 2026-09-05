@@ -49,7 +49,9 @@ describe('les plateformes d’enrôlement ne s’ouvrent qu’à l’ADMIN', () 
       'indicateursDuProjet',
       'list',
       'majReglages',
+      'purger',
       'reglages',
+      'supprimer',
       'tirer',
     ]);
   });
