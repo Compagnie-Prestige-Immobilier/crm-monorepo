@@ -170,20 +170,21 @@ const de = (
 ): SupervisionActivityRowDto | undefined => items.find((ligne) => ligne.teleconseillerId === id);
 
 describe('qualifier un représentant : les chiffres d’Alice', () => {
-  it('4 appels retenus, 2 réponses, 50 % de contact, 25 % de rappel, 1 hérité', async () => {
+  it('5 appels retenus, 4 réponses, 1 rappel, 1 injoignable, aucun hérité', async () => {
     const ligne = await surLeJeu(async ({ service, alice }) => {
       const resultat = await service.activite(FENETRE);
       return de(resultat.items, alice);
     });
 
     expect(ligne?.bucket).toBe(JOUR);
-    expect(ligne?.repCalls).toBe(4);
-    expect(ligne?.repReached).toBe(2);
+    // Le faux numéro est retenu ET joint : quelqu'un a décroché.
+    expect(ligne?.repCalls).toBe(5);
+    expect(ligne?.repReached).toBe(4);
     expect(ligne?.repCallback).toBe(1);
     expect(ligne?.repUnreachable).toBe(1);
-    expect(ligne?.repOther).toBe(1);
-    expect(ligne?.repContactRate).toBe(50);
-    expect(ligne?.repCallbackRate).toBe(25);
+    expect(ligne?.repOther).toBe(0);
+    expect(ligne?.repContactRate).toBe(80);
+    expect(ligne?.repCallbackRate).toBe(20);
     expect(ligne?.representantsContacted).toBe(3);
   });
 
@@ -226,7 +227,7 @@ describe('qualifier un représentant : les chiffres d’Alice', () => {
     });
 
     expect(ligne?.prospectsCreated).toBe(1);
-    expect(ligne?.repCalls).toBe(4);
+    expect(ligne?.repCalls).toBe(5);
     expect(ligne?.repQuestioned).toBe(1);
   });
 
@@ -236,7 +237,7 @@ describe('qualifier un représentant : les chiffres d’Alice', () => {
     );
 
     expect(resultat.items).toHaveLength(1);
-    expect(resultat.items[0]?.repCalls).toBe(4);
+    expect(resultat.items[0]?.repCalls).toBe(5);
   });
 
   it('le total d’équipe compte le représentant UNE fois, pas une par agent', async () => {
@@ -253,10 +254,10 @@ describe('qualifier un représentant : les chiffres d’Alice', () => {
     expect(totals.repQualified).toBe(1);
     expect(totals.repQualificationRate).toBe(50);
 
-    expect(totals.repCalls).toBe(5);
-    expect(totals.repReached).toBe(3);
-    expect(totals.repOther).toBe(1);
-    expect(totals.repContactRate).toBe(60);
+    expect(totals.repCalls).toBe(6);
+    expect(totals.repReached).toBe(5);
+    expect(totals.repOther).toBe(0);
+    expect(totals.repContactRate).toBe(83.3);
     expect(totals.representantsContacted).toBe(3);
     expect(totals.prospectsCreated).toBe(2);
   });
@@ -334,9 +335,9 @@ describe('qualifier un représentant : les chiffres d’Alice', () => {
   it('les taux d’équipe se recalculent sur les sommes, sans moyenner les lignes', async () => {
     const totals = await surLeJeu(async ({ service }) => (await service.activite(FENETRE)).totals);
 
-    // 3 réponses sur 5 appels retenus : 60 %, et non la moyenne de 50 % et 100 %.
-    expect(totals.repContactRate).toBe(60);
-    expect(totals.repCallbackRate).toBe(20);
+    // 5 réponses sur 6 appels retenus : 83,3 %, et non la moyenne des lignes.
+    expect(totals.repContactRate).toBe(83.3);
+    expect(totals.repCallbackRate).toBe(16.7);
   });
 
   it('un seul téléconseiller demandé : le total ne retient que le sien', async () => {
@@ -345,7 +346,7 @@ describe('qualifier un représentant : les chiffres d’Alice', () => {
         (await service.activite({ ...FENETRE, commercialId: alice })).totals,
     );
 
-    expect(totals.repCalls).toBe(4);
+    expect(totals.repCalls).toBe(5);
     expect(totals.repQuestioned).toBe(1);
     expect(totals.repQualified).toBe(0);
   });

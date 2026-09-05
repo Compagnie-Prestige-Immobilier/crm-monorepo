@@ -1,7 +1,7 @@
 'use client';
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { DownloadCloudIcon, PlugZapIcon } from 'lucide-react';
+import { DownloadCloudIcon, PlugZapIcon, RefreshCwIcon, Trash2Icon } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -11,6 +11,7 @@ import { SearchField } from '@/components/filters/search-field';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -36,7 +37,9 @@ import {
   fetchInscriptions,
   fetchReglagesEnrolement,
   projetDeLOnglet,
+  purgerInscriptions,
   saveReglagesEnrolement,
+  supprimerInscription,
   tirerPlateforme,
   type EnrolementIndicateurs,
   type FiltresInscriptions,
@@ -150,6 +153,7 @@ function PanneauProjet({ projet }: { projet: Projet }) {
 
       <TableauInscriptions
         etat={inscriptions}
+        projet={projet}
         page={filtres.page ?? 1}
         onPage={(page) => {
           setFiltres((courant) => ({ ...courant, page }));
@@ -161,6 +165,7 @@ function PanneauProjet({ projet }: { projet: Projet }) {
 
 function CarteReglages({ projet }: { projet: Projet }) {
   const queryClient = useQueryClient();
+  const [reconstruction, setReconstruction] = useState(false);
   const reglages = useQuery({
     queryKey: queryKeys.enrolementReglages(projet),
     queryFn: () => fetchReglagesEnrolement(projet),
@@ -199,6 +204,27 @@ function CarteReglages({ projet }: { projet: Projet }) {
     },
     onError: (error: unknown) => {
       toastApiError(error, 'Le tirage n’a pas pu être lancé.');
+    },
+  });
+
+  const reconstruire = useMutation({
+    mutationFn: async () => {
+      const purge = await purgerInscriptions(projet);
+      return { purge, tirage: await tirerPlateforme(projet) };
+    },
+    onSuccess: async ({ purge, tirage }) => {
+      setReconstruction(false);
+      if (tirage.erreur === null) {
+        toast.success(
+          `${formatNumber(purge.supprimees)} inscriptions vidées, ${formatNumber(tirage.lus)} relues.`,
+        );
+      } else {
+        toast.error(tirage.erreur);
+      }
+      await invalider();
+    },
+    onError: (error: unknown) => {
+      toastApiError(error, 'Le miroir n’a pas pu être reconstruit.');
     },
   });
 
@@ -256,17 +282,43 @@ function CarteReglages({ projet }: { projet: Projet }) {
             </div>
           </div>
 
-          <Button
-            type="button"
-            disabled={tirer.isPending || !donnees.configuree}
-            onClick={() => {
-              tirer.mutate();
-            }}
-          >
-            <DownloadCloudIcon className="size-4" />
-            {tirer.isPending ? 'Tirage en cours…' : 'Tirer maintenant'}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={reconstruire.isPending || !donnees.configuree}
+              onClick={() => {
+                setReconstruction(true);
+              }}
+            >
+              <RefreshCwIcon className="size-4" />
+              {reconstruire.isPending ? 'Reconstruction…' : 'Vider puis tirer'}
+            </Button>
+
+            <Button
+              type="button"
+              disabled={tirer.isPending || !donnees.configuree}
+              onClick={() => {
+                tirer.mutate();
+              }}
+            >
+              <DownloadCloudIcon className="size-4" />
+              {tirer.isPending ? 'Tirage en cours…' : 'Tirer maintenant'}
+            </Button>
+          </div>
         </div>
+
+        <ConfirmDialog
+          open={reconstruction}
+          onOpenChange={setReconstruction}
+          title="Vider le miroir puis le reconstruire ?"
+          description="Les inscriptions lues pour ce projet sont effacées du CRM, puis la plateforme est relue en entier. Elle n’est pas modifiée. Les rapprochements sont recalculés à l’identique."
+          confirmLabel="Vider puis tirer"
+          pending={reconstruire.isPending}
+          onConfirm={() => {
+            reconstruire.mutate();
+          }}
+        />
 
         {donnees.configuree ? null : (
           <p role="alert" className="text-[0.875rem] text-destructive">
@@ -529,13 +581,30 @@ interface EtatInscriptions {
 
 function TableauInscriptions({
   etat,
+  projet,
   page,
   onPage,
 }: {
   etat: EtatInscriptions;
+  projet: Projet;
   page: number;
   onPage: (page: number) => void;
 }) {
+  const queryClient = useQueryClient();
+  const [aRetirer, setARetirer] = useState<{ id: string; nom: string } | null>(null);
+
+  const retirer = useMutation({
+    mutationFn: (id: string) => supprimerInscription(projet, id),
+    onSuccess: async () => {
+      setARetirer(null);
+      toast.success('Inscription retirée du miroir.');
+      await queryClient.invalidateQueries({ queryKey: queryKeys.enrolementRoot });
+    },
+    onError: (error: unknown) => {
+      toastApiError(error, 'L’inscription n’a pas pu être retirée.');
+    },
+  });
+
   if (etat.isError) {
     return (
       <QueryErrorState
@@ -571,6 +640,7 @@ function TableauInscriptions({
             <TableHead>Étape</TableHead>
             <TableHead>Inscription</TableHead>
             <TableHead>Prospect</TableHead>
+            <TableHead className="w-12" />
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -595,10 +665,37 @@ function TableauInscriptions({
                 {ligne.inscriteLe === null ? '—' : formatDate(ligne.inscriteLe)}
               </TableCell>
               <TableCell>{ligne.prospectId === null ? 'Non rapproché' : 'Rapproché'}</TableCell>
+              <TableCell>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Retirer ${ligne.prenom} ${ligne.nom} du miroir`}
+                  onClick={() => {
+                    setARetirer({ id: ligne.id, nom: `${ligne.prenom} ${ligne.nom}` });
+                  }}
+                >
+                  <Trash2Icon className="size-4" />
+                </Button>
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
+
+      <ConfirmDialog
+        open={aRetirer !== null}
+        onOpenChange={(ouvert) => {
+          if (!ouvert) setARetirer(null);
+        }}
+        title="Retirer cette inscription du miroir ?"
+        description={`${aRetirer?.nom ?? ''} disparaît de cet écran. La plateforme n’est pas touchée : le prochain tirage la redépose si elle y figure encore.`}
+        confirmLabel="Retirer"
+        pending={retirer.isPending}
+        onConfirm={() => {
+          if (aRetirer !== null) retirer.mutate(aRetirer.id);
+        }}
+      />
 
       <div className="flex items-center justify-between gap-3">
         <p className="text-[0.8125rem] text-muted-foreground tabular-nums">

@@ -124,7 +124,7 @@ ${series(DEMO_VOLUMES.users)}`,
 
   ref(
     ['agents', 'iefs', 'iefDepartements', 'departements', 'statuts'],
-    `INSERT INTO demo.representants (id, "fullName", prenom, "phoneE164", notes, rev, "departementId", "createdById", "clientCreatedAt", "createdAt", "updatedAt", "deletedAt", "iefId", "relationStatus", "whatsappStatus", "whatsappE164", profession, etablissement, "connaitUES", contacte, syndicat, "lastCallAt", "lastCallById", "lastCallOutcome", "nextCallbackAt", "statutQualificationId")
+    `INSERT INTO demo.representants (id, "fullName", prenom, "phoneE164", notes, rev, "departementId", "createdById", "clientCreatedAt", "createdAt", "updatedAt", "deletedAt", "iefId", "relationStatus", "whatsappStatus", "whatsappE164", profession, etablissement, "connaitUES", contacte, syndicat, "lastCallAt", "lastCallById", "lastCallOutcome", "nextCallbackAt", "nextCallbackOrigine", "statutQualificationId")
 SELECT ${id('rep')},
        ${NOMS}[1 + i % 16] || ' ' || ${PRENOMS}[1 + (i / 16) % 12],
        ${PRENOMS}[1 + (i / 16) % 12],
@@ -150,6 +150,9 @@ SELECT ${id('rep')},
        CASE WHEN i % 6 <> 5 THEN ${pick('agents', 'i + 1')} END,
        CASE WHEN i % 6 <> 5 THEN (ARRAY['REACHED','PROSPECTS_PROMISED','UNREACHABLE','CALLBACK','REFUSED','WRONG_NUMBER'])[1 + i % 6]::demo."RepCallOutcome" END,
        CASE WHEN i % 6 = 3 THEN now() + ((1 + i % 10) || ' days')::interval END,
+       -- Meme condition qu'au-dessus : representants_next_callback_origine_check
+       -- refuse une echeance sans origine.
+       CASE WHEN i % 6 = 3 THEN 'PROMIS'::demo."RappelOrigine" END,
        ${pick('statuts', 'i')}
 ${series(DEMO_VOLUMES.representants)}`,
   ),
