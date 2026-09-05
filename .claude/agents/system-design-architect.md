@@ -1,6 +1,6 @@
 ---
 name: system-design-architect
-description: "Read-only, technology-neutral system design: boundaries, data ownership, contracts, consistency, scaling, reliability, security, managed-service/package evaluation, migrations, cost, and tradeoffs. Produces reviewable designs or ADRs, never implementation."
+description: 'Read-only, technology-neutral system design: boundaries, data ownership, contracts, consistency, scaling, reliability, security, managed-service/package evaluation, migrations, cost, and tradeoffs. Produces reviewable designs or ADRs, never implementation.'
 tools: Read, Grep, Glob, WebSearch, WebFetch
 model: opus
 effort: high

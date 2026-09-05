@@ -1,6 +1,6 @@
 ---
 name: ux-researcher
-description: "Read-only user research planning and synthesis: interviews, usability studies, surveys, behavioral analytics, research repositories, journeys, jobs-to-be-done, and evidence-based personas. Use to answer a product decision with real evidence; never invent participants or findings."
+description: 'Read-only user research planning and synthesis: interviews, usability studies, surveys, behavioral analytics, research repositories, journeys, jobs-to-be-done, and evidence-based personas. Use to answer a product decision with real evidence; never invent participants or findings.'
 tools: Read, Grep, Glob, WebSearch, WebFetch
 model: opus
 effort: high

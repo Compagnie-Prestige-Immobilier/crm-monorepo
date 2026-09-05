@@ -6,27 +6,27 @@ Méthode : lecture des sources de l'application et de `forui-0.21.3` (`~/.pub-ca
 
 ## Synthèse
 
-| Id | Sévérité | Écran / zone | Titre | Statut |
-|---|---|---|---|---|
-| UI-01 | majeur | global | Le texte ne peut jamais atteindre 200 % (plafond 1,755) | prouvé par source |
-| UI-02 | majeur | démarrage, intro, mise à jour | Taille de texte et réduction d'animations ignorées sur 3 écrans | prouvé par source |
-| UI-03 | majeur | Accueil Grand Public | « Appels du jour » figé à zéro en dur | prouvé par source |
-| UI-04 | majeur | Fiches Grand Public / Réglages | L'état vide envoie vers un bouton qui n'existe pas | prouvé par source |
-| UI-05 | majeur | Annonces | Lignes non activables par lecteur d'écran / Switch Access | prouvé par source |
-| UI-06 | majeur | À corriger | Cartes sans clé : l'état d'une saisie migre sur une autre | à confirmer par test |
-| UI-07 | majeur | Accueil CHUES | Les compteurs des trois étapes comptent tout, pas le reste à faire | prouvé par source |
-| UI-08 | mineur | bandeaux d'état | Message coupé à 2 lignes : la date limite de mise à jour disparaît | arithmétique, à confirmer |
-| UI-09 | mineur | Mes fiches / Fiches | Une seule recherche partagée entre CHUES et Grand Public | prouvé par source |
-| UI-10 | mineur | mémoire de route | Le même écran est restauré dans un projet et pas dans l'autre | prouvé par source |
-| UI-11 | mineur | 8 écrans | Roues de chargement sans libellé accessible | prouvé par source |
-| UI-12 | mineur | Réglages | Les cinq en-têtes de section ne sont pas des titres | prouvé par source |
-| UI-13 | mineur | Quel représentant ? | La recherche n'est jamais vidée entre deux visites | prouvé par source |
-| UI-14 | mineur | Quel représentant ? | État vide sans geste de sortie | prouvé par source |
-| UI-15 | cosmétique | Chiffres | Heure de pointe « entre 23 h et 24 h » | prouvé par source |
-| UI-16 | cosmétique | À propos | Version « 1.0.0 » en dur alors que `PackageInfo` la fournit | prouvé par source |
-| UI-17 | cosmétique | Accueil CHUES | Erreur annoncée « en cours de lecture », deux glyphes de tiret | prouvé par source |
-| UI-18 | cosmétique | Accueil CHUES / GP | Minuteur d'une minute qui bat même sans rappel | prouvé par source |
-| UI-19 | cosmétique | vocabulaire | « Rappels » contre « Rappels promis » du web ; « Fiches » veut dire deux choses | prouvé par source |
+| Id    | Sévérité   | Écran / zone                   | Titre                                                                           | Statut                    |
+| ----- | ---------- | ------------------------------ | ------------------------------------------------------------------------------- | ------------------------- |
+| UI-01 | majeur     | global                         | Le texte ne peut jamais atteindre 200 % (plafond 1,755)                         | prouvé par source         |
+| UI-02 | majeur     | démarrage, intro, mise à jour  | Taille de texte et réduction d'animations ignorées sur 3 écrans                 | prouvé par source         |
+| UI-03 | majeur     | Accueil Grand Public           | « Appels du jour » figé à zéro en dur                                           | prouvé par source         |
+| UI-04 | majeur     | Fiches Grand Public / Réglages | L'état vide envoie vers un bouton qui n'existe pas                              | prouvé par source         |
+| UI-05 | majeur     | Annonces                       | Lignes non activables par lecteur d'écran / Switch Access                       | prouvé par source         |
+| UI-06 | majeur     | À corriger                     | Cartes sans clé : l'état d'une saisie migre sur une autre                       | à confirmer par test      |
+| UI-07 | majeur     | Accueil CHUES                  | Les compteurs des trois étapes comptent tout, pas le reste à faire              | prouvé par source         |
+| UI-08 | mineur     | bandeaux d'état                | Message coupé à 2 lignes : la date limite de mise à jour disparaît              | arithmétique, à confirmer |
+| UI-09 | mineur     | Mes fiches / Fiches            | Une seule recherche partagée entre CHUES et Grand Public                        | prouvé par source         |
+| UI-10 | mineur     | mémoire de route               | Le même écran est restauré dans un projet et pas dans l'autre                   | prouvé par source         |
+| UI-11 | mineur     | 8 écrans                       | Roues de chargement sans libellé accessible                                     | prouvé par source         |
+| UI-12 | mineur     | Réglages                       | Les cinq en-têtes de section ne sont pas des titres                             | prouvé par source         |
+| UI-13 | mineur     | Quel représentant ?            | La recherche n'est jamais vidée entre deux visites                              | prouvé par source         |
+| UI-14 | mineur     | Quel représentant ?            | État vide sans geste de sortie                                                  | prouvé par source         |
+| UI-15 | cosmétique | Chiffres                       | Heure de pointe « entre 23 h et 24 h »                                          | prouvé par source         |
+| UI-16 | cosmétique | À propos                       | Version « 1.0.0 » en dur alors que `PackageInfo` la fournit                     | prouvé par source         |
+| UI-17 | cosmétique | Accueil CHUES                  | Erreur annoncée « en cours de lecture », deux glyphes de tiret                  | prouvé par source         |
+| UI-18 | cosmétique | Accueil CHUES / GP             | Minuteur d'une minute qui bat même sans rappel                                  | prouvé par source         |
+| UI-19 | cosmétique | vocabulaire                    | « Rappels » contre « Rappels promis » du web ; « Fiches » veut dire deux choses | prouvé par source         |
 
 ## Fiches
 

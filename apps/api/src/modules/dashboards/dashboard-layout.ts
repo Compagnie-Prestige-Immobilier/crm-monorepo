@@ -76,7 +76,6 @@ const CLASSEMENT: ReglesDeMarque = {
   defaut: 'barres-horizontales',
   compatibles: CATEGORIE_MARQUES,
 };
-const COMPOSITION: ReglesDeMarque = { defaut: 'barres-100', compatibles: COMPOSITION_MARQUES };
 const MATRICE: ReglesDeMarque = { defaut: 'carte-de-chaleur', compatibles: MATRICE_MARQUES };
 
 /** La marque par défaut de chaque source, et les marques compatibles avec sa forme de données. */
@@ -134,6 +133,13 @@ const SOURCE_MARQUES: Record<DashboardSource, ReglesDeMarque> = {
   'par-banque': { defaut: 'anneau', compatibles: COMPOSITION_MARQUES },
   'delais-medians': CLASSEMENT,
   'rendement-par-departement': CLASSEMENT,
+
+  'enrolement-inscriptions': CHIFFRE,
+  'enrolement-taux-rapprochement': TAUX,
+  'enrolement-taux-conversion': TAUX,
+  'enrolement-par-jour': { defaut: 'courbe', compatibles: SERIE_TEMPORELLE_MARQUES },
+  'enrolement-par-etape': { defaut: 'camembert', compatibles: COMPOSITION_MARQUES },
+  'enrolement-par-teleconseiller': CLASSEMENT,
 };
 
 function toPresentation(raw: Record<string, unknown>): DispositionPresentation | undefined {

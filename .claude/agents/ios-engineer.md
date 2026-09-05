@@ -1,6 +1,6 @@
 ---
 name: ios-engineer
-description: "Native Apple-platform implementation in Swift: SwiftUI/UIKit, structured concurrency, persistence, networking, widgets, purchases, device integration, SwiftPM, and Xcode verification. Use for native iOS/iPadOS and related Apple targets; route Flutter and React Native to mobile-engineer."
+description: 'Native Apple-platform implementation in Swift: SwiftUI/UIKit, structured concurrency, persistence, networking, widgets, purchases, device integration, SwiftPM, and Xcode verification. Use for native iOS/iPadOS and related Apple targets; route Flutter and React Native to mobile-engineer.'
 tools: Read, Write, Edit, Bash, Grep, Glob, WebSearch, WebFetch
 model: opus
 effort: high

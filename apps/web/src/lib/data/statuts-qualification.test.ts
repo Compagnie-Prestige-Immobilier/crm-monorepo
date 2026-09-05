@@ -18,6 +18,7 @@ const statut = (
   label,
   effect,
   requiresCallback: false,
+  requiresComment: false,
   retryAfterMinutes: null,
   priorite: 'NORMALE',
   relationStatus: null,

@@ -22,30 +22,28 @@ describe('unwrap', () => {
   });
 
   it('carries the status and the parsed body onto the thrown error', () => {
-    const response = responseWith(409);
-    try {
-      unwrap({ error: { message: 'doublon', code: 'PHONE_TAKEN' }, response });
-      expect.unreachable('unwrap must throw');
-    } catch (error) {
-      expect(error).toBeInstanceOf(ApiError);
-      const apiError = error as ApiError<{ code: string }>;
-      expect(apiError.status).toBe(409);
-      expect(apiError.message).toBe('doublon');
-      expect(apiError.body.code).toBe('PHONE_TAKEN');
-    }
+    const lancer = (): unknown =>
+      unwrap({ error: { message: 'doublon', code: 'PHONE_TAKEN' }, response: responseWith(409) });
+
+    expect(lancer).toThrow(ApiError);
+    expect(lancer).toThrow(
+      expect.objectContaining({
+        status: 409,
+        message: 'doublon',
+        body: expect.objectContaining({ code: 'PHONE_TAKEN' }),
+      }),
+    );
   });
 
   // class-validator returns `message` as an array of strings.
   it('flattens a class-validator message array into the error message', () => {
-    try {
+    const lancer = (): unknown =>
       unwrap({
         error: { message: ['nom requis', 'telephone requis'] },
         response: responseWith(400),
       });
-      expect.unreachable('unwrap must throw');
-    } catch (error) {
-      expect((error as ApiError).message).toBe('nom requis, telephone requis');
-    }
+
+    expect(lancer).toThrow(expect.objectContaining({ message: 'nom requis, telephone requis' }));
   });
 });
 

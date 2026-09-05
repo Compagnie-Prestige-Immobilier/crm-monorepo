@@ -38,7 +38,7 @@ const user = {
 /** Ce que le téléconseiller a sous les yeux quand une fiche est ouverte. */
 function SousVerrou({ user: compte }: { user: SessionUser }): React.JSX.Element {
   useVerrouNavigation(true, vi.fn());
-  return <UserMenu user={compte} />;
+  return <UserMenu user={compte} demoEnabled />;
 }
 
 const ouvrirLeMenu = async (interaction: ReturnType<typeof userEvent.setup>): Promise<void> => {
@@ -74,7 +74,7 @@ beforeEach(() => {
 it('quitte le mode démo et revient au choix des espaces', async () => {
   const interaction = userEvent.setup();
   vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 200 }));
-  renderWithQuery(<UserMenu user={user} />);
+  renderWithQuery(<UserMenu user={user} demoEnabled />);
 
   await ouvrirLeMenu(interaction);
   await interaction.click(await screen.findByRole('menuitem', { name: 'Quitter l’espace démo' }));
@@ -87,6 +87,16 @@ it('quitte le mode démo et revient au choix des espaces', async () => {
     });
     expect(routerMock.refresh).toHaveBeenCalled();
   });
+});
+
+it('ne propose aucune bascule quand l’espace démo est fermé', async () => {
+  const interaction = userEvent.setup();
+  renderWithQuery(<UserMenu user={user} demoEnabled={false} />);
+
+  await ouvrirLeMenu(interaction);
+
+  await screen.findByRole('menuitem', { name: 'Se déconnecter' });
+  expect(screen.queryByRole('menuitem', { name: /espace démo/u })).toBeNull();
 });
 
 // EB-08 : la fiche tenue reste verrouillée sur le serveur. Se déconnecter la
@@ -129,7 +139,7 @@ it('refuse le changement d’espace tant qu’une fiche est en main', async () =
 it('déconnecte quand aucune fiche n’est en main', async () => {
   const interaction = userEvent.setup();
   vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 200 }));
-  renderWithQuery(<UserMenu user={user} />);
+  renderWithQuery(<UserMenu user={user} demoEnabled />);
 
   await ouvrirLeMenu(interaction);
   await interaction.click(await screen.findByRole('menuitem', { name: 'Se déconnecter' }));

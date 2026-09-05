@@ -8,17 +8,17 @@ réponses du serveur local `http://localhost:3001`.
 
 ## Synthèse
 
-| Réf | Sévérité | Formulaire | Titre |
-| --- | --- | --- | --- |
-| FOR-01 | majeur | Prospect (CHUES et Grand Public) | Nom et prénom sans longueur maximale, refusés par le serveur |
-| FOR-02 | majeur | Prospect Grand Public | Ancienneté hors des bornes admises (0, 9999 mois) |
-| FOR-03 | mineur | Prospect Grand Public | Profession sans longueur maximale, bornée partout ailleurs |
-| FOR-04 | majeur | Prospect, Représentant, WhatsApp | Un numéro collé au format international devient un autre numéro |
-| FOR-05 | majeur | Conversion (phase 2) | Adresse e-mail à domaine d'une lettre acceptée, refusée par le serveur |
-| FOR-06 | mineur | Qualification représentant | Deux appuis sur « Enregistrer » consignent deux appels |
-| FOR-07 | mineur | Qualification représentant, conversion | L'heure de rappel choisie disparaît de l'écran sans disparaître de l'envoi |
-| FOR-08 | mineur | Visite (accueil) | « −15 min » avant minuit inscrit la visite la veille |
-| FOR-09 | mineur | Connexion | Champs d'identifiants hors `AutofillGroup` : rien n'est jamais enregistré |
+| Réf    | Sévérité | Formulaire                             | Titre                                                                      |
+| ------ | -------- | -------------------------------------- | -------------------------------------------------------------------------- |
+| FOR-01 | majeur   | Prospect (CHUES et Grand Public)       | Nom et prénom sans longueur maximale, refusés par le serveur               |
+| FOR-02 | majeur   | Prospect Grand Public                  | Ancienneté hors des bornes admises (0, 9999 mois)                          |
+| FOR-03 | mineur   | Prospect Grand Public                  | Profession sans longueur maximale, bornée partout ailleurs                 |
+| FOR-04 | majeur   | Prospect, Représentant, WhatsApp       | Un numéro collé au format international devient un autre numéro            |
+| FOR-05 | majeur   | Conversion (phase 2)                   | Adresse e-mail à domaine d'une lettre acceptée, refusée par le serveur     |
+| FOR-06 | mineur   | Qualification représentant             | Deux appuis sur « Enregistrer » consignent deux appels                     |
+| FOR-07 | mineur   | Qualification représentant, conversion | L'heure de rappel choisie disparaît de l'écran sans disparaître de l'envoi |
+| FOR-08 | mineur   | Visite (accueil)                       | « −15 min » avant minuit inscrit la visite la veille                       |
+| FOR-09 | mineur   | Connexion                              | Champs d'identifiants hors `AutofillGroup` : rien n'est jamais enregistré  |
 
 Total : 4 majeurs, 5 mineurs, 0 bloquant.
 

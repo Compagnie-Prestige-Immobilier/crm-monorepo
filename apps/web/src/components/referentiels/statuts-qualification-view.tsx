@@ -369,6 +369,9 @@ function FormulaireStatut({
             label: values.label.trim(),
             effect: values.effect,
             requiresCallback: values.requiresCallback,
+            // Cet écran ne pose pas la question : seuls les statuts système
+            // exigent un motif, et ils ne se créent pas d'ici.
+            requiresComment: false,
             retryAfterMinutes: values.reessai === '' ? null : Number(values.reessai),
             priorite: values.priorite,
             relationStatus: relationPosee(values.relation),

@@ -9,7 +9,10 @@ describe('createGrandPublicClient', () => {
       authorization = new Request(input).headers.get('Authorization');
       return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
     };
-    const client = createGrandPublicClient('https://gp.test/api', { fetch, getAccessToken: () => 'jeton' });
+    const client = createGrandPublicClient('https://gp.test/api', {
+      fetch,
+      getAccessToken: () => 'jeton',
+    });
 
     await client.GET('/auth/me');
 

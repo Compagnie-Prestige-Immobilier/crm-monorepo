@@ -84,6 +84,12 @@ jobs:
       # Pas de `p/dart` : ce paquet de règles n'existe pas sur le registre
       # Semgrep (404) et sa présence faisait ABANDONNER le scan entier en
       # rendant « 0 finding » — un vert qui ne voulait rien dire.
+      #
+      # `detect-non-literal-regexp` bloquait sur 28 emplacements, tous des
+      # tests qui construisent un matcher de nom accessible depuis leur propre
+      # paramètre. Aucun `new RegExp(` hors des tests dans le dépôt : la règle
+      # ne protégeait rien et refusait tout. Si du code produit relit une
+      # expression depuis une entrée, c'est cette exclusion qu'il faut retirer.
       - name: semgrep
         run: |
           semgrep scan \
@@ -97,6 +103,7 @@ jobs:
             --config=p/owasp-top-ten \
             --exclude-rule=package_managers.npm.npm-missing-minimum-release-age.npm-missing-minimum-release-age \
             --exclude-rule=package_managers.pnpm.pnpm-missing-minimum-release-age.pnpm-minimum-release-age \
+            --exclude-rule=javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp \
             --exclude=node_modules --exclude=build \
             --exclude='*.g.dart' --exclude=.dart_tool \
             --metrics=off --error

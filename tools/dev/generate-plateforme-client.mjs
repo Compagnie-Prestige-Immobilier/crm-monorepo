@@ -24,7 +24,9 @@ const PLATEFORMES = {
 const [plateforme, ...flags] = process.argv.slice(2);
 const backendRelatif = PLATEFORMES[plateforme];
 if (!backendRelatif) {
-  console.error(`Plateforme inconnue : ${plateforme}. Attendu : ${Object.keys(PLATEFORMES).join(', ')}.`);
+  console.error(
+    `Plateforme inconnue : ${plateforme}. Attendu : ${Object.keys(PLATEFORMES).join(', ')}.`,
+  );
   process.exit(1);
 }
 
@@ -34,10 +36,15 @@ const spec = join(packageDir, 'openapi.json');
 const out = join(packageDir, 'src', 'generated', 'schema.ts');
 const generated = `packages/api-client-${plateforme}/src/generated`;
 
-const run = (command, args, cwd = packageDir) => execFileSync(command, args, { cwd, stdio: 'inherit' });
+const run = (command, args, cwd = packageDir) =>
+  execFileSync(command, args, { cwd, stdio: 'inherit' });
 
 if (flags.includes('--export')) {
-  const backend = resolve(repoRoot, process.env.PLATEFORME_DIR ?? join('..', 'PLATEFORME'), backendRelatif);
+  const backend = resolve(
+    repoRoot,
+    process.env.PLATEFORME_DIR ?? join('..', 'PLATEFORME'),
+    backendRelatif,
+  );
   if (!existsSync(join(backend, 'artisan'))) {
     console.error(`Backend introuvable : ${backend}. Définir PLATEFORME_DIR.`);
     process.exit(1);
@@ -65,6 +72,8 @@ try {
 try {
   git(['diff', '--exit-code', '--', generated], 'inherit');
 } catch {
-  console.error(`\n${generated} n'est pas à jour par rapport à openapi.json.\nCommitter les fichiers régénérés. Ne jamais les éditer à la main.\n`);
+  console.error(
+    `\n${generated} n'est pas à jour par rapport à openapi.json.\nCommitter les fichiers régénérés. Ne jamais les éditer à la main.\n`,
+  );
   if (process.env.CI) process.exit(1);
 }

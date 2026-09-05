@@ -4,16 +4,16 @@ Date : 30 août 2026.
 
 ## Environnement
 
-| Élément | Valeur |
-|---|---|
-| AVD | `Pixel_10_Pro_XL` (seul AVD), `emulator-5554` |
-| Écran | 1344 x 2992, densité 480 |
-| Système | `sdk gphone16k arm64`, fuseau `Africa/Dakar` |
-| Flutter | 3.41.7 via FVM, build **debug** (`emu.sh run`) |
-| Application | `sn.cpi.go`, moteur de rendu Impeller (OpenGLES) |
-| Commit | `e8baacd`, arbre de travail **modifié** |
-| API | `http://localhost:3001`, vue par l'émulateur comme `http://10.0.2.2:3001` |
-| Compte | `fixture.awa@cpi.sn` (COMMERCIAL / Télécounseiller) |
+| Élément     | Valeur                                                                    |
+| ----------- | ------------------------------------------------------------------------- |
+| AVD         | `Pixel_10_Pro_XL` (seul AVD), `emulator-5554`                             |
+| Écran       | 1344 x 2992, densité 480                                                  |
+| Système     | `sdk gphone16k arm64`, fuseau `Africa/Dakar`                              |
+| Flutter     | 3.41.7 via FVM, build **debug** (`emu.sh run`)                            |
+| Application | `sn.cpi.go`, moteur de rendu Impeller (OpenGLES)                          |
+| Commit      | `e8baacd`, arbre de travail **modifié**                                   |
+| API         | `http://localhost:3001`, vue par l'émulateur comme `http://10.0.2.2:3001` |
+| Compte      | `fixture.awa@cpi.sn` (COMMERCIAL / Télécounseiller)                       |
 
 L'URL de l'API n'a demandé aucun `--dart-define` : `ApiEnvironment` retient
 `http://10.0.2.2:3001` par défaut hors release
@@ -36,16 +36,16 @@ shell, le `.env` de `apps/api` n'étant pas lu par
 
 ## Synthèse
 
-| Id | Sévérité | Parcours | Titre |
-|---|---|---|---|
-| EMU-01 | bloquant | CHUES, ajout puis conversion de prospect | Le formulaire promet « Il sera enregistré », le serveur refuse le numéro, et la saisie est bloquée à vie : aucune modification possible, et l'application laisse enchaîner une conversion complète par-dessus |
-| EMU-02 | majeur | CHUES, consigner un appel | Écran « Enregistré » sans sortie : retour Android et flèche de retour inertes |
-| EMU-03 | majeur | Connexion | La saisie au clavier bloque le fil principal jusqu'à 13,7 s : caractères perdus, puis « CPI GO isn't responding » |
-| EMU-04 | mineur | CHUES, ajout de prospect | Doublon de téléphone : la seule action offerte est « Réessayer », qui échoue toujours |
-| EMU-05 | mineur | Introduction | Le retour Android sur la page 2 sur 2 ferme l'application au lieu de revenir à la page 1 |
-| EMU-06 | mineur | CHUES, étape 1, résultat « À rappeler » | Le récapitulatif « À enregistrer » n'affiche pas la date du rappel programmé |
-| EMU-07 | cosmétique | À corriger | Les codes d'erreur bruts `PHONE_INVALID` et `PHASE2_PROSPECT_NOT_FOUND` sont montrés au télécounseiller |
-| EMU-08 | cosmétique | CHUES, ajout de prospect | Le libellé de l'interrupteur « Le représentant lui-même est intéressé » est tronqué à la taille de texte par défaut |
+| Id     | Sévérité   | Parcours                                 | Titre                                                                                                                                                                                                         |
+| ------ | ---------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| EMU-01 | bloquant   | CHUES, ajout puis conversion de prospect | Le formulaire promet « Il sera enregistré », le serveur refuse le numéro, et la saisie est bloquée à vie : aucune modification possible, et l'application laisse enchaîner une conversion complète par-dessus |
+| EMU-02 | majeur     | CHUES, consigner un appel                | Écran « Enregistré » sans sortie : retour Android et flèche de retour inertes                                                                                                                                 |
+| EMU-03 | majeur     | Connexion                                | La saisie au clavier bloque le fil principal jusqu'à 13,7 s : caractères perdus, puis « CPI GO isn't responding »                                                                                             |
+| EMU-04 | mineur     | CHUES, ajout de prospect                 | Doublon de téléphone : la seule action offerte est « Réessayer », qui échoue toujours                                                                                                                         |
+| EMU-05 | mineur     | Introduction                             | Le retour Android sur la page 2 sur 2 ferme l'application au lieu de revenir à la page 1                                                                                                                      |
+| EMU-06 | mineur     | CHUES, étape 1, résultat « À rappeler »  | Le récapitulatif « À enregistrer » n'affiche pas la date du rappel programmé                                                                                                                                  |
+| EMU-07 | cosmétique | À corriger                               | Les codes d'erreur bruts `PHONE_INVALID` et `PHASE2_PROSPECT_NOT_FOUND` sont montrés au télécounseiller                                                                                                       |
+| EMU-08 | cosmétique | CHUES, ajout de prospect                 | Le libellé de l'interrupteur « Le représentant lui-même est intéressé » est tronqué à la taille de texte par défaut                                                                                           |
 
 ---
 
@@ -134,6 +134,7 @@ Actions offertes sous « Autres », aucune ne corrige :
 ```
 
 Captures :
+
 - `docs/qa-mobile/captures/emu06-a-corriger-impasse.jpg` (première saisie bloquée, `PHONE_INVALID`)
 - `docs/qa-mobile/captures/emu06-cascade-2-saisies.jpg` (les deux saisies bloquées)
 - `docs/qa-mobile/captures/emu06-fiche-sans-modification.jpg` (la fiche n'offre pas la modification)
@@ -545,21 +546,21 @@ Captures conservées pour référence :
 Le flux a été interrompu par une coupure de session. Les parcours suivants n'ont
 **pas** été exécutés et ne doivent pas être considérés comme couverts.
 
-| Parcours | Raison |
-|---|---|
-| Résultats « Joignable » et « Injoignable », question « représentant CHUES » oui/non, représentant déjà qualifié | Temps ; seul le chemin « À rappeler » a été suivi jusqu'au bout |
-| Brouillon d'un formulaire de prospect interrompu | Non atteint |
-| Conversion d'un prospect **valide** (phase 2 / 3, méthodes autres que « Plateforme », champs étendus) | Seule la conversion d'un prospect condamné a été suivie, pour prouver EMU-01 |
-| Rappels promis, notifications déclenchées, échéance passée | Non atteint |
-| Historique, onglet « Fiches » | Non atteint |
-| Grand Public (saisie prospect direct) | Non atteint |
-| Accueil (registre des visites, formulaire de visite, chiffres) | Le compte utilisé est COMMERCIAL ; demande une reconnexion en `fixture.accueil@cpi.sn` |
-| Réglages (thème, taille de texte, animations), à propos, permission batterie | Non atteint |
-| Déconnexion puis reconnexion avec un autre rôle, fuite de données de l'ancien compte | Non atteint. Déjà couvert par SEC-01 de `securite-session.md` et SYN-02 de `synchronisation.md` : ne pas compter deux fois |
-| Saisie hors ligne puis synchronisation, mode avion 10 minutes, application tuée pendant une synchronisation | Non atteint. Domaine déjà couvert par `synchronisation.md` (SYN-01 à SYN-07) |
-| Rotation d'écran, taille de texte à 200 %, réduction d'animations, écran de 320 dp | Non atteint. Recouvrement avec UI-01 et UI-02 de `navigation-ui.md` |
-| Horloge de l'appareil décalée | Non atteint |
-| Saisie d'emoji dans un champ libre | `adb shell input text` ne transmet pas les caractères hors BMP ; demande un autre canal (presse-papier ou IME de test) |
+| Parcours                                                                                                        | Raison                                                                                                                     |
+| --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Résultats « Joignable » et « Injoignable », question « représentant CHUES » oui/non, représentant déjà qualifié | Temps ; seul le chemin « À rappeler » a été suivi jusqu'au bout                                                            |
+| Brouillon d'un formulaire de prospect interrompu                                                                | Non atteint                                                                                                                |
+| Conversion d'un prospect **valide** (phase 2 / 3, méthodes autres que « Plateforme », champs étendus)           | Seule la conversion d'un prospect condamné a été suivie, pour prouver EMU-01                                               |
+| Rappels promis, notifications déclenchées, échéance passée                                                      | Non atteint                                                                                                                |
+| Historique, onglet « Fiches »                                                                                   | Non atteint                                                                                                                |
+| Grand Public (saisie prospect direct)                                                                           | Non atteint                                                                                                                |
+| Accueil (registre des visites, formulaire de visite, chiffres)                                                  | Le compte utilisé est COMMERCIAL ; demande une reconnexion en `fixture.accueil@cpi.sn`                                     |
+| Réglages (thème, taille de texte, animations), à propos, permission batterie                                    | Non atteint                                                                                                                |
+| Déconnexion puis reconnexion avec un autre rôle, fuite de données de l'ancien compte                            | Non atteint. Déjà couvert par SEC-01 de `securite-session.md` et SYN-02 de `synchronisation.md` : ne pas compter deux fois |
+| Saisie hors ligne puis synchronisation, mode avion 10 minutes, application tuée pendant une synchronisation     | Non atteint. Domaine déjà couvert par `synchronisation.md` (SYN-01 à SYN-07)                                               |
+| Rotation d'écran, taille de texte à 200 %, réduction d'animations, écran de 320 dp                              | Non atteint. Recouvrement avec UI-01 et UI-02 de `navigation-ui.md`                                                        |
+| Horloge de l'appareil décalée                                                                                   | Non atteint                                                                                                                |
+| Saisie d'emoji dans un champ libre                                                                              | `adb shell input text` ne transmet pas les caractères hors BMP ; demande un autre canal (presse-papier ou IME de test)     |
 
 ## Reproduire l'environnement
 

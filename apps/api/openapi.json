@@ -19713,6 +19713,625 @@
         "summary": "Supprime une campagne et sa répartition.",
         "tags": ["lots-export"]
       }
+    },
+    "/api/v1/enrolement/{projet}/inscriptions": {
+      "get": {
+        "operationId": "listEnrolementInscriptions",
+        "parameters": [
+          {
+            "name": "projet",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 25,
+              "type": "number"
+            }
+          },
+          {
+            "name": "statut",
+            "required": false,
+            "in": "query",
+            "description": "Statut distant, tel que la plateforme le rend.",
+            "schema": {
+              "maxLength": 80,
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Recherche libre sur le nom, l’e-mail ou le téléphone.",
+            "schema": {
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "description": "Borne basse sur la date d’inscription, incluse.",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "description": "Borne haute sur la date d’inscription, incluse.",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "rapproche",
+            "required": false,
+            "in": "query",
+            "description": "Vrai : seulement les inscriptions rapprochées d’un prospect. Faux : seulement celles qui ne le sont pas.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "inclureDisparues",
+            "required": false,
+            "in": "query",
+            "description": "Vrai : montrer aussi les inscriptions que la plateforme ne rend plus. Absente, elles sont masquées.",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InscriptionsPageDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ressource introuvable, ou supprimée.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Les inscriptions lues sur la plateforme du projet.",
+        "tags": ["enrolement"]
+      }
+    },
+    "/api/v1/enrolement/{projet}/inscriptions/{id}": {
+      "get": {
+        "operationId": "getEnrolementInscription",
+        "parameters": [
+          {
+            "name": "projet",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InscriptionPlateformeDetailDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ressource introuvable, ou supprimée.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Une inscription, charge utile brute comprise.",
+        "tags": ["enrolement"]
+      }
+    },
+    "/api/v1/enrolement/{projet}/indicateurs": {
+      "get": {
+        "operationId": "getEnrolementIndicateurs",
+        "parameters": [
+          {
+            "name": "projet",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 25,
+              "type": "number"
+            }
+          },
+          {
+            "name": "statut",
+            "required": false,
+            "in": "query",
+            "description": "Statut distant, tel que la plateforme le rend.",
+            "schema": {
+              "maxLength": 80,
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Recherche libre sur le nom, l’e-mail ou le téléphone.",
+            "schema": {
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateFrom",
+            "required": false,
+            "in": "query",
+            "description": "Borne basse sur la date d’inscription, incluse.",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dateTo",
+            "required": false,
+            "in": "query",
+            "description": "Borne haute sur la date d’inscription, incluse.",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "rapproche",
+            "required": false,
+            "in": "query",
+            "description": "Vrai : seulement les inscriptions rapprochées d’un prospect. Faux : seulement celles qui ne le sont pas.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "inclureDisparues",
+            "required": false,
+            "in": "query",
+            "description": "Vrai : montrer aussi les inscriptions que la plateforme ne rend plus. Absente, elles sont masquées.",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrolementIndicateursDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ressource introuvable, ou supprimée.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Les indicateurs d’enrôlement du projet.",
+        "tags": ["enrolement"]
+      }
+    },
+    "/api/v1/enrolement/{projet}/reglages": {
+      "get": {
+        "operationId": "getEnrolementReglages",
+        "parameters": [
+          {
+            "name": "projet",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrolementReglagesDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ressource introuvable, ou supprimée.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fréquence, date de reprise et compte rendu du dernier tirage.",
+        "tags": ["enrolement"]
+      },
+      "put": {
+        "operationId": "putEnrolementReglages",
+        "parameters": [
+          {
+            "name": "projet",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEnrolementReglagesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrolementReglagesDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ressource introuvable, ou supprimée.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change la fréquence de tirage ou la date de reprise.",
+        "tags": ["enrolement"]
+      }
+    },
+    "/api/v1/enrolement/{projet}/tirage": {
+      "post": {
+        "description": "Le tirage est idempotent : une inscription déjà lue est mise à jour, jamais redéposée.",
+        "operationId": "postEnrolementTirage",
+        "parameters": [
+          {
+            "name": "projet",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TirageDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ressource introuvable, ou supprimée.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tire la plateforme maintenant, sans attendre l’échéance.",
+        "tags": ["enrolement"]
+      }
     }
   },
   "info": {
@@ -29894,7 +30513,13 @@
           "methodes-d-adhesion",
           "par-banque",
           "delais-medians",
-          "rendement-par-departement"
+          "rendement-par-departement",
+          "enrolement-inscriptions",
+          "enrolement-taux-rapprochement",
+          "enrolement-taux-conversion",
+          "enrolement-par-jour",
+          "enrolement-par-etape",
+          "enrolement-par-teleconseiller"
         ]
       },
       "DashboardMarque": {
@@ -30652,6 +31277,474 @@
           "distribution",
           "repartition",
           "performance"
+        ]
+      },
+      "InscriptionPlateformeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "projet": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Projet"
+              }
+            ]
+          },
+          "identifiantDistant": {
+            "type": "string"
+          },
+          "nom": {
+            "type": "string"
+          },
+          "prenom": {
+            "type": "string"
+          },
+          "phoneE164": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "statutDistant": {
+            "type": "string"
+          },
+          "etapeDistante": {
+            "type": "number",
+            "nullable": true
+          },
+          "inscriteLe": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "soumiseLe": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "decideeLe": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "disparueLe": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Date du tirage complet qui n’a plus trouvé cette inscription sur la plateforme."
+          },
+          "prospectId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "dernierTirageAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "projet",
+          "identifiantDistant",
+          "nom",
+          "prenom",
+          "phoneE164",
+          "email",
+          "statutDistant",
+          "etapeDistante",
+          "inscriteLe",
+          "soumiseLe",
+          "decideeLe",
+          "disparueLe",
+          "prospectId",
+          "dernierTirageAt"
+        ]
+      },
+      "InscriptionsPageDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InscriptionPlateformeDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMetaDto"
+          }
+        },
+        "required": ["items", "meta"]
+      },
+      "InscriptionPlateformeDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "projet": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Projet"
+              }
+            ]
+          },
+          "identifiantDistant": {
+            "type": "string"
+          },
+          "nom": {
+            "type": "string"
+          },
+          "prenom": {
+            "type": "string"
+          },
+          "phoneE164": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "statutDistant": {
+            "type": "string"
+          },
+          "etapeDistante": {
+            "type": "number",
+            "nullable": true
+          },
+          "inscriteLe": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "soumiseLe": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "decideeLe": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "disparueLe": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Date du tirage complet qui n’a plus trouvé cette inscription sur la plateforme."
+          },
+          "prospectId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "dernierTirageAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "chargeUtile": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "id",
+          "projet",
+          "identifiantDistant",
+          "nom",
+          "prenom",
+          "phoneE164",
+          "email",
+          "statutDistant",
+          "etapeDistante",
+          "inscriteLe",
+          "soumiseLe",
+          "decideeLe",
+          "disparueLe",
+          "prospectId",
+          "dernierTirageAt",
+          "chargeUtile"
+        ]
+      },
+      "SerieJourDto": {
+        "type": "object",
+        "properties": {
+          "jour": {
+            "type": "string",
+            "format": "date"
+          },
+          "inscriptions": {
+            "type": "number"
+          }
+        },
+        "required": ["jour", "inscriptions"]
+      },
+      "RepartitionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "inscriptions": {
+            "type": "number"
+          }
+        },
+        "required": ["id", "label", "inscriptions"]
+      },
+      "DelaiMedianDto": {
+        "type": "object",
+        "properties": {
+          "leg": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "medianDays": {
+            "type": "number",
+            "nullable": true
+          },
+          "sample": {
+            "type": "number"
+          }
+        },
+        "required": ["leg", "label", "medianDays", "sample"]
+      },
+      "EnrolementIndicateursDto": {
+        "type": "object",
+        "properties": {
+          "projet": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Projet"
+              }
+            ]
+          },
+          "inscriptions": {
+            "type": "number"
+          },
+          "rapprochees": {
+            "type": "number"
+          },
+          "tauxConversion": {
+            "type": "number",
+            "nullable": true,
+            "description": "Prospects convertis du projet qui se retrouvent inscrits. Null quand aucun prospect n’est converti."
+          },
+          "tauxRapprochement": {
+            "type": "number",
+            "nullable": true,
+            "description": "Part des inscriptions rapprochées d’un prospect. Null quand rien n’est inscrit."
+          },
+          "parJour": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SerieJourDto"
+            }
+          },
+          "parEtape": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RepartitionDto"
+            }
+          },
+          "delais": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DelaiMedianDto"
+            }
+          },
+          "parTeleconseiller": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RepartitionDto"
+            }
+          },
+          "parCampagne": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RepartitionDto"
+            }
+          },
+          "parMethode": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RepartitionDto"
+            }
+          }
+        },
+        "required": [
+          "projet",
+          "inscriptions",
+          "rapprochees",
+          "tauxConversion",
+          "tauxRapprochement",
+          "parJour",
+          "parEtape",
+          "delais",
+          "parTeleconseiller",
+          "parCampagne",
+          "parMethode"
+        ]
+      },
+      "DernierTirageDto": {
+        "type": "object",
+        "properties": {
+          "termineLe": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "dureeMs": {
+            "type": "number"
+          },
+          "lus": {
+            "type": "number"
+          },
+          "crees": {
+            "type": "number"
+          },
+          "misAJour": {
+            "type": "number"
+          },
+          "rapproches": {
+            "type": "number"
+          },
+          "disparues": {
+            "type": "number",
+            "description": "Inscriptions que la plateforme ne rend plus, marquées disparues par ce tirage."
+          },
+          "erreur": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "termineLe",
+          "dureeMs",
+          "lus",
+          "crees",
+          "misAJour",
+          "rapproches",
+          "disparues",
+          "erreur"
+        ]
+      },
+      "EnrolementReglagesDto": {
+        "type": "object",
+        "properties": {
+          "projet": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Projet"
+              }
+            ]
+          },
+          "frequenceMinutes": {
+            "type": "number"
+          },
+          "repriseDepuis": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Ne garder que les inscriptions postérieures. Nulle, le tirage reprend tout l’historique."
+          },
+          "configuree": {
+            "type": "boolean",
+            "description": "L’URL et le jeton de la plateforme sont posés dans l’environnement."
+          },
+          "dernierTirage": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DernierTirageDto"
+              }
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "projet",
+          "frequenceMinutes",
+          "repriseDepuis",
+          "configuree",
+          "dernierTirage",
+          "updatedAt"
+        ]
+      },
+      "UpdateEnrolementReglagesDto": {
+        "type": "object",
+        "properties": {
+          "frequenceMinutes": {
+            "type": "number",
+            "minimum": 5,
+            "maximum": 1440,
+            "description": "Absente, la fréquence reste inchangée. À l’usine : 15 minutes."
+          },
+          "repriseDepuis": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Chaîne vide pour reprendre tout l’historique."
+          }
+        }
+      },
+      "TirageDto": {
+        "type": "object",
+        "properties": {
+          "projet": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Projet"
+              }
+            ]
+          },
+          "dureeMs": {
+            "type": "number"
+          },
+          "lus": {
+            "type": "number"
+          },
+          "crees": {
+            "type": "number"
+          },
+          "misAJour": {
+            "type": "number"
+          },
+          "rapproches": {
+            "type": "number"
+          },
+          "disparues": {
+            "type": "number"
+          },
+          "erreur": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "projet",
+          "dureeMs",
+          "lus",
+          "crees",
+          "misAJour",
+          "rapproches",
+          "disparues",
+          "erreur"
         ]
       }
     }

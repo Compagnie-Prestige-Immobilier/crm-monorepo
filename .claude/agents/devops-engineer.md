@@ -1,6 +1,6 @@
 ---
 name: devops-engineer
-description: "Use proactively for bounded build-and-ship automation: CI workflows, dependency/build caches, containers, Kubernetes packaging, GitOps, artifact provenance, release/promotion, environment configuration, and rollback. Edits and validates automation by default; does not deploy, publish, promote, or mutate remote environments unless explicitly authorized."
+description: 'Use proactively for bounded build-and-ship automation: CI workflows, dependency/build caches, containers, Kubernetes packaging, GitOps, artifact provenance, release/promotion, environment configuration, and rollback. Edits and validates automation by default; does not deploy, publish, promote, or mutate remote environments unless explicitly authorized.'
 tools: Read, Write, Edit, Bash, Grep, Glob, WebSearch, WebFetch
 model: opus
 effort: high
