@@ -4,6 +4,7 @@ import type { BankRejectionReason, Projet } from '@crm/database';
 import { v7 as uuidv7 } from 'uuid';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { sansAccents } from '../../common/texte.js';
 import { tryNormalizePhone } from '../../common/phone.js';
 import { isPrismaKnownError } from '../../common/filters/prisma-exception.filter.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
@@ -48,20 +49,6 @@ import type {
 
 const DEFAULT_PAGE_SIZE = 25;
 const DEFAULT_SEARCH_PAGE_SIZE = 20;
-
-/**
- * Le motif de recherche est désaccentué ICI, et non en SQL.
- *
- * `LIKE ANY (SELECT immutable_unaccent(m) FROM unnest(...))` marche, mais le
- * planificateur y perd l'index et retombe en balayage séquentiel : vérifié à
- * l'EXPLAIN. Le tableau doit rester une CONSTANTE pour que le
- * `Bitmap Index Scan` tienne.
- *
- * L'accord avec le dictionnaire de PostgreSQL est vérifié par un test
- * d'intégration, sur les accents que portent réellement les noms d'ici.
- */
-export const sansAccents = (valeur: string): string =>
-  valeur.normalize('NFD').replace(/\p{Diacritic}/gu, '');
 
 /** Sentinelle interne : la transaction n'a rien mis à jour, la révision a bougé. */
 const REV_MISMATCH = Symbol('rev-mismatch');
@@ -355,6 +342,8 @@ export class BankCasesService {
     // permutation se fait sur le TERME : inverser les COLONNES demanderait une
     // seconde expression, que l'index ne couvre pas, et ramènerait le balayage
     // séquentiel que cet index existe pour éviter.
+    // Désaccentué ici et non en SQL : `LIKE ANY (SELECT immutable_unaccent(m)
+    // FROM unnest(...))` fait perdre l'index au planificateur, vérifié à l'EXPLAIN.
     const jetons = sansAccents(term.toLowerCase()).split(/\s+/u).filter(Boolean);
     const [premier, second] = jetons;
     const formesRecherchees =
