@@ -47,30 +47,6 @@ class _CorpsCorrectionVisite extends UpdateVisiteDto {
   };
 }
 
-/// Le corps de la tentative, augmenté de `ouvertureId`.
-///
-/// `CreateRepCallAttemptDto` est engendré depuis un contrat qui ne porte pas
-/// encore ce champ : son `toJson` le jetterait, et le chronomètre ne
-/// s'arrêterait jamais. À retirer dès que le client est régénéré.
-class _CorpsTentativeRepresentant extends CreateRepCallAttemptDto {
-  _CorpsTentativeRepresentant(this._base, this._ouvertureId)
-    : super(
-        id: _base.id,
-        representantId: _base.representantId,
-        outcome: _base.outcome,
-        clientCreatedAt: _base.clientCreatedAt,
-      );
-
-  final CreateRepCallAttemptDto _base;
-  final String _ouvertureId;
-
-  @override
-  Map<String, dynamic> toJson() => <String, dynamic>{
-    ..._base.toJson(),
-    'ouvertureId': _ouvertureId,
-  };
-}
-
 class DioApi implements ApiPort {
   DioApi(this._client);
 
@@ -84,6 +60,7 @@ class DioApi implements ApiPort {
   CallOutcomeReasonsApi get _reasons => _client.getCallOutcomeReasonsApi();
   StatutsQualificationApi get _statuts => _client.getStatutsQualificationApi();
   VisitesApi get _visites => _client.getVisitesApi();
+  OuverturesApi get _ouvertures => _client.getOuverturesApi();
 
   @override
   Future<AuthTokens> login({
@@ -229,96 +206,48 @@ class DioApi implements ApiPort {
 
   @override
   Future<RepCallAttemptResultDto> recordRepCallAttempt(
-    CreateRepCallAttemptDto attempt, {
-    String? ouvertureId,
-  }) async {
+    CreateRepCallAttemptDto attempt,
+  ) async {
     return _guard('repCallAttempt', () async {
       final Response<RepCallAttemptResultDto> response = await _repCampaigns
           .recordRepCallAttempt(
-            createRepCallAttemptDto: ouvertureId == null
-                ? attempt
-                : _CorpsTentativeRepresentant(attempt, ouvertureId),
+            createRepCallAttemptDto: attempt,
             extra: TimeoutProfile.push.extra,
           );
       return _body('repCallAttempt', response);
     });
   }
 
-  /// Les trois routes d'ouverture passent par le Dio nu : le client engendré ne
-  /// les connaît pas encore. À remplacer par `OuverturesApi` à la régénération.
   @override
-  Future<OuvertureFicheDto> ouvrirFiche({
-    required String id,
-    required DateTime openedAt,
-    String? representantId,
-    String? prospectId,
-    Map<String, Object?>? draft,
-  }) async {
+  Future<OuvertureFicheDto> ouvrirFiche(OuvrirFicheDto corps) async {
     return _guard('ouvrirFiche', () async {
-      final Response<Object?> response = await _client.dio.post<Object?>(
-        _ouvertures,
-        data: <String, Object?>{
-          'id': id,
-          'openedAt': openedAt.toUtc().toIso8601String(),
-          'representantId': ?representantId,
-          'prospectId': ?prospectId,
-          'draft': ?draft,
-        },
-        options: Options(extra: TimeoutProfile.push.extra),
-      );
-      return OuvertureFicheDto.fromJson(_objet('ouvrirFiche', response));
+      final Response<OuvertureFicheDto> response = await _ouvertures
+          .ouvrirFiche(ouvrirFicheDto: corps, extra: TimeoutProfile.push.extra);
+      return _body('ouvrirFiche', response);
     });
   }
 
   @override
   Future<OuvertureFicheDto?> ouvertureCourante() async {
     return _guard('ouvertureCourante', () async {
-      final Response<Object?> response = await _client.dio.get<Object?>(
-        '$_ouvertures/courante',
-        options: Options(extra: TimeoutProfile.read.extra),
-      );
-      final Object? corps = response.data;
-      if (corps == null) return null;
-      if (corps is! Map) {
-        throw _undecodableBody(
-          'ouvertureCourante',
-          response.headers.value(Headers.contentTypeHeader),
-          'corps non objet',
-        );
-      }
-      return OuvertureFicheDto.fromJson(corps.cast<String, Object?>());
+      final Response<OuvertureFicheDto> response = await _ouvertures
+          .ouvertureCourante(extra: TimeoutProfile.read.extra);
+      return response.data;
     });
   }
 
   @override
   Future<void> enregistrerBrouillonOuverture({
     required String id,
-    required Map<String, Object?> draft,
+    required EnregistrerBrouillonDto corps,
   }) async {
     await _guard('brouillonOuverture', () async {
-      await _client.dio.put<Object?>(
-        '$_ouvertures/$id/brouillon',
-        data: <String, Object?>{'draft': draft},
-        options: Options(extra: TimeoutProfile.push.extra),
+      await _ouvertures.enregistrerBrouillonOuverture(
+        id: id,
+        enregistrerBrouillonDto: corps,
+        extra: TimeoutProfile.push.extra,
       );
     });
-  }
-
-  static const String _ouvertures = '/api/v1/ouvertures';
-
-  static Map<String, Object?> _objet(
-    String operation,
-    Response<Object?> response,
-  ) {
-    final Object? data = response.data;
-    if (data is! Map) {
-      throw _undecodableBody(
-        operation,
-        response.headers.value(Headers.contentTypeHeader),
-        data == null ? 'corps vide' : 'corps non objet',
-      );
-    }
-    return data.cast<String, Object?>();
   }
 
   @override

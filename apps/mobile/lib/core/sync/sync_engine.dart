@@ -665,12 +665,8 @@ class SyncEngine {
         if (decoded is! Map<String, dynamic>) {
           throw const FormatException('payload non objet');
         }
-        // `ouvertureId` ferme l'ouverture et arrête le chronomètre. Il ne
-        // passe pas par le DTO engendré, qui ne le connaît pas encore.
-        final Object? ouvertureId = decoded['ouvertureId'];
         final RepCallAttemptResultDto result = await _api.recordRepCallAttempt(
           CreateRepCallAttemptDto.fromJson(decoded),
-          ouvertureId: ouvertureId is String ? ouvertureId : null,
         );
         if (result.status == RepCallAttemptApplyStatus.unknownDefaultOpenApi) {
           throw const FormatException('statut serveur inconnu');
@@ -721,13 +717,13 @@ class SyncEngine {
             ? DateTime.tryParse(brut)
             : null;
         if (openedAt == null) throw const FormatException('openedAt illisible');
-        final Object? draft = decoded['draft'];
         await _api.ouvrirFiche(
-          id: row.entityId,
-          openedAt: openedAt,
-          representantId: decoded['representantId'] as String?,
-          prospectId: decoded['prospectId'] as String?,
-          draft: draft is Map ? draft.cast<String, Object?>() : null,
+          OuvrirFicheDto(
+            id: row.entityId,
+            openedAt: openedAt,
+            representantId: decoded['representantId'] as String?,
+            prospectId: decoded['prospectId'] as String?,
+          ),
         );
         await _markDone(
           row,
