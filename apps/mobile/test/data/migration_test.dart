@@ -33,6 +33,7 @@ import 'generated_migrations/schema_v28.dart' as v28schema;
 import 'generated_migrations/schema_v29.dart' as v29schema;
 import 'generated_migrations/schema_v30.dart' as v30schema;
 import 'generated_migrations/schema_v31.dart' as v31schema;
+import 'generated_migrations/schema_v32.dart' as v32schema;
 
 /// Test doré de migration.
 ///
@@ -2794,7 +2795,7 @@ void main() {
   // Le verrou d'ouverture de fiche n'est pas une règle d'écran : c'est l'index
   // partiel qui refuse la seconde. Un palier qui créerait la table sans lui
   // passerait le doré et laisserait deux fiches ouvertes sur le terrain.
-  test('v31 -> v32 pose le verrou d\'ouverture de fiche', () async {
+  test('v31 -> courant pose le verrou d\'ouverture de fiche', () async {
     final schema = await verifier.schemaAt(31);
     final v31schema.DatabaseAtV31 old = v31schema.DatabaseAtV31(
       schema.newConnection(),
@@ -2816,7 +2817,7 @@ void main() {
     await old.close();
 
     final AppDatabase db = AppDatabase(schema.newConnection());
-    await verifier.migrateAndValidate(db, 32);
+    await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
 
     expect(
       await db
@@ -2862,6 +2863,49 @@ void main() {
     );
     await db.close();
   });
+
+  // La fiche ouverte avant la migration n'a pas de chronomètre : elle n'en a
+  // pas un à zéro, elle n'en a pas du tout. Un palier qui recopierait la table
+  // au lieu d'ajouter la colonne perdrait au passage le verrou partiel.
+  test(
+    'v32 -> v33 laisse la fiche ouverte sans départ de chronomètre',
+    () async {
+      final schema = await verifier.schemaAt(32);
+      final v32schema.DatabaseAtV32 old = v32schema.DatabaseAtV32(
+        schema.newConnection(),
+      );
+      await old.customStatement(
+        'INSERT INTO ouvertures_fiche '
+        '(id, opened_by_id, representant_id, opened_at) VALUES (?, ?, ?, ?)',
+        <Object?>['ouv-32', 'user-32', 'rep-32', _iso],
+      );
+      await old.close();
+
+      final AppDatabase db = AppDatabase(schema.newConnection());
+      await verifier.migrateAndValidate(db, 33);
+
+      final OuverturesFicheData reprise = await db
+          .ouvertureCourante(openedById: 'user-32')
+          .getSingle();
+      expect(reprise.openedAt, DateTime.parse(_iso));
+      expect(reprise.firstInputAt, isNull);
+
+      await expectLater(
+        db
+            .into(db.ouverturesFiche)
+            .insert(
+              OuverturesFicheCompanion.insert(
+                id: 'ouv-33',
+                openedById: 'user-32',
+                prospectId: const Value<String?>('pros-33'),
+                openedAt: DateTime.parse(_iso),
+              ),
+            ),
+        throwsA(isA<SqliteException>()),
+      );
+      await db.close();
+    },
+  );
 
   test('v11 -> courant traverse sans créer les tables de campagne', () async {
     final schema = await verifier.schemaAt(11);

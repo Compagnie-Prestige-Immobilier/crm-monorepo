@@ -1163,6 +1163,9 @@ CREATE TABLE ouvertures_fiche (
     released_by_id TEXT NULL,
     released_by_name TEXT NULL,
     released_at DATETIME NULL,
+    -- Le départ du chronomètre : la première lettre saisie ou la première case
+    -- cochée. Nulle tant que la fiche n'a été que lue.
+    first_input_at DATETIME NULL,
     CHECK ((representant_id IS NULL) <> (prospect_id IS NULL))
 );
 
@@ -1209,8 +1212,13 @@ historiqueRepresentant:
     SELECT a.*,
            sq.label AS statut_label,
            sq.effect AS statut_effect,
-           sq.requires_comment AS statut_requires_comment
+           sq.requires_comment AS statut_requires_comment,
+           -- Les DATETIME sont du texte ISO-8601 : la soustraction passe par
+           -- unixepoch(), jamais par une comparaison de chaînes.
+           unixepoch(o.closed_at) - unixepoch(o.first_input_at)
+               AS duree_traitement_secondes
     FROM rep_call_attempts AS a
     LEFT JOIN statuts_qualification AS sq ON sq.id = a.statut_qualification_id
+    LEFT JOIN ouvertures_fiche AS o ON o.closing_attempt_id = a.id
     WHERE a.representant_id = :representantId
     ORDER BY a.client_created_at DESC;
