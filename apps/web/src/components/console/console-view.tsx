@@ -176,6 +176,7 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
       setVise(null);
       setDemandee(null);
       setOuverte(prise);
+      queryClient.setQueryData(queryKeys.ouvertureCourante, prise.ouverture);
     },
     onError: (error) => {
       void reprendreOuverte(reprendre, error);
@@ -193,6 +194,9 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
         onEnregistre={(nom) => {
           setConfirme(nom);
           revenir();
+          // La tentative a fermé l'ouverture : la barre supérieure lit ce cache
+          // pour refuser la déconnexion, et le laisser périmé l'y enfermerait.
+          queryClient.setQueryData(queryKeys.ouvertureCourante, null);
           void queryClient.invalidateQueries({ queryKey: ['prospects'] });
           void queryClient.invalidateQueries({ queryKey: callbackKeys.root });
         }}

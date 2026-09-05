@@ -1,10 +1,13 @@
 'use client';
 
+import { useQuery } from '@tanstack/react-query';
 import {
   ChevronDownIcon,
   FlaskConicalIcon,
+  HeadsetIcon,
   KeyRoundIcon,
   LogOutIcon,
+  PhoneCallIcon,
   UserIcon,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -22,8 +25,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { fetchOuvertureCourante, type OuvertureFiche } from '@/lib/data/ouvertures';
 import { initials } from '@/lib/format';
-import { ROLE_LABELS, type SessionUser } from '@/lib/types';
+import { queryKeys } from '@/lib/query-keys';
+import { peutTenirUneFiche, ROLE_LABELS, type SessionUser } from '@/lib/types';
 import { ficheTenue } from '@/lib/use-verrou-navigation';
 
 /**
@@ -33,9 +38,27 @@ import { ficheTenue } from '@/lib/use-verrou-navigation';
 const SOUS_VERROU =
   'Vous avez une fiche en main. Qualifiez-la, ou demandez à un superviseur de la libérer.';
 
+/** L'écran où la fiche se reprend : les deux consoles rouvrent seules ce que le serveur tient. */
+const ecranDe = (ouverture: OuvertureFiche) =>
+  ouverture.representantId === null
+    ? { href: '/chues/console', Icone: HeadsetIcon }
+    : { href: '/chues/appels-representants', Icone: PhoneCallIcon };
+
 export function UserMenu({ user }: { user: SessionUser }) {
   const router = useRouter();
   const [pending, setPending] = useState<'workspace' | 'logout' | null>(null);
+
+  // EB-08 : `ficheTenue()` ne connaît le verrou que si une console est à
+  // l'écran. Après un rechargement sur une page tierce, seul le serveur sait
+  // encore que la fiche est en main.
+  const ouverture = useQuery({
+    queryKey: queryKeys.ouvertureCourante,
+    queryFn: () => fetchOuvertureCourante(),
+    enabled: peutTenirUneFiche(user.role),
+    refetchOnWindowFocus: true,
+  });
+  const tenue = ouverture.data ?? null;
+  const sousVerrou = (): boolean => ficheTenue() || tenue !== null;
   let workspaceLabel = 'Ouvrir l’espace démo';
   if (user.workspace === 'demo') workspaceLabel = 'Quitter l’espace démo';
   if (pending === 'workspace') workspaceLabel = 'Changement d’espace…';
@@ -43,7 +66,7 @@ export function UserMenu({ user }: { user: SessionUser }) {
   async function switchWorkspace(): Promise<void> {
     // L'écran resterait sur la fiche, mais son ouverture appartient à l'espace
     // qu'on vient de quitter : la qualification n'aurait plus où atterrir.
-    if (ficheTenue()) {
+    if (sousVerrou()) {
       toast.error(SOUS_VERROU);
       return;
     }
@@ -65,7 +88,7 @@ export function UserMenu({ user }: { user: SessionUser }) {
   }
 
   async function signOut(): Promise<void> {
-    if (ficheTenue()) {
+    if (sousVerrou()) {
       toast.error(SOUS_VERROU);
       return;
     }
@@ -112,6 +135,7 @@ export function UserMenu({ user }: { user: SessionUser }) {
           <UserIcon aria-hidden="true" />
           {ROLE_LABELS[user.role]}
         </DropdownMenuItem>
+        {tenue === null ? null : <FicheEnMain ouverture={tenue} />}
         <DropdownMenuSeparator />
         <DropdownMenuItem render={<Link href="/compte" />}>
           <KeyRoundIcon aria-hidden="true" />
@@ -142,5 +166,19 @@ export function UserMenu({ user }: { user: SessionUser }) {
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+/** Le retour vers la fiche tenue : la refuser sans dire où elle est ferait chercher. */
+function FicheEnMain({ ouverture }: { ouverture: OuvertureFiche }) {
+  const { href, Icone } = ecranDe(ouverture);
+  return (
+    <>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem render={<Link href={href} />}>
+        <Icone aria-hidden="true" />
+        <span className="truncate">Reprendre la fiche de {ouverture.ficheNom}</span>
+      </DropdownMenuItem>
+    </>
   );
 }

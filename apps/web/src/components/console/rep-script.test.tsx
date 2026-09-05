@@ -16,6 +16,7 @@ import type { ScriptedRepresentant } from '@/lib/data/representants';
 import type * as OuverturesData from '@/lib/data/ouvertures';
 import type * as StatutsData from '@/lib/data/statuts-qualification';
 import type { StatutQualification } from '@/lib/data/statuts-qualification';
+import { queryKeys } from '@/lib/query-keys';
 import { REP_CALL_OUTCOME_LABELS } from '@/lib/types';
 import type { RepresentantFilters } from '@/lib/representant-filters';
 import { masquerLOnglet } from '@/test/masquer-onglet';
@@ -1214,5 +1215,24 @@ describe('RepScript : la saisie survit à une fermeture brutale', () => {
     await repondre('Injoignable');
 
     expect(screen.getByLabelText('Commentaire')).toHaveProperty('value', 'il rappelle demain');
+  });
+});
+
+// EB-08 : la barre supérieure refuse la déconnexion sur ce cache. Périmé dans
+// un sens il laisse partir sous verrou, dans l'autre il enferme sans fiche.
+describe('RepScript : ce que la barre supérieure lit du verrou', () => {
+  it('y publie la fiche ouverte, puis sa fermeture', async () => {
+    const { client } = await renderListe();
+    await choisir(/Aminata Ndiaye/u);
+
+    expect(client.getQueryData(queryKeys.ouvertureCourante)).toMatchObject({ id: 'ouv-1' });
+
+    await injoindre();
+    await userEvent.click(screen.getByRole('button', { name: 'Continuer' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(() => {
+      expect(client.getQueryData(queryKeys.ouvertureCourante)).toBeNull();
+    });
   });
 });
