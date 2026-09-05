@@ -122,6 +122,7 @@ describe('l’écran Chiffres, du squelette aux chiffres', () => {
       performance: [
         {
           teleconseillerId: 'awa',
+          objectif: 50,
           teleconseillerName: 'Awa Fixture',
           assigned: 25,
           treated: 15,

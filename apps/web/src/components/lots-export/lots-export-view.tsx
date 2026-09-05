@@ -56,7 +56,15 @@ function requeteLots(
   };
 }
 
-export function LotsExportView({ canCreate, projet }: { canCreate: boolean; projet: Projet }) {
+export function LotsExportView({
+  canCreate,
+  canDelete,
+  projet,
+}: {
+  canCreate: boolean;
+  canDelete: boolean;
+  projet: Projet;
+}) {
   const [recherche, setRecherche] = useState('');
   const [cible, setCible] = useState<FiltreCible>(TOUTES);
   const [page, setPage] = useState(1);
@@ -205,7 +213,7 @@ export function LotsExportView({ canCreate, projet }: { canCreate: boolean; proj
                       <p className="text-[0.8125rem] text-muted-foreground">
                         {formatDate(lot.createdAt)}, par {lot.createdByName}
                       </p>
-                      {canCreate ? (
+                      {canDelete ? (
                         <Button
                           type="button"
                           variant="ghost"

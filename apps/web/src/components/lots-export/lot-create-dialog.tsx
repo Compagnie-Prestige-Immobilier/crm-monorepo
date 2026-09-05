@@ -77,9 +77,38 @@ const CIBLES = [
     titre: 'Représentants (CHUES)',
     aide: 'Les personnes qui remettent les listes, et non leurs prospects.',
   },
+  {
+    cle: 'representants-injoignables',
+    projet: 'CHUES',
+    titre: 'Représentants injoignables',
+    aide: 'Ceux dont le dernier appel n’a abouti à aucun échange, sauf les injoignables définitifs.',
+  },
+  {
+    cle: 'contacts-recommandes',
+    projet: 'CHUES',
+    titre: 'Contacts recommandés',
+    aide: 'Les numéros donnés par un représentant qui décline. Une fiche est créée pour chacun au lancement.',
+  },
 ] as const satisfies readonly { cle: string; projet: Projet; titre: string; aide: string }[];
 
 type CleCible = (typeof CIBLES)[number]['cle'];
+
+/** Trois cibles tirent des représentants : les mêmes filtres de lieu leur servent. */
+type CleRepresentants = 'representants' | 'representants-injoignables' | 'contacts-recommandes';
+
+const CIBLE_API: Record<CleRepresentants, CreateLotExportInput['cible']> = {
+  representants: 'REPRESENTANTS',
+  'representants-injoignables': 'REPRESENTANTS_INJOIGNABLES',
+  'contacts-recommandes': 'CONTACTS_RECOMMANDES',
+};
+
+const TETE: Record<CleRepresentants, string> = {
+  representants: 'Représentants',
+  'representants-injoignables': 'Représentants injoignables',
+  'contacts-recommandes': 'Contacts recommandés',
+};
+
+const surRepresentants = (cle: CleCible): cle is CleRepresentants => cle in CIBLE_API;
 
 /** Valeur de liste déroulante qui veut dire « ne pas filtrer ». */
 const TOUS = 'TOUS';
@@ -108,6 +137,25 @@ const choixInitial = (cle: CleCible): Choix => ({
   nonQualifies: true,
 });
 
+/** Ce qui n'est pas un entier valable n'est pas envoyé : le serveur retombe sur le défaut. */
+function objectifsRetenus(
+  equipe: readonly Teleconseiller[],
+  saisies: Readonly<Record<string, string>>,
+): { teleconseillerId: string; fichesParJour: number }[] {
+  return equipe.flatMap((compte) => {
+    const saisi = Number.parseInt(saisies[compte.id] ?? '', 10);
+    return Number.isFinite(saisi) && saisi >= 1
+      ? [{ teleconseillerId: compte.id, fichesParJour: Math.min(500, saisi) }]
+      : [];
+  });
+}
+
+/** Le libellé d'un référentiel, nul tant qu'il n'est pas lu ou que rien n'est filtré. */
+function nomDe(lignes: readonly { id: string; name: string }[] | undefined, id: string) {
+  const ligne = (lignes ?? []).find((row) => row.id === id);
+  return ligne === undefined ? null : ligne.name;
+}
+
 function entierBorne(saisie: string, defaut: number, min: number, max: number): number {
   const valeur = Number.parseInt(saisie, 10);
   if (!Number.isFinite(valeur)) return defaut;
@@ -132,7 +180,13 @@ function texteApercu(apercu: LotExportPreview, jours: number): string {
 
 type Critere = { corps: Omit<CreateLotExportInput, 'name' | 'distribution'>; etiquette: string };
 
+/**
+ * Les trois cibles de représentants partagent les mêmes filtres de lieu. Seule
+ * « Représentants » exclut les déjà qualifiés : les injoignables et les
+ * contacts recommandés le sont par construction.
+ */
 function critereRepresentants(
+  cle: CleRepresentants,
   choix: Choix,
   nomDepartement: string | null,
   nomIef: string | null,
@@ -141,17 +195,17 @@ function critereRepresentants(
     nomDepartement === null ? null : `département de ${nomDepartement}`,
     nomIef === null ? null : `IEF ${nomIef}`,
   ].filter((part) => part !== null);
-  const tete = choix.nonQualifies ? 'Représentants non qualifiés' : 'Représentants';
+  const exclureQualifies = cle === 'representants' && choix.nonQualifies;
   return {
     corps: {
-      cible: 'REPRESENTANTS',
+      cible: CIBLE_API[cle],
       representants: {
         ...(choix.departementId === TOUS ? {} : { departementId: choix.departementId }),
         ...(choix.iefId === TOUS ? {} : { iefId: choix.iefId }),
-        ...(choix.nonQualifies ? { relationStatus: 'INCONNU' as const } : {}),
+        ...(exclureQualifies ? { relationStatus: 'INCONNU' as const } : {}),
       },
     },
-    etiquette: [tete, ...lieu].join(', '),
+    etiquette: [exclureQualifies ? 'Représentants non qualifiés' : TETE[cle], ...lieu].join(', '),
   };
 }
 
@@ -164,7 +218,8 @@ function critereDuChoix(
   nomDepartement: string | null,
   nomIef: string | null,
 ): Critere {
-  if (choix.cle === 'representants') return critereRepresentants(choix, nomDepartement, nomIef);
+  if (surRepresentants(choix.cle))
+    return critereRepresentants(choix.cle, choix, nomDepartement, nomIef);
 
   if (choix.cle === 'grand-public') {
     return {
@@ -303,7 +358,7 @@ function ChampsCritere({
       </Field>
     );
 
-  if (choix.cle !== 'representants') return null;
+  if (!surRepresentants(choix.cle)) return null;
 
   const iefsDuDepartement = iefs.filter(
     (ief) => choix.departementId === TOUS || ief.departementId === choix.departementId,
@@ -368,17 +423,19 @@ function ChampsCritere({
         </Field>
       </div>
 
-      <label className="flex cursor-pointer items-start gap-3 text-[0.875rem]">
-        <input
-          type="checkbox"
-          checked={choix.nonQualifies}
-          className="mt-0.5 size-4 shrink-0 accent-primary"
-          onChange={(event) => {
-            onChange({ ...choix, nonQualifies: event.target.checked });
-          }}
-        />
-        Exclure les représentants déjà qualifiés (ambassadeur ou refus)
-      </label>
+      {choix.cle !== 'representants' ? null : (
+        <label className="flex cursor-pointer items-start gap-3 text-[0.875rem]">
+          <input
+            type="checkbox"
+            checked={choix.nonQualifies}
+            className="mt-0.5 size-4 shrink-0 accent-primary"
+            onChange={(event) => {
+              onChange({ ...choix, nonQualifies: event.target.checked });
+            }}
+          />
+          Exclure les représentants déjà qualifiés (ambassadeur ou refus)
+        </label>
+      )}
     </div>
   );
 }
@@ -389,12 +446,18 @@ function ChampTeleconseillers({
   erreur,
   decoches,
   onChange,
+  objectifs,
+  onObjectif,
+  defaut,
 }: {
   comptes: readonly Teleconseiller[] | null;
   chargement: boolean;
   erreur: unknown;
   decoches: readonly string[];
   onChange: (decoches: readonly string[]) => void;
+  objectifs: Readonly<Record<string, string>>;
+  onObjectif: (id: string, saisie: string) => void;
+  defaut: number;
 }) {
   const aide = useId();
   const liste = comptes ?? [];
@@ -405,7 +468,8 @@ function ChampTeleconseillers({
       <legend className="mb-2 font-[600]">Téléconseillers</legend>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p id={aide} className="text-[0.75rem] text-muted-foreground">
-          L’ordre de la liste est l’ordre de distribution.
+          L’ordre de la liste est l’ordre de distribution. L’objectif est le nombre de fiches à
+          traiter par jour.
         </p>
         {liste.length > 0 ? (
           <Button
@@ -467,10 +531,24 @@ function ChampTeleconseillers({
                       );
                     }}
                   />
-                  <span className="min-w-0 flex-1 truncate">
-                    {compte.fullName}
-                    {compte.role === 'COMMERCIAL' ? '' : ' (20 %)'}
-                  </span>
+                  <span className="min-w-0 flex-1 truncate">{compte.fullName}</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={500}
+                    step={1}
+                    disabled={!coche}
+                    aria-label={`Objectif quotidien de ${compte.fullName}`}
+                    placeholder={String(capaciteDeDefaut(compte.role, defaut))}
+                    value={objectifs[compte.id] ?? ''}
+                    className="h-9 w-20 rounded-sm border border-border bg-background px-2 text-right tabular-nums"
+                    onClick={(event) => {
+                      event.preventDefault();
+                    }}
+                    onChange={(event) => {
+                      onObjectif(compte.id, event.target.value);
+                    }}
+                  />
                 </label>
               </li>
             );
@@ -479,6 +557,15 @@ function ChampTeleconseillers({
       )}
     </fieldset>
   );
+}
+
+/**
+ * Ce que le serveur retiendra à défaut d'objectif saisi. Même règle que
+ * `capaciteParJour` côté API : supervision et direction appellent en plus de
+ * leur travail, pas à la place.
+ */
+function capaciteDeDefaut(role: Teleconseiller['role'], fichesParJour: number): number {
+  return role === 'COMMERCIAL' ? fichesParJour : Math.max(1, Math.ceil(fichesParJour / 5));
 }
 
 function ApercuLot({
@@ -509,6 +596,54 @@ function ApercuLot({
   );
 }
 
+function ChoixCible({
+  cibles,
+  groupe,
+  choix,
+  onChange,
+}: {
+  cibles: readonly (typeof CIBLES)[number][];
+  groupe: string;
+  choix: Choix;
+  onChange: (choix: Choix) => void;
+}) {
+  return (
+    <>
+      {/* Une seule cible possible (Grand Public) : rien à choisir, on saute l'étape. */}
+    {cibles.length < 2 ? null : (
+      <fieldset className="flex flex-col gap-2">
+        <legend className="mb-2 font-[600]">Que voulez-vous exporter&nbsp;?</legend>
+        {cibles.map((cible) => (
+          <label
+            key={cible.cle}
+            className={cn(
+              'grid cursor-pointer grid-cols-[auto_1fr] items-start gap-x-3 rounded-md border p-3',
+              'transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring',
+              choix.cle === cible.cle
+                ? 'border-primary bg-secondary'
+                : 'border-border hover:bg-secondary/60',
+            )}
+          >
+            <input
+              type="radio"
+              name={groupe}
+              value={cible.cle}
+              checked={choix.cle === cible.cle}
+              onChange={() => {
+                onChange(choixInitial(cible.cle));
+              }}
+              className="row-span-2 mt-1 size-4 shrink-0 accent-primary"
+            />
+            <span className="font-[600]">{cible.titre}</span>
+            <span className="col-start-2 text-[0.75rem] text-muted-foreground">{cible.aide}</span>
+          </label>
+        ))}
+      </fieldset>
+    )}
+    </>
+  );
+}
+
 function FormulaireDeLot({
   projet,
   onCree,
@@ -521,6 +656,9 @@ function FormulaireDeLot({
   const queryClient = useQueryClient();
   const router = useRouter();
   const groupe = useId();
+  // Figée à l'ouverture : recalculée à chaque rendu, la date du nom proposé
+  // sauterait d'une seconde à l'autre sous les doigts de celui qui le corrige.
+  const [maintenant] = useState(() => new Date().toISOString());
   const cibles = CIBLES.filter((cible) => cible.projet === projet);
   const [choix, setChoix] = useState<Choix>(() => choixInitial(cibles[0]?.cle ?? 'chues'));
   // On retient les comptes DÉCOCHÉS : la liste arrive après le premier rendu, et
@@ -528,6 +666,10 @@ function FormulaireDeLot({
   const [decoches, setDecoches] = useState<readonly string[]>([]);
   const [fichesParJourSaisi, setFichesParJourSaisi] = useState(String(FICHES_PAR_JOUR_DEFAUT));
   const [joursSaisi, setJoursSaisi] = useState(String(JOURS_DEFAUT));
+  const [objectifsSaisis, setObjectifsSaisis] = useState<Readonly<Record<string, string>>>({});
+  // EB-14 : nul tant que personne n'a touché au champ. Le nom proposé suit
+  // alors les critères ; dès la première frappe, il ne bouge plus tout seul.
+  const [nomSaisi, setNomSaisi] = useState<string | null>(null);
 
   const teleconseillers = useQuery({
     queryKey: queryKeys.lotsExportTeleconseillers,
@@ -538,13 +680,15 @@ function FormulaireDeLot({
   const equipe = (teleconseillers.data ?? []).filter((compte) => !decoches.includes(compte.id));
   const fichesParJour = entierBorne(fichesParJourSaisi, FICHES_PAR_JOUR_DEFAUT, 1, 500);
   const jours = entierBorne(joursSaisi, JOURS_DEFAUT, 1, 10);
+  const objectifs = objectifsRetenus(equipe, objectifsSaisis);
   const distribution = {
     teleconseillerIds: equipe.map((compte) => compte.id),
     fichesParJour,
     jours,
+    ...(objectifs.length > 0 ? { objectifs } : {}),
   };
 
-  const referentielsUtiles = choix.cle === 'representants';
+  const referentielsUtiles = surRepresentants(choix.cle);
   const departements = useQuery({
     queryKey: queryKeys.departements,
     queryFn: () => fetchDepartements(),
@@ -558,11 +702,11 @@ function FormulaireDeLot({
     staleTime: 30 * 60_000,
   });
 
-  const nomDepartement =
-    (departements.data ?? []).find((row) => row.id === choix.departementId)?.name ?? null;
-  const nomIef = (iefs.data ?? []).find((row) => row.id === choix.iefId)?.name ?? null;
-
-  const { corps, etiquette } = critereDuChoix(choix, nomDepartement, nomIef);
+  const { corps, etiquette } = critereDuChoix(
+    choix,
+    nomDe(departements.data, choix.departementId),
+    nomDe(iefs.data, choix.iefId),
+  );
 
   // La temporisation porte sur une CLÉ, pas sur l'objet des critères : celui-ci
   // est reconstruit à chaque rendu, et son identité relancerait le report sans fin.
@@ -576,6 +720,9 @@ function FormulaireDeLot({
     distribution.teleconseillerIds.join(','),
     fichesParJour,
     jours,
+    objectifs
+      .map((objectif) => `${objectif.teleconseillerId}:${String(objectif.fichesParJour)}`)
+      .join(','),
   ].join('|');
   const cleDifferee = useDebouncedValue(cleCritere, 250);
   const critereStable = cleDifferee === cleCritere;
@@ -589,15 +736,11 @@ function FormulaireDeLot({
 
   const eligible = apercu.isSuccess ? apercu.data.eligible : null;
 
+  const nomPropose = `${etiquette}, ${formatDateTime(maintenant)}`.slice(0, 120);
+  const nom = nomSaisi === null ? nomPropose.trim() : nomSaisi.trim();
+
   const creation = useMutation({
-    mutationFn: () =>
-      // L'API exige un nom de 3 à 120 caractères. Il est fabriqué ici, au moment
-      // du clic, pour dater le lot de sa création et non de l'ouverture du dialogue.
-      createLotExport({
-        ...corps,
-        distribution,
-        name: `${etiquette}, ${formatDateTime(new Date().toISOString())}`.slice(0, 120),
-      }),
+    mutationFn: () => createLotExport({ ...corps, distribution, name: nom }),
     onSuccess: (lot) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.lotsExportRoot });
       toast.success(`Campagne créée : ${formatNumber(lot.itemCount)} fiches réparties.`);
@@ -605,6 +748,9 @@ function FormulaireDeLot({
       router.push(`${campagnesPath(projet)}/${lot.id}`);
     },
   });
+
+  const pretACreer =
+    equipeChoisie && eligible !== null && eligible > 0 && nom.length >= 3 && !creation.isPending;
 
   return (
     <>
@@ -616,37 +762,7 @@ function FormulaireDeLot({
         </DialogDescription>
       </DialogHeader>
 
-      {/* Une seule cible possible (Grand Public) : rien à choisir, on saute l'étape. */}
-      {cibles.length < 2 ? null : (
-        <fieldset className="flex flex-col gap-2">
-          <legend className="mb-2 font-[600]">Que voulez-vous exporter&nbsp;?</legend>
-          {cibles.map((cible) => (
-            <label
-              key={cible.cle}
-              className={cn(
-                'grid cursor-pointer grid-cols-[auto_1fr] items-start gap-x-3 rounded-md border p-3',
-                'transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring',
-                choix.cle === cible.cle
-                  ? 'border-primary bg-secondary'
-                  : 'border-border hover:bg-secondary/60',
-              )}
-            >
-              <input
-                type="radio"
-                name={groupe}
-                value={cible.cle}
-                checked={choix.cle === cible.cle}
-                onChange={() => {
-                  setChoix(choixInitial(cible.cle));
-                }}
-                className="row-span-2 mt-1 size-4 shrink-0 accent-primary"
-              />
-              <span className="font-[600]">{cible.titre}</span>
-              <span className="col-start-2 text-[0.75rem] text-muted-foreground">{cible.aide}</span>
-            </label>
-          ))}
-        </fieldset>
-      )}
+      <ChoixCible cibles={cibles} groupe={groupe} choix={choix} onChange={setChoix} />
 
       <ChampsCritere
         choix={choix}
@@ -661,12 +777,33 @@ function FormulaireDeLot({
         erreur={teleconseillers.isError ? teleconseillers.error : null}
         decoches={decoches}
         onChange={setDecoches}
+        objectifs={objectifsSaisis}
+        defaut={fichesParJour}
+        onObjectif={(id, saisie) => {
+          setObjectifsSaisis((courants) => ({ ...courants, [id]: saisie }));
+        }}
       />
+
+      <Field
+        label="Nom de la campagne"
+        description="Proposé d’après les critères. Modifiable ici et plus tard."
+      >
+        {(props) => (
+          <Input
+            {...props}
+            maxLength={120}
+            value={nomSaisi ?? nomPropose}
+            onChange={(event) => {
+              setNomSaisi(event.target.value);
+            }}
+          />
+        )}
+      </Field>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field
-          label="Fiches par téléconseiller et par jour"
-          description="Une fiche de programme tient 50 lignes, recto verso."
+          label="Fiches par jour, à défaut d’objectif"
+          description="La valeur retenue pour qui n’a pas d’objectif propre."
         >
           {(props) => (
             <Input
@@ -715,7 +852,7 @@ function FormulaireDeLot({
         </Button>
         <Button
           type="button"
-          disabled={!equipeChoisie || eligible === null || eligible === 0 || creation.isPending}
+          disabled={!pretACreer}
           onClick={() => {
             creation.mutate();
           }}

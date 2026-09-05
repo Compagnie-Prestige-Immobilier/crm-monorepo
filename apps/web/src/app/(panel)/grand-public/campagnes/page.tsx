@@ -27,7 +27,9 @@ export default async function LotsExportGrandPublicPage() {
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <LotsExportView canCreate={guard.user.role === 'ADMIN'} projet="GRAND_PUBLIC" />
+      <LotsExportView         canCreate={guard.user.role === 'ADMIN' || guard.user.role === 'SUPERVISEUR'}
+        canDelete={guard.user.role === 'ADMIN'}
+        projet="GRAND_PUBLIC" />
     </HydrationBoundary>
   );
 }
