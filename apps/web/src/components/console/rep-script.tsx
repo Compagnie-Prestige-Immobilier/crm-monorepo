@@ -210,6 +210,7 @@ export function RepScript() {
       setConfirme(null);
       setAConfirmer(null);
       setChoisi(ouverte);
+      queryClient.setQueryData(queryKeys.ouvertureCourante, ouverte.ouverture);
     },
     onError: (error) => {
       void reprendreOuverte(reprendre, error);
@@ -227,6 +228,9 @@ export function RepScript() {
         onEnregistre={(nom) => {
           setConfirme(nom);
           setChoisi(null);
+          // La tentative a fermé l'ouverture : la barre supérieure lit ce cache
+          // pour refuser la déconnexion, et le laisser périmé l'y enfermerait.
+          queryClient.setQueryData(queryKeys.ouvertureCourante, null);
           // La racine, pas la seule liste de l'écran : le compteur « pas encore
           // qualifiés » de l'accueil se lit sous une autre clé de la même famille.
           void queryClient.invalidateQueries({ queryKey: queryKeys.representantsRoot });

@@ -9,6 +9,7 @@ import type * as ConsoleData from '@/lib/data/console';
 import type * as OuverturesData from '@/lib/data/ouvertures';
 import type * as ProspectsData from '@/lib/data/prospects';
 import type * as ReferenceData from '@/lib/data/reference';
+import { queryKeys } from '@/lib/query-keys';
 import type { CallOutcome, ProspectFilters, ProspectRow } from '@/lib/types';
 import { masquerLOnglet } from '@/test/masquer-onglet';
 import { prospectFixture } from '@/test/prospect-fixture';
@@ -1339,5 +1340,21 @@ describe('ConsoleView : la saisie survit à une fermeture brutale', () => {
     masquerLOnglet();
 
     expect(enregistrerBrouillon).not.toHaveBeenCalled();
+  });
+});
+
+// EB-08 : la barre supérieure refuse la déconnexion sur ce cache. Périmé dans
+// un sens il laisse partir sous verrou, dans l'autre il enferme sans fiche.
+describe('ConsoleView : ce que la barre supérieure lit du verrou', () => {
+  it('y publie la fiche ouverte, puis sa fermeture', async () => {
+    const { client } = await renderConsole([NEUVE]);
+
+    expect(client.getQueryData(queryKeys.ouvertureCourante)).toMatchObject({ id: 'ouv-1' });
+
+    await userEvent.keyboard('3');
+
+    await waitFor(() => {
+      expect(client.getQueryData(queryKeys.ouvertureCourante)).toBeNull();
+    });
   });
 });
