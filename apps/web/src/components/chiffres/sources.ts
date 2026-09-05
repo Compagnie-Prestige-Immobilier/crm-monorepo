@@ -10,6 +10,7 @@ import type {
   ChiffresBanques,
   ChiffresCampagne,
   ChiffresDelais,
+  ChiffresEnrolement,
   ChiffresEntonnoir,
   ChiffresMethodes,
   ChiffresRendement,
@@ -23,7 +24,14 @@ export type ChiffreSource = components['schemas']['DashboardSource'];
 
 /** Une requête, et les cartes qui en vivent. Rien d'autre n'est lancé. */
 export type Jeu =
-  'activite' | 'entonnoir' | 'delais' | 'rendement' | 'methodes' | 'banques' | 'campagne';
+  | 'activite'
+  | 'entonnoir'
+  | 'delais'
+  | 'rendement'
+  | 'methodes'
+  | 'banques'
+  | 'campagne'
+  | 'enrolement';
 
 export interface Jeux {
   activite?: ChiffresActivite;
@@ -33,6 +41,7 @@ export interface Jeux {
   methodes?: ChiffresMethodes;
   banques?: ChiffresBanques;
   campagne?: ChiffresCampagne;
+  enrolement?: ChiffresEnrolement;
 }
 
 export interface SourceChiffre {
@@ -470,6 +479,113 @@ export const SOURCES_CHIFFRES = {
             ),
           },
   },
+
+  // ─── Enrôlement, lu sur les plateformes ─────────────────────────────────
+  'enrolement-inscriptions': {
+    label: 'Inscriptions sur la plateforme',
+    forme: 'scalaire',
+    jeu: 'enrolement',
+    description: 'Le nombre de personnes inscrites sur la plateforme d’enrôlement du projet.',
+    groupe: 'Enrôlement',
+    extraire: ({ enrolement }) =>
+      enrolement === undefined
+        ? null
+        : scalaire('inscriptions lues sur la plateforme', enrolement.inscriptions),
+  },
+  'enrolement-taux-rapprochement': {
+    label: 'Inscriptions reconnues',
+    forme: 'scalaire',
+    jeu: 'enrolement',
+    description:
+      'La part des inscriptions qu’on retrouve sur une fiche prospect, par le téléphone puis par l’e-mail. Le reste vient de personnes qui ne sont pas passées par nos appels.',
+    groupe: 'Enrôlement',
+    extraire: ({ enrolement }) =>
+      enrolement === undefined
+        ? null
+        : scalaireTaux(
+            enrolement.tauxRapprochement,
+            enrolement.rapprochees,
+            `${formatNumber(enrolement.rapprochees)} inscriptions reconnues sur ${formatNumber(enrolement.inscriptions)}`,
+            'Aucune inscription sur la période',
+          ),
+  },
+  'enrolement-taux-conversion': {
+    label: 'Convertis puis inscrits',
+    forme: 'scalaire',
+    jeu: 'enrolement',
+    description:
+      'La part des prospects convertis, méthode d’enrôlement obtenue, qui vont jusqu’à s’inscrire sur la plateforme. C’est la mesure de la marche entre l’appel et l’enrôlement.',
+    groupe: 'Enrôlement',
+    extraire: ({ enrolement }) =>
+      enrolement === undefined
+        ? null
+        : scalaireTaux(
+            enrolement.tauxConversion,
+            enrolement.rapprochees,
+            `${formatNumber(enrolement.rapprochees)} prospects convertis retrouvés inscrits`,
+            'Aucun prospect converti sur la période',
+          ),
+  },
+  'enrolement-par-jour': {
+    label: 'Inscriptions par jour',
+    forme: 'serie-temporelle',
+    jeu: 'enrolement',
+    description: 'Voir si le rythme des inscriptions suit celui des appels.',
+    groupe: 'Enrôlement',
+    extraire: ({ enrolement }) =>
+      enrolement === undefined
+        ? null
+        : {
+            forme: 'serie-temporelle',
+            donnee: enrolement.parJour.map((point) => ({
+              id: point.jour,
+              label: point.jour,
+              value: point.inscriptions,
+            })),
+          },
+  },
+  'enrolement-par-etape': {
+    label: 'Dossiers par étape',
+    forme: 'composition',
+    jeu: 'enrolement',
+    description: 'Repérer l’étape où les dossiers s’accumulent sur la plateforme.',
+    groupe: 'Enrôlement',
+    extraire: ({ enrolement }) =>
+      enrolement === undefined
+        ? null
+        : {
+            forme: 'composition',
+            donnee: [
+              {
+                ligne: 'Étapes',
+                segments: enrolement.parEtape.map((etape) => ({
+                  id: etape.id,
+                  label: etape.label,
+                  value: etape.inscriptions,
+                })),
+              },
+            ],
+          },
+  },
+  'enrolement-par-teleconseiller': {
+    label: 'Inscriptions par téléconseiller',
+    forme: 'classement',
+    jeu: 'enrolement',
+    description:
+      'À qui revient chaque inscription reconnue : le téléconseiller qui a obtenu la méthode d’enrôlement, à défaut celui qui a saisi la fiche.',
+    groupe: 'Enrôlement',
+    extraire: ({ enrolement }) =>
+      enrolement === undefined
+        ? null
+        : {
+            forme: 'classement',
+            donnee: enrolement.parTeleconseiller.map((ligne) => ({
+              id: ligne.id,
+              label: ligne.label,
+              value: ligne.inscriptions,
+            })),
+          },
+  },
 } satisfies Partial<Record<ChiffreSource, SourceChiffre>>;
 
 /** Un représentant n'existe que dans CHUES : ces taux seraient vides ailleurs. */
@@ -493,6 +609,20 @@ const SOURCES_SUPERVISION: readonly string[] = [
   'hors-attribution-derniere-campagne',
 ];
 
+/**
+ * Ce que les plateformes d'enrôlement rendent ne sort pas de la cellule
+ * pilotage, qui tient le rôle ADMIN. L'API qui alimente ces cartes refuse tout
+ * autre rôle : ce filtre évite de proposer une carte qui répondrait 403.
+ */
+const SOURCES_ENROLEMENT: readonly string[] = [
+  'enrolement-inscriptions',
+  'enrolement-taux-rapprochement',
+  'enrolement-taux-conversion',
+  'enrolement-par-jour',
+  'enrolement-par-etape',
+  'enrolement-par-teleconseiller',
+];
+
 export function catalogueDe(input: {
   chues: boolean;
   voitLesMontants: boolean;
@@ -502,6 +632,7 @@ export function catalogueDe(input: {
     if (!input.chues && SOURCES_CHUES_SEULEMENT.includes(cle)) return false;
     if (!input.voitLesMontants && SOURCES_MONTANTS.includes(cle)) return false;
     if (input.role === 'SUPERVISEUR' && SOURCES_SUPERVISION.includes(cle)) return false;
+    if (input.role !== 'ADMIN' && SOURCES_ENROLEMENT.includes(cle)) return false;
     return true;
   });
   const catalogue = Object.fromEntries(entrees);

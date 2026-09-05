@@ -24,6 +24,7 @@ vi.mock('@/lib/data/chiffres', () => ({
   fetchChiffresMethodes: vi.fn<() => Promise<never>>(),
   fetchChiffresBanques: vi.fn<() => Promise<never>>(),
   fetchChiffresCampagne: vi.fn<() => Promise<never>>(),
+  fetchChiffresEnrolement: vi.fn<() => Promise<never>>(),
 }));
 
 vi.mock('@/lib/data/disposition', async () => {

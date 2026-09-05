@@ -45,6 +45,7 @@ import {
   fetchChiffresBanques,
   fetchChiffresCampagne,
   fetchChiffresDelais,
+  fetchChiffresEnrolement,
   fetchChiffresEntonnoir,
   fetchChiffresMethodes,
   fetchChiffresRendement,
@@ -73,6 +74,7 @@ const CHARGEURS: Record<Jeu, (perimetre: PerimetreChiffres) => Promise<unknown>>
   methodes: fetchChiffresMethodes,
   banques: fetchChiffresBanques,
   campagne: fetchChiffresCampagne,
+  enrolement: fetchChiffresEnrolement,
 };
 
 const clefDeJeu = (jeu: Jeu, perimetre: PerimetreChiffres): readonly unknown[] => [

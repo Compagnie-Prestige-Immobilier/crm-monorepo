@@ -78,6 +78,18 @@ enum DashboardSource {
   delaisMedians(r'delais-medians'),
   @JsonValue(r'rendement-par-departement')
   rendementParDepartement(r'rendement-par-departement'),
+  @JsonValue(r'enrolement-inscriptions')
+  enrolementInscriptions(r'enrolement-inscriptions'),
+  @JsonValue(r'enrolement-taux-rapprochement')
+  enrolementTauxRapprochement(r'enrolement-taux-rapprochement'),
+  @JsonValue(r'enrolement-taux-conversion')
+  enrolementTauxConversion(r'enrolement-taux-conversion'),
+  @JsonValue(r'enrolement-par-jour')
+  enrolementParJour(r'enrolement-par-jour'),
+  @JsonValue(r'enrolement-par-etape')
+  enrolementParEtape(r'enrolement-par-etape'),
+  @JsonValue(r'enrolement-par-teleconseiller')
+  enrolementParTeleconseiller(r'enrolement-par-teleconseiller'),
   @JsonValue(r'unknown_default_open_api')
   unknownDefaultOpenApi(r'unknown_default_open_api');
 

@@ -16,6 +16,7 @@ import { CallbacksController } from '../../modules/callbacks/callbacks.controlle
 import { ClientRequestsController } from '../../modules/client-requests/client-requests.controller.js';
 import { DbDumpController } from '../../modules/db-dump/db-dump.controller.js';
 import { DemoController } from '../../modules/demo/demo.controller.js';
+import { EnrolementController } from '../../modules/enrolement/enrolement.controller.js';
 import { ExportController } from '../../modules/export/export.controller.js';
 import { HealthController } from '../../modules/health/health.controller.js';
 import { ImportsController } from '../../modules/imports/imports.controller.js';
@@ -53,6 +54,7 @@ const CONTROLLERS: readonly Controller[] = [
   DashboardsController,
   DbDumpController,
   DemoController,
+  EnrolementController,
   ExportController,
   HealthController,
   ImportsController,
@@ -385,6 +387,12 @@ describe('ce qu’un SUPERVISEUR atteint, route par route', () => {
     expect(allows(CallbacksController, 'cancel')).toBe(false);
   });
 
+  it('ne lit RIEN des plateformes d’enrôlement, réservées à la cellule pilotage', () => {
+    for (const method of routesOf(EnrolementController)) {
+      expect(allows(EnrolementController, method), `enrolement.${method}`).toBe(false);
+    }
+  });
+
   it('n’administre aucun compte, alors qu’il en lit la liste', () => {
     expect(allows(UsersController, 'list')).toBe(true);
     for (const method of routesOf(UsersController).filter((name) => name !== 'list')) {
@@ -501,6 +509,14 @@ describe('ce qu’une DIRECTION atteint, route par route', () => {
     }
     for (const method of routesOf(ImportsController)) {
       expect(allowsAs(Role.DIRECTION, ImportsController, method), `imports.${method}`).toBe(false);
+    }
+  });
+
+  it('ne lit RIEN des plateformes d’enrôlement, réservées à la cellule pilotage', () => {
+    for (const method of routesOf(EnrolementController)) {
+      expect(allowsAs(Role.DIRECTION, EnrolementController, method), `enrolement.${method}`).toBe(
+        false,
+      );
     }
   });
 
