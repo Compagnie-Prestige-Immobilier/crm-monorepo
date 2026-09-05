@@ -12,7 +12,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'sync_operation_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -23,176 +22,102 @@ part 'sync_operation_dto.g.dart';
 class SyncOperationDto {
   /// Returns a new [SyncOperationDto] instance.
   SyncOperationDto({
+    required this.opId,
 
-    required  this.opId,
+    required this.seq,
 
-    required  this.seq,
+    required this.entity,
 
-    required  this.entity,
+    required this.op,
 
-    required  this.op,
+    required this.entityId,
 
-    required  this.entityId,
+    required this.clientUpdatedAt,
 
-    required  this.clientUpdatedAt,
+    this.baseRev,
 
-     this.baseRev,
+    this.data,
 
-     this.data,
-
-     this.clearedFields,
+    this.clearedFields,
   });
 
-      /// Identifiant unique de l’opération, stable entre deux rejeux.
-  @JsonKey(
-    
-    name: r'opId',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Identifiant unique de l’opération, stable entre deux rejeux.
+  @JsonKey(name: r'opId', required: true, includeIfNull: false)
   final String opId;
 
-
-
-      /// Ordre d’application voulu par le client.
-          // minimum: 0
-  @JsonKey(
-    
-    name: r'seq',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Ordre d’application voulu par le client.
+  // minimum: 0
+  @JsonKey(name: r'seq', required: true, includeIfNull: false)
   final num seq;
 
-
-
   @JsonKey(
-    
     name: r'entity',
     required: true,
     includeIfNull: false,
-  unknownEnumValue: SyncEntity.unknownDefaultOpenApi,
+    unknownEnumValue: SyncEntity.unknownDefaultOpenApi,
   )
-
-
   final SyncEntity entity;
 
-
-
   @JsonKey(
-    
     name: r'op',
     required: true,
     includeIfNull: false,
-  unknownEnumValue: SyncOp.unknownDefaultOpenApi,
+    unknownEnumValue: SyncOp.unknownDefaultOpenApi,
   )
-
-
   final SyncOp op;
 
-
-
-      /// Identifiant de la ligne visée, généré par le client.
-  @JsonKey(
-    
-    name: r'entityId',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Identifiant de la ligne visée, généré par le client.
+  @JsonKey(name: r'entityId', required: true, includeIfNull: false)
   final String entityId;
 
-
-
-  @JsonKey(
-    
-    name: r'clientUpdatedAt',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'clientUpdatedAt', required: true, includeIfNull: false)
   final DateTime clientUpdatedAt;
 
-
-
-      /// Révision serveur sur laquelle le client s’est basé. Fournie sur update/delete, elle transforme une écriture aveugle en écriture conditionnelle.
-  @JsonKey(
-    
-    name: r'baseRev',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  /// Révision serveur sur laquelle le client s’est basé. Fournie sur update/delete, elle transforme une écriture aveugle en écriture conditionnelle.
+  @JsonKey(name: r'baseRev', required: false, includeIfNull: false)
   final num? baseRev;
 
-
-
-  @JsonKey(
-    
-    name: r'data',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'data', required: false, includeIfNull: false)
   final SyncEntityDataDto? data;
 
-
-
-      /// Champs que le client a explicitement VIDÉS. Un champ simplement absent de `data` reste inchangé ; un champ nommé ici est écrit à NULL. Valeurs acceptées : iefId, notes, whatsappE164, profession, prenom, etablissement, syndicat, banqueId, syndicatId, representantId.
-  @JsonKey(
-    
-    name: r'clearedFields',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  /// Champs que le client a explicitement VIDÉS. Un champ simplement absent de `data` reste inchangé ; un champ nommé ici est écrit à NULL. Valeurs acceptées : iefId, notes, whatsappE164, profession, prenom, etablissement, syndicat, banqueId, syndicatId, representantId.
+  @JsonKey(name: r'clearedFields', required: false, includeIfNull: false)
   final List<String>? clearedFields;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is SyncOperationDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [
+                opId,
+                seq,
+                entity,
+                op,
+                entityId,
+                clientUpdatedAt,
+                baseRev,
+                data,
+                clearedFields,
+              ],
+              [
+                other.opId,
+                other.seq,
+                other.entity,
+                other.op,
+                other.entityId,
+                other.clientUpdatedAt,
+                other.baseRev,
+                other.data,
+                other.clearedFields,
+              ],
+            );
+  }
 
-
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is SyncOperationDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            opId,
-            seq,
-            entity,
-            op,
-            entityId,
-            clientUpdatedAt,
-            baseRev,
-            data,
-            clearedFields,
-        ],
-        [
-            other.opId,
-            other.seq,
-            other.entity,
-            other.op,
-            other.entityId,
-            other.clientUpdatedAt,
-            other.baseRev,
-            other.data,
-            other.clearedFields,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([
         opId,
         seq,
         entity,
@@ -202,9 +127,10 @@ class SyncOperationDto {
         baseRev,
         data,
         clearedFields,
-    ],);
+      ]);
 
-  factory SyncOperationDto.fromJson(Map<String, dynamic> json) => _$SyncOperationDtoFromJson(json);
+  factory SyncOperationDto.fromJson(Map<String, dynamic> json) =>
+      _$SyncOperationDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$SyncOperationDtoToJson(this);
 
@@ -212,6 +138,4 @@ class SyncOperationDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

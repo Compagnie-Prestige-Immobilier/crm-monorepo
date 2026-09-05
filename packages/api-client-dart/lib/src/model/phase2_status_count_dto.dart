@@ -10,7 +10,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'phase2_status_count_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -21,97 +20,50 @@ part 'phase2_status_count_dto.g.dart';
 class Phase2StatusCountDto {
   /// Returns a new [Phase2StatusCountDto] instance.
   Phase2StatusCountDto({
+    required this.status,
 
-    required  this.status,
+    required this.label,
 
-    required  this.label,
+    required this.prospects,
 
-    required  this.prospects,
-
-    required  this.share,
+    required this.share,
   });
 
   @JsonKey(
-    
     name: r'status',
     required: true,
     includeIfNull: false,
-  unknownEnumValue: Phase2Status.unknownDefaultOpenApi,
+    unknownEnumValue: Phase2Status.unknownDefaultOpenApi,
   )
-
-
   final Phase2Status status;
 
-
-
-  @JsonKey(
-    
-    name: r'label',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'label', required: true, includeIfNull: false)
   final String label;
 
-
-
-  @JsonKey(
-    
-    name: r'prospects',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'prospects', required: true, includeIfNull: false)
   final num prospects;
 
-
-
-      /// Part du total filtré, en pourcentage.
-  @JsonKey(
-    
-    name: r'share',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Part du total filtré, en pourcentage.
+  @JsonKey(name: r'share', required: true, includeIfNull: false)
   final num share;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is Phase2StatusCountDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [status, label, prospects, share],
+              [other.status, other.label, other.prospects, other.share],
+            );
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([status, label, prospects, share]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is Phase2StatusCountDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            status,
-            label,
-            prospects,
-            share,
-        ],
-        [
-            other.status,
-            other.label,
-            other.prospects,
-            other.share,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        status,
-        label,
-        prospects,
-        share,
-    ],);
-
-  factory Phase2StatusCountDto.fromJson(Map<String, dynamic> json) => _$Phase2StatusCountDtoFromJson(json);
+  factory Phase2StatusCountDto.fromJson(Map<String, dynamic> json) =>
+      _$Phase2StatusCountDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$Phase2StatusCountDtoToJson(this);
 
@@ -119,6 +71,4 @@ class Phase2StatusCountDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

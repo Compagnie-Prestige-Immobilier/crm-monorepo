@@ -18,7 +18,6 @@ import 'package:crm_api_client/src/model/purge_result_dto.dart';
 import 'package:crm_api_client/src/model/supervision_dto.dart';
 
 class AdminApi {
-
   final Dio _dio;
 
   const AdminApi(this._dio);
@@ -36,7 +35,7 @@ class AdminApi {
   ///
   /// Returns a [Future] containing a [Response] with a [Uint8List] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<Uint8List>> downloadDatabaseDump({ 
+  Future<Response<Uint8List>> downloadDatabaseDump({
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -48,16 +47,10 @@ class AdminApi {
     final _options = Options(
       method: r'GET',
       responseType: ResponseType.bytes,
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -75,9 +68,8 @@ class AdminApi {
     Uint8List? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : rawData as Uint8List;
-
+      final rawData = _response.data;
+      _responseData = rawData == null ? null : rawData as Uint8List;
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -113,7 +105,7 @@ _responseData = rawData == null ? null : rawData as Uint8List;
   ///
   /// Returns a [Future] containing a [Response] with a [DatabaseDumpJobDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<DatabaseDumpJobDto>> getDatabaseDump({ 
+  Future<Response<DatabaseDumpJobDto>> getDatabaseDump({
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -124,16 +116,10 @@ _responseData = rawData == null ? null : rawData as Uint8List;
     final _path = r'/api/v1/admin/database-dump';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -151,9 +137,14 @@ _responseData = rawData == null ? null : rawData as Uint8List;
     DatabaseDumpJobDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<DatabaseDumpJobDto, DatabaseDumpJobDto>(rawData, 'DatabaseDumpJobDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<DatabaseDumpJobDto, DatabaseDumpJobDto>(
+              rawData,
+              'DatabaseDumpJobDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -189,7 +180,7 @@ _responseData = rawData == null ? null : deserialize<DatabaseDumpJobDto, Databas
   ///
   /// Returns a [Future] containing a [Response] with a [PurgeCatalogDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<PurgeCatalogDto>> getPurgeCatalog({ 
+  Future<Response<PurgeCatalogDto>> getPurgeCatalog({
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -200,16 +191,10 @@ _responseData = rawData == null ? null : deserialize<DatabaseDumpJobDto, Databas
     final _path = r'/api/v1/admin/purge';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -227,9 +212,14 @@ _responseData = rawData == null ? null : deserialize<DatabaseDumpJobDto, Databas
     PurgeCatalogDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<PurgeCatalogDto, PurgeCatalogDto>(rawData, 'PurgeCatalogDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<PurgeCatalogDto, PurgeCatalogDto>(
+              rawData,
+              'PurgeCatalogDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -265,7 +255,7 @@ _responseData = rawData == null ? null : deserialize<PurgeCatalogDto, PurgeCatal
   ///
   /// Returns a [Future] containing a [Response] with a [SupervisionDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<SupervisionDto>> getSupervision({ 
+  Future<Response<SupervisionDto>> getSupervision({
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -276,16 +266,10 @@ _responseData = rawData == null ? null : deserialize<PurgeCatalogDto, PurgeCatal
     final _path = r'/api/v1/admin/supervision';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -303,9 +287,14 @@ _responseData = rawData == null ? null : deserialize<PurgeCatalogDto, PurgeCatal
     SupervisionDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<SupervisionDto, SupervisionDto>(rawData, 'SupervisionDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<SupervisionDto, SupervisionDto>(
+              rawData,
+              'SupervisionDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -332,7 +321,7 @@ _responseData = rawData == null ? null : deserialize<SupervisionDto, Supervision
   /// Réservé au premier compte administrateur, qui ressaisit son identifiant de connexion. Transactionnel, enfants avant parents. Le compte appelant n’est jamais supprimé. Journalisé.
   ///
   /// Parameters:
-  /// * [purgeRequestDto] 
+  /// * [purgeRequestDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -342,7 +331,7 @@ _responseData = rawData == null ? null : deserialize<SupervisionDto, Supervision
   ///
   /// Returns a [Future] containing a [Response] with a [PurgeResultDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<PurgeResultDto>> purgeDatabase({ 
+  Future<Response<PurgeResultDto>> purgeDatabase({
     required PurgeRequestDto purgeRequestDto,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -354,16 +343,10 @@ _responseData = rawData == null ? null : deserialize<SupervisionDto, Supervision
     final _path = r'/api/v1/admin/purge';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -375,13 +358,9 @@ _responseData = rawData == null ? null : deserialize<SupervisionDto, Supervision
 
     try {
       _bodyData = jsonEncode(purgeRequestDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -400,9 +379,14 @@ _responseData = rawData == null ? null : deserialize<SupervisionDto, Supervision
     PurgeResultDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<PurgeResultDto, PurgeResultDto>(rawData, 'PurgeResultDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<PurgeResultDto, PurgeResultDto>(
+              rawData,
+              'PurgeResultDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -438,7 +422,7 @@ _responseData = rawData == null ? null : deserialize<PurgeResultDto, PurgeResult
   ///
   /// Returns a [Future] containing a [Response] with a [DatabaseDumpJobDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<DatabaseDumpJobDto>> requestDatabaseDump({ 
+  Future<Response<DatabaseDumpJobDto>> requestDatabaseDump({
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -449,16 +433,10 @@ _responseData = rawData == null ? null : deserialize<PurgeResultDto, PurgeResult
     final _path = r'/api/v1/admin/database-dump';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -476,9 +454,14 @@ _responseData = rawData == null ? null : deserialize<PurgeResultDto, PurgeResult
     DatabaseDumpJobDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<DatabaseDumpJobDto, DatabaseDumpJobDto>(rawData, 'DatabaseDumpJobDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<DatabaseDumpJobDto, DatabaseDumpJobDto>(
+              rawData,
+              'DatabaseDumpJobDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -500,5 +483,4 @@ _responseData = rawData == null ? null : deserialize<DatabaseDumpJobDto, Databas
       extra: _response.extra,
     );
   }
-
 }

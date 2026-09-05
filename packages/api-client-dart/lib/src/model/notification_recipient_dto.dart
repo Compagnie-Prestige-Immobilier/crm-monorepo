@@ -11,7 +11,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'notification_recipient_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -22,138 +21,74 @@ part 'notification_recipient_dto.g.dart';
 class NotificationRecipientDto {
   /// Returns a new [NotificationRecipientDto] instance.
   NotificationRecipientDto({
+    required this.userId,
 
-    required  this.userId,
+    required this.fullName,
 
-    required  this.fullName,
+    required this.role,
 
-    required  this.role,
+    required this.status,
 
-    required  this.status,
+    required this.error,
 
-    required  this.error,
+    required this.sentAt,
 
-    required  this.sentAt,
-
-    required  this.readAt,
+    required this.readAt,
   });
 
-  @JsonKey(
-    
-    name: r'userId',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'userId', required: true, includeIfNull: false)
   final String userId;
 
-
-
-  @JsonKey(
-    
-    name: r'fullName',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'fullName', required: true, includeIfNull: false)
   final String fullName;
 
-
-
   @JsonKey(
-    
     name: r'role',
     required: true,
     includeIfNull: false,
-  unknownEnumValue: Role.unknownDefaultOpenApi,
+    unknownEnumValue: Role.unknownDefaultOpenApi,
   )
-
-
   final Role role;
 
-
-
   @JsonKey(
-    
     name: r'status',
     required: true,
     includeIfNull: false,
-  unknownEnumValue: NotificationDeliveryStatus.unknownDefaultOpenApi,
+    unknownEnumValue: NotificationDeliveryStatus.unknownDefaultOpenApi,
   )
-
-
   final NotificationDeliveryStatus status;
 
-
-
-  @JsonKey(
-    
-    name: r'error',
-    required: true,
-    includeIfNull: true,
-  )
-
-
+  @JsonKey(name: r'error', required: true, includeIfNull: true)
   final String? error;
 
-
-
-  @JsonKey(
-    
-    name: r'sentAt',
-    required: true,
-    includeIfNull: true,
-  )
-
-
+  @JsonKey(name: r'sentAt', required: true, includeIfNull: true)
   final DateTime? sentAt;
 
-
-
-  @JsonKey(
-    
-    name: r'readAt',
-    required: true,
-    includeIfNull: true,
-  )
-
-
+  @JsonKey(name: r'readAt', required: true, includeIfNull: true)
   final DateTime? readAt;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is NotificationRecipientDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [userId, fullName, role, status, error, sentAt, readAt],
+              [
+                other.userId,
+                other.fullName,
+                other.role,
+                other.status,
+                other.error,
+                other.sentAt,
+                other.readAt,
+              ],
+            );
+  }
 
-
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is NotificationRecipientDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            userId,
-            fullName,
-            role,
-            status,
-            error,
-            sentAt,
-            readAt,
-        ],
-        [
-            other.userId,
-            other.fullName,
-            other.role,
-            other.status,
-            other.error,
-            other.sentAt,
-            other.readAt,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([
         userId,
         fullName,
         role,
@@ -161,9 +96,10 @@ class NotificationRecipientDto {
         error,
         sentAt,
         readAt,
-    ],);
+      ]);
 
-  factory NotificationRecipientDto.fromJson(Map<String, dynamic> json) => _$NotificationRecipientDtoFromJson(json);
+  factory NotificationRecipientDto.fromJson(Map<String, dynamic> json) =>
+      _$NotificationRecipientDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$NotificationRecipientDtoToJson(this);
 
@@ -171,6 +107,4 @@ class NotificationRecipientDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

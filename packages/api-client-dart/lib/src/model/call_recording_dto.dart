@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'call_recording_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,62 +18,27 @@ part 'call_recording_dto.g.dart';
 )
 class CallRecordingDto {
   /// Returns a new [CallRecordingDto] instance.
-  CallRecordingDto({
+  CallRecordingDto({required this.attemptId, required this.bytes});
 
-    required  this.attemptId,
-
-    required  this.bytes,
-  });
-
-  @JsonKey(
-    
-    name: r'attemptId',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'attemptId', required: true, includeIfNull: false)
   final String attemptId;
 
-
-
-  @JsonKey(
-    
-    name: r'bytes',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'bytes', required: true, includeIfNull: false)
   final num bytes;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is CallRecordingDto &&
+            runtimeType == other.runtimeType &&
+            equals([attemptId, bytes], [other.attemptId, other.bytes]);
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^ mapPropsToHashCode([attemptId, bytes]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is CallRecordingDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            attemptId,
-            bytes,
-        ],
-        [
-            other.attemptId,
-            other.bytes,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        attemptId,
-        bytes,
-    ],);
-
-  factory CallRecordingDto.fromJson(Map<String, dynamic> json) => _$CallRecordingDtoFromJson(json);
+  factory CallRecordingDto.fromJson(Map<String, dynamic> json) =>
+      _$CallRecordingDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$CallRecordingDtoToJson(this);
 
@@ -82,6 +46,4 @@ class CallRecordingDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

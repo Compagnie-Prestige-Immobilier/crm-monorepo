@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'representant_comment_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,136 +19,72 @@ part 'representant_comment_dto.g.dart';
 class RepresentantCommentDto {
   /// Returns a new [RepresentantCommentDto] instance.
   RepresentantCommentDto({
+    required this.id,
 
-    required  this.id,
+    required this.representantId,
 
-    required  this.representantId,
+    required this.authorId,
 
-    required  this.authorId,
+    required this.authorName,
 
-    required  this.authorName,
+    required this.body,
 
-    required  this.body,
+    required this.clientCreatedAt,
 
-    required  this.clientCreatedAt,
-
-    required  this.createdAt,
+    required this.createdAt,
   });
 
-  @JsonKey(
-    
-    name: r'id',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'id', required: true, includeIfNull: false)
   final String id;
 
-
-
-  @JsonKey(
-    
-    name: r'representantId',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'representantId', required: true, includeIfNull: false)
   final String representantId;
 
-
-
-  @JsonKey(
-    
-    name: r'authorId',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'authorId', required: true, includeIfNull: false)
   final String authorId;
 
-
-
-  @JsonKey(
-    
-    name: r'authorName',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'authorName', required: true, includeIfNull: false)
   final String authorName;
 
-
-
-  @JsonKey(
-    
-    name: r'body',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'body', required: true, includeIfNull: false)
   final String body;
 
-
-
-  @JsonKey(
-    
-    name: r'clientCreatedAt',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'clientCreatedAt', required: true, includeIfNull: false)
   final DateTime clientCreatedAt;
 
-
-
-  @JsonKey(
-    
-    name: r'createdAt',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'createdAt', required: true, includeIfNull: false)
   final DateTime createdAt;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is RepresentantCommentDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [
+                id,
+                representantId,
+                authorId,
+                authorName,
+                body,
+                clientCreatedAt,
+                createdAt,
+              ],
+              [
+                other.id,
+                other.representantId,
+                other.authorId,
+                other.authorName,
+                other.body,
+                other.clientCreatedAt,
+                other.createdAt,
+              ],
+            );
+  }
 
-
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is RepresentantCommentDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            id,
-            representantId,
-            authorId,
-            authorName,
-            body,
-            clientCreatedAt,
-            createdAt,
-        ],
-        [
-            other.id,
-            other.representantId,
-            other.authorId,
-            other.authorName,
-            other.body,
-            other.clientCreatedAt,
-            other.createdAt,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([
         id,
         representantId,
         authorId,
@@ -157,9 +92,10 @@ class RepresentantCommentDto {
         body,
         clientCreatedAt,
         createdAt,
-    ],);
+      ]);
 
-  factory RepresentantCommentDto.fromJson(Map<String, dynamic> json) => _$RepresentantCommentDtoFromJson(json);
+  factory RepresentantCommentDto.fromJson(Map<String, dynamic> json) =>
+      _$RepresentantCommentDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$RepresentantCommentDtoToJson(this);
 
@@ -167,6 +103,4 @@ class RepresentantCommentDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

@@ -10,7 +10,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'purge_result_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -21,79 +20,39 @@ part 'purge_result_dto.g.dart';
 class PurgeResultDto {
   /// Returns a new [PurgeResultDto] instance.
   PurgeResultDto({
+    required this.deleted,
 
-    required  this.deleted,
+    required this.total,
 
-    required  this.total,
-
-    required  this.purgedAt,
+    required this.purgedAt,
   });
 
-  @JsonKey(
-    
-    name: r'deleted',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'deleted', required: true, includeIfNull: false)
   final List<PurgeDeletionDto> deleted;
 
-
-
-  @JsonKey(
-    
-    name: r'total',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'total', required: true, includeIfNull: false)
   final num total;
 
-
-
-      /// Horodatage serveur de la purge.
-  @JsonKey(
-    
-    name: r'purgedAt',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Horodatage serveur de la purge.
+  @JsonKey(name: r'purgedAt', required: true, includeIfNull: false)
   final DateTime purgedAt;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is PurgeResultDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [deleted, total, purgedAt],
+              [other.deleted, other.total, other.purgedAt],
+            );
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^ mapPropsToHashCode([deleted, total, purgedAt]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is PurgeResultDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            deleted,
-            total,
-            purgedAt,
-        ],
-        [
-            other.deleted,
-            other.total,
-            other.purgedAt,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        deleted,
-        total,
-        purgedAt,
-    ],);
-
-  factory PurgeResultDto.fromJson(Map<String, dynamic> json) => _$PurgeResultDtoFromJson(json);
+  factory PurgeResultDto.fromJson(Map<String, dynamic> json) =>
+      _$PurgeResultDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$PurgeResultDtoToJson(this);
 
@@ -101,6 +60,4 @@ class PurgeResultDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

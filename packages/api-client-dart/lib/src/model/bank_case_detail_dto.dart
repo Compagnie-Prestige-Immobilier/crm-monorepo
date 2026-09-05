@@ -11,7 +11,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'bank_case_detail_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -21,63 +20,28 @@ part 'bank_case_detail_dto.g.dart';
 )
 class BankCaseDetailDto {
   /// Returns a new [BankCaseDetailDto] instance.
-  BankCaseDetailDto({
+  BankCaseDetailDto({required this.bankCase, required this.history});
 
-    required  this.bankCase,
-
-    required  this.history,
-  });
-
-  @JsonKey(
-    
-    name: r'bankCase',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'bankCase', required: true, includeIfNull: false)
   final BankCaseDto bankCase;
 
-
-
-      /// Historique complet, du plus ancien au plus récent. Append-only.
-  @JsonKey(
-    
-    name: r'history',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Historique complet, du plus ancien au plus récent. Append-only.
+  @JsonKey(name: r'history', required: true, includeIfNull: false)
   final List<BankCaseTransitionDto> history;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is BankCaseDetailDto &&
+            runtimeType == other.runtimeType &&
+            equals([bankCase, history], [other.bankCase, other.history]);
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^ mapPropsToHashCode([bankCase, history]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is BankCaseDetailDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            bankCase,
-            history,
-        ],
-        [
-            other.bankCase,
-            other.history,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        bankCase,
-        history,
-    ],);
-
-  factory BankCaseDetailDto.fromJson(Map<String, dynamic> json) => _$BankCaseDetailDtoFromJson(json);
+  factory BankCaseDetailDto.fromJson(Map<String, dynamic> json) =>
+      _$BankCaseDetailDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$BankCaseDetailDtoToJson(this);
 
@@ -85,6 +49,4 @@ class BankCaseDetailDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

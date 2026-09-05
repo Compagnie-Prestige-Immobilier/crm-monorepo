@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'comptage_ouvertures_jour_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,114 +19,69 @@ part 'comptage_ouvertures_jour_dto.g.dart';
 class ComptageOuverturesJourDto {
   /// Returns a new [ComptageOuverturesJourDto] instance.
   ComptageOuverturesJourDto({
+    required this.openedById,
 
-    required  this.openedById,
+    required this.openedByName,
 
-    required  this.openedByName,
+    required this.jour,
 
-    required  this.jour,
+    required this.ouvertures,
 
-    required  this.ouvertures,
-
-    required  this.dureeMoyenneSecondes,
+    required this.dureeMoyenneSecondes,
   });
 
-  @JsonKey(
-    
-    name: r'openedById',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'openedById', required: true, includeIfNull: false)
   final String openedById;
 
-
-
-  @JsonKey(
-    
-    name: r'openedByName',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'openedByName', required: true, includeIfNull: false)
   final String openedByName;
 
-
-
-      /// Journée de travail, Africa/Dakar.
-  @JsonKey(
-    
-    name: r'jour',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Journée de travail, Africa/Dakar.
+  @JsonKey(name: r'jour', required: true, includeIfNull: false)
   final DateTime jour;
 
-
-
-  @JsonKey(
-    
-    name: r'ouvertures',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'ouvertures', required: true, includeIfNull: false)
   final num ouvertures;
 
-
-
-      /// DMT du jour, en secondes. Nulle tant qu’aucune ouverture n’est fermée.
-  @JsonKey(
-    
-    name: r'dureeMoyenneSecondes',
-    required: true,
-    includeIfNull: true,
-  )
-
-
+  /// DMT du jour, en secondes. Nulle tant qu’aucune ouverture n’est fermée.
+  @JsonKey(name: r'dureeMoyenneSecondes', required: true, includeIfNull: true)
   final num? dureeMoyenneSecondes;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is ComptageOuverturesJourDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [
+                openedById,
+                openedByName,
+                jour,
+                ouvertures,
+                dureeMoyenneSecondes,
+              ],
+              [
+                other.openedById,
+                other.openedByName,
+                other.jour,
+                other.ouvertures,
+                other.dureeMoyenneSecondes,
+              ],
+            );
+  }
 
-
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is ComptageOuverturesJourDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            openedById,
-            openedByName,
-            jour,
-            ouvertures,
-            dureeMoyenneSecondes,
-        ],
-        [
-            other.openedById,
-            other.openedByName,
-            other.jour,
-            other.ouvertures,
-            other.dureeMoyenneSecondes,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([
         openedById,
         openedByName,
         jour,
         ouvertures,
         dureeMoyenneSecondes,
-    ],);
+      ]);
 
-  factory ComptageOuverturesJourDto.fromJson(Map<String, dynamic> json) => _$ComptageOuverturesJourDtoFromJson(json);
+  factory ComptageOuverturesJourDto.fromJson(Map<String, dynamic> json) =>
+      _$ComptageOuverturesJourDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$ComptageOuverturesJourDtoToJson(this);
 
@@ -135,6 +89,4 @@ class ComptageOuverturesJourDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

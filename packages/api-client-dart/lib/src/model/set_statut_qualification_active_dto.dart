@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'set_statut_qualification_active_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,52 +18,29 @@ part 'set_statut_qualification_active_dto.g.dart';
 )
 class SetStatutQualificationActiveDto {
   /// Returns a new [SetStatutQualificationActiveDto] instance.
-  SetStatutQualificationActiveDto({
+  SetStatutQualificationActiveDto({required this.isActive});
 
-    required  this.isActive,
-  });
-
-  @JsonKey(
-    
-    name: r'isActive',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'isActive', required: true, includeIfNull: false)
   final bool isActive;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is SetStatutQualificationActiveDto &&
+            runtimeType == other.runtimeType &&
+            equals([isActive], [other.isActive]);
+  }
 
+  @override
+  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([isActive]);
 
+  factory SetStatutQualificationActiveDto.fromJson(Map<String, dynamic> json) =>
+      _$SetStatutQualificationActiveDtoFromJson(json);
 
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is SetStatutQualificationActiveDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            isActive,
-        ],
-        [
-            other.isActive,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        isActive,
-    ],);
-
-  factory SetStatutQualificationActiveDto.fromJson(Map<String, dynamic> json) => _$SetStatutQualificationActiveDtoFromJson(json);
-
-  Map<String, dynamic> toJson() => _$SetStatutQualificationActiveDtoToJson(this);
+  Map<String, dynamic> toJson() =>
+      _$SetStatutQualificationActiveDtoToJson(this);
 
   @override
   String toString() {
     return toJson().toString();
   }
-
 }
-

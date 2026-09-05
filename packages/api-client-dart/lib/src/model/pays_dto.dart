@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'pays_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,138 +19,66 @@ part 'pays_dto.g.dart';
 class PaysDto {
   /// Returns a new [PaysDto] instance.
   PaysDto({
+    required this.id,
 
-    required  this.id,
+    required this.code,
 
-    required  this.code,
+    required this.label,
 
-    required  this.label,
+    required this.indicatif,
 
-    required  this.indicatif,
+    required this.position,
 
-    required  this.position,
+    required this.isActive,
 
-    required  this.isActive,
-
-    required  this.updatedAt,
+    required this.updatedAt,
   });
 
-  @JsonKey(
-    
-    name: r'id',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'id', required: true, includeIfNull: false)
   final String id;
 
-
-
-      /// ISO 3166-1 alpha-2.
-  @JsonKey(
-    
-    name: r'code',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// ISO 3166-1 alpha-2.
+  @JsonKey(name: r'code', required: true, includeIfNull: false)
   final String code;
 
-
-
-  @JsonKey(
-    
-    name: r'label',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'label', required: true, includeIfNull: false)
   final String label;
 
-
-
-      /// Indicatif téléphonique sans le « + ».
-  @JsonKey(
-    
-    name: r'indicatif',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Indicatif téléphonique sans le « + ».
+  @JsonKey(name: r'indicatif', required: true, includeIfNull: false)
   final String indicatif;
 
-
-
-  @JsonKey(
-    
-    name: r'position',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'position', required: true, includeIfNull: false)
   final num position;
 
-
-
-  @JsonKey(
-    
-    name: r'isActive',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'isActive', required: true, includeIfNull: false)
   final bool isActive;
 
-
-
-  @JsonKey(
-    
-    name: r'updatedAt',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'updatedAt', required: true, includeIfNull: false)
   final DateTime updatedAt;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is PaysDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [id, code, label, indicatif, position, isActive, updatedAt],
+              [
+                other.id,
+                other.code,
+                other.label,
+                other.indicatif,
+                other.position,
+                other.isActive,
+                other.updatedAt,
+              ],
+            );
+  }
 
-
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is PaysDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            id,
-            code,
-            label,
-            indicatif,
-            position,
-            isActive,
-            updatedAt,
-        ],
-        [
-            other.id,
-            other.code,
-            other.label,
-            other.indicatif,
-            other.position,
-            other.isActive,
-            other.updatedAt,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([
         id,
         code,
         label,
@@ -159,9 +86,10 @@ class PaysDto {
         position,
         isActive,
         updatedAt,
-    ],);
+      ]);
 
-  factory PaysDto.fromJson(Map<String, dynamic> json) => _$PaysDtoFromJson(json);
+  factory PaysDto.fromJson(Map<String, dynamic> json) =>
+      _$PaysDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$PaysDtoToJson(this);
 
@@ -169,6 +97,4 @@ class PaysDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'visite_stat_jour_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,62 +18,26 @@ part 'visite_stat_jour_dto.g.dart';
 )
 class VisiteStatJourDto {
   /// Returns a new [VisiteStatJourDto] instance.
-  VisiteStatJourDto({
+  VisiteStatJourDto({required this.date, required this.count});
 
-    required  this.date,
-
-    required  this.count,
-  });
-
-  @JsonKey(
-    
-    name: r'date',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'date', required: true, includeIfNull: false)
   final String date;
 
-
-
-  @JsonKey(
-    
-    name: r'count',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'count', required: true, includeIfNull: false)
   final num count;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is VisiteStatJourDto &&
+            runtimeType == other.runtimeType &&
+            equals([date, count], [other.date, other.count]);
+  }
 
+  @override
+  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([date, count]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is VisiteStatJourDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            date,
-            count,
-        ],
-        [
-            other.date,
-            other.count,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        date,
-        count,
-    ],);
-
-  factory VisiteStatJourDto.fromJson(Map<String, dynamic> json) => _$VisiteStatJourDtoFromJson(json);
+  factory VisiteStatJourDto.fromJson(Map<String, dynamic> json) =>
+      _$VisiteStatJourDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$VisiteStatJourDtoToJson(this);
 
@@ -82,6 +45,4 @@ class VisiteStatJourDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

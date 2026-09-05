@@ -13,7 +13,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'segment_conversion_list_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -24,96 +23,45 @@ part 'segment_conversion_list_dto.g.dart';
 class SegmentConversionListDto {
   /// Returns a new [SegmentConversionListDto] instance.
   SegmentConversionListDto({
+    required this.items,
 
-    required  this.items,
+    required this.meta,
 
-    required  this.meta,
+    required this.byOriginSegment,
 
-    required  this.byOriginSegment,
-
-    required  this.byAuthor,
+    required this.byAuthor,
   });
 
-      /// De la plus récente à la plus ancienne.
-  @JsonKey(
-    
-    name: r'items',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// De la plus récente à la plus ancienne.
+  @JsonKey(name: r'items', required: true, includeIfNull: false)
   final List<SegmentConversionDto> items;
 
-
-
-  @JsonKey(
-    
-    name: r'meta',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'meta', required: true, includeIfNull: false)
   final PageMetaDto meta;
 
-
-
-  @JsonKey(
-    
-    name: r'byOriginSegment',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'byOriginSegment', required: true, includeIfNull: false)
   final List<SegmentConversionOriginDto> byOriginSegment;
 
-
-
-  @JsonKey(
-    
-    name: r'byAuthor',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'byAuthor', required: true, includeIfNull: false)
   final List<SegmentConversionAuthorDto> byAuthor;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is SegmentConversionListDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [items, meta, byOriginSegment, byAuthor],
+              [other.items, other.meta, other.byOriginSegment, other.byAuthor],
+            );
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([items, meta, byOriginSegment, byAuthor]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is SegmentConversionListDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            items,
-            meta,
-            byOriginSegment,
-            byAuthor,
-        ],
-        [
-            other.items,
-            other.meta,
-            other.byOriginSegment,
-            other.byAuthor,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        items,
-        meta,
-        byOriginSegment,
-        byAuthor,
-    ],);
-
-  factory SegmentConversionListDto.fromJson(Map<String, dynamic> json) => _$SegmentConversionListDtoFromJson(json);
+  factory SegmentConversionListDto.fromJson(Map<String, dynamic> json) =>
+      _$SegmentConversionListDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$SegmentConversionListDtoToJson(this);
 
@@ -121,6 +69,4 @@ class SegmentConversionListDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

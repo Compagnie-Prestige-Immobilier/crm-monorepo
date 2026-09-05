@@ -17,7 +17,6 @@ import 'package:crm_api_client/src/model/update_work_shifts_dto.dart';
 import 'package:crm_api_client/src/model/work_shifts_dto.dart';
 
 class SupervisionApi {
-
   final Dio _dio;
 
   const SupervisionApi(this._dio);
@@ -28,7 +27,7 @@ class SupervisionApi {
   /// Parameters:
   /// * [actFrom] - Borne basse sur la date de l’ACTE, incluse : heure d’appel, de saisie ou de clôture relevée chez le client, et non date d’arrivée en base. Une date seule (AAAA-MM-JJ) démarre à minuit, fuseau Africa/Dakar.
   /// * [actTo] - Borne haute sur la date de l’acte, incluse. Une date seule finit à 23:59:59.999.
-  /// * [granularity] 
+  /// * [granularity]
   /// * [projet] - Le projet. ABSENT veut dire les deux. Un représentant n’existe que dans CHUES : sous `GRAND_PUBLIC`, toutes les colonnes `rep*` valent 0 ou `null`.
   /// * [commercialId] - Un seul téléconseiller : borne les lignes, la liste et les histogrammes.
   /// * [timeFrom] - Heure de début quotidienne, Dakar.
@@ -42,7 +41,7 @@ class SupervisionApi {
   ///
   /// Returns a [Future] containing a [Response] with a [SupervisionActivityDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<SupervisionActivityDto>> getSupervisionActivite({ 
+  Future<Response<SupervisionActivityDto>> getSupervisionActivite({
     DateTime? actFrom,
     DateTime? actTo,
     SupervisionGranularity? granularity,
@@ -60,16 +59,10 @@ class SupervisionApi {
     final _path = r'/api/v1/supervision/activite';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -98,9 +91,14 @@ class SupervisionApi {
     SupervisionActivityDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<SupervisionActivityDto, SupervisionActivityDto>(rawData, 'SupervisionActivityDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<SupervisionActivityDto, SupervisionActivityDto>(
+              rawData,
+              'SupervisionActivityDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -124,7 +122,7 @@ _responseData = rawData == null ? null : deserialize<SupervisionActivityDto, Sup
   }
 
   /// Créneaux de travail suivis.
-  /// 
+  ///
   ///
   /// Parameters:
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
@@ -136,7 +134,7 @@ _responseData = rawData == null ? null : deserialize<SupervisionActivityDto, Sup
   ///
   /// Returns a [Future] containing a [Response] with a [WorkShiftsDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<WorkShiftsDto>> getSupervisionCreneaux({ 
+  Future<Response<WorkShiftsDto>> getSupervisionCreneaux({
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -147,16 +145,10 @@ _responseData = rawData == null ? null : deserialize<SupervisionActivityDto, Sup
     final _path = r'/api/v1/supervision/creneaux';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -174,9 +166,14 @@ _responseData = rawData == null ? null : deserialize<SupervisionActivityDto, Sup
     WorkShiftsDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<WorkShiftsDto, WorkShiftsDto>(rawData, 'WorkShiftsDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<WorkShiftsDto, WorkShiftsDto>(
+              rawData,
+              'WorkShiftsDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -200,10 +197,10 @@ _responseData = rawData == null ? null : deserialize<WorkShiftsDto, WorkShiftsDt
   }
 
   /// Modifie les créneaux de travail.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [updateWorkShiftsDto] 
+  /// * [updateWorkShiftsDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -213,7 +210,7 @@ _responseData = rawData == null ? null : deserialize<WorkShiftsDto, WorkShiftsDt
   ///
   /// Returns a [Future] containing a [Response] with a [WorkShiftsDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<WorkShiftsDto>> updateSupervisionCreneaux({ 
+  Future<Response<WorkShiftsDto>> updateSupervisionCreneaux({
     required UpdateWorkShiftsDto updateWorkShiftsDto,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -225,16 +222,10 @@ _responseData = rawData == null ? null : deserialize<WorkShiftsDto, WorkShiftsDt
     final _path = r'/api/v1/supervision/creneaux';
     final _options = Options(
       method: r'PUT',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -246,13 +237,9 @@ _responseData = rawData == null ? null : deserialize<WorkShiftsDto, WorkShiftsDt
 
     try {
       _bodyData = jsonEncode(updateWorkShiftsDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -271,9 +258,14 @@ _responseData = rawData == null ? null : deserialize<WorkShiftsDto, WorkShiftsDt
     WorkShiftsDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<WorkShiftsDto, WorkShiftsDto>(rawData, 'WorkShiftsDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<WorkShiftsDto, WorkShiftsDto>(
+              rawData,
+              'WorkShiftsDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -295,5 +287,4 @@ _responseData = rawData == null ? null : deserialize<WorkShiftsDto, WorkShiftsDt
       extra: _response.extra,
     );
   }
-
 }

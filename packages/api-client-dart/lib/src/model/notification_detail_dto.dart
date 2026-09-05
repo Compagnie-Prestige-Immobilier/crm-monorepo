@@ -11,7 +11,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'notification_detail_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -21,63 +20,31 @@ part 'notification_detail_dto.g.dart';
 )
 class NotificationDetailDto {
   /// Returns a new [NotificationDetailDto] instance.
-  NotificationDetailDto({
+  NotificationDetailDto({required this.notification, required this.recipients});
 
-    required  this.notification,
-
-    required  this.recipients,
-  });
-
-  @JsonKey(
-    
-    name: r'notification',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'notification', required: true, includeIfNull: false)
   final NotificationDto notification;
 
-
-
-      /// Une ligne par destinataire, c’est ce qui rend « qui a reçu ? » répondable.
-  @JsonKey(
-    
-    name: r'recipients',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Une ligne par destinataire, c’est ce qui rend « qui a reçu ? » répondable.
+  @JsonKey(name: r'recipients', required: true, includeIfNull: false)
   final List<NotificationRecipientDto> recipients;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is NotificationDetailDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [notification, recipients],
+              [other.notification, other.recipients],
+            );
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^ mapPropsToHashCode([notification, recipients]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is NotificationDetailDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            notification,
-            recipients,
-        ],
-        [
-            other.notification,
-            other.recipients,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        notification,
-        recipients,
-    ],);
-
-  factory NotificationDetailDto.fromJson(Map<String, dynamic> json) => _$NotificationDetailDtoFromJson(json);
+  factory NotificationDetailDto.fromJson(Map<String, dynamic> json) =>
+      _$NotificationDetailDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$NotificationDetailDtoToJson(this);
 
@@ -85,6 +52,4 @@ class NotificationDetailDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

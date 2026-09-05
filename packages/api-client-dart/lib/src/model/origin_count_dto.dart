@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'origin_count_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,98 +19,47 @@ part 'origin_count_dto.g.dart';
 class OriginCountDto {
   /// Returns a new [OriginCountDto] instance.
   OriginCountDto({
+    required this.origin,
 
-    required  this.origin,
+    required this.label,
 
-    required  this.label,
+    required this.prospects,
 
-    required  this.prospects,
-
-    required  this.share,
+    required this.share,
   });
 
-      /// Clé de provenance. Nulle pour une fiche née d’une tournée terrain.
-  @JsonKey(
-    
-    name: r'origin',
-    required: true,
-    includeIfNull: true,
-  )
-
-
+  /// Clé de provenance. Nulle pour une fiche née d’une tournée terrain.
+  @JsonKey(name: r'origin', required: true, includeIfNull: true)
   final String? origin;
 
-
-
-      /// Libellé prêt à afficher.
-  @JsonKey(
-    
-    name: r'label',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Libellé prêt à afficher.
+  @JsonKey(name: r'label', required: true, includeIfNull: false)
   final String label;
 
-
-
-  @JsonKey(
-    
-    name: r'prospects',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'prospects', required: true, includeIfNull: false)
   final num prospects;
 
-
-
-      /// Part du total filtré, en pourcentage. Nul quand le dénominateur est vide : un taux calculé sur zéro observation n’existe pas, et le publier comme 0 le rendrait indistinguable d’un vrai 0 %.
-  @JsonKey(
-    
-    name: r'share',
-    required: true,
-    includeIfNull: true,
-  )
-
-
+  /// Part du total filtré, en pourcentage. Nul quand le dénominateur est vide : un taux calculé sur zéro observation n’existe pas, et le publier comme 0 le rendrait indistinguable d’un vrai 0 %.
+  @JsonKey(name: r'share', required: true, includeIfNull: true)
   final num? share;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is OriginCountDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [origin, label, prospects, share],
+              [other.origin, other.label, other.prospects, other.share],
+            );
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([origin, label, prospects, share]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is OriginCountDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            origin,
-            label,
-            prospects,
-            share,
-        ],
-        [
-            other.origin,
-            other.label,
-            other.prospects,
-            other.share,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        origin,
-        label,
-        prospects,
-        share,
-    ],);
-
-  factory OriginCountDto.fromJson(Map<String, dynamic> json) => _$OriginCountDtoFromJson(json);
+  factory OriginCountDto.fromJson(Map<String, dynamic> json) =>
+      _$OriginCountDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$OriginCountDtoToJson(this);
 
@@ -119,6 +67,4 @@ class OriginCountDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

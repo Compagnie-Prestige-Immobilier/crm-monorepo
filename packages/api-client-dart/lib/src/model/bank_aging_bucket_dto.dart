@@ -10,7 +10,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'bank_aging_bucket_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -21,98 +20,51 @@ part 'bank_aging_bucket_dto.g.dart';
 class BankAgingBucketDto {
   /// Returns a new [BankAgingBucketDto] instance.
   BankAgingBucketDto({
+    required this.bucket,
 
-    required  this.bucket,
+    required this.label,
 
-    required  this.label,
+    required this.dossiers,
 
-    required  this.dossiers,
-
-    required  this.share,
+    required this.share,
   });
 
   @JsonKey(
-    
     name: r'bucket',
     required: true,
     includeIfNull: false,
-  unknownEnumValue: BankAgeBucket.unknownDefaultOpenApi,
+    unknownEnumValue: BankAgeBucket.unknownDefaultOpenApi,
   )
-
-
   final BankAgeBucket bucket;
 
-
-
-      /// Libellé prêt à afficher.
-  @JsonKey(
-    
-    name: r'label',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Libellé prêt à afficher.
+  @JsonKey(name: r'label', required: true, includeIfNull: false)
   final String label;
 
-
-
-  @JsonKey(
-    
-    name: r'dossiers',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'dossiers', required: true, includeIfNull: false)
   final num dossiers;
 
-
-
-      /// Part du total, en pourcentage. Nul quand le dénominateur est vide : un taux calculé sur zéro observation n’existe pas, et le publier comme 0 le rendrait indistinguable d’un vrai 0 %.
-  @JsonKey(
-    
-    name: r'share',
-    required: true,
-    includeIfNull: true,
-  )
-
-
+  /// Part du total, en pourcentage. Nul quand le dénominateur est vide : un taux calculé sur zéro observation n’existe pas, et le publier comme 0 le rendrait indistinguable d’un vrai 0 %.
+  @JsonKey(name: r'share', required: true, includeIfNull: true)
   final num? share;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is BankAgingBucketDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [bucket, label, dossiers, share],
+              [other.bucket, other.label, other.dossiers, other.share],
+            );
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([bucket, label, dossiers, share]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is BankAgingBucketDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            bucket,
-            label,
-            dossiers,
-            share,
-        ],
-        [
-            other.bucket,
-            other.label,
-            other.dossiers,
-            other.share,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        bucket,
-        label,
-        dossiers,
-        share,
-    ],);
-
-  factory BankAgingBucketDto.fromJson(Map<String, dynamic> json) => _$BankAgingBucketDtoFromJson(json);
+  factory BankAgingBucketDto.fromJson(Map<String, dynamic> json) =>
+      _$BankAgingBucketDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$BankAgingBucketDtoToJson(this);
 
@@ -120,6 +72,4 @@ class BankAgingBucketDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

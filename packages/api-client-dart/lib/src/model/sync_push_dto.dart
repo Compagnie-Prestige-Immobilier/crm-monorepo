@@ -10,7 +10,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'sync_push_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -21,118 +20,73 @@ part 'sync_push_dto.g.dart';
 class SyncPushDto {
   /// Returns a new [SyncPushDto] instance.
   SyncPushDto({
+    required this.clientBatchId,
 
-    required  this.clientBatchId,
+    required this.payloadVersion,
 
-    required  this.payloadVersion,
+    required this.operations,
 
-    required  this.operations,
+    this.pendingOps,
 
-     this.pendingOps,
-
-     this.appVersion,
+    this.appVersion,
   });
 
-      /// Identifiant du lot. Doit être répété à l’identique dans l’en-tête Idempotency-Key.
-  @JsonKey(
-    
-    name: r'clientBatchId',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Identifiant du lot. Doit être répété à l’identique dans l’en-tête Idempotency-Key.
+  @JsonKey(name: r'clientBatchId', required: true, includeIfNull: false)
   final String clientBatchId;
 
-
-
-      /// Version du format de charge utile.
-          // minimum: 1
-  @JsonKey(
-    
-    name: r'payloadVersion',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Version du format de charge utile.
+  // minimum: 1
+  @JsonKey(name: r'payloadVersion', required: true, includeIfNull: false)
   final num payloadVersion;
 
-
-
-  @JsonKey(
-    
-    name: r'operations',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'operations', required: true, includeIfNull: false)
   final List<SyncOperationDto> operations;
 
-
-
-      /// Opérations restant dans la file d’attente de l’appareil APRÈS ce lot. Le serveur ne peut pas la deviner. Facultatif sans limite de temps : une version déjà déployée ne l’envoie pas.
-          // minimum: 0
-  @JsonKey(
-    
-    name: r'pendingOps',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  /// Opérations restant dans la file d’attente de l’appareil APRÈS ce lot. Le serveur ne peut pas la deviner. Facultatif sans limite de temps : une version déjà déployée ne l’envoie pas.
+  // minimum: 0
+  @JsonKey(name: r'pendingOps', required: false, includeIfNull: false)
   final num? pendingOps;
 
-
-
-      /// Version de l’application mobile, telle qu’elle s’annonce. Facultative.
-  @JsonKey(
-    
-    name: r'appVersion',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  /// Version de l’application mobile, telle qu’elle s’annonce. Facultative.
+  @JsonKey(name: r'appVersion', required: false, includeIfNull: false)
   final String? appVersion;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is SyncPushDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [
+                clientBatchId,
+                payloadVersion,
+                operations,
+                pendingOps,
+                appVersion,
+              ],
+              [
+                other.clientBatchId,
+                other.payloadVersion,
+                other.operations,
+                other.pendingOps,
+                other.appVersion,
+              ],
+            );
+  }
 
-
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is SyncPushDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            clientBatchId,
-            payloadVersion,
-            operations,
-            pendingOps,
-            appVersion,
-        ],
-        [
-            other.clientBatchId,
-            other.payloadVersion,
-            other.operations,
-            other.pendingOps,
-            other.appVersion,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([
         clientBatchId,
         payloadVersion,
         operations,
         pendingOps,
         appVersion,
-    ],);
+      ]);
 
-  factory SyncPushDto.fromJson(Map<String, dynamic> json) => _$SyncPushDtoFromJson(json);
+  factory SyncPushDto.fromJson(Map<String, dynamic> json) =>
+      _$SyncPushDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$SyncPushDtoToJson(this);
 
@@ -140,6 +94,4 @@ class SyncPushDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

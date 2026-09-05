@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'update_bank_case_stage_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,62 +18,26 @@ part 'update_bank_case_stage_dto.g.dart';
 )
 class UpdateBankCaseStageDto {
   /// Returns a new [UpdateBankCaseStageDto] instance.
-  UpdateBankCaseStageDto({
+  UpdateBankCaseStageDto({this.label, this.color});
 
-     this.label,
-
-     this.color,
-  });
-
-  @JsonKey(
-    
-    name: r'label',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'label', required: false, includeIfNull: false)
   final String? label;
 
-
-
-  @JsonKey(
-    
-    name: r'color',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'color', required: false, includeIfNull: false)
   final String? color;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is UpdateBankCaseStageDto &&
+            runtimeType == other.runtimeType &&
+            equals([label, color], [other.label, other.color]);
+  }
 
+  @override
+  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([label, color]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is UpdateBankCaseStageDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            label,
-            color,
-        ],
-        [
-            other.label,
-            other.color,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        label,
-        color,
-    ],);
-
-  factory UpdateBankCaseStageDto.fromJson(Map<String, dynamic> json) => _$UpdateBankCaseStageDtoFromJson(json);
+  factory UpdateBankCaseStageDto.fromJson(Map<String, dynamic> json) =>
+      _$UpdateBankCaseStageDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$UpdateBankCaseStageDtoToJson(this);
 
@@ -82,6 +45,4 @@ class UpdateBankCaseStageDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

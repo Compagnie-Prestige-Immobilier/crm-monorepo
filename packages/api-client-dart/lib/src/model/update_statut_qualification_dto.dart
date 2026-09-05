@@ -11,7 +11,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'update_statut_qualification_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -22,135 +21,89 @@ part 'update_statut_qualification_dto.g.dart';
 class UpdateStatutQualificationDto {
   /// Returns a new [UpdateStatutQualificationDto] instance.
   UpdateStatutQualificationDto({
+    this.label,
 
-     this.label,
+    this.requiresCallback,
 
-     this.requiresCallback,
+    this.requiresComment,
 
-     this.requiresComment,
+    this.retryAfterMinutes,
 
-     this.retryAfterMinutes,
+    this.priorite,
 
-     this.priorite,
-
-     this.relationStatus,
+    this.relationStatus,
   });
 
-  @JsonKey(
-    
-    name: r'label',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'label', required: false, includeIfNull: false)
   final String? label;
 
-
-
-  @JsonKey(
-    
-    name: r'requiresCallback',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'requiresCallback', required: false, includeIfNull: false)
   final bool? requiresCallback;
 
-
-
-  @JsonKey(
-    
-    name: r'requiresComment',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'requiresComment', required: false, includeIfNull: false)
   final bool? requiresComment;
 
-
-
-      /// Nul retire le réessai proposé.
-          // minimum: 5
-          // maximum: 10080
-  @JsonKey(
-    
-    name: r'retryAfterMinutes',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  /// Nul retire le réessai proposé.
+  // minimum: 5
+  // maximum: 10080
+  @JsonKey(name: r'retryAfterMinutes', required: false, includeIfNull: false)
   final num? retryAfterMinutes;
 
-
-
   @JsonKey(
-    
     name: r'priorite',
     required: false,
     includeIfNull: false,
-  unknownEnumValue: PrioriteTraitement.unknownDefaultOpenApi,
+    unknownEnumValue: PrioriteTraitement.unknownDefaultOpenApi,
   )
-
-
   final PrioriteTraitement? priorite;
 
-
-
-      /// Nul retire la relation posée : le statut cesse alors de trancher.
+  /// Nul retire la relation posée : le statut cesse alors de trancher.
   @JsonKey(
-    
     name: r'relationStatus',
     required: false,
     includeIfNull: false,
-  unknownEnumValue: RepresentantRelation.unknownDefaultOpenApi,
+    unknownEnumValue: RepresentantRelation.unknownDefaultOpenApi,
   )
-
-
   final RepresentantRelation? relationStatus;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is UpdateStatutQualificationDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [
+                label,
+                requiresCallback,
+                requiresComment,
+                retryAfterMinutes,
+                priorite,
+                relationStatus,
+              ],
+              [
+                other.label,
+                other.requiresCallback,
+                other.requiresComment,
+                other.retryAfterMinutes,
+                other.priorite,
+                other.relationStatus,
+              ],
+            );
+  }
 
-
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is UpdateStatutQualificationDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            label,
-            requiresCallback,
-            requiresComment,
-            retryAfterMinutes,
-            priorite,
-            relationStatus,
-        ],
-        [
-            other.label,
-            other.requiresCallback,
-            other.requiresComment,
-            other.retryAfterMinutes,
-            other.priorite,
-            other.relationStatus,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([
         label,
         requiresCallback,
         requiresComment,
         retryAfterMinutes,
         priorite,
         relationStatus,
-    ],);
+      ]);
 
-  factory UpdateStatutQualificationDto.fromJson(Map<String, dynamic> json) => _$UpdateStatutQualificationDtoFromJson(json);
+  factory UpdateStatutQualificationDto.fromJson(Map<String, dynamic> json) =>
+      _$UpdateStatutQualificationDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$UpdateStatutQualificationDtoToJson(this);
 
@@ -158,6 +111,4 @@ class UpdateStatutQualificationDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

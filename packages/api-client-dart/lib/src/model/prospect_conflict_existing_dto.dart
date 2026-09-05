@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'prospect_conflict_existing_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,152 +19,79 @@ part 'prospect_conflict_existing_dto.g.dart';
 class ProspectConflictExistingDto {
   /// Returns a new [ProspectConflictExistingDto] instance.
   ProspectConflictExistingDto({
+    required this.id,
 
-    required  this.id,
+    required this.nom,
 
-    required  this.nom,
+    required this.prenom,
 
-    required  this.prenom,
+    required this.representantId,
 
-    required  this.representantId,
+    required this.representantName,
 
-    required  this.representantName,
+    required this.ownedByCommercialId,
 
-    required  this.ownedByCommercialId,
+    required this.ownedByCommercialName,
 
-    required  this.ownedByCommercialName,
-
-    required  this.createdAt,
+    required this.createdAt,
   });
 
-  @JsonKey(
-    
-    name: r'id',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'id', required: true, includeIfNull: false)
   final String id;
 
-
-
-  @JsonKey(
-    
-    name: r'nom',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'nom', required: true, includeIfNull: false)
   final String nom;
 
-
-
-  @JsonKey(
-    
-    name: r'prenom',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'prenom', required: true, includeIfNull: false)
   final String prenom;
 
-
-
-  @JsonKey(
-    
-    name: r'representantId',
-    required: true,
-    includeIfNull: true,
-  )
-
-
+  @JsonKey(name: r'representantId', required: true, includeIfNull: true)
   final String? representantId;
 
-
-
-  @JsonKey(
-    
-    name: r'representantName',
-    required: true,
-    includeIfNull: true,
-  )
-
-
+  @JsonKey(name: r'representantName', required: true, includeIfNull: true)
   final String? representantName;
 
-
-
-  @JsonKey(
-    
-    name: r'ownedByCommercialId',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'ownedByCommercialId', required: true, includeIfNull: false)
   final String ownedByCommercialId;
 
-
-
-  @JsonKey(
-    
-    name: r'ownedByCommercialName',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'ownedByCommercialName', required: true, includeIfNull: false)
   final String ownedByCommercialName;
 
-
-
-  @JsonKey(
-    
-    name: r'createdAt',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'createdAt', required: true, includeIfNull: false)
   final DateTime createdAt;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is ProspectConflictExistingDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [
+                id,
+                nom,
+                prenom,
+                representantId,
+                representantName,
+                ownedByCommercialId,
+                ownedByCommercialName,
+                createdAt,
+              ],
+              [
+                other.id,
+                other.nom,
+                other.prenom,
+                other.representantId,
+                other.representantName,
+                other.ownedByCommercialId,
+                other.ownedByCommercialName,
+                other.createdAt,
+              ],
+            );
+  }
 
-
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is ProspectConflictExistingDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            id,
-            nom,
-            prenom,
-            representantId,
-            representantName,
-            ownedByCommercialId,
-            ownedByCommercialName,
-            createdAt,
-        ],
-        [
-            other.id,
-            other.nom,
-            other.prenom,
-            other.representantId,
-            other.representantName,
-            other.ownedByCommercialId,
-            other.ownedByCommercialName,
-            other.createdAt,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([
         id,
         nom,
         prenom,
@@ -174,9 +100,10 @@ class ProspectConflictExistingDto {
         ownedByCommercialId,
         ownedByCommercialName,
         createdAt,
-    ],);
+      ]);
 
-  factory ProspectConflictExistingDto.fromJson(Map<String, dynamic> json) => _$ProspectConflictExistingDtoFromJson(json);
+  factory ProspectConflictExistingDto.fromJson(Map<String, dynamic> json) =>
+      _$ProspectConflictExistingDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$ProspectConflictExistingDtoToJson(this);
 
@@ -184,6 +111,4 @@ class ProspectConflictExistingDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

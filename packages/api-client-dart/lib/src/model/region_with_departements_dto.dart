@@ -10,7 +10,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'region_with_departements_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -21,95 +20,43 @@ part 'region_with_departements_dto.g.dart';
 class RegionWithDepartementsDto {
   /// Returns a new [RegionWithDepartementsDto] instance.
   RegionWithDepartementsDto({
+    required this.id,
 
-    required  this.id,
+    required this.code,
 
-    required  this.code,
+    required this.name,
 
-    required  this.name,
-
-    required  this.departements,
+    required this.departements,
   });
 
-  @JsonKey(
-    
-    name: r'id',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'id', required: true, includeIfNull: false)
   final String id;
 
-
-
-  @JsonKey(
-    
-    name: r'code',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'code', required: true, includeIfNull: false)
   final String code;
 
-
-
-  @JsonKey(
-    
-    name: r'name',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'name', required: true, includeIfNull: false)
   final String name;
 
-
-
-  @JsonKey(
-    
-    name: r'departements',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'departements', required: true, includeIfNull: false)
   final List<DepartementDto> departements;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is RegionWithDepartementsDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [id, code, name, departements],
+              [other.id, other.code, other.name, other.departements],
+            );
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^ mapPropsToHashCode([id, code, name, departements]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is RegionWithDepartementsDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            id,
-            code,
-            name,
-            departements,
-        ],
-        [
-            other.id,
-            other.code,
-            other.name,
-            other.departements,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        id,
-        code,
-        name,
-        departements,
-    ],);
-
-  factory RegionWithDepartementsDto.fromJson(Map<String, dynamic> json) => _$RegionWithDepartementsDtoFromJson(json);
+  factory RegionWithDepartementsDto.fromJson(Map<String, dynamic> json) =>
+      _$RegionWithDepartementsDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$RegionWithDepartementsDtoToJson(this);
 
@@ -117,6 +64,4 @@ class RegionWithDepartementsDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

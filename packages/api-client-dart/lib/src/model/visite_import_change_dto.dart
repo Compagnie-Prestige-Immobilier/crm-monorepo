@@ -11,7 +11,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'visite_import_change_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -22,172 +21,94 @@ part 'visite_import_change_dto.g.dart';
 class VisiteImportChangeDto {
   /// Returns a new [VisiteImportChangeDto] instance.
   VisiteImportChangeDto({
+    required this.id,
 
-    required  this.id,
+    required this.sheet,
 
-    required  this.sheet,
+    required this.rowNumber,
 
-    required  this.rowNumber,
+    required this.kind,
 
-    required  this.kind,
+    required this.reference,
 
-    required  this.reference,
+    required this.visiteId,
 
-    required  this.visiteId,
+    required this.label,
 
-    required  this.label,
+    required this.fields,
 
-    required  this.fields,
-
-    required  this.selected,
+    required this.selected,
   });
 
-  @JsonKey(
-    
-    name: r'id',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'id', required: true, includeIfNull: false)
   final String id;
 
-
-
-  @JsonKey(
-    
-    name: r'sheet',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'sheet', required: true, includeIfNull: false)
   final String sheet;
 
-
-
-  @JsonKey(
-    
-    name: r'rowNumber',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'rowNumber', required: true, includeIfNull: false)
   final num rowNumber;
 
-
-
   @JsonKey(
-    
     name: r'kind',
     required: true,
     includeIfNull: false,
-  unknownEnumValue: VisiteImportChangeKind.unknownDefaultOpenApi,
+    unknownEnumValue: VisiteImportChangeKind.unknownDefaultOpenApi,
   )
-
-
   final VisiteImportChangeKind kind;
 
-
-
-      /// Nul pour une création.
-  @JsonKey(
-    
-    name: r'reference',
-    required: true,
-    includeIfNull: true,
-  )
-
-
+  /// Nul pour une création.
+  @JsonKey(name: r'reference', required: true, includeIfNull: true)
   final String? reference;
 
-
-
-  @JsonKey(
-    
-    name: r'visiteId',
-    required: true,
-    includeIfNull: true,
-  )
-
-
+  @JsonKey(name: r'visiteId', required: true, includeIfNull: true)
   final String? visiteId;
 
-
-
-      /// « MME LY SEYNABOU, 12/08 14:30 », sans avoir à relire la visite.
-  @JsonKey(
-    
-    name: r'label',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// « MME LY SEYNABOU, 12/08 14:30 », sans avoir à relire la visite.
+  @JsonKey(name: r'label', required: true, includeIfNull: false)
   final String label;
 
-
-
-  @JsonKey(
-    
-    name: r'fields',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'fields', required: true, includeIfNull: false)
   final List<VisiteImportChangeFieldDto> fields;
 
-
-
-      /// Coché par défaut : décocher retire la ligne de l’application.
-  @JsonKey(
-    
-    name: r'selected',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Coché par défaut : décocher retire la ligne de l’application.
+  @JsonKey(name: r'selected', required: true, includeIfNull: false)
   final bool selected;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is VisiteImportChangeDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [
+                id,
+                sheet,
+                rowNumber,
+                kind,
+                reference,
+                visiteId,
+                label,
+                fields,
+                selected,
+              ],
+              [
+                other.id,
+                other.sheet,
+                other.rowNumber,
+                other.kind,
+                other.reference,
+                other.visiteId,
+                other.label,
+                other.fields,
+                other.selected,
+              ],
+            );
+  }
 
-
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is VisiteImportChangeDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            id,
-            sheet,
-            rowNumber,
-            kind,
-            reference,
-            visiteId,
-            label,
-            fields,
-            selected,
-        ],
-        [
-            other.id,
-            other.sheet,
-            other.rowNumber,
-            other.kind,
-            other.reference,
-            other.visiteId,
-            other.label,
-            other.fields,
-            other.selected,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([
         id,
         sheet,
         rowNumber,
@@ -197,9 +118,10 @@ class VisiteImportChangeDto {
         label,
         fields,
         selected,
-    ],);
+      ]);
 
-  factory VisiteImportChangeDto.fromJson(Map<String, dynamic> json) => _$VisiteImportChangeDtoFromJson(json);
+  factory VisiteImportChangeDto.fromJson(Map<String, dynamic> json) =>
+      _$VisiteImportChangeDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$VisiteImportChangeDtoToJson(this);
 
@@ -207,6 +129,4 @@ class VisiteImportChangeDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

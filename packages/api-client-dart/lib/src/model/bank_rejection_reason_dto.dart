@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'bank_rejection_reason_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,112 +19,55 @@ part 'bank_rejection_reason_dto.g.dart';
 class BankRejectionReasonDto {
   /// Returns a new [BankRejectionReasonDto] instance.
   BankRejectionReasonDto({
+    required this.id,
 
-    required  this.id,
+    required this.code,
 
-    required  this.code,
+    required this.label,
 
-    required  this.label,
+    required this.sortOrder,
 
-    required  this.sortOrder,
-
-    required  this.isActive,
+    required this.isActive,
   });
 
-  @JsonKey(
-    
-    name: r'id',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'id', required: true, includeIfNull: false)
   final String id;
 
-
-
-  @JsonKey(
-    
-    name: r'code',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'code', required: true, includeIfNull: false)
   final String code;
 
-
-
-  @JsonKey(
-    
-    name: r'label',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'label', required: true, includeIfNull: false)
   final String label;
 
-
-
-  @JsonKey(
-    
-    name: r'sortOrder',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'sortOrder', required: true, includeIfNull: false)
   final num sortOrder;
 
-
-
-  @JsonKey(
-    
-    name: r'isActive',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'isActive', required: true, includeIfNull: false)
   final bool isActive;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is BankRejectionReasonDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [id, code, label, sortOrder, isActive],
+              [
+                other.id,
+                other.code,
+                other.label,
+                other.sortOrder,
+                other.isActive,
+              ],
+            );
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([id, code, label, sortOrder, isActive]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is BankRejectionReasonDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            id,
-            code,
-            label,
-            sortOrder,
-            isActive,
-        ],
-        [
-            other.id,
-            other.code,
-            other.label,
-            other.sortOrder,
-            other.isActive,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        id,
-        code,
-        label,
-        sortOrder,
-        isActive,
-    ],);
-
-  factory BankRejectionReasonDto.fromJson(Map<String, dynamic> json) => _$BankRejectionReasonDtoFromJson(json);
+  factory BankRejectionReasonDto.fromJson(Map<String, dynamic> json) =>
+      _$BankRejectionReasonDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$BankRejectionReasonDtoToJson(this);
 
@@ -133,6 +75,4 @@ class BankRejectionReasonDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

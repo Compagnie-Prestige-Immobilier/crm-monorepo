@@ -11,7 +11,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'visite_list_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -21,62 +20,26 @@ part 'visite_list_dto.g.dart';
 )
 class VisiteListDto {
   /// Returns a new [VisiteListDto] instance.
-  VisiteListDto({
+  VisiteListDto({required this.items, required this.meta});
 
-    required  this.items,
-
-    required  this.meta,
-  });
-
-  @JsonKey(
-    
-    name: r'items',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'items', required: true, includeIfNull: false)
   final List<VisiteDto> items;
 
-
-
-  @JsonKey(
-    
-    name: r'meta',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'meta', required: true, includeIfNull: false)
   final PageMetaDto meta;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is VisiteListDto &&
+            runtimeType == other.runtimeType &&
+            equals([items, meta], [other.items, other.meta]);
+  }
 
+  @override
+  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([items, meta]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is VisiteListDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            items,
-            meta,
-        ],
-        [
-            other.items,
-            other.meta,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        items,
-        meta,
-    ],);
-
-  factory VisiteListDto.fromJson(Map<String, dynamic> json) => _$VisiteListDtoFromJson(json);
+  factory VisiteListDto.fromJson(Map<String, dynamic> json) =>
+      _$VisiteListDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$VisiteListDtoToJson(this);
 
@@ -84,6 +47,4 @@ class VisiteListDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

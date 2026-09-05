@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'update_syndicat_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,53 +19,25 @@ part 'update_syndicat_dto.g.dart';
 class UpdateSyndicatDto {
   /// Returns a new [UpdateSyndicatDto] instance.
   UpdateSyndicatDto({
+    this.name,
 
-     this.name,
+    this.sigle,
 
-     this.sigle,
+    this.secteur,
 
-     this.secteur,
+    this.isActive = true,
 
-     this.isActive = true,
-
-     this.sortOrder = 100,
+    this.sortOrder = 100,
   });
 
-  @JsonKey(
-    
-    name: r'name',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'name', required: false, includeIfNull: false)
   final String? name;
 
-
-
-  @JsonKey(
-    
-    name: r'sigle',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'sigle', required: false, includeIfNull: false)
   final String? sigle;
 
-
-
-  @JsonKey(
-    
-    name: r'secteur',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'secteur', required: false, includeIfNull: false)
   final String? secteur;
-
-
 
   @JsonKey(
     defaultValue: true,
@@ -74,11 +45,7 @@ class UpdateSyndicatDto {
     required: false,
     includeIfNull: false,
   )
-
-
   final bool? isActive;
-
-
 
   @JsonKey(
     defaultValue: 100,
@@ -86,46 +53,31 @@ class UpdateSyndicatDto {
     required: false,
     includeIfNull: false,
   )
-
-
   final num? sortOrder;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is UpdateSyndicatDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [name, sigle, secteur, isActive, sortOrder],
+              [
+                other.name,
+                other.sigle,
+                other.secteur,
+                other.isActive,
+                other.sortOrder,
+              ],
+            );
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([name, sigle, secteur, isActive, sortOrder]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is UpdateSyndicatDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            name,
-            sigle,
-            secteur,
-            isActive,
-            sortOrder,
-        ],
-        [
-            other.name,
-            other.sigle,
-            other.secteur,
-            other.isActive,
-            other.sortOrder,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        name,
-        sigle,
-        secteur,
-        isActive,
-        sortOrder,
-    ],);
-
-  factory UpdateSyndicatDto.fromJson(Map<String, dynamic> json) => _$UpdateSyndicatDtoFromJson(json);
+  factory UpdateSyndicatDto.fromJson(Map<String, dynamic> json) =>
+      _$UpdateSyndicatDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$UpdateSyndicatDtoToJson(this);
 
@@ -133,6 +85,4 @@ class UpdateSyndicatDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

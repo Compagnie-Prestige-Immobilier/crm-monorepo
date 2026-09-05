@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'ok_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,43 +18,20 @@ part 'ok_dto.g.dart';
 )
 class OkDto {
   /// Returns a new [OkDto] instance.
-  OkDto({
+  OkDto({required this.ok});
 
-    required  this.ok,
-  });
-
-  @JsonKey(
-    
-    name: r'ok',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'ok', required: true, includeIfNull: false)
   final bool ok;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is OkDto &&
+            runtimeType == other.runtimeType &&
+            equals([ok], [other.ok]);
+  }
 
-
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is OkDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            ok,
-        ],
-        [
-            other.ok,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        ok,
-    ],);
+  @override
+  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([ok]);
 
   factory OkDto.fromJson(Map<String, dynamic> json) => _$OkDtoFromJson(json);
 
@@ -65,6 +41,4 @@ class OkDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

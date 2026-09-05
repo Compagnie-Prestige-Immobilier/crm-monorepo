@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'create_canal_provenance_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,81 +19,41 @@ part 'create_canal_provenance_dto.g.dart';
 class CreateCanalProvenanceDto {
   /// Returns a new [CreateCanalProvenanceDto] instance.
   CreateCanalProvenanceDto({
+    required this.code,
 
-    required  this.code,
+    required this.label,
 
-    required  this.label,
-
-     this.position,
+    this.position,
   });
 
-      /// Immuable une fois posé.
-  @JsonKey(
-    
-    name: r'code',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Immuable une fois posé.
+  @JsonKey(name: r'code', required: true, includeIfNull: false)
   final String code;
 
-
-
-  @JsonKey(
-    
-    name: r'label',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'label', required: true, includeIfNull: false)
   final String label;
 
-
-
-          // minimum: 0
-          // maximum: 9999
-  @JsonKey(
-    
-    name: r'position',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  // minimum: 0
+  // maximum: 9999
+  @JsonKey(name: r'position', required: false, includeIfNull: false)
   final num? position;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is CreateCanalProvenanceDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [code, label, position],
+              [other.code, other.label, other.position],
+            );
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^ mapPropsToHashCode([code, label, position]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is CreateCanalProvenanceDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            code,
-            label,
-            position,
-        ],
-        [
-            other.code,
-            other.label,
-            other.position,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        code,
-        label,
-        position,
-    ],);
-
-  factory CreateCanalProvenanceDto.fromJson(Map<String, dynamic> json) => _$CreateCanalProvenanceDtoFromJson(json);
+  factory CreateCanalProvenanceDto.fromJson(Map<String, dynamic> json) =>
+      _$CreateCanalProvenanceDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$CreateCanalProvenanceDtoToJson(this);
 
@@ -102,6 +61,4 @@ class CreateCanalProvenanceDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

@@ -11,7 +11,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'prospect_search_list_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -21,62 +20,26 @@ part 'prospect_search_list_dto.g.dart';
 )
 class ProspectSearchListDto {
   /// Returns a new [ProspectSearchListDto] instance.
-  ProspectSearchListDto({
+  ProspectSearchListDto({required this.items, required this.meta});
 
-    required  this.items,
-
-    required  this.meta,
-  });
-
-  @JsonKey(
-    
-    name: r'items',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'items', required: true, includeIfNull: false)
   final List<ProspectSearchItemDto> items;
 
-
-
-  @JsonKey(
-    
-    name: r'meta',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'meta', required: true, includeIfNull: false)
   final PageMetaDto meta;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is ProspectSearchListDto &&
+            runtimeType == other.runtimeType &&
+            equals([items, meta], [other.items, other.meta]);
+  }
 
+  @override
+  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([items, meta]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is ProspectSearchListDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            items,
-            meta,
-        ],
-        [
-            other.items,
-            other.meta,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        items,
-        meta,
-    ],);
-
-  factory ProspectSearchListDto.fromJson(Map<String, dynamic> json) => _$ProspectSearchListDtoFromJson(json);
+  factory ProspectSearchListDto.fromJson(Map<String, dynamic> json) =>
+      _$ProspectSearchListDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$ProspectSearchListDtoToJson(this);
 
@@ -84,6 +47,4 @@ class ProspectSearchListDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

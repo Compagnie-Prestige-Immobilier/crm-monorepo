@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'analytics_finance_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,191 +19,104 @@ part 'analytics_finance_dto.g.dart';
 class AnalyticsFinanceDto {
   /// Returns a new [AnalyticsFinanceDto] instance.
   AnalyticsFinanceDto({
+    required this.montantEncaisse,
 
-    required  this.montantEncaisse,
+    required this.montantEnCours,
 
-    required  this.montantEnCours,
+    required this.encaissementMoyen,
 
-    required  this.encaissementMoyen,
+    required this.montantEncaisse30Jours,
 
-    required  this.montantEncaisse30Jours,
+    required this.dossiers,
 
-    required  this.dossiers,
+    required this.dossiersOuverts,
 
-    required  this.dossiersOuverts,
+    required this.dossiersEncaisses,
 
-    required  this.dossiersEncaisses,
+    required this.dossiersRejetes,
 
-    required  this.dossiersRejetes,
+    required this.tauxRejet,
 
-    required  this.tauxRejet,
-
-    required  this.delaiMoyenJours,
+    required this.delaiMoyenJours,
   });
 
-      /// Total encaissé, en francs CFA. Chaîne : XOF est un Decimal(18,0).
-  @JsonKey(
-    
-    name: r'montantEncaisse',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Total encaissé, en francs CFA. Chaîne : XOF est un Decimal(18,0).
+  @JsonKey(name: r'montantEncaisse', required: true, includeIfNull: false)
   final String montantEncaisse;
 
-
-
-      /// Montant des dossiers encore ouverts, à l’instant. Chaîne.
-  @JsonKey(
-    
-    name: r'montantEnCours',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Montant des dossiers encore ouverts, à l’instant. Chaîne.
+  @JsonKey(name: r'montantEnCours', required: true, includeIfNull: false)
   final String montantEnCours;
 
-
-
-      /// Encaissement moyen par dossier encaissé. Chaîne.
-  @JsonKey(
-    
-    name: r'encaissementMoyen',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Encaissement moyen par dossier encaissé. Chaîne.
+  @JsonKey(name: r'encaissementMoyen', required: true, includeIfNull: false)
   final String encaissementMoyen;
 
-
-
-      /// Total encaissé sur les 30 derniers jours. Chaîne.
+  /// Total encaissé sur les 30 derniers jours. Chaîne.
   @JsonKey(
-    
     name: r'montantEncaisse30Jours',
     required: true,
     includeIfNull: false,
   )
-
-
   final String montantEncaisse30Jours;
 
-
-
-  @JsonKey(
-    
-    name: r'dossiers',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'dossiers', required: true, includeIfNull: false)
   final num dossiers;
 
-
-
-      /// Dossiers encore ouverts.
-  @JsonKey(
-    
-    name: r'dossiersOuverts',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Dossiers encore ouverts.
+  @JsonKey(name: r'dossiersOuverts', required: true, includeIfNull: false)
   final num dossiersOuverts;
 
-
-
-  @JsonKey(
-    
-    name: r'dossiersEncaisses',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'dossiersEncaisses', required: true, includeIfNull: false)
   final num dossiersEncaisses;
 
-
-
-  @JsonKey(
-    
-    name: r'dossiersRejetes',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'dossiersRejetes', required: true, includeIfNull: false)
   final num dossiersRejetes;
 
-
-
-      /// Part des dossiers clos qui ont été rejetés, en pourcentage. Calculée sur les dossiers CLOS et non sur tous : inclure les dossiers en cours ferait baisser le taux simplement parce qu’on ouvre des dossiers.
-  @JsonKey(
-    
-    name: r'tauxRejet',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Part des dossiers clos qui ont été rejetés, en pourcentage. Calculée sur les dossiers CLOS et non sur tous : inclure les dossiers en cours ferait baisser le taux simplement parce qu’on ouvre des dossiers.
+  @JsonKey(name: r'tauxRejet', required: true, includeIfNull: false)
   final num tauxRejet;
 
-
-
-      /// Délai moyen en jours entre l’ouverture d’un dossier et son issue. Nul tant qu’aucun dossier n’est clos.
-  @JsonKey(
-    
-    name: r'delaiMoyenJours',
-    required: true,
-    includeIfNull: true,
-  )
-
-
+  /// Délai moyen en jours entre l’ouverture d’un dossier et son issue. Nul tant qu’aucun dossier n’est clos.
+  @JsonKey(name: r'delaiMoyenJours', required: true, includeIfNull: true)
   final num? delaiMoyenJours;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is AnalyticsFinanceDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [
+                montantEncaisse,
+                montantEnCours,
+                encaissementMoyen,
+                montantEncaisse30Jours,
+                dossiers,
+                dossiersOuverts,
+                dossiersEncaisses,
+                dossiersRejetes,
+                tauxRejet,
+                delaiMoyenJours,
+              ],
+              [
+                other.montantEncaisse,
+                other.montantEnCours,
+                other.encaissementMoyen,
+                other.montantEncaisse30Jours,
+                other.dossiers,
+                other.dossiersOuverts,
+                other.dossiersEncaisses,
+                other.dossiersRejetes,
+                other.tauxRejet,
+                other.delaiMoyenJours,
+              ],
+            );
+  }
 
-
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is AnalyticsFinanceDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            montantEncaisse,
-            montantEnCours,
-            encaissementMoyen,
-            montantEncaisse30Jours,
-            dossiers,
-            dossiersOuverts,
-            dossiersEncaisses,
-            dossiersRejetes,
-            tauxRejet,
-            delaiMoyenJours,
-        ],
-        [
-            other.montantEncaisse,
-            other.montantEnCours,
-            other.encaissementMoyen,
-            other.montantEncaisse30Jours,
-            other.dossiers,
-            other.dossiersOuverts,
-            other.dossiersEncaisses,
-            other.dossiersRejetes,
-            other.tauxRejet,
-            other.delaiMoyenJours,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([
         montantEncaisse,
         montantEnCours,
         encaissementMoyen,
@@ -215,9 +127,10 @@ class AnalyticsFinanceDto {
         dossiersRejetes,
         tauxRejet,
         delaiMoyenJours,
-    ],);
+      ]);
 
-  factory AnalyticsFinanceDto.fromJson(Map<String, dynamic> json) => _$AnalyticsFinanceDtoFromJson(json);
+  factory AnalyticsFinanceDto.fromJson(Map<String, dynamic> json) =>
+      _$AnalyticsFinanceDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$AnalyticsFinanceDtoToJson(this);
 
@@ -225,6 +138,4 @@ class AnalyticsFinanceDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

@@ -10,7 +10,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'ouverture_fiche_list_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,46 +19,24 @@ part 'ouverture_fiche_list_dto.g.dart';
 )
 class OuvertureFicheListDto {
   /// Returns a new [OuvertureFicheListDto] instance.
-  OuvertureFicheListDto({
+  OuvertureFicheListDto({required this.items});
 
-    required  this.items,
-  });
-
-      /// De la plus ancienne à la plus récente.
-  @JsonKey(
-    
-    name: r'items',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// De la plus ancienne à la plus récente.
+  @JsonKey(name: r'items', required: true, includeIfNull: false)
   final List<OuvertureFicheDto> items;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is OuvertureFicheListDto &&
+            runtimeType == other.runtimeType &&
+            equals([items], [other.items]);
+  }
 
+  @override
+  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([items]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is OuvertureFicheListDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            items,
-        ],
-        [
-            other.items,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        items,
-    ],);
-
-  factory OuvertureFicheListDto.fromJson(Map<String, dynamic> json) => _$OuvertureFicheListDtoFromJson(json);
+  factory OuvertureFicheListDto.fromJson(Map<String, dynamic> json) =>
+      _$OuvertureFicheListDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$OuvertureFicheListDtoToJson(this);
 
@@ -67,6 +44,4 @@ class OuvertureFicheListDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

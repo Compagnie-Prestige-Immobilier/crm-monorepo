@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'supervision_histogram_bar_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,78 +19,38 @@ part 'supervision_histogram_bar_dto.g.dart';
 class SupervisionHistogramBarDto {
   /// Returns a new [SupervisionHistogramBarDto] instance.
   SupervisionHistogramBarDto({
+    required this.id,
 
-    required  this.id,
+    required this.label,
 
-    required  this.label,
-
-    required  this.prospects,
+    required this.prospects,
   });
 
-  @JsonKey(
-    
-    name: r'id',
-    required: true,
-    includeIfNull: true,
-  )
-
-
+  @JsonKey(name: r'id', required: true, includeIfNull: true)
   final String? id;
 
-
-
-  @JsonKey(
-    
-    name: r'label',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'label', required: true, includeIfNull: false)
   final String label;
 
-
-
-  @JsonKey(
-    
-    name: r'prospects',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'prospects', required: true, includeIfNull: false)
   final num prospects;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is SupervisionHistogramBarDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [id, label, prospects],
+              [other.id, other.label, other.prospects],
+            );
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^ mapPropsToHashCode([id, label, prospects]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is SupervisionHistogramBarDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            id,
-            label,
-            prospects,
-        ],
-        [
-            other.id,
-            other.label,
-            other.prospects,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        id,
-        label,
-        prospects,
-    ],);
-
-  factory SupervisionHistogramBarDto.fromJson(Map<String, dynamic> json) => _$SupervisionHistogramBarDtoFromJson(json);
+  factory SupervisionHistogramBarDto.fromJson(Map<String, dynamic> json) =>
+      _$SupervisionHistogramBarDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$SupervisionHistogramBarDtoToJson(this);
 
@@ -99,6 +58,4 @@ class SupervisionHistogramBarDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

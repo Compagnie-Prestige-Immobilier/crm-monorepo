@@ -10,7 +10,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'update_grand_public_consent_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,46 +19,28 @@ part 'update_grand_public_consent_dto.g.dart';
 )
 class UpdateGrandPublicConsentDto {
   /// Returns a new [UpdateGrandPublicConsentDto] instance.
-  UpdateGrandPublicConsentDto({
-
-    required  this.consent,
-  });
+  UpdateGrandPublicConsentDto({required this.consent});
 
   @JsonKey(
-    
     name: r'consent',
     required: true,
     includeIfNull: false,
-  unknownEnumValue: GrandPublicConsent.unknownDefaultOpenApi,
+    unknownEnumValue: GrandPublicConsent.unknownDefaultOpenApi,
   )
-
-
   final GrandPublicConsent consent;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is UpdateGrandPublicConsentDto &&
+            runtimeType == other.runtimeType &&
+            equals([consent], [other.consent]);
+  }
 
+  @override
+  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([consent]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is UpdateGrandPublicConsentDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            consent,
-        ],
-        [
-            other.consent,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        consent,
-    ],);
-
-  factory UpdateGrandPublicConsentDto.fromJson(Map<String, dynamic> json) => _$UpdateGrandPublicConsentDtoFromJson(json);
+  factory UpdateGrandPublicConsentDto.fromJson(Map<String, dynamic> json) =>
+      _$UpdateGrandPublicConsentDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$UpdateGrandPublicConsentDtoToJson(this);
 
@@ -67,6 +48,4 @@ class UpdateGrandPublicConsentDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

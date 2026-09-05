@@ -5,14 +5,13 @@
 // ignore_for_file: unused_element
 import 'package:json_annotation/json_annotation.dart';
 
-
 enum SupervisionGranularity {
-      @JsonValue(r'day')
-      day(r'day'),
-      @JsonValue(r'week')
-      week(r'week'),
-      @JsonValue(r'unknown_default_open_api')
-      unknownDefaultOpenApi(r'unknown_default_open_api');
+  @JsonValue(r'day')
+  day(r'day'),
+  @JsonValue(r'week')
+  week(r'week'),
+  @JsonValue(r'unknown_default_open_api')
+  unknownDefaultOpenApi(r'unknown_default_open_api');
 
   const SupervisionGranularity(this.value);
 

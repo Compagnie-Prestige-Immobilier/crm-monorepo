@@ -41,16 +41,15 @@ import 'package:crm_api_client/src/model/update_profession_dto.dart';
 import 'package:crm_api_client/src/model/update_syndicat_dto.dart';
 
 class ReferentielsApi {
-
   final Dio _dio;
 
   const ReferentielsApi(this._dio);
 
   /// Ajoute une banque.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [createBanqueDto] 
+  /// * [createBanqueDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -60,7 +59,7 @@ class ReferentielsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [BanqueDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<BanqueDto>> createBanque({ 
+  Future<Response<BanqueDto>> createBanque({
     required CreateBanqueDto createBanqueDto,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -72,16 +71,10 @@ class ReferentielsApi {
     final _path = r'/api/v1/referentiels/banques';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -93,13 +86,9 @@ class ReferentielsApi {
 
     try {
       _bodyData = jsonEncode(createBanqueDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -118,9 +107,14 @@ class ReferentielsApi {
     BanqueDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<BanqueDto, BanqueDto>(rawData, 'BanqueDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<BanqueDto, BanqueDto>(
+              rawData,
+              'BanqueDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -144,10 +138,10 @@ _responseData = rawData == null ? null : deserialize<BanqueDto, BanqueDto>(rawDa
   }
 
   /// Ajoute un canal. Le code est immuable : les fiches le désignent.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [createCanalProvenanceDto] 
+  /// * [createCanalProvenanceDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -157,7 +151,7 @@ _responseData = rawData == null ? null : deserialize<BanqueDto, BanqueDto>(rawDa
   ///
   /// Returns a [Future] containing a [Response] with a [CanalProvenanceDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<CanalProvenanceDto>> createCanalProvenance({ 
+  Future<Response<CanalProvenanceDto>> createCanalProvenance({
     required CreateCanalProvenanceDto createCanalProvenanceDto,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -169,16 +163,10 @@ _responseData = rawData == null ? null : deserialize<BanqueDto, BanqueDto>(rawDa
     final _path = r'/api/v1/referentiels/canaux-provenance';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -190,13 +178,9 @@ _responseData = rawData == null ? null : deserialize<BanqueDto, BanqueDto>(rawDa
 
     try {
       _bodyData = jsonEncode(createCanalProvenanceDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -215,9 +199,14 @@ _responseData = rawData == null ? null : deserialize<BanqueDto, BanqueDto>(rawDa
     CanalProvenanceDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<CanalProvenanceDto, CanalProvenanceDto>(rawData, 'CanalProvenanceDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<CanalProvenanceDto, CanalProvenanceDto>(
+              rawData,
+              'CanalProvenanceDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -241,10 +230,10 @@ _responseData = rawData == null ? null : deserialize<CanalProvenanceDto, CanalPr
   }
 
   /// Ajoute un département.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [createDepartementDto] 
+  /// * [createDepartementDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -254,7 +243,7 @@ _responseData = rawData == null ? null : deserialize<CanalProvenanceDto, CanalPr
   ///
   /// Returns a [Future] containing a [Response] with a [DepartementDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<DepartementDto>> createDepartement({ 
+  Future<Response<DepartementDto>> createDepartement({
     required CreateDepartementDto createDepartementDto,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -266,16 +255,10 @@ _responseData = rawData == null ? null : deserialize<CanalProvenanceDto, CanalPr
     final _path = r'/api/v1/referentiels/departements';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -287,13 +270,9 @@ _responseData = rawData == null ? null : deserialize<CanalProvenanceDto, CanalPr
 
     try {
       _bodyData = jsonEncode(createDepartementDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -312,9 +291,14 @@ _responseData = rawData == null ? null : deserialize<CanalProvenanceDto, CanalPr
     DepartementDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<DepartementDto, DepartementDto>(rawData, 'DepartementDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<DepartementDto, DepartementDto>(
+              rawData,
+              'DepartementDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -338,10 +322,10 @@ _responseData = rawData == null ? null : deserialize<DepartementDto, Departement
   }
 
   /// Ajoute un employeur.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [createEmployeurDto] 
+  /// * [createEmployeurDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -351,7 +335,7 @@ _responseData = rawData == null ? null : deserialize<DepartementDto, Departement
   ///
   /// Returns a [Future] containing a [Response] with a [EmployeurDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<EmployeurDto>> createEmployeur({ 
+  Future<Response<EmployeurDto>> createEmployeur({
     required CreateEmployeurDto createEmployeurDto,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -363,16 +347,10 @@ _responseData = rawData == null ? null : deserialize<DepartementDto, Departement
     final _path = r'/api/v1/referentiels/employeurs';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -384,13 +362,9 @@ _responseData = rawData == null ? null : deserialize<DepartementDto, Departement
 
     try {
       _bodyData = jsonEncode(createEmployeurDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -409,9 +383,14 @@ _responseData = rawData == null ? null : deserialize<DepartementDto, Departement
     EmployeurDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<EmployeurDto, EmployeurDto>(rawData, 'EmployeurDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<EmployeurDto, EmployeurDto>(
+              rawData,
+              'EmployeurDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -435,10 +414,10 @@ _responseData = rawData == null ? null : deserialize<EmployeurDto, EmployeurDto>
   }
 
   /// Ajoute une tranche de revenu.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [createIncomeBandDto] 
+  /// * [createIncomeBandDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -448,7 +427,7 @@ _responseData = rawData == null ? null : deserialize<EmployeurDto, EmployeurDto>
   ///
   /// Returns a [Future] containing a [Response] with a [IncomeBandDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<IncomeBandDto>> createIncomeBand({ 
+  Future<Response<IncomeBandDto>> createIncomeBand({
     required CreateIncomeBandDto createIncomeBandDto,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -460,16 +439,10 @@ _responseData = rawData == null ? null : deserialize<EmployeurDto, EmployeurDto>
     final _path = r'/api/v1/referentiels/tranches-revenu';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -481,13 +454,9 @@ _responseData = rawData == null ? null : deserialize<EmployeurDto, EmployeurDto>
 
     try {
       _bodyData = jsonEncode(createIncomeBandDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -506,9 +475,14 @@ _responseData = rawData == null ? null : deserialize<EmployeurDto, EmployeurDto>
     IncomeBandDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<IncomeBandDto, IncomeBandDto>(rawData, 'IncomeBandDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<IncomeBandDto, IncomeBandDto>(
+              rawData,
+              'IncomeBandDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -532,10 +506,10 @@ _responseData = rawData == null ? null : deserialize<IncomeBandDto, IncomeBandDt
   }
 
   /// Ajoute une offre.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [createOfferDto] 
+  /// * [createOfferDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -545,7 +519,7 @@ _responseData = rawData == null ? null : deserialize<IncomeBandDto, IncomeBandDt
   ///
   /// Returns a [Future] containing a [Response] with a [OfferDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<OfferDto>> createOffer({ 
+  Future<Response<OfferDto>> createOffer({
     required CreateOfferDto createOfferDto,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -557,16 +531,10 @@ _responseData = rawData == null ? null : deserialize<IncomeBandDto, IncomeBandDt
     final _path = r'/api/v1/referentiels/offres';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -578,13 +546,9 @@ _responseData = rawData == null ? null : deserialize<IncomeBandDto, IncomeBandDt
 
     try {
       _bodyData = jsonEncode(createOfferDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -603,9 +567,14 @@ _responseData = rawData == null ? null : deserialize<IncomeBandDto, IncomeBandDt
     OfferDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<OfferDto, OfferDto>(rawData, 'OfferDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<OfferDto, OfferDto>(
+              rawData,
+              'OfferDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -629,10 +598,10 @@ _responseData = rawData == null ? null : deserialize<OfferDto, OfferDto>(rawData
   }
 
   /// Ajoute une profession.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [createProfessionDto] 
+  /// * [createProfessionDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -642,7 +611,7 @@ _responseData = rawData == null ? null : deserialize<OfferDto, OfferDto>(rawData
   ///
   /// Returns a [Future] containing a [Response] with a [ProfessionDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<ProfessionDto>> createProfession({ 
+  Future<Response<ProfessionDto>> createProfession({
     required CreateProfessionDto createProfessionDto,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -654,16 +623,10 @@ _responseData = rawData == null ? null : deserialize<OfferDto, OfferDto>(rawData
     final _path = r'/api/v1/referentiels/professions';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -675,13 +638,9 @@ _responseData = rawData == null ? null : deserialize<OfferDto, OfferDto>(rawData
 
     try {
       _bodyData = jsonEncode(createProfessionDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -700,9 +659,14 @@ _responseData = rawData == null ? null : deserialize<OfferDto, OfferDto>(rawData
     ProfessionDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<ProfessionDto, ProfessionDto>(rawData, 'ProfessionDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<ProfessionDto, ProfessionDto>(
+              rawData,
+              'ProfessionDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -726,10 +690,10 @@ _responseData = rawData == null ? null : deserialize<ProfessionDto, ProfessionDt
   }
 
   /// Ajoute un syndicat.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [createSyndicatDto] 
+  /// * [createSyndicatDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -739,7 +703,7 @@ _responseData = rawData == null ? null : deserialize<ProfessionDto, ProfessionDt
   ///
   /// Returns a [Future] containing a [Response] with a [SyndicatDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<SyndicatDto>> createSyndicat({ 
+  Future<Response<SyndicatDto>> createSyndicat({
     required CreateSyndicatDto createSyndicatDto,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -751,16 +715,10 @@ _responseData = rawData == null ? null : deserialize<ProfessionDto, ProfessionDt
     final _path = r'/api/v1/referentiels/syndicats';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -772,13 +730,9 @@ _responseData = rawData == null ? null : deserialize<ProfessionDto, ProfessionDt
 
     try {
       _bodyData = jsonEncode(createSyndicatDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -797,9 +751,14 @@ _responseData = rawData == null ? null : deserialize<ProfessionDto, ProfessionDt
     SyndicatDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<SyndicatDto, SyndicatDto>(rawData, 'SyndicatDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<SyndicatDto, SyndicatDto>(
+              rawData,
+              'SyndicatDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -823,7 +782,7 @@ _responseData = rawData == null ? null : deserialize<SyndicatDto, SyndicatDto>(r
   }
 
   /// Tous les référentiels en un appel (amorçage du mobile).
-  /// 
+  ///
   ///
   /// Parameters:
   /// * [activeOnly] - Ne renvoyer que les entrées actives.
@@ -836,7 +795,7 @@ _responseData = rawData == null ? null : deserialize<SyndicatDto, SyndicatDto>(r
   ///
   /// Returns a [Future] containing a [Response] with a [ReferentielsBundleDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<ReferentielsBundleDto>> getReferentiels({ 
+  Future<Response<ReferentielsBundleDto>> getReferentiels({
     bool? activeOnly = true,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -848,16 +807,10 @@ _responseData = rawData == null ? null : deserialize<SyndicatDto, SyndicatDto>(r
     final _path = r'/api/v1/referentiels';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -880,9 +833,14 @@ _responseData = rawData == null ? null : deserialize<SyndicatDto, SyndicatDto>(r
     ReferentielsBundleDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<ReferentielsBundleDto, ReferentielsBundleDto>(rawData, 'ReferentielsBundleDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<ReferentielsBundleDto, ReferentielsBundleDto>(
+              rawData,
+              'ReferentielsBundleDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -906,7 +864,7 @@ _responseData = rawData == null ? null : deserialize<ReferentielsBundleDto, Refe
   }
 
   /// Liste des banques.
-  /// 
+  ///
   ///
   /// Parameters:
   /// * [activeOnly] - Ne renvoyer que les entrées actives.
@@ -919,7 +877,7 @@ _responseData = rawData == null ? null : deserialize<ReferentielsBundleDto, Refe
   ///
   /// Returns a [Future] containing a [Response] with a [List<BanqueDto>] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<List<BanqueDto>>> listBanques({ 
+  Future<Response<List<BanqueDto>>> listBanques({
     bool? activeOnly = true,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -931,16 +889,10 @@ _responseData = rawData == null ? null : deserialize<ReferentielsBundleDto, Refe
     final _path = r'/api/v1/referentiels/banques';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -963,9 +915,14 @@ _responseData = rawData == null ? null : deserialize<ReferentielsBundleDto, Refe
     List<BanqueDto>? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<List<BanqueDto>, BanqueDto>(rawData, 'List<BanqueDto>', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<List<BanqueDto>, BanqueDto>(
+              rawData,
+              'List<BanqueDto>',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -989,7 +946,7 @@ _responseData = rawData == null ? null : deserialize<List<BanqueDto>, BanqueDto>
   }
 
   /// Canaux de provenance du Grand Public.
-  /// 
+  ///
   ///
   /// Parameters:
   /// * [activeOnly] - Ne renvoyer que les entrées actives.
@@ -1002,7 +959,7 @@ _responseData = rawData == null ? null : deserialize<List<BanqueDto>, BanqueDto>
   ///
   /// Returns a [Future] containing a [Response] with a [List<CanalProvenanceDto>] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<List<CanalProvenanceDto>>> listCanauxProvenance({ 
+  Future<Response<List<CanalProvenanceDto>>> listCanauxProvenance({
     bool? activeOnly = true,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -1014,16 +971,10 @@ _responseData = rawData == null ? null : deserialize<List<BanqueDto>, BanqueDto>
     final _path = r'/api/v1/referentiels/canaux-provenance';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -1046,9 +997,14 @@ _responseData = rawData == null ? null : deserialize<List<BanqueDto>, BanqueDto>
     List<CanalProvenanceDto>? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<List<CanalProvenanceDto>, CanalProvenanceDto>(rawData, 'List<CanalProvenanceDto>', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<List<CanalProvenanceDto>, CanalProvenanceDto>(
+              rawData,
+              'List<CanalProvenanceDto>',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1072,7 +1028,7 @@ _responseData = rawData == null ? null : deserialize<List<CanalProvenanceDto>, C
   }
 
   /// Liste des départements.
-  /// 
+  ///
   ///
   /// Parameters:
   /// * [activeOnly] - Ne renvoyer que les entrées actives.
@@ -1085,7 +1041,7 @@ _responseData = rawData == null ? null : deserialize<List<CanalProvenanceDto>, C
   ///
   /// Returns a [Future] containing a [Response] with a [List<DepartementDto>] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<List<DepartementDto>>> listDepartements({ 
+  Future<Response<List<DepartementDto>>> listDepartements({
     bool? activeOnly = true,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -1097,16 +1053,10 @@ _responseData = rawData == null ? null : deserialize<List<CanalProvenanceDto>, C
     final _path = r'/api/v1/referentiels/departements';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -1129,9 +1079,14 @@ _responseData = rawData == null ? null : deserialize<List<CanalProvenanceDto>, C
     List<DepartementDto>? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<List<DepartementDto>, DepartementDto>(rawData, 'List<DepartementDto>', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<List<DepartementDto>, DepartementDto>(
+              rawData,
+              'List<DepartementDto>',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1155,7 +1110,7 @@ _responseData = rawData == null ? null : deserialize<List<DepartementDto>, Depar
   }
 
   /// Employeurs : ministères et grandes entreprises.
-  /// 
+  ///
   ///
   /// Parameters:
   /// * [activeOnly] - Ne renvoyer que les entrées actives.
@@ -1168,7 +1123,7 @@ _responseData = rawData == null ? null : deserialize<List<DepartementDto>, Depar
   ///
   /// Returns a [Future] containing a [Response] with a [List<EmployeurDto>] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<List<EmployeurDto>>> listEmployeurs({ 
+  Future<Response<List<EmployeurDto>>> listEmployeurs({
     bool? activeOnly = true,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -1180,16 +1135,10 @@ _responseData = rawData == null ? null : deserialize<List<DepartementDto>, Depar
     final _path = r'/api/v1/referentiels/employeurs';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -1212,9 +1161,14 @@ _responseData = rawData == null ? null : deserialize<List<DepartementDto>, Depar
     List<EmployeurDto>? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<List<EmployeurDto>, EmployeurDto>(rawData, 'List<EmployeurDto>', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<List<EmployeurDto>, EmployeurDto>(
+              rawData,
+              'List<EmployeurDto>',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1242,7 +1196,7 @@ _responseData = rawData == null ? null : deserialize<List<EmployeurDto>, Employe
   ///
   /// Parameters:
   /// * [activeOnly] - Ne renvoyer que les entrées actives.
-  /// * [departementId] 
+  /// * [departementId]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -1252,7 +1206,7 @@ _responseData = rawData == null ? null : deserialize<List<EmployeurDto>, Employe
   ///
   /// Returns a [Future] containing a [Response] with a [List<IefDto>] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<List<IefDto>>> listIefs({ 
+  Future<Response<List<IefDto>>> listIefs({
     bool? activeOnly = true,
     String? departementId,
     CancelToken? cancelToken,
@@ -1265,16 +1219,10 @@ _responseData = rawData == null ? null : deserialize<List<EmployeurDto>, Employe
     final _path = r'/api/v1/referentiels/iefs';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -1298,9 +1246,14 @@ _responseData = rawData == null ? null : deserialize<List<EmployeurDto>, Employe
     List<IefDto>? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<List<IefDto>, IefDto>(rawData, 'List<IefDto>', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<List<IefDto>, IefDto>(
+              rawData,
+              'List<IefDto>',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1324,7 +1277,7 @@ _responseData = rawData == null ? null : deserialize<List<IefDto>, IefDto>(rawDa
   }
 
   /// Tranches de revenu mensuel.
-  /// 
+  ///
   ///
   /// Parameters:
   /// * [activeOnly] - Ne renvoyer que les entrées actives.
@@ -1337,7 +1290,7 @@ _responseData = rawData == null ? null : deserialize<List<IefDto>, IefDto>(rawDa
   ///
   /// Returns a [Future] containing a [Response] with a [List<IncomeBandDto>] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<List<IncomeBandDto>>> listIncomeBands({ 
+  Future<Response<List<IncomeBandDto>>> listIncomeBands({
     bool? activeOnly = true,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -1349,16 +1302,10 @@ _responseData = rawData == null ? null : deserialize<List<IefDto>, IefDto>(rawDa
     final _path = r'/api/v1/referentiels/tranches-revenu';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -1381,9 +1328,14 @@ _responseData = rawData == null ? null : deserialize<List<IefDto>, IefDto>(rawDa
     List<IncomeBandDto>? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<List<IncomeBandDto>, IncomeBandDto>(rawData, 'List<IncomeBandDto>', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<List<IncomeBandDto>, IncomeBandDto>(
+              rawData,
+              'List<IncomeBandDto>',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1407,7 +1359,7 @@ _responseData = rawData == null ? null : deserialize<List<IncomeBandDto>, Income
   }
 
   /// Offres proposées au Grand Public.
-  /// 
+  ///
   ///
   /// Parameters:
   /// * [activeOnly] - Ne renvoyer que les entrées actives.
@@ -1420,7 +1372,7 @@ _responseData = rawData == null ? null : deserialize<List<IncomeBandDto>, Income
   ///
   /// Returns a [Future] containing a [Response] with a [List<OfferDto>] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<List<OfferDto>>> listOffers({ 
+  Future<Response<List<OfferDto>>> listOffers({
     bool? activeOnly = true,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -1432,16 +1384,10 @@ _responseData = rawData == null ? null : deserialize<List<IncomeBandDto>, Income
     final _path = r'/api/v1/referentiels/offres';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -1464,9 +1410,14 @@ _responseData = rawData == null ? null : deserialize<List<IncomeBandDto>, Income
     List<OfferDto>? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<List<OfferDto>, OfferDto>(rawData, 'List<OfferDto>', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<List<OfferDto>, OfferDto>(
+              rawData,
+              'List<OfferDto>',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1490,7 +1441,7 @@ _responseData = rawData == null ? null : deserialize<List<OfferDto>, OfferDto>(r
   }
 
   /// Pays de résidence, avec leur indicatif.
-  /// 
+  ///
   ///
   /// Parameters:
   /// * [activeOnly] - Ne renvoyer que les entrées actives.
@@ -1503,7 +1454,7 @@ _responseData = rawData == null ? null : deserialize<List<OfferDto>, OfferDto>(r
   ///
   /// Returns a [Future] containing a [Response] with a [List<PaysDto>] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<List<PaysDto>>> listPays({ 
+  Future<Response<List<PaysDto>>> listPays({
     bool? activeOnly = true,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -1515,16 +1466,10 @@ _responseData = rawData == null ? null : deserialize<List<OfferDto>, OfferDto>(r
     final _path = r'/api/v1/referentiels/pays';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -1547,9 +1492,14 @@ _responseData = rawData == null ? null : deserialize<List<OfferDto>, OfferDto>(r
     List<PaysDto>? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<List<PaysDto>, PaysDto>(rawData, 'List<PaysDto>', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<List<PaysDto>, PaysDto>(
+              rawData,
+              'List<PaysDto>',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1573,7 +1523,7 @@ _responseData = rawData == null ? null : deserialize<List<PaysDto>, PaysDto>(raw
   }
 
   /// Liste fermée des professions.
-  /// 
+  ///
   ///
   /// Parameters:
   /// * [activeOnly] - Ne renvoyer que les entrées actives.
@@ -1586,7 +1536,7 @@ _responseData = rawData == null ? null : deserialize<List<PaysDto>, PaysDto>(raw
   ///
   /// Returns a [Future] containing a [Response] with a [List<ProfessionDto>] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<List<ProfessionDto>>> listProfessions({ 
+  Future<Response<List<ProfessionDto>>> listProfessions({
     bool? activeOnly = true,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -1598,16 +1548,10 @@ _responseData = rawData == null ? null : deserialize<List<PaysDto>, PaysDto>(raw
     final _path = r'/api/v1/referentiels/professions';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -1630,9 +1574,14 @@ _responseData = rawData == null ? null : deserialize<List<PaysDto>, PaysDto>(raw
     List<ProfessionDto>? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<List<ProfessionDto>, ProfessionDto>(rawData, 'List<ProfessionDto>', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<List<ProfessionDto>, ProfessionDto>(
+              rawData,
+              'List<ProfessionDto>',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1656,7 +1605,7 @@ _responseData = rawData == null ? null : deserialize<List<ProfessionDto>, Profes
   }
 
   /// Liste des régions.
-  /// 
+  ///
   ///
   /// Parameters:
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
@@ -1668,7 +1617,7 @@ _responseData = rawData == null ? null : deserialize<List<ProfessionDto>, Profes
   ///
   /// Returns a [Future] containing a [Response] with a [List<RegionDto>] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<List<RegionDto>>> listRegions({ 
+  Future<Response<List<RegionDto>>> listRegions({
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -1679,16 +1628,10 @@ _responseData = rawData == null ? null : deserialize<List<ProfessionDto>, Profes
     final _path = r'/api/v1/referentiels/regions';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -1706,9 +1649,14 @@ _responseData = rawData == null ? null : deserialize<List<ProfessionDto>, Profes
     List<RegionDto>? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<List<RegionDto>, RegionDto>(rawData, 'List<RegionDto>', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<List<RegionDto>, RegionDto>(
+              rawData,
+              'List<RegionDto>',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1732,7 +1680,7 @@ _responseData = rawData == null ? null : deserialize<List<RegionDto>, RegionDto>
   }
 
   /// Régions et leurs départements, pour les sélecteurs en cascade.
-  /// 
+  ///
   ///
   /// Parameters:
   /// * [activeOnly] - Ne renvoyer que les entrées actives.
@@ -1745,7 +1693,8 @@ _responseData = rawData == null ? null : deserialize<List<RegionDto>, RegionDto>
   ///
   /// Returns a [Future] containing a [Response] with a [List<RegionWithDepartementsDto>] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<List<RegionWithDepartementsDto>>> listRegionsWithDepartements({ 
+  Future<Response<List<RegionWithDepartementsDto>>>
+  listRegionsWithDepartements({
     bool? activeOnly = true,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -1757,16 +1706,10 @@ _responseData = rawData == null ? null : deserialize<List<RegionDto>, RegionDto>
     final _path = r'/api/v1/referentiels/regions/departements';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -1789,9 +1732,13 @@ _responseData = rawData == null ? null : deserialize<List<RegionDto>, RegionDto>
     List<RegionWithDepartementsDto>? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<List<RegionWithDepartementsDto>, RegionWithDepartementsDto>(rawData, 'List<RegionWithDepartementsDto>', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<
+              List<RegionWithDepartementsDto>,
+              RegionWithDepartementsDto
+            >(rawData, 'List<RegionWithDepartementsDto>', growable: true);
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1815,7 +1762,7 @@ _responseData = rawData == null ? null : deserialize<List<RegionWithDepartements
   }
 
   /// Liste des syndicats.
-  /// 
+  ///
   ///
   /// Parameters:
   /// * [activeOnly] - Ne renvoyer que les entrées actives.
@@ -1828,7 +1775,7 @@ _responseData = rawData == null ? null : deserialize<List<RegionWithDepartements
   ///
   /// Returns a [Future] containing a [Response] with a [List<SyndicatDto>] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<List<SyndicatDto>>> listSyndicats({ 
+  Future<Response<List<SyndicatDto>>> listSyndicats({
     bool? activeOnly = true,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -1840,16 +1787,10 @@ _responseData = rawData == null ? null : deserialize<List<RegionWithDepartements
     final _path = r'/api/v1/referentiels/syndicats';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -1872,9 +1813,14 @@ _responseData = rawData == null ? null : deserialize<List<RegionWithDepartements
     List<SyndicatDto>? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<List<SyndicatDto>, SyndicatDto>(rawData, 'List<SyndicatDto>', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<List<SyndicatDto>, SyndicatDto>(
+              rawData,
+              'List<SyndicatDto>',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1898,11 +1844,11 @@ _responseData = rawData == null ? null : deserialize<List<SyndicatDto>, Syndicat
   }
 
   /// Modifie une banque. La retirer des listes se fait via isActive.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [id] 
-  /// * [updateBanqueDto] 
+  /// * [id]
+  /// * [updateBanqueDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -1912,7 +1858,7 @@ _responseData = rawData == null ? null : deserialize<List<SyndicatDto>, Syndicat
   ///
   /// Returns a [Future] containing a [Response] with a [BanqueDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<BanqueDto>> updateBanque({ 
+  Future<Response<BanqueDto>> updateBanque({
     required String id,
     required UpdateBanqueDto updateBanqueDto,
     CancelToken? cancelToken,
@@ -1922,19 +1868,18 @@ _responseData = rawData == null ? null : deserialize<List<SyndicatDto>, Syndicat
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/referentiels/banques/{id}'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/api/v1/referentiels/banques/{id}'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
     final _options = Options(
       method: r'PATCH',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -1946,13 +1891,9 @@ _responseData = rawData == null ? null : deserialize<List<SyndicatDto>, Syndicat
 
     try {
       _bodyData = jsonEncode(updateBanqueDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -1971,9 +1912,14 @@ _responseData = rawData == null ? null : deserialize<List<SyndicatDto>, Syndicat
     BanqueDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<BanqueDto, BanqueDto>(rawData, 'BanqueDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<BanqueDto, BanqueDto>(
+              rawData,
+              'BanqueDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1997,11 +1943,11 @@ _responseData = rawData == null ? null : deserialize<BanqueDto, BanqueDto>(rawDa
   }
 
   /// Renomme un canal, ou le retire des listes via isActive.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [id] 
-  /// * [updateCanalProvenanceDto] 
+  /// * [id]
+  /// * [updateCanalProvenanceDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -2011,7 +1957,7 @@ _responseData = rawData == null ? null : deserialize<BanqueDto, BanqueDto>(rawDa
   ///
   /// Returns a [Future] containing a [Response] with a [CanalProvenanceDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<CanalProvenanceDto>> updateCanalProvenance({ 
+  Future<Response<CanalProvenanceDto>> updateCanalProvenance({
     required String id,
     required UpdateCanalProvenanceDto updateCanalProvenanceDto,
     CancelToken? cancelToken,
@@ -2021,19 +1967,18 @@ _responseData = rawData == null ? null : deserialize<BanqueDto, BanqueDto>(rawDa
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/referentiels/canaux-provenance/{id}'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/api/v1/referentiels/canaux-provenance/{id}'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
     final _options = Options(
       method: r'PATCH',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -2045,13 +1990,9 @@ _responseData = rawData == null ? null : deserialize<BanqueDto, BanqueDto>(rawDa
 
     try {
       _bodyData = jsonEncode(updateCanalProvenanceDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -2070,9 +2011,14 @@ _responseData = rawData == null ? null : deserialize<BanqueDto, BanqueDto>(rawDa
     CanalProvenanceDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<CanalProvenanceDto, CanalProvenanceDto>(rawData, 'CanalProvenanceDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<CanalProvenanceDto, CanalProvenanceDto>(
+              rawData,
+              'CanalProvenanceDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -2096,11 +2042,11 @@ _responseData = rawData == null ? null : deserialize<CanalProvenanceDto, CanalPr
   }
 
   /// Modifie un département.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [id] 
-  /// * [updateDepartementDto] 
+  /// * [id]
+  /// * [updateDepartementDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -2110,7 +2056,7 @@ _responseData = rawData == null ? null : deserialize<CanalProvenanceDto, CanalPr
   ///
   /// Returns a [Future] containing a [Response] with a [DepartementDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<DepartementDto>> updateDepartement({ 
+  Future<Response<DepartementDto>> updateDepartement({
     required String id,
     required UpdateDepartementDto updateDepartementDto,
     CancelToken? cancelToken,
@@ -2120,19 +2066,18 @@ _responseData = rawData == null ? null : deserialize<CanalProvenanceDto, CanalPr
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/referentiels/departements/{id}'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/api/v1/referentiels/departements/{id}'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
     final _options = Options(
       method: r'PATCH',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -2144,13 +2089,9 @@ _responseData = rawData == null ? null : deserialize<CanalProvenanceDto, CanalPr
 
     try {
       _bodyData = jsonEncode(updateDepartementDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -2169,9 +2110,14 @@ _responseData = rawData == null ? null : deserialize<CanalProvenanceDto, CanalPr
     DepartementDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<DepartementDto, DepartementDto>(rawData, 'DepartementDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<DepartementDto, DepartementDto>(
+              rawData,
+              'DepartementDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -2195,11 +2141,11 @@ _responseData = rawData == null ? null : deserialize<DepartementDto, Departement
   }
 
   /// Modifie un employeur.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [id] 
-  /// * [updateEmployeurDto] 
+  /// * [id]
+  /// * [updateEmployeurDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -2209,7 +2155,7 @@ _responseData = rawData == null ? null : deserialize<DepartementDto, Departement
   ///
   /// Returns a [Future] containing a [Response] with a [EmployeurDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<EmployeurDto>> updateEmployeur({ 
+  Future<Response<EmployeurDto>> updateEmployeur({
     required String id,
     required UpdateEmployeurDto updateEmployeurDto,
     CancelToken? cancelToken,
@@ -2219,19 +2165,18 @@ _responseData = rawData == null ? null : deserialize<DepartementDto, Departement
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/referentiels/employeurs/{id}'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/api/v1/referentiels/employeurs/{id}'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
     final _options = Options(
       method: r'PATCH',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -2243,13 +2188,9 @@ _responseData = rawData == null ? null : deserialize<DepartementDto, Departement
 
     try {
       _bodyData = jsonEncode(updateEmployeurDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -2268,9 +2209,14 @@ _responseData = rawData == null ? null : deserialize<DepartementDto, Departement
     EmployeurDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<EmployeurDto, EmployeurDto>(rawData, 'EmployeurDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<EmployeurDto, EmployeurDto>(
+              rawData,
+              'EmployeurDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -2294,11 +2240,11 @@ _responseData = rawData == null ? null : deserialize<EmployeurDto, EmployeurDto>
   }
 
   /// Modifie une tranche de revenu.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [id] 
-  /// * [updateIncomeBandDto] 
+  /// * [id]
+  /// * [updateIncomeBandDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -2308,7 +2254,7 @@ _responseData = rawData == null ? null : deserialize<EmployeurDto, EmployeurDto>
   ///
   /// Returns a [Future] containing a [Response] with a [IncomeBandDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<IncomeBandDto>> updateIncomeBand({ 
+  Future<Response<IncomeBandDto>> updateIncomeBand({
     required String id,
     required UpdateIncomeBandDto updateIncomeBandDto,
     CancelToken? cancelToken,
@@ -2318,19 +2264,18 @@ _responseData = rawData == null ? null : deserialize<EmployeurDto, EmployeurDto>
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/referentiels/tranches-revenu/{id}'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/api/v1/referentiels/tranches-revenu/{id}'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
     final _options = Options(
       method: r'PATCH',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -2342,13 +2287,9 @@ _responseData = rawData == null ? null : deserialize<EmployeurDto, EmployeurDto>
 
     try {
       _bodyData = jsonEncode(updateIncomeBandDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -2367,9 +2308,14 @@ _responseData = rawData == null ? null : deserialize<EmployeurDto, EmployeurDto>
     IncomeBandDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<IncomeBandDto, IncomeBandDto>(rawData, 'IncomeBandDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<IncomeBandDto, IncomeBandDto>(
+              rawData,
+              'IncomeBandDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -2393,11 +2339,11 @@ _responseData = rawData == null ? null : deserialize<IncomeBandDto, IncomeBandDt
   }
 
   /// Modifie une offre.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [id] 
-  /// * [updateOfferDto] 
+  /// * [id]
+  /// * [updateOfferDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -2407,7 +2353,7 @@ _responseData = rawData == null ? null : deserialize<IncomeBandDto, IncomeBandDt
   ///
   /// Returns a [Future] containing a [Response] with a [OfferDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<OfferDto>> updateOffer({ 
+  Future<Response<OfferDto>> updateOffer({
     required String id,
     required UpdateOfferDto updateOfferDto,
     CancelToken? cancelToken,
@@ -2417,19 +2363,18 @@ _responseData = rawData == null ? null : deserialize<IncomeBandDto, IncomeBandDt
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/referentiels/offres/{id}'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/api/v1/referentiels/offres/{id}'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
     final _options = Options(
       method: r'PATCH',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -2441,13 +2386,9 @@ _responseData = rawData == null ? null : deserialize<IncomeBandDto, IncomeBandDt
 
     try {
       _bodyData = jsonEncode(updateOfferDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -2466,9 +2407,14 @@ _responseData = rawData == null ? null : deserialize<IncomeBandDto, IncomeBandDt
     OfferDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<OfferDto, OfferDto>(rawData, 'OfferDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<OfferDto, OfferDto>(
+              rawData,
+              'OfferDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -2492,11 +2438,11 @@ _responseData = rawData == null ? null : deserialize<OfferDto, OfferDto>(rawData
   }
 
   /// Modifie une profession.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [id] 
-  /// * [updateProfessionDto] 
+  /// * [id]
+  /// * [updateProfessionDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -2506,7 +2452,7 @@ _responseData = rawData == null ? null : deserialize<OfferDto, OfferDto>(rawData
   ///
   /// Returns a [Future] containing a [Response] with a [ProfessionDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<ProfessionDto>> updateProfession({ 
+  Future<Response<ProfessionDto>> updateProfession({
     required String id,
     required UpdateProfessionDto updateProfessionDto,
     CancelToken? cancelToken,
@@ -2516,19 +2462,18 @@ _responseData = rawData == null ? null : deserialize<OfferDto, OfferDto>(rawData
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/referentiels/professions/{id}'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/api/v1/referentiels/professions/{id}'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
     final _options = Options(
       method: r'PATCH',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -2540,13 +2485,9 @@ _responseData = rawData == null ? null : deserialize<OfferDto, OfferDto>(rawData
 
     try {
       _bodyData = jsonEncode(updateProfessionDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -2565,9 +2506,14 @@ _responseData = rawData == null ? null : deserialize<OfferDto, OfferDto>(rawData
     ProfessionDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<ProfessionDto, ProfessionDto>(rawData, 'ProfessionDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<ProfessionDto, ProfessionDto>(
+              rawData,
+              'ProfessionDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -2591,11 +2537,11 @@ _responseData = rawData == null ? null : deserialize<ProfessionDto, ProfessionDt
   }
 
   /// Modifie un syndicat.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [id] 
-  /// * [updateSyndicatDto] 
+  /// * [id]
+  /// * [updateSyndicatDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -2605,7 +2551,7 @@ _responseData = rawData == null ? null : deserialize<ProfessionDto, ProfessionDt
   ///
   /// Returns a [Future] containing a [Response] with a [SyndicatDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<SyndicatDto>> updateSyndicat({ 
+  Future<Response<SyndicatDto>> updateSyndicat({
     required String id,
     required UpdateSyndicatDto updateSyndicatDto,
     CancelToken? cancelToken,
@@ -2615,19 +2561,18 @@ _responseData = rawData == null ? null : deserialize<ProfessionDto, ProfessionDt
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/referentiels/syndicats/{id}'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/api/v1/referentiels/syndicats/{id}'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
     final _options = Options(
       method: r'PATCH',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -2639,13 +2584,9 @@ _responseData = rawData == null ? null : deserialize<ProfessionDto, ProfessionDt
 
     try {
       _bodyData = jsonEncode(updateSyndicatDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -2664,9 +2605,14 @@ _responseData = rawData == null ? null : deserialize<ProfessionDto, ProfessionDt
     SyndicatDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<SyndicatDto, SyndicatDto>(rawData, 'SyndicatDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<SyndicatDto, SyndicatDto>(
+              rawData,
+              'SyndicatDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -2688,5 +2634,4 @@ _responseData = rawData == null ? null : deserialize<SyndicatDto, SyndicatDto>(r
       extra: _response.extra,
     );
   }
-
 }

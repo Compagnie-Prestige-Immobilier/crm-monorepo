@@ -8,7 +8,6 @@ export 'package:crm_api_client/src/auth/basic_auth.dart';
 export 'package:crm_api_client/src/auth/bearer_auth.dart';
 export 'package:crm_api_client/src/auth/oauth.dart';
 
-
 export 'package:crm_api_client/src/api/admin_api.dart';
 export 'package:crm_api_client/src/api/analytics_api.dart';
 export 'package:crm_api_client/src/api/app_updates_api.dart';
@@ -371,4 +370,3 @@ export 'package:crm_api_client/src/model/weekly_cohort_list_dto.dart';
 export 'package:crm_api_client/src/model/whatsapp_status.dart';
 export 'package:crm_api_client/src/model/work_shift_dto.dart';
 export 'package:crm_api_client/src/model/work_shifts_dto.dart';
-

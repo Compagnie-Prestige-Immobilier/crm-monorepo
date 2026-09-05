@@ -10,7 +10,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'bank_case_stage_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -21,172 +20,94 @@ part 'bank_case_stage_dto.g.dart';
 class BankCaseStageDto {
   /// Returns a new [BankCaseStageDto] instance.
   BankCaseStageDto({
+    required this.id,
 
-    required  this.id,
+    required this.code,
 
-    required  this.code,
+    required this.label,
 
-    required  this.label,
+    required this.position,
 
-    required  this.position,
+    required this.color,
 
-    required  this.color,
+    required this.type,
 
-    required  this.type,
+    required this.isActive,
 
-    required  this.isActive,
+    required this.isInitial,
 
-    required  this.isInitial,
-
-    required  this.isSystem,
+    required this.isSystem,
   });
 
-  @JsonKey(
-    
-    name: r'id',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'id', required: true, includeIfNull: false)
   final String id;
 
-
-
-      /// Code stable, jamais modifiable après création.
-  @JsonKey(
-    
-    name: r'code',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Code stable, jamais modifiable après création.
+  @JsonKey(name: r'code', required: true, includeIfNull: false)
   final String code;
 
-
-
-  @JsonKey(
-    
-    name: r'label',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'label', required: true, includeIfNull: false)
   final String label;
 
-
-
-  @JsonKey(
-    
-    name: r'position',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'position', required: true, includeIfNull: false)
   final num position;
 
-
-
-      /// Rôle du design system (info, warning, success…), pas un hex.
-  @JsonKey(
-    
-    name: r'color',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Rôle du design system (info, warning, success…), pas un hex.
+  @JsonKey(name: r'color', required: true, includeIfNull: false)
   final String color;
 
-
-
   @JsonKey(
-    
     name: r'type',
     required: true,
     includeIfNull: false,
-  unknownEnumValue: BankStageType.unknownDefaultOpenApi,
+    unknownEnumValue: BankStageType.unknownDefaultOpenApi,
   )
-
-
   final BankStageType type;
 
-
-
-  @JsonKey(
-    
-    name: r'isActive',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'isActive', required: true, includeIfNull: false)
   final bool isActive;
 
-
-
-  @JsonKey(
-    
-    name: r'isInitial',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'isInitial', required: true, includeIfNull: false)
   final bool isInitial;
 
-
-
-      /// Étape système : règles financières fixes, ni désactivable ni renommable en code.
-  @JsonKey(
-    
-    name: r'isSystem',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Étape système : règles financières fixes, ni désactivable ni renommable en code.
+  @JsonKey(name: r'isSystem', required: true, includeIfNull: false)
   final bool isSystem;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is BankCaseStageDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [
+                id,
+                code,
+                label,
+                position,
+                color,
+                type,
+                isActive,
+                isInitial,
+                isSystem,
+              ],
+              [
+                other.id,
+                other.code,
+                other.label,
+                other.position,
+                other.color,
+                other.type,
+                other.isActive,
+                other.isInitial,
+                other.isSystem,
+              ],
+            );
+  }
 
-
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is BankCaseStageDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            id,
-            code,
-            label,
-            position,
-            color,
-            type,
-            isActive,
-            isInitial,
-            isSystem,
-        ],
-        [
-            other.id,
-            other.code,
-            other.label,
-            other.position,
-            other.color,
-            other.type,
-            other.isActive,
-            other.isInitial,
-            other.isSystem,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([
         id,
         code,
         label,
@@ -196,9 +117,10 @@ class BankCaseStageDto {
         isActive,
         isInitial,
         isSystem,
-    ],);
+      ]);
 
-  factory BankCaseStageDto.fromJson(Map<String, dynamic> json) => _$BankCaseStageDtoFromJson(json);
+  factory BankCaseStageDto.fromJson(Map<String, dynamic> json) =>
+      _$BankCaseStageDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$BankCaseStageDtoToJson(this);
 
@@ -206,6 +128,4 @@ class BankCaseStageDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

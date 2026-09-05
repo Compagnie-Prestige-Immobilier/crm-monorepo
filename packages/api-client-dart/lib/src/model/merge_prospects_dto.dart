@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'merge_prospects_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,81 +19,47 @@ part 'merge_prospects_dto.g.dart';
 class MergeProspectsDto {
   /// Returns a new [MergeProspectsDto] instance.
   MergeProspectsDto({
+    required this.targetId,
 
-    required  this.targetId,
+    required this.sourceId,
 
-    required  this.sourceId,
-
-     this.preferSource = false,
+    this.preferSource = false,
   });
 
-      /// La fiche conservée.
-  @JsonKey(
-    
-    name: r'targetId',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// La fiche conservée.
+  @JsonKey(name: r'targetId', required: true, includeIfNull: false)
   final String targetId;
 
-
-
-      /// La fiche absorbée puis supprimée logiquement.
-  @JsonKey(
-    
-    name: r'sourceId',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// La fiche absorbée puis supprimée logiquement.
+  @JsonKey(name: r'sourceId', required: true, includeIfNull: false)
   final String sourceId;
 
-
-
-      /// Reprendre les champs de la source (nom, prénom, banque, syndicat, statut) sur la cible.
+  /// Reprendre les champs de la source (nom, prénom, banque, syndicat, statut) sur la cible.
   @JsonKey(
     defaultValue: false,
     name: r'preferSource',
     required: false,
     includeIfNull: false,
   )
-
-
   final bool? preferSource;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is MergeProspectsDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [targetId, sourceId, preferSource],
+              [other.targetId, other.sourceId, other.preferSource],
+            );
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([targetId, sourceId, preferSource]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is MergeProspectsDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            targetId,
-            sourceId,
-            preferSource,
-        ],
-        [
-            other.targetId,
-            other.sourceId,
-            other.preferSource,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        targetId,
-        sourceId,
-        preferSource,
-    ],);
-
-  factory MergeProspectsDto.fromJson(Map<String, dynamic> json) => _$MergeProspectsDtoFromJson(json);
+  factory MergeProspectsDto.fromJson(Map<String, dynamic> json) =>
+      _$MergeProspectsDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$MergeProspectsDtoToJson(this);
 
@@ -102,6 +67,4 @@ class MergeProspectsDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

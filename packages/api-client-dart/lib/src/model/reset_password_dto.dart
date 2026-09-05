@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'reset_password_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,45 +18,23 @@ part 'reset_password_dto.g.dart';
 )
 class ResetPasswordDto {
   /// Returns a new [ResetPasswordDto] instance.
-  ResetPasswordDto({
+  ResetPasswordDto({required this.password});
 
-    required  this.password,
-  });
-
-  @JsonKey(
-    
-    name: r'password',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'password', required: true, includeIfNull: false)
   final String password;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is ResetPasswordDto &&
+            runtimeType == other.runtimeType &&
+            equals([password], [other.password]);
+  }
 
+  @override
+  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([password]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is ResetPasswordDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            password,
-        ],
-        [
-            other.password,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        password,
-    ],);
-
-  factory ResetPasswordDto.fromJson(Map<String, dynamic> json) => _$ResetPasswordDtoFromJson(json);
+  factory ResetPasswordDto.fromJson(Map<String, dynamic> json) =>
+      _$ResetPasswordDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$ResetPasswordDtoToJson(this);
 
@@ -65,6 +42,4 @@ class ResetPasswordDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

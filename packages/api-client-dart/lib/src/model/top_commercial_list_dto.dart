@@ -10,7 +10,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'top_commercial_list_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,62 +19,26 @@ part 'top_commercial_list_dto.g.dart';
 )
 class TopCommercialListDto {
   /// Returns a new [TopCommercialListDto] instance.
-  TopCommercialListDto({
+  TopCommercialListDto({required this.items, required this.total});
 
-    required  this.items,
-
-    required  this.total,
-  });
-
-  @JsonKey(
-    
-    name: r'items',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'items', required: true, includeIfNull: false)
   final List<TopCommercialDto> items;
 
-
-
-  @JsonKey(
-    
-    name: r'total',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'total', required: true, includeIfNull: false)
   final num total;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is TopCommercialListDto &&
+            runtimeType == other.runtimeType &&
+            equals([items, total], [other.items, other.total]);
+  }
 
+  @override
+  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([items, total]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is TopCommercialListDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            items,
-            total,
-        ],
-        [
-            other.items,
-            other.total,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        items,
-        total,
-    ],);
-
-  factory TopCommercialListDto.fromJson(Map<String, dynamic> json) => _$TopCommercialListDtoFromJson(json);
+  factory TopCommercialListDto.fromJson(Map<String, dynamic> json) =>
+      _$TopCommercialListDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$TopCommercialListDtoToJson(this);
 
@@ -83,6 +46,4 @@ class TopCommercialListDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

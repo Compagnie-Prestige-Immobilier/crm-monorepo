@@ -10,7 +10,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'comptage_ouvertures_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,46 +19,24 @@ part 'comptage_ouvertures_dto.g.dart';
 )
 class ComptageOuverturesDto {
   /// Returns a new [ComptageOuverturesDto] instance.
-  ComptageOuverturesDto({
+  ComptageOuverturesDto({required this.items});
 
-    required  this.items,
-  });
-
-      /// Une ligne par téléconseiller et par jour, de la plus récente à la plus ancienne.
-  @JsonKey(
-    
-    name: r'items',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Une ligne par téléconseiller et par jour, de la plus récente à la plus ancienne.
+  @JsonKey(name: r'items', required: true, includeIfNull: false)
   final List<ComptageOuverturesJourDto> items;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is ComptageOuverturesDto &&
+            runtimeType == other.runtimeType &&
+            equals([items], [other.items]);
+  }
 
+  @override
+  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([items]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is ComptageOuverturesDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            items,
-        ],
-        [
-            other.items,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        items,
-    ],);
-
-  factory ComptageOuverturesDto.fromJson(Map<String, dynamic> json) => _$ComptageOuverturesDtoFromJson(json);
+  factory ComptageOuverturesDto.fromJson(Map<String, dynamic> json) =>
+      _$ComptageOuverturesDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$ComptageOuverturesDtoToJson(this);
 
@@ -67,6 +44,4 @@ class ComptageOuverturesDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

@@ -11,7 +11,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'representant_list_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -21,62 +20,26 @@ part 'representant_list_dto.g.dart';
 )
 class RepresentantListDto {
   /// Returns a new [RepresentantListDto] instance.
-  RepresentantListDto({
+  RepresentantListDto({required this.items, required this.meta});
 
-    required  this.items,
-
-    required  this.meta,
-  });
-
-  @JsonKey(
-    
-    name: r'items',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'items', required: true, includeIfNull: false)
   final List<RepresentantDto> items;
 
-
-
-  @JsonKey(
-    
-    name: r'meta',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'meta', required: true, includeIfNull: false)
   final PageMetaDto meta;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is RepresentantListDto &&
+            runtimeType == other.runtimeType &&
+            equals([items, meta], [other.items, other.meta]);
+  }
 
+  @override
+  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([items, meta]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is RepresentantListDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            items,
-            meta,
-        ],
-        [
-            other.items,
-            other.meta,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        items,
-        meta,
-    ],);
-
-  factory RepresentantListDto.fromJson(Map<String, dynamic> json) => _$RepresentantListDtoFromJson(json);
+  factory RepresentantListDto.fromJson(Map<String, dynamic> json) =>
+      _$RepresentantListDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$RepresentantListDtoToJson(this);
 
@@ -84,6 +47,4 @@ class RepresentantListDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

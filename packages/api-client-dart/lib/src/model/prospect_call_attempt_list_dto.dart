@@ -10,7 +10,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'prospect_call_attempt_list_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,46 +19,24 @@ part 'prospect_call_attempt_list_dto.g.dart';
 )
 class ProspectCallAttemptListDto {
   /// Returns a new [ProspectCallAttemptListDto] instance.
-  ProspectCallAttemptListDto({
+  ProspectCallAttemptListDto({required this.items});
 
-    required  this.items,
-  });
-
-      /// Du plus récent au plus ancien.
-  @JsonKey(
-    
-    name: r'items',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Du plus récent au plus ancien.
+  @JsonKey(name: r'items', required: true, includeIfNull: false)
   final List<ProspectCallAttemptDto> items;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is ProspectCallAttemptListDto &&
+            runtimeType == other.runtimeType &&
+            equals([items], [other.items]);
+  }
 
+  @override
+  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([items]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is ProspectCallAttemptListDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            items,
-        ],
-        [
-            other.items,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        items,
-    ],);
-
-  factory ProspectCallAttemptListDto.fromJson(Map<String, dynamic> json) => _$ProspectCallAttemptListDtoFromJson(json);
+  factory ProspectCallAttemptListDto.fromJson(Map<String, dynamic> json) =>
+      _$ProspectCallAttemptListDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$ProspectCallAttemptListDtoToJson(this);
 
@@ -67,6 +44,4 @@ class ProspectCallAttemptListDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

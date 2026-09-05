@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'named_count_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,96 +19,44 @@ part 'named_count_dto.g.dart';
 class NamedCountDto {
   /// Returns a new [NamedCountDto] instance.
   NamedCountDto({
+    required this.id,
 
-    required  this.id,
+    required this.label,
 
-    required  this.label,
+    required this.prospects,
 
-    required  this.prospects,
-
-    required  this.share,
+    required this.share,
   });
 
-  @JsonKey(
-    
-    name: r'id',
-    required: true,
-    includeIfNull: true,
-  )
-
-
+  @JsonKey(name: r'id', required: true, includeIfNull: true)
   final String? id;
 
-
-
-  @JsonKey(
-    
-    name: r'label',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'label', required: true, includeIfNull: false)
   final String label;
 
-
-
-  @JsonKey(
-    
-    name: r'prospects',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'prospects', required: true, includeIfNull: false)
   final num prospects;
 
-
-
-      /// Part du total filtré, en pourcentage.
-  @JsonKey(
-    
-    name: r'share',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Part du total filtré, en pourcentage.
+  @JsonKey(name: r'share', required: true, includeIfNull: false)
   final num share;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is NamedCountDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [id, label, prospects, share],
+              [other.id, other.label, other.prospects, other.share],
+            );
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^ mapPropsToHashCode([id, label, prospects, share]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is NamedCountDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            id,
-            label,
-            prospects,
-            share,
-        ],
-        [
-            other.id,
-            other.label,
-            other.prospects,
-            other.share,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        id,
-        label,
-        prospects,
-        share,
-    ],);
-
-  factory NamedCountDto.fromJson(Map<String, dynamic> json) => _$NamedCountDtoFromJson(json);
+  factory NamedCountDto.fromJson(Map<String, dynamic> json) =>
+      _$NamedCountDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$NamedCountDtoToJson(this);
 
@@ -117,6 +64,4 @@ class NamedCountDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'logout_response_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,45 +18,23 @@ part 'logout_response_dto.g.dart';
 )
 class LogoutResponseDto {
   /// Returns a new [LogoutResponseDto] instance.
-  LogoutResponseDto({
+  LogoutResponseDto({required this.revoked});
 
-    required  this.revoked,
-  });
-
-  @JsonKey(
-    
-    name: r'revoked',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'revoked', required: true, includeIfNull: false)
   final bool revoked;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is LogoutResponseDto &&
+            runtimeType == other.runtimeType &&
+            equals([revoked], [other.revoked]);
+  }
 
+  @override
+  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([revoked]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is LogoutResponseDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            revoked,
-        ],
-        [
-            other.revoked,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        revoked,
-    ],);
-
-  factory LogoutResponseDto.fromJson(Map<String, dynamic> json) => _$LogoutResponseDtoFromJson(json);
+  factory LogoutResponseDto.fromJson(Map<String, dynamic> json) =>
+      _$LogoutResponseDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$LogoutResponseDtoToJson(this);
 
@@ -65,6 +42,4 @@ class LogoutResponseDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

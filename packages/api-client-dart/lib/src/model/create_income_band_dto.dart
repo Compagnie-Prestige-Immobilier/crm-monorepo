@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'create_income_band_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,83 +19,37 @@ part 'create_income_band_dto.g.dart';
 class CreateIncomeBandDto {
   /// Returns a new [CreateIncomeBandDto] instance.
   CreateIncomeBandDto({
+    required this.code,
 
-    required  this.code,
+    required this.label,
 
-    required  this.label,
+    this.minXof,
 
-     this.minXof,
+    this.maxXof,
 
-     this.maxXof,
+    this.position,
 
-     this.position,
-
-     this.isActive = true,
+    this.isActive = true,
   });
 
-  @JsonKey(
-    
-    name: r'code',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'code', required: true, includeIfNull: false)
   final String code;
 
-
-
-  @JsonKey(
-    
-    name: r'label',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'label', required: true, includeIfNull: false)
   final String label;
 
-
-
-          // minimum: 0
-  @JsonKey(
-    
-    name: r'minXof',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  // minimum: 0
+  @JsonKey(name: r'minXof', required: false, includeIfNull: false)
   final num? minXof;
 
-
-
-          // minimum: 0
-  @JsonKey(
-    
-    name: r'maxXof',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  // minimum: 0
+  @JsonKey(name: r'maxXof', required: false, includeIfNull: false)
   final num? maxXof;
 
-
-
-          // minimum: 0
-          // maximum: 9999
-  @JsonKey(
-    
-    name: r'position',
-    required: false,
-    includeIfNull: false,
-  )
-
-
+  // minimum: 0
+  // maximum: 9999
+  @JsonKey(name: r'position', required: false, includeIfNull: false)
   final num? position;
-
-
 
   @JsonKey(
     defaultValue: true,
@@ -104,49 +57,32 @@ class CreateIncomeBandDto {
     required: false,
     includeIfNull: false,
   )
-
-
   final bool? isActive;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is CreateIncomeBandDto &&
+            runtimeType == other.runtimeType &&
+            equals(
+              [code, label, minXof, maxXof, position, isActive],
+              [
+                other.code,
+                other.label,
+                other.minXof,
+                other.maxXof,
+                other.position,
+                other.isActive,
+              ],
+            );
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^
+      mapPropsToHashCode([code, label, minXof, maxXof, position, isActive]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is CreateIncomeBandDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            code,
-            label,
-            minXof,
-            maxXof,
-            position,
-            isActive,
-        ],
-        [
-            other.code,
-            other.label,
-            other.minXof,
-            other.maxXof,
-            other.position,
-            other.isActive,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        code,
-        label,
-        minXof,
-        maxXof,
-        position,
-        isActive,
-    ],);
-
-  factory CreateIncomeBandDto.fromJson(Map<String, dynamic> json) => _$CreateIncomeBandDtoFromJson(json);
+  factory CreateIncomeBandDto.fromJson(Map<String, dynamic> json) =>
+      _$CreateIncomeBandDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$CreateIncomeBandDtoToJson(this);
 
@@ -154,6 +90,4 @@ class CreateIncomeBandDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

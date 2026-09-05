@@ -10,7 +10,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'supervision_rep_statuts_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,63 +19,27 @@ part 'supervision_rep_statuts_dto.g.dart';
 )
 class SupervisionRepStatutsDto {
   /// Returns a new [SupervisionRepStatutsDto] instance.
-  SupervisionRepStatutsDto({
+  SupervisionRepStatutsDto({required this.total, required this.items});
 
-    required  this.total,
-
-    required  this.items,
-  });
-
-      /// Représentants distincts comptés dans la répartition.
-  @JsonKey(
-    
-    name: r'total',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Représentants distincts comptés dans la répartition.
+  @JsonKey(name: r'total', required: true, includeIfNull: false)
   final num total;
 
-
-
-  @JsonKey(
-    
-    name: r'items',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'items', required: true, includeIfNull: false)
   final List<SupervisionRepStatutDto> items;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is SupervisionRepStatutsDto &&
+            runtimeType == other.runtimeType &&
+            equals([total, items], [other.total, other.items]);
+  }
 
+  @override
+  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([total, items]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is SupervisionRepStatutsDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            total,
-            items,
-        ],
-        [
-            other.total,
-            other.items,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        total,
-        items,
-    ],);
-
-  factory SupervisionRepStatutsDto.fromJson(Map<String, dynamic> json) => _$SupervisionRepStatutsDtoFromJson(json);
+  factory SupervisionRepStatutsDto.fromJson(Map<String, dynamic> json) =>
+      _$SupervisionRepStatutsDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$SupervisionRepStatutsDtoToJson(this);
 
@@ -84,6 +47,4 @@ class SupervisionRepStatutsDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

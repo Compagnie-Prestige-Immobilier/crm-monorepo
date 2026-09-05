@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'visite_referentiel_ref_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,78 +19,35 @@ part 'visite_referentiel_ref_dto.g.dart';
 class VisiteReferentielRefDto {
   /// Returns a new [VisiteReferentielRefDto] instance.
   VisiteReferentielRefDto({
+    required this.id,
 
-    required  this.id,
+    required this.code,
 
-    required  this.code,
-
-    required  this.label,
+    required this.label,
   });
 
-  @JsonKey(
-    
-    name: r'id',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'id', required: true, includeIfNull: false)
   final String id;
 
-
-
-  @JsonKey(
-    
-    name: r'code',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'code', required: true, includeIfNull: false)
   final String code;
 
-
-
-  @JsonKey(
-    
-    name: r'label',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'label', required: true, includeIfNull: false)
   final String label;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is VisiteReferentielRefDto &&
+            runtimeType == other.runtimeType &&
+            equals([id, code, label], [other.id, other.code, other.label]);
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^ mapPropsToHashCode([id, code, label]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is VisiteReferentielRefDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            id,
-            code,
-            label,
-        ],
-        [
-            other.id,
-            other.code,
-            other.label,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        id,
-        code,
-        label,
-    ],);
-
-  factory VisiteReferentielRefDto.fromJson(Map<String, dynamic> json) => _$VisiteReferentielRefDtoFromJson(json);
+  factory VisiteReferentielRefDto.fromJson(Map<String, dynamic> json) =>
+      _$VisiteReferentielRefDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$VisiteReferentielRefDtoToJson(this);
 
@@ -99,6 +55,4 @@ class VisiteReferentielRefDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

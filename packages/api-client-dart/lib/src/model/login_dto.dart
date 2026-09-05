@@ -9,7 +9,6 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'login_dto.g.dart';
 
-
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,63 +18,28 @@ part 'login_dto.g.dart';
 )
 class LoginDto {
   /// Returns a new [LoginDto] instance.
-  LoginDto({
+  LoginDto({required this.identifier, required this.password});
 
-    required  this.identifier,
-
-    required  this.password,
-  });
-
-      /// Adresse e-mail OU nom d’utilisateur. Le serveur essaie les deux.
-  @JsonKey(
-    
-    name: r'identifier',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  /// Adresse e-mail OU nom d’utilisateur. Le serveur essaie les deux.
+  @JsonKey(name: r'identifier', required: true, includeIfNull: false)
   final String identifier;
 
-
-
-  @JsonKey(
-    
-    name: r'password',
-    required: true,
-    includeIfNull: false,
-  )
-
-
+  @JsonKey(name: r'password', required: true, includeIfNull: false)
   final String password;
 
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        other is LoginDto &&
+            runtimeType == other.runtimeType &&
+            equals([identifier, password], [other.identifier, other.password]);
+  }
 
+  @override
+  int get hashCode =>
+      runtimeType.hashCode ^ mapPropsToHashCode([identifier, password]);
 
-
-    bool operator ==(Object other) {
-      return identical(this, other) ||
-      other is LoginDto &&
-      runtimeType == other.runtimeType &&
-      equals(
-        [
-            identifier,
-            password,
-        ],
-        [
-            other.identifier,
-            other.password,
-        ]
-      );
-    }
-
-
-    @override
-    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
-        identifier,
-        password,
-    ],);
-
-  factory LoginDto.fromJson(Map<String, dynamic> json) => _$LoginDtoFromJson(json);
+  factory LoginDto.fromJson(Map<String, dynamic> json) =>
+      _$LoginDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$LoginDtoToJson(this);
 
@@ -83,6 +47,4 @@ class LoginDto {
   String toString() {
     return toJson().toString();
   }
-
 }
-

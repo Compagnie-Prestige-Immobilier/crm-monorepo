@@ -21,16 +21,15 @@ import 'package:crm_api_client/src/model/mes_attributions_dto.dart';
 import 'package:crm_api_client/src/model/projet.dart';
 
 class LotsExportApi {
-
   final Dio _dio;
 
   const LotsExportApi(this._dio);
 
   /// Crée une campagne de fiches.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [createLotExportDto] 
+  /// * [createLotExportDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -40,7 +39,7 @@ class LotsExportApi {
   ///
   /// Returns a [Future] containing a [Response] with a [LotExportSummaryDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<LotExportSummaryDto>> createLotExport({ 
+  Future<Response<LotExportSummaryDto>> createLotExport({
     required CreateLotExportDto createLotExportDto,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -52,16 +51,10 @@ class LotsExportApi {
     final _path = r'/api/v1/lots-export';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -73,13 +66,9 @@ class LotsExportApi {
 
     try {
       _bodyData = jsonEncode(createLotExportDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -98,9 +87,14 @@ class LotsExportApi {
     LotExportSummaryDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<LotExportSummaryDto, LotExportSummaryDto>(rawData, 'LotExportSummaryDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<LotExportSummaryDto, LotExportSummaryDto>(
+              rawData,
+              'LotExportSummaryDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -124,10 +118,10 @@ _responseData = rawData == null ? null : deserialize<LotExportSummaryDto, LotExp
   }
 
   /// Supprime une campagne et sa répartition.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [id] 
+  /// * [id]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -137,7 +131,7 @@ _responseData = rawData == null ? null : deserialize<LotExportSummaryDto, LotExp
   ///
   /// Returns a [Future]
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<void>> deleteLotExport({ 
+  Future<Response<void>> deleteLotExport({
     required String id,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -146,19 +140,18 @@ _responseData = rawData == null ? null : deserialize<LotExportSummaryDto, LotExp
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/lots-export/{id}'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/api/v1/lots-export/{id}'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
     final _options = Options(
       method: r'DELETE',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -177,12 +170,12 @@ _responseData = rawData == null ? null : deserialize<LotExportSummaryDto, LotExp
   }
 
   /// Télécharge le programme d’un téléconseiller pour une journée.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [id] 
-  /// * [teleconseillerId] 
-  /// * [jour] 
+  /// * [id]
+  /// * [teleconseillerId]
+  /// * [jour]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -192,7 +185,7 @@ _responseData = rawData == null ? null : deserialize<LotExportSummaryDto, LotExp
   ///
   /// Returns a [Future] containing a [Response] with a [Uint8List] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<Uint8List>> downloadLotExportProgramme({ 
+  Future<Response<Uint8List>> downloadLotExportProgramme({
     required String id,
     required String teleconseillerId,
     num? jour = 1,
@@ -203,20 +196,19 @@ _responseData = rawData == null ? null : deserialize<LotExportSummaryDto, LotExp
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/lots-export/{id}/programme.pdf'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/api/v1/lots-export/{id}/programme.pdf'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
     final _options = Options(
       method: r'GET',
       responseType: ResponseType.bytes,
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -240,9 +232,8 @@ _responseData = rawData == null ? null : deserialize<LotExportSummaryDto, LotExp
     Uint8List? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : rawData as Uint8List;
-
+      final rawData = _response.data;
+      _responseData = rawData == null ? null : rawData as Uint8List;
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -266,10 +257,10 @@ _responseData = rawData == null ? null : rawData as Uint8List;
   }
 
   /// Télécharge tous les programmes de la campagne.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [id] 
+  /// * [id]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -279,7 +270,7 @@ _responseData = rawData == null ? null : rawData as Uint8List;
   ///
   /// Returns a [Future] containing a [Response] with a [Uint8List] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<Uint8List>> downloadLotExportProgrammesZip({ 
+  Future<Response<Uint8List>> downloadLotExportProgrammesZip({
     required String id,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -288,20 +279,19 @@ _responseData = rawData == null ? null : rawData as Uint8List;
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/lots-export/{id}/programmes.zip'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/api/v1/lots-export/{id}/programmes.zip'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
     final _options = Options(
       method: r'GET',
       responseType: ResponseType.bytes,
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -319,9 +309,8 @@ _responseData = rawData == null ? null : rawData as Uint8List;
     Uint8List? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : rawData as Uint8List;
-
+      final rawData = _response.data;
+      _responseData = rawData == null ? null : rawData as Uint8List;
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -345,10 +334,10 @@ _responseData = rawData == null ? null : rawData as Uint8List;
   }
 
   /// Télécharge le classeur figé de la campagne.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [id] 
+  /// * [id]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -358,7 +347,7 @@ _responseData = rawData == null ? null : rawData as Uint8List;
   ///
   /// Returns a [Future] containing a [Response] with a [Uint8List] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<Uint8List>> downloadLotExportXlsx({ 
+  Future<Response<Uint8List>> downloadLotExportXlsx({
     required String id,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -367,20 +356,19 @@ _responseData = rawData == null ? null : rawData as Uint8List;
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/lots-export/{id}/export.xlsx'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/api/v1/lots-export/{id}/export.xlsx'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
     final _options = Options(
       method: r'GET',
       responseType: ResponseType.bytes,
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -398,9 +386,8 @@ _responseData = rawData == null ? null : rawData as Uint8List;
     Uint8List? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : rawData as Uint8List;
-
+      final rawData = _response.data;
+      _responseData = rawData == null ? null : rawData as Uint8List;
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -424,10 +411,10 @@ _responseData = rawData == null ? null : rawData as Uint8List;
   }
 
   /// Consulte une campagne et les appels qui ont suivi.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [id] 
+  /// * [id]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -437,7 +424,7 @@ _responseData = rawData == null ? null : rawData as Uint8List;
   ///
   /// Returns a [Future] containing a [Response] with a [LotExportDetailDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<LotExportDetailDto>> getLotExport({ 
+  Future<Response<LotExportDetailDto>> getLotExport({
     required String id,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -446,19 +433,18 @@ _responseData = rawData == null ? null : rawData as Uint8List;
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/lots-export/{id}'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/api/v1/lots-export/{id}'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -476,9 +462,14 @@ _responseData = rawData == null ? null : rawData as Uint8List;
     LotExportDetailDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<LotExportDetailDto, LotExportDetailDto>(rawData, 'LotExportDetailDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<LotExportDetailDto, LotExportDetailDto>(
+              rawData,
+              'LotExportDetailDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -502,17 +493,17 @@ _responseData = rawData == null ? null : deserialize<LotExportDetailDto, LotExpo
   }
 
   /// Liste les campagnes.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [search] 
-  /// * [cible] 
-  /// * [projet] 
-  /// * [createdById] 
-  /// * [dateFrom] 
-  /// * [dateTo] 
-  /// * [page] 
-  /// * [pageSize] 
+  /// * [search]
+  /// * [cible]
+  /// * [projet]
+  /// * [createdById]
+  /// * [dateFrom]
+  /// * [dateTo]
+  /// * [page]
+  /// * [pageSize]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -522,7 +513,7 @@ _responseData = rawData == null ? null : deserialize<LotExportDetailDto, LotExpo
   ///
   /// Returns a [Future] containing a [Response] with a [LotExportListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<LotExportListDto>> listLotsExport({ 
+  Future<Response<LotExportListDto>> listLotsExport({
     String? search,
     LotExportCible? cible,
     Projet? projet,
@@ -541,16 +532,10 @@ _responseData = rawData == null ? null : deserialize<LotExportDetailDto, LotExpo
     final _path = r'/api/v1/lots-export';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -580,9 +565,14 @@ _responseData = rawData == null ? null : deserialize<LotExportDetailDto, LotExpo
     LotExportListDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<LotExportListDto, LotExportListDto>(rawData, 'LotExportListDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<LotExportListDto, LotExportListDto>(
+              rawData,
+              'LotExportListDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -618,7 +608,7 @@ _responseData = rawData == null ? null : deserialize<LotExportListDto, LotExport
   ///
   /// Returns a [Future] containing a [Response] with a [MesAttributionsDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<MesAttributionsDto>> mesAttributions({ 
+  Future<Response<MesAttributionsDto>> mesAttributions({
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -629,16 +619,10 @@ _responseData = rawData == null ? null : deserialize<LotExportListDto, LotExport
     final _path = r'/api/v1/lots-export/mes-attributions';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -656,9 +640,14 @@ _responseData = rawData == null ? null : deserialize<LotExportListDto, LotExport
     MesAttributionsDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<MesAttributionsDto, MesAttributionsDto>(rawData, 'MesAttributionsDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<MesAttributionsDto, MesAttributionsDto>(
+              rawData,
+              'MesAttributionsDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -682,10 +671,10 @@ _responseData = rawData == null ? null : deserialize<MesAttributionsDto, MesAttr
   }
 
   /// Compte les fiches d’une cible.
-  /// 
+  ///
   ///
   /// Parameters:
-  /// * [createLotExportDto] 
+  /// * [createLotExportDto]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -695,7 +684,7 @@ _responseData = rawData == null ? null : deserialize<MesAttributionsDto, MesAttr
   ///
   /// Returns a [Future] containing a [Response] with a [LotExportPreviewDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<LotExportPreviewDto>> previewLotExport({ 
+  Future<Response<LotExportPreviewDto>> previewLotExport({
     required CreateLotExportDto createLotExportDto,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -707,16 +696,10 @@ _responseData = rawData == null ? null : deserialize<MesAttributionsDto, MesAttr
     final _path = r'/api/v1/lots-export/apercu';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{
-        ...?headers,
-      },
+      headers: <String, dynamic>{...?headers},
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {
-            'type': 'http',
-            'scheme': 'bearer',
-            'name': 'bearer',
-          },
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
         ],
         ...?extra,
       },
@@ -728,13 +711,9 @@ _responseData = rawData == null ? null : deserialize<MesAttributionsDto, MesAttr
 
     try {
       _bodyData = jsonEncode(createLotExportDto);
-
-    } catch(error, stackTrace) {
+    } catch (error, stackTrace) {
       throw DioException(
-         requestOptions: _options.compose(
-          _dio.options,
-          _path,
-        ),
+        requestOptions: _options.compose(_dio.options, _path),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -753,9 +732,14 @@ _responseData = rawData == null ? null : deserialize<MesAttributionsDto, MesAttr
     LotExportPreviewDto? _responseData;
 
     try {
-final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<LotExportPreviewDto, LotExportPreviewDto>(rawData, 'LotExportPreviewDto', growable: true);
-
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<LotExportPreviewDto, LotExportPreviewDto>(
+              rawData,
+              'LotExportPreviewDto',
+              growable: true,
+            );
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -777,5 +761,4 @@ _responseData = rawData == null ? null : deserialize<LotExportPreviewDto, LotExp
       extra: _response.extra,
     );
   }
-
 }
