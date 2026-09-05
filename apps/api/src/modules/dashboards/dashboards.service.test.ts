@@ -45,7 +45,7 @@ describe('la disposition d’un écran, de la sienne à celle d’usine', () => 
     const { service: sut } = service();
 
     const saved = await sut.put('usr-1', 'grand-public', {
-      widgets: [{ source: 'adhesions' }, { source: 'taux-de-qualification' }],
+      widgets: [{ source: 'adhesions' }, { source: 'taux-d-acceptation' }],
     });
     expect(saved.widgets.map((widget) => widget.source)).toEqual(['adhesions']);
   });

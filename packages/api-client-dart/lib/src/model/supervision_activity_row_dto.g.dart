@@ -31,6 +31,12 @@ abstract class _$SupervisionActivityRowDtoCWProxy {
 
   SupervisionActivityRowDto reachRate(num? reachRate);
 
+  SupervisionActivityRowDto fiches(num fiches);
+
+  SupervisionActivityRowDto fichesJointes(num fichesJointes);
+
+  SupervisionActivityRowDto ficheReachRate(num? ficheReachRate);
+
   SupervisionActivityRowDto prospectsCreated(num prospectsCreated);
 
   SupervisionActivityRowDto representantsContacted(num representantsContacted);
@@ -64,6 +70,26 @@ abstract class _$SupervisionActivityRowDtoCWProxy {
   SupervisionActivityRowDto repQualified(num repQualified);
 
   SupervisionActivityRowDto repQualificationRate(num? repQualificationRate);
+
+  SupervisionActivityRowDto repFiches(num repFiches);
+
+  SupervisionActivityRowDto repFichesJointes(num repFichesJointes);
+
+  SupervisionActivityRowDto repFichesNonJointes(num repFichesNonJointes);
+
+  SupervisionActivityRowDto repFichesAcceptees(num repFichesAcceptees);
+
+  SupervisionActivityRowDto repFichesRefusees(num repFichesRefusees);
+
+  SupervisionActivityRowDto repFichesARappeler(num repFichesARappeler);
+
+  SupervisionActivityRowDto repFichesEligibles(num repFichesEligibles);
+
+  SupervisionActivityRowDto repReachabilityRate(num? repReachabilityRate);
+
+  SupervisionActivityRowDto repAcceptanceRate(num? repAcceptanceRate);
+
+  SupervisionActivityRowDto repCallbackFicheRate(num? repCallbackFicheRate);
 
   SupervisionActivityRowDto inboundCalls(num inboundCalls);
 
@@ -106,6 +132,9 @@ abstract class _$SupervisionActivityRowDtoCWProxy {
     num methodObtained,
     num callback,
     num? reachRate,
+    num fiches,
+    num fichesJointes,
+    num? ficheReachRate,
     num prospectsCreated,
     num representantsContacted,
     num repCalls,
@@ -123,6 +152,16 @@ abstract class _$SupervisionActivityRowDtoCWProxy {
     num repQuestioned,
     num repQualified,
     num? repQualificationRate,
+    num repFiches,
+    num repFichesJointes,
+    num repFichesNonJointes,
+    num repFichesAcceptees,
+    num repFichesRefusees,
+    num repFichesARappeler,
+    num repFichesEligibles,
+    num? repReachabilityRate,
+    num? repAcceptanceRate,
+    num? repCallbackFicheRate,
     num inboundCalls,
     num missedCalls,
     num callbacksHonored,
@@ -187,6 +226,17 @@ class _$SupervisionActivityRowDtoCWProxyImpl
   @override
   SupervisionActivityRowDto reachRate(num? reachRate) =>
       this(reachRate: reachRate);
+
+  @override
+  SupervisionActivityRowDto fiches(num fiches) => this(fiches: fiches);
+
+  @override
+  SupervisionActivityRowDto fichesJointes(num fichesJointes) =>
+      this(fichesJointes: fichesJointes);
+
+  @override
+  SupervisionActivityRowDto ficheReachRate(num? ficheReachRate) =>
+      this(ficheReachRate: ficheReachRate);
 
   @override
   SupervisionActivityRowDto prospectsCreated(num prospectsCreated) =>
@@ -256,6 +306,46 @@ class _$SupervisionActivityRowDtoCWProxyImpl
       this(repQualificationRate: repQualificationRate);
 
   @override
+  SupervisionActivityRowDto repFiches(num repFiches) =>
+      this(repFiches: repFiches);
+
+  @override
+  SupervisionActivityRowDto repFichesJointes(num repFichesJointes) =>
+      this(repFichesJointes: repFichesJointes);
+
+  @override
+  SupervisionActivityRowDto repFichesNonJointes(num repFichesNonJointes) =>
+      this(repFichesNonJointes: repFichesNonJointes);
+
+  @override
+  SupervisionActivityRowDto repFichesAcceptees(num repFichesAcceptees) =>
+      this(repFichesAcceptees: repFichesAcceptees);
+
+  @override
+  SupervisionActivityRowDto repFichesRefusees(num repFichesRefusees) =>
+      this(repFichesRefusees: repFichesRefusees);
+
+  @override
+  SupervisionActivityRowDto repFichesARappeler(num repFichesARappeler) =>
+      this(repFichesARappeler: repFichesARappeler);
+
+  @override
+  SupervisionActivityRowDto repFichesEligibles(num repFichesEligibles) =>
+      this(repFichesEligibles: repFichesEligibles);
+
+  @override
+  SupervisionActivityRowDto repReachabilityRate(num? repReachabilityRate) =>
+      this(repReachabilityRate: repReachabilityRate);
+
+  @override
+  SupervisionActivityRowDto repAcceptanceRate(num? repAcceptanceRate) =>
+      this(repAcceptanceRate: repAcceptanceRate);
+
+  @override
+  SupervisionActivityRowDto repCallbackFicheRate(num? repCallbackFicheRate) =>
+      this(repCallbackFicheRate: repCallbackFicheRate);
+
+  @override
   SupervisionActivityRowDto inboundCalls(num inboundCalls) =>
       this(inboundCalls: inboundCalls);
 
@@ -318,6 +408,9 @@ class _$SupervisionActivityRowDtoCWProxyImpl
     Object? methodObtained = const $CopyWithPlaceholder(),
     Object? callback = const $CopyWithPlaceholder(),
     Object? reachRate = const $CopyWithPlaceholder(),
+    Object? fiches = const $CopyWithPlaceholder(),
+    Object? fichesJointes = const $CopyWithPlaceholder(),
+    Object? ficheReachRate = const $CopyWithPlaceholder(),
     Object? prospectsCreated = const $CopyWithPlaceholder(),
     Object? representantsContacted = const $CopyWithPlaceholder(),
     Object? repCalls = const $CopyWithPlaceholder(),
@@ -335,6 +428,16 @@ class _$SupervisionActivityRowDtoCWProxyImpl
     Object? repQuestioned = const $CopyWithPlaceholder(),
     Object? repQualified = const $CopyWithPlaceholder(),
     Object? repQualificationRate = const $CopyWithPlaceholder(),
+    Object? repFiches = const $CopyWithPlaceholder(),
+    Object? repFichesJointes = const $CopyWithPlaceholder(),
+    Object? repFichesNonJointes = const $CopyWithPlaceholder(),
+    Object? repFichesAcceptees = const $CopyWithPlaceholder(),
+    Object? repFichesRefusees = const $CopyWithPlaceholder(),
+    Object? repFichesARappeler = const $CopyWithPlaceholder(),
+    Object? repFichesEligibles = const $CopyWithPlaceholder(),
+    Object? repReachabilityRate = const $CopyWithPlaceholder(),
+    Object? repAcceptanceRate = const $CopyWithPlaceholder(),
+    Object? repCallbackFicheRate = const $CopyWithPlaceholder(),
     Object? inboundCalls = const $CopyWithPlaceholder(),
     Object? missedCalls = const $CopyWithPlaceholder(),
     Object? callbacksHonored = const $CopyWithPlaceholder(),
@@ -396,6 +499,18 @@ class _$SupervisionActivityRowDtoCWProxyImpl
           ? _value.reachRate
           // ignore: cast_nullable_to_non_nullable
           : reachRate as num?,
+      fiches: fiches == const $CopyWithPlaceholder()
+          ? _value.fiches
+          // ignore: cast_nullable_to_non_nullable
+          : fiches as num,
+      fichesJointes: fichesJointes == const $CopyWithPlaceholder()
+          ? _value.fichesJointes
+          // ignore: cast_nullable_to_non_nullable
+          : fichesJointes as num,
+      ficheReachRate: ficheReachRate == const $CopyWithPlaceholder()
+          ? _value.ficheReachRate
+          // ignore: cast_nullable_to_non_nullable
+          : ficheReachRate as num?,
       prospectsCreated: prospectsCreated == const $CopyWithPlaceholder()
           ? _value.prospectsCreated
           // ignore: cast_nullable_to_non_nullable
@@ -465,6 +580,46 @@ class _$SupervisionActivityRowDtoCWProxyImpl
           ? _value.repQualificationRate
           // ignore: cast_nullable_to_non_nullable
           : repQualificationRate as num?,
+      repFiches: repFiches == const $CopyWithPlaceholder()
+          ? _value.repFiches
+          // ignore: cast_nullable_to_non_nullable
+          : repFiches as num,
+      repFichesJointes: repFichesJointes == const $CopyWithPlaceholder()
+          ? _value.repFichesJointes
+          // ignore: cast_nullable_to_non_nullable
+          : repFichesJointes as num,
+      repFichesNonJointes: repFichesNonJointes == const $CopyWithPlaceholder()
+          ? _value.repFichesNonJointes
+          // ignore: cast_nullable_to_non_nullable
+          : repFichesNonJointes as num,
+      repFichesAcceptees: repFichesAcceptees == const $CopyWithPlaceholder()
+          ? _value.repFichesAcceptees
+          // ignore: cast_nullable_to_non_nullable
+          : repFichesAcceptees as num,
+      repFichesRefusees: repFichesRefusees == const $CopyWithPlaceholder()
+          ? _value.repFichesRefusees
+          // ignore: cast_nullable_to_non_nullable
+          : repFichesRefusees as num,
+      repFichesARappeler: repFichesARappeler == const $CopyWithPlaceholder()
+          ? _value.repFichesARappeler
+          // ignore: cast_nullable_to_non_nullable
+          : repFichesARappeler as num,
+      repFichesEligibles: repFichesEligibles == const $CopyWithPlaceholder()
+          ? _value.repFichesEligibles
+          // ignore: cast_nullable_to_non_nullable
+          : repFichesEligibles as num,
+      repReachabilityRate: repReachabilityRate == const $CopyWithPlaceholder()
+          ? _value.repReachabilityRate
+          // ignore: cast_nullable_to_non_nullable
+          : repReachabilityRate as num?,
+      repAcceptanceRate: repAcceptanceRate == const $CopyWithPlaceholder()
+          ? _value.repAcceptanceRate
+          // ignore: cast_nullable_to_non_nullable
+          : repAcceptanceRate as num?,
+      repCallbackFicheRate: repCallbackFicheRate == const $CopyWithPlaceholder()
+          ? _value.repCallbackFicheRate
+          // ignore: cast_nullable_to_non_nullable
+          : repCallbackFicheRate as num?,
       inboundCalls: inboundCalls == const $CopyWithPlaceholder()
           ? _value.inboundCalls
           // ignore: cast_nullable_to_non_nullable
@@ -542,6 +697,9 @@ SupervisionActivityRowDto _$SupervisionActivityRowDtoFromJson(
       'methodObtained',
       'callback',
       'reachRate',
+      'fiches',
+      'fichesJointes',
+      'ficheReachRate',
       'prospectsCreated',
       'representantsContacted',
       'repCalls',
@@ -559,6 +717,16 @@ SupervisionActivityRowDto _$SupervisionActivityRowDtoFromJson(
       'repQuestioned',
       'repQualified',
       'repQualificationRate',
+      'repFiches',
+      'repFichesJointes',
+      'repFichesNonJointes',
+      'repFichesAcceptees',
+      'repFichesRefusees',
+      'repFichesARappeler',
+      'repFichesEligibles',
+      'repReachabilityRate',
+      'repAcceptanceRate',
+      'repCallbackFicheRate',
       'inboundCalls',
       'missedCalls',
       'callbacksHonored',
@@ -585,6 +753,9 @@ SupervisionActivityRowDto _$SupervisionActivityRowDtoFromJson(
     methodObtained: $checkedConvert('methodObtained', (v) => v as num),
     callback: $checkedConvert('callback', (v) => v as num),
     reachRate: $checkedConvert('reachRate', (v) => v as num?),
+    fiches: $checkedConvert('fiches', (v) => v as num),
+    fichesJointes: $checkedConvert('fichesJointes', (v) => v as num),
+    ficheReachRate: $checkedConvert('ficheReachRate', (v) => v as num?),
     prospectsCreated: $checkedConvert('prospectsCreated', (v) => v as num),
     representantsContacted: $checkedConvert(
       'representantsContacted',
@@ -606,6 +777,25 @@ SupervisionActivityRowDto _$SupervisionActivityRowDtoFromJson(
     repQualified: $checkedConvert('repQualified', (v) => v as num),
     repQualificationRate: $checkedConvert(
       'repQualificationRate',
+      (v) => v as num?,
+    ),
+    repFiches: $checkedConvert('repFiches', (v) => v as num),
+    repFichesJointes: $checkedConvert('repFichesJointes', (v) => v as num),
+    repFichesNonJointes: $checkedConvert(
+      'repFichesNonJointes',
+      (v) => v as num,
+    ),
+    repFichesAcceptees: $checkedConvert('repFichesAcceptees', (v) => v as num),
+    repFichesRefusees: $checkedConvert('repFichesRefusees', (v) => v as num),
+    repFichesARappeler: $checkedConvert('repFichesARappeler', (v) => v as num),
+    repFichesEligibles: $checkedConvert('repFichesEligibles', (v) => v as num),
+    repReachabilityRate: $checkedConvert(
+      'repReachabilityRate',
+      (v) => v as num?,
+    ),
+    repAcceptanceRate: $checkedConvert('repAcceptanceRate', (v) => v as num?),
+    repCallbackFicheRate: $checkedConvert(
+      'repCallbackFicheRate',
       (v) => v as num?,
     ),
     inboundCalls: $checkedConvert('inboundCalls', (v) => v as num),
@@ -647,6 +837,9 @@ Map<String, dynamic> _$SupervisionActivityRowDtoToJson(
   'methodObtained': instance.methodObtained,
   'callback': instance.callback,
   'reachRate': instance.reachRate,
+  'fiches': instance.fiches,
+  'fichesJointes': instance.fichesJointes,
+  'ficheReachRate': instance.ficheReachRate,
   'prospectsCreated': instance.prospectsCreated,
   'representantsContacted': instance.representantsContacted,
   'repCalls': instance.repCalls,
@@ -664,6 +857,16 @@ Map<String, dynamic> _$SupervisionActivityRowDtoToJson(
   'repQuestioned': instance.repQuestioned,
   'repQualified': instance.repQualified,
   'repQualificationRate': instance.repQualificationRate,
+  'repFiches': instance.repFiches,
+  'repFichesJointes': instance.repFichesJointes,
+  'repFichesNonJointes': instance.repFichesNonJointes,
+  'repFichesAcceptees': instance.repFichesAcceptees,
+  'repFichesRefusees': instance.repFichesRefusees,
+  'repFichesARappeler': instance.repFichesARappeler,
+  'repFichesEligibles': instance.repFichesEligibles,
+  'repReachabilityRate': instance.repReachabilityRate,
+  'repAcceptanceRate': instance.repAcceptanceRate,
+  'repCallbackFicheRate': instance.repCallbackFicheRate,
   'inboundCalls': instance.inboundCalls,
   'missedCalls': instance.missedCalls,
   'callbacksHonored': instance.callbacksHonored,
