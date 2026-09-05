@@ -121,6 +121,7 @@ const SOURCE_MARQUES: Record<DashboardSource, ReglesDeMarque> = {
   'prospects-notes': { defaut: 'tuile', compatibles: CHIFFRE_MARQUES },
   adhesions: CHIFFRE,
   'reste-a-appeler': { defaut: 'tuile', compatibles: ['tuile'] },
+  'fiches-ouvertes': MATRICE,
   'par-teleconseiller': { defaut: 'tableau', compatibles: ['tableau'] },
   'couverture-derniere-campagne': {
     defaut: 'barres-100',
@@ -275,8 +276,15 @@ const USINE: Record<DashboardEcran, readonly WidgetUsine[]> = {
       presentation: { valeurs: true },
     },
     'par-teleconseiller',
+    { source: 'fiches-ouvertes', taille: 'pleine' },
   ],
-  'grand-public': ['taux-de-joignabilite', 'prospects-notes', 'adhesions', 'par-teleconseiller'],
+  'grand-public': [
+    'taux-de-joignabilite',
+    'prospects-notes',
+    'adhesions',
+    'par-teleconseiller',
+    { source: 'fiches-ouvertes', taille: 'pleine' },
+  ],
 };
 
 /** Ce que la direction voit EN PLUS, ajouté après le tableau d'équipe : le résultat. */

@@ -13,6 +13,7 @@ const SUPERVISEUR: Role = 'SUPERVISEUR';
 
 const activiteMock = vi.hoisted(() => vi.fn<() => Promise<unknown>>());
 const dispositionMock = vi.hoisted(() => vi.fn<() => Promise<unknown>>());
+const comptageMock = vi.hoisted(() => vi.fn<() => Promise<unknown>>());
 
 // Seuls les jeux des cartes POSÉES doivent partir : les autres rejettent, et
 // une requête de trop ferait rougir le test au lieu de passer inaperçue.
@@ -25,6 +26,8 @@ vi.mock('@/lib/data/chiffres', () => ({
   fetchChiffresBanques: vi.fn<() => Promise<never>>(),
   fetchChiffresCampagne: vi.fn<() => Promise<never>>(),
 }));
+
+vi.mock('@/lib/data/ouvertures', () => ({ fetchComptageOuvertures: comptageMock }));
 
 vi.mock('@/lib/data/disposition', async () => {
   const actual = await vi.importActual<typeof DispositionModule>('@/lib/data/disposition');
@@ -137,6 +140,66 @@ describe('l’écran Chiffres, du squelette aux chiffres', () => {
       forme: 'classement',
       donnee: [{ id: 'awa', label: 'Awa Fixture', value: 4 }],
     });
+  });
+
+  // EB-13 : le compte se lit par téléconseiller ET par jour. Cumulé sur la
+  // période, il ne dirait plus qui a ouvert quoi, ni quand.
+  it('croise les fiches ouvertes par téléconseiller et par jour', () => {
+    const catalogue = catalogueDe({ chues: true, voitLesMontants: false, role: SUPERVISEUR });
+
+    expect(
+      catalogue['fiches-ouvertes']?.extraire({
+        ouvertures: [
+          {
+            openedById: 'u-1',
+            openedByName: 'Awa Sy',
+            jour: '2026-08-27',
+            ouvertures: 12,
+            dureeMoyenneSecondes: 240,
+          },
+          {
+            openedById: 'u-2',
+            openedByName: 'Moussa Ba',
+            jour: '2026-08-26',
+            ouvertures: 5,
+            dureeMoyenneSecondes: null,
+          },
+        ],
+      }),
+    ).toEqual({
+      forme: 'matrice',
+      donnee: {
+        lignes: ['Awa Sy', 'Moussa Ba'],
+        colonnes: ['26 août', '27 août'],
+        cellules: [
+          { ligne: 'Awa Sy', colonne: '26 août', value: 0 },
+          { ligne: 'Awa Sy', colonne: '27 août', value: 12 },
+          { ligne: 'Moussa Ba', colonne: '26 août', value: 5 },
+          { ligne: 'Moussa Ba', colonne: '27 août', value: 0 },
+        ],
+      },
+    });
+  });
+
+  it('ne demande le comptage des ouvertures que si sa carte est posée', async () => {
+    setUrl('/chues/statistiques');
+    dispositionMock.mockResolvedValue(disposition(['fiches-ouvertes']));
+    activiteMock.mockRejectedValue(new Error('jeu non demandé'));
+    comptageMock.mockResolvedValue([
+      {
+        openedById: 'u-1',
+        openedByName: 'Awa Sy',
+        jour: '2026-08-27',
+        ouvertures: 12,
+        dureeMoyenneSecondes: 240,
+      },
+    ]);
+
+    renderWithQuery(<ChiffresView ecran="chues" role={SUPERVISEUR} />);
+
+    expect(await screen.findByText('Awa Sy')).toBeTruthy();
+    expect(screen.getByText('12')).toBeTruthy();
+    expect(activiteMock).not.toHaveBeenCalled();
   });
 
   it('affiche les cartes posées une fois la requête revenue', async () => {

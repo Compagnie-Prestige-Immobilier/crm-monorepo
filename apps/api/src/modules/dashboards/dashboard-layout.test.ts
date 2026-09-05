@@ -76,7 +76,7 @@ describe('assainissement de la disposition d’un écran de chiffres', () => {
   // Un écran de pilotage se lit d'un coup d'œil : le repli ne doit pas ouvrir
   // sur un mur de cartes que personne ne trie ensuite.
   it.each(DASHBOARD_ECRANS)('la disposition d’usine de %s reste courte', (ecran) => {
-    expect(dispositionUsine(ecran, true).widgets.length).toBeLessThanOrEqual(11);
+    expect(dispositionUsine(ecran, true).widgets.length).toBeLessThanOrEqual(12);
   });
 
   it('n’ouvre les montants qu’à qui les regarde', () => {
@@ -94,6 +94,23 @@ describe('assainissement de la disposition d’un écran de chiffres', () => {
     expect(direction).toContain('couverture-derniere-campagne');
     expect(direction).toContain('hors-attribution-derniere-campagne');
   });
+
+  // EB-13 : le compte des fiches ouvertes se lit SUR le tableau de bord. Posé
+  // seulement dans le tiroir, il resterait à découvrir.
+  it.each(['chues', 'grand-public'] as const)(
+    'pose les fiches ouvertes par téléconseiller et par jour sur le tableau de bord de %s',
+    (ecran) => {
+      const widget = dispositionUsine(ecran).widgets.find(
+        (item) => item.source === 'fiches-ouvertes',
+      );
+
+      expect(widget).toMatchObject({
+        source: 'fiches-ouvertes',
+        marque: 'carte-de-chaleur',
+        taille: 'pleine',
+      });
+    },
+  );
 
   it('met la répartition des statuts de qualification en graphique large dès l’usine', () => {
     const widget = dispositionUsine('chues').widgets.find(

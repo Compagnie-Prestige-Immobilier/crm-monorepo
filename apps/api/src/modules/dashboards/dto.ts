@@ -46,7 +46,12 @@ const SOURCES_VISITES = [
  * La qualification des représentants : elle n'existe QUE dans CHUES, où un
  * enseignant relais donne les contacts de ses collègues.
  */
-const SOURCES_QUALIFICATION = ['taux-de-contact', 'a-rappeler', 'taux-de-qualification', 'repartition-statuts-qualification'] as const;
+const SOURCES_QUALIFICATION = [
+  'taux-de-contact',
+  'a-rappeler',
+  'taux-de-qualification',
+  'repartition-statuts-qualification',
+] as const;
 
 /**
  * Le travail d'appel et la vente, communs à CHUES et au Grand Public.
@@ -61,6 +66,7 @@ const SOURCES_PROSPECTS = [
   'prospects-notes',
   'adhesions',
   'reste-a-appeler',
+  'fiches-ouvertes',
   'par-teleconseiller',
   'couverture-derniere-campagne',
   'hors-attribution-derniere-campagne',
