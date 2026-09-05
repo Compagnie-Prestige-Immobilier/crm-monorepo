@@ -14683,6 +14683,185 @@
         "tags": ["analytics"]
       }
     },
+    "/api/v1/supervision/representants": {
+      "get": {
+        "operationId": "getSupervisionRepresentants",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockRepresentantsDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Le stock des représentants : total, par département, par IEF, jamais appelés, injoignables.",
+        "tags": ["supervision"]
+      }
+    },
+    "/api/v1/supervision/campagnes": {
+      "get": {
+        "description": "Une campagne entre dans la fenêtre par ses jours de programme. `granularity`, `timeFrom` et `timeTo` sont ignorés.",
+        "operationId": "getSupervisionCampagnes",
+        "parameters": [
+          {
+            "name": "actFrom",
+            "required": false,
+            "in": "query",
+            "description": "Borne basse sur la date de l’ACTE, incluse : heure d’appel, de saisie ou de clôture relevée chez le client, et non date d’arrivée en base. Une date seule (AAAA-MM-JJ) démarre à minuit, fuseau Africa/Dakar.",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "actTo",
+            "required": false,
+            "in": "query",
+            "description": "Borne haute sur la date de l’acte, incluse. Une date seule finit à 23:59:59.999.",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "granularity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/SupervisionGranularity"
+            }
+          },
+          {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux. Un représentant n’existe que dans CHUES : sous `GRAND_PUBLIC`, toutes les colonnes `rep*` valent 0 ou `null`.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "commercialId",
+            "required": false,
+            "in": "query",
+            "description": "Un seul téléconseiller : borne les lignes, la liste et les histogrammes.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "timeFrom",
+            "required": false,
+            "in": "query",
+            "description": "Heure de début quotidienne, Dakar.",
+            "schema": {
+              "example": "09:00",
+              "type": "string"
+            }
+          },
+          {
+            "name": "timeTo",
+            "required": false,
+            "in": "query",
+            "description": "Heure de fin quotidienne, exclue.",
+            "schema": {
+              "example": "14:00",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupervisionCampagnesDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Taux de contact et d’exploitation des campagnes de la fenêtre.",
+        "tags": ["supervision"]
+      }
+    },
     "/api/v1/supervision/activite": {
       "get": {
         "description": "La fenêtre porte sur la date de l’ACTE, pas sur celle de la fiche : un téléconseiller resté hors ligne trois semaines verrait sinon ses appels du lundi comptés le jeudi de la synchronisation. Les lignes n’existent qu’aux périodes où il s’est passé quelque chose ; `teleconseillers` porte la liste complète et le reste à faire, qu’aucune date ne borne.",
@@ -23229,13 +23408,29 @@
           "ouvertures": {
             "type": "number"
           },
+          "qualifiees": {
+            "type": "number",
+            "description": "Parmi `ouvertures`, celles closes par une qualification. Taux de qualification : `qualifiees` / `ouvertures`."
+          },
+          "liberees": {
+            "type": "number",
+            "description": "Parmi `ouvertures`, celles libérées par un superviseur ou un administrateur."
+          },
           "dureeMoyenneSecondes": {
             "type": "number",
             "nullable": true,
             "description": "DMT du jour, en secondes, lue entre la première saisie et la qualification. Les ouvertures fermées sans aucune saisie n’entrent pas au dénominateur. Nulle tant qu’aucune ne s’y prête."
           }
         },
-        "required": ["openedById", "openedByName", "jour", "ouvertures", "dureeMoyenneSecondes"]
+        "required": [
+          "openedById",
+          "openedByName",
+          "jour",
+          "ouvertures",
+          "qualifiees",
+          "liberees",
+          "dureeMoyenneSecondes"
+        ]
       },
       "ComptageOuverturesDto": {
         "type": "object",
@@ -27993,9 +28188,209 @@
         },
         "required": ["items", "byLabel", "total"]
       },
+      "StockRepresentantsPartDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "label": {
+            "type": "string"
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": ["id", "label", "count"]
+      },
+      "StockRepresentantsDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "description": "Représentants non supprimés, toutes fiches."
+          },
+          "jamaisAppeles": {
+            "type": "number",
+            "description": "Représentants sans aucun appel."
+          },
+          "injoignables": {
+            "type": "number",
+            "description": "Représentants dont le statut est non joint, hors « Injoignable définitif »."
+          },
+          "parDepartement": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockRepresentantsPartDto"
+            }
+          },
+          "parIef": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockRepresentantsPartDto"
+            }
+          }
+        },
+        "required": ["total", "jamaisAppeles", "injoignables", "parDepartement", "parIef"]
+      },
       "SupervisionGranularity": {
         "type": "string",
         "enum": ["day", "week"]
+      },
+      "LotExportCible": {
+        "type": "string",
+        "enum": ["REPRESENTANTS", "PROSPECTS"]
+      },
+      "SupervisionCampagneTeleconseillerDto": {
+        "type": "object",
+        "properties": {
+          "prevues": {
+            "type": "number",
+            "description": "Fiches confiées pour les jours de programme de la fenêtre."
+          },
+          "appelees": {
+            "type": "number",
+            "description": "Parmi `prevues`, celles qui ont reçu au moins un appel."
+          },
+          "traitees": {
+            "type": "number",
+            "description": "Parmi `prevues`, celles qui portent au moins une qualification."
+          },
+          "contactRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Taux de contact : `appelees` / `prevues`. `null` sans fiche prévue."
+          },
+          "exploitationRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Taux d’exploitation : `traitees` / `prevues`. `null` sans fiche prévue."
+          },
+          "teleconseillerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "teleconseillerName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "prevues",
+          "appelees",
+          "traitees",
+          "contactRate",
+          "exploitationRate",
+          "teleconseillerId",
+          "teleconseillerName"
+        ]
+      },
+      "SupervisionCampagneDto": {
+        "type": "object",
+        "properties": {
+          "prevues": {
+            "type": "number",
+            "description": "Fiches confiées pour les jours de programme de la fenêtre."
+          },
+          "appelees": {
+            "type": "number",
+            "description": "Parmi `prevues`, celles qui ont reçu au moins un appel."
+          },
+          "traitees": {
+            "type": "number",
+            "description": "Parmi `prevues`, celles qui portent au moins une qualification."
+          },
+          "contactRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Taux de contact : `appelees` / `prevues`. `null` sans fiche prévue."
+          },
+          "exploitationRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Taux d’exploitation : `traitees` / `prevues`. `null` sans fiche prévue."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "cible": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LotExportCible"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "parTeleconseiller": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupervisionCampagneTeleconseillerDto"
+            }
+          }
+        },
+        "required": [
+          "prevues",
+          "appelees",
+          "traitees",
+          "contactRate",
+          "exploitationRate",
+          "id",
+          "name",
+          "cible",
+          "createdAt",
+          "parTeleconseiller"
+        ]
+      },
+      "SupervisionCampagnesTotauxDto": {
+        "type": "object",
+        "properties": {
+          "prevues": {
+            "type": "number",
+            "description": "Fiches confiées pour les jours de programme de la fenêtre."
+          },
+          "appelees": {
+            "type": "number",
+            "description": "Parmi `prevues`, celles qui ont reçu au moins un appel."
+          },
+          "traitees": {
+            "type": "number",
+            "description": "Parmi `prevues`, celles qui portent au moins une qualification."
+          },
+          "contactRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Taux de contact : `appelees` / `prevues`. `null` sans fiche prévue."
+          },
+          "exploitationRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Taux d’exploitation : `traitees` / `prevues`. `null` sans fiche prévue."
+          }
+        },
+        "required": ["prevues", "appelees", "traitees", "contactRate", "exploitationRate"]
+      },
+      "SupervisionCampagnesDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "Les campagnes dont un jour de programme tombe dans la fenêtre, la plus récente en tête.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupervisionCampagneDto"
+            }
+          },
+          "totals": {
+            "$ref": "#/components/schemas/SupervisionCampagnesTotauxDto"
+          }
+        },
+        "required": ["items", "totals"]
       },
       "SupervisionActivityRowDto": {
         "type": "object",
@@ -28049,6 +28444,19 @@
             "type": "number",
             "nullable": true,
             "description": "Part des appels joints, en pourcentage. Seule l’issue UNREACHABLE en est exclue : un faux numéro est une fiche traitée. `null` sans aucun appel : « personne appelé » n’est pas « personne joint »."
+          },
+          "fiches": {
+            "type": "number",
+            "description": "Prospects DISTINCTS appelés, attribués à qui a passé le dernier appel de la fenêtre. Une fiche par fenêtre : sommable entre lignes de la même fenêtre."
+          },
+          "fichesJointes": {
+            "type": "number",
+            "description": "Parmi `fiches`, celles dont le dernier appel a joint."
+          },
+          "ficheReachRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Taux de joignabilité PAR FICHE : `fichesJointes` / `fiches`. `null` sans fiche."
           },
           "prospectsCreated": {
             "type": "number",
@@ -28122,6 +28530,49 @@
             "nullable": true,
             "description": "Part des représentants interrogés qui ont dit oui, en pourcentage. `null` sans aucun représentant interrogé."
           },
+          "repFiches": {
+            "type": "number",
+            "description": "Représentants DISTINCTS appelés, lus sur le DERNIER statut de la fenêtre et attribués à qui l’a posé. Une fiche par fenêtre : sommable entre lignes de la même fenêtre, pas entre fenêtres."
+          },
+          "repFichesJointes": {
+            "type": "number",
+            "description": "Parmi `repFiches`, dernier statut de la famille jointe."
+          },
+          "repFichesNonJointes": {
+            "type": "number",
+            "description": "Parmi `repFiches`, dernier statut non joint."
+          },
+          "repFichesAcceptees": {
+            "type": "number",
+            "description": "Parmi `repFiches`, dernier statut Accepté."
+          },
+          "repFichesRefusees": {
+            "type": "number",
+            "description": "Parmi `repFiches`, dernier statut Refusé."
+          },
+          "repFichesARappeler": {
+            "type": "number",
+            "description": "Parmi `repFiches`, dernier statut À rappeler."
+          },
+          "repFichesEligibles": {
+            "type": "number",
+            "description": "Dénominateur du taux d’acceptation : fiches jointes hors faux numéro, décédé, retraité, hors cible et affecté ailleurs."
+          },
+          "repReachabilityRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Taux de joignabilité PAR FICHE : `repFichesJointes` / `repFiches`. `null` sans fiche."
+          },
+          "repAcceptanceRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Taux d’acceptation : `repFichesAcceptees` / `repFichesEligibles`. `null` sans fiche éligible."
+          },
+          "repCallbackFicheRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Taux de rappel PAR FICHE : `repFichesARappeler` / `repFiches`. `null` sans fiche."
+          },
           "inboundCalls": {
             "type": "number",
             "description": "Appels entrants relevés au journal du téléphone, les deux familles confondues. Une détection déjà consignée n’est comptée qu’une fois, par sa tentative."
@@ -28179,6 +28630,9 @@
           "methodObtained",
           "callback",
           "reachRate",
+          "fiches",
+          "fichesJointes",
+          "ficheReachRate",
           "prospectsCreated",
           "representantsContacted",
           "repCalls",
@@ -28196,6 +28650,16 @@
           "repQuestioned",
           "repQualified",
           "repQualificationRate",
+          "repFiches",
+          "repFichesJointes",
+          "repFichesNonJointes",
+          "repFichesAcceptees",
+          "repFichesRefusees",
+          "repFichesARappeler",
+          "repFichesEligibles",
+          "repReachabilityRate",
+          "repAcceptanceRate",
+          "repCallbackFicheRate",
           "inboundCalls",
           "missedCalls",
           "callbacksHonored",
@@ -28262,6 +28726,19 @@
             "nullable": true,
             "description": "Part des appels joints, en pourcentage. Seule l’issue UNREACHABLE en est exclue : un faux numéro est une fiche traitée. `null` sans aucun appel : « personne appelé » n’est pas « personne joint »."
           },
+          "fiches": {
+            "type": "number",
+            "description": "Prospects DISTINCTS appelés, attribués à qui a passé le dernier appel de la fenêtre. Une fiche par fenêtre : sommable entre lignes de la même fenêtre."
+          },
+          "fichesJointes": {
+            "type": "number",
+            "description": "Parmi `fiches`, celles dont le dernier appel a joint."
+          },
+          "ficheReachRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Taux de joignabilité PAR FICHE : `fichesJointes` / `fiches`. `null` sans fiche."
+          },
           "prospectsCreated": {
             "type": "number",
             "description": "Fiches prospect saisies sur la période."
@@ -28334,6 +28811,49 @@
             "nullable": true,
             "description": "Part des représentants interrogés qui ont dit oui, en pourcentage. `null` sans aucun représentant interrogé."
           },
+          "repFiches": {
+            "type": "number",
+            "description": "Représentants DISTINCTS appelés, lus sur le DERNIER statut de la fenêtre et attribués à qui l’a posé. Une fiche par fenêtre : sommable entre lignes de la même fenêtre, pas entre fenêtres."
+          },
+          "repFichesJointes": {
+            "type": "number",
+            "description": "Parmi `repFiches`, dernier statut de la famille jointe."
+          },
+          "repFichesNonJointes": {
+            "type": "number",
+            "description": "Parmi `repFiches`, dernier statut non joint."
+          },
+          "repFichesAcceptees": {
+            "type": "number",
+            "description": "Parmi `repFiches`, dernier statut Accepté."
+          },
+          "repFichesRefusees": {
+            "type": "number",
+            "description": "Parmi `repFiches`, dernier statut Refusé."
+          },
+          "repFichesARappeler": {
+            "type": "number",
+            "description": "Parmi `repFiches`, dernier statut À rappeler."
+          },
+          "repFichesEligibles": {
+            "type": "number",
+            "description": "Dénominateur du taux d’acceptation : fiches jointes hors faux numéro, décédé, retraité, hors cible et affecté ailleurs."
+          },
+          "repReachabilityRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Taux de joignabilité PAR FICHE : `repFichesJointes` / `repFiches`. `null` sans fiche."
+          },
+          "repAcceptanceRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Taux d’acceptation : `repFichesAcceptees` / `repFichesEligibles`. `null` sans fiche éligible."
+          },
+          "repCallbackFicheRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Taux de rappel PAR FICHE : `repFichesARappeler` / `repFiches`. `null` sans fiche."
+          },
           "inboundCalls": {
             "type": "number",
             "description": "Appels entrants relevés au journal du téléphone, les deux familles confondues. Une détection déjà consignée n’est comptée qu’une fois, par sa tentative."
@@ -28380,6 +28900,9 @@
           "methodObtained",
           "callback",
           "reachRate",
+          "fiches",
+          "fichesJointes",
+          "ficheReachRate",
           "prospectsCreated",
           "representantsContacted",
           "repCalls",
@@ -28397,6 +28920,16 @@
           "repQuestioned",
           "repQualified",
           "repQualificationRate",
+          "repFiches",
+          "repFichesJointes",
+          "repFichesNonJointes",
+          "repFichesAcceptees",
+          "repFichesRefusees",
+          "repFichesARappeler",
+          "repFichesEligibles",
+          "repReachabilityRate",
+          "repAcceptanceRate",
+          "repCallbackFicheRate",
           "inboundCalls",
           "missedCalls",
           "callbacksHonored",
@@ -28539,6 +29072,10 @@
         },
         "required": ["id", "label", "prospects"]
       },
+      "FamilleStatut": {
+        "type": "string",
+        "enum": ["JOINT", "NON_JOINT"]
+      },
       "SupervisionRepStatutDto": {
         "type": "object",
         "properties": {
@@ -28555,11 +29092,18 @@
           "isActive": {
             "type": "boolean"
           },
+          "famille": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FamilleStatut"
+              }
+            ]
+          },
           "count": {
             "type": "number"
           }
         },
-        "required": ["id", "code", "label", "isActive", "count"]
+        "required": ["id", "code", "label", "isActive", "famille", "count"]
       },
       "SupervisionRepStatutsDto": {
         "type": "object",
@@ -30675,14 +31219,28 @@
           "avec-telephone",
           "qualite-de-saisie",
           "taux-de-contact",
-          "a-rappeler",
-          "taux-de-qualification",
+          "taux-de-joignabilite-representants",
+          "taux-d-acceptation",
+          "taux-de-rappel",
           "repartition-statuts-qualification",
+          "joints-non-joints",
+          "statuts-par-famille",
+          "joignabilite-par-creneau",
+          "taux-d-exploitation",
+          "exploitation-par-campagne",
+          "representants-par-departement",
+          "representants-par-ief",
+          "representants-jamais-appeles",
+          "representants-injoignables",
           "taux-de-joignabilite",
           "prospects-notes",
           "adhesions",
           "reste-a-appeler",
           "fiches-ouvertes",
+          "taux-de-qualification",
+          "duree-moyenne-sur-la-fiche",
+          "duree-moyenne-de-communication",
+          "appels-par-jour",
           "par-teleconseiller",
           "couverture-derniere-campagne",
           "hors-attribution-derniere-campagne",
@@ -30835,10 +31393,6 @@
           }
         },
         "required": ["widgets"]
-      },
-      "LotExportCible": {
-        "type": "string",
-        "enum": ["REPRESENTANTS", "PROSPECTS"]
       },
       "RepresentantExportQueryDto": {
         "type": "object",

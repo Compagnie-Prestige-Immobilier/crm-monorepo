@@ -2232,6 +2232,43 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/supervision/representants': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Le stock des représentants : total, par département, par IEF, jamais appelés, injoignables. */
+    get: operations['getSupervisionRepresentants'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/supervision/campagnes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Taux de contact et d’exploitation des campagnes de la fenêtre.
+     * @description Une campagne entre dans la fenêtre par ses jours de programme. `granularity`, `timeFrom` et `timeTo` sont ignorés.
+     */
+    get: operations['getSupervisionCampagnes'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/supervision/activite': {
     parameters: {
       query?: never;
@@ -4281,6 +4318,10 @@ export interface components {
        */
       jour: string;
       ouvertures: number;
+      /** @description Parmi `ouvertures`, celles closes par une qualification. Taux de qualification : `qualifiees` / `ouvertures`. */
+      qualifiees: number;
+      /** @description Parmi `ouvertures`, celles libérées par un superviseur ou un administrateur. */
+      liberees: number;
       /** @description DMT du jour, en secondes, lue entre la première saisie et la qualification. Les ouvertures fermées sans aucune saisie n’entrent pas au dénominateur. Nulle tant qu’aucune ne s’y prête. */
       dureeMoyenneSecondes: number | null;
     };
@@ -5972,8 +6013,77 @@ export interface components {
       byLabel: components['schemas']['OriginLabelCountDto'][];
       total: number;
     };
+    StockRepresentantsPartDto: {
+      /** Format: uuid */
+      id: string;
+      label: string;
+      count: number;
+    };
+    StockRepresentantsDto: {
+      /** @description Représentants non supprimés, toutes fiches. */
+      total: number;
+      /** @description Représentants sans aucun appel. */
+      jamaisAppeles: number;
+      /** @description Représentants dont le statut est non joint, hors « Injoignable définitif ». */
+      injoignables: number;
+      parDepartement: components['schemas']['StockRepresentantsPartDto'][];
+      parIef: components['schemas']['StockRepresentantsPartDto'][];
+    };
     /** @enum {string} */
     SupervisionGranularity: 'day' | 'week';
+    /** @enum {string} */
+    LotExportCible: 'REPRESENTANTS' | 'PROSPECTS';
+    SupervisionCampagneTeleconseillerDto: {
+      /** @description Fiches confiées pour les jours de programme de la fenêtre. */
+      prevues: number;
+      /** @description Parmi `prevues`, celles qui ont reçu au moins un appel. */
+      appelees: number;
+      /** @description Parmi `prevues`, celles qui portent au moins une qualification. */
+      traitees: number;
+      /** @description Taux de contact : `appelees` / `prevues`. `null` sans fiche prévue. */
+      contactRate: number | null;
+      /** @description Taux d’exploitation : `traitees` / `prevues`. `null` sans fiche prévue. */
+      exploitationRate: number | null;
+      /** Format: uuid */
+      teleconseillerId: string;
+      teleconseillerName: string;
+    };
+    SupervisionCampagneDto: {
+      /** @description Fiches confiées pour les jours de programme de la fenêtre. */
+      prevues: number;
+      /** @description Parmi `prevues`, celles qui ont reçu au moins un appel. */
+      appelees: number;
+      /** @description Parmi `prevues`, celles qui portent au moins une qualification. */
+      traitees: number;
+      /** @description Taux de contact : `appelees` / `prevues`. `null` sans fiche prévue. */
+      contactRate: number | null;
+      /** @description Taux d’exploitation : `traitees` / `prevues`. `null` sans fiche prévue. */
+      exploitationRate: number | null;
+      /** Format: uuid */
+      id: string;
+      name: string;
+      cible: components['schemas']['LotExportCible'];
+      /** Format: date-time */
+      createdAt: string;
+      parTeleconseiller: components['schemas']['SupervisionCampagneTeleconseillerDto'][];
+    };
+    SupervisionCampagnesTotauxDto: {
+      /** @description Fiches confiées pour les jours de programme de la fenêtre. */
+      prevues: number;
+      /** @description Parmi `prevues`, celles qui ont reçu au moins un appel. */
+      appelees: number;
+      /** @description Parmi `prevues`, celles qui portent au moins une qualification. */
+      traitees: number;
+      /** @description Taux de contact : `appelees` / `prevues`. `null` sans fiche prévue. */
+      contactRate: number | null;
+      /** @description Taux d’exploitation : `traitees` / `prevues`. `null` sans fiche prévue. */
+      exploitationRate: number | null;
+    };
+    SupervisionCampagnesDto: {
+      /** @description Les campagnes dont un jour de programme tombe dans la fenêtre, la plus récente en tête. */
+      items: components['schemas']['SupervisionCampagneDto'][];
+      totals: components['schemas']['SupervisionCampagnesTotauxDto'];
+    };
     SupervisionActivityRowDto: {
       /** @description Appels passés à des prospects. */
       calls: number;
@@ -5999,6 +6109,12 @@ export interface components {
       callback: number;
       /** @description Part des appels joints, en pourcentage. Seule l’issue UNREACHABLE en est exclue : un faux numéro est une fiche traitée. `null` sans aucun appel : « personne appelé » n’est pas « personne joint ». */
       reachRate: number | null;
+      /** @description Prospects DISTINCTS appelés, attribués à qui a passé le dernier appel de la fenêtre. Une fiche par fenêtre : sommable entre lignes de la même fenêtre. */
+      fiches: number;
+      /** @description Parmi `fiches`, celles dont le dernier appel a joint. */
+      fichesJointes: number;
+      /** @description Taux de joignabilité PAR FICHE : `fichesJointes` / `fiches`. `null` sans fiche. */
+      ficheReachRate: number | null;
       /** @description Fiches prospect saisies sur la période. */
       prospectsCreated: number;
       /** @description Représentants distincts appelés sur la période. */
@@ -6033,6 +6149,26 @@ export interface components {
       repQualified: number;
       /** @description Part des représentants interrogés qui ont dit oui, en pourcentage. `null` sans aucun représentant interrogé. */
       repQualificationRate: number | null;
+      /** @description Représentants DISTINCTS appelés, lus sur le DERNIER statut de la fenêtre et attribués à qui l’a posé. Une fiche par fenêtre : sommable entre lignes de la même fenêtre, pas entre fenêtres. */
+      repFiches: number;
+      /** @description Parmi `repFiches`, dernier statut de la famille jointe. */
+      repFichesJointes: number;
+      /** @description Parmi `repFiches`, dernier statut non joint. */
+      repFichesNonJointes: number;
+      /** @description Parmi `repFiches`, dernier statut Accepté. */
+      repFichesAcceptees: number;
+      /** @description Parmi `repFiches`, dernier statut Refusé. */
+      repFichesRefusees: number;
+      /** @description Parmi `repFiches`, dernier statut À rappeler. */
+      repFichesARappeler: number;
+      /** @description Dénominateur du taux d’acceptation : fiches jointes hors faux numéro, décédé, retraité, hors cible et affecté ailleurs. */
+      repFichesEligibles: number;
+      /** @description Taux de joignabilité PAR FICHE : `repFichesJointes` / `repFiches`. `null` sans fiche. */
+      repReachabilityRate: number | null;
+      /** @description Taux d’acceptation : `repFichesAcceptees` / `repFichesEligibles`. `null` sans fiche éligible. */
+      repAcceptanceRate: number | null;
+      /** @description Taux de rappel PAR FICHE : `repFichesARappeler` / `repFiches`. `null` sans fiche. */
+      repCallbackFicheRate: number | null;
       /** @description Appels entrants relevés au journal du téléphone, les deux familles confondues. Une détection déjà consignée n’est comptée qu’une fois, par sa tentative. */
       inboundCalls: number;
       /** @description Appels manqués relevés au journal du téléphone, les deux familles confondues. */
@@ -6080,6 +6216,12 @@ export interface components {
       callback: number;
       /** @description Part des appels joints, en pourcentage. Seule l’issue UNREACHABLE en est exclue : un faux numéro est une fiche traitée. `null` sans aucun appel : « personne appelé » n’est pas « personne joint ». */
       reachRate: number | null;
+      /** @description Prospects DISTINCTS appelés, attribués à qui a passé le dernier appel de la fenêtre. Une fiche par fenêtre : sommable entre lignes de la même fenêtre. */
+      fiches: number;
+      /** @description Parmi `fiches`, celles dont le dernier appel a joint. */
+      fichesJointes: number;
+      /** @description Taux de joignabilité PAR FICHE : `fichesJointes` / `fiches`. `null` sans fiche. */
+      ficheReachRate: number | null;
       /** @description Fiches prospect saisies sur la période. */
       prospectsCreated: number;
       /** @description Représentants distincts appelés sur la période. */
@@ -6114,6 +6256,26 @@ export interface components {
       repQualified: number;
       /** @description Part des représentants interrogés qui ont dit oui, en pourcentage. `null` sans aucun représentant interrogé. */
       repQualificationRate: number | null;
+      /** @description Représentants DISTINCTS appelés, lus sur le DERNIER statut de la fenêtre et attribués à qui l’a posé. Une fiche par fenêtre : sommable entre lignes de la même fenêtre, pas entre fenêtres. */
+      repFiches: number;
+      /** @description Parmi `repFiches`, dernier statut de la famille jointe. */
+      repFichesJointes: number;
+      /** @description Parmi `repFiches`, dernier statut non joint. */
+      repFichesNonJointes: number;
+      /** @description Parmi `repFiches`, dernier statut Accepté. */
+      repFichesAcceptees: number;
+      /** @description Parmi `repFiches`, dernier statut Refusé. */
+      repFichesRefusees: number;
+      /** @description Parmi `repFiches`, dernier statut À rappeler. */
+      repFichesARappeler: number;
+      /** @description Dénominateur du taux d’acceptation : fiches jointes hors faux numéro, décédé, retraité, hors cible et affecté ailleurs. */
+      repFichesEligibles: number;
+      /** @description Taux de joignabilité PAR FICHE : `repFichesJointes` / `repFiches`. `null` sans fiche. */
+      repReachabilityRate: number | null;
+      /** @description Taux d’acceptation : `repFichesAcceptees` / `repFichesEligibles`. `null` sans fiche éligible. */
+      repAcceptanceRate: number | null;
+      /** @description Taux de rappel PAR FICHE : `repFichesARappeler` / `repFiches`. `null` sans fiche. */
+      repCallbackFicheRate: number | null;
       /** @description Appels entrants relevés au journal du téléphone, les deux familles confondues. Une détection déjà consignée n’est comptée qu’une fois, par sa tentative. */
       inboundCalls: number;
       /** @description Appels manqués relevés au journal du téléphone, les deux familles confondues. */
@@ -6180,12 +6342,15 @@ export interface components {
       label: string;
       prospects: number;
     };
+    /** @enum {string} */
+    FamilleStatut: 'JOINT' | 'NON_JOINT';
     SupervisionRepStatutDto: {
       /** Format: uuid */
       id: string;
       code: string;
       label: string;
       isActive: boolean;
+      famille: components['schemas']['FamilleStatut'];
       count: number;
     };
     SupervisionRepStatutsDto: {
@@ -6983,14 +7148,28 @@ export interface components {
       | 'avec-telephone'
       | 'qualite-de-saisie'
       | 'taux-de-contact'
-      | 'a-rappeler'
-      | 'taux-de-qualification'
+      | 'taux-de-joignabilite-representants'
+      | 'taux-d-acceptation'
+      | 'taux-de-rappel'
       | 'repartition-statuts-qualification'
+      | 'joints-non-joints'
+      | 'statuts-par-famille'
+      | 'joignabilite-par-creneau'
+      | 'taux-d-exploitation'
+      | 'exploitation-par-campagne'
+      | 'representants-par-departement'
+      | 'representants-par-ief'
+      | 'representants-jamais-appeles'
+      | 'representants-injoignables'
       | 'taux-de-joignabilite'
       | 'prospects-notes'
       | 'adhesions'
       | 'reste-a-appeler'
       | 'fiches-ouvertes'
+      | 'taux-de-qualification'
+      | 'duree-moyenne-sur-la-fiche'
+      | 'duree-moyenne-de-communication'
+      | 'appels-par-jour'
       | 'par-teleconseiller'
       | 'couverture-derniere-campagne'
       | 'hors-attribution-derniere-campagne'
@@ -7063,8 +7242,6 @@ export interface components {
       /** @description Les éléments du tableau de bord. `version` est fixé par le serveur et refusé s’il est transmis. */
       widgets: components['schemas']['DispositionWidgetDto'][];
     };
-    /** @enum {string} */
-    LotExportCible: 'REPRESENTANTS' | 'PROSPECTS';
     RepresentantExportQueryDto: {
       search?: string;
       /** Format: uuid */
@@ -15869,6 +16046,112 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['OriginBreakdownDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getSupervisionRepresentants: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['StockRepresentantsDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getSupervisionCampagnes: {
+    parameters: {
+      query?: {
+        /** @description Borne basse sur la date de l’ACTE, incluse : heure d’appel, de saisie ou de clôture relevée chez le client, et non date d’arrivée en base. Une date seule (AAAA-MM-JJ) démarre à minuit, fuseau Africa/Dakar. */
+        actFrom?: string;
+        /** @description Borne haute sur la date de l’acte, incluse. Une date seule finit à 23:59:59.999. */
+        actTo?: string;
+        granularity?: components['schemas']['SupervisionGranularity'];
+        /** @description Le projet. ABSENT veut dire les deux. Un représentant n’existe que dans CHUES : sous `GRAND_PUBLIC`, toutes les colonnes `rep*` valent 0 ou `null`. */
+        projet?: components['schemas']['Projet'];
+        /** @description Un seul téléconseiller : borne les lignes, la liste et les histogrammes. */
+        commercialId?: string;
+        /** @description Heure de début quotidienne, Dakar. */
+        timeFrom?: string;
+        /** @description Heure de fin quotidienne, exclue. */
+        timeTo?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SupervisionCampagnesDto'];
         };
       };
       /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */

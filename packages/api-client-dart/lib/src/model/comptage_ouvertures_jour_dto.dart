@@ -27,6 +27,10 @@ class ComptageOuverturesJourDto {
 
     required this.ouvertures,
 
+    required this.qualifiees,
+
+    required this.liberees,
+
     required this.dureeMoyenneSecondes,
   });
 
@@ -43,6 +47,14 @@ class ComptageOuverturesJourDto {
   @JsonKey(name: r'ouvertures', required: true, includeIfNull: false)
   final num ouvertures;
 
+  /// Parmi `ouvertures`, celles closes par une qualification. Taux de qualification : `qualifiees` / `ouvertures`.
+  @JsonKey(name: r'qualifiees', required: true, includeIfNull: false)
+  final num qualifiees;
+
+  /// Parmi `ouvertures`, celles libérées par un superviseur ou un administrateur.
+  @JsonKey(name: r'liberees', required: true, includeIfNull: false)
+  final num liberees;
+
   /// DMT du jour, en secondes, lue entre la première saisie et la qualification. Les ouvertures fermées sans aucune saisie n’entrent pas au dénominateur. Nulle tant qu’aucune ne s’y prête.
   @JsonKey(name: r'dureeMoyenneSecondes', required: true, includeIfNull: true)
   final num? dureeMoyenneSecondes;
@@ -57,6 +69,8 @@ class ComptageOuverturesJourDto {
                 openedByName,
                 jour,
                 ouvertures,
+                qualifiees,
+                liberees,
                 dureeMoyenneSecondes,
               ],
               [
@@ -64,6 +78,8 @@ class ComptageOuverturesJourDto {
                 other.openedByName,
                 other.jour,
                 other.ouvertures,
+                other.qualifiees,
+                other.liberees,
                 other.dureeMoyenneSecondes,
               ],
             );
@@ -77,6 +93,8 @@ class ComptageOuverturesJourDto {
         openedByName,
         jour,
         ouvertures,
+        qualifiees,
+        liberees,
         dureeMoyenneSecondes,
       ]);
 

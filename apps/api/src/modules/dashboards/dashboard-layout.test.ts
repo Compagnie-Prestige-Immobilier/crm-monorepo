@@ -21,8 +21,41 @@ describe('assainissement de la disposition d’un écran de chiffres', () => {
 
   // La qualification d'un représentant syndical n'existe pas hors CHUES.
   it('réserve les chiffres de qualification à CHUES', () => {
-    expect(sanitize('chues', [{ source: 'taux-de-qualification' }])).toHaveLength(1);
-    expect(sanitize('grand-public', [{ source: 'taux-de-qualification' }])).toEqual([]);
+    expect(sanitize('chues', [{ source: 'taux-d-acceptation' }])).toHaveLength(1);
+    expect(sanitize('grand-public', [{ source: 'taux-d-acceptation' }])).toEqual([]);
+  });
+
+  // Trois clés de la version 1 ont changé de sens en version 2 : relues telles
+  // quelles, elles afficheraient un autre chiffre sous le même nom.
+  it('renomme les clés d’une disposition en version 1', () => {
+    const parsed = parseLayout({
+      version: 1,
+      preset: 'essentiel',
+      widgets: [
+        { source: 'taux-de-contact', marque: 'tuile' },
+        { source: 'taux-de-qualification' },
+        { source: 'a-rappeler' },
+        { source: 'adhesions' },
+      ],
+    });
+
+    expect(parsed?.version).toBe(2);
+    expect(parsed?.widgets.map((widget) => widget.source)).toEqual([
+      'taux-de-joignabilite-representants',
+      'taux-d-acceptation',
+      'taux-de-rappel',
+      'adhesions',
+    ]);
+  });
+
+  it('lit une version 2 sans renommer', () => {
+    const parsed = parseLayout({
+      version: 2,
+      preset: 'essentiel',
+      widgets: [{ source: 'taux-de-contact' }],
+    });
+
+    expect(parsed?.widgets.map((widget) => widget.source)).toEqual(['taux-de-contact']);
   });
 
   it('déduplique une source répétée', () => {
@@ -41,26 +74,26 @@ describe('assainissement de la disposition d’un écran de chiffres', () => {
   });
 
   it('rejette une version inconnue', () => {
-    expect(parseLayout({ version: 2, preset: 'essentiel', widgets: [] })).toBeNull();
+    expect(parseLayout({ version: 3, preset: 'essentiel', widgets: [] })).toBeNull();
     expect(
-      parseLayout({ version: 1, preset: 'essentiel', widgets: [{ source: 'par-jour' }] }),
+      parseLayout({ version: 2, preset: 'essentiel', widgets: [{ source: 'par-jour' }] }),
     ).not.toBeNull();
   });
 
   it('replie quand la liste est vide une fois nettoyée', () => {
     expect(
-      resolveLayout('visites', { version: 1, preset: 'essentiel', widgets: [{ source: 'x' }] }),
+      resolveLayout('visites', { version: 2, preset: 'essentiel', widgets: [{ source: 'x' }] }),
     ).toBeNull();
     expect(
       resolveLayout('visites', {
-        version: 2,
+        version: 3,
         preset: 'essentiel',
         widgets: [{ source: 'par-jour' }],
       }),
     ).toBeNull();
     expect(
       resolveLayout('visites', {
-        version: 1,
+        version: 2,
         preset: 'essentiel',
         widgets: [{ source: 'par-jour' }],
       }),

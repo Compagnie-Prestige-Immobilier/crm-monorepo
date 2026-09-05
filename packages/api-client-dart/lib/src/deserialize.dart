@@ -205,12 +205,18 @@ import 'package:crm_api_client/src/model/set_visite_import_change_selection_dto.
 import 'package:crm_api_client/src/model/set_visite_referentiel_active_dto.dart';
 import 'package:crm_api_client/src/model/statut_qualification_dto.dart';
 import 'package:crm_api_client/src/model/statut_qualification_list_dto.dart';
+import 'package:crm_api_client/src/model/stock_representants_dto.dart';
+import 'package:crm_api_client/src/model/stock_representants_part_dto.dart';
 import 'package:crm_api_client/src/model/suggestion_dto.dart';
 import 'package:crm_api_client/src/model/suggestion_list_dto.dart';
 import 'package:crm_api_client/src/model/supervised_user_dto.dart';
 import 'package:crm_api_client/src/model/supervision_activity_counts_dto.dart';
 import 'package:crm_api_client/src/model/supervision_activity_dto.dart';
 import 'package:crm_api_client/src/model/supervision_activity_row_dto.dart';
+import 'package:crm_api_client/src/model/supervision_campagne_dto.dart';
+import 'package:crm_api_client/src/model/supervision_campagne_teleconseiller_dto.dart';
+import 'package:crm_api_client/src/model/supervision_campagnes_dto.dart';
+import 'package:crm_api_client/src/model/supervision_campagnes_totaux_dto.dart';
 import 'package:crm_api_client/src/model/supervision_dto.dart';
 import 'package:crm_api_client/src/model/supervision_histogram_bar_dto.dart';
 import 'package:crm_api_client/src/model/supervision_rep_statut_dto.dart';
@@ -612,6 +618,7 @@ ReturnType deserialize<ReturnType, BaseType>(
       return EnrollmentMethodListDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'ExportMode':
+    case 'FamilleStatut':
     case 'FunnelStageDto':
       return FunnelStageDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -983,6 +990,12 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'StatutQualificationListDto':
       return StatutQualificationListDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'StockRepresentantsDto':
+      return StockRepresentantsDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'StockRepresentantsPartDto':
+      return StockRepresentantsPartDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'SuggestionDto':
       return SuggestionDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -1003,6 +1016,22 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'SupervisionActivityRowDto':
       return SupervisionActivityRowDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'SupervisionCampagneDto':
+      return SupervisionCampagneDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'SupervisionCampagneTeleconseillerDto':
+      return SupervisionCampagneTeleconseillerDto.fromJson(
+            value as Map<String, dynamic>,
+          )
+          as ReturnType;
+    case 'SupervisionCampagnesDto':
+      return SupervisionCampagnesDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'SupervisionCampagnesTotauxDto':
+      return SupervisionCampagnesTotauxDto.fromJson(
+            value as Map<String, dynamic>,
+          )
           as ReturnType;
     case 'SupervisionDto':
       return SupervisionDto.fromJson(value as Map<String, dynamic>)
