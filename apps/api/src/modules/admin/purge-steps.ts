@@ -54,6 +54,11 @@ export const PURGE_STEPS: Readonly<Record<PurgeStepKey, PurgeStep>> = {
     count: (db) => db.callAttempt.count(),
     remove: async (db) => (await db.callAttempt.deleteMany({})).count,
   },
+  lotExportReaffectations: {
+    table: 'lot_export_reaffectations',
+    count: (db) => db.lotExportReaffectation.count(),
+    remove: async (db) => (await db.lotExportReaffectation.deleteMany({})).count,
+  },
   lotExportItems: {
     table: 'lot_export_items',
     count: (db) => db.lotExportItem.count(),

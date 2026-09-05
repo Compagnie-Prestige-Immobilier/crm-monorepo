@@ -19648,6 +19648,89 @@
         "summary": "Consulte une campagne et les appels qui ont suivi.",
         "tags": ["lots-export"]
       },
+      "patch": {
+        "operationId": "updateLotExport",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLotExportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LotExportSummaryDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LOT_EXPORT_NOT_FOUND.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Renomme une campagne et règle les objectifs.",
+        "tags": ["lots-export"]
+      },
       "delete": {
         "operationId": "deleteLotExport",
         "parameters": [
@@ -19712,6 +19795,289 @@
           }
         ],
         "summary": "Supprime une campagne et sa répartition.",
+        "tags": ["lots-export"]
+      }
+    },
+    "/api/v1/lots-export/{id}/fiches": {
+      "get": {
+        "operationId": "listLotExportFiches",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "teleconseillerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "etat",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/LotExportFicheEtat"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LotExportFichesDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LOT_EXPORT_NOT_FOUND.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Liste les fiches d’une campagne, avec leur état et le statut posé.",
+        "tags": ["lots-export"]
+      }
+    },
+    "/api/v1/lots-export/{id}/reaffectation": {
+      "post": {
+        "operationId": "reaffecterLotExport",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReaffecterLotExportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LotExportDetailDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LOT_EXPORT_NOT_FOUND.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Confie des fiches non traitées à un autre téléconseiller.",
+        "tags": ["lots-export"]
+      }
+    },
+    "/api/v1/lots-export/{id}/retrait": {
+      "post": {
+        "operationId": "retirerTeleconseillerLotExport",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetirerTeleconseillerDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LotExportDetailDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LOT_EXPORT_NOT_FOUND.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retire un téléconseiller et redistribue ses fiches non traitées.",
         "tags": ["lots-export"]
       }
     },
@@ -30838,7 +31204,7 @@
       },
       "LotExportCible": {
         "type": "string",
-        "enum": ["REPRESENTANTS", "PROSPECTS"]
+        "enum": ["REPRESENTANTS", "PROSPECTS", "REPRESENTANTS_INJOIGNABLES", "CONTACTS_RECOMMANDES"]
       },
       "RepresentantExportQueryDto": {
         "type": "object",
@@ -31031,6 +31397,21 @@
         },
         "required": ["projet"]
       },
+      "LotExportObjectifDto": {
+        "type": "object",
+        "properties": {
+          "teleconseillerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fichesParJour": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 500
+          }
+        },
+        "required": ["teleconseillerId", "fichesParJour"]
+      },
       "LotExportDistributionInputDto": {
         "type": "object",
         "properties": {
@@ -31054,6 +31435,12 @@
             "minimum": 1,
             "maximum": 10,
             "default": 1
+          },
+          "objectifs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LotExportObjectifDto"
+            }
           }
         },
         "required": ["teleconseillerIds"]
@@ -31341,6 +31728,9 @@
           "teleconseillerName": {
             "type": "string"
           },
+          "objectif": {
+            "type": "number"
+          },
           "assigned": {
             "type": "number"
           },
@@ -31360,12 +31750,39 @@
         "required": [
           "teleconseillerId",
           "teleconseillerName",
+          "objectif",
           "assigned",
           "treated",
           "completionRate",
           "assignedCalls",
           "outsideAssignmentCalls"
         ]
+      },
+      "LotExportReaffectationDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fromName": {
+            "type": "string",
+            "nullable": true
+          },
+          "toName": {
+            "type": "string"
+          },
+          "fiches": {
+            "type": "number"
+          },
+          "performedByName": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "fromName", "toName", "fiches", "performedByName", "createdAt"]
       },
       "LotExportDetailDto": {
         "type": "object",
@@ -31436,6 +31853,12 @@
             "items": {
               "$ref": "#/components/schemas/LotExportPerformanceDto"
             }
+          },
+          "reaffectations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LotExportReaffectationDto"
+            }
           }
         },
         "required": [
@@ -31454,8 +31877,123 @@
           "callsByTeleconseiller",
           "distribution",
           "repartition",
-          "performance"
+          "performance",
+          "reaffectations"
         ]
+      },
+      "UpdateLotExportDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "objectifs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LotExportObjectifDto"
+            }
+          }
+        }
+      },
+      "LotExportFicheEtat": {
+        "type": "string",
+        "enum": ["NON_TRAITEE", "TRAITEE", "A_RAPPELER"]
+      },
+      "LotExportFicheDto": {
+        "type": "object",
+        "properties": {
+          "position": {
+            "type": "number"
+          },
+          "jour": {
+            "type": "number"
+          },
+          "ficheId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "phoneE164": {
+            "type": "string"
+          },
+          "teleconseillerId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "teleconseillerName": {
+            "type": "string"
+          },
+          "etat": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LotExportFicheEtat"
+              }
+            ]
+          },
+          "statutLabel": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "position",
+          "jour",
+          "ficheId",
+          "fullName",
+          "phoneE164",
+          "teleconseillerId",
+          "teleconseillerName",
+          "etat",
+          "statutLabel"
+        ]
+      },
+      "LotExportFichesDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LotExportFicheDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PageMetaDto"
+          }
+        },
+        "required": ["items", "meta"]
+      },
+      "ReaffecterLotExportDto": {
+        "type": "object",
+        "properties": {
+          "positions": {
+            "minItems": 1,
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "versTeleconseillerId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": ["positions", "versTeleconseillerId"]
+      },
+      "RetirerTeleconseillerDto": {
+        "type": "object",
+        "properties": {
+          "teleconseillerId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": ["teleconseillerId"]
       },
       "InscriptionPlateformeDto": {
         "type": "object",

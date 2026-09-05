@@ -114,10 +114,14 @@ import 'package:crm_api_client/src/model/lot_export_attempt_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_detail_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_distribution_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_distribution_input_dto.dart';
+import 'package:crm_api_client/src/model/lot_export_fiche_dto.dart';
+import 'package:crm_api_client/src/model/lot_export_fiches_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_list_dto.dart';
+import 'package:crm_api_client/src/model/lot_export_objectif_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_performance_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_preview_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_prospect_filter_dto.dart';
+import 'package:crm_api_client/src/model/lot_export_reaffectation_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_repartition_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_repartition_jour_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_summary_dto.dart';
@@ -161,6 +165,7 @@ import 'package:crm_api_client/src/model/purge_deletion_dto.dart';
 import 'package:crm_api_client/src/model/purge_domain_dto.dart';
 import 'package:crm_api_client/src/model/purge_request_dto.dart';
 import 'package:crm_api_client/src/model/purge_result_dto.dart';
+import 'package:crm_api_client/src/model/reaffecter_lot_export_dto.dart';
 import 'package:crm_api_client/src/model/reassign_prospects_dto.dart';
 import 'package:crm_api_client/src/model/reassign_result_dto.dart';
 import 'package:crm_api_client/src/model/referentiels_bundle_dto.dart';
@@ -187,6 +192,7 @@ import 'package:crm_api_client/src/model/representant_productivity_list_dto.dart
 import 'package:crm_api_client/src/model/representant_relation_change_dto.dart';
 import 'package:crm_api_client/src/model/representant_relation_change_list_dto.dart';
 import 'package:crm_api_client/src/model/reset_password_dto.dart';
+import 'package:crm_api_client/src/model/retirer_teleconseiller_dto.dart';
 import 'package:crm_api_client/src/model/score_part.dart';
 import 'package:crm_api_client/src/model/segment_change_dto.dart';
 import 'package:crm_api_client/src/model/segment_change_list_dto.dart';
@@ -247,6 +253,7 @@ import 'package:crm_api_client/src/model/update_employeur_dto.dart';
 import 'package:crm_api_client/src/model/update_enrolement_reglages_dto.dart';
 import 'package:crm_api_client/src/model/update_grand_public_consent_dto.dart';
 import 'package:crm_api_client/src/model/update_income_band_dto.dart';
+import 'package:crm_api_client/src/model/update_lot_export_dto.dart';
 import 'package:crm_api_client/src/model/update_notification_template_dto.dart';
 import 'package:crm_api_client/src/model/update_offer_dto.dart';
 import 'package:crm_api_client/src/model/update_profession_dto.dart';
@@ -679,8 +686,18 @@ ReturnType deserialize<ReturnType, BaseType>(
             value as Map<String, dynamic>,
           )
           as ReturnType;
+    case 'LotExportFicheDto':
+      return LotExportFicheDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'LotExportFicheEtat':
+    case 'LotExportFichesDto':
+      return LotExportFichesDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'LotExportListDto':
       return LotExportListDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'LotExportObjectifDto':
+      return LotExportObjectifDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'LotExportPerformanceDto':
       return LotExportPerformanceDto.fromJson(value as Map<String, dynamic>)
@@ -690,6 +707,9 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'LotExportProspectFilterDto':
       return LotExportProspectFilterDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'LotExportReaffectationDto':
+      return LotExportReaffectationDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'LotExportRepartitionDto':
       return LotExportRepartitionDto.fromJson(value as Map<String, dynamic>)
@@ -832,6 +852,9 @@ ReturnType deserialize<ReturnType, BaseType>(
       return PurgeResultDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'RappelOrigine':
+    case 'ReaffecterLotExportDto':
+      return ReaffecterLotExportDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'ReassignProspectsDto':
       return ReassignProspectsDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -920,6 +943,9 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'RepresentantSuivi':
     case 'ResetPasswordDto':
       return ResetPasswordDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'RetirerTeleconseillerDto':
+      return RetirerTeleconseillerDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'Role':
     case 'ScorePart':
@@ -1116,6 +1142,9 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'UpdateIncomeBandDto':
       return UpdateIncomeBandDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'UpdateLotExportDto':
+      return UpdateLotExportDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'UpdateNotificationTemplateDto':
       return UpdateNotificationTemplateDto.fromJson(

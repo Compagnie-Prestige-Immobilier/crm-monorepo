@@ -6,8 +6,8 @@ leur état vérifié dans le code de `dev` le 5 septembre 2026.
 Lire ce fichier avant d'ouvrir un chantier. S'il contredit le code, c'est le
 code qui a raison : corriger le fichier.
 
-**14 faites, 5 partielles, 20 absentes.** Le lot 1 est livré en entier, le lot 7
-à une ventilation près. Les lots 3, 4 et 6 n'ont pas commencé.
+**20 faites, 5 partielles, 14 absentes.** Les lots 1 et 3 sont livrés en
+entier, le lot 7 à une ventilation près. Les lots 4 et 6 n'ont pas commencé.
 
 ## Lot 2, indicateurs et tableau de bord
 
@@ -32,24 +32,6 @@ code qui a raison : corriger le fichier.
 - [ ] EB-37 La permission de lecture du journal d'appels n'est demandée que
       depuis l'écran de diagnostic. La demander à la première ouverture de
       fiche, et signaler le refus en supervision et sur l'accueil.
-
-## Lot 3, campagnes
-
-L'entité est `LotExport` : il n'existe pas de modèle « campagne » distinct.
-Aucune des six exigences n'est commencée.
-
-- [ ] EB-14 Nom de campagne modifiable. Fabriqué au clic, aucun champ éditable,
-      aucune route de renommage.
-- [ ] EB-15 Le superviseur crée et lance les campagnes. `@Roles(Role.ADMIN)` sur
-      `create` et `apercu`, `lots-export.controller.ts:56`.
-- [ ] EB-16 Réaffectation des fiches. `assigneeId` est figé à la création.
-- [ ] EB-17 Objectif par téléconseiller. `fichesParJour` vaut pour toute
-      l'équipe.
-- [ ] EB-18 Liste des fiches par téléconseiller. Le détail n'affiche que des
-      compteurs.
-- [ ] EB-19 Cibles injoignables et contacts recommandés. L'enum `LotExportCible`
-      ne connaît que REPRESENTANTS et PROSPECTS. Le filtre `suivi=INJOIGNABLE`
-      existe déjà côté API, aucun écran ne l'expose.
 
 ## Lot 4, conversion et paramètres
 
@@ -107,6 +89,28 @@ reprise comprises. Pièges déjà payés :
   dans le module `callbacks` où on le cherche d'abord.
 - Sous verrou, la déconnexion et le changement d'espace sont REFUSÉS : la fiche
   resterait verrouillée côté serveur, hors de vue.
+
+### Lot 3 en entier, campagnes
+
+Branche `feat/lot2-compagnes`.
+
+Les six exigences EB-14 à EB-19 sont dans le code. Pièges déjà payés :
+
+- La répartition n'a jamais eu de colonne : elle vit dans
+  `LotExport.filters.distribution`, et les objectifs par téléconseiller avec
+  elle. La réécrire sans garder les critères qui l'entourent efface l'étiquette
+  de la campagne.
+- Une fiche DÉJÀ APPELÉE ne se réaffecte jamais. Le calcul porte sur la
+  POSITION et non sur la fiche : la même personne peut figurer dans deux
+  campagnes.
+- « Hors Injoignable définitif » se lit sur `retryAfterMinutes IS NULL`, pas sur
+  un code écrit en dur. L'administrateur peut créer d'autres statuts qui ne
+  repassent jamais.
+- Un contact recommandé devient une fiche AU LANCEMENT. `Representant.phoneE164`
+  porte un index unique partiel : sans dédoublonnage par numéro, la transaction
+  entière échoue.
+- La suppression d'une campagne reste à l'administrateur seul. Elle était gardée
+  par le même drapeau que la création côté web ; les deux sont séparés.
 
 ### Lot 7, connecteur d'enrôlement
 
