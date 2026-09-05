@@ -32,6 +32,7 @@ import 'generated_migrations/schema_v27.dart' as v27schema;
 import 'generated_migrations/schema_v28.dart' as v28schema;
 import 'generated_migrations/schema_v29.dart' as v29schema;
 import 'generated_migrations/schema_v30.dart' as v30schema;
+import 'generated_migrations/schema_v31.dart' as v31schema;
 
 /// Test doré de migration.
 ///
@@ -2787,6 +2788,78 @@ void main() {
     expect(statut.code, 'A_RAPPELER');
     expect(statut.requiresComment, isFalse);
     expect(statut.relationStatus, isNull);
+    await db.close();
+  });
+
+  // Le verrou d'ouverture de fiche n'est pas une règle d'écran : c'est l'index
+  // partiel qui refuse la seconde. Un palier qui créerait la table sans lui
+  // passerait le doré et laisserait deux fiches ouvertes sur le terrain.
+  test('v31 -> v32 pose le verrou d\'ouverture de fiche', () async {
+    final schema = await verifier.schemaAt(31);
+    final v31schema.DatabaseAtV31 old = v31schema.DatabaseAtV31(
+      schema.newConnection(),
+    );
+    await old.customStatement(
+      'INSERT INTO outbox '
+      '(id, entity_type, entity_id, op, payload, next_attempt_at, created_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?)',
+      <Object?>[
+        'op-v31',
+        'rep_call_attempt',
+        'att-31',
+        'create',
+        '{}',
+        _iso,
+        _iso,
+      ],
+    );
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 32);
+
+    expect(
+      await db
+          .customSelect('SELECT id FROM outbox')
+          .getSingle()
+          .then((QueryRow row) => row.read<String>('id')),
+      'op-v31',
+    );
+
+    await db
+        .into(db.ouverturesFiche)
+        .insert(
+          OuverturesFicheCompanion.insert(
+            id: 'ouv-32',
+            openedById: 'user-32',
+            representantId: const Value<String?>('rep-32'),
+            openedAt: DateTime.parse(_iso),
+          ),
+        );
+    await expectLater(
+      db
+          .into(db.ouverturesFiche)
+          .insert(
+            OuverturesFicheCompanion.insert(
+              id: 'ouv-32-bis',
+              openedById: 'user-32',
+              prospectId: const Value<String?>('pros-32'),
+              openedAt: DateTime.parse(_iso),
+            ),
+          ),
+      throwsA(isA<SqliteException>()),
+    );
+
+    // Exactement une cible : une ligne qui en porte deux ne décrit aucune fiche.
+    await expectLater(
+      db.customStatement(
+        'INSERT INTO ouvertures_fiche '
+        '(id, opened_by_id, representant_id, prospect_id, opened_at) '
+        'VALUES (?, ?, ?, ?, ?)',
+        <Object?>['ouv-32-ter', 'user-33', 'rep-32', 'pros-32', _iso],
+      ),
+      throwsA(isA<SqliteException>()),
+    );
     await db.close();
   });
 
