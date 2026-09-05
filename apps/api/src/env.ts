@@ -101,6 +101,8 @@ export const envSchema = z
     DB_DUMP_DIR: z.string().min(1).default('./storage/db-dumps'),
 
     DB_DUMP_ENABLED: booleanFlag(false),
+
+    DEMO_WORKSPACE_ENABLED: booleanFlag(false),
   })
   .superRefine((env, context) => {
     if (env.NODE_ENV !== 'production') return;
@@ -126,6 +128,16 @@ export const envSchema = z
         code: 'custom',
         path: ['API_DOCS_ENABLED'],
         message: 'API_DOCS_ENABLED must be false in production',
+      });
+    }
+
+    // La fabrique de démonstration écrit neuf cent mille lignes : elle n'a rien
+    // à faire sur la base qui porte les vraies fiches.
+    if (env.DEMO_WORKSPACE_ENABLED) {
+      context.addIssue({
+        code: 'custom',
+        path: ['DEMO_WORKSPACE_ENABLED'],
+        message: 'DEMO_WORKSPACE_ENABLED must be false in production',
       });
     }
 

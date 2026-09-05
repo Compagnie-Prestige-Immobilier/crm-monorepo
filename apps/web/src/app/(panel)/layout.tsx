@@ -9,6 +9,7 @@ import { SidebarShell } from '@/components/layout/sidebar-shell';
 import { Topbar } from '@/components/layout/topbar';
 import { LiveStream } from '@/components/live/live-stream';
 import { QueryErrorState } from '@/components/query-error-state';
+import { demoWorkspaceEnabled } from '@/lib/demo-workspace';
 import { readSession } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
@@ -44,7 +45,7 @@ export default async function PanelLayout({ children }: { children: ReactNode })
 
       <div className="flex min-w-0 flex-1 flex-col">
         {user.workspace === 'demo' ? <DemoBanner /> : null}
-        <Topbar user={user} />
+        <Topbar user={user} demoEnabled={demoWorkspaceEnabled()} />
         <main id="contenu-principal" className="flex-1 p-4 md:p-6">
           {children}
         </main>

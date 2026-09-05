@@ -56,7 +56,10 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('Jeton d’accès invalide');
     }
 
-    const workspace = payload.workspace === 'demo' ? 'demo' : 'public';
+    // Un jeton frappé avant la coupure porte encore `demo` : sans ce repli, il
+    // ouvrirait le schéma de démonstration sur une base qui n'en veut pas.
+    const workspace =
+      payload.workspace === 'demo' && readEnv().DEMO_WORKSPACE_ENABLED ? 'demo' : 'public';
     this.workspace.enter(workspace);
     request.user = {
       id: payload.sub,

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import { generateDemoVolume } from './demo-volume.js';
-import { GrandPublicConsent, Projet, ProspectType, type PrismaClient } from './index.js';
+import { GrandPublicConsent, Projet, ProspectType, type PrismaClient } from '@prisma/client';
 
 export const DEMO_SEED_SETTING = 'demo.seed.version';
 export const DEMO_SEED_VERSION = '4';

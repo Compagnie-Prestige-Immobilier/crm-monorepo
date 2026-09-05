@@ -1,4 +1,4 @@
-import type { PrismaClient } from './index.js';
+import type { PrismaClient } from '@prisma/client';
 
 export const DEMO_VOLUMES = {
   users: 60,
@@ -31,6 +31,16 @@ export const DEMO_VOLUMES = {
   refreshTokens: 600,
   agentActivitySlots: 30_000,
   androidReleases: 6,
+} as const;
+
+/** Lignes engendrées puis marquées supprimées : les compteurs de la carte démo s'en déduisent. */
+export const DEMO_SUPPRIMES = { representants: 100, prospects: 200, bankCases: 50 } as const;
+
+/** Effectifs actifs après réinitialisation, échantillon nommé compris (8 / 16 / 3). */
+export const DEMO_EFFECTIFS = {
+  representants: DEMO_VOLUMES.representants - DEMO_SUPPRIMES.representants + 8,
+  prospects: DEMO_VOLUMES.prospects - DEMO_SUPPRIMES.prospects + 16,
+  bankCases: DEMO_VOLUMES.bankCases - DEMO_SUPPRIMES.bankCases + 3,
 } as const;
 
 const SOURCES: Record<string, string> = {
@@ -77,8 +87,13 @@ function pick(source: string, index: string): string {
   return `r.${source}[1 + (${index}) % cardinality(r.${source})]`;
 }
 
+/**
+ * `md5` seul produit un UUID sans version ni variante, que `IsUUID` refuse :
+ * les identifiants engendrés sortaient de la base et se faisaient rejeter à
+ * l'entrée. Les deux quartets sont donc forcés, comme le fait `demoId`.
+ */
 function id(prefix: string, index = 'i'): string {
-  return `md5('${prefix}:' || (${index}))::uuid::text`;
+  return `overlay(overlay(md5('${prefix}:' || (${index})) placing '4' from 13) placing 'a' from 17)::uuid::text`;
 }
 
 function daysAgo(expression: string): string {
@@ -118,10 +133,10 @@ SELECT ${id('rep')},
        1 + i % 3,
        CASE WHEN i % 9 = 0 THEN ${pick('departements', 'i')} ELSE ${pick('iefDepartements', 'i')} END,
        ${pick('agents', 'i')},
-       ${daysAgo('i % 400')},
-       ${daysAgo('i % 400')},
+       ${daysAgo('30 + i % 400')},
+       ${daysAgo('30 + i % 400')},
        now(),
-       CASE WHEN i % 137 = 0 THEN ${daysAgo('i % 30')} END,
+       CASE WHEN i < ${String(DEMO_SUPPRIMES.representants)} THEN ${daysAgo('i % 30')} END,
        CASE WHEN i % 9 = 0 THEN NULL ELSE ${pick('iefs', 'i')} END,
        (ARRAY['INCONNU','CONTACTE','AMBASSADEUR','REFUS'])[1 + i % 4]::demo."RepresentantRelation",
        (ARRAY['NON_DEMANDE','MEME_NUMERO','AUTRE_NUMERO','AUCUN'])[1 + i % 4]::demo."WhatsappStatus",
@@ -231,10 +246,10 @@ SELECT ${id('prospect')},
        CASE WHEN i % 5 = 4 THEN NULL ELSE ${pick('representants', 'i')} END,
        ${pick('agents', 'i')},
        (ARRAY['NOUVEAU','CONTACTE','CONVERTI','PERDU'])[1 + i % 4]::demo."ProspectStatut",
-       ${daysAgo('i % 400')},
-       ${daysAgo('i % 400')},
+       ${daysAgo('30 + i % 400')},
+       ${daysAgo('30 + i % 400')},
        now(),
-       CASE WHEN i % 151 = 0 THEN ${daysAgo('i % 30')} END,
+       CASE WHEN i < ${String(DEMO_SUPPRIMES.prospects)} THEN ${daysAgo('i % 30')} END,
        CASE WHEN i % 4 = 1 THEN ${daysAgo('i % 90')} END,
        CASE WHEN i % 4 = 1 THEN ${pick('agents', 'i + 3')} END,
        CASE WHEN i % 4 = 1 THEN (ARRAY['PLATFORM','PHYSICAL','VOICE_OR_ELECTRONIC_MESSAGING','APPOINTMENT'])[1 + (i / 4) % 4]::demo."EnrollmentMethod" END,
@@ -400,7 +415,7 @@ SELECT ${id('dossier')},
        ${pick('agents', 'i + 1')},
        ${daysAgo('i % 300')},
        now(),
-       CASE WHEN i % 173 = 0 THEN now() END
+       CASE WHEN i < ${String(DEMO_SUPPRIMES.bankCases)} THEN now() END
 ${series(DEMO_VOLUMES.bankCases)}`,
   ),
 

@@ -73,6 +73,7 @@ jobs:
       SEED_ADMIN_USERNAME: admin
       SEED_ADMIN_PASSWORD: ci-admin-password-2026
       REDIS_URL: redis://localhost:6379
+      DEMO_WORKSPACE_ENABLED: 'true'
     services:
       postgres:
         image: postgres:18.4
