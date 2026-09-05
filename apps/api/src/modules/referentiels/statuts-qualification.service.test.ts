@@ -330,8 +330,38 @@ describe('activation', () => {
     });
   });
 
-  it('laisse retirer le dernier non abouti tant que le rappel reste proposable', async () => {
-    expect((await service.setActive('3', { isActive: false })).isActive).toBe(false);
+  it('ne compte NI le rappel NI le faux numéro dans la branche non jointe', async () => {
+    prisma.rows.push(
+      ligne({
+        id: '5',
+        code: 'FAUX_NUMERO',
+        label: 'Faux numéro',
+        effect: StatutQualificationEffect.WRONG_NUMBER,
+        isSystem: true,
+      }),
+    );
+
+    await expect(service.setActive('3', { isActive: false })).rejects.toMatchObject({
+      response: { code: StatutQualificationError.LAST_OF_BRANCH },
+    });
+  });
+
+  it('refuse de retirer le faux numéro quand il est le dernier joint proposable', async () => {
+    prisma.rows[0]!.isActive = false;
+    prisma.rows[1]!.isActive = false;
+    prisma.rows.push(
+      ligne({
+        id: '5',
+        code: 'FAUX_NUMERO',
+        label: 'Faux numéro',
+        effect: StatutQualificationEffect.WRONG_NUMBER,
+        isSystem: true,
+      }),
+    );
+
+    await expect(service.setActive('5', { isActive: false })).rejects.toMatchObject({
+      response: { code: StatutQualificationError.LAST_OF_BRANCH },
+    });
   });
 
   it('refuse de retirer le rappel quand il est le dernier statut de l’appel abouti', async () => {
