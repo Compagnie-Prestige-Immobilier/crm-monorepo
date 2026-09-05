@@ -235,7 +235,8 @@ export function RepresentantDetailView({
         </CardContent>
       </Card>
 
-      <Card>
+      {/* « Mes contacts » ouvre la fiche sur cette ancre. */}
+      <Card id="appels">
         <CardHeader>
           <CardTitle>Appels</CardTitle>
         </CardHeader>

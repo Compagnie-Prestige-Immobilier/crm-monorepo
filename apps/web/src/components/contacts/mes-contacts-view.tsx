@@ -3,6 +3,7 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { PhoneCallIcon } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 
 import { EmptyState } from '@/components/empty-state';
@@ -48,11 +49,32 @@ const ONGLETS: readonly { value: Onglet; label: string }[] = [
 
 const SANS_VALEUR = <span className="text-muted-foreground">–</span>;
 
-/** CHUES n'a pas d'écran de fiche prospect : la liste filtrée sur le numéro en tient lieu. */
+/** Section « Appels » des fiches CHUES. Grand Public n'en a pas encore. */
+const ANCRE_APPELS = '#appels';
+
 const ficheProspect = (projet: Projet, prospect: ProspectRow): string =>
   projet === 'GRAND_PUBLIC'
     ? `/grand-public/${prospect.id}`
-    : `/chues/prospects?search=${encodeURIComponent(prospect.phoneE164)}`;
+    : `/chues/prospects/${prospect.id}${ANCRE_APPELS}`;
+
+const ficheRepresentant = (id: string): string => `/chues/representants/${id}${ANCRE_APPELS}`;
+
+function LigneVersFiche({ href, children }: { href: string; children: ReactNode }) {
+  const router = useRouter();
+  return (
+    <TableRow
+      className="h-11 cursor-pointer"
+      onClick={(event) => {
+        if (event.target instanceof HTMLElement && event.target.closest('a') !== null) return;
+        // Relâcher une sélection de texte ne doit pas quitter la liste.
+        if (window.getSelection()?.isCollapsed === false) return;
+        router.push(href);
+      }}
+    >
+      {children}
+    </TableRow>
+  );
+}
 
 export function MesContactsView({
   projet,
@@ -233,10 +255,10 @@ function TableRepresentants({ items }: { items: RepresentantRow[] }) {
       <EnTete />
       <TableBody>
         {items.map((representant) => (
-          <TableRow key={representant.id}>
+          <LigneVersFiche key={representant.id} href={ficheRepresentant(representant.id)}>
             <TableCell>
               <Link
-                href={`/chues/representants/${representant.id}`}
+                href={ficheRepresentant(representant.id)}
                 className="font-[600] underline underline-offset-4"
               >
                 {representant.fullName}
@@ -263,7 +285,7 @@ function TableRepresentants({ items }: { items: RepresentantRow[] }) {
                 lastCallOutcome={representant.lastCallOutcome}
               />
             </TableCell>
-          </TableRow>
+          </LigneVersFiche>
         ))}
       </TableBody>
     </Table>
@@ -276,7 +298,7 @@ function TableProspects({ items, projet }: { items: ProspectRow[]; projet: Proje
       <EnTete />
       <TableBody>
         {items.map((prospect) => (
-          <TableRow key={prospect.id}>
+          <LigneVersFiche key={prospect.id} href={ficheProspect(projet, prospect)}>
             <TableCell>
               <Link
                 href={ficheProspect(projet, prospect)}
@@ -299,7 +321,7 @@ function TableProspects({ items, projet }: { items: ProspectRow[]; projet: Proje
               )}
             </TableCell>
             <TableCell>{PHASE2_STATUS_LABELS[prospect.phase2Status]}</TableCell>
-          </TableRow>
+          </LigneVersFiche>
         ))}
       </TableBody>
     </Table>
