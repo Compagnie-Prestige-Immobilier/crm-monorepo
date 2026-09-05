@@ -17,6 +17,7 @@ import '../../../ui/widgets/cpi_kit.dart';
 import '../../../ui/widgets/cpi_pressable.dart';
 import '../../auth/auth_state.dart';
 import '../../notifications/notifications_controller.dart';
+import '../../permissions/journal_appels.dart';
 import '../../rappels/presentation/rappels_en_retard_banner.dart';
 import '../../shell/app_shell.dart';
 import '../../shell/projects.dart';
@@ -57,6 +58,7 @@ class HomeScreen extends ConsumerWidget {
 
     final List<Widget> corps = <Widget>[
       const RappelsEnRetardBanner(padded: false),
+      const JournalAppelsBanner(padded: false),
       if (chiffresIllisibles)
         Padding(
           padding: const EdgeInsets.only(bottom: CpiSpacing.sm),

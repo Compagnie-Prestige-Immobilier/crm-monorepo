@@ -25,8 +25,10 @@ import '../../data/repositories/write_repository.dart';
 import '../../data/secure/secure_token_store.dart';
 import '../../features/auth/auth_controller.dart';
 import '../../features/auth/auth_state.dart';
+import '../../features/permissions/journal_appels.dart';
 import '../network/dio_factory.dart';
 import '../router/route_memory.dart';
+import '../telephonie/telephonie_port.dart';
 import '../router/route_paths.dart';
 import '../sync/api_port.dart';
 import '../sync/clock.dart';
@@ -77,7 +79,11 @@ final Provider<({Dio dio, CrmApiClient client})> apiClientProvider =
     });
 
 final Provider<ApiPort> apiPortProvider = Provider<ApiPort>((Ref ref) {
-  return DioApi(ref.watch(apiClientProvider).client);
+  return DioApi(
+    ref.watch(apiClientProvider).client,
+    journalAppelsAutorise: () =>
+        journalAppelsAutorise(ref.read(telephonieProvider)),
+  );
 });
 
 final Provider<RouteMemory> routeMemoryProvider = Provider<RouteMemory>((

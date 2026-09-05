@@ -6581,6 +6581,15 @@
             }
           },
           {
+            "name": "journalAppelsAutorise",
+            "required": false,
+            "in": "query",
+            "description": "Lecture du journal d’appels accordée sur l’appareil. Facultatif.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "X-CPI-Payload-Version",
             "in": "header",
             "description": "Format de données que le client sait lire. En dessous de 5, le tirage est refusé au lieu d’être servi : les liens banque, syndicat et représentant d’un prospect peuvent être nuls, et un client plus ancien échoue à les décoder.",
@@ -25478,6 +25487,10 @@
             "type": "string",
             "maxLength": 32,
             "description": "Version de l’application mobile, telle qu’elle s’annonce. Facultative."
+          },
+          "journalAppelsAutorise": {
+            "type": "boolean",
+            "description": "Lecture du journal d’appels accordée sur l’appareil. Sans elle, la durée de communication n’est jamais relevée. Facultatif sans limite de temps."
           }
         },
         "required": ["clientBatchId", "payloadVersion", "operations"]
@@ -31171,6 +31184,11 @@
             "nullable": true,
             "description": "Version de l’application mobile, telle qu’elle s’annonce."
           },
+          "journalAppelsAutorise": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "Lecture du journal d’appels accordée sur l’appareil, DÉCLARÉE PAR LUI. `false` : la durée de communication de ce compte ne se mesure pas. `null` : inconnu."
+          },
           "lastWriteAt": {
             "type": "string",
             "format": "date-time",
@@ -31255,6 +31273,7 @@
           "lastPullAt",
           "pendingOps",
           "appVersion",
+          "journalAppelsAutorise",
           "lastWriteAt",
           "activeSecondsToday",
           "activeSecondsInShifts",

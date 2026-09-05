@@ -10,6 +10,7 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 export interface HeartbeatSignal {
   readonly pendingOps?: number;
   readonly appVersion?: string;
+  readonly journalAppelsAutorise?: boolean;
 }
 
 @Injectable()
@@ -28,6 +29,9 @@ export class HeartbeatService {
       ...(kind === 'pull' ? { lastPullAt: at } : { lastPushAt: at }),
       ...(signal.pendingOps === undefined ? {} : { pendingOps: signal.pendingOps }),
       ...(signal.appVersion === undefined ? {} : { appVersion: signal.appVersion }),
+      ...(signal.journalAppelsAutorise === undefined
+        ? {}
+        : { journalAppelsAutorise: signal.journalAppelsAutorise }),
     };
 
     try {

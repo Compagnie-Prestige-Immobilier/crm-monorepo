@@ -12,6 +12,7 @@ interface HeartbeatRow {
   lastPushAt: Date | null;
   pendingOps: number | null;
   appVersion: string | null;
+  journalAppelsAutorise?: boolean | null;
 }
 
 interface SlotRow {
@@ -110,6 +111,7 @@ describe('ce que le battement de cœur rend visible', () => {
         lastPushAt: null,
         pendingOps: 12,
         appVersion: '1.4.2',
+        journalAppelsAutorise: false,
       },
     ]);
 
@@ -121,6 +123,7 @@ describe('ce que le battement de cœur rend visible', () => {
     expect(row?.lastSyncAt).toBeNull();
     expect(row?.pendingOps).toBe(12);
     expect(row?.appVersion).toBe('1.4.2');
+    expect(row?.journalAppelsAutorise).toBe(false);
   });
 
   it('un appareil qui ne déclare pas sa file laisse « inconnu », jamais zéro', async () => {
@@ -138,6 +141,7 @@ describe('ce que le battement de cœur rend visible', () => {
 
     expect(row?.pendingOps).toBeNull();
     expect(row?.appVersion).toBeNull();
+    expect(row?.journalAppelsAutorise).toBeNull();
   });
 
   it('un compte sans aucun battement reste lisible', async () => {

@@ -44,6 +44,7 @@ function user(
     lastPullAt: '2026-08-17T11:55:00.000Z',
     pendingOps: 0,
     appVersion: '1.0.0',
+    journalAppelsAutorise: null,
     lastWriteAt: '2026-08-17T11:40:00.000Z',
     activeSecondsToday: 12_600,
     activeSecondsInShifts: 10_800,

@@ -261,6 +261,7 @@ export class SupervisionService {
           lastPushAt: true,
           pendingOps: true,
           appVersion: true,
+          journalAppelsAutorise: true,
         },
       }),
       this.prisma.agentActivitySlot.findMany({
@@ -299,6 +300,7 @@ export class SupervisionService {
         lastPullAt: null,
         pendingOps: null,
         appVersion: null,
+        journalAppelsAutorise: null,
       };
       const pushedAt = latest(syncAt.get(user.id), optionalDate(beat.lastPushAt));
       const activity = activityOf.get(user.id);
@@ -339,6 +341,7 @@ export class SupervisionService {
         lastPullAt: isoOrNull(beat.lastPullAt),
         pendingOps: beat.pendingOps,
         appVersion: beat.appVersion,
+        journalAppelsAutorise: beat.journalAppelsAutorise ?? null,
         lastWriteAt: isoOrNull(signals.lastWriteAt),
         activeSecondsToday: activity?.active ?? 0,
         activeSecondsInShifts: activity?.inShifts ?? 0,
