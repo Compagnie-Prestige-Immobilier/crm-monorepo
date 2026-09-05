@@ -1,6 +1,6 @@
 ---
 name: android-engineer
-description: "Native Android implementation in Kotlin: Compose or Views, lifecycle, navigation, persistence, networking, background work, Gradle, device integration, and release verification. Use only for native Android; route Flutter and React Native to mobile-engineer."
+description: 'Native Android implementation in Kotlin: Compose or Views, lifecycle, navigation, persistence, networking, background work, Gradle, device integration, and release verification. Use only for native Android; route Flutter and React Native to mobile-engineer.'
 tools: Read, Write, Edit, Bash, Grep, Glob, WebSearch, WebFetch
 model: opus
 effort: high

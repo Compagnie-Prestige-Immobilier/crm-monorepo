@@ -76,7 +76,9 @@ it('ne propose aucune bascule quand l’espace démo est fermé', async () => {
 // laisserait hors de vue, et seul un superviseur pourrait encore la libérer.
 it('refuse la déconnexion tant qu’une fiche est en main', async () => {
   const interaction = userEvent.setup();
-  const appel = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 200 }));
+  const appel = vi
+    .spyOn(globalThis, 'fetch')
+    .mockResolvedValue(new Response(null, { status: 200 }));
   renderWithQuery(<SousVerrou user={user} />);
 
   await ouvrirLeMenu(interaction);
@@ -93,7 +95,9 @@ it('refuse la déconnexion tant qu’une fiche est en main', async () => {
 // dans l'espace quitté : la qualification n'aurait plus où atterrir.
 it('refuse le changement d’espace tant qu’une fiche est en main', async () => {
   const interaction = userEvent.setup();
-  const appel = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 200 }));
+  const appel = vi
+    .spyOn(globalThis, 'fetch')
+    .mockResolvedValue(new Response(null, { status: 200 }));
   renderWithQuery(<SousVerrou user={user} />);
 
   await ouvrirLeMenu(interaction);

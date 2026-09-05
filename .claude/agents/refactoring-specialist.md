@@ -1,6 +1,6 @@
 ---
 name: refactoring-specialist
-description: "Behavior-preserving restructuring, dependency untangling, dead-code removal, and safe codemods. Use when the requested outcome is a cleaner implementation with unchanged product behavior; not for feature work, architecture redesign, or an unexplained defect. Runs in an isolated worktree."
+description: 'Behavior-preserving restructuring, dependency untangling, dead-code removal, and safe codemods. Use when the requested outcome is a cleaner implementation with unchanged product behavior; not for feature work, architecture redesign, or an unexplained defect. Runs in an isolated worktree.'
 tools: Read, Write, Edit, Bash, Grep, Glob, WebSearch, WebFetch
 model: opus
 effort: high

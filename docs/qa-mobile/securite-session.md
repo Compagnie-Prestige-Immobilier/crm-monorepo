@@ -7,19 +7,19 @@ Méthode : lecture de code, appels HTTP réels contre `http://localhost:3001`. A
 
 ## Synthèse
 
-| Id | Sévérité | Composant | Titre |
-|---|---|---|---|
-| SEC-01 | bloquant | `features/auth` + base locale | La déconnexion ne purge pas la base : les fiches d'un commercial restent lisibles et sa file part sous l'identité du suivant |
-| SEC-02 | majeur | `features/auth` + `core/router` | Le rôle n'est jamais réévalué après la connexion : la surveillance de rétrogradation est morte |
-| SEC-03 | majeur | `android/app/build.gradle.kts` | Une release se signe avec la clé de debug publique quand `key.properties` manque |
-| SEC-04 | majeur | `core/network/auth_interceptor.dart` | Une réponse de renouvellement perdue après rotation révoque toute la famille : déconnexion en plein terrain |
-| SEC-05 | majeur | `api/modules/auth` | `POST /auth/workspace` laisse la famille précédente vivante : « Se déconnecter » ne ferme pas tout |
-| SEC-06 | mineur | `core/updates` | L'empreinte de signataire attendue vient du même canal que l'APK : ce n'est pas un épinglage |
-| SEC-07 | mineur | `api/modules/auth` | Le jeton d'accès survit à la déconnexion pendant tout son TTL (4 h ici) |
-| SEC-08 | mineur | `core/updates` + API | Le plancher de version n'est appliqué que par le client ; aucun contrôle serveur |
-| SEC-09 | mineur | `features/shell/projects.dart` | Le garde de projet est défaillant-ouvert : un rôle inconnu entre dans le CHUES |
-| SEC-10 | mineur | `features/phase2` | Notes vocales orphelines jamais purgées, ni à l'échec définitif ni à la déconnexion |
-| SEC-11 | mineur | Android | Aucun `FLAG_SECURE` : capture d'écran et vignette « Récents » sur des écrans nominatifs |
+| Id     | Sévérité | Composant                            | Titre                                                                                                                        |
+| ------ | -------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| SEC-01 | bloquant | `features/auth` + base locale        | La déconnexion ne purge pas la base : les fiches d'un commercial restent lisibles et sa file part sous l'identité du suivant |
+| SEC-02 | majeur   | `features/auth` + `core/router`      | Le rôle n'est jamais réévalué après la connexion : la surveillance de rétrogradation est morte                               |
+| SEC-03 | majeur   | `android/app/build.gradle.kts`       | Une release se signe avec la clé de debug publique quand `key.properties` manque                                             |
+| SEC-04 | majeur   | `core/network/auth_interceptor.dart` | Une réponse de renouvellement perdue après rotation révoque toute la famille : déconnexion en plein terrain                  |
+| SEC-05 | majeur   | `api/modules/auth`                   | `POST /auth/workspace` laisse la famille précédente vivante : « Se déconnecter » ne ferme pas tout                           |
+| SEC-06 | mineur   | `core/updates`                       | L'empreinte de signataire attendue vient du même canal que l'APK : ce n'est pas un épinglage                                 |
+| SEC-07 | mineur   | `api/modules/auth`                   | Le jeton d'accès survit à la déconnexion pendant tout son TTL (4 h ici)                                                      |
+| SEC-08 | mineur   | `core/updates` + API                 | Le plancher de version n'est appliqué que par le client ; aucun contrôle serveur                                             |
+| SEC-09 | mineur   | `features/shell/projects.dart`       | Le garde de projet est défaillant-ouvert : un rôle inconnu entre dans le CHUES                                               |
+| SEC-10 | mineur   | `features/phase2`                    | Notes vocales orphelines jamais purgées, ni à l'échec définitif ni à la déconnexion                                          |
+| SEC-11 | mineur   | Android                              | Aucun `FLAG_SECURE` : capture d'écran et vignette « Récents » sur des écrans nominatifs                                      |
 
 ## SEC-01 (bloquant) : la déconnexion ne purge pas la base locale
 
@@ -28,6 +28,7 @@ Méthode : lecture de code, appels HTTP réels contre `http://localhost:3001`. A
 **Attendu.** Aucune donnée personnelle de la session précédente ne survit à la déconnexion ; aucune saisie en file ne peut être imputée au compte suivant.
 
 **Observé.**
+
 1. Fatou voit dans « Historique », « Registre », « Rappels » et « À corriger » les fiches d'Awa : noms, prénoms, téléphones E.164, commentaires.
 2. Les lignes d'outbox d'Awa restent `pending` et repartent avec le jeton de Fatou. Les créations sont enregistrées côté serveur au nom de Fatou ; les mises à jour sont refusées et retombent dans « À corriger » de Fatou, en lui montrant les données d'Awa.
 

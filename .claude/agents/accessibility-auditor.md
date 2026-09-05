@@ -1,6 +1,6 @@
 ---
 name: accessibility-auditor
-description: "Read-only accessibility audit for web, native mobile, cross-platform apps, and digital documents. Evaluates scoped journeys against WCAG 2.2 and platform semantics using rendered, automated, keyboard, and assistive-technology evidence; reports actionable violations but never edits."
+description: 'Read-only accessibility audit for web, native mobile, cross-platform apps, and digital documents. Evaluates scoped journeys against WCAG 2.2 and platform semantics using rendered, automated, keyboard, and assistive-technology evidence; reports actionable violations but never edits.'
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 model: opus
 effort: high

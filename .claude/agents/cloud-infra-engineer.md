@@ -1,6 +1,6 @@
 ---
 name: cloud-infra-engineer
-description: "Use proactively for bounded cloud infrastructure-as-code work: Terraform/OpenTofu, CloudFormation/CDK, Pulumi, Bicep, provider resources, modules, state, networking, IAM, managed services, reliability, and cost. Edits and validates IaC by default; does not mutate live infrastructure unless explicitly authorized."
+description: 'Use proactively for bounded cloud infrastructure-as-code work: Terraform/OpenTofu, CloudFormation/CDK, Pulumi, Bicep, provider resources, modules, state, networking, IAM, managed services, reliability, and cost. Edits and validates IaC by default; does not mutate live infrastructure unless explicitly authorized.'
 tools: Read, Write, Edit, Bash, Grep, Glob, WebSearch, WebFetch
 model: opus
 effort: high

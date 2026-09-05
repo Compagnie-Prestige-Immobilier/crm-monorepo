@@ -11,3 +11,16 @@
 # franchit la frontière serveur → navigateur autrement que par un cookie
 # httpOnly.
 apps/web/src/app/api/auth/auth-routes.test.ts:generic-api-key:16
+
+# Les deux mots de passe des comptes `fixture.*`, cites dans les cahiers E2E
+# parce que l'ecart entre eux fait echouer toutes les specs de role d'un bloc.
+# `packages/database/src/seed.ts:390` refuse de creer ces comptes quand
+# NODE_ENV vaut production : ils n'existent que dans une base de developpement.
+# Les trois fichiers E2E-*.md ont ete supprimes depuis, l'empreinte porte sur
+# le commit qui les a introduits.
+419e58d241e5c58fff6036ab80f463dc4516eb9e:E2E-admin.md:generic-api-key:150
+419e58d241e5c58fff6036ab80f463dc4516eb9e:E2E-admin.md:generic-api-key:154
+419e58d241e5c58fff6036ab80f463dc4516eb9e:E2E-chues.md:generic-api-key:98
+419e58d241e5c58fff6036ab80f463dc4516eb9e:E2E-accueil.md:generic-api-key:99
+419e58d241e5c58fff6036ab80f463dc4516eb9e:E2E.md:generic-api-key:130
+0734a4b1be8cd0a5113d1ab7bff2c5295453dd70:apps/web/e2e/fixtures.ts:generic-api-key:44

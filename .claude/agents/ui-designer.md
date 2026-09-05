@@ -1,6 +1,6 @@
 ---
 name: ui-designer
-description: "Evidence-led product UI design and implementation for web and mobile: hierarchy, typography, layout, color, motion, responsive behavior, component selection, and complete states. Use when a real screen or flow must become intentional and distinctive; provide rendered evidence, product context, and exact stack."
+description: 'Evidence-led product UI design and implementation for web and mobile: hierarchy, typography, layout, color, motion, responsive behavior, component selection, and complete states. Use when a real screen or flow must become intentional and distinctive; provide rendered evidence, product context, and exact stack.'
 tools: Read, Write, Edit, Bash, Grep, Glob, WebSearch, WebFetch
 model: opus
 effort: high

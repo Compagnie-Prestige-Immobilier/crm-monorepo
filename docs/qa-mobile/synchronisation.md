@@ -23,15 +23,15 @@ fois SYN-01 à SYN-07 corrigés.
 
 ## Synthèse
 
-| Réf | Sévérité | Composant | Titre |
-| --- | --- | --- | --- |
-| SYN-01 | bloquant | `sync_engine.dart`, `write_repository.dart` | La clé d'idempotence d'un lot est rejouée sur un contenu différent : refus 422 définitif de toutes les saisies concernées |
-| SYN-02 | majeur | `auth_controller.dart`, `sync_engine.dart` | Le curseur keyset survit à la déconnexion : le commercial suivant ne reçoit JAMAIS son portefeuille (complément de SEC-01, même racine) |
-| SYN-03 | majeur | `sync_engine.dart` (`_applyPage`) | Un représentant rendu vivant par le serveur reste marqué supprimé sur le téléphone, pour toujours |
-| SYN-04 | majeur | `sync_engine.dart` (`_applyPage`) | Une suppression serveur arrivée pendant qu'une saisie attend est écartée, et le curseur avance quand même |
-| SYN-05 | majeur | `sync_engine.dart` (`_sendRepCallAttempts`) | Un représentant supprimé côté serveur fait basculer en échec toutes les tentatives d'appel suivantes du lot |
-| SYN-06 | majeur | `sync_engine.dart` (`remapEntityId`) | La fusion d'un doublon de représentant efface définitivement son fil de commentaires local |
-| SYN-07 | majeur | `sync_engine.dart` (`runOnce`) | Un envoi qui échoue en boucle empêche DÉFINITIVEMENT tout tirage |
+| Réf    | Sévérité | Composant                                   | Titre                                                                                                                                   |
+| ------ | -------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| SYN-01 | bloquant | `sync_engine.dart`, `write_repository.dart` | La clé d'idempotence d'un lot est rejouée sur un contenu différent : refus 422 définitif de toutes les saisies concernées               |
+| SYN-02 | majeur   | `auth_controller.dart`, `sync_engine.dart`  | Le curseur keyset survit à la déconnexion : le commercial suivant ne reçoit JAMAIS son portefeuille (complément de SEC-01, même racine) |
+| SYN-03 | majeur   | `sync_engine.dart` (`_applyPage`)           | Un représentant rendu vivant par le serveur reste marqué supprimé sur le téléphone, pour toujours                                       |
+| SYN-04 | majeur   | `sync_engine.dart` (`_applyPage`)           | Une suppression serveur arrivée pendant qu'une saisie attend est écartée, et le curseur avance quand même                               |
+| SYN-05 | majeur   | `sync_engine.dart` (`_sendRepCallAttempts`) | Un représentant supprimé côté serveur fait basculer en échec toutes les tentatives d'appel suivantes du lot                             |
+| SYN-06 | majeur   | `sync_engine.dart` (`remapEntityId`)        | La fusion d'un doublon de représentant efface définitivement son fil de commentaires local                                              |
+| SYN-07 | majeur   | `sync_engine.dart` (`runOnce`)              | Un envoi qui échoue en boucle empêche DÉFINITIVEMENT tout tirage                                                                        |
 
 ## SYN-01, bloquant : clé d'idempotence rejouée sur un contenu différent
 
@@ -109,15 +109,15 @@ HTTP 200   (rejeu du cache d'idempotence, résultats identiques)
 
 Preuve côté client, `apps/mobile/test/qa/qa_sync_preuves.dart` :
 
-* « un renvoi partiel garde le batchId du lot complet » : ÉCHOUE.
+- « un renvoi partiel garde le batchId du lot complet » : ÉCHOUE.
   `Expected: not '01a0532f-5f96-...' / Actual: '01a0532f-5f96-...'`, avec
   `api.calls[1].operations` de longueur 1 contre 3 au premier envoi.
-* « Réessayer depuis À corriger garde aussi le batchId » : ÉCHOUE.
+- « Réessayer depuis À corriger garde aussi le batchId » : ÉCHOUE.
   `Expected: null / Actual: '01a0532f-5fe1-...'`.
-* « un 422 de clé réutilisée est classé terminal » : PASSE, et c'est le
+- « un 422 de clé réutilisée est classé terminal » : PASSE, et c'est le
   problème (`DioApi.classify` rend `FailureKind.terminal`,
   `rejectedOperations` vide).
-* « un refus terminal anonyme condamne TOUT le lot » : PASSE, les deux lignes
+- « un refus terminal anonyme condamne TOUT le lot » : PASSE, les deux lignes
   finissent en `failed`.
 
 ### Cause
@@ -257,10 +257,10 @@ localUpdatedAt`. Aucun `deletedAt`.
 
 Tests `qa_sync_preuves.dart` :
 
-* « le pull ne rouvre pas un représentant marqué supprimé » : ÉCHOUE,
+- « le pull ne rouvre pas un représentant marqué supprimé » : ÉCHOUE,
   `Expected: null / Actual: DateTime:<2026-08-12 09:00:00.000Z>`, alors que
   `rev` vaut bien 9.
-* « le prospect, lui, est bien rouvert par le même chemin » : PASSE. L'asymétrie
+- « le prospect, lui, est bien rouvert par le même chemin » : PASSE. L'asymétrie
   est le défaut.
 
 ### Cause
@@ -495,39 +495,39 @@ plutôt qu'un seul.
 
 ## Vérifié sans défaut
 
-* **Idempotence par opération côté serveur.** `sync_operations` avec
+- **Idempotence par opération côté serveur.** `sync_operations` avec
   `ON CONFLICT ("opId") DO NOTHING` (`sync.service.ts:1287`) : un `opId` déjà
   appliqué rend `duplicate`, jamais une seconde écriture. Rejeu exact d'un lot :
   HTTP 200 et résultats identiques (envoi 3 du script `syn01.sh`).
-* **Rejeu exact d'une clé d'idempotence.** Le cache rend la réponse d'origine
+- **Rejeu exact d'une clé d'idempotence.** Le cache rend la réponse d'origine
   sans réécrire, en-tête `Idempotency-Replayed` compris.
-* **Idempotence des tentatives d'appel représentant.** Déduplication par `id`
+- **Idempotence des tentatives d'appel représentant.** Déduplication par `id`
   client (`rep-campaigns.service.ts:37`), statut `DUPLICATE`.
-* **Bail et jeton de possession de l'outbox.** Toutes les écritures
+- **Bail et jeton de possession de l'outbox.** Toutes les écritures
   d'après-envoi sont fenêtrées sur `seq` ET `claim_token` (`_ownedBy`,
   `sync_engine.dart:175`) ; `reclaimExpiredLeases` ne reprend que les baux
   expirés.
-* **Réparation de dérive d'horloge.** `repairClockDrift`
+- **Réparation de dérive d'horloge.** `repairClockDrift`
   (`sync_engine.dart:224`) ramène un `next_attempt_at` ou un `lease_until`
   aberrant, ce qui couvre un téléphone remis à l'heure en arrière.
-* **Chaîne empoisonnée.** `claimableOutbox` (`schema.drift:720`) exclut en SQL
+- **Chaîne empoisonnée.** `claimableOutbox` (`schema.drift:720`) exclut en SQL
   les lignes dont un prédécesseur de même `dependency_key` est `conflict` ou
   `failed` : l'ordre créer-puis-modifier survit, et le travail plus loin dans la
   file reste visible.
-* **Palier de schéma 20.** `schemaVersion` est bien passé de 19 à 20, le dump
+- **Palier de schéma 20.** `schemaVersion` est bien passé de 19 à 20, le dump
   doré existe, et `flutter test` rend « All tests passed! » sur 1058 tests, dont
   `v19 -> v20 supprime les tables de campagne et garde les saisies` et
   `v11 -> courant traverse sans créer les tables de campagne`. Aucun défaut de
   migration constaté sur les chemins couverts.
-* **Version de format 5.** Le client annonce `payloadVersion = 5`
+- **Version de format 5.** Le client annonce `payloadVersion = 5`
   (`sync_engine.dart:59`) et le serveur exige `MIN_PULL_PAYLOAD_VERSION = 5`
   (`sync.controller.ts:29`) : la bascule est cohérente, et un client plus ancien
   reçoit `426 APP_UPDATE_REQUIRED`, que `DioApi.classify` traduit en
   `FailureKind.appUpdateRequired` sans user la file.
-* **Retrait des campagnes.** `SyncChangesDto` n'expose plus `callCampaigns`,
+- **Retrait des campagnes.** `SyncChangesDto` n'expose plus `callCampaigns`,
   `callTasks`, `repCallCampaigns`, `repCallTasks` ni côté serveur, ni dans
   `packages/api-client-dart` : le retrait est cohérent de bout en bout.
-* **Ce que protégeaient les deux tests supprimés.** `sync_generations_test.dart`
+- **Ce que protégeaient les deux tests supprimés.** `sync_generations_test.dart`
   couvrait le miroir des référentiels et le retrait des lignes fantômes :
   `mirrorReferentiels`, `_mirrorKind` et `_retireShadowed` sont toujours en
   place, et `sync_engine_test.dart` en garde des cas. Les seuls cas orphelins
@@ -535,14 +535,14 @@ plutôt qu'un seul.
 
 ## Non vérifié
 
-* **Taille et tenue de la base au-delà de 10 000 lignes** : demande un émulateur,
+- **Taille et tenue de la base au-delà de 10 000 lignes** : demande un émulateur,
   occupé par un autre testeur.
-* **Deux isolats réellement concurrents sur le même fichier de base**
+- **Deux isolats réellement concurrents sur le même fichier de base**
   (WorkManager plus interface). Le test supprimé `sync_ownership_test.dart`
   couvrait ces entrelacements ; je n'ai pas rejoué sa matrice, faute de temps.
   À reprendre en priorité, c'est le seul endroit du moteur où le garde
   `_draining` ne protège rien.
-* **Migrations exécutées avec les pragmas de PRODUCTION.** `connection.dart:10`
+- **Migrations exécutées avec les pragmas de PRODUCTION.** `connection.dart:10`
   branche `AppDatabase.applyPragmas`, donc `PRAGMA foreign_keys = ON` pendant
   `onUpgrade` ; `migration_test.dart` ouvre ses bases sans ce `setup`, donc
   clés étrangères DÉSACTIVÉES. La chaîne actuelle ne recrée aucune table PARENT
@@ -550,15 +550,15 @@ plutôt qu'un seul.
   et je ne compte pas ceci comme un défaut. C'est un angle mort du test doré :
   la première recopie future de `prospects` viderait `prospect_journeys` en
   production sans que le test s'en aperçoive.
-* **Horloge locale en avance.** `clientDate` (`sync.service.ts:1385`) ne borne
+- **Horloge locale en avance.** `clientDate` (`sync.service.ts:1385`) ne borne
   pas `clientCreatedAt`, et les listes du téléphone trient sur
   `client_created_at DESC` : un téléphone en avance épinglerait sa fiche en tête
   de liste. Effet cosmétique constaté par lecture, non reproduit.
-* **Résurrection d'un prospect supprimé par une modification hors ligne**
+- **Résurrection d'un prospect supprimé par une modification hors ligne**
   (`sync.service.ts:912`, `deletedAt: null`, sans `assertRev`). Comportement
   serveur possiblement voulu ; je n'ai pas trouvé de décision écrite et je ne
   l'ai donc pas compté.
-* **Troncature de champs, encodage des numéros, notes vocales** : non éprouvés.
+- **Troncature de champs, encodage des numéros, notes vocales** : non éprouvés.
 
 ## Commandes exécutées
 

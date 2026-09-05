@@ -27,14 +27,13 @@ vi.mock('@/lib/data/statuts-qualification', async () => {
 const { StatutsQualificationView } =
   await import('@/components/referentiels/statuts-qualification-view');
 
-const statut = (
-  patch: Partial<StatutQualification> & { requiresComment?: boolean },
-): StatutQualification => ({
+const statut = (patch: Partial<StatutQualification>): StatutQualification => ({
   id: 's-1',
   code: 'TRES_INTERESSE',
   label: 'Très intéressé',
   effect: 'REACHED',
   requiresCallback: false,
+  requiresComment: false,
   retryAfterMinutes: null,
   priorite: 'HAUTE',
   relationStatus: 'AMBASSADEUR',

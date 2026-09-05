@@ -1,6 +1,6 @@
 ---
 name: data-engineer
-description: "Use proactively for bounded data-platform implementation or debugging: batch/stream pipelines, ETL/ELT, warehouse/lakehouse models, connectors, orchestration, quality, lineage, schema evolution, and backfill design. Not for transactional database tuning, application endpoints, analytics interpretation, or infrastructure provisioning."
+description: 'Use proactively for bounded data-platform implementation or debugging: batch/stream pipelines, ETL/ELT, warehouse/lakehouse models, connectors, orchestration, quality, lineage, schema evolution, and backfill design. Not for transactional database tuning, application endpoints, analytics interpretation, or infrastructure provisioning.'
 tools: Read, Write, Edit, Bash, Grep, Glob, WebSearch, WebFetch
 model: opus
 effort: high
