@@ -934,6 +934,13 @@ describe('ConsoleView : fiche déjà close', () => {
 });
 
 describe('ConsoleView : raccourcis annexes', () => {
+  const CONSULTEE = prospect({
+    id: 'p-7',
+    nom: 'Consultee',
+    prenom: 'Fiche',
+    phase2Status: 'REFUSED',
+  });
+
   it('copie le numéro sur C, sans le faire retaper', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
@@ -945,7 +952,7 @@ describe('ConsoleView : raccourcis annexes', () => {
   });
 
   it('ouvre la création de prospect sur le représentant courant', async () => {
-    await renderConsole();
+    await renderConsole([CONSULTEE]);
 
     await userEvent.keyboard('n');
 
@@ -953,11 +960,23 @@ describe('ConsoleView : raccourcis annexes', () => {
   });
 
   it('ouvre la fiche du représentant', async () => {
-    await renderConsole();
+    await renderConsole([CONSULTEE]);
 
     await userEvent.keyboard('r');
 
     expect(routerMock.push).toHaveBeenCalledWith('/chues/representants/r-9');
+  });
+
+  // EB-08 : le verrou ne tient que s'il tient AUSSI les navigations lancées par
+  // le code, qu'aucun écouteur de clic ni de popstate ne voit passer.
+  it('retient N et R tant que la fiche ouverte n’a pas d’issue', async () => {
+    await renderConsole();
+
+    await userEvent.keyboard('n');
+    await userEvent.keyboard('r');
+
+    expect(routerMock.push).not.toHaveBeenCalled();
+    expect(toastError).toHaveBeenLastCalledWith('Consignez l’appel avant de quitter cette fiche.');
   });
 
   it('garde la carte clavier repliée, dépliable sur ?, sans ↑ ↓ ni Espace', async () => {
