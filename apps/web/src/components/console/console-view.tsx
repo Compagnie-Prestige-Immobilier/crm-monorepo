@@ -501,11 +501,15 @@ function Consignation({
       // ferait refuser toute écriture postérieure. Le dossier passe par lui et
       // non par la tentative : incomplet, le serveur la refuserait en 400.
       if (draft.outcome === 'CALLBACK' && ouverture !== null) {
-        await enregistrerBrouillon(ouverture.id, brouillonDe(draft.comment, conversion)).catch(
-          () => {
-            toast.error('Les réponses saisies n’ont pas pu être conservées. L’appel, lui, part.');
-          },
-        );
+        // La borne vient d'ici et non de l'horloge du serveur : la base exige
+        // qu'elle suive `openedAt`, qui est l'heure de ce navigateur.
+        await enregistrerBrouillon(
+          ouverture.id,
+          brouillonDe(draft.comment, conversion),
+          departChrono ?? new Date().toISOString(),
+        ).catch(() => {
+          toast.error('Les réponses saisies n’ont pas pu être conservées. L’appel, lui, part.');
+        });
       }
       return pushCallAttempt(newAttemptInput(prospect.id, draft));
     },

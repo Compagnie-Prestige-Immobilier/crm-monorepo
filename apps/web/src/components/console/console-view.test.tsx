@@ -1095,7 +1095,11 @@ describe('ConsoleView : l’ouverture confirmée d’une fiche', () => {
     await waitFor(() => {
       expect(pushCallAttempt).toHaveBeenCalledTimes(1);
     });
-    expect(enregistrerBrouillon).toHaveBeenCalledWith('ouv-1', { comment: 'il est en réunion' });
+    expect(enregistrerBrouillon).toHaveBeenCalledWith(
+      'ouv-1',
+      { comment: 'il est en réunion' },
+      expect.stringMatching(/^\d{4}-/u) as unknown,
+    );
   });
 
   // Le scénario littéral d'EB-10 : occupé EN COURS DE SAISIE du dossier.
@@ -1119,13 +1123,17 @@ describe('ConsoleView : l’ouverture confirmée d’une fiche', () => {
     await waitFor(() => {
       expect(pushCallAttempt).toHaveBeenCalledTimes(1);
     });
-    expect(enregistrerBrouillon).toHaveBeenCalledWith('ouv-1', {
-      comment: 'il rappelle après 17 h',
-      conversion: expect.objectContaining({
-        profession: 'Instituteur',
-        dureeEtablissementMois: '36',
-      }) as unknown,
-    });
+    expect(enregistrerBrouillon).toHaveBeenCalledWith(
+      'ouv-1',
+      {
+        comment: 'il rappelle après 17 h',
+        conversion: expect.objectContaining({
+          profession: 'Instituteur',
+          dureeEtablissementMois: '36',
+        }) as unknown,
+      },
+      expect.stringMatching(/^\d{4}-/u) as unknown,
+    );
     // Le dossier incomplet ne voyage PAS dans la tentative : le serveur la refuserait.
     expect(lastDraft().outcome).toBe('CALLBACK');
     expect(lastDraft().conversion).toBeUndefined();
