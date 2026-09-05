@@ -84,6 +84,7 @@ import {
   type UpdateWorkShifts,
   type WorkShifts,
 } from '@/lib/data/admin';
+import { fetchComptageOuvertures } from '@/lib/data/ouvertures';
 import { downloadCsv } from '@/lib/csv';
 import { formatDecimal, formatNumber, formatRateOrNone, formatShortDate } from '@/lib/format';
 import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
@@ -322,6 +323,8 @@ export function ActivityView({ projet }: { projet: Projet }) {
 
       <ShiftComparison range={range} granularity={granularity} projet={projet} famille={famille} />
 
+      <FichesOuvertes range={range} />
+
       <ScoreSection scores={data.scores} />
 
       <Card>
@@ -424,6 +427,61 @@ export function ActivityView({ projet }: { projet: Projet }) {
         </Card>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * Section à part, et non une colonne du tableau d'activité : une ouverture ne
+ * suit pas la famille d'appel, et son compte se lit par jour, pas par période.
+ */
+function FichesOuvertes({ range }: { range: ActivityRange }) {
+  const comptage = useQuery({
+    queryKey: ['ouvertures', 'comptage', range.from, range.to] as const,
+    queryFn: () => fetchComptageOuvertures({ from: range.from, to: range.to }),
+  });
+
+  if (comptage.isPending) return <Skeleton className="h-40 w-full" />;
+  if (comptage.isError) return null;
+
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <Table>
+          <caption className="px-3 py-3 text-left font-display text-[1.0625rem] font-[700] tracking-[-0.02em]">
+            Fiches ouvertes, par téléconseiller et par jour
+          </caption>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead>Téléconseiller</TableHead>
+              <TableHead>Jour</TableHead>
+              <TableHead className="text-right">Fiches ouvertes</TableHead>
+              <TableHead className="text-right">Durée moyenne</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {comptage.data.map((ligne) => (
+              <TableRow key={`${ligne.openedById}-${ligne.jour}`}>
+                <TableCell className="font-[600]">{ligne.openedByName}</TableCell>
+                <TableCell>{formatShortDate(ligne.jour)}</TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {formatNumber(ligne.ouvertures)}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {formatDuration(ligne.dureeMoyenneSecondes)}
+                </TableCell>
+              </TableRow>
+            ))}
+            {comptage.data.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} className="py-8 text-center">
+                  Aucune fiche ouverte sur la période. Élargissez les dates.
+                </TableCell>
+              </TableRow>
+            ) : null}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   );
 }
 
