@@ -15,6 +15,10 @@ abstract class _$LotExportDistributionInputDtoCWProxy {
 
   LotExportDistributionInputDto jours(num? jours);
 
+  LotExportDistributionInputDto objectifs(
+    List<LotExportObjectifDto>? objectifs,
+  );
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `LotExportDistributionInputDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -25,6 +29,7 @@ abstract class _$LotExportDistributionInputDtoCWProxy {
     List<String> teleconseillerIds,
     num? fichesParJour,
     num? jours,
+    List<LotExportObjectifDto>? objectifs,
   });
 }
 
@@ -48,6 +53,11 @@ class _$LotExportDistributionInputDtoCWProxyImpl
   LotExportDistributionInputDto jours(num? jours) => this(jours: jours);
 
   @override
+  LotExportDistributionInputDto objectifs(
+    List<LotExportObjectifDto>? objectifs,
+  ) => this(objectifs: objectifs);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `LotExportDistributionInputDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -58,6 +68,7 @@ class _$LotExportDistributionInputDtoCWProxyImpl
     Object? teleconseillerIds = const $CopyWithPlaceholder(),
     Object? fichesParJour = const $CopyWithPlaceholder(),
     Object? jours = const $CopyWithPlaceholder(),
+    Object? objectifs = const $CopyWithPlaceholder(),
   }) {
     return LotExportDistributionInputDto(
       teleconseillerIds: teleconseillerIds == const $CopyWithPlaceholder()
@@ -72,6 +83,10 @@ class _$LotExportDistributionInputDtoCWProxyImpl
           ? _value.jours
           // ignore: cast_nullable_to_non_nullable
           : jours as num?,
+      objectifs: objectifs == const $CopyWithPlaceholder()
+          ? _value.objectifs
+          // ignore: cast_nullable_to_non_nullable
+          : objectifs as List<LotExportObjectifDto>?,
     );
   }
 }
@@ -99,6 +114,12 @@ LotExportDistributionInputDto _$LotExportDistributionInputDtoFromJson(
     ),
     fichesParJour: $checkedConvert('fichesParJour', (v) => v as num? ?? 50),
     jours: $checkedConvert('jours', (v) => v as num? ?? 1),
+    objectifs: $checkedConvert(
+      'objectifs',
+      (v) => (v as List<dynamic>?)
+          ?.map((e) => LotExportObjectifDto.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    ),
   );
   return val;
 });
@@ -109,4 +130,6 @@ Map<String, dynamic> _$LotExportDistributionInputDtoToJson(
   'teleconseillerIds': instance.teleconseillerIds,
   if (instance.fichesParJour case final value?) 'fichesParJour': value,
   if (instance.jours case final value?) 'jours': value,
+  if (instance.objectifs?.map((e) => e.toJson()).toList() case final value?)
+    'objectifs': value,
 };

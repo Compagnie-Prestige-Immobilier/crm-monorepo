@@ -23,6 +23,8 @@ class LotExportPerformanceDto {
 
     required this.teleconseillerName,
 
+    required this.objectif,
+
     required this.assigned,
 
     required this.treated,
@@ -39,6 +41,9 @@ class LotExportPerformanceDto {
 
   @JsonKey(name: r'teleconseillerName', required: true, includeIfNull: false)
   final String teleconseillerName;
+
+  @JsonKey(name: r'objectif', required: true, includeIfNull: false)
+  final num objectif;
 
   @JsonKey(name: r'assigned', required: true, includeIfNull: false)
   final num assigned;
@@ -67,6 +72,7 @@ class LotExportPerformanceDto {
               [
                 teleconseillerId,
                 teleconseillerName,
+                objectif,
                 assigned,
                 treated,
                 completionRate,
@@ -76,6 +82,7 @@ class LotExportPerformanceDto {
               [
                 other.teleconseillerId,
                 other.teleconseillerName,
+                other.objectif,
                 other.assigned,
                 other.treated,
                 other.completionRate,
@@ -91,6 +98,7 @@ class LotExportPerformanceDto {
       mapPropsToHashCode([
         teleconseillerId,
         teleconseillerName,
+        objectif,
         assigned,
         treated,
         completionRate,
