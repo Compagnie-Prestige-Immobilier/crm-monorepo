@@ -287,6 +287,8 @@ async function seedStatutsQualification(): Promise<void> {
         label: statut.label,
         effect: statut.effect,
         requiresCallback: statut.requiresCallback,
+        requiresComment: statut.requiresComment,
+        retryAfterMinutes: statut.retryAfterMinutes,
         priorite: statut.priorite,
         relationStatus: statut.relationStatus,
         sortOrder: statut.sortOrder,
