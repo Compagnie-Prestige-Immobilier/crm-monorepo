@@ -158,7 +158,7 @@ it('refuse la déconnexion depuis une page tierce, fiche tenue sur le serveur', 
     .spyOn(globalThis, 'fetch')
     .mockResolvedValue(new Response(null, { status: 200 }));
   fetchOuvertureCourante.mockResolvedValue(ouverture());
-  renderWithQuery(<UserMenu user={user} />);
+  renderWithQuery(<UserMenu user={user} demoEnabled={false} />);
 
   await ouvrirLeMenu(interaction);
   await interaction.click(await screen.findByRole('menuitem', { name: 'Se déconnecter' }));
@@ -173,7 +173,7 @@ it('refuse la déconnexion depuis une page tierce, fiche tenue sur le serveur', 
 it('mène à la fiche tenue plutôt que de laisser chercher', async () => {
   const interaction = userEvent.setup();
   fetchOuvertureCourante.mockResolvedValue(ouverture({ ficheNom: 'Neuve Fiche' }));
-  renderWithQuery(<UserMenu user={user} />);
+  renderWithQuery(<UserMenu user={user} demoEnabled={false} />);
 
   await ouvrirLeMenu(interaction);
 
@@ -188,7 +188,7 @@ it('mène au script quand la fiche tenue est un représentant', async () => {
   fetchOuvertureCourante.mockResolvedValue(
     ouverture({ prospectId: null, representantId: 'r-1', ficheNom: 'Aminata Ndiaye' }),
   );
-  renderWithQuery(<UserMenu user={user} />);
+  renderWithQuery(<UserMenu user={user} demoEnabled={false} />);
 
   await ouvrirLeMenu(interaction);
 
@@ -201,7 +201,9 @@ it('mène au script quand la fiche tenue est un représentant', async () => {
 // Ni la banque ni l'accueil ne peuvent ouvrir une fiche : leur demander la
 // sienne à chaque chargement de page serait une requête pour rien.
 it('ne demande pas d’ouverture aux rôles qui n’en tiennent jamais', async () => {
-  renderWithQuery(<UserMenu user={{ ...user, role: 'BANQUE_FINANCE' } as SessionUser} />);
+  renderWithQuery(
+    <UserMenu user={{ ...user, role: 'BANQUE_FINANCE' } as SessionUser} demoEnabled={false} />,
+  );
 
   await screen.findByRole('button', { name: 'Compte de Awa Fixture' });
 
