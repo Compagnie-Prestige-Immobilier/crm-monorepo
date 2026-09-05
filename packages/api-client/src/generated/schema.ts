@@ -3059,6 +3059,95 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/enrolement/{projet}/inscriptions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Les inscriptions lues sur la plateforme du projet. */
+    get: operations['listEnrolementInscriptions'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/enrolement/{projet}/inscriptions/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Une inscription, charge utile brute comprise. */
+    get: operations['getEnrolementInscription'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/enrolement/{projet}/indicateurs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Les indicateurs d’enrôlement du projet. */
+    get: operations['getEnrolementIndicateurs'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/enrolement/{projet}/reglages': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Fréquence, date de reprise et compte rendu du dernier tirage. */
+    get: operations['getEnrolementReglages'];
+    /** Change la fréquence de tirage ou la date de reprise. */
+    put: operations['putEnrolementReglages'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/enrolement/{projet}/tirage': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Tire la plateforme maintenant, sans attendre l’échéance.
+     * @description Le tirage est idempotent : une inscription déjà lue est mise à jour, jamais redéposée.
+     */
+    post: operations['postEnrolementTirage'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -6663,7 +6752,13 @@ export interface components {
       | 'methodes-d-adhesion'
       | 'par-banque'
       | 'delais-medians'
-      | 'rendement-par-departement';
+      | 'rendement-par-departement'
+      | 'enrolement-inscriptions'
+      | 'enrolement-taux-rapprochement'
+      | 'enrolement-taux-conversion'
+      | 'enrolement-par-jour'
+      | 'enrolement-par-etape'
+      | 'enrolement-par-teleconseiller';
     /** @enum {string} */
     DashboardMarque:
       | 'barres-verticales'
@@ -6953,6 +7048,143 @@ export interface components {
       distribution: components['schemas']['LotExportDistributionDto'];
       repartition: components['schemas']['LotExportRepartitionDto'][];
       performance: components['schemas']['LotExportPerformanceDto'][];
+    };
+    InscriptionPlateformeDto: {
+      /** Format: uuid */
+      id: string;
+      projet: components['schemas']['Projet'];
+      identifiantDistant: string;
+      nom: string;
+      prenom: string;
+      phoneE164: string | null;
+      email: string | null;
+      statutDistant: string;
+      etapeDistante: number | null;
+      /** Format: date-time */
+      inscriteLe: string | null;
+      /** Format: date-time */
+      soumiseLe: string | null;
+      /** Format: date-time */
+      decideeLe: string | null;
+      /**
+       * Format: date-time
+       * @description Date du tirage complet qui n’a plus trouvé cette inscription sur la plateforme.
+       */
+      disparueLe: string | null;
+      /** Format: uuid */
+      prospectId: string | null;
+      /** Format: date-time */
+      dernierTirageAt: string;
+    };
+    InscriptionsPageDto: {
+      items: components['schemas']['InscriptionPlateformeDto'][];
+      meta: components['schemas']['PageMetaDto'];
+    };
+    InscriptionPlateformeDetailDto: {
+      /** Format: uuid */
+      id: string;
+      projet: components['schemas']['Projet'];
+      identifiantDistant: string;
+      nom: string;
+      prenom: string;
+      phoneE164: string | null;
+      email: string | null;
+      statutDistant: string;
+      etapeDistante: number | null;
+      /** Format: date-time */
+      inscriteLe: string | null;
+      /** Format: date-time */
+      soumiseLe: string | null;
+      /** Format: date-time */
+      decideeLe: string | null;
+      /**
+       * Format: date-time
+       * @description Date du tirage complet qui n’a plus trouvé cette inscription sur la plateforme.
+       */
+      disparueLe: string | null;
+      /** Format: uuid */
+      prospectId: string | null;
+      /** Format: date-time */
+      dernierTirageAt: string;
+      chargeUtile: {
+        [key: string]: unknown;
+      };
+    };
+    SerieJourDto: {
+      /** Format: date */
+      jour: string;
+      inscriptions: number;
+    };
+    RepartitionDto: {
+      id: string;
+      label: string;
+      inscriptions: number;
+    };
+    DelaiMedianDto: {
+      leg: string;
+      label: string;
+      medianDays: number | null;
+      sample: number;
+    };
+    EnrolementIndicateursDto: {
+      projet: components['schemas']['Projet'];
+      inscriptions: number;
+      rapprochees: number;
+      /** @description Prospects convertis du projet qui se retrouvent inscrits. Null quand aucun prospect n’est converti. */
+      tauxConversion: number | null;
+      /** @description Part des inscriptions rapprochées d’un prospect. Null quand rien n’est inscrit. */
+      tauxRapprochement: number | null;
+      parJour: components['schemas']['SerieJourDto'][];
+      parEtape: components['schemas']['RepartitionDto'][];
+      delais: components['schemas']['DelaiMedianDto'][];
+      parTeleconseiller: components['schemas']['RepartitionDto'][];
+      parCampagne: components['schemas']['RepartitionDto'][];
+      parMethode: components['schemas']['RepartitionDto'][];
+    };
+    DernierTirageDto: {
+      /** Format: date-time */
+      termineLe: string;
+      dureeMs: number;
+      lus: number;
+      crees: number;
+      misAJour: number;
+      rapproches: number;
+      /** @description Inscriptions que la plateforme ne rend plus, marquées disparues par ce tirage. */
+      disparues: number;
+      erreur: string | null;
+    };
+    EnrolementReglagesDto: {
+      projet: components['schemas']['Projet'];
+      frequenceMinutes: number;
+      /**
+       * Format: date-time
+       * @description Ne garder que les inscriptions postérieures. Nulle, le tirage reprend tout l’historique.
+       */
+      repriseDepuis: string | null;
+      /** @description L’URL et le jeton de la plateforme sont posés dans l’environnement. */
+      configuree: boolean;
+      dernierTirage: components['schemas']['DernierTirageDto'] | null;
+      /** Format: date-time */
+      updatedAt: string | null;
+    };
+    UpdateEnrolementReglagesDto: {
+      /** @description Absente, la fréquence reste inchangée. À l’usine : 15 minutes. */
+      frequenceMinutes?: number;
+      /**
+       * Format: date-time
+       * @description Chaîne vide pour reprendre tout l’historique.
+       */
+      repriseDepuis?: string | null;
+    };
+    TirageDto: {
+      projet: components['schemas']['Projet'];
+      dureeMs: number;
+      lus: number;
+      crees: number;
+      misAJour: number;
+      rapproches: number;
+      disparues: number;
+      erreur: string | null;
     };
   };
   responses: never;
@@ -18307,6 +18539,383 @@ export interface operations {
         };
       };
       /** @description LOT_EXPORT_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listEnrolementInscriptions: {
+    parameters: {
+      query?: {
+        page?: number;
+        pageSize?: number;
+        /** @description Statut distant, tel que la plateforme le rend. */
+        statut?: string;
+        /** @description Recherche libre sur le nom, l’e-mail ou le téléphone. */
+        search?: string;
+        /** @description Borne basse sur la date d’inscription, incluse. */
+        dateFrom?: string;
+        /** @description Borne haute sur la date d’inscription, incluse. */
+        dateTo?: string;
+        /** @description Vrai : seulement les inscriptions rapprochées d’un prospect. Faux : seulement celles qui ne le sont pas. */
+        rapproche?: boolean;
+        /** @description Vrai : montrer aussi les inscriptions que la plateforme ne rend plus. Absente, elles sont masquées. */
+        inclureDisparues?: boolean;
+      };
+      header?: never;
+      path: {
+        projet: components['schemas']['Projet'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['InscriptionsPageDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Ressource introuvable, ou supprimée. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getEnrolementInscription: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projet: components['schemas']['Projet'];
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['InscriptionPlateformeDetailDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Ressource introuvable, ou supprimée. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getEnrolementIndicateurs: {
+    parameters: {
+      query?: {
+        page?: number;
+        pageSize?: number;
+        /** @description Statut distant, tel que la plateforme le rend. */
+        statut?: string;
+        /** @description Recherche libre sur le nom, l’e-mail ou le téléphone. */
+        search?: string;
+        /** @description Borne basse sur la date d’inscription, incluse. */
+        dateFrom?: string;
+        /** @description Borne haute sur la date d’inscription, incluse. */
+        dateTo?: string;
+        /** @description Vrai : seulement les inscriptions rapprochées d’un prospect. Faux : seulement celles qui ne le sont pas. */
+        rapproche?: boolean;
+        /** @description Vrai : montrer aussi les inscriptions que la plateforme ne rend plus. Absente, elles sont masquées. */
+        inclureDisparues?: boolean;
+      };
+      header?: never;
+      path: {
+        projet: components['schemas']['Projet'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EnrolementIndicateursDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Ressource introuvable, ou supprimée. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getEnrolementReglages: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projet: components['schemas']['Projet'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EnrolementReglagesDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Ressource introuvable, ou supprimée. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  putEnrolementReglages: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projet: components['schemas']['Projet'];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateEnrolementReglagesDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EnrolementReglagesDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Ressource introuvable, ou supprimée. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  postEnrolementTirage: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projet: components['schemas']['Projet'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TirageDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Ressource introuvable, ou supprimée. */
       404: {
         headers: {
           [name: string]: unknown;

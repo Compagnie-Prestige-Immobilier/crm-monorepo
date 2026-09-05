@@ -840,6 +840,9 @@ model Prospect {
   segmentChanges SegmentChange[]
   journeys       ProspectJourney[]
 
+  /// Le rapprochement vit du cote de l'inscription : rien n'est ecrit ici.
+  inscriptionsPlateforme InscriptionPlateforme[]
+
   @@index([phoneE164])
   @@index([representantId])
   // `origin` est indexée en index PARTIEL (`WHERE "origin" IS NOT NULL`) dans
@@ -2419,4 +2422,64 @@ model VisiteImportChange {
   @@unique([importJobId, sheet, rowNumber])
   @@index([importJobId, kind])
   @@map("visite_import_changes")
+}
+
+/// Une inscription lue sur la plateforme d'enrolement du projet.
+///
+/// La table est un MIROIR : rien n'y remonte vers le CRM, et le rapprochement
+/// avec un prospect vit ici, pas sur la fiche. La cellule pilotage lit ces
+/// lignes, personne d'autre.
+///
+/// `projet` + `identifiantDistant` est la cle d'idempotence du tirage : la
+/// plateforme est relue en entier a chaque passage, et une ligne deja vue est
+/// mise a jour au lieu d'etre redeposee.
+model InscriptionPlateforme {
+  id String @id @default(uuid(7))
+
+  projet             Projet
+  /// L'identifiant de la ligne CHEZ la plateforme, tel quel.
+  identifiantDistant String
+
+  nom       String
+  prenom    String
+  /// Normalise par `normalizePhone`, ou nul si la plateforme n'en donne pas
+  /// d'exploitable. Un numero vide ne rapproche RIEN.
+  phoneE164 String?
+  email     String?
+
+  /// Le statut rendu par la plateforme, tel quel. Deux plateformes, deux
+  /// vocabulaires : les figer dans une enumeration obligerait une migration a
+  /// chaque libelle ajoute en face.
+  statutDistant String
+  /// Grand Public : `dossier_etape`, 0 a 5. Nulle en CHUES, qui n'a pas d'etape
+  /// numerotee.
+  etapeDistante Int?
+
+  inscriteLe DateTime?
+  soumiseLe  DateTime?
+  decideeLe  DateTime?
+
+  /// La ligne n'est plus rendue par la plateforme. Marquee, jamais supprimee :
+  /// le lien vers le prospect et la charge utile restent lisibles.
+  disparueLe DateTime?
+
+  /// Le prospect du MEME projet reconnu au telephone puis a l'e-mail. Nul tant
+  /// qu'aucun ne correspond, et le lien ne s'ecrit que d'ici.
+  prospectId String?
+  prospect   Prospect? @relation(fields: [prospectId], references: [id], onDelete: SetNull)
+
+  /// La reponse brute de la plateforme, pour relire une ligne sans la retirer.
+  chargeUtile Json
+
+  premierTirageAt DateTime @default(now())
+  dernierTirageAt DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([projet, identifiantDistant])
+  @@index([projet, statutDistant])
+  @@index([projet, inscriteLe])
+  @@index([prospectId])
+  @@map("inscriptions_plateforme")
 }

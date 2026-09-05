@@ -130,4 +130,12 @@ export const queryKeys = {
     ['stats', 'vieillissement', filtersQueryKey(filters)] as const,
   statsAmbassadeurs: (filters: ProspectFilters) =>
     ['stats', 'ambassadeurs', filtersQueryKey(filters)] as const,
+
+  // ─── Plateformes d'enrôlement ─────────────────────────────────────────────
+  enrolementRoot: ['enrolement'] as const,
+  enrolementInscriptions: (projet: string, filtres: Record<string, unknown>) =>
+    ['enrolement', 'inscriptions', projet, filtres] as const,
+  enrolementIndicateurs: (projet: string, filtres: Record<string, unknown>) =>
+    ['enrolement', 'indicateurs', projet, filtres] as const,
+  enrolementReglages: (projet: string) => ['enrolement', 'reglages', projet] as const,
 };

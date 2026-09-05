@@ -99,6 +99,19 @@ export const envSchema = z
     DB_DUMP_DIR: z.string().min(1).default('./storage/db-dumps'),
 
     DB_DUMP_ENABLED: booleanFlag(false),
+
+    /**
+     * Les deux plateformes d'enrôlement, en LECTURE seule. `servers[0].url` des
+     * specs porte déjà `/api` : l'URL attendue est donc `https://<hôte>/api`.
+     *
+     * Vides par défaut, et c'est le cas normal en développement comme en test :
+     * le connecteur ne tire alors rien et l'écran d'administration le dit, au
+     * lieu de faire échouer le démarrage de toute l'API.
+     */
+    PLATEFORME_CHUES_URL: z.union([z.url(), z.literal('')]).default(''),
+    PLATEFORME_CHUES_TOKEN: z.string().default(''),
+    PLATEFORME_GRAND_PUBLIC_URL: z.union([z.url(), z.literal('')]).default(''),
+    PLATEFORME_GRAND_PUBLIC_TOKEN: z.string().default(''),
   })
   .superRefine((env, context) => {
     if (env.NODE_ENV !== 'production') return;
@@ -125,6 +138,28 @@ export const envSchema = z
           code: 'custom',
           path: ['API_CORS_ORIGINS'],
           message: `Production CORS origins must use https: ${origin}`,
+        });
+      }
+    }
+
+    // Une URL sans jeton tirerait en anonyme et remonterait un 401 toutes les
+    // quinze minutes, sans que personne ne sache que le jeton n'a jamais été posé.
+    const plateformes = [
+      ['PLATEFORME_CHUES_URL', 'PLATEFORME_CHUES_TOKEN', env.PLATEFORME_CHUES_URL, env.PLATEFORME_CHUES_TOKEN],
+      [
+        'PLATEFORME_GRAND_PUBLIC_URL',
+        'PLATEFORME_GRAND_PUBLIC_TOKEN',
+        env.PLATEFORME_GRAND_PUBLIC_URL,
+        env.PLATEFORME_GRAND_PUBLIC_TOKEN,
+      ],
+    ] as const;
+
+    for (const [cleUrl, cleJeton, url, jeton] of plateformes) {
+      if (url !== '' && jeton.trim() === '') {
+        context.addIssue({
+          code: 'custom',
+          path: [cleJeton],
+          message: `${cleJeton} is required when ${cleUrl} is set`,
         });
       }
     }

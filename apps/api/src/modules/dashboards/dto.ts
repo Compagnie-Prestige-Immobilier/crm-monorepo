@@ -72,18 +72,33 @@ const SOURCES_PROSPECTS = [
   'rendement-par-departement',
 ] as const;
 
+/**
+ * La phase d'enrôlement, lue sur les plateformes externes. Elle ne parle qu'à
+ * la cellule pilotage : le catalogue web la retire à tout rôle autre qu'ADMIN,
+ * et l'API qui l'alimente refuse les autres rôles de son côté.
+ */
+const SOURCES_ENROLEMENT = [
+  'enrolement-inscriptions',
+  'enrolement-taux-rapprochement',
+  'enrolement-taux-conversion',
+  'enrolement-par-jour',
+  'enrolement-par-etape',
+  'enrolement-par-teleconseiller',
+] as const;
+
 export const DASHBOARD_SOURCES = [
   ...SOURCES_VISITES,
   ...SOURCES_QUALIFICATION,
   ...SOURCES_PROSPECTS,
+  ...SOURCES_ENROLEMENT,
 ] as const;
 
 export type DashboardSource = (typeof DASHBOARD_SOURCES)[number];
 
 export const SOURCES_PAR_ECRAN: Record<DashboardEcran, readonly DashboardSource[]> = {
   visites: SOURCES_VISITES,
-  chues: [...SOURCES_QUALIFICATION, ...SOURCES_PROSPECTS],
-  'grand-public': SOURCES_PROSPECTS,
+  chues: [...SOURCES_QUALIFICATION, ...SOURCES_PROSPECTS, ...SOURCES_ENROLEMENT],
+  'grand-public': [...SOURCES_PROSPECTS, ...SOURCES_ENROLEMENT],
 };
 
 /**
