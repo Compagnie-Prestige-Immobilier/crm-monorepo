@@ -14,6 +14,11 @@ export function navigationRetenue(): boolean {
   return true;
 }
 
+/** Le même verrou, sans son message : pour l'appelant qui a le sien. */
+export function ficheTenue(): boolean {
+  return retenue !== null;
+}
+
 /**
  * Next.js App Router n'expose aucune API de blocage. Trois prises seulement :
  * la fermeture de l'onglet, le clic sur un lien, et le retour arrière.
