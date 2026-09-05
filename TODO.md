@@ -139,9 +139,10 @@ Merges `2c508581` et `5e9458af`. Deux pièges qui se reproduisent :
 ## Exploitation
 
 - [ ] Appliquer la migration `20260905090000_inscriptions_plateforme` hors local.
-- [ ] Renseigner `PLATEFORME_CHUES_URL`, `PLATEFORME_CHUES_TOKEN`,
-      `PLATEFORME_GRAND_PUBLIC_URL`, `PLATEFORME_GRAND_PUBLIC_TOKEN`. Vides, le
-      connecteur ne tire rien et l'écran d'administration le dit.
+- [ ] Délivrer le jeton machine Grand Public : `php artisan integration:token crm`
+      dans son conteneur. C'est la dernière variable manquante ; l'URL et le
+      couple CHUES sont posés et vérifiés. Sans jeton, le connecteur ne tire pas
+      Grand Public et l'écran d'administration le dit.
 - [ ] Lancer les e2e Playwright. Ils n'ont jamais tourné sur l'arbre fusionné.
 - [ ] Décider du sort des branches locales `feat/connecteur-enrolement` et
       `feat/redis-implementation`, fusionnées dans `dev`.
