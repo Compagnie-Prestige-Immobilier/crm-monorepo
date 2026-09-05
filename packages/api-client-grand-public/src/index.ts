@@ -11,7 +11,10 @@ export type GrandPublicClient = Client<paths>;
  * Client typé de la plateforme d'enrôlement Grand Public (Laravel, spec Scramble).
  * Tout vient de src/generated/schema.ts, généré depuis openapi.json.
  */
-export const createGrandPublicClient = (baseUrl: string, options: ApiClientOptions = {}): GrandPublicClient => {
+export const createGrandPublicClient = (
+  baseUrl: string,
+  options: ApiClientOptions = {},
+): GrandPublicClient => {
   const client = createClient<paths>({
     baseUrl,
     ...(options.fetch ? { fetch: options.fetch } : {}),

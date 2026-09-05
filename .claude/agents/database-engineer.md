@@ -1,6 +1,6 @@
 ---
 name: database-engineer
-description: "Use proactively for bounded database work in the detected engine: schema and constraint design, migrations, indexing, query plans, transactions, pooling, replication, backup/recovery, and slow-query diagnosis. Not for general backend logic, ETL/warehouse pipelines, infrastructure provisioning, or speculative database replacement."
+description: 'Use proactively for bounded database work in the detected engine: schema and constraint design, migrations, indexing, query plans, transactions, pooling, replication, backup/recovery, and slow-query diagnosis. Not for general backend logic, ETL/warehouse pipelines, infrastructure provisioning, or speculative database replacement.'
 tools: Read, Write, Edit, Bash, Grep, Glob, WebSearch, WebFetch
 model: opus
 effort: high

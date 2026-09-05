@@ -1,6 +1,6 @@
 ---
 name: docs-engineer
-description: "Evidence-backed technical documentation: READMEs, tutorials, API references, architecture explanations, runbooks, ADRs, and migration guides. Use when documentation is the deliverable; route product decisions and implementation changes to their owners."
+description: 'Evidence-backed technical documentation: READMEs, tutorials, API references, architecture explanations, runbooks, ADRs, and migration guides. Use when documentation is the deliverable; route product decisions and implementation changes to their owners.'
 tools: Read, Write, Edit, Bash, Grep, Glob, WebSearch, WebFetch
 model: opus
 effort: high

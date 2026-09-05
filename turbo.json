@@ -20,8 +20,8 @@
   "tasks": {
     // `generate` n'est PAS une dépendance globale de `build`. Le faire créerait
     // un cycle : @crm/database#build -> generate -> @crm/api#openapi:generate
-    // -> @crm/database#build. Seuls les deux paquets clients doivent générer
-    // avant de compiler, et c'est déclaré nommément plus bas.
+    // -> @crm/database#build. Les paquets qui doivent engendrer avant de
+    // compiler le déclarent nommément plus bas.
     "build": {
       "dependsOn": ["^build"],
       "outputs": [".next/**", "dist/**", "!.next/cache/**"]
@@ -41,19 +41,36 @@
       "dependsOn": ["db:generate"],
       "outputs": ["dist/**"]
     },
+    // Pas d'arête vers `generate` : le boot qui produit notre spec importe les
+    // deux clients de plateforme, qui compilent contre ce paquet. Le cycle est
+    // coupé ici parce que `src/generated/schema.ts` est COMMITTÉ — compiler la
+    // version du dépôt est toujours possible, et `pnpm codegen:check` reste le
+    // seul juge de sa fraîcheur.
     "@crm/api-client#build": {
-      "dependsOn": ["^build", "generate"],
+      "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
     "@crm/api-client-dart#build": {
       "dependsOn": ["generate"]
     },
+    // Ces deux paquets engendrent leur client depuis la spec de LEUR plateforme,
+    // jamais depuis `apps/api/openapi.json`. Leur `generate` ne doit donc pas
+    // hériter de l'arête vers `@crm/api#openapi:generate` : ce serait un cycle,
+    // puisque le boot qui produit notre spec importe ces deux clients.
+    "@crm/api-client-chues#generate": {
+      "inputs": ["../../tools/dev/generate-plateforme-client.mjs", "openapi.json"],
+      "outputs": ["src/generated/**"]
+    },
+    "@crm/api-client-grand-public#generate": {
+      "inputs": ["../../tools/dev/generate-plateforme-client.mjs", "openapi.json"],
+      "outputs": ["src/generated/**"]
+    },
     "@crm/api-client-chues#build": {
-      "dependsOn": ["^build", "generate"],
+      "dependsOn": ["@crm/api-client-chues#generate", "@crm/api-client#build"],
       "outputs": ["dist/**"]
     },
     "@crm/api-client-grand-public#build": {
-      "dependsOn": ["^build", "generate"],
+      "dependsOn": ["@crm/api-client-grand-public#generate", "@crm/api-client#build"],
       "outputs": ["dist/**"]
     },
     "@crm/database#lint": {
@@ -88,7 +105,15 @@
       // @crm/database, que le boot headless importe. Sans la seconde arête, la
       // génération du contrat échoue sur un `dist` absent ou périmé — et
       // seulement sur une machine propre, jamais sur celle du développeur.
-      "dependsOn": ["@crm/database#db:generate", "@crm/database#build"],
+      // Le connecteur d'enrolement importe les deux clients de plateforme : sans
+      // leur `dist`, la compilation de `tsconfig.gen.json` echoue sur un module
+      // introuvable, et seulement sur une machine propre.
+      "dependsOn": [
+        "@crm/database#db:generate",
+        "@crm/database#build",
+        "@crm/api-client-chues#build",
+        "@crm/api-client-grand-public#build"
+      ],
       // `tsconfig.gen.json` est le fichier que la commande compile réellement
       // (`tsc -p tsconfig.gen.json`), et il manquait : seul `tsconfig.json`
       // était déclaré. Changer la cible, le `include` ou le `outDir` de la

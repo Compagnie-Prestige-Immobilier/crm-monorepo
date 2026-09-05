@@ -60,14 +60,13 @@ vi.mock('@/lib/data/statuts-qualification', async (importOriginal) => {
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn(), info: vi.fn() } }));
 
-function statut(
-  over: Partial<StatutQualification> & { id: string; requiresComment?: boolean },
-): StatutQualification {
+function statut(over: Partial<StatutQualification> & { id: string }): StatutQualification {
   return {
     code: 'ACCEPTE',
     label: 'Accepté',
     effect: 'REACHED',
     requiresCallback: false,
+    requiresComment: false,
     priorite: 'NORMALE',
     relationStatus: null,
     retryAfterMinutes: null,
@@ -155,6 +154,7 @@ const REPRESENTANT: ScriptedRepresentant = {
   lastCallById: null,
   lastCallByName: null,
   nextCallbackAt: null,
+  nextCallbackOrigine: null,
 };
 
 const ouverture = (over: Partial<OuverturesData.OuvertureFiche> = {}) => ({

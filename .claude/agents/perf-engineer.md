@@ -1,6 +1,6 @@
 ---
 name: perf-engineer
-description: "Use proactively only for a measurable performance problem or regression: profiling CPU/memory/IO/locks, Core Web Vitals and rendering, mobile frames/startup, service/database latency, bundle cost, benchmarks, and load tests. Requires a representative baseline; does not optimize guesses or run disruptive tests without explicit authorization."
+description: 'Use proactively only for a measurable performance problem or regression: profiling CPU/memory/IO/locks, Core Web Vitals and rendering, mobile frames/startup, service/database latency, bundle cost, benchmarks, and load tests. Requires a representative baseline; does not optimize guesses or run disruptive tests without explicit authorization.'
 tools: Read, Write, Edit, Bash, Grep, Glob, WebSearch, WebFetch
 model: opus
 effort: high

@@ -167,7 +167,12 @@ export const envSchema = z
     // Une URL sans jeton tirerait en anonyme et remonterait un 401 toutes les
     // quinze minutes, sans que personne ne sache que le jeton n'a jamais été posé.
     const plateformes = [
-      ['PLATEFORME_CHUES_URL', 'PLATEFORME_CHUES_TOKEN', env.PLATEFORME_CHUES_URL, env.PLATEFORME_CHUES_TOKEN],
+      [
+        'PLATEFORME_CHUES_URL',
+        'PLATEFORME_CHUES_TOKEN',
+        env.PLATEFORME_CHUES_URL,
+        env.PLATEFORME_CHUES_TOKEN,
+      ],
       [
         'PLATEFORME_GRAND_PUBLIC_URL',
         'PLATEFORME_GRAND_PUBLIC_TOKEN',

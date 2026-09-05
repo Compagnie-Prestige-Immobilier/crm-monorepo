@@ -16,7 +16,7 @@ Branche `feat/redis-implementation`, merge `67bf58bc`.
 
 - `apps/api/src/redis/` : service Redis, interceptor `@Cached`, TTL 30 s.
   `fake-redis.ts` couvre les tests, aucune instance n'est requise pour `pnpm
-  test`.
+test`.
 - `apps/api/src/modules/live/` : flux SSE, consomme par
   `apps/web/src/lib/live-stream.ts` et `components/live/live-stream.tsx`.
 - Espace demo isole : `packages/database/src/demo-volume.ts`,

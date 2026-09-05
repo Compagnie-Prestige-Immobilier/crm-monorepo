@@ -256,9 +256,10 @@ function versInscriptionGrandPublic(
     // `statut` de la plateforme est un texte libre décoratif : les neuf fiches
     // relevées portaient toutes « Dossier en préparation » alors que leur étape
     // allait de 0 à 5. L'état qui se mesure est l'ÉTAPE, et le statut en dérive.
-    statutDistant: ligne.dossierEtape === null || ligne.dossierEtape === undefined
-      ? 'etape-inconnue'
-      : `etape-${String(ligne.dossierEtape)}`,
+    statutDistant:
+      ligne.dossierEtape === null || ligne.dossierEtape === undefined
+        ? 'etape-inconnue'
+        : `etape-${String(ligne.dossierEtape)}`,
     etapeDistante: ligne.dossierEtape ?? null,
     inscriteLe: dateDeTexte(ligne.dateInscription),
     soumiseLe: dateDeTexte(ligne.demande?.submittedAt),

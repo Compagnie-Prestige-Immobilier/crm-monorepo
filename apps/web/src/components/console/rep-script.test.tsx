@@ -131,6 +131,7 @@ function rep(over: Partial<ScriptedRepresentant> & { id: string }): ScriptedRepr
     lastCallById: null,
     lastCallByName: null,
     nextCallbackAt: null,
+    nextCallbackOrigine: null,
     ...over,
   };
 }
@@ -141,6 +142,7 @@ function statut(over: Partial<StatutQualification> & { id: string }): StatutQual
     label: 'Accepté',
     effect: 'REACHED',
     requiresCallback: false,
+    requiresComment: false,
     priorite: 'NORMALE',
     relationStatus: null,
     retryAfterMinutes: null,

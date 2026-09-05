@@ -9,7 +9,10 @@ describe('createChuesClient', () => {
       authorization = new Request(input).headers.get('Authorization');
       return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
     };
-    const client = createChuesClient('https://chues.test/api', { fetch, getAccessToken: () => 'jeton' });
+    const client = createChuesClient('https://chues.test/api', {
+      fetch,
+      getAccessToken: () => 'jeton',
+    });
 
     await client.GET('/accounts');
 
