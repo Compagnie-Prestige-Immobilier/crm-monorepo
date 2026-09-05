@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
 
+import { generateDemoVolume } from './demo-volume.js';
 import { GrandPublicConsent, Projet, ProspectType, type PrismaClient } from './index.js';
 
 export const DEMO_SEED_SETTING = 'demo.seed.version';
-export const DEMO_SEED_VERSION = '3';
+export const DEMO_SEED_VERSION = '4';
 
 const MIRRORED_TABLES = [
   'regions',
@@ -18,6 +19,9 @@ const MIRRORED_TABLES = [
   'bank_case_stages',
   'bank_rejection_reasons',
   'call_outcome_reasons',
+  'statuts_qualification',
+  'pays',
+  'employeurs',
   'visite_entreprises',
   'visite_directions',
   'visite_destinataires',
@@ -129,6 +133,8 @@ export class DemoWorkspaceFactory {
         })),
       });
     }
+
+    await generateDemoVolume(this.demoDb);
 
     await this.demoDb.appSetting.create({
       data: { key: DEMO_SEED_SETTING, value: DEMO_SEED_VERSION },
