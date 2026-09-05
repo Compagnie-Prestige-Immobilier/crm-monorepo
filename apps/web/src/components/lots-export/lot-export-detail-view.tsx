@@ -460,7 +460,8 @@ function ChampObjectif({
             autre.teleconseillerId === ligne.teleconseillerId ? valeur : autre.objectif,
         })),
       }),
-    onSuccess: () => {
+    onSuccess: (_summary, valeur) => {
+      setSaisie(String(valeur));
       void queryClient.invalidateQueries({ queryKey: queryKeys.lotsExportDetail(id) });
       toast.success('Objectif enregistré.');
     },
