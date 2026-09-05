@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { ChangeSource, RepCallOutcome } from '@crm/database';
-import type { RepresentantRelation, StatutQualification } from '@crm/database';
+import { ChangeSource, RepCallOutcome, RepresentantRelation } from '@crm/database';
+import type { StatutQualification } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { outcomeOf } from '../referentiels/statuts-qualification.service.js';
@@ -25,7 +25,9 @@ import {
   statutInactif,
   statutInconnu,
   commentRequired,
+  motifRequis,
   phoneConflict,
+  relationContreditStatut,
   promisedNotAllowed,
   representantNotAssigned,
   representantNotFound,
@@ -70,7 +72,7 @@ export class RepCampaignsService {
 
     // Le statut commande l'issue. Résolu AVANT la transaction : c'est une
     // lecture, et la faire dedans allongerait le verrou pour rien.
-    const statut = await this.statutCoherent(body);
+    const statut = await this.statutCoherent(body, comment);
     const relation = relationAPoser(body, statut, representant.relationStatus);
 
     const applied = await this.prisma.$transaction(async (tx) => {
@@ -148,7 +150,10 @@ export class RepCampaignsService {
    * qui la contredit est refusée plutôt qu'enregistrée. Sans statut, l'issue
    * envoyée fait foi, comme le font les versions déjà installées.
    */
-  private async statutCoherent(body: CreateRepCallAttemptDto): Promise<StatutQualification | null> {
+  private async statutCoherent(
+    body: CreateRepCallAttemptDto,
+    comment: string | null,
+  ): Promise<StatutQualification | null> {
     if (body.statutQualificationId === undefined) return null;
 
     const statut = await this.prisma.statutQualification.findUnique({
@@ -160,10 +165,15 @@ export class RepCampaignsService {
     const attendue = outcomeOf(statut.effect);
     if (body.outcome !== attendue) throw issueContreditStatut(attendue, body.outcome);
 
-    // Pas de garde sur `requiresCallback` ici : `assertCallbackAllowed` ne
-    // l'autorise que sur l'effet SCHEDULE_CALLBACK, dont l'issue dérivée est
-    // CALLBACK, que `validatedComment` refuse déjà sans date. Un second garde
-    // serait une branche que rien ne peut atteindre.
+    if (contreditLeRattachement(body.relationStatus, statut.relationStatus)) {
+      throw relationContreditStatut(statut.label);
+    }
+
+    // `validatedComment` n'exige un commentaire que sur l'issue OTHER, qu'aucun
+    // effet ne dérive : la garde du motif est donc atteignable, contrairement à
+    // celle de `requiresCallback`, que l'issue CALLBACK couvre déjà.
+    if (statut.requiresComment && comment === null) throw motifRequis(statut.label);
+
     return statut;
   }
 
@@ -198,6 +208,27 @@ export class RepCampaignsService {
  * la perdrait définitivement. Celle que le client affirme garde la garde
  * stricte de `applyRelationChange` : c'est une contradiction, pas un silence.
  */
+/**
+ * « Souhaite-t-il être représentant CHUES ? » n'a que deux réponses, et le
+ * statut dit la même : oui vaut Accepté, non vaut Refusé. Les autres états de
+ * relation ne répondent pas à cette question et gardent la garde de transition
+ * d'`applyRelationChange`.
+ */
+const REPONSES_AU_RATTACHEMENT: readonly RepresentantRelation[] = [
+  RepresentantRelation.AMBASSADEUR,
+  RepresentantRelation.REFUS,
+];
+
+function contreditLeRattachement(
+  repondue: RepresentantRelation | undefined,
+  posee: RepresentantRelation | null,
+): boolean {
+  if (repondue === undefined || posee === null) return false;
+  if (!REPONSES_AU_RATTACHEMENT.includes(repondue)) return false;
+  if (!REPONSES_AU_RATTACHEMENT.includes(posee)) return false;
+  return repondue !== posee;
+}
+
 function relationAPoser(
   body: CreateRepCallAttemptDto,
   statut: StatutQualification | null,

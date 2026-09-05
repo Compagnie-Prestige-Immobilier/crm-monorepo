@@ -418,6 +418,37 @@ describe('le statut de qualification commande l’issue', () => {
       RepCallAttemptApplyStatus.APPLIED,
     );
   });
+
+  // EB-04 : la garde vit sur le STATUT, pas sur l'issue. Aucun effet ne dérive
+  // l'issue OTHER, donc `validatedComment` ne peut pas couvrir ce cas.
+  it('refuse « Autre » sans motif, et l’accepte dès qu’un motif est écrit', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(
+      statut({ code: 'AUTRE_JOINT', label: 'Autre joint', requiresComment: true }),
+    );
+    const body = baseBody();
+    body.statutQualificationId = STATUT;
+    body.comment = '   ';
+
+    await expect(service.recordAttempt(ALICE, body)).rejects.toMatchObject({
+      response: { code: 'REP_STATUT_MOTIF_REQUIRED' },
+    });
+    expect(tx.repCallAttempt.createMany).not.toHaveBeenCalled();
+
+    body.comment = 'A rappelé pour dire qu’il réfléchit.';
+    expect((await service.recordAttempt(ALICE, body)).status).toBe(
+      RepCallAttemptApplyStatus.APPLIED,
+    );
+  });
+
+  it('n’exige aucun motif d’un statut qui n’en demande pas', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(statut({ requiresComment: false }));
+    const body = baseBody();
+    body.statutQualificationId = STATUT;
+
+    expect((await service.recordAttempt(ALICE, body)).status).toBe(
+      RepCallAttemptApplyStatus.APPLIED,
+    );
+  });
 });
 
 describe('la relation que le statut pose sur la fiche', () => {
@@ -453,8 +484,33 @@ describe('la relation que le statut pose sur la fiche', () => {
     expect(bascule()).toMatchObject({ relationStatus: RepresentantRelation.REFUS });
   });
 
-  it('laisse le dernier mot au client qui répond à la question', async () => {
+  // EB-02 : le statut DÉCOULE de la réponse au rattachement. « Oui » avec
+  // « Refusé » n'est pas un dernier mot, c'est une contradiction.
+  it('refuse une réponse au rattachement que le statut contredit', async () => {
     db.statutQualification.findUnique.mockResolvedValue(statut(RepresentantRelation.REFUS));
+    const body = refus();
+    body.relationStatus = RepresentantRelation.AMBASSADEUR;
+
+    await expect(service.recordAttempt(ALICE, body)).rejects.toMatchObject({
+      response: { code: 'REP_RELATION_STATUT_MISMATCH' },
+    });
+    expect(tx.repCallAttempt.createMany).not.toHaveBeenCalled();
+  });
+
+  it('accepte la même réponse répétée par le client et par le statut', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(statut(RepresentantRelation.REFUS));
+    const body = refus();
+    body.relationStatus = RepresentantRelation.REFUS;
+
+    await service.recordAttempt(ALICE, body);
+
+    expect(bascule()).toMatchObject({ relationStatus: RepresentantRelation.REFUS });
+  });
+
+  // Les sept autres statuts joints portent une relation nulle : la question n'a
+  // pas lieu d'être posée, et y répondre quand même reste admis.
+  it('laisse le dernier mot au client quand le statut ne tranche pas', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(statut(null));
     const body = refus();
     body.relationStatus = RepresentantRelation.AMBASSADEUR;
 
