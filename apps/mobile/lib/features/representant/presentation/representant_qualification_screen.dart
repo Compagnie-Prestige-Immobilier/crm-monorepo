@@ -17,6 +17,8 @@ import '../../../core/utils/phone.dart';
 import '../../../core/utils/relative_time.dart';
 import '../../../core/utils/whatsapp.dart';
 import '../../../data/local/database.dart';
+import '../../../core/drafts/draft_form_mixin.dart';
+import '../../../data/repositories/draft_repository.dart';
 import '../../../data/repositories/ouverture_repository.dart';
 import '../../../data/repositories/reference_repository.dart';
 import '../../../ui/widgets/cpi_action_bar.dart';
@@ -116,7 +118,8 @@ class RepresentantQualificationScreen extends ConsumerStatefulWidget {
 }
 
 class _RepresentantQualificationScreenState
-    extends ConsumerState<RepresentantQualificationScreen> {
+    extends ConsumerState<RepresentantQualificationScreen>
+    with DraftFormMixin<RepresentantQualificationScreen> {
   final TextEditingController whatsapp = TextEditingController();
   final TextEditingController commentaire = TextEditingController();
   final TextEditingController suggestionTelephone = TextEditingController();
@@ -156,6 +159,10 @@ class _RepresentantQualificationScreenState
   /// lit entre l'ouverture et maintenant.
   Timer? battement;
 
+  /// Le temps affiché, hors `setState` : un rebâti par seconde marquerait le
+  /// brouillon sale sans qu'une seule réponse ait changé.
+  final ValueNotifier<Duration> ecoule = ValueNotifier<Duration>(Duration.zero);
+
   /// Ce que le verrou vient de refuser. Bande et non toast : le refus doit
   /// rester lisible tant que le statut n'est pas posé.
   String? refus;
@@ -164,6 +171,88 @@ class _RepresentantQualificationScreenState
 
   _Etape etape = _Etape.fiche;
   bool enAvant = true;
+
+  /// EB-10 : ce qui a été saisi survit à « À rappeler » et à la mort de l'app.
+  /// Le brouillon est rangé SOUS LA FICHE : au rappel, le formulaire se rouvre
+  /// avec les réponses du dernier appel.
+  @override
+  String get draftId => 'qualification:${widget.representantId}';
+
+  @override
+  String get draftFormKey => 'representant_qualification';
+
+  @override
+  String? get draftEntityId => widget.representantId;
+
+  @override
+  int get draftStep => parcours.indexOf(etape);
+
+  @override
+  DraftRepository get draftRepository => ref.read(draftRepositoryProvider);
+
+  @override
+  bool get draftIsEmpty => !aSaisi;
+
+  @override
+  Map<String, Object?> collectDraftValues() => <String, Object?>{
+    'resultat': resultat?.name,
+    'statutCode': statutChoisi?.code,
+    'aEteContacte': aEteContacte,
+    'connaitUES': connaitUES,
+    'representantCHUES': representantCHUES,
+    'commentaire': commentaire.text,
+    'rappelAt': rappelAt?.toIso8601String(),
+    'whatsappStatus': whatsappStatus,
+    'whatsapp': whatsapp.text,
+    'prenom': prenom.text,
+    'nom': nom.text,
+    'telephone': telephone.text,
+    'etablissement': etablissement.text,
+    'profession': profession.text,
+    'syndicat': syndicatNom.text,
+    'suggestionTelephone': suggestionTelephone.text,
+    'suggestionNom': suggestionNom.text,
+    'suggestionNote': suggestionNote.text,
+  };
+
+  /// Le brouillon du dernier appel, repris APRÈS la fiche importée : c'est lui
+  /// qui a raison, il porte ce que le téléconseiller avait déjà corrigé.
+  Future<void> reprendreLeBrouillon() async {
+    final DraftSnapshot? repris = await draftRepository.read(draftId);
+    if (repris == null || !mounted) return;
+    final Map<String, Object?> valeurs = repris.values;
+    String texte(String cle) =>
+        valeurs[cle] is String ? valeurs[cle]! as String : '';
+    bool? oui(String cle) =>
+        valeurs[cle] is bool ? valeurs[cle]! as bool : null;
+
+    setState(() {
+      resultat = _Resultat.values
+          .where((_Resultat r) => r.name == valeurs['resultat'])
+          .firstOrNull;
+      statutChoisi = statutsDuReferentiel
+          .where((StatutQualificationRow r) => r.code == valeurs['statutCode'])
+          .firstOrNull;
+      aEteContacte = oui('aEteContacte');
+      connaitUES = oui('connaitUES');
+      representantCHUES = oui('representantCHUES');
+      commentaire.text = texte('commentaire');
+      rappelAt = DateTime.tryParse(texte('rappelAt'));
+      if (texte('whatsappStatus').isNotEmpty) {
+        whatsappStatus = texte('whatsappStatus');
+      }
+      whatsapp.text = texte('whatsapp');
+      if (texte('prenom').isNotEmpty) prenom.text = texte('prenom');
+      if (texte('nom').isNotEmpty) nom.text = texte('nom');
+      if (texte('telephone').isNotEmpty) telephone.text = texte('telephone');
+      etablissement.text = texte('etablissement');
+      profession.text = texte('profession');
+      syndicatNom.text = texte('syndicat');
+      suggestionTelephone.text = texte('suggestionTelephone');
+      suggestionNom.text = texte('suggestionNom');
+      suggestionNote.text = texte('suggestionNote');
+    });
+  }
 
   static const Map<_Etape, String> questions = <_Etape, String>{
     _Etape.fiche: 'Avant l\'appel',
@@ -177,6 +266,15 @@ class _RepresentantQualificationScreenState
   void initState() {
     super.initState();
     unawaited(semerLaFiche());
+  }
+
+  /// Toute réponse qui redessine l'écran salit le brouillon. Le poser ici
+  /// plutôt qu'à chacun des trente `setState` de cet écran est ce qui garantit
+  /// qu'aucune n'est oubliée.
+  @override
+  void setState(VoidCallback fn) {
+    super.setState(fn);
+    markDraftDirty();
   }
 
   @override
@@ -199,6 +297,7 @@ class _RepresentantQualificationScreenState
     departementFocus.dispose();
     iefFocus.dispose();
     battement?.cancel();
+    ecoule.dispose();
     super.dispose();
   }
 
@@ -248,6 +347,8 @@ class _RepresentantQualificationScreenState
       iefId = importee.iefId;
       ief.text = inspection?.name ?? '';
     });
+    await reprendreLeBrouillon();
+    if (!mounted) return;
     await prendreLaFiche(importee);
   }
 
@@ -303,9 +404,10 @@ class _RepresentantQualificationScreenState
       return;
     }
     setState(() => ouverture = resultat.ouverte);
+    ecoule.value = tempsDeTraitement ?? Duration.zero;
     battement?.cancel();
     battement = Timer.periodic(const Duration(seconds: 1), (Timer _) {
-      if (mounted) setState(() {});
+      if (mounted) ecoule.value = tempsDeTraitement ?? Duration.zero;
     });
   }
 
@@ -641,10 +743,23 @@ class _RepresentantQualificationScreenState
     final List<_Etape> etapes = parcours;
     final int index = etapes.indexOf(etape);
     if (index + 1 >= etapes.length) return;
+    markDraftDirty();
     setState(() {
       enAvant = true;
       etape = etapes[index + 1];
     });
+    unawaited(remonterLeBrouillon());
+  }
+
+  /// Le brouillon remonté au serveur, au passage d'étape et non à la frappe :
+  /// une remontée par lettre saisie noierait le lien. Au mieux : c'est la copie
+  /// locale qui rouvre le formulaire, celle-ci sert la reprise ailleurs.
+  Future<void> remonterLeBrouillon() async {
+    final OuverturesFicheData? prise = ouverture;
+    if (prise == null) return;
+    await ref
+        .read(ouvertureRepositoryProvider)
+        .enregistrerBrouillon(id: prise.id, draft: collectDraftValues());
   }
 
   void precedent() {
@@ -870,6 +985,10 @@ class _RepresentantQualificationScreenState
       ref.read(syncCoordinatorProvider.notifier).nudge();
       battement?.cancel();
       ouverture = null;
+      // Un rappel promis garde les réponses pour le prochain appel; une fiche
+      // qualifiée pour de bon les rouvrirait sans raison.
+      discardDraft();
+      if (rappelAt == null) await draftRepository.delete(draftId);
       if (context.mounted) Navigator.of(context).pop();
     } on Object catch (error) {
       if (!context.mounted) return;
@@ -948,8 +1067,15 @@ class _RepresentantQualificationScreenState
   /// EB-09 : le temps de traitement, visible du premier écran jusqu'à la
   /// qualification. Distinct de la durée de communication du journal d'appels.
   Widget? _chronometre(ThemeData theme) {
-    final Duration? ecoule = tempsDeTraitement;
-    if (ecoule == null) return null;
+    if (ouverture == null) return null;
+    return ValueListenableBuilder<Duration>(
+      valueListenable: ecoule,
+      builder: (BuildContext context, Duration passe, Widget? _) =>
+          _bandeauChrono(theme, passe),
+    );
+  }
+
+  Widget _bandeauChrono(ThemeData theme, Duration passe) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         CpiSpacing.md,
@@ -959,7 +1085,7 @@ class _RepresentantQualificationScreenState
       ),
       child: Semantics(
         liveRegion: true,
-        label: 'Fiche ouverte depuis ${ecoule.inMinutes} minutes',
+        label: 'Fiche ouverte depuis ${passe.inMinutes} minutes',
         excludeSemantics: true,
         child: Row(
           children: <Widget>[
@@ -970,7 +1096,7 @@ class _RepresentantQualificationScreenState
             ),
             const SizedBox(width: CpiSpacing.xs),
             Text(
-              chrono(ecoule),
+              chrono(passe),
               style: theme.textTheme.labelMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
                 fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
