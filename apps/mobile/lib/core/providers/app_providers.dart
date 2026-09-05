@@ -26,6 +26,7 @@ import '../../features/auth/auth_controller.dart';
 import '../../features/auth/auth_state.dart';
 import '../network/dio_factory.dart';
 import '../router/route_memory.dart';
+import '../router/route_paths.dart';
 import '../sync/api_port.dart';
 import '../sync/clock.dart';
 import '../sync/dio_api.dart';
@@ -142,6 +143,32 @@ final StreamProvider<OuverturesFicheData?> ouvertureCouranteProvider =
       if (moi.isEmpty) return Stream<OuverturesFicheData?>.value(null);
       return ref.watch(ouvertureRepositoryProvider).watchCourante(moi);
     });
+
+/// EB-08 : la route de la fiche tenue. C'est elle que le routeur rouvre au
+/// démarrage, et la seule qu'il laisse ouverte tant qu'aucun statut n'est posé.
+///
+/// Nulle quand la fiche d'un prospect n'est pas descendue sur cet appareil :
+/// sans son numéro, l'écran d'appel n'a rien à rouvrir, et un renvoi en boucle
+/// vers une recherche vide vaudrait moins que de laisser l'application libre.
+final FutureProvider<String?> routeFicheTenueProvider = FutureProvider<String?>(
+  (Ref ref) async {
+    final OuverturesFicheData? tenue = await ref.watch(
+      ouvertureCouranteProvider.future,
+    );
+    if (tenue == null) return null;
+    final String? representantId = tenue.representantId;
+    if (representantId != null) {
+      return Routes.representantQualificationFor(representantId);
+    }
+    final String? prospectId = tenue.prospectId;
+    if (prospectId == null) return null;
+    final String? numero = await ref
+        .read(referenceRepositoryProvider)
+        .numeroDuProspect(prospectId);
+    if (numero == null) return null;
+    return Routes.phase2Pour(numero);
+  },
+);
 
 final historiqueRepresentantProvider =
     StreamProvider.family<List<HistoriqueRepresentantResult>, String>((
