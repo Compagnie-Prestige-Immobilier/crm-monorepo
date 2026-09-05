@@ -24,6 +24,7 @@ import {
   conversionErrorFor,
   conversionFrom,
   formatCallbackAt,
+  lireBrouillon,
   newAttemptInput,
   pushCallAttempt,
   validateAttempt,
@@ -419,9 +420,10 @@ function Consignation({
   const commentRef = useRef<HTMLTextAreaElement>(null);
   const callbackRef = useRef<HTMLInputElement>(null);
 
-  const [comment, setComment] = useState(() => commentaireDuBrouillon(ouverture));
+  const [repris] = useState(() => lireBrouillon(ouverture?.draft));
+  const [comment, setComment] = useState(repris.comment);
   const [draftOutcome, setDraftOutcome] = useState<CallOutcome | null>(null);
-  const [conversion, setConversion] = useState<ConversionDraft | null>(null);
+  const [conversion, setConversion] = useState<ConversionDraft | null>(repris.conversion);
   const [conversionErrors, setConversionErrors] = useState<ConversionErrors>({});
   const [slots, setSlots] = useState<readonly CallbackSlot[] | null>(null);
   const [freeCallback, setFreeCallback] = useState('');
@@ -842,12 +844,6 @@ function Consignation({
       </details>
     </div>
   );
-}
-
-/** Ce qu'une ouverture reprise garde de la saisie interrompue. */
-function commentaireDuBrouillon(ouverture: OuvertureFiche | null): string {
-  const comment = ouverture?.draft?.comment;
-  return typeof comment === 'string' ? comment : '';
 }
 
 function Commentaire({
