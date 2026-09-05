@@ -37,6 +37,8 @@ abstract class _$SupervisedUserDtoCWProxy {
 
   SupervisedUserDto appVersion(String? appVersion);
 
+  SupervisedUserDto journalAppelsAutorise(bool? journalAppelsAutorise);
+
   SupervisedUserDto lastWriteAt(DateTime? lastWriteAt);
 
   SupervisedUserDto activeSecondsToday(num activeSecondsToday);
@@ -89,6 +91,7 @@ abstract class _$SupervisedUserDtoCWProxy {
     DateTime? lastPullAt,
     num? pendingOps,
     String? appVersion,
+    bool? journalAppelsAutorise,
     DateTime? lastWriteAt,
     num activeSecondsToday,
     num activeSecondsInShifts,
@@ -165,6 +168,10 @@ class _$SupervisedUserDtoCWProxyImpl implements _$SupervisedUserDtoCWProxy {
   @override
   SupervisedUserDto appVersion(String? appVersion) =>
       this(appVersion: appVersion);
+
+  @override
+  SupervisedUserDto journalAppelsAutorise(bool? journalAppelsAutorise) =>
+      this(journalAppelsAutorise: journalAppelsAutorise);
 
   @override
   SupervisedUserDto lastWriteAt(DateTime? lastWriteAt) =>
@@ -246,6 +253,7 @@ class _$SupervisedUserDtoCWProxyImpl implements _$SupervisedUserDtoCWProxy {
     Object? lastPullAt = const $CopyWithPlaceholder(),
     Object? pendingOps = const $CopyWithPlaceholder(),
     Object? appVersion = const $CopyWithPlaceholder(),
+    Object? journalAppelsAutorise = const $CopyWithPlaceholder(),
     Object? lastWriteAt = const $CopyWithPlaceholder(),
     Object? activeSecondsToday = const $CopyWithPlaceholder(),
     Object? activeSecondsInShifts = const $CopyWithPlaceholder(),
@@ -323,6 +331,11 @@ class _$SupervisedUserDtoCWProxyImpl implements _$SupervisedUserDtoCWProxy {
           ? _value.appVersion
           // ignore: cast_nullable_to_non_nullable
           : appVersion as String?,
+      journalAppelsAutorise:
+          journalAppelsAutorise == const $CopyWithPlaceholder()
+          ? _value.journalAppelsAutorise
+          // ignore: cast_nullable_to_non_nullable
+          : journalAppelsAutorise as bool?,
       lastWriteAt: lastWriteAt == const $CopyWithPlaceholder()
           ? _value.lastWriteAt
           // ignore: cast_nullable_to_non_nullable
@@ -420,6 +433,7 @@ SupervisedUserDto _$SupervisedUserDtoFromJson(Map<String, dynamic> json) =>
           'lastPullAt',
           'pendingOps',
           'appVersion',
+          'journalAppelsAutorise',
           'lastWriteAt',
           'activeSecondsToday',
           'activeSecondsInShifts',
@@ -479,6 +493,10 @@ SupervisedUserDto _$SupervisedUserDtoFromJson(Map<String, dynamic> json) =>
         ),
         pendingOps: $checkedConvert('pendingOps', (v) => v as num?),
         appVersion: $checkedConvert('appVersion', (v) => v as String?),
+        journalAppelsAutorise: $checkedConvert(
+          'journalAppelsAutorise',
+          (v) => v as bool?,
+        ),
         lastWriteAt: $checkedConvert(
           'lastWriteAt',
           (v) => v == null ? null : DateTime.parse(v as String),
@@ -539,6 +557,7 @@ Map<String, dynamic> _$SupervisedUserDtoToJson(SupervisedUserDto instance) =>
       'lastPullAt': instance.lastPullAt?.toIso8601String(),
       'pendingOps': instance.pendingOps,
       'appVersion': instance.appVersion,
+      'journalAppelsAutorise': instance.journalAppelsAutorise,
       'lastWriteAt': instance.lastWriteAt?.toIso8601String(),
       'activeSecondsToday': instance.activeSecondsToday,
       'activeSecondsInShifts': instance.activeSecondsInShifts,

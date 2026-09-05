@@ -1059,6 +1059,9 @@ model AgentHeartbeat {
   /// laisse « inconnu », et non « zéro en attente », qui serait un fait faux.
   pendingOps Int?
   appVersion String?
+  /// EB-37 : lecture du journal d'appels accordée. Nul tant que l'appareil ne
+  /// l'annonce pas ; faux, la DMC de ce compte ne se mesure pas.
+  journalAppelsAutorise Boolean?
 
   updatedAt DateTime @updatedAt
 

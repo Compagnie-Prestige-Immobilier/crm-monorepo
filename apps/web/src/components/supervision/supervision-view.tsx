@@ -271,6 +271,9 @@ function PresenceRows({
           <div className="flex flex-wrap items-center gap-1.5">
             <PresenceBadge presence={user.presence} />
             {!user.isActive ? <Badge variant="outline">Désactivé</Badge> : null}
+            {user.journalAppelsAutorise === false ? (
+              <Badge variant="outline">Journal d’appels refusé</Badge>
+            ) : null}
           </div>
         </td>
         <td className="px-5 py-2">

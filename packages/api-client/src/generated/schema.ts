@@ -5012,6 +5012,8 @@ export interface components {
       pendingOps?: number;
       /** @description Version de l’application mobile, telle qu’elle s’annonce. Facultative. */
       appVersion?: string;
+      /** @description Lecture du journal d’appels accordée sur l’appareil. Sans elle, la durée de communication n’est jamais relevée. Facultatif sans limite de temps. */
+      journalAppelsAutorise?: boolean;
     };
     /** @enum {string} */
     SyncOpStatus: 'applied' | 'duplicate' | 'conflict' | 'invalid' | 'skipped_dependency_failed';
@@ -6994,6 +6996,8 @@ export interface components {
       pendingOps: number | null;
       /** @description Version de l’application mobile, telle qu’elle s’annonce. */
       appVersion: string | null;
+      /** @description Lecture du journal d’appels accordée sur l’appareil, DÉCLARÉE PAR LUI. `false` : la durée de communication de ce compte ne se mesure pas. `null` : inconnu. */
+      journalAppelsAutorise: boolean | null;
       /**
        * Format: date-time
        * @description Dernière écriture métier : tentative d’appel ou transition de dossier. Cherchée sur les 31 derniers jours seulement ; au-delà, vaut null.
@@ -12181,6 +12185,8 @@ export interface operations {
         pendingOps?: number;
         /** @description Version de l’application mobile, telle qu’elle s’annonce. Facultative. */
         appVersion?: string;
+        /** @description Lecture du journal d’appels accordée sur l’appareil. Facultatif. */
+        journalAppelsAutorise?: boolean;
       };
       header: {
         /** @description Format de données que le client sait lire. En dessous de 5, le tirage est refusé au lieu d’être servi : les liens banque, syndicat et représentant d’un prospect peuvent être nuls, et un client plus ancien échoue à les décoder. */

@@ -5,6 +5,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../data/local/database.dart';
 import '../../data/repositories/ouverture_repository.dart';
+import '../../features/permissions/journal_appels.dart';
 import '../../ui/widgets/cpi_kit.dart';
 import '../providers/app_providers.dart';
 import '../theme/cpi_tokens.dart';
@@ -89,6 +90,7 @@ mixin OuvertureFicheMixin<T extends ConsumerStatefulWidget>
     // Après un plantage, la fiche se rouvre avec sa borne : le chronomètre
     // repart de la première saisie, jamais de zéro.
     _suivreLeTemps();
+    await demanderLeJournalUneFois(context, ref);
     return resultat;
   }
 

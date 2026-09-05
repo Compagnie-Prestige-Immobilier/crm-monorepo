@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -61,6 +61,7 @@ import {
   DEVICE_CALL_TYPES,
   type DeviceCallType,
 } from '../../common/device-call.js';
+import { queryBoolean } from '../../common/dto/query-boolean.js';
 import {
   DATE_PATTERN as VISITE_DATE_PATTERN,
   TIME_PATTERN as VISITE_TIME_PATTERN,
@@ -792,6 +793,16 @@ export class SyncPushDto {
   @IsString()
   @MaxLength(32)
   appVersion?: string;
+
+  @ApiPropertyOptional({
+    type: Boolean,
+    description:
+      'Lecture du journal d’appels accordée sur l’appareil. Sans elle, la durée de ' +
+      'communication n’est jamais relevée. Facultatif sans limite de temps.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  journalAppelsAutorise?: boolean;
 }
 
 export class SyncOperationResultDto {
@@ -876,6 +887,15 @@ export class SyncPullQueryDto {
   @IsString()
   @MaxLength(32)
   appVersion?: string;
+
+  @ApiPropertyOptional({
+    type: Boolean,
+    description: 'Lecture du journal d’appels accordée sur l’appareil. Facultatif.',
+  })
+  @IsOptional()
+  @Transform(queryBoolean)
+  @IsBoolean()
+  journalAppelsAutorise?: boolean;
 }
 
 /**

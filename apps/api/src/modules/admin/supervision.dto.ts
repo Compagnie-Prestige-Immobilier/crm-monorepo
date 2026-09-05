@@ -74,6 +74,15 @@ export class SupervisedUserDto {
   appVersion!: string | null;
 
   @ApiProperty({
+    type: Boolean,
+    nullable: true,
+    description:
+      'Lecture du journal d’appels accordée sur l’appareil, DÉCLARÉE PAR LUI. `false` : ' +
+      'la durée de communication de ce compte ne se mesure pas. `null` : inconnu.',
+  })
+  journalAppelsAutorise!: boolean | null;
+
+  @ApiProperty({
     type: String,
     format: 'date-time',
     nullable: true,
