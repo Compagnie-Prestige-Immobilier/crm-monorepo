@@ -19,6 +19,7 @@ import { CallbacksModule } from './modules/callbacks/callbacks.module.js';
 import { ClientRequestsModule } from './modules/client-requests/client-requests.module.js';
 import { DbDumpModule } from './modules/db-dump/db-dump.module.js';
 import { DemoModule } from './modules/demo/demo.module.js';
+import { EnrolementModule } from './modules/enrolement/enrolement.module.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
 import { OuverturesModule } from './modules/ouvertures/ouvertures.module.js';
 import { Phase2Module } from './modules/phase2/phase2.module.js';
@@ -125,6 +126,7 @@ const apiLogPath = resolve(import.meta.dirname, '../../../logs/api.log');
     VisitesModule,
     DashboardsModule,
     LotsExportModule,
+    EnrolementModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

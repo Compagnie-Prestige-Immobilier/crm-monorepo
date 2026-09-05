@@ -17,6 +17,7 @@ export type ChiffresRendement = Schemas['DepartementYieldListDto'];
 export type ChiffresMethodes = Schemas['EnrollmentMethodListDto'];
 export type ChiffresBanques = Schemas['NamedCountListDto'];
 export type ChiffresCampagne = CampagnePerformance | null;
+export type ChiffresEnrolement = Schemas['EnrolementIndicateursDto'];
 
 /** Le périmètre commun à toutes les requêtes de l'écran. */
 export interface PerimetreChiffres {
@@ -118,4 +119,23 @@ export async function fetchChiffresCampagne(
   perimetre: PerimetreChiffres,
 ): Promise<ChiffresCampagne> {
   return fetchDerniereCampagne(perimetre.projet, perimetre.commercialId);
+}
+
+/**
+ * Réservé à l'ADMIN : le catalogue ne propose ces cartes qu'à lui, et l'API
+ * refuse tout autre rôle. Le téléconseiller regardé ne borne pas ces chiffres,
+ * qui sont ceux de la plateforme et non ceux d'un portefeuille.
+ */
+export async function fetchChiffresEnrolement(
+  perimetre: PerimetreChiffres,
+  client: ApiClient = getApiClient(),
+): Promise<ChiffresEnrolement> {
+  return unwrap(
+    await client.GET('/api/v1/enrolement/{projet}/indicateurs', {
+      params: {
+        path: { projet: perimetre.projet },
+        query: { dateFrom: perimetre.plage.from, dateTo: perimetre.plage.to },
+      },
+    }),
+  );
 }

@@ -69,6 +69,10 @@ const PURGE_EXEMPT = new Map<string, string>([
     'visite_import_changes',
     'différentiel d’un aller-retour Excel, emporté en CASCADE avec le travail d’import qu’il décrit. `import_jobs` est lui-même dispensé pour la même raison : il décrit un GESTE d’administration et s’efface de lui-même par `expiresAt`',
   ],
+  [
+    'inscriptions_plateforme',
+    'MIROIR de lecture des plateformes d’enrôlement : aucune de ces lignes n’est saisie ici, et le tirage suivant les réécrit toutes depuis la plateforme, comme `agent_heartbeats` renaît au pull suivant. Lui donner une étape viderait un écran de pilotage pour un quart d’heure sans rien retirer à la source. Le lien vers le prospect part en SetNull avec la fiche ; couper vraiment le miroir se fait en retirant l’URL et le jeton de la plateforme',
+  ],
 ]);
 
 function isSubsequenceOf(

@@ -46,6 +46,7 @@ import {
   fetchChiffresBanques,
   fetchChiffresCampagne,
   fetchChiffresDelais,
+  fetchChiffresEnrolement,
   fetchChiffresEntonnoir,
   fetchChiffresMethodes,
   fetchChiffresRendement,
@@ -83,6 +84,7 @@ const CHARGEURS: Record<Jeu, (perimetre: PerimetreChiffres) => Promise<unknown>>
       to: perimetre.plage.to,
       ...(perimetre.commercialId === null ? {} : { openedById: perimetre.commercialId }),
     }),
+  enrolement: fetchChiffresEnrolement,
 };
 
 const clefDeJeu = (jeu: Jeu, perimetre: PerimetreChiffres): readonly unknown[] => [
