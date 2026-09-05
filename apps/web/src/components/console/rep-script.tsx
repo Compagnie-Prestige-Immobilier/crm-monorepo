@@ -16,6 +16,7 @@ import { copyPhone } from '@/components/console/console-ui';
 import { useShortcuts } from '@/components/console/use-shortcuts';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { QueryErrorState } from '@/components/query-error-state';
+import { AppelsRepresentant } from '@/components/representants/appels-representant';
 import { RelationBadge } from '@/components/representants/relation-badge';
 import { RepresentantFormDialog } from '@/components/representants/representant-form-dialog';
 import { Button } from '@/components/ui/button';
@@ -49,6 +50,7 @@ import {
 import { fetchReferenceData } from '@/lib/data/reference';
 import {
   fetchRepresentant,
+  fetchRepresentantCallAttempts,
   fetchRepresentantsAQualifier,
   type ScriptedRepresentant,
 } from '@/lib/data/representants';
@@ -885,6 +887,29 @@ function relationTrancheeTexte(row: ScriptedRepresentant): string | null {
     : 'Cette personne a déjà refusé.';
 }
 
+/**
+ * Ce que les appels précédents ont donné, en lecture seule. Rien ne s'y modifie :
+ * une nouvelle qualification ajoute une entrée, elle n'en réécrit aucune.
+ */
+function HistoriqueAppels({ representantId }: { representantId: string }) {
+  const appels = useQuery({
+    queryKey: [...queryKeys.representant(representantId), 'appels'] as const,
+    queryFn: () => fetchRepresentantCallAttempts(representantId),
+  });
+
+  if (appels.isPending) return <Skeleton className="h-20 w-full" />;
+  if (appels.isError || appels.data.length === 0) return null;
+
+  return (
+    <section className="flex flex-col gap-2 rounded-lg border border-border bg-card px-4 py-3">
+      <h3 className="text-[0.875rem] font-[600]">Appels précédents</h3>
+      <div className="max-h-64 overflow-y-auto scrollbar-thin">
+        <AppelsRepresentant items={appels.data} />
+      </div>
+    </section>
+  );
+}
+
 /** Le temps passé sur la fiche, depuis l'ouverture confirmée jusqu'au statut. */
 function Chrono({ openedAt }: { openedAt: string }) {
   const [secondes, setSecondes] = useState(() => secondesEcoulees(openedAt, Date.now()));
@@ -1283,6 +1308,10 @@ function Qualification({
       <Chrono openedAt={ouverture.openedAt} />
 
       <EnTeteRepresentant representant={representant} />
+
+      {representant.callAttemptCount === 0 ? null : (
+        <HistoriqueAppels representantId={representant.id} />
+      )}
 
       <p className="text-[0.8125rem] font-[600] text-muted-foreground">
         Étape {etape} sur 2 ·{' '}

@@ -22,6 +22,7 @@ import { renderWithQuery } from '@/test/render-query';
 
 const pushRepCallAttempt = vi.fn();
 const fetchRepresentant = vi.fn();
+const fetchRepresentantCallAttempts = vi.fn();
 const fetchRepresentants = vi.fn();
 const fetchRepresentantsAQualifier = vi.fn();
 const fetchReferenceData = vi.fn();
@@ -61,6 +62,7 @@ vi.mock('@/lib/data/representants', async (importOriginal) => {
   return {
     ...actual,
     fetchRepresentant: (...args: unknown[]) => fetchRepresentant(...args),
+    fetchRepresentantCallAttempts: (...args: unknown[]) => fetchRepresentantCallAttempts(...args),
     fetchRepresentants: (...args: unknown[]) => fetchRepresentants(...args),
     fetchRepresentantsAQualifier: (...args: unknown[]) => fetchRepresentantsAQualifier(...args),
   };
@@ -281,6 +283,8 @@ beforeEach(() => {
     suggestion: null,
   });
   fetchRepresentant.mockReset();
+  fetchRepresentantCallAttempts.mockReset();
+  fetchRepresentantCallAttempts.mockResolvedValue([]);
   fetchRepresentants.mockReset();
   fetchRepresentantsAQualifier.mockReset();
   fetchRepresentants.mockResolvedValue(page([HORS_LISTE]));
@@ -718,6 +722,53 @@ describe('RepScript : l’ouverture confirmée d’une fiche', () => {
       expect(pushRepCallAttempt).toHaveBeenCalledTimes(1);
     });
     expect(dernierEnvoi()).toMatchObject({ ouvertureId: 'ouv-1' });
+  });
+
+  // EB-11 : l'historique passait par la fiche de détail, jamais par l'écran où
+  // le téléconseiller décroche. Il rappelait sans savoir ce qui avait été dit.
+  it('montre les appels précédents en lecture seule, motif compris', async () => {
+    fetchRepresentantCallAttempts.mockResolvedValue([
+      {
+        id: 'att-1',
+        outcome: 'UNREACHABLE',
+        statutQualificationLabel: 'Autre non joint',
+        statutQualificationRequiresComment: true,
+        comment: 'Ligne coupée deux fois',
+        callbackAt: null,
+        promisedProspects: null,
+        etablissementConfirme: null,
+        contacte: true,
+        connaitUES: null,
+        syndicat: null,
+        suggestedName: null,
+        suggestedPhoneE164: null,
+        suggestedNote: null,
+        performedById: 'u-2',
+        performedByName: 'Awa Sy',
+        deviceCallType: null,
+        deviceCallDurationSeconds: null,
+        deviceCallAt: null,
+        clientCreatedAt: '2026-09-01T09:15:00.000Z',
+      },
+    ]);
+    await renderListe([rep({ id: 'r-1', callAttemptCount: 1 })]);
+    await choisir(/Aminata Ndiaye/u);
+
+    const appels = await screen.findByRole('list', { name: 'Appels' });
+    const texte = within(appels).getAllByRole('listitem')[0]?.textContent ?? '';
+    expect(texte).toContain('Autre non joint');
+    expect(texte).toContain('Awa Sy');
+    expect(texte).toContain('Contacté : Oui');
+    expect(texte).toContain('Motif : Ligne coupée deux fois');
+    expect(within(appels).queryByRole('button')).toBeNull();
+  });
+
+  it('n’encombre pas l’écran quand la fiche n’a jamais été appelée', async () => {
+    await renderListe();
+    await choisir(/Aminata Ndiaye/u);
+
+    expect(screen.queryByText('Appels précédents')).toBeNull();
+    expect(fetchRepresentantCallAttempts).not.toHaveBeenCalled();
   });
 
   // Next.js n'expose aucune API de blocage : le clic sur un lien est l'une des
