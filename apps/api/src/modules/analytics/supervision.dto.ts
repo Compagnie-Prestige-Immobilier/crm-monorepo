@@ -127,6 +127,24 @@ export class SupervisionActivityCountsDto {
   })
   reachRate!: number | null;
 
+  @ApiProperty({
+    type: Number,
+    description:
+      'Prospects DISTINCTS appelés, attribués à qui a passé le dernier appel de la fenêtre. ' +
+      'Une fiche par fenêtre : sommable entre lignes de la même fenêtre.',
+  })
+  fiches!: number;
+
+  @ApiProperty({ type: Number, description: 'Parmi `fiches`, celles dont le dernier appel a joint.' })
+  fichesJointes!: number;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: 'Taux de joignabilité PAR FICHE : `fichesJointes` / `fiches`. `null` sans fiche.',
+  })
+  ficheReachRate!: number | null;
+
   @ApiProperty({ type: Number, description: 'Fiches prospect saisies sur la période.' })
   prospectsCreated!: number;
 
@@ -243,6 +261,60 @@ export class SupervisionActivityCountsDto {
       'aucun représentant interrogé.',
   })
   repQualificationRate!: number | null;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      'Représentants DISTINCTS appelés, lus sur le DERNIER statut de la fenêtre et attribués ' +
+      'à qui l’a posé. Une fiche par fenêtre : sommable entre lignes de la même fenêtre, ' +
+      'pas entre fenêtres.',
+  })
+  repFiches!: number;
+
+  @ApiProperty({ type: Number, description: 'Parmi `repFiches`, dernier statut de la famille jointe.' })
+  repFichesJointes!: number;
+
+  @ApiProperty({ type: Number, description: 'Parmi `repFiches`, dernier statut non joint.' })
+  repFichesNonJointes!: number;
+
+  @ApiProperty({ type: Number, description: 'Parmi `repFiches`, dernier statut Accepté.' })
+  repFichesAcceptees!: number;
+
+  @ApiProperty({ type: Number, description: 'Parmi `repFiches`, dernier statut Refusé.' })
+  repFichesRefusees!: number;
+
+  @ApiProperty({ type: Number, description: 'Parmi `repFiches`, dernier statut À rappeler.' })
+  repFichesARappeler!: number;
+
+  @ApiProperty({
+    type: Number,
+    description:
+      'Dénominateur du taux d’acceptation : fiches jointes hors faux numéro, décédé, ' +
+      'retraité, hors cible et affecté ailleurs.',
+  })
+  repFichesEligibles!: number;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: 'Taux de joignabilité PAR FICHE : `repFichesJointes` / `repFiches`. `null` sans fiche.',
+  })
+  repReachabilityRate!: number | null;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description:
+      'Taux d’acceptation : `repFichesAcceptees` / `repFichesEligibles`. `null` sans fiche éligible.',
+  })
+  repAcceptanceRate!: number | null;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: 'Taux de rappel PAR FICHE : `repFichesARappeler` / `repFiches`. `null` sans fiche.',
+  })
+  repCallbackFicheRate!: number | null;
 
   @ApiProperty({
     type: Number,
@@ -367,6 +439,10 @@ export class SupervisionRepStatutDto {
   @ApiProperty() code!: string;
   @ApiProperty() label!: string;
   @ApiProperty({ type: Boolean }) isActive!: boolean;
+
+  @ApiProperty({ enum: ['JOINT', 'NON_JOINT'], enumName: 'FamilleStatut' })
+  famille!: 'JOINT' | 'NON_JOINT';
+
   @ApiProperty({ type: Number }) count!: number;
 }
 
@@ -379,6 +455,84 @@ export class SupervisionRepStatutsDto {
 
   @ApiProperty({ type: () => [SupervisionRepStatutDto] })
   items!: SupervisionRepStatutDto[];
+}
+
+export class SupervisionCampagnesTotauxDto {
+  @ApiProperty({ type: Number, description: 'Fiches confiées pour les jours de programme de la fenêtre.' })
+  prevues!: number;
+
+  @ApiProperty({ type: Number, description: 'Parmi `prevues`, celles qui ont reçu au moins un appel.' })
+  appelees!: number;
+
+  @ApiProperty({ type: Number, description: 'Parmi `prevues`, celles qui portent au moins une qualification.' })
+  traitees!: number;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: 'Taux de contact : `appelees` / `prevues`. `null` sans fiche prévue.',
+  })
+  contactRate!: number | null;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: 'Taux d’exploitation : `traitees` / `prevues`. `null` sans fiche prévue.',
+  })
+  exploitationRate!: number | null;
+}
+
+export class SupervisionCampagneTeleconseillerDto extends SupervisionCampagnesTotauxDto {
+  @ApiProperty({ format: 'uuid' }) teleconseillerId!: string;
+  @ApiProperty() teleconseillerName!: string;
+}
+
+export class SupervisionCampagneDto extends SupervisionCampagnesTotauxDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty() name!: string;
+  @ApiProperty({ enum: ['REPRESENTANTS', 'PROSPECTS'], enumName: 'LotExportCible' })
+  cible!: 'REPRESENTANTS' | 'PROSPECTS';
+  @ApiProperty({ type: String, format: 'date-time' }) createdAt!: string;
+
+  @ApiProperty({ type: () => [SupervisionCampagneTeleconseillerDto] })
+  parTeleconseiller!: SupervisionCampagneTeleconseillerDto[];
+}
+
+export class SupervisionCampagnesDto {
+  @ApiProperty({
+    type: () => [SupervisionCampagneDto],
+    description: 'Les campagnes dont un jour de programme tombe dans la fenêtre, la plus récente en tête.',
+  })
+  items!: SupervisionCampagneDto[];
+
+  @ApiProperty({ type: () => SupervisionCampagnesTotauxDto })
+  totals!: SupervisionCampagnesTotauxDto;
+}
+
+export class StockRepresentantsPartDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty() label!: string;
+  @ApiProperty({ type: Number }) count!: number;
+}
+
+export class StockRepresentantsDto {
+  @ApiProperty({ type: Number, description: 'Représentants non supprimés, toutes fiches.' })
+  total!: number;
+
+  @ApiProperty({ type: Number, description: 'Représentants sans aucun appel.' })
+  jamaisAppeles!: number;
+
+  @ApiProperty({
+    type: Number,
+    description: 'Représentants dont le statut est non joint, hors « Injoignable définitif ».',
+  })
+  injoignables!: number;
+
+  @ApiProperty({ type: () => [StockRepresentantsPartDto] })
+  parDepartement!: StockRepresentantsPartDto[];
+
+  @ApiProperty({ type: () => [StockRepresentantsPartDto] })
+  parIef!: StockRepresentantsPartDto[];
 }
 
 export class SupervisionActivityDto {
