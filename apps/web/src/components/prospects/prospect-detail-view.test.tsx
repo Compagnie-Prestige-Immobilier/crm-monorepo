@@ -77,6 +77,7 @@ describe('ProspectDetailView', () => {
         deviceCallType: null,
         deviceCallDurationSeconds: null,
         deviceCallAt: null,
+        dureeTraitementSecondes: null,
         clientCreatedAt: '2026-03-04T09:15:00.000Z',
       },
     ]);
@@ -91,6 +92,9 @@ describe('ProspectDetailView', () => {
     expect(texte).toContain('24 mois');
     expect(texte).toContain('Commentaire : Préfère la plateforme');
     expect(texte).toContain('Téléphone : non confirmé');
+    // Un appel d'avant le parcours de fiche ouverte n'a pas de durée : « 0 s »
+    // en ferait un appel expédié.
+    expect(texte).not.toContain('Traitement');
     expect(screen.getAllByText('Segment')).toHaveLength(2);
   });
 
@@ -112,6 +116,7 @@ describe('ProspectDetailView', () => {
         deviceCallType: 'sortant',
         deviceCallDurationSeconds: 92,
         deviceCallAt: '2026-03-04T14:02:00.000Z',
+        dureeTraitementSecondes: 180,
         clientCreatedAt: '2026-03-04T14:03:00.000Z',
       },
     ]);
@@ -120,6 +125,9 @@ describe('ProspectDetailView', () => {
     const appels = await screen.findByRole('list', { name: 'Appels' });
     const texte = within(appels).getAllByRole('listitem')[0]?.textContent ?? '';
     expect(texte).toContain('Téléphone : Sortant · 1 min 32 · 14:02');
+    // Le temps passé sur la fiche et le temps passé au téléphone se lisent sur
+    // deux lignes : confondus, la DMT et la DMC diraient la même chose.
+    expect(texte).toContain('Traitement : 3 min');
   });
 
   // « Mes contacts » ouvre la fiche sur cette ancre. La retirer laisserait le

@@ -1,6 +1,7 @@
 'use client';
 
 import { Badge } from '@/components/ui/badge';
+import { formatDuration } from '@/lib/data/admin';
 import { formatDateTime, formatDeviceCall, formatPhone } from '@/lib/format';
 import type { RepresentantCallAttempt } from '@/lib/data/representants';
 import { REP_CALL_OUTCOME_LABELS } from '@/lib/types';
@@ -60,6 +61,11 @@ export function AppelsRepresentant({ items }: { items: readonly RepresentantCall
               · {appel.performedByName}
             </p>
             <p className="text-[0.8125rem] text-muted-foreground">{formatDeviceCall(appel)}</p>
+            {appel.dureeTraitementSecondes === null ? null : (
+              <p className="text-[0.8125rem] text-muted-foreground">
+                Traitement : {formatDuration(appel.dureeTraitementSecondes)}
+              </p>
+            )}
             {reponses.length === 0 ? null : (
               <p className="text-[0.8125rem] text-muted-foreground">{reponses.join(' · ')}</p>
             )}
