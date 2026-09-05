@@ -310,6 +310,22 @@ describe('EB-14 et EB-17 réglages', () => {
     expect(parRole.places).toBe(60);
     expect(parObjectif.places).toBe(100);
   });
+
+  // Le detail annoncait `fichesParJour` brut a qui n'avait pas d'objectif
+  // saisi : la supervision lisait « objectif 50 » en face d'une seule fiche
+  // recue, et l'ecran contredisait la ligne d'a cote.
+  it('l’objectif rendu est celui que la répartition a appliqué', async () => {
+    await fiches(4);
+    const lot = await service.create(admin, campagne('objectifs', [alice, superviseur], 50));
+
+    const detail = await service.get(lot.id);
+    const objectifs = new Map(
+      detail.performance.map((ligne) => [ligne.teleconseillerId, ligne.objectif]),
+    );
+
+    expect(objectifs.get(alice)).toBe(50);
+    expect(objectifs.get(superviseur)).toBe(10);
+  });
 });
 
 describe('EB-18 état des fiches', () => {

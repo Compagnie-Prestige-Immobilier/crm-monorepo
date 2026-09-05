@@ -96,6 +96,7 @@ interface ItemRow {
 interface PerformanceRow {
   id: string;
   name: string;
+  role: Role;
   assigned: number;
   treated: number;
   assignedCalls: number;
@@ -923,11 +924,12 @@ export class LotsExportService {
         SELECT
           i."assigneeId" AS id,
           u."fullName" AS name,
+          u."role" AS role,
           COUNT(*)::int AS assigned
         FROM "lot_export_items" i
         INNER JOIN "users" u ON u.id = i."assigneeId"
         WHERE i."lotId" = ${id} AND i."assigneeId" IS NOT NULL
-        GROUP BY i."assigneeId", u."fullName"
+        GROUP BY i."assigneeId", u."fullName", u."role"
       ),
       conformes AS (
         SELECT
@@ -962,6 +964,7 @@ export class LotsExportService {
       SELECT
         m.id,
         m.name,
+        m.role,
         m.assigned,
         COALESCE(c.treated, 0)::int AS treated,
         COALESCE(c."assignedCalls", 0)::int AS "assignedCalls",
@@ -975,7 +978,7 @@ export class LotsExportService {
     return rows.map((row) => ({
       teleconseillerId: row.id,
       teleconseillerName: row.name,
-      objectif: distribution?.objectifs[row.id] ?? distribution?.fichesParJour ?? 0,
+      objectif: objectifDe(row, distribution),
       assigned: row.assigned,
       treated: row.treated,
       completionRate:
@@ -1230,6 +1233,20 @@ export class LotsExportService {
     if (value.whatsappStatus) where.whatsappStatus = value.whatsappStatus;
     return where;
   }
+}
+
+/**
+ * A defaut d'objectif saisi, ce que la repartition a REELLEMENT applique.
+ *
+ * Rendre `fichesParJour` brut annoncait a la supervision un objectif de 50
+ * quand le tourniquet ne lui avait donne que 10 fiches : l'ecran contredisait
+ * la ligne d'a cote.
+ */
+function objectifDe(row: PerformanceRow, distribution: Distribution | null): number {
+  const explicite = distribution?.objectifs[row.id];
+  if (explicite !== undefined) return explicite;
+  if (!distribution) return 0;
+  return capaciteParJour(row.role, distribution.fichesParJour);
 }
 
 function placesDe(membres: readonly MembreRepartition[], jours: number): number {
