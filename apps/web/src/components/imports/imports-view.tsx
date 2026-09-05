@@ -187,7 +187,7 @@ function errorsCaption(report: ImportJobReport): string {
 
 export function ImportsView({ initialKind = 'PROSPECTS' }: { initialKind?: UploadableImportKind }) {
   const queryClient = useQueryClient();
-  const live = useLive();
+  const live = useLive({ topic: 'imports' });
   const inputId = useId();
   const selectId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -690,7 +690,7 @@ function History({
   selectedId: string | null;
   onOpen: (job: ImportJob) => void;
 }) {
-  const live = useLive();
+  const live = useLive({ topic: 'imports' });
   const [page, setPage] = useState(1);
 
   const history = useQuery({

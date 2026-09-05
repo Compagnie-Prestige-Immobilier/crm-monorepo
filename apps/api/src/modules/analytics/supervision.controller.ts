@@ -8,6 +8,7 @@ import {
   type AuthenticatedUser,
 } from '../../common/decorators/current-user.decorator.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
+import { Cached } from '../../redis/cache.interceptor.js';
 import { SupervisionActivityService } from './supervision.service.js';
 import {
   SupervisionActivityDto,
@@ -29,6 +30,7 @@ export class SupervisionController {
   ) {}
 
   @Get('activite')
+  @Cached(30)
   @ApiOperation({
     operationId: 'getSupervisionActivite',
     summary: 'Activité des téléconseillers sur la fenêtre demandée.',

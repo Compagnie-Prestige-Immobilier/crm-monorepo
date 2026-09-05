@@ -42,6 +42,7 @@ import {
 } from './dto.js';
 import { DispatchClaim, SENDING_LEASE_MS } from './dispatch-claim.js';
 import { WorkspaceContext } from '../../workspaces/workspace.js';
+import { LiveService } from '../live/live.service.js';
 
 /** Motif d'une livraison `PENDING` conservée pour un nouvel essai. */
 export const DELIVERY_RETRY_ERROR = 'EMAIL_RETRY';
@@ -290,6 +291,7 @@ export class NotificationsService {
     private readonly prisma: PrismaService,
     private readonly workspace: WorkspaceContext,
     @Inject(BREVO_TRANSPORT) private readonly email: BrevoTransport,
+    private readonly live: LiveService,
   ) {}
 
   // Composition
@@ -1002,6 +1004,7 @@ export class NotificationsService {
         dispatchClaim: null,
       },
     });
+    if (closed.count > 0) this.live.emit('notifications');
     if (closed.count === claim.notificationIds.length) return;
 
     // Il reste des livraisons à servir. LE BAIL EST CONSERVÉ, et c'est ce qui
@@ -1254,6 +1257,7 @@ export class NotificationsService {
     });
 
     const result = { count: advanced.count + stamped.count };
+    if (result.count > 0) this.live.emit('notifications');
 
     if (result.count === 0) {
       const existing = await this.prisma.notificationDelivery.findFirst({

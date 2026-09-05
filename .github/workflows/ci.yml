@@ -72,6 +72,8 @@ jobs:
       SEED_ADMIN_EMAIL: admin@cpi.sn
       SEED_ADMIN_USERNAME: admin
       SEED_ADMIN_PASSWORD: ci-admin-password-2026
+      REDIS_URL: redis://localhost:6379
+      DEMO_WORKSPACE_ENABLED: 'true'
     services:
       postgres:
         image: postgres:18.4
@@ -83,6 +85,15 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd "pg_isready -U crm -d crm"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5

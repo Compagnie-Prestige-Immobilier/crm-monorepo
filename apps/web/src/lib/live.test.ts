@@ -38,6 +38,21 @@ describe('rythme de sondage', () => {
   });
 });
 
+describe('sujet poussé par le serveur', () => {
+  it('ralentit le sondage au rythme lent quand le flux porte le sujet', () => {
+    expect(liveInterval({ ...RUNNING, streamed: true })).toBe(LIVE_SLOW_INTERVAL_MS);
+  });
+
+  it('ne ralentit pas un sondage déjà plus lent', () => {
+    const slow = 5 * 60_000;
+    expect(liveInterval({ ...RUNNING, streamed: true }, slow)).toBe(slow);
+  });
+
+  it('s’arrête toujours en arrière-plan', () => {
+    expect(liveInterval({ ...RUNNING, hidden: true, streamed: true })).toBe(false);
+  });
+});
+
 describe('rythme choisi par l’appelant', () => {
   it('sonde au rythme demandé plutôt qu’au rythme nominal', () => {
     expect(liveInterval(RUNNING, LIVE_SLOW_INTERVAL_MS)).toBe(LIVE_SLOW_INTERVAL_MS);

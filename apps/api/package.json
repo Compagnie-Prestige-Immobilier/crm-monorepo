@@ -36,6 +36,7 @@
     "class-validator": "catalog:",
     "exceljs": "catalog:",
     "fastify": "catalog:",
+    "ioredis": "catalog:",
     "jszip": "catalog:",
     "libphonenumber-js": "catalog:",
     "nestjs-pino": "catalog:",

@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ImportStatus, type ImportJob, type Prisma } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { LiveService } from '../live/live.service.js';
 import {
   IMPORT_ADAPTERS,
   ImportAdapterFailure,
@@ -73,6 +74,7 @@ export class ImportRunnerService {
     private readonly prisma: PrismaService,
     @Inject(IMPORT_ADAPTERS) private readonly adapters: readonly AnyImportAdapter[],
     @Inject(IMPORT_ROW_READER) private readonly reader: ImportRowReader,
+    private readonly live: LiveService,
   ) {}
 
   async run(jobId: string, now = new Date()): Promise<ImportRunOutcome> {
@@ -159,6 +161,7 @@ export class ImportRunnerService {
     ) {
       throw new LostLeaseError();
     }
+    this.live.emit('imports');
 
     const run = await adapter.prepare(this.contextOn(job, this.prisma));
 
@@ -222,6 +225,7 @@ export class ImportRunnerService {
       throw new LostLeaseError();
     }
 
+    this.live.emit('imports');
     return { result: 'succeeded', created: totals.created, processed: totals.processed };
   }
 
@@ -260,6 +264,7 @@ export class ImportRunnerService {
     );
 
     totals.processed = processed;
+    this.live.emit('imports');
     totals.created += outcome.created;
     totals.updated += outcome.updated ?? 0;
     totals.skipped += outcome.skipped;
@@ -287,6 +292,7 @@ export class ImportRunnerService {
       },
       now,
     );
+    this.live.emit('imports');
     return { result: 'failed', code };
   }
 }
