@@ -218,6 +218,14 @@ enum StatutQualificationEffect {
   WRONG_NUMBER
 }
 
+// D'ou vient l'echeance d'un rappel. Sans elle, la file mele la date convenue
+// avec le representant et le simple delai de reessai : deplacer la premiere est
+// une parole trahie, deplacer la seconde ne coute rien.
+enum RappelOrigine {
+  PROMIS
+  AUTOMATIQUE
+}
+
 enum RepCallOutcome {
   REACHED
   PROSPECTS_PROMISED
@@ -539,6 +547,12 @@ model Representant {
   lastCallById    String?
   lastCallBy      User?           @relation("RepresentantLastCallBy", fields: [lastCallById], references: [id], onDelete: Restrict)
   nextCallbackAt  DateTime?
+
+  /// Qui a fixe l'echeance : le representant lui-meme, ou le delai de reessai
+  /// de son statut. Un rappel promis se tient a l'heure dite ; un rappel
+  /// automatique se deplace sans rien trahir. Nulle en meme temps que
+  /// `nextCallbackAt`, contrainte CHECK.
+  nextCallbackOrigine RappelOrigine?
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
