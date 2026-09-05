@@ -29,6 +29,7 @@ import 'package:crm_api_client/src/model/update_representant_dto.dart';
 import 'package:crm_api_client/src/model/whatsapp_status.dart';
 
 class RepresentantsApi {
+
   final Dio _dio;
 
   const RepresentantsApi(this._dio);
@@ -37,8 +38,8 @@ class RepresentantsApi {
   /// Le fil est en AJOUT SEUL : ni édition ni fusion, deux téléconseillers hors ligne produisent deux lignes. Reposter le même identifiant rend la ligne déjà enregistrée.
   ///
   /// Parameters:
-  /// * [id]
-  /// * [createRepresentantCommentDto]
+  /// * [id] 
+  /// * [createRepresentantCommentDto] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -48,7 +49,7 @@ class RepresentantsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [RepresentantCommentDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<RepresentantCommentDto>> addRepresentantComment({
+  Future<Response<RepresentantCommentDto>> addRepresentantComment({ 
     required String id,
     required CreateRepresentantCommentDto createRepresentantCommentDto,
     CancelToken? cancelToken,
@@ -58,18 +59,19 @@ class RepresentantsApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/representants/{id}/comments'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
+    final _path = r'/api/v1/representants/{id}/comments'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -81,9 +83,13 @@ class RepresentantsApi {
 
     try {
       _bodyData = jsonEncode(createRepresentantCommentDto);
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -102,14 +108,9 @@ class RepresentantsApi {
     RepresentantCommentDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<RepresentantCommentDto, RepresentantCommentDto>(
-              rawData,
-              'RepresentantCommentDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<RepresentantCommentDto, RepresentantCommentDto>(rawData, 'RepresentantCommentDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -133,10 +134,10 @@ class RepresentantsApi {
   }
 
   /// Crée un représentant. L’identifiant peut être fourni par le client.
-  ///
+  /// 
   ///
   /// Parameters:
-  /// * [createRepresentantDto]
+  /// * [createRepresentantDto] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -146,7 +147,7 @@ class RepresentantsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [RepresentantDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<RepresentantDto>> createRepresentant({
+  Future<Response<RepresentantDto>> createRepresentant({ 
     required CreateRepresentantDto createRepresentantDto,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -158,10 +159,16 @@ class RepresentantsApi {
     final _path = r'/api/v1/representants';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -173,9 +180,13 @@ class RepresentantsApi {
 
     try {
       _bodyData = jsonEncode(createRepresentantDto);
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -194,14 +205,9 @@ class RepresentantsApi {
     RepresentantDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<RepresentantDto, RepresentantDto>(
-              rawData,
-              'RepresentantDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<RepresentantDto, RepresentantDto>(rawData, 'RepresentantDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -225,10 +231,10 @@ class RepresentantsApi {
   }
 
   /// Supprime logiquement un représentant.
-  ///
+  /// 
   ///
   /// Parameters:
-  /// * [id]
+  /// * [id] 
   /// * [cascade] - Supprimer aussi les prospects rattachés. Sinon la suppression est refusée.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
@@ -239,7 +245,7 @@ class RepresentantsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [OkDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<OkDto>> deleteRepresentant({
+  Future<Response<OkDto>> deleteRepresentant({ 
     required String id,
     bool? cascade = false,
     CancelToken? cancelToken,
@@ -249,18 +255,19 @@ class RepresentantsApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/representants/{id}'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
+    final _path = r'/api/v1/representants/{id}'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'DELETE',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -283,10 +290,9 @@ class RepresentantsApi {
     OkDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<OkDto, OkDto>(rawData, 'OkDto', growable: true);
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<OkDto, OkDto>(rawData, 'OkDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -310,11 +316,11 @@ class RepresentantsApi {
   }
 
   /// Supprime logiquement un commentaire.
-  ///
+  /// 
   ///
   /// Parameters:
-  /// * [id]
-  /// * [commentId]
+  /// * [id] 
+  /// * [commentId] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -324,7 +330,7 @@ class RepresentantsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [OkDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<OkDto>> deleteRepresentantComment({
+  Future<Response<OkDto>> deleteRepresentantComment({ 
     required String id,
     required String commentId,
     CancelToken? cancelToken,
@@ -334,25 +340,19 @@ class RepresentantsApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/representants/{id}/comments/{commentId}'
-        .replaceAll(
-          '{'
-          r'id'
-          '}',
-          id.toString(),
-        )
-        .replaceAll(
-          '{'
-          r'commentId'
-          '}',
-          commentId.toString(),
-        );
+    final _path = r'/api/v1/representants/{id}/comments/{commentId}'.replaceAll('{' r'id' '}', id.toString()).replaceAll('{' r'commentId' '}', commentId.toString());
     final _options = Options(
       method: r'DELETE',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -370,10 +370,9 @@ class RepresentantsApi {
     OkDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<OkDto, OkDto>(rawData, 'OkDto', growable: true);
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<OkDto, OkDto>(rawData, 'OkDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -397,10 +396,10 @@ class RepresentantsApi {
   }
 
   /// Détail d’un représentant.
-  ///
+  /// 
   ///
   /// Parameters:
-  /// * [id]
+  /// * [id] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -410,7 +409,7 @@ class RepresentantsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [RepresentantDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<RepresentantDto>> getRepresentant({
+  Future<Response<RepresentantDto>> getRepresentant({ 
     required String id,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -419,18 +418,19 @@ class RepresentantsApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/representants/{id}'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
+    final _path = r'/api/v1/representants/{id}'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -448,14 +448,9 @@ class RepresentantsApi {
     RepresentantDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<RepresentantDto, RepresentantDto>(
-              rawData,
-              'RepresentantDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<RepresentantDto, RepresentantDto>(rawData, 'RepresentantDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -482,7 +477,7 @@ class RepresentantsApi {
   /// &#x60;dryRun&#x3D;true&#x60; (défaut) SIMULE : rien n’est écrit, et le rapport liste les erreurs avec leur numéro de ligne dans le fichier, ainsi que les doublons de téléphone (dans le fichier et contre la base). &#x60;dryRun&#x3D;false&#x60; applique, en une seule transaction : tout ou rien. Le premier temps n’est pas une précaution décorative, c’est ce qui évite d’écrire quelques milliers de fiches dont personne ne sait lesquelles sont bonnes.
   ///
   /// Parameters:
-  /// * [file]
+  /// * [file] 
   /// * [dryRun] - Simulation. Vaut VRAI par défaut : l’écriture doit être un acte explicite, pas ce qui arrive quand on oublie un paramètre.
   /// * [enrichir] - Complète les fiches déjà en base au lieu de les rejeter. NE REMPLIT QUE LE VIDE : un statut déjà tranché, une note déjà écrite et une fiche qui porte déjà un appel ne sont jamais touchés.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
@@ -494,7 +489,7 @@ class RepresentantsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [ImportReportDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<ImportReportDto>> importRepresentants({
+  Future<Response<ImportReportDto>> importRepresentants({ 
     required MultipartFile file,
     bool? dryRun = true,
     bool? enrichir = false,
@@ -508,10 +503,16 @@ class RepresentantsApi {
     final _path = r'/api/v1/representants/import';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -527,10 +528,13 @@ class RepresentantsApi {
     dynamic _bodyData;
 
     try {
-      _bodyData = FormData.fromMap(<String, dynamic>{r'file': file});
-    } catch (error, stackTrace) {
+      _bodyData = FormData.fromMap(<String, dynamic>{
+        r'file': file,
+      });
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(
+         requestOptions: _options.compose(
           _dio.options,
           _path,
           queryParameters: _queryParameters,
@@ -554,14 +558,9 @@ class RepresentantsApi {
     ImportReportDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<ImportReportDto, ImportReportDto>(
-              rawData,
-              'ImportReportDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<ImportReportDto, ImportReportDto>(rawData, 'ImportReportDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -585,10 +584,10 @@ class RepresentantsApi {
   }
 
   /// Les appels consignés sur une fiche, du plus récent au plus ancien.
-  ///
+  /// 
   ///
   /// Parameters:
-  /// * [id]
+  /// * [id] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -598,8 +597,7 @@ class RepresentantsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [RepresentantCallAttemptListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<RepresentantCallAttemptListDto>>
-  listRepresentantCallAttempts({
+  Future<Response<RepresentantCallAttemptListDto>> listRepresentantCallAttempts({ 
     required String id,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -608,18 +606,19 @@ class RepresentantsApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/representants/{id}/call-attempts'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
+    final _path = r'/api/v1/representants/{id}/call-attempts'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -637,13 +636,9 @@ class RepresentantsApi {
     RepresentantCallAttemptListDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<
-              RepresentantCallAttemptListDto,
-              RepresentantCallAttemptListDto
-            >(rawData, 'RepresentantCallAttemptListDto', growable: true);
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<RepresentantCallAttemptListDto, RepresentantCallAttemptListDto>(rawData, 'RepresentantCallAttemptListDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -667,12 +662,12 @@ class RepresentantsApi {
   }
 
   /// Fil de commentaires d’une fiche, du plus récent au plus ancien.
-  ///
+  /// 
   ///
   /// Parameters:
-  /// * [id]
-  /// * [page]
-  /// * [pageSize]
+  /// * [id] 
+  /// * [page] 
+  /// * [pageSize] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -682,7 +677,7 @@ class RepresentantsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [RepresentantCommentListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<RepresentantCommentListDto>> listRepresentantComments({
+  Future<Response<RepresentantCommentListDto>> listRepresentantComments({ 
     required String id,
     num? page = 1,
     num? pageSize = 50,
@@ -693,18 +688,19 @@ class RepresentantsApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/representants/{id}/comments'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
+    final _path = r'/api/v1/representants/{id}/comments'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -728,14 +724,9 @@ class RepresentantsApi {
     RepresentantCommentListDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<RepresentantCommentListDto, RepresentantCommentListDto>(
-              rawData,
-              'RepresentantCommentListDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<RepresentantCommentListDto, RepresentantCommentListDto>(rawData, 'RepresentantCommentListDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -762,7 +753,7 @@ class RepresentantsApi {
   /// Une détection sans &#x60;attemptId&#x60; est un appel que personne n’a consigné : c’est elle qui alimente l’alerte de supervision.
   ///
   /// Parameters:
-  /// * [id]
+  /// * [id] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -772,7 +763,7 @@ class RepresentantsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [DeviceCallDetectionListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<DeviceCallDetectionListDto>> listRepresentantDeviceCalls({
+  Future<Response<DeviceCallDetectionListDto>> listRepresentantDeviceCalls({ 
     required String id,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -781,18 +772,19 @@ class RepresentantsApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/representants/{id}/device-calls'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
+    final _path = r'/api/v1/representants/{id}/device-calls'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -810,14 +802,9 @@ class RepresentantsApi {
     DeviceCallDetectionListDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<DeviceCallDetectionListDto, DeviceCallDetectionListDto>(
-              rawData,
-              'DeviceCallDetectionListDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<DeviceCallDetectionListDto, DeviceCallDetectionListDto>(rawData, 'DeviceCallDetectionListDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -841,10 +828,10 @@ class RepresentantsApi {
   }
 
   /// Bascules de relation déjà subies par une fiche, de la plus récente à la plus ancienne.
-  ///
+  /// 
   ///
   /// Parameters:
-  /// * [id]
+  /// * [id] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -854,8 +841,7 @@ class RepresentantsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [RepresentantRelationChangeListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<RepresentantRelationChangeListDto>>
-  listRepresentantRelationChanges({
+  Future<Response<RepresentantRelationChangeListDto>> listRepresentantRelationChanges({ 
     required String id,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -864,18 +850,19 @@ class RepresentantsApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/representants/{id}/relation-history'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
+    final _path = r'/api/v1/representants/{id}/relation-history'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -893,13 +880,9 @@ class RepresentantsApi {
     RepresentantRelationChangeListDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<
-              RepresentantRelationChangeListDto,
-              RepresentantRelationChangeListDto
-            >(rawData, 'RepresentantRelationChangeListDto', growable: true);
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<RepresentantRelationChangeListDto, RepresentantRelationChangeListDto>(rawData, 'RepresentantRelationChangeListDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -926,24 +909,24 @@ class RepresentantsApi {
   /// Un COMMERCIAL ne voit que les représentants qu’il a créés ou qui lui sont attribués dans un lot d’export. ADMIN, SUPERVISEUR et DIRECTION voient tout.
   ///
   /// Parameters:
-  /// * [search]
-  /// * [departementId]
+  /// * [search] 
+  /// * [departementId] 
   /// * [iefId] - Filtre par IEF.
   /// * [commercialId] - Réservé à l’ADMIN.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [hasProspects] - true : au moins un prospect vivant. false : aucun (représentant dormant).
   /// * [statutQualificationId] - Statut de qualification du dernier appel. Sert le filtre de l’annuaire ET le tirage d’un lot d’appels.
-  /// * [whatsappStatus]
-  /// * [hasWhatsapp]
-  /// * [suivi] - A_RAPPELER : un rappel promis reste dû (`nextCallbackAt`), tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien.
+  /// * [whatsappStatus] 
+  /// * [hasWhatsapp] 
+  /// * [suivi] - A_RAPPELER : un rappel reste dû (`nextCallbackAt`), promis ou automatique, tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien.
   /// * [lastCallById] - Qui a passé le dernier appel. Un téléconseiller y met son propre identifiant.
   /// * [relationStatus] - Un ou plusieurs états de relation, séparés par des virgules. `CONTACTE,AMBASSADEUR,REFUS` rend tout ce qui a été contacté.
   /// * [mesFiches] - true : ne rend que ses propres fiches et celles qu’une campagne lui a confiées, quel que soit le rôle. L’écran d’appel le pose, l’annuaire non.
-  /// * [sortBy]
-  /// * [sortOrder]
-  /// * [page]
-  /// * [pageSize]
+  /// * [sortBy] 
+  /// * [sortOrder] 
+  /// * [page] 
+  /// * [pageSize] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -953,7 +936,7 @@ class RepresentantsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [RepresentantListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<RepresentantListDto>> listRepresentants({
+  Future<Response<RepresentantListDto>> listRepresentants({ 
     String? search,
     String? departementId,
     String? iefId,
@@ -982,10 +965,16 @@ class RepresentantsApi {
     final _path = r'/api/v1/representants';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -1000,8 +989,7 @@ class RepresentantsApi {
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
       if (hasProspects != null) r'hasProspects': hasProspects,
-      if (statutQualificationId != null)
-        r'statutQualificationId': statutQualificationId,
+      if (statutQualificationId != null) r'statutQualificationId': statutQualificationId,
       if (whatsappStatus != null) r'whatsappStatus': whatsappStatus,
       if (hasWhatsapp != null) r'hasWhatsapp': hasWhatsapp,
       if (suivi != null) r'suivi': suivi,
@@ -1026,14 +1014,9 @@ class RepresentantsApi {
     RepresentantListDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<RepresentantListDto, RepresentantListDto>(
-              rawData,
-              'RepresentantListDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<RepresentantListDto, RepresentantListDto>(rawData, 'RepresentantListDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1070,7 +1053,7 @@ class RepresentantsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [RepresentantLookupDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<RepresentantLookupDto>> lookupRepresentantByPhone({
+  Future<Response<RepresentantLookupDto>> lookupRepresentantByPhone({ 
     required String phone,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -1082,17 +1065,25 @@ class RepresentantsApi {
     final _path = r'/api/v1/representants/lookup';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
       validateStatus: validateStatus,
     );
 
-    final _queryParameters = <String, dynamic>{r'phone': phone};
+    final _queryParameters = <String, dynamic>{
+      r'phone': phone,
+    };
 
     final _response = await _dio.request<Object>(
       _path,
@@ -1106,14 +1097,9 @@ class RepresentantsApi {
     RepresentantLookupDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<RepresentantLookupDto, RepresentantLookupDto>(
-              rawData,
-              'RepresentantLookupDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<RepresentantLookupDto, RepresentantLookupDto>(rawData, 'RepresentantLookupDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1137,11 +1123,11 @@ class RepresentantsApi {
   }
 
   /// Modifie un représentant.
-  ///
+  /// 
   ///
   /// Parameters:
-  /// * [id]
-  /// * [updateRepresentantDto]
+  /// * [id] 
+  /// * [updateRepresentantDto] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -1151,7 +1137,7 @@ class RepresentantsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [RepresentantDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<RepresentantDto>> updateRepresentant({
+  Future<Response<RepresentantDto>> updateRepresentant({ 
     required String id,
     required UpdateRepresentantDto updateRepresentantDto,
     CancelToken? cancelToken,
@@ -1161,18 +1147,19 @@ class RepresentantsApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/representants/{id}'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
+    final _path = r'/api/v1/representants/{id}'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'PATCH',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -1184,9 +1171,13 @@ class RepresentantsApi {
 
     try {
       _bodyData = jsonEncode(updateRepresentantDto);
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -1205,14 +1196,9 @@ class RepresentantsApi {
     RepresentantDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<RepresentantDto, RepresentantDto>(
-              rawData,
-              'RepresentantDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<RepresentantDto, RepresentantDto>(rawData, 'RepresentantDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1234,4 +1220,5 @@ class RepresentantsApi {
       extra: _response.extra,
     );
   }
+
 }

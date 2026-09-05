@@ -5,13 +5,14 @@
 // ignore_for_file: unused_element
 import 'package:json_annotation/json_annotation.dart';
 
+
 enum VisiteImportChangeKind {
-  @JsonValue(r'CREATE')
-  CREATE(r'CREATE'),
-  @JsonValue(r'UPDATE')
-  UPDATE(r'UPDATE'),
-  @JsonValue(r'unknown_default_open_api')
-  unknownDefaultOpenApi(r'unknown_default_open_api');
+      @JsonValue(r'CREATE')
+      CREATE(r'CREATE'),
+      @JsonValue(r'UPDATE')
+      UPDATE(r'UPDATE'),
+      @JsonValue(r'unknown_default_open_api')
+      unknownDefaultOpenApi(r'unknown_default_open_api');
 
   const VisiteImportChangeKind(this.value);
 

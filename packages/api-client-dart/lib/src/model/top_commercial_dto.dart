@@ -9,6 +9,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'top_commercial_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,79 +20,152 @@ part 'top_commercial_dto.g.dart';
 class TopCommercialDto {
   /// Returns a new [TopCommercialDto] instance.
   TopCommercialDto({
-    required this.id,
 
-    required this.label,
+    required  this.id,
 
-    required this.prospects,
+    required  this.label,
 
-    required this.representants,
+    required  this.prospects,
 
-    required this.methodObtained,
+    required  this.representants,
 
-    required this.conversionRate,
+    required  this.methodObtained,
 
-    required this.share,
+    required  this.conversionRate,
 
-    required this.derniereSaisie,
+    required  this.share,
+
+    required  this.derniereSaisie,
   });
 
-  @JsonKey(name: r'id', required: true, includeIfNull: false)
+  @JsonKey(
+    
+    name: r'id',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String id;
 
-  @JsonKey(name: r'label', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'label',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String label;
 
-  @JsonKey(name: r'prospects', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'prospects',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num prospects;
 
-  @JsonKey(name: r'representants', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'representants',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num representants;
 
-  @JsonKey(name: r'methodObtained', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'methodObtained',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num methodObtained;
 
-  @JsonKey(name: r'conversionRate', required: true, includeIfNull: true)
+
+
+  @JsonKey(
+    
+    name: r'conversionRate',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final num? conversionRate;
 
-  @JsonKey(name: r'share', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'share',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num share;
 
-  @JsonKey(name: r'derniereSaisie', required: true, includeIfNull: true)
+
+
+  @JsonKey(
+    
+    name: r'derniereSaisie',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final DateTime? derniereSaisie;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is TopCommercialDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [
-                id,
-                label,
-                prospects,
-                representants,
-                methodObtained,
-                conversionRate,
-                share,
-                derniereSaisie,
-              ],
-              [
-                other.id,
-                other.label,
-                other.prospects,
-                other.representants,
-                other.methodObtained,
-                other.conversionRate,
-                other.share,
-                other.derniereSaisie,
-              ],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([
+
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is TopCommercialDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            id,
+            label,
+            prospects,
+            representants,
+            methodObtained,
+            conversionRate,
+            share,
+            derniereSaisie,
+        ],
+        [
+            other.id,
+            other.label,
+            other.prospects,
+            other.representants,
+            other.methodObtained,
+            other.conversionRate,
+            other.share,
+            other.derniereSaisie,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
         id,
         label,
         prospects,
@@ -100,10 +174,9 @@ class TopCommercialDto {
         conversionRate,
         share,
         derniereSaisie,
-      ]);
+    ],);
 
-  factory TopCommercialDto.fromJson(Map<String, dynamic> json) =>
-      _$TopCommercialDtoFromJson(json);
+  factory TopCommercialDto.fromJson(Map<String, dynamic> json) => _$TopCommercialDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$TopCommercialDtoToJson(this);
 
@@ -111,4 +184,6 @@ class TopCommercialDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

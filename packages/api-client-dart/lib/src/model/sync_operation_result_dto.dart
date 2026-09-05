@@ -10,6 +10,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'sync_operation_result_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,71 +21,139 @@ part 'sync_operation_result_dto.g.dart';
 class SyncOperationResultDto {
   /// Returns a new [SyncOperationResultDto] instance.
   SyncOperationResultDto({
-    required this.opId,
 
-    required this.status,
+    required  this.opId,
 
-    required this.entityId,
+    required  this.status,
 
-    required this.rev,
+    required  this.entityId,
 
-    required this.serverUpdatedAt,
+    required  this.rev,
 
-    required this.errorCode,
+    required  this.serverUpdatedAt,
 
-    required this.error,
+    required  this.errorCode,
+
+    required  this.error,
   });
 
-  @JsonKey(name: r'opId', required: true, includeIfNull: false)
+  @JsonKey(
+    
+    name: r'opId',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String opId;
 
+
+
   @JsonKey(
+    
     name: r'status',
     required: true,
     includeIfNull: false,
-    unknownEnumValue: SyncOpStatus.unknownDefaultOpenApi,
+  unknownEnumValue: SyncOpStatus.unknownDefaultOpenApi,
   )
+
+
   final SyncOpStatus status;
 
-  @JsonKey(name: r'entityId', required: true, includeIfNull: true)
+
+
+  @JsonKey(
+    
+    name: r'entityId',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final String? entityId;
 
-  /// Révision serveur après écriture.
-  @JsonKey(name: r'rev', required: true, includeIfNull: true)
+
+
+      /// Révision serveur après écriture.
+  @JsonKey(
+    
+    name: r'rev',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final num? rev;
 
-  @JsonKey(name: r'serverUpdatedAt', required: true, includeIfNull: true)
+
+
+  @JsonKey(
+    
+    name: r'serverUpdatedAt',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final DateTime? serverUpdatedAt;
 
-  /// Code métier lisible par le client : PROSPECT_PHONE_CONFLICT, REV_CONFLICT, …
-  @JsonKey(name: r'errorCode', required: true, includeIfNull: true)
+
+
+      /// Code métier lisible par le client : PROSPECT_PHONE_CONFLICT, REV_CONFLICT, …
+  @JsonKey(
+    
+    name: r'errorCode',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final String? errorCode;
 
-  @JsonKey(name: r'error', required: true, includeIfNull: true)
+
+
+  @JsonKey(
+    
+    name: r'error',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final String? error;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is SyncOperationResultDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [opId, status, entityId, rev, serverUpdatedAt, errorCode, error],
-              [
-                other.opId,
-                other.status,
-                other.entityId,
-                other.rev,
-                other.serverUpdatedAt,
-                other.errorCode,
-                other.error,
-              ],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([
+
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is SyncOperationResultDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            opId,
+            status,
+            entityId,
+            rev,
+            serverUpdatedAt,
+            errorCode,
+            error,
+        ],
+        [
+            other.opId,
+            other.status,
+            other.entityId,
+            other.rev,
+            other.serverUpdatedAt,
+            other.errorCode,
+            other.error,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
         opId,
         status,
         entityId,
@@ -92,10 +161,9 @@ class SyncOperationResultDto {
         serverUpdatedAt,
         errorCode,
         error,
-      ]);
+    ],);
 
-  factory SyncOperationResultDto.fromJson(Map<String, dynamic> json) =>
-      _$SyncOperationResultDtoFromJson(json);
+  factory SyncOperationResultDto.fromJson(Map<String, dynamic> json) => _$SyncOperationResultDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$SyncOperationResultDtoToJson(this);
 
@@ -103,4 +171,6 @@ class SyncOperationResultDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

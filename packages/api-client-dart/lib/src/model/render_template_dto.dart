@@ -9,6 +9,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'render_template_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -18,24 +19,46 @@ part 'render_template_dto.g.dart';
 )
 class RenderTemplateDto {
   /// Returns a new [RenderTemplateDto] instance.
-  RenderTemplateDto({required this.variables});
+  RenderTemplateDto({
 
-  /// Couples `{ variable: valeur }`.
-  @JsonKey(name: r'variables', required: true, includeIfNull: false)
+    required  this.variables,
+  });
+
+      /// Couples `{ variable: valeur }`.
+  @JsonKey(
+    
+    name: r'variables',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final Map<String, String> variables;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is RenderTemplateDto &&
-            runtimeType == other.runtimeType &&
-            equals([variables], [other.variables]);
-  }
 
-  @override
-  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([variables]);
 
-  factory RenderTemplateDto.fromJson(Map<String, dynamic> json) =>
-      _$RenderTemplateDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is RenderTemplateDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            variables,
+        ],
+        [
+            other.variables,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        variables,
+    ],);
+
+  factory RenderTemplateDto.fromJson(Map<String, dynamic> json) => _$RenderTemplateDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$RenderTemplateDtoToJson(this);
 
@@ -43,4 +66,6 @@ class RenderTemplateDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

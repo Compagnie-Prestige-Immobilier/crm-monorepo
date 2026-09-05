@@ -10,6 +10,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'sync_visite_referentiel_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,69 +21,137 @@ part 'sync_visite_referentiel_dto.g.dart';
 class SyncVisiteReferentielDto {
   /// Returns a new [SyncVisiteReferentielDto] instance.
   SyncVisiteReferentielDto({
-    required this.id,
 
-    required this.kind,
+    required  this.id,
 
-    required this.code,
+    required  this.kind,
 
-    required this.label,
+    required  this.code,
 
-    required this.isActive,
+    required  this.label,
 
-    required this.sortOrder,
+    required  this.isActive,
 
-    required this.updatedAt,
+    required  this.sortOrder,
+
+    required  this.updatedAt,
   });
 
-  @JsonKey(name: r'id', required: true, includeIfNull: false)
+  @JsonKey(
+    
+    name: r'id',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String id;
 
+
+
   @JsonKey(
+    
     name: r'kind',
     required: true,
     includeIfNull: false,
-    unknownEnumValue: VisiteReferentielKind.unknownDefaultOpenApi,
+  unknownEnumValue: VisiteReferentielKind.unknownDefaultOpenApi,
   )
+
+
   final VisiteReferentielKind kind;
 
-  @JsonKey(name: r'code', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'code',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String code;
 
-  @JsonKey(name: r'label', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'label',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String label;
 
-  @JsonKey(name: r'isActive', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'isActive',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final bool isActive;
 
-  @JsonKey(name: r'sortOrder', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'sortOrder',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num sortOrder;
 
-  @JsonKey(name: r'updatedAt', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'updatedAt',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final DateTime updatedAt;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is SyncVisiteReferentielDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [id, kind, code, label, isActive, sortOrder, updatedAt],
-              [
-                other.id,
-                other.kind,
-                other.code,
-                other.label,
-                other.isActive,
-                other.sortOrder,
-                other.updatedAt,
-              ],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([
+
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is SyncVisiteReferentielDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            id,
+            kind,
+            code,
+            label,
+            isActive,
+            sortOrder,
+            updatedAt,
+        ],
+        [
+            other.id,
+            other.kind,
+            other.code,
+            other.label,
+            other.isActive,
+            other.sortOrder,
+            other.updatedAt,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
         id,
         kind,
         code,
@@ -90,10 +159,9 @@ class SyncVisiteReferentielDto {
         isActive,
         sortOrder,
         updatedAt,
-      ]);
+    ],);
 
-  factory SyncVisiteReferentielDto.fromJson(Map<String, dynamic> json) =>
-      _$SyncVisiteReferentielDtoFromJson(json);
+  factory SyncVisiteReferentielDto.fromJson(Map<String, dynamic> json) => _$SyncVisiteReferentielDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$SyncVisiteReferentielDtoToJson(this);
 
@@ -101,4 +169,6 @@ class SyncVisiteReferentielDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

@@ -9,6 +9,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'notification_delivery_counts_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,63 +20,131 @@ part 'notification_delivery_counts_dto.g.dart';
 class NotificationDeliveryCountsDto {
   /// Returns a new [NotificationDeliveryCountsDto] instance.
   NotificationDeliveryCountsDto({
-    required this.total,
 
-    required this.pending,
+    required  this.total,
 
-    required this.sent,
+    required  this.pending,
 
-    required this.delivered,
+    required  this.sent,
 
-    required this.failed,
+    required  this.delivered,
 
-    required this.read,
+    required  this.failed,
+
+    required  this.read,
   });
 
-  @JsonKey(name: r'total', required: true, includeIfNull: false)
+  @JsonKey(
+    
+    name: r'total',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num total;
 
-  /// En file. Soit le destinataire n’est pas servi par e-mail et lira dans l’application, soit l’envoi a échoué de façon passagère et sera réessayé. Ce n’est pas un échec.
-  @JsonKey(name: r'pending', required: true, includeIfNull: false)
+
+
+      /// En file. Soit le destinataire n’est pas servi par e-mail et lira dans l’application, soit l’envoi a échoué de façon passagère et sera réessayé. Ce n’est pas un échec.
+  @JsonKey(
+    
+    name: r'pending',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num pending;
 
-  /// E-mail accepté par Brevo. N’implique pas « lu », ni même « remis ».
-  @JsonKey(name: r'sent', required: true, includeIfNull: false)
+
+
+      /// E-mail accepté par Brevo. N’implique pas « lu », ni même « remis ».
+  @JsonKey(
+    
+    name: r'sent',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num sent;
 
-  @JsonKey(name: r'delivered', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'delivered',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num delivered;
 
-  @JsonKey(name: r'failed', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'failed',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num failed;
 
-  @JsonKey(name: r'read', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'read',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num read;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is NotificationDeliveryCountsDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [total, pending, sent, delivered, failed, read],
-              [
-                other.total,
-                other.pending,
-                other.sent,
-                other.delivered,
-                other.failed,
-                other.read,
-              ],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([total, pending, sent, delivered, failed, read]);
 
-  factory NotificationDeliveryCountsDto.fromJson(Map<String, dynamic> json) =>
-      _$NotificationDeliveryCountsDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is NotificationDeliveryCountsDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            total,
+            pending,
+            sent,
+            delivered,
+            failed,
+            read,
+        ],
+        [
+            other.total,
+            other.pending,
+            other.sent,
+            other.delivered,
+            other.failed,
+            other.read,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        total,
+        pending,
+        sent,
+        delivered,
+        failed,
+        read,
+    ],);
+
+  factory NotificationDeliveryCountsDto.fromJson(Map<String, dynamic> json) => _$NotificationDeliveryCountsDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$NotificationDeliveryCountsDtoToJson(this);
 
@@ -83,4 +152,6 @@ class NotificationDeliveryCountsDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

@@ -9,6 +9,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'visite_stat_recurrent_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,38 +20,78 @@ part 'visite_stat_recurrent_dto.g.dart';
 class VisiteStatRecurrentDto {
   /// Returns a new [VisiteStatRecurrentDto] instance.
   VisiteStatRecurrentDto({
-    required this.nom,
 
-    required this.visites,
+    required  this.nom,
 
-    required this.derniereVisite,
+    required  this.visites,
+
+    required  this.derniereVisite,
   });
 
-  @JsonKey(name: r'nom', required: true, includeIfNull: false)
+  @JsonKey(
+    
+    name: r'nom',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String nom;
 
-  @JsonKey(name: r'visites', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'visites',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num visites;
 
-  @JsonKey(name: r'derniereVisite', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'derniereVisite',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String derniereVisite;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is VisiteStatRecurrentDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [nom, visites, derniereVisite],
-              [other.nom, other.visites, other.derniereVisite],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^ mapPropsToHashCode([nom, visites, derniereVisite]);
 
-  factory VisiteStatRecurrentDto.fromJson(Map<String, dynamic> json) =>
-      _$VisiteStatRecurrentDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is VisiteStatRecurrentDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            nom,
+            visites,
+            derniereVisite,
+        ],
+        [
+            other.nom,
+            other.visites,
+            other.derniereVisite,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        nom,
+        visites,
+        derniereVisite,
+    ],);
+
+  factory VisiteStatRecurrentDto.fromJson(Map<String, dynamic> json) => _$VisiteStatRecurrentDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$VisiteStatRecurrentDtoToJson(this);
 
@@ -58,4 +99,6 @@ class VisiteStatRecurrentDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

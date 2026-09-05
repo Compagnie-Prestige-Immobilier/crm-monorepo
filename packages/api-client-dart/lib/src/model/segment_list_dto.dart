@@ -10,6 +10,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'segment_list_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,26 +20,62 @@ part 'segment_list_dto.g.dart';
 )
 class SegmentListDto {
   /// Returns a new [SegmentListDto] instance.
-  SegmentListDto({required this.items, required this.total});
+  SegmentListDto({
 
-  @JsonKey(name: r'items', required: true, includeIfNull: false)
+    required  this.items,
+
+    required  this.total,
+  });
+
+  @JsonKey(
+    
+    name: r'items',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final List<SegmentCountDto> items;
 
-  @JsonKey(name: r'total', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'total',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num total;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is SegmentListDto &&
-            runtimeType == other.runtimeType &&
-            equals([items, total], [other.items, other.total]);
-  }
 
-  @override
-  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([items, total]);
 
-  factory SegmentListDto.fromJson(Map<String, dynamic> json) =>
-      _$SegmentListDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is SegmentListDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            items,
+            total,
+        ],
+        [
+            other.items,
+            other.total,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        items,
+        total,
+    ],);
+
+  factory SegmentListDto.fromJson(Map<String, dynamic> json) => _$SegmentListDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$SegmentListDtoToJson(this);
 
@@ -46,4 +83,6 @@ class SegmentListDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

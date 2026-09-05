@@ -10,6 +10,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'create_user_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,69 +21,132 @@ part 'create_user_dto.g.dart';
 class CreateUserDto {
   /// Returns a new [CreateUserDto] instance.
   CreateUserDto({
-    required this.email,
 
-    required this.username,
+    required  this.email,
 
-    required this.fullName,
+    required  this.username,
 
-    required this.password,
+    required  this.fullName,
 
-    this.role = Role.COMMERCIAL,
+    required  this.password,
 
-    this.phone,
+     this.role = Role.COMMERCIAL,
+
+     this.phone,
   });
 
-  @JsonKey(name: r'email', required: true, includeIfNull: false)
+  @JsonKey(
+    
+    name: r'email',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String email;
 
-  /// Identifiant de connexion alternatif : lettres, chiffres, point, tiret bas.
-  @JsonKey(name: r'username', required: true, includeIfNull: false)
+
+
+      /// Identifiant de connexion alternatif : lettres, chiffres, point, tiret bas.
+  @JsonKey(
+    
+    name: r'username',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String username;
 
-  @JsonKey(name: r'fullName', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'fullName',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String fullName;
 
-  @JsonKey(name: r'password', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'password',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String password;
+
+
 
   @JsonKey(
     defaultValue: Role.COMMERCIAL,
     name: r'role',
     required: false,
     includeIfNull: false,
-    unknownEnumValue: Role.unknownDefaultOpenApi,
+  unknownEnumValue: Role.unknownDefaultOpenApi,
   )
+
+
   final Role? role;
 
-  /// Téléphone, normalisé en E.164 par le serveur.
-  @JsonKey(name: r'phone', required: false, includeIfNull: false)
+
+
+      /// Téléphone, normalisé en E.164 par le serveur.
+  @JsonKey(
+    
+    name: r'phone',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final String? phone;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is CreateUserDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [email, username, fullName, password, role, phone],
-              [
-                other.email,
-                other.username,
-                other.fullName,
-                other.password,
-                other.role,
-                other.phone,
-              ],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([email, username, fullName, password, role, phone]);
 
-  factory CreateUserDto.fromJson(Map<String, dynamic> json) =>
-      _$CreateUserDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is CreateUserDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            email,
+            username,
+            fullName,
+            password,
+            role,
+            phone,
+        ],
+        [
+            other.email,
+            other.username,
+            other.fullName,
+            other.password,
+            other.role,
+            other.phone,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        email,
+        username,
+        fullName,
+        password,
+        role,
+        phone,
+    ],);
+
+  factory CreateUserDto.fromJson(Map<String, dynamic> json) => _$CreateUserDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$CreateUserDtoToJson(this);
 
@@ -90,4 +154,6 @@ class CreateUserDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

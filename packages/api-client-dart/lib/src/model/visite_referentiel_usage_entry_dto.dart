@@ -9,6 +9,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'visite_referentiel_usage_entry_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -18,26 +19,62 @@ part 'visite_referentiel_usage_entry_dto.g.dart';
 )
 class VisiteReferentielUsageEntryDto {
   /// Returns a new [VisiteReferentielUsageEntryDto] instance.
-  VisiteReferentielUsageEntryDto({required this.id, required this.count});
+  VisiteReferentielUsageEntryDto({
 
-  @JsonKey(name: r'id', required: true, includeIfNull: false)
+    required  this.id,
+
+    required  this.count,
+  });
+
+  @JsonKey(
+    
+    name: r'id',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String id;
 
-  @JsonKey(name: r'count', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'count',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num count;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is VisiteReferentielUsageEntryDto &&
-            runtimeType == other.runtimeType &&
-            equals([id, count], [other.id, other.count]);
-  }
 
-  @override
-  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([id, count]);
 
-  factory VisiteReferentielUsageEntryDto.fromJson(Map<String, dynamic> json) =>
-      _$VisiteReferentielUsageEntryDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is VisiteReferentielUsageEntryDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            id,
+            count,
+        ],
+        [
+            other.id,
+            other.count,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        id,
+        count,
+    ],);
+
+  factory VisiteReferentielUsageEntryDto.fromJson(Map<String, dynamic> json) => _$VisiteReferentielUsageEntryDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$VisiteReferentielUsageEntryDtoToJson(this);
 
@@ -45,4 +82,6 @@ class VisiteReferentielUsageEntryDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

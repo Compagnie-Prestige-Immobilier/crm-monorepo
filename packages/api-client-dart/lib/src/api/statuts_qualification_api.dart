@@ -17,15 +17,16 @@ import 'package:crm_api_client/src/model/statut_qualification_list_dto.dart';
 import 'package:crm_api_client/src/model/update_statut_qualification_dto.dart';
 
 class StatutsQualificationApi {
+
   final Dio _dio;
 
   const StatutsQualificationApi(this._dio);
 
   /// Ajouter un statut de qualification.
-  ///
+  /// Le code est déduit du libellé, puis figé : l’historique le référence. Deux libellés qui ne se distinguent que par les accents ou la casse donnent le même code et le second est refusé.
   ///
   /// Parameters:
-  /// * [createStatutQualificationDto]
+  /// * [createStatutQualificationDto] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -35,7 +36,7 @@ class StatutsQualificationApi {
   ///
   /// Returns a [Future] containing a [Response] with a [StatutQualificationDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<StatutQualificationDto>> createStatutQualification({
+  Future<Response<StatutQualificationDto>> createStatutQualification({ 
     required CreateStatutQualificationDto createStatutQualificationDto,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -47,10 +48,16 @@ class StatutsQualificationApi {
     final _path = r'/api/v1/statuts-qualification';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -62,9 +69,13 @@ class StatutsQualificationApi {
 
     try {
       _bodyData = jsonEncode(createStatutQualificationDto);
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -83,14 +94,9 @@ class StatutsQualificationApi {
     StatutQualificationDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<StatutQualificationDto, StatutQualificationDto>(
-              rawData,
-              'StatutQualificationDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<StatutQualificationDto, StatutQualificationDto>(rawData, 'StatutQualificationDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -114,7 +120,7 @@ class StatutsQualificationApi {
   }
 
   /// Tous les statuts, actifs ou non, toutes versions de charge utile.
-  ///
+  /// 
   ///
   /// Parameters:
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
@@ -126,7 +132,7 @@ class StatutsQualificationApi {
   ///
   /// Returns a [Future] containing a [Response] with a [StatutQualificationListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<StatutQualificationListDto>> listAllStatutsQualification({
+  Future<Response<StatutQualificationListDto>> listAllStatutsQualification({ 
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -137,10 +143,16 @@ class StatutsQualificationApi {
     final _path = r'/api/v1/statuts-qualification/administration';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -158,14 +170,9 @@ class StatutsQualificationApi {
     StatutQualificationListDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<StatutQualificationListDto, StatutQualificationListDto>(
-              rawData,
-              'StatutQualificationListDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<StatutQualificationListDto, StatutQualificationListDto>(rawData, 'StatutQualificationListDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -202,7 +209,7 @@ class StatutsQualificationApi {
   ///
   /// Returns a [Future] containing a [Response] with a [StatutQualificationListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<StatutQualificationListDto>> listStatutsQualification({
+  Future<Response<StatutQualificationListDto>> listStatutsQualification({ 
     required num payloadVersion,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -214,10 +221,16 @@ class StatutsQualificationApi {
     final _path = r'/api/v1/statuts-qualification';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -240,14 +253,9 @@ class StatutsQualificationApi {
     StatutQualificationListDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<StatutQualificationListDto, StatutQualificationListDto>(
-              rawData,
-              'StatutQualificationListDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<StatutQualificationListDto, StatutQualificationListDto>(rawData, 'StatutQualificationListDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -274,8 +282,8 @@ class StatutsQualificationApi {
   /// Un statut désactivé disparaît de la saisie et reste lisible sur les fiches qui le désignent. Vider une branche du script de son dernier statut actif est refusé.
   ///
   /// Parameters:
-  /// * [id]
-  /// * [setStatutQualificationActiveDto]
+  /// * [id] 
+  /// * [setStatutQualificationActiveDto] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -285,7 +293,7 @@ class StatutsQualificationApi {
   ///
   /// Returns a [Future] containing a [Response] with a [StatutQualificationDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<StatutQualificationDto>> setStatutQualificationActive({
+  Future<Response<StatutQualificationDto>> setStatutQualificationActive({ 
     required String id,
     required SetStatutQualificationActiveDto setStatutQualificationActiveDto,
     CancelToken? cancelToken,
@@ -295,18 +303,19 @@ class StatutsQualificationApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/statuts-qualification/{id}/active'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
+    final _path = r'/api/v1/statuts-qualification/{id}/active'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -318,9 +327,13 @@ class StatutsQualificationApi {
 
     try {
       _bodyData = jsonEncode(setStatutQualificationActiveDto);
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -339,14 +352,9 @@ class StatutsQualificationApi {
     StatutQualificationDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<StatutQualificationDto, StatutQualificationDto>(
-              rawData,
-              'StatutQualificationDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<StatutQualificationDto, StatutQualificationDto>(rawData, 'StatutQualificationDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -370,11 +378,11 @@ class StatutsQualificationApi {
   }
 
   /// Renommer un statut, changer son rang, ou sa règle si elle n’est pas système.
-  ///
+  /// 
   ///
   /// Parameters:
-  /// * [id]
-  /// * [updateStatutQualificationDto]
+  /// * [id] 
+  /// * [updateStatutQualificationDto] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -384,7 +392,7 @@ class StatutsQualificationApi {
   ///
   /// Returns a [Future] containing a [Response] with a [StatutQualificationDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<StatutQualificationDto>> updateStatutQualification({
+  Future<Response<StatutQualificationDto>> updateStatutQualification({ 
     required String id,
     required UpdateStatutQualificationDto updateStatutQualificationDto,
     CancelToken? cancelToken,
@@ -394,18 +402,19 @@ class StatutsQualificationApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/statuts-qualification/{id}'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
+    final _path = r'/api/v1/statuts-qualification/{id}'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'PATCH',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -417,9 +426,13 @@ class StatutsQualificationApi {
 
     try {
       _bodyData = jsonEncode(updateStatutQualificationDto);
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -438,14 +451,9 @@ class StatutsQualificationApi {
     StatutQualificationDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<StatutQualificationDto, StatutQualificationDto>(
-              rawData,
-              'StatutQualificationDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<StatutQualificationDto, StatutQualificationDto>(rawData, 'StatutQualificationDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -467,4 +475,5 @@ class StatutsQualificationApi {
       extra: _response.extra,
     );
   }
+
 }

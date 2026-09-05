@@ -10,6 +10,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'representant_call_attempt_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,187 +21,383 @@ part 'representant_call_attempt_dto.g.dart';
 class RepresentantCallAttemptDto {
   /// Returns a new [RepresentantCallAttemptDto] instance.
   RepresentantCallAttemptDto({
-    required this.id,
 
-    required this.outcome,
+    required  this.id,
 
-    required this.statutQualificationId,
+    required  this.outcome,
 
-    required this.statutQualificationLabel,
+    required  this.statutQualificationId,
 
-    required this.comment,
+    required  this.statutQualificationLabel,
 
-    required this.callbackAt,
+    required  this.statutQualificationRequiresComment,
 
-    required this.promisedProspects,
+    required  this.comment,
 
-    required this.etablissementConfirme,
+    required  this.callbackAt,
 
-    required this.numeroConfirme,
+    required  this.promisedProspects,
 
-    required this.contacte,
+    required  this.etablissementConfirme,
 
-    required this.connaitUES,
+    required  this.numeroConfirme,
 
-    required this.syndicat,
+    required  this.contacte,
 
-    required this.suggestedName,
+    required  this.connaitUES,
 
-    required this.suggestedPhoneE164,
+    required  this.syndicat,
 
-    required this.suggestedNote,
+    required  this.suggestedName,
 
-    required this.deviceCallType,
+    required  this.suggestedPhoneE164,
 
-    required this.deviceCallDurationSeconds,
+    required  this.suggestedNote,
 
-    required this.deviceCallAt,
+    required  this.deviceCallType,
 
-    required this.performedById,
+    required  this.deviceCallDurationSeconds,
 
-    required this.performedByName,
+    required  this.deviceCallAt,
 
-    required this.clientCreatedAt,
+    required  this.performedById,
+
+    required  this.performedByName,
+
+    required  this.clientCreatedAt,
   });
 
-  @JsonKey(name: r'id', required: true, includeIfNull: false)
+  @JsonKey(
+    
+    name: r'id',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String id;
 
+
+
   @JsonKey(
+    
     name: r'outcome',
     required: true,
     includeIfNull: false,
-    unknownEnumValue: RepCallOutcome.unknownDefaultOpenApi,
+  unknownEnumValue: RepCallOutcome.unknownDefaultOpenApi,
   )
+
+
   final RepCallOutcome outcome;
 
-  @JsonKey(name: r'statutQualificationId', required: true, includeIfNull: true)
-  final String? statutQualificationId;
+
 
   @JsonKey(
+    
+    name: r'statutQualificationId',
+    required: true,
+    includeIfNull: true,
+  )
+
+
+  final String? statutQualificationId;
+
+
+
+  @JsonKey(
+    
     name: r'statutQualificationLabel',
     required: true,
     includeIfNull: true,
   )
+
+
   final String? statutQualificationLabel;
 
-  @JsonKey(name: r'comment', required: true, includeIfNull: true)
-  final String? comment;
 
-  @JsonKey(name: r'callbackAt', required: true, includeIfNull: true)
-  final DateTime? callbackAt;
 
-  @JsonKey(name: r'promisedProspects', required: true, includeIfNull: true)
-  final num? promisedProspects;
+      /// Le statut exigeait un motif : `comment` porte alors ce motif, et non un commentaire libre.
+  @JsonKey(
+    
+    name: r'statutQualificationRequiresComment',
+    required: true,
+    includeIfNull: false,
+  )
 
-  @JsonKey(name: r'etablissementConfirme', required: true, includeIfNull: true)
-  final bool? etablissementConfirme;
 
-  @JsonKey(name: r'numeroConfirme', required: true, includeIfNull: true)
-  final bool? numeroConfirme;
+  final bool statutQualificationRequiresComment;
 
-  @JsonKey(name: r'contacte', required: true, includeIfNull: true)
-  final bool? contacte;
 
-  @JsonKey(name: r'connaitUES', required: true, includeIfNull: true)
-  final bool? connaitUES;
-
-  @JsonKey(name: r'syndicat', required: true, includeIfNull: true)
-  final String? syndicat;
-
-  @JsonKey(name: r'suggestedName', required: true, includeIfNull: true)
-  final String? suggestedName;
-
-  @JsonKey(name: r'suggestedPhoneE164', required: true, includeIfNull: true)
-  final String? suggestedPhoneE164;
-
-  @JsonKey(name: r'suggestedNote', required: true, includeIfNull: true)
-  final String? suggestedNote;
-
-  @JsonKey(name: r'deviceCallType', required: true, includeIfNull: true)
-  final String? deviceCallType;
 
   @JsonKey(
+    
+    name: r'comment',
+    required: true,
+    includeIfNull: true,
+  )
+
+
+  final String? comment;
+
+
+
+  @JsonKey(
+    
+    name: r'callbackAt',
+    required: true,
+    includeIfNull: true,
+  )
+
+
+  final DateTime? callbackAt;
+
+
+
+  @JsonKey(
+    
+    name: r'promisedProspects',
+    required: true,
+    includeIfNull: true,
+  )
+
+
+  final num? promisedProspects;
+
+
+
+  @JsonKey(
+    
+    name: r'etablissementConfirme',
+    required: true,
+    includeIfNull: true,
+  )
+
+
+  final bool? etablissementConfirme;
+
+
+
+  @JsonKey(
+    
+    name: r'numeroConfirme',
+    required: true,
+    includeIfNull: true,
+  )
+
+
+  final bool? numeroConfirme;
+
+
+
+  @JsonKey(
+    
+    name: r'contacte',
+    required: true,
+    includeIfNull: true,
+  )
+
+
+  final bool? contacte;
+
+
+
+  @JsonKey(
+    
+    name: r'connaitUES',
+    required: true,
+    includeIfNull: true,
+  )
+
+
+  final bool? connaitUES;
+
+
+
+  @JsonKey(
+    
+    name: r'syndicat',
+    required: true,
+    includeIfNull: true,
+  )
+
+
+  final String? syndicat;
+
+
+
+  @JsonKey(
+    
+    name: r'suggestedName',
+    required: true,
+    includeIfNull: true,
+  )
+
+
+  final String? suggestedName;
+
+
+
+  @JsonKey(
+    
+    name: r'suggestedPhoneE164',
+    required: true,
+    includeIfNull: true,
+  )
+
+
+  final String? suggestedPhoneE164;
+
+
+
+  @JsonKey(
+    
+    name: r'suggestedNote',
+    required: true,
+    includeIfNull: true,
+  )
+
+
+  final String? suggestedNote;
+
+
+
+  @JsonKey(
+    
+    name: r'deviceCallType',
+    required: true,
+    includeIfNull: true,
+  )
+
+
+  final String? deviceCallType;
+
+
+
+  @JsonKey(
+    
     name: r'deviceCallDurationSeconds',
     required: true,
     includeIfNull: true,
   )
+
+
   final num? deviceCallDurationSeconds;
 
-  @JsonKey(name: r'deviceCallAt', required: true, includeIfNull: true)
+
+
+  @JsonKey(
+    
+    name: r'deviceCallAt',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final DateTime? deviceCallAt;
 
-  @JsonKey(name: r'performedById', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'performedById',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String performedById;
 
-  @JsonKey(name: r'performedByName', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'performedByName',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String performedByName;
 
-  @JsonKey(name: r'clientCreatedAt', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'clientCreatedAt',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final DateTime clientCreatedAt;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is RepresentantCallAttemptDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [
-                id,
-                outcome,
-                statutQualificationId,
-                statutQualificationLabel,
-                comment,
-                callbackAt,
-                promisedProspects,
-                etablissementConfirme,
-                numeroConfirme,
-                contacte,
-                connaitUES,
-                syndicat,
-                suggestedName,
-                suggestedPhoneE164,
-                suggestedNote,
-                deviceCallType,
-                deviceCallDurationSeconds,
-                deviceCallAt,
-                performedById,
-                performedByName,
-                clientCreatedAt,
-              ],
-              [
-                other.id,
-                other.outcome,
-                other.statutQualificationId,
-                other.statutQualificationLabel,
-                other.comment,
-                other.callbackAt,
-                other.promisedProspects,
-                other.etablissementConfirme,
-                other.numeroConfirme,
-                other.contacte,
-                other.connaitUES,
-                other.syndicat,
-                other.suggestedName,
-                other.suggestedPhoneE164,
-                other.suggestedNote,
-                other.deviceCallType,
-                other.deviceCallDurationSeconds,
-                other.deviceCallAt,
-                other.performedById,
-                other.performedByName,
-                other.clientCreatedAt,
-              ],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([
+
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is RepresentantCallAttemptDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            id,
+            outcome,
+            statutQualificationId,
+            statutQualificationLabel,
+            statutQualificationRequiresComment,
+            comment,
+            callbackAt,
+            promisedProspects,
+            etablissementConfirme,
+            numeroConfirme,
+            contacte,
+            connaitUES,
+            syndicat,
+            suggestedName,
+            suggestedPhoneE164,
+            suggestedNote,
+            deviceCallType,
+            deviceCallDurationSeconds,
+            deviceCallAt,
+            performedById,
+            performedByName,
+            clientCreatedAt,
+        ],
+        [
+            other.id,
+            other.outcome,
+            other.statutQualificationId,
+            other.statutQualificationLabel,
+            other.statutQualificationRequiresComment,
+            other.comment,
+            other.callbackAt,
+            other.promisedProspects,
+            other.etablissementConfirme,
+            other.numeroConfirme,
+            other.contacte,
+            other.connaitUES,
+            other.syndicat,
+            other.suggestedName,
+            other.suggestedPhoneE164,
+            other.suggestedNote,
+            other.deviceCallType,
+            other.deviceCallDurationSeconds,
+            other.deviceCallAt,
+            other.performedById,
+            other.performedByName,
+            other.clientCreatedAt,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
         id,
         outcome,
         statutQualificationId,
         statutQualificationLabel,
+        statutQualificationRequiresComment,
         comment,
         callbackAt,
         promisedProspects,
@@ -218,10 +415,9 @@ class RepresentantCallAttemptDto {
         performedById,
         performedByName,
         clientCreatedAt,
-      ]);
+    ],);
 
-  factory RepresentantCallAttemptDto.fromJson(Map<String, dynamic> json) =>
-      _$RepresentantCallAttemptDtoFromJson(json);
+  factory RepresentantCallAttemptDto.fromJson(Map<String, dynamic> json) => _$RepresentantCallAttemptDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$RepresentantCallAttemptDtoToJson(this);
 
@@ -229,4 +425,6 @@ class RepresentantCallAttemptDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

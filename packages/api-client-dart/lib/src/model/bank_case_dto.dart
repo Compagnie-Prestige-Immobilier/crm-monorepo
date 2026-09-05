@@ -11,6 +11,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'bank_case_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -21,170 +22,351 @@ part 'bank_case_dto.g.dart';
 class BankCaseDto {
   /// Returns a new [BankCaseDto] instance.
   BankCaseDto({
-    required this.id,
 
-    required this.reference,
+    required  this.id,
 
-    required this.referenceKey,
+    required  this.reference,
 
-    required this.prospectId,
+    required  this.referenceKey,
 
-    required this.customerName,
+    required  this.prospectId,
 
-    required this.customerPhoneE164,
+    required  this.customerName,
 
-    required this.processingBankId,
+    required  this.customerPhoneE164,
 
-    required this.processingBankName,
+    required  this.processingBankId,
 
-    required this.currentStage,
+    required  this.processingBankName,
 
-    required this.amountXof,
+    required  this.currentStage,
 
-    required this.rejectionReason,
+    required  this.amountXof,
 
-    required this.rejectionDetail,
+    required  this.rejectionReason,
 
-    required this.rev,
+    required  this.rejectionDetail,
 
-    required this.isTerminal,
+    required  this.rev,
 
-    required this.createdById,
+    required  this.isTerminal,
 
-    required this.createdByName,
+    required  this.createdById,
 
-    required this.updatedById,
+    required  this.createdByName,
 
-    required this.updatedByName,
+    required  this.updatedById,
 
-    required this.createdAt,
+    required  this.updatedByName,
 
-    required this.updatedAt,
+    required  this.createdAt,
+
+    required  this.updatedAt,
   });
 
-  @JsonKey(name: r'id', required: true, includeIfNull: false)
+  @JsonKey(
+    
+    name: r'id',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String id;
 
-  /// Référence telle que saisie par l’agent.
-  @JsonKey(name: r'reference', required: true, includeIfNull: false)
+
+
+      /// Référence telle que saisie par l’agent.
+  @JsonKey(
+    
+    name: r'reference',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String reference;
 
-  /// Forme normalisée portant l’unicité globale.
-  @JsonKey(name: r'referenceKey', required: true, includeIfNull: false)
+
+
+      /// Forme normalisée portant l’unicité globale.
+  @JsonKey(
+    
+    name: r'referenceKey',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String referenceKey;
 
-  @JsonKey(name: r'prospectId', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'prospectId',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String prospectId;
 
-  /// Nom COPIÉ à la création. Immuable : corriger le prospect ne réécrit pas ce qui a été transmis à la banque.
-  @JsonKey(name: r'customerName', required: true, includeIfNull: false)
+
+
+      /// Nom COPIÉ à la création. Immuable : corriger le prospect ne réécrit pas ce qui a été transmis à la banque.
+  @JsonKey(
+    
+    name: r'customerName',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String customerName;
 
-  /// Téléphone E.164 copié à la création. Immuable.
-  @JsonKey(name: r'customerPhoneE164', required: true, includeIfNull: false)
+
+
+      /// Téléphone E.164 copié à la création. Immuable.
+  @JsonKey(
+    
+    name: r'customerPhoneE164',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String customerPhoneE164;
 
-  @JsonKey(name: r'processingBankId', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'processingBankId',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String processingBankId;
 
-  @JsonKey(name: r'processingBankName', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'processingBankName',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String processingBankName;
 
-  @JsonKey(name: r'currentStage', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'currentStage',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final BankCaseStageDto currentStage;
 
-  /// Montant en francs CFA, entier, exposé en chaîne. XOF n’a pas de décimales et un nombre JSON perdrait de la précision au-delà de 2^53.
-  @JsonKey(name: r'amountXof', required: true, includeIfNull: true)
+
+
+      /// Montant en francs CFA, entier, exposé en chaîne. XOF n’a pas de décimales et un nombre JSON perdrait de la précision au-delà de 2^53.
+  @JsonKey(
+    
+    name: r'amountXof',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final String? amountXof;
 
-  @JsonKey(name: r'rejectionReason', required: true, includeIfNull: true)
+
+
+  @JsonKey(
+    
+    name: r'rejectionReason',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final BankRejectionReasonDto? rejectionReason;
 
-  @JsonKey(name: r'rejectionDetail', required: true, includeIfNull: true)
+
+
+  @JsonKey(
+    
+    name: r'rejectionDetail',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final String? rejectionDetail;
 
-  /// Révision serveur. À renvoyer en `expectedRev` sur toute mutation.
-  @JsonKey(name: r'rev', required: true, includeIfNull: false)
+
+
+      /// Révision serveur. À renvoyer en `expectedRev` sur toute mutation.
+  @JsonKey(
+    
+    name: r'rev',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num rev;
 
-  /// Dossier encaissé ou rejeté : verrouillé pour un agent BANQUE_FINANCE.
-  @JsonKey(name: r'isTerminal', required: true, includeIfNull: false)
+
+
+      /// Dossier encaissé ou rejeté : verrouillé pour un agent BANQUE_FINANCE.
+  @JsonKey(
+    
+    name: r'isTerminal',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final bool isTerminal;
 
-  @JsonKey(name: r'createdById', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'createdById',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String createdById;
 
-  @JsonKey(name: r'createdByName', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'createdByName',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String createdByName;
 
-  @JsonKey(name: r'updatedById', required: true, includeIfNull: true)
+
+
+  @JsonKey(
+    
+    name: r'updatedById',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final String? updatedById;
 
-  @JsonKey(name: r'updatedByName', required: true, includeIfNull: true)
+
+
+  @JsonKey(
+    
+    name: r'updatedByName',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final String? updatedByName;
 
-  @JsonKey(name: r'createdAt', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'createdAt',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final DateTime createdAt;
 
-  @JsonKey(name: r'updatedAt', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'updatedAt',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final DateTime updatedAt;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is BankCaseDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [
-                id,
-                reference,
-                referenceKey,
-                prospectId,
-                customerName,
-                customerPhoneE164,
-                processingBankId,
-                processingBankName,
-                currentStage,
-                amountXof,
-                rejectionReason,
-                rejectionDetail,
-                rev,
-                isTerminal,
-                createdById,
-                createdByName,
-                updatedById,
-                updatedByName,
-                createdAt,
-                updatedAt,
-              ],
-              [
-                other.id,
-                other.reference,
-                other.referenceKey,
-                other.prospectId,
-                other.customerName,
-                other.customerPhoneE164,
-                other.processingBankId,
-                other.processingBankName,
-                other.currentStage,
-                other.amountXof,
-                other.rejectionReason,
-                other.rejectionDetail,
-                other.rev,
-                other.isTerminal,
-                other.createdById,
-                other.createdByName,
-                other.updatedById,
-                other.updatedByName,
-                other.createdAt,
-                other.updatedAt,
-              ],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([
+
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is BankCaseDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            id,
+            reference,
+            referenceKey,
+            prospectId,
+            customerName,
+            customerPhoneE164,
+            processingBankId,
+            processingBankName,
+            currentStage,
+            amountXof,
+            rejectionReason,
+            rejectionDetail,
+            rev,
+            isTerminal,
+            createdById,
+            createdByName,
+            updatedById,
+            updatedByName,
+            createdAt,
+            updatedAt,
+        ],
+        [
+            other.id,
+            other.reference,
+            other.referenceKey,
+            other.prospectId,
+            other.customerName,
+            other.customerPhoneE164,
+            other.processingBankId,
+            other.processingBankName,
+            other.currentStage,
+            other.amountXof,
+            other.rejectionReason,
+            other.rejectionDetail,
+            other.rev,
+            other.isTerminal,
+            other.createdById,
+            other.createdByName,
+            other.updatedById,
+            other.updatedByName,
+            other.createdAt,
+            other.updatedAt,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
         id,
         reference,
         referenceKey,
@@ -205,10 +387,9 @@ class BankCaseDto {
         updatedByName,
         createdAt,
         updatedAt,
-      ]);
+    ],);
 
-  factory BankCaseDto.fromJson(Map<String, dynamic> json) =>
-      _$BankCaseDtoFromJson(json);
+  factory BankCaseDto.fromJson(Map<String, dynamic> json) => _$BankCaseDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$BankCaseDtoToJson(this);
 
@@ -216,4 +397,6 @@ class BankCaseDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

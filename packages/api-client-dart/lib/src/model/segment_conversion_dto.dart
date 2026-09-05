@@ -11,6 +11,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'segment_conversion_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -21,109 +22,188 @@ part 'segment_conversion_dto.g.dart';
 class SegmentConversionDto {
   /// Returns a new [SegmentConversionDto] instance.
   SegmentConversionDto({
-    required this.id,
 
-    required this.prospectId,
+    required  this.id,
 
-    required this.prospectName,
+    required  this.prospectId,
 
-    required this.fromSegment,
+    required  this.prospectName,
 
-    required this.toSegment,
+    required  this.fromSegment,
 
-    required this.reason,
+    required  this.toSegment,
 
-    required this.changedById,
+    required  this.reason,
 
-    required this.changedByName,
+    required  this.changedById,
 
-    required this.source_,
+    required  this.changedByName,
 
-    required this.changedAt,
+    required  this.source_,
+
+    required  this.changedAt,
   });
 
-  @JsonKey(name: r'id', required: true, includeIfNull: false)
+  @JsonKey(
+    
+    name: r'id',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String id;
 
-  @JsonKey(name: r'prospectId', required: true, includeIfNull: false)
-  final String prospectId;
 
-  /// Prénom et nom de la fiche convertie, au moment de la lecture.
-  @JsonKey(name: r'prospectName', required: true, includeIfNull: false)
-  final String prospectName;
 
   @JsonKey(
+    
+    name: r'prospectId',
+    required: true,
+    includeIfNull: false,
+  )
+
+
+  final String prospectId;
+
+
+
+      /// Prénom et nom de la fiche convertie, au moment de la lecture.
+  @JsonKey(
+    
+    name: r'prospectName',
+    required: true,
+    includeIfNull: false,
+  )
+
+
+  final String prospectName;
+
+
+
+  @JsonKey(
+    
     name: r'fromSegment',
     required: true,
     includeIfNull: false,
-    unknownEnumValue: BddSegment.unknownDefaultOpenApi,
+  unknownEnumValue: BddSegment.unknownDefaultOpenApi,
   )
+
+
   final BddSegment fromSegment;
 
+
+
   @JsonKey(
+    
     name: r'toSegment',
     required: true,
     includeIfNull: false,
-    unknownEnumValue: BddSegment.unknownDefaultOpenApi,
+  unknownEnumValue: BddSegment.unknownDefaultOpenApi,
   )
+
+
   final BddSegment toSegment;
 
-  @JsonKey(name: r'reason', required: true, includeIfNull: true)
-  final String? reason;
 
-  @JsonKey(name: r'changedById', required: true, includeIfNull: false)
-  final String changedById;
-
-  @JsonKey(name: r'changedByName', required: true, includeIfNull: false)
-  final String changedByName;
 
   @JsonKey(
+    
+    name: r'reason',
+    required: true,
+    includeIfNull: true,
+  )
+
+
+  final String? reason;
+
+
+
+  @JsonKey(
+    
+    name: r'changedById',
+    required: true,
+    includeIfNull: false,
+  )
+
+
+  final String changedById;
+
+
+
+  @JsonKey(
+    
+    name: r'changedByName',
+    required: true,
+    includeIfNull: false,
+  )
+
+
+  final String changedByName;
+
+
+
+  @JsonKey(
+    
     name: r'source',
     required: true,
     includeIfNull: false,
-    unknownEnumValue: ChangeSource.unknownDefaultOpenApi,
+  unknownEnumValue: ChangeSource.unknownDefaultOpenApi,
   )
+
+
   final ChangeSource source_;
 
-  @JsonKey(name: r'changedAt', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'changedAt',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final DateTime changedAt;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is SegmentConversionDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [
-                id,
-                prospectId,
-                prospectName,
-                fromSegment,
-                toSegment,
-                reason,
-                changedById,
-                changedByName,
-                source_,
-                changedAt,
-              ],
-              [
-                other.id,
-                other.prospectId,
-                other.prospectName,
-                other.fromSegment,
-                other.toSegment,
-                other.reason,
-                other.changedById,
-                other.changedByName,
-                other.source_,
-                other.changedAt,
-              ],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([
+
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is SegmentConversionDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            id,
+            prospectId,
+            prospectName,
+            fromSegment,
+            toSegment,
+            reason,
+            changedById,
+            changedByName,
+            source_,
+            changedAt,
+        ],
+        [
+            other.id,
+            other.prospectId,
+            other.prospectName,
+            other.fromSegment,
+            other.toSegment,
+            other.reason,
+            other.changedById,
+            other.changedByName,
+            other.source_,
+            other.changedAt,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
         id,
         prospectId,
         prospectName,
@@ -134,10 +214,9 @@ class SegmentConversionDto {
         changedByName,
         source_,
         changedAt,
-      ]);
+    ],);
 
-  factory SegmentConversionDto.fromJson(Map<String, dynamic> json) =>
-      _$SegmentConversionDtoFromJson(json);
+  factory SegmentConversionDto.fromJson(Map<String, dynamic> json) => _$SegmentConversionDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$SegmentConversionDtoToJson(this);
 
@@ -145,4 +224,6 @@ class SegmentConversionDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

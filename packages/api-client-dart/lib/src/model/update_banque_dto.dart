@@ -9,6 +9,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'update_banque_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,20 +20,39 @@ part 'update_banque_dto.g.dart';
 class UpdateBanqueDto {
   /// Returns a new [UpdateBanqueDto] instance.
   UpdateBanqueDto({
-    this.name,
 
-    this.shortName,
+     this.name,
 
-    this.isActive = true,
+     this.shortName,
 
-    this.sortOrder = 100,
+     this.isActive = true,
+
+     this.sortOrder = 100,
   });
 
-  @JsonKey(name: r'name', required: false, includeIfNull: false)
+  @JsonKey(
+    
+    name: r'name',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final String? name;
 
-  @JsonKey(name: r'shortName', required: false, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'shortName',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final String? shortName;
+
+
 
   @JsonKey(
     defaultValue: true,
@@ -40,7 +60,11 @@ class UpdateBanqueDto {
     required: false,
     includeIfNull: false,
   )
+
+
   final bool? isActive;
+
+
 
   @JsonKey(
     defaultValue: 100,
@@ -48,25 +72,43 @@ class UpdateBanqueDto {
     required: false,
     includeIfNull: false,
   )
+
+
   final num? sortOrder;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is UpdateBanqueDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [name, shortName, isActive, sortOrder],
-              [other.name, other.shortName, other.isActive, other.sortOrder],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([name, shortName, isActive, sortOrder]);
 
-  factory UpdateBanqueDto.fromJson(Map<String, dynamic> json) =>
-      _$UpdateBanqueDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is UpdateBanqueDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            name,
+            shortName,
+            isActive,
+            sortOrder,
+        ],
+        [
+            other.name,
+            other.shortName,
+            other.isActive,
+            other.sortOrder,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        name,
+        shortName,
+        isActive,
+        sortOrder,
+    ],);
+
+  factory UpdateBanqueDto.fromJson(Map<String, dynamic> json) => _$UpdateBanqueDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$UpdateBanqueDtoToJson(this);
 
@@ -74,4 +116,6 @@ class UpdateBanqueDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

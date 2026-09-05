@@ -9,6 +9,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'update_departement_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,24 +20,52 @@ part 'update_departement_dto.g.dart';
 class UpdateDepartementDto {
   /// Returns a new [UpdateDepartementDto] instance.
   UpdateDepartementDto({
-    this.code,
 
-    this.name,
+     this.code,
 
-    this.regionId,
+     this.name,
 
-    this.isActive = true,
+     this.regionId,
+
+     this.isActive = true,
   });
 
-  /// Code administratif, unique.
-  @JsonKey(name: r'code', required: false, includeIfNull: false)
+      /// Code administratif, unique.
+  @JsonKey(
+    
+    name: r'code',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final String? code;
 
-  @JsonKey(name: r'name', required: false, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'name',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final String? name;
 
-  @JsonKey(name: r'regionId', required: false, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'regionId',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final String? regionId;
+
+
 
   @JsonKey(
     defaultValue: true,
@@ -44,25 +73,43 @@ class UpdateDepartementDto {
     required: false,
     includeIfNull: false,
   )
+
+
   final bool? isActive;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is UpdateDepartementDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [code, name, regionId, isActive],
-              [other.code, other.name, other.regionId, other.isActive],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([code, name, regionId, isActive]);
 
-  factory UpdateDepartementDto.fromJson(Map<String, dynamic> json) =>
-      _$UpdateDepartementDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is UpdateDepartementDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            code,
+            name,
+            regionId,
+            isActive,
+        ],
+        [
+            other.code,
+            other.name,
+            other.regionId,
+            other.isActive,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        code,
+        name,
+        regionId,
+        isActive,
+    ],);
+
+  factory UpdateDepartementDto.fromJson(Map<String, dynamic> json) => _$UpdateDepartementDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$UpdateDepartementDtoToJson(this);
 
@@ -70,4 +117,6 @@ class UpdateDepartementDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

@@ -11,6 +11,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'representant_comment_list_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,27 +21,63 @@ part 'representant_comment_list_dto.g.dart';
 )
 class RepresentantCommentListDto {
   /// Returns a new [RepresentantCommentListDto] instance.
-  RepresentantCommentListDto({required this.items, required this.meta});
+  RepresentantCommentListDto({
 
-  /// Du plus récent au plus ancien.
-  @JsonKey(name: r'items', required: true, includeIfNull: false)
+    required  this.items,
+
+    required  this.meta,
+  });
+
+      /// Du plus récent au plus ancien.
+  @JsonKey(
+    
+    name: r'items',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final List<RepresentantCommentDto> items;
 
-  @JsonKey(name: r'meta', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'meta',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final PageMetaDto meta;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is RepresentantCommentListDto &&
-            runtimeType == other.runtimeType &&
-            equals([items, meta], [other.items, other.meta]);
-  }
 
-  @override
-  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([items, meta]);
 
-  factory RepresentantCommentListDto.fromJson(Map<String, dynamic> json) =>
-      _$RepresentantCommentListDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is RepresentantCommentListDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            items,
+            meta,
+        ],
+        [
+            other.items,
+            other.meta,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        items,
+        meta,
+    ],);
+
+  factory RepresentantCommentListDto.fromJson(Map<String, dynamic> json) => _$RepresentantCommentListDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$RepresentantCommentListDtoToJson(this);
 
@@ -48,4 +85,6 @@ class RepresentantCommentListDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

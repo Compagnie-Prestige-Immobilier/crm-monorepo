@@ -9,6 +9,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'visite_referentiel_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,66 +20,138 @@ part 'visite_referentiel_dto.g.dart';
 class VisiteReferentielDto {
   /// Returns a new [VisiteReferentielDto] instance.
   VisiteReferentielDto({
-    required this.id,
 
-    required this.code,
+    required  this.id,
 
-    required this.label,
+    required  this.code,
 
-    required this.isActive,
+    required  this.label,
 
-    required this.isSystem,
+    required  this.isActive,
 
-    required this.sortOrder,
+    required  this.isSystem,
 
-    required this.updatedAt,
+    required  this.sortOrder,
+
+    required  this.updatedAt,
   });
 
-  @JsonKey(name: r'id', required: true, includeIfNull: false)
+  @JsonKey(
+    
+    name: r'id',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String id;
 
-  /// Code stable, jamais modifiable après création.
-  @JsonKey(name: r'code', required: true, includeIfNull: false)
+
+
+      /// Code stable, jamais modifiable après création.
+  @JsonKey(
+    
+    name: r'code',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String code;
 
-  @JsonKey(name: r'label', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'label',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String label;
 
-  @JsonKey(name: r'isActive', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'isActive',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final bool isActive;
 
-  /// Entrée reprise du classeur d’origine : renommable, désactivable, jamais effacée.
-  @JsonKey(name: r'isSystem', required: true, includeIfNull: false)
+
+
+      /// Entrée reprise du classeur d’origine : renommable, désactivable, jamais effacée.
+  @JsonKey(
+    
+    name: r'isSystem',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final bool isSystem;
 
-  @JsonKey(name: r'sortOrder', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'sortOrder',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num sortOrder;
 
-  @JsonKey(name: r'updatedAt', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'updatedAt',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final DateTime updatedAt;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is VisiteReferentielDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [id, code, label, isActive, isSystem, sortOrder, updatedAt],
-              [
-                other.id,
-                other.code,
-                other.label,
-                other.isActive,
-                other.isSystem,
-                other.sortOrder,
-                other.updatedAt,
-              ],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([
+
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is VisiteReferentielDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            id,
+            code,
+            label,
+            isActive,
+            isSystem,
+            sortOrder,
+            updatedAt,
+        ],
+        [
+            other.id,
+            other.code,
+            other.label,
+            other.isActive,
+            other.isSystem,
+            other.sortOrder,
+            other.updatedAt,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
         id,
         code,
         label,
@@ -86,10 +159,9 @@ class VisiteReferentielDto {
         isSystem,
         sortOrder,
         updatedAt,
-      ]);
+    ],);
 
-  factory VisiteReferentielDto.fromJson(Map<String, dynamic> json) =>
-      _$VisiteReferentielDtoFromJson(json);
+  factory VisiteReferentielDto.fromJson(Map<String, dynamic> json) => _$VisiteReferentielDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$VisiteReferentielDtoToJson(this);
 
@@ -97,4 +169,6 @@ class VisiteReferentielDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

@@ -10,6 +10,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'user_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,99 +21,186 @@ part 'user_dto.g.dart';
 class UserDto {
   /// Returns a new [UserDto] instance.
   UserDto({
-    required this.id,
 
-    required this.email,
+    required  this.id,
 
-    required this.username,
+    required  this.email,
 
-    required this.fullName,
+    required  this.username,
 
-    required this.role,
+    required  this.fullName,
 
-    required this.isActive,
+    required  this.role,
 
-    required this.phoneE164,
+    required  this.isActive,
 
-    required this.lastLoginAt,
+    required  this.phoneE164,
 
-    required this.createdAt,
+    required  this.lastLoginAt,
 
-    required this.prospectCount,
+    required  this.createdAt,
+
+    required  this.prospectCount,
   });
 
-  @JsonKey(name: r'id', required: true, includeIfNull: false)
+  @JsonKey(
+    
+    name: r'id',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String id;
 
-  @JsonKey(name: r'email', required: true, includeIfNull: false)
-  final String email;
 
-  @JsonKey(name: r'username', required: true, includeIfNull: false)
-  final String username;
-
-  @JsonKey(name: r'fullName', required: true, includeIfNull: false)
-  final String fullName;
 
   @JsonKey(
+    
+    name: r'email',
+    required: true,
+    includeIfNull: false,
+  )
+
+
+  final String email;
+
+
+
+  @JsonKey(
+    
+    name: r'username',
+    required: true,
+    includeIfNull: false,
+  )
+
+
+  final String username;
+
+
+
+  @JsonKey(
+    
+    name: r'fullName',
+    required: true,
+    includeIfNull: false,
+  )
+
+
+  final String fullName;
+
+
+
+  @JsonKey(
+    
     name: r'role',
     required: true,
     includeIfNull: false,
-    unknownEnumValue: Role.unknownDefaultOpenApi,
+  unknownEnumValue: Role.unknownDefaultOpenApi,
   )
+
+
   final Role role;
 
-  @JsonKey(name: r'isActive', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'isActive',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final bool isActive;
 
-  @JsonKey(name: r'phoneE164', required: true, includeIfNull: true)
+
+
+  @JsonKey(
+    
+    name: r'phoneE164',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final String? phoneE164;
 
-  @JsonKey(name: r'lastLoginAt', required: true, includeIfNull: true)
+
+
+  @JsonKey(
+    
+    name: r'lastLoginAt',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final DateTime? lastLoginAt;
 
-  @JsonKey(name: r'createdAt', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'createdAt',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final DateTime createdAt;
 
-  /// Nombre de prospects saisis par ce commercial.
-  @JsonKey(name: r'prospectCount', required: true, includeIfNull: false)
+
+
+      /// Nombre de prospects saisis par ce commercial.
+  @JsonKey(
+    
+    name: r'prospectCount',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num prospectCount;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is UserDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [
-                id,
-                email,
-                username,
-                fullName,
-                role,
-                isActive,
-                phoneE164,
-                lastLoginAt,
-                createdAt,
-                prospectCount,
-              ],
-              [
-                other.id,
-                other.email,
-                other.username,
-                other.fullName,
-                other.role,
-                other.isActive,
-                other.phoneE164,
-                other.lastLoginAt,
-                other.createdAt,
-                other.prospectCount,
-              ],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([
+
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is UserDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            id,
+            email,
+            username,
+            fullName,
+            role,
+            isActive,
+            phoneE164,
+            lastLoginAt,
+            createdAt,
+            prospectCount,
+        ],
+        [
+            other.id,
+            other.email,
+            other.username,
+            other.fullName,
+            other.role,
+            other.isActive,
+            other.phoneE164,
+            other.lastLoginAt,
+            other.createdAt,
+            other.prospectCount,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
         id,
         email,
         username,
@@ -123,10 +211,9 @@ class UserDto {
         lastLoginAt,
         createdAt,
         prospectCount,
-      ]);
+    ],);
 
-  factory UserDto.fromJson(Map<String, dynamic> json) =>
-      _$UserDtoFromJson(json);
+  factory UserDto.fromJson(Map<String, dynamic> json) => _$UserDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$UserDtoToJson(this);
 
@@ -134,4 +221,6 @@ class UserDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

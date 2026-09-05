@@ -10,6 +10,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'callback_list_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,29 +20,64 @@ part 'callback_list_dto.g.dart';
 )
 class CallbackListDto {
   /// Returns a new [CallbackListDto] instance.
-  CallbackListDto({required this.items, required this.serverTime});
+  CallbackListDto({
 
-  /// Du plus ancien au plus récent.
-  @JsonKey(name: r'items', required: true, includeIfNull: false)
+    required  this.items,
+
+    required  this.serverTime,
+  });
+
+      /// Du plus ancien au plus récent.
+  @JsonKey(
+    
+    name: r'items',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final List<CallbackDto> items;
 
-  /// Heure du serveur ayant servi à décider du retard.
-  @JsonKey(name: r'serverTime', required: true, includeIfNull: false)
+
+
+      /// Heure du serveur ayant servi à décider du retard.
+  @JsonKey(
+    
+    name: r'serverTime',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final DateTime serverTime;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is CallbackListDto &&
-            runtimeType == other.runtimeType &&
-            equals([items, serverTime], [other.items, other.serverTime]);
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^ mapPropsToHashCode([items, serverTime]);
 
-  factory CallbackListDto.fromJson(Map<String, dynamic> json) =>
-      _$CallbackListDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is CallbackListDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            items,
+            serverTime,
+        ],
+        [
+            other.items,
+            other.serverTime,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        items,
+        serverTime,
+    ],);
+
+  factory CallbackListDto.fromJson(Map<String, dynamic> json) => _$CallbackListDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$CallbackListDtoToJson(this);
 
@@ -49,4 +85,6 @@ class CallbackListDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

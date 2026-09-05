@@ -10,6 +10,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'statut_qualification_list_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,23 +20,45 @@ part 'statut_qualification_list_dto.g.dart';
 )
 class StatutQualificationListDto {
   /// Returns a new [StatutQualificationListDto] instance.
-  StatutQualificationListDto({required this.items});
+  StatutQualificationListDto({
 
-  @JsonKey(name: r'items', required: true, includeIfNull: false)
+    required  this.items,
+  });
+
+  @JsonKey(
+    
+    name: r'items',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final List<StatutQualificationDto> items;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is StatutQualificationListDto &&
-            runtimeType == other.runtimeType &&
-            equals([items], [other.items]);
-  }
 
-  @override
-  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([items]);
 
-  factory StatutQualificationListDto.fromJson(Map<String, dynamic> json) =>
-      _$StatutQualificationListDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is StatutQualificationListDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            items,
+        ],
+        [
+            other.items,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        items,
+    ],);
+
+  factory StatutQualificationListDto.fromJson(Map<String, dynamic> json) => _$StatutQualificationListDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$StatutQualificationListDtoToJson(this);
 
@@ -43,4 +66,6 @@ class StatutQualificationListDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

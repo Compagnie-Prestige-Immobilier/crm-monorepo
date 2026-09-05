@@ -13,6 +13,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'create_lot_export_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -23,60 +24,113 @@ part 'create_lot_export_dto.g.dart';
 class CreateLotExportDto {
   /// Returns a new [CreateLotExportDto] instance.
   CreateLotExportDto({
-    required this.name,
 
-    required this.cible,
+    required  this.name,
 
-    this.representants,
+    required  this.cible,
 
-    this.prospects,
+     this.representants,
 
-    required this.distribution,
+     this.prospects,
+
+    required  this.distribution,
   });
 
-  @JsonKey(name: r'name', required: true, includeIfNull: false)
+  @JsonKey(
+    
+    name: r'name',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String name;
 
+
+
   @JsonKey(
+    
     name: r'cible',
     required: true,
     includeIfNull: false,
-    unknownEnumValue: LotExportCible.unknownDefaultOpenApi,
+  unknownEnumValue: LotExportCible.unknownDefaultOpenApi,
   )
+
+
   final LotExportCible cible;
 
-  @JsonKey(name: r'representants', required: false, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'representants',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final RepresentantExportQueryDto? representants;
 
-  @JsonKey(name: r'prospects', required: false, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'prospects',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final LotExportProspectFilterDto? prospects;
 
-  @JsonKey(name: r'distribution', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'distribution',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final LotExportDistributionInputDto distribution;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is CreateLotExportDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [name, cible, representants, prospects, distribution],
-              [
-                other.name,
-                other.cible,
-                other.representants,
-                other.prospects,
-                other.distribution,
-              ],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([name, cible, representants, prospects, distribution]);
 
-  factory CreateLotExportDto.fromJson(Map<String, dynamic> json) =>
-      _$CreateLotExportDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is CreateLotExportDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            name,
+            cible,
+            representants,
+            prospects,
+            distribution,
+        ],
+        [
+            other.name,
+            other.cible,
+            other.representants,
+            other.prospects,
+            other.distribution,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        name,
+        cible,
+        representants,
+        prospects,
+        distribution,
+    ],);
+
+  factory CreateLotExportDto.fromJson(Map<String, dynamic> json) => _$CreateLotExportDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$CreateLotExportDtoToJson(this);
 
@@ -84,4 +138,6 @@ class CreateLotExportDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

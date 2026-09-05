@@ -10,6 +10,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'named_count_list_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,26 +20,62 @@ part 'named_count_list_dto.g.dart';
 )
 class NamedCountListDto {
   /// Returns a new [NamedCountListDto] instance.
-  NamedCountListDto({required this.items, required this.total});
+  NamedCountListDto({
 
-  @JsonKey(name: r'items', required: true, includeIfNull: false)
+    required  this.items,
+
+    required  this.total,
+  });
+
+  @JsonKey(
+    
+    name: r'items',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final List<NamedCountDto> items;
 
-  @JsonKey(name: r'total', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'total',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num total;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is NamedCountListDto &&
-            runtimeType == other.runtimeType &&
-            equals([items, total], [other.items, other.total]);
-  }
 
-  @override
-  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([items, total]);
 
-  factory NamedCountListDto.fromJson(Map<String, dynamic> json) =>
-      _$NamedCountListDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is NamedCountListDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            items,
+            total,
+        ],
+        [
+            other.items,
+            other.total,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        items,
+        total,
+    ],);
+
+  factory NamedCountListDto.fromJson(Map<String, dynamic> json) => _$NamedCountListDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$NamedCountListDtoToJson(this);
 
@@ -46,4 +83,6 @@ class NamedCountListDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

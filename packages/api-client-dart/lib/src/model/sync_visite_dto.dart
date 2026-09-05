@@ -10,6 +10,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'sync_visite_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,128 +21,264 @@ part 'sync_visite_dto.g.dart';
 class SyncVisiteDto {
   /// Returns a new [SyncVisiteDto] instance.
   SyncVisiteDto({
-    required this.id,
 
-    required this.reference,
+    required  this.id,
 
-    required this.date,
+    required  this.reference,
 
-    required this.time,
+    required  this.date,
 
-    required this.visitorName,
+    required  this.time,
 
-    required this.phone,
+    required  this.visitorName,
 
-    required this.phoneE164,
+    required  this.phone,
 
-    required this.entreprise,
+    required  this.phoneE164,
 
-    required this.objet,
+    required  this.entreprise,
 
-    required this.direction,
+    required  this.objet,
 
-    required this.destinataire,
+    required  this.direction,
 
-    required this.comment,
+    required  this.destinataire,
 
-    required this.createdById,
+    required  this.comment,
 
-    required this.createdAt,
+    required  this.createdById,
 
-    required this.updatedAt,
+    required  this.createdAt,
+
+    required  this.updatedAt,
   });
 
-  @JsonKey(name: r'id', required: true, includeIfNull: false)
+  @JsonKey(
+    
+    name: r'id',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String id;
 
-  @JsonKey(name: r'reference', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'reference',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String reference;
 
-  @JsonKey(name: r'date', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'date',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String date;
 
-  @JsonKey(name: r'time', required: true, includeIfNull: true)
+
+
+  @JsonKey(
+    
+    name: r'time',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final String? time;
 
-  @JsonKey(name: r'visitorName', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'visitorName',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String visitorName;
 
-  @JsonKey(name: r'phone', required: true, includeIfNull: true)
+
+
+  @JsonKey(
+    
+    name: r'phone',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final String? phone;
 
-  @JsonKey(name: r'phoneE164', required: true, includeIfNull: true)
+
+
+  @JsonKey(
+    
+    name: r'phoneE164',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final String? phoneE164;
 
-  @JsonKey(name: r'entreprise', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'entreprise',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final VisiteReferentielRefDto entreprise;
 
-  @JsonKey(name: r'objet', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'objet',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final VisiteReferentielRefDto objet;
 
-  @JsonKey(name: r'direction', required: true, includeIfNull: true)
+
+
+  @JsonKey(
+    
+    name: r'direction',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final VisiteReferentielRefDto? direction;
 
-  @JsonKey(name: r'destinataire', required: true, includeIfNull: true)
+
+
+  @JsonKey(
+    
+    name: r'destinataire',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final VisiteReferentielRefDto? destinataire;
 
-  @JsonKey(name: r'comment', required: true, includeIfNull: true)
+
+
+  @JsonKey(
+    
+    name: r'comment',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final String? comment;
 
-  @JsonKey(name: r'createdById', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'createdById',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String createdById;
 
-  @JsonKey(name: r'createdAt', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'createdAt',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final DateTime createdAt;
 
-  @JsonKey(name: r'updatedAt', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'updatedAt',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final DateTime updatedAt;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is SyncVisiteDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [
-                id,
-                reference,
-                date,
-                time,
-                visitorName,
-                phone,
-                phoneE164,
-                entreprise,
-                objet,
-                direction,
-                destinataire,
-                comment,
-                createdById,
-                createdAt,
-                updatedAt,
-              ],
-              [
-                other.id,
-                other.reference,
-                other.date,
-                other.time,
-                other.visitorName,
-                other.phone,
-                other.phoneE164,
-                other.entreprise,
-                other.objet,
-                other.direction,
-                other.destinataire,
-                other.comment,
-                other.createdById,
-                other.createdAt,
-                other.updatedAt,
-              ],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([
+
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is SyncVisiteDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            id,
+            reference,
+            date,
+            time,
+            visitorName,
+            phone,
+            phoneE164,
+            entreprise,
+            objet,
+            direction,
+            destinataire,
+            comment,
+            createdById,
+            createdAt,
+            updatedAt,
+        ],
+        [
+            other.id,
+            other.reference,
+            other.date,
+            other.time,
+            other.visitorName,
+            other.phone,
+            other.phoneE164,
+            other.entreprise,
+            other.objet,
+            other.direction,
+            other.destinataire,
+            other.comment,
+            other.createdById,
+            other.createdAt,
+            other.updatedAt,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
         id,
         reference,
         date,
@@ -157,10 +294,9 @@ class SyncVisiteDto {
         createdById,
         createdAt,
         updatedAt,
-      ]);
+    ],);
 
-  factory SyncVisiteDto.fromJson(Map<String, dynamic> json) =>
-      _$SyncVisiteDtoFromJson(json);
+  factory SyncVisiteDto.fromJson(Map<String, dynamic> json) => _$SyncVisiteDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$SyncVisiteDtoToJson(this);
 
@@ -168,4 +304,6 @@ class SyncVisiteDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

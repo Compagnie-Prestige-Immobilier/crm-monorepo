@@ -9,6 +9,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'app_update_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,110 +20,219 @@ part 'app_update_dto.g.dart';
 class AppUpdateDto {
   /// Returns a new [AppUpdateDto] instance.
   AppUpdateDto({
-    required this.available,
 
-    required this.forceUpdate,
+    required  this.available,
 
-    required this.versionName,
+    required  this.forceUpdate,
 
-    required this.versionCode,
+    required  this.versionName,
 
-    required this.fileName,
+    required  this.versionCode,
 
-    required this.fileSize,
+    required  this.fileName,
 
-    required this.sha256,
+    required  this.fileSize,
 
-    required this.signerSha256,
+    required  this.sha256,
 
-    required this.downloadUrl,
+    required  this.signerSha256,
 
-    required this.publishedAt,
+    required  this.downloadUrl,
 
-    required this.minVersionCode,
+    required  this.publishedAt,
 
-    required this.notes,
+    required  this.minVersionCode,
+
+    required  this.notes,
   });
 
-  @JsonKey(name: r'available', required: true, includeIfNull: false)
+  @JsonKey(
+    
+    name: r'available',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final bool available;
 
-  /// Le poste est sous le plancher obligatoire.
-  @JsonKey(name: r'forceUpdate', required: true, includeIfNull: false)
+
+
+      /// Le poste est sous le plancher obligatoire.
+  @JsonKey(
+    
+    name: r'forceUpdate',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final bool forceUpdate;
 
-  @JsonKey(name: r'versionName', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'versionName',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String versionName;
 
-  @JsonKey(name: r'versionCode', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'versionCode',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num versionCode;
 
-  @JsonKey(name: r'fileName', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'fileName',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String fileName;
 
-  @JsonKey(name: r'fileSize', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'fileSize',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num fileSize;
 
-  @JsonKey(name: r'sha256', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'sha256',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String sha256;
 
-  /// Empreinte SHA-256 du certificat signataire de l’APK servi.
-  @JsonKey(name: r'signerSha256', required: true, includeIfNull: false)
+
+
+      /// Empreinte SHA-256 du certificat signataire de l’APK servi.
+  @JsonKey(
+    
+    name: r'signerSha256',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String signerSha256;
 
-  @JsonKey(name: r'downloadUrl', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'downloadUrl',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String downloadUrl;
 
-  @JsonKey(name: r'publishedAt', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'publishedAt',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String publishedAt;
 
-  /// Plus haut versionCode obligatoire encore en ligne, ou null.
-  @JsonKey(name: r'minVersionCode', required: true, includeIfNull: true)
+
+
+      /// Plus haut versionCode obligatoire encore en ligne, ou null.
+  @JsonKey(
+    
+    name: r'minVersionCode',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final num? minVersionCode;
 
-  @JsonKey(name: r'notes', required: true, includeIfNull: true)
+
+
+  @JsonKey(
+    
+    name: r'notes',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final String? notes;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is AppUpdateDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [
-                available,
-                forceUpdate,
-                versionName,
-                versionCode,
-                fileName,
-                fileSize,
-                sha256,
-                signerSha256,
-                downloadUrl,
-                publishedAt,
-                minVersionCode,
-                notes,
-              ],
-              [
-                other.available,
-                other.forceUpdate,
-                other.versionName,
-                other.versionCode,
-                other.fileName,
-                other.fileSize,
-                other.sha256,
-                other.signerSha256,
-                other.downloadUrl,
-                other.publishedAt,
-                other.minVersionCode,
-                other.notes,
-              ],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([
+
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is AppUpdateDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            available,
+            forceUpdate,
+            versionName,
+            versionCode,
+            fileName,
+            fileSize,
+            sha256,
+            signerSha256,
+            downloadUrl,
+            publishedAt,
+            minVersionCode,
+            notes,
+        ],
+        [
+            other.available,
+            other.forceUpdate,
+            other.versionName,
+            other.versionCode,
+            other.fileName,
+            other.fileSize,
+            other.sha256,
+            other.signerSha256,
+            other.downloadUrl,
+            other.publishedAt,
+            other.minVersionCode,
+            other.notes,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
         available,
         forceUpdate,
         versionName,
@@ -135,10 +245,9 @@ class AppUpdateDto {
         publishedAt,
         minVersionCode,
         notes,
-      ]);
+    ],);
 
-  factory AppUpdateDto.fromJson(Map<String, dynamic> json) =>
-      _$AppUpdateDtoFromJson(json);
+  factory AppUpdateDto.fromJson(Map<String, dynamic> json) => _$AppUpdateDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$AppUpdateDtoToJson(this);
 
@@ -146,4 +255,6 @@ class AppUpdateDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

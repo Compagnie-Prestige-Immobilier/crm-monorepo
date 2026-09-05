@@ -10,6 +10,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'demo_workspace_status_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,32 +20,63 @@ part 'demo_workspace_status_dto.g.dart';
 )
 class DemoWorkspaceStatusDto {
   /// Returns a new [DemoWorkspaceStatusDto] instance.
-  DemoWorkspaceStatusDto({required this.workspace, required this.counts});
+  DemoWorkspaceStatusDto({
+
+    required  this.workspace,
+
+    required  this.counts,
+  });
 
   @JsonKey(
+    
     name: r'workspace',
     required: true,
     includeIfNull: false,
-    unknownEnumValue: DemoWorkspaceStatusDtoWorkspaceEnum.unknownDefaultOpenApi,
+  unknownEnumValue: DemoWorkspaceStatusDtoWorkspaceEnum.unknownDefaultOpenApi,
   )
+
+
   final DemoWorkspaceStatusDtoWorkspaceEnum workspace;
 
-  @JsonKey(name: r'counts', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'counts',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final DemoWorkspaceCountsDto counts;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is DemoWorkspaceStatusDto &&
-            runtimeType == other.runtimeType &&
-            equals([workspace, counts], [other.workspace, other.counts]);
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^ mapPropsToHashCode([workspace, counts]);
 
-  factory DemoWorkspaceStatusDto.fromJson(Map<String, dynamic> json) =>
-      _$DemoWorkspaceStatusDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is DemoWorkspaceStatusDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            workspace,
+            counts,
+        ],
+        [
+            other.workspace,
+            other.counts,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        workspace,
+        counts,
+    ],);
+
+  factory DemoWorkspaceStatusDto.fromJson(Map<String, dynamic> json) => _$DemoWorkspaceStatusDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$DemoWorkspaceStatusDtoToJson(this);
 
@@ -52,18 +84,22 @@ class DemoWorkspaceStatusDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+
 
 enum DemoWorkspaceStatusDtoWorkspaceEnum {
-  @JsonValue(r'demo')
-  demo(r'demo'),
-  @JsonValue(r'unknown_default_open_api')
-  unknownDefaultOpenApi(r'unknown_default_open_api');
+@JsonValue(r'demo')
+demo(r'demo'),
+@JsonValue(r'unknown_default_open_api')
+unknownDefaultOpenApi(r'unknown_default_open_api');
 
-  const DemoWorkspaceStatusDtoWorkspaceEnum(this.value);
+const DemoWorkspaceStatusDtoWorkspaceEnum(this.value);
 
-  final String value;
+final String value;
 
-  @override
-  String toString() => value;
+@override
+String toString() => value;
 }
+
+

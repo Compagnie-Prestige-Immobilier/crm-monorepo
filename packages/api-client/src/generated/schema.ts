@@ -676,7 +676,10 @@ export interface paths {
      */
     get: operations['listStatutsQualification'];
     put?: never;
-    /** Ajouter un statut de qualification. */
+    /**
+     * Ajouter un statut de qualification.
+     * @description Le code est déduit du libellé, puis figé : l’historique le référence. Deux libellés qui ne se distinguent que par les accents ou la casse donnent le même code et le second est refusé.
+     */
     post: operations['createStatutQualification'];
     delete?: never;
     options?: never;
@@ -905,6 +908,120 @@ export interface paths {
     post?: never;
     /** Supprime logiquement un commentaire. */
     delete: operations['deleteRepresentantComment'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/ouvertures': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Enregistre l’ouverture confirmée d’une fiche.
+     * @description Chaque ouverture confirmée compte, même répétée le même jour sur la même fiche. La consultation en lecture seule ne passe pas par ici. Un téléconseiller n’a qu’une fiche ouverte à la fois : la seconde sort en 409 OUVERTURE_FICHE_DEJA_OUVERTE.
+     */
+    post: operations['ouvrirFiche'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/ouvertures/courante': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * La fiche que l’appelant a en main, avec son brouillon.
+     * @description Nulle quand aucune fiche n’est ouverte.
+     */
+    get: operations['ouvertureCourante'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/ouvertures/{id}/brouillon': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Remplace le brouillon d’une fiche ouverte. */
+    put: operations['enregistrerBrouillonOuverture'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/ouvertures/ouvertes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Les fiches restées ouvertes, à libérer. */
+    get: operations['listOuverturesOuvertes'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/ouvertures/{id}/liberation': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Libère une fiche restée ouverte.
+     * @description Réservé au superviseur et à l’administrateur, jamais automatique. La libération est tracée et la fiche repasse en file de rappel.
+     */
+    post: operations['libererOuverture'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/ouvertures/comptage': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Fiches ouvertes par téléconseiller et par jour.
+     * @description Porte aussi la durée moyenne de traitement, lue entre l’ouverture et la qualification. Un téléconseiller ne lit que son propre compte.
+     */
+    get: operations['compterOuvertures'];
+    put?: never;
+    post?: never;
+    delete?: never;
     options?: never;
     head?: never;
     patch?: never;
@@ -3567,6 +3684,8 @@ export interface components {
       effect: components['schemas']['StatutQualificationEffect'];
       /** @description La date du rappel est exigée par ce statut. */
       requiresCallback: boolean;
+      /** @description Le motif est exigé par ce statut : « Autre » ne dit rien seul. */
+      requiresComment: boolean;
       /** @description Délai, en minutes, du réessai que l’application propose d’elle-même. Nul : aucun réessai. */
       retryAfterMinutes: number | null;
       /** @description Ordre de reprise : un « Très intéressé » se rappelle avant un « Non éligible ». */
@@ -3585,12 +3704,13 @@ export interface components {
       items: components['schemas']['StatutQualificationDto'][];
     };
     CreateStatutQualificationDto: {
-      /** @description Immuable : l’historique le référence. */
-      code: string;
+      /** @description Le code en est déduit, puis figé : majuscules, sans accents, espaces en tirets bas. */
       label: string;
       effect: components['schemas']['StatutQualificationEffect'];
       /** @default false */
       requiresCallback: boolean;
+      /** @default false */
+      requiresComment: boolean;
       retryAfterMinutes?: number | null;
       /** @default NORMALE */
       priorite: components['schemas']['PrioriteTraitement'];
@@ -3600,6 +3720,7 @@ export interface components {
     UpdateStatutQualificationDto: {
       label?: string;
       requiresCallback?: boolean;
+      requiresComment?: boolean;
       /** @description Nul retire le réessai proposé. */
       retryAfterMinutes?: number | null;
       priorite?: components['schemas']['PrioriteTraitement'];
@@ -3636,6 +3757,11 @@ export interface components {
       | 'REFUSED'
       | 'WRONG_NUMBER'
       | 'OTHER';
+    /**
+     * @description PROMIS : la date convenue avec la personne. AUTOMATIQUE : le délai de réessai du dernier statut non joint. Nul en même temps que `nextCallbackAt`.
+     * @enum {string}
+     */
+    RappelOrigine: 'PROMIS' | 'AUTOMATIQUE';
     RepresentantDto: {
       /** Format: uuid */
       id: string;
@@ -3690,9 +3816,11 @@ export interface components {
       lastCallByName: string | null;
       /**
        * Format: date-time
-       * @description Rappel promis par le dernier appel, tant qu’aucun appel ne l’a honoré.
+       * @description Rappel dû, tant qu’aucun appel ne l’a honoré.
        */
       nextCallbackAt: string | null;
+      /** @description PROMIS : la date convenue avec la personne. AUTOMATIQUE : le délai de réessai du dernier statut non joint. Nul en même temps que `nextCallbackAt`. */
+      nextCallbackOrigine: components['schemas']['RappelOrigine'] | null;
     };
     RepresentantListDto: {
       items: components['schemas']['RepresentantDto'][];
@@ -3865,6 +3993,8 @@ export interface components {
       /** Format: uuid */
       statutQualificationId: string | null;
       statutQualificationLabel: string | null;
+      /** @description Le statut exigeait un motif : `comment` porte alors ce motif, et non un commentaire libre. */
+      statutQualificationRequiresComment: boolean;
       comment: string | null;
       /** Format: date-time */
       callbackAt: string | null;
@@ -3964,6 +4094,90 @@ export interface components {
        * @description Horodatage de la saisie sur le terrain. Défaut : maintenant.
        */
       clientCreatedAt?: string;
+    };
+    OuvrirFicheDto: {
+      /**
+       * Format: uuid
+       * @description UUID v7 engendré par le client. Clé d’idempotence : l’ouverture existe sur l’appareil avant d’atteindre le serveur.
+       */
+      id: string;
+      /**
+       * Format: uuid
+       * @description Exclusif de `prospectId`.
+       */
+      representantId?: string;
+      /**
+       * Format: uuid
+       * @description Exclusif de `representantId`.
+       */
+      prospectId?: string;
+      /**
+       * Format: date-time
+       * @description Heure du terrain, comme `clientCreatedAt` ailleurs : une ouverture faite hors ligne lundi compte lundi.
+       */
+      openedAt: string;
+      /** @description Réponses déjà saisies au moment de l’ouverture. */
+      draft?: {
+        [key: string]: unknown;
+      };
+    };
+    OuvertureFicheDto: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      openedById: string;
+      openedByName: string;
+      /** Format: uuid */
+      representantId: string | null;
+      /** Format: uuid */
+      prospectId: string | null;
+      /** @description Nom de la fiche ouverte. */
+      ficheNom: string;
+      /** Format: date-time */
+      openedAt: string;
+      /**
+       * Format: date-time
+       * @description Nul tant que la fiche est verrouillée.
+       */
+      closedAt: string | null;
+      /** @description Durée de traitement, lue entre les deux bornes et jamais stockée. Distincte de la durée de communication du journal d’appels. */
+      dureeSecondes: number | null;
+      /** Format: uuid */
+      closingAttemptId: string | null;
+      /** @description Réponses saisies, restituées au rappel et après un plantage. */
+      draft: {
+        [key: string]: unknown;
+      } | null;
+      releasedByName: string | null;
+      /** Format: date-time */
+      releasedAt: string | null;
+    };
+    EnregistrerBrouillonDto: {
+      /** @description Remplace le brouillon précédent en entier. */
+      draft: {
+        [key: string]: unknown;
+      };
+    };
+    OuvertureFicheListDto: {
+      /** @description De la plus ancienne à la plus récente. */
+      items: components['schemas']['OuvertureFicheDto'][];
+    };
+    ComptageOuverturesJourDto: {
+      /** Format: uuid */
+      openedById: string;
+      openedByName: string;
+      /**
+       * Format: date
+       * @description Journée de travail, Africa/Dakar.
+       */
+      jour: string;
+      ouvertures: number;
+      /** @description DMT du jour, en secondes. Nulle tant qu’aucune ouverture n’est fermée. */
+      dureeMoyenneSecondes: number | null;
+    };
+    ComptageOuverturesDto: {
+      /** @description Une ligne par téléconseiller et par jour, de la plus récente à la plus ancienne. */
+      items: components['schemas']['ComptageOuverturesJourDto'][];
     };
     /** @enum {string} */
     Projet: 'CHUES' | 'GRAND_PUBLIC';
@@ -4522,6 +4736,11 @@ export interface components {
        * @description Tentative d’appel : prospect concerné. Sert aussi de clé de groupe.
        */
       prospectId?: string;
+      /**
+       * Format: uuid
+       * @description Tentative d’appel : ouverture de fiche que cette qualification ferme. Une ouverture inconnue, déjà fermée ou ouverte par un autre est ignorée : la tentative vient du terrain et ne se perd pas pour un verrou.
+       */
+      ouvertureId?: string;
       outcome?: components['schemas']['CallOutcome'];
       /** @description Tentative d’appel : code du motif d’issue. FACULTATIF POUR TOUJOURS. Un lot qui ne le porte pas résout le motif système dont le code égale outcome. */
       reasonCode?: string;
@@ -5667,7 +5886,7 @@ export interface components {
       methodObtained: number;
       /** @description Issue CALLBACK : à rappeler. */
       callback: number;
-      /** @description Part des appels dont le numéro s’est révélé exploitable, en pourcentage. `null` sans aucun appel : « personne appelé » n’est pas « personne joint ». */
+      /** @description Part des appels joints, en pourcentage. Seule l’issue UNREACHABLE en est exclue : un faux numéro est une fiche traitée. `null` sans aucun appel : « personne appelé » n’est pas « personne joint ». */
       reachRate: number | null;
       /** @description Fiches prospect saisies sur la période. */
       prospectsCreated: number;
@@ -5685,7 +5904,7 @@ export interface components {
       repAvgCallSeconds: number | null;
       /** @description Issue WRONG_NUMBER : faux numéro parmi les appels représentants. */
       repWrongNumber: number;
-      /** @description Représentants qui ont DÉCROCHÉ et répondu : REACHED ou REFUSED. Un refus est un contact ; un rappel promis n’en est pas encore un. */
+      /** @description Appels de la famille jointe : REACHED, REFUSED, CALLBACK, WRONG_NUMBER. Un refus est un contact, un rappel promis aussi. Recoupe `repCallback` et `repWrongNumber`, qui en détaillent deux issues. */
       repReached: number;
       /** @description Issue CALLBACK : rappel promis, date posée. */
       repCallback: number;
@@ -5693,13 +5912,13 @@ export interface components {
       repUnreachable: number;
       /** @description Issues d’héritage que le terrain ne saisit plus : PROSPECTS_PROMISED, OTHER. Hors de tous les taux. */
       repOther: number;
-      /** @description Part des appels représentants où quelqu’un a répondu, en pourcentage. `null` sans aucun appel. */
+      /** @description Part des appels représentants de la famille jointe, en pourcentage. `null` sans aucun appel. */
       repContactRate: number | null;
       /** @description Part des appels représentants finissant en rappel, en pourcentage. Dénominateur : appels hors faux numéro. */
       repCallbackRate: number | null;
-      /** @description Représentants DISTINCTS dont la dernière réponse de la fenêtre a été obtenue par ce téléconseiller. Attribué à qui a obtenu la réponse, pas à qui a appelé le premier. NON SOMMABLE entre périodes ni entre téléconseillers. */
+      /** @description Représentants DISTINCTS dont la dernière réponse TRANCHÉE de la fenêtre a été obtenue par ce téléconseiller. Tranche celui dont le statut pose AMBASSADEUR ou REFUS : « Décédé », « Hors cible » ou « Autre » ferment la fiche sans trancher. Attribué à qui a obtenu la réponse, pas à qui a appelé le premier. NON SOMMABLE entre périodes ni entre téléconseillers. */
       repQuestioned: number;
-      /** @description Parmi `repQuestioned`, ceux dont cette dernière réponse est REACHED. NON SOMMABLE. */
+      /** @description Parmi `repQuestioned`, ceux dont cette dernière réponse pose AMBASSADEUR. NON SOMMABLE. */
       repQualified: number;
       /** @description Part des représentants interrogés qui ont dit oui, en pourcentage. `null` sans aucun représentant interrogé. */
       repQualificationRate: number | null;
@@ -5748,7 +5967,7 @@ export interface components {
       methodObtained: number;
       /** @description Issue CALLBACK : à rappeler. */
       callback: number;
-      /** @description Part des appels dont le numéro s’est révélé exploitable, en pourcentage. `null` sans aucun appel : « personne appelé » n’est pas « personne joint ». */
+      /** @description Part des appels joints, en pourcentage. Seule l’issue UNREACHABLE en est exclue : un faux numéro est une fiche traitée. `null` sans aucun appel : « personne appelé » n’est pas « personne joint ». */
       reachRate: number | null;
       /** @description Fiches prospect saisies sur la période. */
       prospectsCreated: number;
@@ -5766,7 +5985,7 @@ export interface components {
       repAvgCallSeconds: number | null;
       /** @description Issue WRONG_NUMBER : faux numéro parmi les appels représentants. */
       repWrongNumber: number;
-      /** @description Représentants qui ont DÉCROCHÉ et répondu : REACHED ou REFUSED. Un refus est un contact ; un rappel promis n’en est pas encore un. */
+      /** @description Appels de la famille jointe : REACHED, REFUSED, CALLBACK, WRONG_NUMBER. Un refus est un contact, un rappel promis aussi. Recoupe `repCallback` et `repWrongNumber`, qui en détaillent deux issues. */
       repReached: number;
       /** @description Issue CALLBACK : rappel promis, date posée. */
       repCallback: number;
@@ -5774,13 +5993,13 @@ export interface components {
       repUnreachable: number;
       /** @description Issues d’héritage que le terrain ne saisit plus : PROSPECTS_PROMISED, OTHER. Hors de tous les taux. */
       repOther: number;
-      /** @description Part des appels représentants où quelqu’un a répondu, en pourcentage. `null` sans aucun appel. */
+      /** @description Part des appels représentants de la famille jointe, en pourcentage. `null` sans aucun appel. */
       repContactRate: number | null;
       /** @description Part des appels représentants finissant en rappel, en pourcentage. Dénominateur : appels hors faux numéro. */
       repCallbackRate: number | null;
-      /** @description Représentants DISTINCTS dont la dernière réponse de la fenêtre a été obtenue par ce téléconseiller. Attribué à qui a obtenu la réponse, pas à qui a appelé le premier. NON SOMMABLE entre périodes ni entre téléconseillers. */
+      /** @description Représentants DISTINCTS dont la dernière réponse TRANCHÉE de la fenêtre a été obtenue par ce téléconseiller. Tranche celui dont le statut pose AMBASSADEUR ou REFUS : « Décédé », « Hors cible » ou « Autre » ferment la fiche sans trancher. Attribué à qui a obtenu la réponse, pas à qui a appelé le premier. NON SOMMABLE entre périodes ni entre téléconseillers. */
       repQuestioned: number;
-      /** @description Parmi `repQuestioned`, ceux dont cette dernière réponse est REACHED. NON SOMMABLE. */
+      /** @description Parmi `repQuestioned`, ceux dont cette dernière réponse pose AMBASSADEUR. NON SOMMABLE. */
       repQualified: number;
       /** @description Part des représentants interrogés qui ont dit oui, en pourcentage. `null` sans aucun représentant interrogé. */
       repQualificationRate: number | null;
@@ -5950,6 +6169,11 @@ export interface components {
        * @description Statut de qualification recueilli. FACULTATIF : les versions déjà installées ne l’émettent pas, et un refus mettrait leur saisie en échec définitif. Quand il est présent, c’est lui qui commande l’issue enregistrée.
        */
       statutQualificationId?: string;
+      /**
+       * Format: uuid
+       * @description Ouverture de fiche que cette qualification ferme. Le chronomètre se lit entre son `openedAt` et cette fermeture. Une ouverture inconnue, déjà fermée ou ouverte par un autre est ignorée : la tentative vient du terrain et ne se perd pas pour un verrou.
+       */
+      ouvertureId?: string;
       /** @description Fiches promises. Admis uniquement pour l’issue PROSPECTS_PROMISED. */
       promisedProspects?: number;
       /** @description Obligatoire et non vide si l’issue vaut OTHER. */
@@ -6655,6 +6879,7 @@ export interface components {
       | 'prospects-notes'
       | 'adhesions'
       | 'reste-a-appeler'
+      | 'fiches-ouvertes'
       | 'par-teleconseiller'
       | 'couverture-derniere-campagne'
       | 'hors-attribution-derniere-campagne'
@@ -6757,7 +6982,7 @@ export interface components {
       statutQualificationId?: string;
       whatsappStatus?: components['schemas']['WhatsappStatus'];
       hasWhatsapp?: boolean;
-      /** @description A_RAPPELER : un rappel promis reste dû (`nextCallbackAt`), tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien. */
+      /** @description A_RAPPELER : un rappel reste dû (`nextCallbackAt`), promis ou automatique, tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien. */
       suivi?: components['schemas']['RepresentantSuivi'];
       /**
        * Format: uuid
@@ -9376,7 +9601,7 @@ export interface operations {
           'application/json': components['schemas']['ApiErrorDto'];
         };
       };
-      /** @description STATUT_QUALIFICATION_CODE_CONFLICT, _LABEL_CONFLICT, _CALLBACK_NOT_ALLOWED. */
+      /** @description STATUT_QUALIFICATION_LABEL_CONFLICT, _CODE_CONFLICT, _CALLBACK_NOT_ALLOWED. */
       409: {
         headers: {
           [name: string]: unknown;
@@ -9583,7 +9808,7 @@ export interface operations {
         statutQualificationId?: string;
         whatsappStatus?: components['schemas']['WhatsappStatus'];
         hasWhatsapp?: boolean;
-        /** @description A_RAPPELER : un rappel promis reste dû (`nextCallbackAt`), tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien. */
+        /** @description A_RAPPELER : un rappel reste dû (`nextCallbackAt`), promis ou automatique, tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien. */
         suivi?: components['schemas']['RepresentantSuivi'];
         /** @description Qui a passé le dernier appel. Un téléconseiller y met son propre identifiant. */
         lastCallById?: string;
@@ -10324,6 +10549,355 @@ export interface operations {
       };
       /** @description REPRESENTANT_COMMENT_NOT_FOUND. */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  ouvrirFiche: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['OuvrirFicheDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OuvertureFicheDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description OUVERTURE_FICHE_INTROUVABLE. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description OUVERTURE_FICHE_DEJA_OUVERTE, OUVERTURE_ID_PRIS. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  ouvertureCourante: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OuvertureFicheDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  enregistrerBrouillonOuverture: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['EnregistrerBrouillonDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OuvertureFicheDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description OUVERTURE_INTROUVABLE. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description OUVERTURE_DEJA_FERMEE. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listOuverturesOuvertes: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OuvertureFicheListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  libererOuverture: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OuvertureFicheDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description OUVERTURE_INTROUVABLE. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description OUVERTURE_DEJA_FERMEE. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  compterOuvertures: {
+    parameters: {
+      query?: {
+        /** @description Journée incluse. */
+        from?: string;
+        /** @description Journée incluse. */
+        to?: string;
+        /** @description Un seul téléconseiller. */
+        openedById?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ComptageOuverturesDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
         headers: {
           [name: string]: unknown;
         };
@@ -17110,7 +17684,7 @@ export interface operations {
         statutQualificationId?: string;
         whatsappStatus?: components['schemas']['WhatsappStatus'];
         hasWhatsapp?: boolean;
-        /** @description A_RAPPELER : un rappel promis reste dû (`nextCallbackAt`), tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien. */
+        /** @description A_RAPPELER : un rappel reste dû (`nextCallbackAt`), promis ou automatique, tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien. */
         suivi?: components['schemas']['RepresentantSuivi'];
         /** @description Qui a passé le dernier appel. Un téléconseiller y met son propre identifiant. */
         lastCallById?: string;

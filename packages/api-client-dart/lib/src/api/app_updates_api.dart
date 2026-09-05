@@ -16,6 +16,7 @@ import 'package:crm_api_client/src/model/api_error_dto.dart';
 import 'package:crm_api_client/src/model/app_update_dto.dart';
 
 class AppUpdatesApi {
+
   final Dio _dio;
 
   const AppUpdatesApi(this._dio);
@@ -24,7 +25,7 @@ class AppUpdatesApi {
   /// &#x60;v&#x60; sert exactement cette version, avec un cache immuable. Sans &#x60;v&#x60;, la release courante est servie, pour les APK déjà installés qui ignorent ce paramètre.
   ///
   /// Parameters:
-  /// * [v]
+  /// * [v] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -34,7 +35,7 @@ class AppUpdatesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [Uint8List] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<Uint8List>> downloadAndroidUpdate({
+  Future<Response<Uint8List>> downloadAndroidUpdate({ 
     num? v,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -47,12 +48,19 @@ class AppUpdatesApi {
     final _options = Options(
       method: r'GET',
       responseType: ResponseType.bytes,
-      headers: <String, dynamic>{...?headers},
-      extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[],
+        ...?extra,
+      },
       validateStatus: validateStatus,
     );
 
-    final _queryParameters = <String, dynamic>{if (v != null) r'v': v};
+    final _queryParameters = <String, dynamic>{
+      if (v != null) r'v': v,
+    };
 
     final _response = await _dio.request<Object>(
       _path,
@@ -66,8 +74,9 @@ class AppUpdatesApi {
     Uint8List? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null ? null : rawData as Uint8List;
+final rawData = _response.data;
+_responseData = rawData == null ? null : rawData as Uint8List;
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -94,7 +103,7 @@ class AppUpdatesApi {
   /// &#x60;minVersionCode&#x60; est le plus haut &#x60;versionCode&#x60; marqué obligatoire encore en ligne, ou &#x60;null&#x60;. &#x60;forceUpdate&#x60; vaut &#x60;versionCode &lt; minVersionCode&#x60;.
   ///
   /// Parameters:
-  /// * [versionCode]
+  /// * [versionCode] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -104,7 +113,7 @@ class AppUpdatesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [AppUpdateDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<AppUpdateDto>> getAndroidUpdate({
+  Future<Response<AppUpdateDto>> getAndroidUpdate({ 
     required num versionCode,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -116,12 +125,19 @@ class AppUpdatesApi {
     final _path = r'/api/v1/app-updates/android/current';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{...?headers},
-      extra: <String, dynamic>{'secure': <Map<String, String>>[], ...?extra},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[],
+        ...?extra,
+      },
       validateStatus: validateStatus,
     );
 
-    final _queryParameters = <String, dynamic>{r'versionCode': versionCode};
+    final _queryParameters = <String, dynamic>{
+      r'versionCode': versionCode,
+    };
 
     final _response = await _dio.request<Object>(
       _path,
@@ -135,14 +151,9 @@ class AppUpdatesApi {
     AppUpdateDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<AppUpdateDto, AppUpdateDto>(
-              rawData,
-              'AppUpdateDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<AppUpdateDto, AppUpdateDto>(rawData, 'AppUpdateDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -166,7 +177,7 @@ class AppUpdatesApi {
   }
 
   /// Historique des releases Android.
-  ///
+  /// 
   ///
   /// Parameters:
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
@@ -178,7 +189,7 @@ class AppUpdatesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [AndroidReleaseListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<AndroidReleaseListDto>> listAndroidReleases({
+  Future<Response<AndroidReleaseListDto>> listAndroidReleases({ 
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -189,10 +200,16 @@ class AppUpdatesApi {
     final _path = r'/api/v1/app-updates/android/releases';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -210,14 +227,9 @@ class AppUpdatesApi {
     AndroidReleaseListDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<AndroidReleaseListDto, AndroidReleaseListDto>(
-              rawData,
-              'AndroidReleaseListDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<AndroidReleaseListDto, AndroidReleaseListDto>(rawData, 'AndroidReleaseListDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -244,7 +256,7 @@ class AppUpdatesApi {
   /// Pose le plancher : tout poste sous ce &#x60;versionCode&#x60; reçoit &#x60;forceUpdate&#x60;. Idempotent.
   ///
   /// Parameters:
-  /// * [versionCode]
+  /// * [versionCode] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -254,7 +266,7 @@ class AppUpdatesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [AndroidReleaseDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<AndroidReleaseDto>> markAndroidReleaseMandatory({
+  Future<Response<AndroidReleaseDto>> markAndroidReleaseMandatory({ 
     required num versionCode,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -263,19 +275,19 @@ class AppUpdatesApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/app-updates/android/{versionCode}/mandatory'
-        .replaceAll(
-          '{'
-          r'versionCode'
-          '}',
-          versionCode.toString(),
-        );
+    final _path = r'/api/v1/app-updates/android/{versionCode}/mandatory'.replaceAll('{' r'versionCode' '}', versionCode.toString());
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -293,14 +305,9 @@ class AppUpdatesApi {
     AndroidReleaseDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<AndroidReleaseDto, AndroidReleaseDto>(
-              rawData,
-              'AndroidReleaseDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<AndroidReleaseDto, AndroidReleaseDto>(rawData, 'AndroidReleaseDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -327,8 +334,8 @@ class AppUpdatesApi {
   /// &#x60;versionName&#x60; et &#x60;versionCode&#x60; ne sont PAS envoyés : ils sont lus dans le &#x60;AndroidManifest.xml&#x60; de l’APK. Les envoyer quand même produit un 400, la validation refusant tout champ inconnu. La publication est refusée si le manifeste est illisible, si le paquet n’est pas &#x60;sn.cpi.go&#x60;, si le &#x60;versionCode&#x60; n’est pas STRICTEMENT supérieur au plus haut publié, ou si le certificat signataire diffère de celui du parc. Une release naît NON obligatoire : le plancher se pose ensuite.
   ///
   /// Parameters:
-  /// * [file]
-  /// * [notes]
+  /// * [file] 
+  /// * [notes] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -338,7 +345,7 @@ class AppUpdatesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [AndroidReleaseDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<AndroidReleaseDto>> uploadAndroidUpdate({
+  Future<Response<AndroidReleaseDto>> uploadAndroidUpdate({ 
     required MultipartFile file,
     String? notes,
     CancelToken? cancelToken,
@@ -351,10 +358,16 @@ class AppUpdatesApi {
     final _path = r'/api/v1/app-updates/android';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -369,9 +382,13 @@ class AppUpdatesApi {
         r'file': file,
         if (notes != null) r'notes': notes,
       });
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -390,14 +407,9 @@ class AppUpdatesApi {
     AndroidReleaseDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<AndroidReleaseDto, AndroidReleaseDto>(
-              rawData,
-              'AndroidReleaseDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<AndroidReleaseDto, AndroidReleaseDto>(rawData, 'AndroidReleaseDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -424,7 +436,7 @@ class AppUpdatesApi {
   /// Le fichier est supprimé et la version cesse d’être téléchargeable. Idempotent sur une release déjà retirée.
   ///
   /// Parameters:
-  /// * [versionCode]
+  /// * [versionCode] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -434,7 +446,7 @@ class AppUpdatesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [AndroidReleaseDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<AndroidReleaseDto>> withdrawAndroidRelease({
+  Future<Response<AndroidReleaseDto>> withdrawAndroidRelease({ 
     required num versionCode,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -443,19 +455,19 @@ class AppUpdatesApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/app-updates/android/{versionCode}/withdraw'
-        .replaceAll(
-          '{'
-          r'versionCode'
-          '}',
-          versionCode.toString(),
-        );
+    final _path = r'/api/v1/app-updates/android/{versionCode}/withdraw'.replaceAll('{' r'versionCode' '}', versionCode.toString());
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -473,14 +485,9 @@ class AppUpdatesApi {
     AndroidReleaseDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<AndroidReleaseDto, AndroidReleaseDto>(
-              rawData,
-              'AndroidReleaseDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<AndroidReleaseDto, AndroidReleaseDto>(rawData, 'AndroidReleaseDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -502,4 +509,5 @@ class AppUpdatesApi {
       extra: _response.extra,
     );
   }
+
 }

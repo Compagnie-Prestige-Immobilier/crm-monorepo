@@ -9,6 +9,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'bank_agent_activity_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,72 +20,133 @@ part 'bank_agent_activity_dto.g.dart';
 class BankAgentActivityDto {
   /// Returns a new [BankAgentActivityDto] instance.
   BankAgentActivityDto({
-    required this.agentId,
 
-    required this.label,
+    required  this.agentId,
 
-    required this.created,
+    required  this.label,
 
-    required this.transitions,
+    required  this.created,
 
-    required this.cashed,
+    required  this.transitions,
 
-    required this.amountXof,
+    required  this.cashed,
+
+    required  this.amountXof,
   });
 
-  @JsonKey(name: r'agentId', required: true, includeIfNull: false)
+  @JsonKey(
+    
+    name: r'agentId',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String agentId;
 
-  @JsonKey(name: r'label', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'label',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String label;
 
-  /// Dossiers créés par l’agent.
-  @JsonKey(name: r'created', required: true, includeIfNull: false)
+
+
+      /// Dossiers créés par l’agent.
+  @JsonKey(
+    
+    name: r'created',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num created;
 
-  /// Transitions écrites par l’agent.
-  @JsonKey(name: r'transitions', required: true, includeIfNull: false)
+
+
+      /// Transitions écrites par l’agent.
+  @JsonKey(
+    
+    name: r'transitions',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num transitions;
 
-  /// Dossiers menés à l’encaissement par l’agent.
-  @JsonKey(name: r'cashed', required: true, includeIfNull: false)
+
+
+      /// Dossiers menés à l’encaissement par l’agent.
+  @JsonKey(
+    
+    name: r'cashed',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num cashed;
 
-  /// Montant encaissé par l’agent, en chaîne.
-  @JsonKey(name: r'amountXof', required: true, includeIfNull: false)
+
+
+      /// Montant encaissé par l’agent, en chaîne.
+  @JsonKey(
+    
+    name: r'amountXof',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String amountXof;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is BankAgentActivityDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [agentId, label, created, transitions, cashed, amountXof],
-              [
-                other.agentId,
-                other.label,
-                other.created,
-                other.transitions,
-                other.cashed,
-                other.amountXof,
-              ],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([
+
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is BankAgentActivityDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            agentId,
+            label,
+            created,
+            transitions,
+            cashed,
+            amountXof,
+        ],
+        [
+            other.agentId,
+            other.label,
+            other.created,
+            other.transitions,
+            other.cashed,
+            other.amountXof,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
         agentId,
         label,
         created,
         transitions,
         cashed,
         amountXof,
-      ]);
+    ],);
 
-  factory BankAgentActivityDto.fromJson(Map<String, dynamic> json) =>
-      _$BankAgentActivityDtoFromJson(json);
+  factory BankAgentActivityDto.fromJson(Map<String, dynamic> json) => _$BankAgentActivityDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$BankAgentActivityDtoToJson(this);
 
@@ -92,4 +154,6 @@ class BankAgentActivityDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

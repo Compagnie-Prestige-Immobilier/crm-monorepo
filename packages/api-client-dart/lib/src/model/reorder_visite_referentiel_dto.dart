@@ -9,6 +9,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'reorder_visite_referentiel_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -18,24 +19,46 @@ part 'reorder_visite_referentiel_dto.g.dart';
 )
 class ReorderVisiteReferentielDto {
   /// Returns a new [ReorderVisiteReferentielDto] instance.
-  ReorderVisiteReferentielDto({required this.ids});
+  ReorderVisiteReferentielDto({
 
-  /// Les entrées dans leur nouvel ordre. Celles omises gardent leur rang.
-  @JsonKey(name: r'ids', required: true, includeIfNull: false)
+    required  this.ids,
+  });
+
+      /// Les entrées dans leur nouvel ordre. Celles omises gardent leur rang.
+  @JsonKey(
+    
+    name: r'ids',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final List<String> ids;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is ReorderVisiteReferentielDto &&
-            runtimeType == other.runtimeType &&
-            equals([ids], [other.ids]);
-  }
 
-  @override
-  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([ids]);
 
-  factory ReorderVisiteReferentielDto.fromJson(Map<String, dynamic> json) =>
-      _$ReorderVisiteReferentielDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is ReorderVisiteReferentielDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            ids,
+        ],
+        [
+            other.ids,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        ids,
+    ],);
+
+  factory ReorderVisiteReferentielDto.fromJson(Map<String, dynamic> json) => _$ReorderVisiteReferentielDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$ReorderVisiteReferentielDtoToJson(this);
 
@@ -43,4 +66,6 @@ class ReorderVisiteReferentielDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

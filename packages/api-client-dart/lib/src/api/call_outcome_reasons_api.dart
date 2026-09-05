@@ -17,6 +17,7 @@ import 'package:crm_api_client/src/model/set_call_outcome_reason_active_dto.dart
 import 'package:crm_api_client/src/model/update_call_outcome_reason_dto.dart';
 
 class CallOutcomeReasonsApi {
+
   final Dio _dio;
 
   const CallOutcomeReasonsApi(this._dio);
@@ -25,7 +26,7 @@ class CallOutcomeReasonsApi {
   /// L’effet est choisi à la création et n’est plus modifiable : l’historique le référence. Le motif naît en version de charge utile 2, donc invisible du parc tant que l’application n’a pas été renouvelée.
   ///
   /// Parameters:
-  /// * [createCallOutcomeReasonDto]
+  /// * [createCallOutcomeReasonDto] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -35,7 +36,7 @@ class CallOutcomeReasonsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [CallOutcomeReasonDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<CallOutcomeReasonDto>> createCallOutcomeReason({
+  Future<Response<CallOutcomeReasonDto>> createCallOutcomeReason({ 
     required CreateCallOutcomeReasonDto createCallOutcomeReasonDto,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -47,10 +48,16 @@ class CallOutcomeReasonsApi {
     final _path = r'/api/v1/call-outcome-reasons';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -62,9 +69,13 @@ class CallOutcomeReasonsApi {
 
     try {
       _bodyData = jsonEncode(createCallOutcomeReasonDto);
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -83,14 +94,9 @@ class CallOutcomeReasonsApi {
     CallOutcomeReasonDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<CallOutcomeReasonDto, CallOutcomeReasonDto>(
-              rawData,
-              'CallOutcomeReasonDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<CallOutcomeReasonDto, CallOutcomeReasonDto>(rawData, 'CallOutcomeReasonDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -114,7 +120,7 @@ class CallOutcomeReasonsApi {
   }
 
   /// Tous les motifs, actifs ou non, toutes versions de charge utile.
-  ///
+  /// 
   ///
   /// Parameters:
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
@@ -126,7 +132,7 @@ class CallOutcomeReasonsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [CallOutcomeReasonListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<CallOutcomeReasonListDto>> listAllCallOutcomeReasons({
+  Future<Response<CallOutcomeReasonListDto>> listAllCallOutcomeReasons({ 
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -137,10 +143,16 @@ class CallOutcomeReasonsApi {
     final _path = r'/api/v1/call-outcome-reasons/administration';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -158,14 +170,9 @@ class CallOutcomeReasonsApi {
     CallOutcomeReasonListDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<CallOutcomeReasonListDto, CallOutcomeReasonListDto>(
-              rawData,
-              'CallOutcomeReasonListDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<CallOutcomeReasonListDto, CallOutcomeReasonListDto>(rawData, 'CallOutcomeReasonListDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -202,7 +209,7 @@ class CallOutcomeReasonsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [CallOutcomeReasonListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<CallOutcomeReasonListDto>> listCallOutcomeReasons({
+  Future<Response<CallOutcomeReasonListDto>> listCallOutcomeReasons({ 
     required num payloadVersion,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -214,10 +221,16 @@ class CallOutcomeReasonsApi {
     final _path = r'/api/v1/call-outcome-reasons';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -240,14 +253,9 @@ class CallOutcomeReasonsApi {
     CallOutcomeReasonListDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<CallOutcomeReasonListDto, CallOutcomeReasonListDto>(
-              rawData,
-              'CallOutcomeReasonListDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<CallOutcomeReasonListDto, CallOutcomeReasonListDto>(rawData, 'CallOutcomeReasonListDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -274,8 +282,8 @@ class CallOutcomeReasonsApi {
   /// Jamais de suppression : les tentatives déjà remontées référencent le code. Refusé sur un motif système, que les téléphones en place proposent encore.
   ///
   /// Parameters:
-  /// * [id]
-  /// * [setCallOutcomeReasonActiveDto]
+  /// * [id] 
+  /// * [setCallOutcomeReasonActiveDto] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -285,7 +293,7 @@ class CallOutcomeReasonsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [CallOutcomeReasonDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<CallOutcomeReasonDto>> setCallOutcomeReasonActive({
+  Future<Response<CallOutcomeReasonDto>> setCallOutcomeReasonActive({ 
     required String id,
     required SetCallOutcomeReasonActiveDto setCallOutcomeReasonActiveDto,
     CancelToken? cancelToken,
@@ -295,18 +303,19 @@ class CallOutcomeReasonsApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/call-outcome-reasons/{id}/active'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
+    final _path = r'/api/v1/call-outcome-reasons/{id}/active'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -318,9 +327,13 @@ class CallOutcomeReasonsApi {
 
     try {
       _bodyData = jsonEncode(setCallOutcomeReasonActiveDto);
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -339,14 +352,9 @@ class CallOutcomeReasonsApi {
     CallOutcomeReasonDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<CallOutcomeReasonDto, CallOutcomeReasonDto>(
-              rawData,
-              'CallOutcomeReasonDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<CallOutcomeReasonDto, CallOutcomeReasonDto>(rawData, 'CallOutcomeReasonDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -373,8 +381,8 @@ class CallOutcomeReasonsApi {
   /// Ni le code, ni l’effet, ni la version de charge utile. Sur un motif système, les règles de saisie non plus : elles sont compilées dans l’application de terrain.
   ///
   /// Parameters:
-  /// * [id]
-  /// * [updateCallOutcomeReasonDto]
+  /// * [id] 
+  /// * [updateCallOutcomeReasonDto] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -384,7 +392,7 @@ class CallOutcomeReasonsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [CallOutcomeReasonDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<CallOutcomeReasonDto>> updateCallOutcomeReason({
+  Future<Response<CallOutcomeReasonDto>> updateCallOutcomeReason({ 
     required String id,
     required UpdateCallOutcomeReasonDto updateCallOutcomeReasonDto,
     CancelToken? cancelToken,
@@ -394,18 +402,19 @@ class CallOutcomeReasonsApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/call-outcome-reasons/{id}'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
+    final _path = r'/api/v1/call-outcome-reasons/{id}'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'PATCH',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -417,9 +426,13 @@ class CallOutcomeReasonsApi {
 
     try {
       _bodyData = jsonEncode(updateCallOutcomeReasonDto);
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -438,14 +451,9 @@ class CallOutcomeReasonsApi {
     CallOutcomeReasonDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<CallOutcomeReasonDto, CallOutcomeReasonDto>(
-              rawData,
-              'CallOutcomeReasonDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<CallOutcomeReasonDto, CallOutcomeReasonDto>(rawData, 'CallOutcomeReasonDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -467,4 +475,5 @@ class CallOutcomeReasonsApi {
       extra: _response.extra,
     );
   }
+
 }

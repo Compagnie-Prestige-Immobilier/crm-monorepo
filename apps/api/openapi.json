@@ -3279,6 +3279,7 @@
         "tags": ["statuts-qualification"]
       },
       "post": {
+        "description": "Le code est déduit du libellé, puis figé : l’historique le référence. Deux libellés qui ne se distinguent que par les accents ou la casse donnent le même code et le second est refusé.",
         "operationId": "createStatutQualification",
         "parameters": [],
         "requestBody": {
@@ -3333,7 +3334,7 @@
             }
           },
           "409": {
-            "description": "STATUT_QUALIFICATION_CODE_CONFLICT, _LABEL_CONFLICT, _CALLBACK_NOT_ALLOWED.",
+            "description": "STATUT_QUALIFICATION_LABEL_CONFLICT, _CODE_CONFLICT, _CALLBACK_NOT_ALLOWED.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3690,7 +3691,7 @@
             "name": "suivi",
             "required": false,
             "in": "query",
-            "description": "A_RAPPELER : un rappel promis reste dû (`nextCallbackAt`), tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien.",
+            "description": "A_RAPPELER : un rappel reste dû (`nextCallbackAt`), promis ou automatique, tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien.",
             "schema": {
               "$ref": "#/components/schemas/RepresentantSuivi"
             }
@@ -4776,6 +4777,471 @@
         ],
         "summary": "Supprime logiquement un commentaire.",
         "tags": ["representants"]
+      }
+    },
+    "/api/v1/ouvertures": {
+      "post": {
+        "description": "Chaque ouverture confirmée compte, même répétée le même jour sur la même fiche. La consultation en lecture seule ne passe pas par ici. Un téléconseiller n’a qu’une fiche ouverte à la fois : la seconde sort en 409 OUVERTURE_FICHE_DEJA_OUVERTE.",
+        "operationId": "ouvrirFiche",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OuvrirFicheDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OuvertureFicheDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "OUVERTURE_FICHE_INTROUVABLE.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "OUVERTURE_FICHE_DEJA_OUVERTE, OUVERTURE_ID_PRIS.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Enregistre l’ouverture confirmée d’une fiche.",
+        "tags": ["ouvertures"]
+      }
+    },
+    "/api/v1/ouvertures/courante": {
+      "get": {
+        "description": "Nulle quand aucune fiche n’est ouverte.",
+        "operationId": "ouvertureCourante",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OuvertureFicheDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "La fiche que l’appelant a en main, avec son brouillon.",
+        "tags": ["ouvertures"]
+      }
+    },
+    "/api/v1/ouvertures/{id}/brouillon": {
+      "put": {
+        "operationId": "enregistrerBrouillonOuverture",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnregistrerBrouillonDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OuvertureFicheDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "OUVERTURE_INTROUVABLE.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "OUVERTURE_DEJA_FERMEE.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remplace le brouillon d’une fiche ouverte.",
+        "tags": ["ouvertures"]
+      }
+    },
+    "/api/v1/ouvertures/ouvertes": {
+      "get": {
+        "operationId": "listOuverturesOuvertes",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OuvertureFicheListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Les fiches restées ouvertes, à libérer.",
+        "tags": ["ouvertures"]
+      }
+    },
+    "/api/v1/ouvertures/{id}/liberation": {
+      "post": {
+        "description": "Réservé au superviseur et à l’administrateur, jamais automatique. La libération est tracée et la fiche repasse en file de rappel.",
+        "operationId": "libererOuverture",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OuvertureFicheDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "OUVERTURE_INTROUVABLE.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "OUVERTURE_DEJA_FERMEE.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Libère une fiche restée ouverte.",
+        "tags": ["ouvertures"]
+      }
+    },
+    "/api/v1/ouvertures/comptage": {
+      "get": {
+        "description": "Porte aussi la durée moyenne de traitement, lue entre l’ouverture et la qualification. Un téléconseiller ne lit que son propre compte.",
+        "operationId": "compterOuvertures",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Journée incluse.",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Journée incluse.",
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "name": "openedById",
+            "required": false,
+            "in": "query",
+            "description": "Un seul téléconseiller.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComptageOuverturesDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fiches ouvertes par téléconseiller et par jour.",
+        "tags": ["ouvertures"]
       }
     },
     "/api/v1/prospects": {
@@ -17542,7 +18008,7 @@
             "name": "suivi",
             "required": false,
             "in": "query",
-            "description": "A_RAPPELER : un rappel promis reste dû (`nextCallbackAt`), tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien.",
+            "description": "A_RAPPELER : un rappel reste dû (`nextCallbackAt`), promis ou automatique, tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien.",
             "schema": {
               "$ref": "#/components/schemas/RepresentantSuivi"
             }
@@ -20696,6 +21162,10 @@
             "type": "boolean",
             "description": "La date du rappel est exigée par ce statut."
           },
+          "requiresComment": {
+            "type": "boolean",
+            "description": "Le motif est exigé par ce statut : « Autre » ne dit rien seul."
+          },
           "retryAfterMinutes": {
             "type": "number",
             "nullable": true,
@@ -20740,6 +21210,7 @@
           "label",
           "effect",
           "requiresCallback",
+          "requiresComment",
           "retryAfterMinutes",
           "priorite",
           "relationStatus",
@@ -20764,14 +21235,10 @@
       "CreateStatutQualificationDto": {
         "type": "object",
         "properties": {
-          "code": {
-            "type": "string",
-            "maxLength": 64,
-            "description": "Immuable : l’historique le référence."
-          },
           "label": {
             "type": "string",
-            "maxLength": 120
+            "maxLength": 120,
+            "description": "Le code en est déduit, puis figé : majuscules, sans accents, espaces en tirets bas."
           },
           "effect": {
             "allOf": [
@@ -20781,6 +21248,10 @@
             ]
           },
           "requiresCallback": {
+            "type": "boolean",
+            "default": false
+          },
+          "requiresComment": {
             "type": "boolean",
             "default": false
           },
@@ -20808,7 +21279,7 @@
             ]
           }
         },
-        "required": ["code", "label", "effect"]
+        "required": ["label", "effect"]
       },
       "UpdateStatutQualificationDto": {
         "type": "object",
@@ -20818,6 +21289,9 @@
             "maxLength": 120
           },
           "requiresCallback": {
+            "type": "boolean"
+          },
+          "requiresComment": {
             "type": "boolean"
           },
           "retryAfterMinutes": {
@@ -20890,6 +21364,11 @@
           "OTHER"
         ],
         "description": "Issue du dernier appel. Nul : jamais appelé."
+      },
+      "RappelOrigine": {
+        "type": "string",
+        "enum": ["PROMIS", "AUTOMATIQUE"],
+        "description": "PROMIS : la date convenue avec la personne. AUTOMATIQUE : le délai de réessai du dernier statut non joint. Nul en même temps que `nextCallbackAt`."
       },
       "RepresentantDto": {
         "type": "object",
@@ -21049,7 +21528,16 @@
             "type": "string",
             "format": "date-time",
             "nullable": true,
-            "description": "Rappel promis par le dernier appel, tant qu’aucun appel ne l’a honoré."
+            "description": "Rappel dû, tant qu’aucun appel ne l’a honoré."
+          },
+          "nextCallbackOrigine": {
+            "nullable": true,
+            "description": "PROMIS : la date convenue avec la personne. AUTOMATIQUE : le délai de réessai du dernier statut non joint. Nul en même temps que `nextCallbackAt`.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RappelOrigine"
+              }
+            ]
           }
         },
         "required": [
@@ -21086,7 +21574,8 @@
           "callAttemptCount",
           "lastCallById",
           "lastCallByName",
-          "nextCallbackAt"
+          "nextCallbackAt",
+          "nextCallbackOrigine"
         ]
       },
       "RepresentantListDto": {
@@ -21534,6 +22023,10 @@
             "type": "string",
             "nullable": true
           },
+          "statutQualificationRequiresComment": {
+            "type": "boolean",
+            "description": "Le statut exigeait un motif : `comment` porte alors ce motif, et non un commentaire libre."
+          },
           "comment": {
             "type": "string",
             "nullable": true
@@ -21609,6 +22102,7 @@
           "outcome",
           "statutQualificationId",
           "statutQualificationLabel",
+          "statutQualificationRequiresComment",
           "comment",
           "callbackAt",
           "promisedProspects",
@@ -21790,6 +22284,180 @@
           }
         },
         "required": ["id", "body"]
+      },
+      "OuvrirFicheDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID v7 engendré par le client. Clé d’idempotence : l’ouverture existe sur l’appareil avant d’atteindre le serveur."
+          },
+          "representantId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Exclusif de `prospectId`."
+          },
+          "prospectId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Exclusif de `representantId`."
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Heure du terrain, comme `clientCreatedAt` ailleurs : une ouverture faite hors ligne lundi compte lundi."
+          },
+          "draft": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Réponses déjà saisies au moment de l’ouverture."
+          }
+        },
+        "required": ["id", "openedAt"]
+      },
+      "OuvertureFicheDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "openedById": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "openedByName": {
+            "type": "string"
+          },
+          "representantId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "prospectId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "ficheNom": {
+            "type": "string",
+            "description": "Nom de la fiche ouverte."
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "closedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Nul tant que la fiche est verrouillée."
+          },
+          "dureeSecondes": {
+            "type": "number",
+            "nullable": true,
+            "description": "Durée de traitement, lue entre les deux bornes et jamais stockée. Distincte de la durée de communication du journal d’appels."
+          },
+          "closingAttemptId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "draft": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true,
+            "description": "Réponses saisies, restituées au rappel et après un plantage."
+          },
+          "releasedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "releasedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "openedById",
+          "openedByName",
+          "representantId",
+          "prospectId",
+          "ficheNom",
+          "openedAt",
+          "closedAt",
+          "dureeSecondes",
+          "closingAttemptId",
+          "draft",
+          "releasedByName",
+          "releasedAt"
+        ]
+      },
+      "EnregistrerBrouillonDto": {
+        "type": "object",
+        "properties": {
+          "draft": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Remplace le brouillon précédent en entier."
+          }
+        },
+        "required": ["draft"]
+      },
+      "OuvertureFicheListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "De la plus ancienne à la plus récente.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OuvertureFicheDto"
+            }
+          }
+        },
+        "required": ["items"]
+      },
+      "ComptageOuverturesJourDto": {
+        "type": "object",
+        "properties": {
+          "openedById": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "openedByName": {
+            "type": "string"
+          },
+          "jour": {
+            "type": "string",
+            "format": "date",
+            "description": "Journée de travail, Africa/Dakar."
+          },
+          "ouvertures": {
+            "type": "number"
+          },
+          "dureeMoyenneSecondes": {
+            "type": "number",
+            "nullable": true,
+            "description": "DMT du jour, en secondes. Nulle tant qu’aucune ouverture n’est fermée."
+          }
+        },
+        "required": ["openedById", "openedByName", "jour", "ouvertures", "dureeMoyenneSecondes"]
+      },
+      "ComptageOuverturesDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "Une ligne par téléconseiller et par jour, de la plus récente à la plus ancienne.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ComptageOuverturesJourDto"
+            }
+          }
+        },
+        "required": ["items"]
       },
       "Projet": {
         "type": "string",
@@ -23244,6 +23912,11 @@
             "type": "string",
             "format": "uuid",
             "description": "Tentative d’appel : prospect concerné. Sert aussi de clé de groupe."
+          },
+          "ouvertureId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Tentative d’appel : ouverture de fiche que cette qualification ferme. Une ouverture inconnue, déjà fermée ou ouverte par un autre est ignorée : la tentative vient du terrain et ne se perd pas pour un verrou."
           },
           "outcome": {
             "allOf": [
@@ -26578,7 +27251,7 @@
           "reachRate": {
             "type": "number",
             "nullable": true,
-            "description": "Part des appels dont le numéro s’est révélé exploitable, en pourcentage. `null` sans aucun appel : « personne appelé » n’est pas « personne joint »."
+            "description": "Part des appels joints, en pourcentage. Seule l’issue UNREACHABLE en est exclue : un faux numéro est une fiche traitée. `null` sans aucun appel : « personne appelé » n’est pas « personne joint »."
           },
           "prospectsCreated": {
             "type": "number",
@@ -26615,7 +27288,7 @@
           },
           "repReached": {
             "type": "number",
-            "description": "Représentants qui ont DÉCROCHÉ et répondu : REACHED ou REFUSED. Un refus est un contact ; un rappel promis n’en est pas encore un."
+            "description": "Appels de la famille jointe : REACHED, REFUSED, CALLBACK, WRONG_NUMBER. Un refus est un contact, un rappel promis aussi. Recoupe `repCallback` et `repWrongNumber`, qui en détaillent deux issues."
           },
           "repCallback": {
             "type": "number",
@@ -26632,7 +27305,7 @@
           "repContactRate": {
             "type": "number",
             "nullable": true,
-            "description": "Part des appels représentants où quelqu’un a répondu, en pourcentage. `null` sans aucun appel."
+            "description": "Part des appels représentants de la famille jointe, en pourcentage. `null` sans aucun appel."
           },
           "repCallbackRate": {
             "type": "number",
@@ -26641,11 +27314,11 @@
           },
           "repQuestioned": {
             "type": "number",
-            "description": "Représentants DISTINCTS dont la dernière réponse de la fenêtre a été obtenue par ce téléconseiller. Attribué à qui a obtenu la réponse, pas à qui a appelé le premier. NON SOMMABLE entre périodes ni entre téléconseillers."
+            "description": "Représentants DISTINCTS dont la dernière réponse TRANCHÉE de la fenêtre a été obtenue par ce téléconseiller. Tranche celui dont le statut pose AMBASSADEUR ou REFUS : « Décédé », « Hors cible » ou « Autre » ferment la fiche sans trancher. Attribué à qui a obtenu la réponse, pas à qui a appelé le premier. NON SOMMABLE entre périodes ni entre téléconseillers."
           },
           "repQualified": {
             "type": "number",
-            "description": "Parmi `repQuestioned`, ceux dont cette dernière réponse est REACHED. NON SOMMABLE."
+            "description": "Parmi `repQuestioned`, ceux dont cette dernière réponse pose AMBASSADEUR. NON SOMMABLE."
           },
           "repQualificationRate": {
             "type": "number",
@@ -26790,7 +27463,7 @@
           "reachRate": {
             "type": "number",
             "nullable": true,
-            "description": "Part des appels dont le numéro s’est révélé exploitable, en pourcentage. `null` sans aucun appel : « personne appelé » n’est pas « personne joint »."
+            "description": "Part des appels joints, en pourcentage. Seule l’issue UNREACHABLE en est exclue : un faux numéro est une fiche traitée. `null` sans aucun appel : « personne appelé » n’est pas « personne joint »."
           },
           "prospectsCreated": {
             "type": "number",
@@ -26827,7 +27500,7 @@
           },
           "repReached": {
             "type": "number",
-            "description": "Représentants qui ont DÉCROCHÉ et répondu : REACHED ou REFUSED. Un refus est un contact ; un rappel promis n’en est pas encore un."
+            "description": "Appels de la famille jointe : REACHED, REFUSED, CALLBACK, WRONG_NUMBER. Un refus est un contact, un rappel promis aussi. Recoupe `repCallback` et `repWrongNumber`, qui en détaillent deux issues."
           },
           "repCallback": {
             "type": "number",
@@ -26844,7 +27517,7 @@
           "repContactRate": {
             "type": "number",
             "nullable": true,
-            "description": "Part des appels représentants où quelqu’un a répondu, en pourcentage. `null` sans aucun appel."
+            "description": "Part des appels représentants de la famille jointe, en pourcentage. `null` sans aucun appel."
           },
           "repCallbackRate": {
             "type": "number",
@@ -26853,11 +27526,11 @@
           },
           "repQuestioned": {
             "type": "number",
-            "description": "Représentants DISTINCTS dont la dernière réponse de la fenêtre a été obtenue par ce téléconseiller. Attribué à qui a obtenu la réponse, pas à qui a appelé le premier. NON SOMMABLE entre périodes ni entre téléconseillers."
+            "description": "Représentants DISTINCTS dont la dernière réponse TRANCHÉE de la fenêtre a été obtenue par ce téléconseiller. Tranche celui dont le statut pose AMBASSADEUR ou REFUS : « Décédé », « Hors cible » ou « Autre » ferment la fiche sans trancher. Attribué à qui a obtenu la réponse, pas à qui a appelé le premier. NON SOMMABLE entre périodes ni entre téléconseillers."
           },
           "repQualified": {
             "type": "number",
-            "description": "Parmi `repQuestioned`, ceux dont cette dernière réponse est REACHED. NON SOMMABLE."
+            "description": "Parmi `repQuestioned`, ceux dont cette dernière réponse pose AMBASSADEUR. NON SOMMABLE."
           },
           "repQualificationRate": {
             "type": "number",
@@ -27349,6 +28022,11 @@
             "type": "string",
             "format": "uuid",
             "description": "Statut de qualification recueilli. FACULTATIF : les versions déjà installées ne l’émettent pas, et un refus mettrait leur saisie en échec définitif. Quand il est présent, c’est lui qui commande l’issue enregistrée."
+          },
+          "ouvertureId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Ouverture de fiche que cette qualification ferme. Le chronomètre se lit entre son `openedAt` et cette fermeture. Une ouverture inconnue, déjà fermée ou ouverte par un autre est ignorée : la tentative vient du terrain et ne se perd pas pour un verrou."
           },
           "promisedProspects": {
             "type": "number",
@@ -29207,6 +29885,7 @@
           "prospects-notes",
           "adhesions",
           "reste-a-appeler",
+          "fiches-ouvertes",
           "par-teleconseiller",
           "couverture-derniere-campagne",
           "hors-attribution-derniere-campagne",
@@ -29416,7 +30095,7 @@
             "type": "boolean"
           },
           "suivi": {
-            "description": "A_RAPPELER : un rappel promis reste dû (`nextCallbackAt`), tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien.",
+            "description": "A_RAPPELER : un rappel reste dû (`nextCallbackAt`), promis ou automatique, tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/RepresentantSuivi"

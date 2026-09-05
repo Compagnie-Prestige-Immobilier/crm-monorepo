@@ -9,6 +9,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'set_active_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -18,31 +19,63 @@ part 'set_active_dto.g.dart';
 )
 class SetActiveDto {
   /// Returns a new [SetActiveDto] instance.
-  SetActiveDto({required this.isActive, this.handoverToId});
+  SetActiveDto({
 
-  @JsonKey(name: r'isActive', required: true, includeIfNull: false)
+    required  this.isActive,
+
+     this.handoverToId,
+  });
+
+  @JsonKey(
+    
+    name: r'isActive',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final bool isActive;
 
-  /// Compte qui reprend le portefeuille. Exigé si le compte désactivé en a un.
-  @JsonKey(name: r'handoverToId', required: false, includeIfNull: false)
+
+
+      /// Compte qui reprend le portefeuille. Exigé si le compte désactivé en a un.
+  @JsonKey(
+    
+    name: r'handoverToId',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final String? handoverToId;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is SetActiveDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [isActive, handoverToId],
-              [other.isActive, other.handoverToId],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^ mapPropsToHashCode([isActive, handoverToId]);
 
-  factory SetActiveDto.fromJson(Map<String, dynamic> json) =>
-      _$SetActiveDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is SetActiveDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            isActive,
+            handoverToId,
+        ],
+        [
+            other.isActive,
+            other.handoverToId,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        isActive,
+        handoverToId,
+    ],);
+
+  factory SetActiveDto.fromJson(Map<String, dynamic> json) => _$SetActiveDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$SetActiveDtoToJson(this);
 
@@ -50,4 +83,6 @@ class SetActiveDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+
