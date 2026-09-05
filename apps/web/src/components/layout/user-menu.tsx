@@ -25,7 +25,7 @@ import {
 import { initials } from '@/lib/format';
 import { ROLE_LABELS, type SessionUser } from '@/lib/types';
 
-export function UserMenu({ user }: { user: SessionUser }) {
+export function UserMenu({ user, demoEnabled }: { user: SessionUser; demoEnabled: boolean }) {
   const router = useRouter();
   const [pending, setPending] = useState<'workspace' | 'logout' | null>(null);
   let workspaceLabel = 'Ouvrir l’espace démo';
@@ -99,17 +99,21 @@ export function UserMenu({ user }: { user: SessionUser }) {
           <KeyRoundIcon aria-hidden="true" />
           Mot de passe
         </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          disabled={pending !== null}
-          closeOnClick={false}
-          onClick={() => {
-            void switchWorkspace();
-          }}
-        >
-          <FlaskConicalIcon aria-hidden="true" />
-          {workspaceLabel}
-        </DropdownMenuItem>
+        {demoEnabled ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              disabled={pending !== null}
+              closeOnClick={false}
+              onClick={() => {
+                void switchWorkspace();
+              }}
+            >
+              <FlaskConicalIcon aria-hidden="true" />
+              {workspaceLabel}
+            </DropdownMenuItem>
+          </>
+        ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           variant="destructive"

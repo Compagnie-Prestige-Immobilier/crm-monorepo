@@ -6,6 +6,7 @@ import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { UserMenu } from '@/components/layout/user-menu';
 import { LiveStream } from '@/components/live/live-stream';
 import { QueryErrorState } from '@/components/query-error-state';
+import { demoWorkspaceEnabled } from '@/lib/demo-workspace';
 import { readSession } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
@@ -42,7 +43,7 @@ export default async function HubLayout({ children }: { children: ReactNode }) {
         />
         <div className="flex-1" />
         <ThemeToggle />
-        <UserMenu user={session.user} />
+        <UserMenu user={session.user} demoEnabled={demoWorkspaceEnabled()} />
       </header>
       <main id="contenu-principal" className="flex-1 px-4 py-8 md:px-6 md:py-12">
         {children}

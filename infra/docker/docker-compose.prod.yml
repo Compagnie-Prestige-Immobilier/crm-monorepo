@@ -124,6 +124,9 @@ services:
       # Swagger fermé en production : le contrat est publié par la CI, pas par
       # le serveur de production.
       API_DOCS_ENABLED: 'false'
+      # Espace de démonstration fermé : sa fabrique engendre neuf cent mille
+      # lignes fictives, à tenir hors de la base qui porte les vraies fiches.
+      DEMO_WORKSPACE_ENABLED: 'false'
       # Les APK publiés depuis le panel doivent survivre à une nouvelle image.
       APK_RELEASE_DIR: /repo/storage/releases
       # Exports intégraux de la base. Même motif que ci-dessus : le fichier vit
