@@ -85,6 +85,26 @@ const LIBELLES_ABREGES: Record<string, string> = {
 export const libelleStatut = (statut: Pick<StatutQualification, 'code' | 'label'>): string =>
   LIBELLES_ABREGES[statut.code] ?? statut.label;
 
+/** Les deux statuts que la question du script pose seule : ils ne se choisissent plus. */
+export const STATUTS_DE_LA_QUESTION = { oui: 'ACCEPTE', non: 'REFUSE' } as const;
+
+export const statutDuSouhait = (
+  statuts: readonly StatutQualification[],
+  souhaite: boolean | null,
+): StatutQualification | null => {
+  if (souhaite === null) return null;
+  const code = souhaite ? STATUTS_DE_LA_QUESTION.oui : STATUTS_DE_LA_QUESTION.non;
+  return statuts.find((statut) => statut.code === code) ?? null;
+};
+
+export const statutsHorsQuestion = (
+  statuts: readonly StatutQualification[],
+): StatutQualification[] =>
+  statuts.filter(
+    (statut) =>
+      statut.code !== STATUTS_DE_LA_QUESTION.oui && statut.code !== STATUTS_DE_LA_QUESTION.non,
+  );
+
 /** Vocabulaire de SAISIE : actifs seulement, servis dans l'ordre dicté. */
 export async function fetchStatutsQualification(
   client: ApiClient = getApiClient(),

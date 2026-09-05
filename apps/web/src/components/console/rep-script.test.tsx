@@ -116,8 +116,8 @@ function rep(over: Partial<ScriptedRepresentant> & { id: string }): ScriptedRepr
 
 function statut(over: Partial<StatutQualification> & { id: string }): StatutQualification {
   return {
-    code: 'INTERESSE',
-    label: 'Intéressé',
+    code: 'ACCEPTE',
+    label: 'Accepté',
     effect: 'REACHED',
     requiresCallback: false,
     priorite: 'NORMALE',
@@ -133,7 +133,7 @@ function statut(over: Partial<StatutQualification> & { id: string }): StatutQual
 
 const STATUTS: StatutQualification[] = [
   statut({ id: 's-1' }),
-  statut({ id: 's-2', code: 'NON_INTERESSE', label: 'Non intéressé', effect: 'REFUSED' }),
+  statut({ id: 's-2', code: 'REFUSE', label: 'Refusé', effect: 'REFUSED' }),
   statut({
     id: 's-3',
     code: 'A_RAPPELER',
@@ -211,17 +211,17 @@ const injoindre = async (): Promise<void> => {
   await choisirStatut('Pas de réponse');
 };
 
-/** Parcourt les questions 1 à 5 du script joignable, jusqu'à l'ambassadeur. */
+/** Parcourt le script joignable en entier ; la dernière réponse pose le statut. */
 const parcoursJoignable = async (
   ambassadeur: 'Oui' | 'Non',
-  statutLabel = ambassadeur === 'Oui' ? 'Intéressé' : 'Non intéressé',
+  statutLabel: string | null = null,
 ): Promise<void> => {
   await repondre('Joignable');
-  await choisirStatut(statutLabel);
+  if (statutLabel !== null) await choisirStatut(statutLabel);
   await repondreA('L’établissement de la fiche est-il confirmé ?', 'Oui');
   await repondreA('A-t-il déjà été contacté ?', 'Oui');
   await repondreA('Connaît-il l’UES ?', 'Oui');
-  await repondreA('Est-il représentant CPI CHUES ?', ambassadeur);
+  await repondreA('Souhaite-t-il être représentant CHUES ?', ambassadeur);
 };
 
 const dernierEnvoi = (): Record<string, unknown> => {
@@ -313,7 +313,7 @@ describe('RepScript : les questions restent, et on peut revenir', () => {
     expect(screen.getByRole('button', { name: 'Joignable' }).getAttribute('aria-pressed')).toBe(
       'true',
     );
-    expect(screen.getByText('Est-il représentant CPI CHUES ?')).toBeTruthy();
+    expect(screen.getByText('Souhaite-t-il être représentant CHUES ?')).toBeTruthy();
   });
 
   it('laisse changer une réponse déjà donnée', async () => {
@@ -326,7 +326,7 @@ describe('RepScript : les questions restent, et on peut revenir', () => {
     expect(screen.getByRole('button', { name: 'Injoignable' }).getAttribute('aria-pressed')).toBe(
       'true',
     );
-    expect(screen.queryByText('Est-il représentant CPI CHUES ?')).toBeNull();
+    expect(screen.queryByText('Souhaite-t-il être représentant CHUES ?')).toBeNull();
   });
 
   it('revient à la liste sans rien envoyer', async () => {
