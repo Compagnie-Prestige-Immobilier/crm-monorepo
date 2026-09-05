@@ -92,6 +92,12 @@ describe('statuts de qualification du Lot 1', () => {
     ]);
   });
 
+  it('réserve un statut à motif obligatoire aux applications qui savent l’exiger', () => {
+    for (const statut of STATUTS_QUALIFICATION) {
+      expect(statut.minPayloadVersion).toBeGreaterThanOrEqual(statut.requiresComment ? 7 : 6);
+    }
+  });
+
   it('n’exige une date de rappel que du statut qui la planifie', () => {
     for (const statut of STATUTS_QUALIFICATION) {
       expect(statut.requiresCallback, statut.code).toBe(statut.effect === 'SCHEDULE_CALLBACK');
