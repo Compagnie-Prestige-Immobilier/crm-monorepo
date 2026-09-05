@@ -248,8 +248,14 @@ CREATE TABLE statuts_qualification (
     label TEXT NOT NULL,
     effect TEXT NOT NULL,
     requires_callback BOOLEAN NOT NULL DEFAULT 0,
+    -- Le motif est exigé avant d'enregistrer. Miroir de la colonne du serveur,
+    -- qui refuse la tentative sans lui.
+    requires_comment BOOLEAN NOT NULL DEFAULT 0,
     -- Délai du réessai proposé (minutes). NULL : aucun réessai.
     retry_after_minutes INTEGER NULL,
+    -- La relation posée sur la fiche. C'est elle, et non le code, qui dit quel
+    -- statut la question « Souhaite-t-il être représentant CHUES ? » pose.
+    relation_status TEXT NULL,
     is_active BOOLEAN NOT NULL DEFAULT 1,
     position INTEGER NOT NULL DEFAULT 0,
     min_payload_version INTEGER NOT NULL DEFAULT 6

@@ -61,9 +61,13 @@ class SyncEngine {
   /// v4 : les liens banque, syndicat et représentant d'un prospect peuvent
   /// être nuls ; le tirage exige ce numéro en en-tête et refuse en dessous.
   /// v6 : la tentative auprès d'un représentant porte `statutQualificationId`.
+  /// v7 : le motif exigé par un statut (`requiresComment`) est lu et imposé
+  /// avant l'envoi. Les APK d'avant ne le lisent pas : servis, les deux statuts
+  /// « Autre » repartiraient sans motif, le serveur refuserait, et un refus
+  /// hors ligne est définitif.
   /// C'est ce nombre que la route dédiée compare au `minPayloadVersion` de
   /// chaque statut ; en dessous, aucun statut ne descend.
-  static const int payloadVersion = 6;
+  static const int payloadVersion = 7;
 
   /// Poids qu'un lot peut atteindre sur le fil ; c'est lui que le `sendTimeout`
   /// du profil `push` doit pouvoir émettre sur un lien montant EDGE.
@@ -1436,6 +1440,7 @@ class SyncEngine {
                 retryAfterMinutes: Value<int?>(
                   statut.retryAfterMinutes?.toInt(),
                 ),
+                relationStatus: Value<String?>(statut.relationStatus?.value),
                 isActive: Value<bool>(statut.isActive),
                 position: Value<int>(rang),
                 minPayloadVersion: Value<int>(statut.minPayloadVersion.toInt()),

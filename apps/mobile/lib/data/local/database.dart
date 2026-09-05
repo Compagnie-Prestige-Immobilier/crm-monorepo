@@ -14,7 +14,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 30;
+  int get schemaVersion => 31;
 
   /// Les colonnes ajoutées à `call_attempts` par la v19. Déclarées ici parce
   /// que TROIS paliers recopient cette table : chacun engendre sa forme
@@ -363,6 +363,18 @@ class AppDatabase extends _$AppDatabase {
       if (from >= 29 && from < 30 && to >= 30) {
         await m.addColumn(preuvesAppel, preuvesAppel.signaleAt);
         await m.addColumn(preuvesAppel, preuvesAppel.ignoreAt);
+      }
+      // Même garde qu'au palier v28 : avant la v24 la table est créée dans sa
+      // forme courante, les deux colonnes y sont déjà.
+      if (from >= 24 && from < 31 && to >= 31) {
+        await m.addColumn(
+          statutsQualification,
+          statutsQualification.requiresComment,
+        );
+        await m.addColumn(
+          statutsQualification,
+          statutsQualification.relationStatus,
+        );
       }
     },
     beforeOpen: (OpeningDetails details) async {
