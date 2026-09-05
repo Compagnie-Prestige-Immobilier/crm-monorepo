@@ -33,6 +33,7 @@ import {
 } from '../../common/decorators/current-user.decorator.js';
 import { Public } from '../../common/decorators/public.decorator.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
+import { Cached } from '../../redis/cache.interceptor.js';
 import { AppUpdatesService } from './app-updates.service.js';
 import { AndroidReleaseDto, AndroidReleaseListDto, AppUpdateDto } from './dto.js';
 
@@ -58,6 +59,7 @@ export const downloadThrottle = {
 };
 
 @ApiTags('app-updates')
+@Cached(60, 'app-updates')
 @Controller({ path: 'app-updates', version: '1' })
 export class AppUpdatesController {
   constructor(private readonly updates: AppUpdatesService) {}

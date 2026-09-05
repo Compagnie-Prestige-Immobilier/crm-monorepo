@@ -4,11 +4,17 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { DemoService } from './demo.service.js';
 
 const findMarker = vi.fn();
-const demoDb = { appSetting: { findUnique: findMarker } };
+const countRepresentants = vi.fn();
+const demoDb = {
+  appSetting: { findUnique: findMarker },
+  representant: { count: countRepresentants },
+};
 const service = new DemoService({ get: () => demoDb } as never);
 
 beforeEach(() => {
   findMarker.mockReset();
+  countRepresentants.mockReset();
+  countRepresentants.mockResolvedValue(14_908);
   vi.restoreAllMocks();
 });
 
@@ -22,6 +28,18 @@ it('garde le schéma existant quand la factory a déjà posé son marqueur', asy
   await service.ensureSeeded();
 
   expect(reset).not.toHaveBeenCalled();
+});
+
+// Une purge lancée depuis l'espace démo vide les tables métier et laisse
+// `app_settings` intact : le marqueur restait à jour sur un schéma sans données.
+it('réamorce quand le marqueur survit à un schéma vidé', async () => {
+  findMarker.mockResolvedValue({ key: DEMO_SEED_SETTING, value: DEMO_SEED_VERSION });
+  countRepresentants.mockResolvedValue(0);
+  const reset = vi.spyOn(DemoWorkspaceFactory.prototype, 'reset').mockResolvedValue(undefined);
+
+  await service.ensureSeeded();
+
+  expect(reset).toHaveBeenCalledTimes(1);
 });
 
 it('ne lance qu’une factory pour deux premiers accès simultanés', async () => {

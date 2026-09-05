@@ -23,7 +23,7 @@ beforeEach(() => {
 it('quitte le mode démo et revient au choix des espaces', async () => {
   const interaction = userEvent.setup();
   vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 200 }));
-  renderWithQuery(<UserMenu user={user} />);
+  renderWithQuery(<UserMenu user={user} demoEnabled />);
 
   await interaction.click(screen.getByRole('button', { name: 'Compte de Awa Fixture' }));
   await interaction.click(await screen.findByRole('menuitem', { name: 'Quitter l’espace démo' }));
@@ -36,4 +36,14 @@ it('quitte le mode démo et revient au choix des espaces', async () => {
     });
     expect(routerMock.refresh).toHaveBeenCalled();
   });
+});
+
+it('ne propose aucune bascule quand l’espace démo est fermé', async () => {
+  const interaction = userEvent.setup();
+  renderWithQuery(<UserMenu user={user} demoEnabled={false} />);
+
+  await interaction.click(screen.getByRole('button', { name: 'Compte de Awa Fixture' }));
+
+  await screen.findByRole('menuitem', { name: 'Se déconnecter' });
+  expect(screen.queryByRole('menuitem', { name: /espace démo/u })).toBeNull();
 });

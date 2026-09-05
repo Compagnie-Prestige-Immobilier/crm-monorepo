@@ -15,4 +15,5 @@ export * from './seed-data/pays.js';
 export * from './seed-data/offers.js';
 export * from './segment.js';
 export * from './demo-workspace-factory.js';
+export * from './demo-volume.js';
 export * from './seed-data/visites.js';

@@ -5,6 +5,7 @@ import { Role } from '@crm/database';
 import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
 import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
 import { ANY_AUTHENTICATED, Roles } from '../../common/decorators/roles.decorator.js';
+import { Cached } from '../../redis/cache.interceptor.js';
 import { StatutsQualificationService } from './statuts-qualification.service.js';
 import {
   CreateStatutQualificationDto,
@@ -18,6 +19,7 @@ import {
 @ApiTags('statuts-qualification')
 @ApiBearerAuth()
 @ApiErrors({ 400: true, 401: true, 403: true })
+@Cached(60, 'referentiels')
 @Controller({ path: 'statuts-qualification', version: '1' })
 export class StatutsQualificationController {
   constructor(private readonly statuts: StatutsQualificationService) {}

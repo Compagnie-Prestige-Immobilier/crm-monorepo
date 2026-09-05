@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import { fakeJob, FakeImportPrisma } from './fake-import-prisma.js';
 import type { ImportFileStore, StoredImportFile } from './import-file.store.js';
+import { fakeWorkspace } from '../../workspaces/fake-workspace.js';
+import { LiveService } from '../live/live.service.js';
 import type { ImportRunnerService } from './import-runner.service.js';
 import { ImportsService } from './imports.service.js';
 
@@ -37,7 +39,12 @@ describe('service d’import', () => {
   beforeEach(() => {
     prisma = new FakeImportPrisma();
     files = new FakeFileStore();
-    service = new ImportsService(prisma as unknown as PrismaService, idleRunner, files);
+    service = new ImportsService(
+      prisma as unknown as PrismaService,
+      idleRunner,
+      files,
+      new LiveService(fakeWorkspace()),
+    );
   });
 
   describe('application d’une simulation', () => {

@@ -48,6 +48,8 @@ export const envSchema = z
 
     DATABASE_URL: z.url(),
     DATABASE_POOL_SIZE: z.coerce.number().int().min(2).default(10),
+    /** Absent : aucun cache, tout retombe sur Postgres. Obligatoire en production. */
+    REDIS_URL: z.url().optional(),
 
     JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 characters'),
     JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),
@@ -99,9 +101,19 @@ export const envSchema = z
     DB_DUMP_DIR: z.string().min(1).default('./storage/db-dumps'),
 
     DB_DUMP_ENABLED: booleanFlag(false),
+
+    DEMO_WORKSPACE_ENABLED: booleanFlag(false),
   })
   .superRefine((env, context) => {
     if (env.NODE_ENV !== 'production') return;
+
+    if (!env.REDIS_URL) {
+      context.addIssue({
+        code: 'custom',
+        path: ['REDIS_URL'],
+        message: 'REDIS_URL is required in production',
+      });
+    }
 
     if (env.JWT_ACCESS_SECRET === env.JWT_REFRESH_SECRET) {
       context.addIssue({
@@ -116,6 +128,16 @@ export const envSchema = z
         code: 'custom',
         path: ['API_DOCS_ENABLED'],
         message: 'API_DOCS_ENABLED must be false in production',
+      });
+    }
+
+    // La fabrique de démonstration écrit neuf cent mille lignes : elle n'a rien
+    // à faire sur la base qui porte les vraies fiches.
+    if (env.DEMO_WORKSPACE_ENABLED) {
+      context.addIssue({
+        code: 'custom',
+        path: ['DEMO_WORKSPACE_ENABLED'],
+        message: 'DEMO_WORKSPACE_ENABLED must be false in production',
       });
     }
 

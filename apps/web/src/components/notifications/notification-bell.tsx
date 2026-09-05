@@ -36,7 +36,7 @@ import { cn } from '@/lib/utils';
 export function NotificationBell({ href }: { href: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const live = useLive();
+  const live = useLive({ topic: 'notifications' });
 
   const [open, setOpen] = useState(false);
   const [swinging, setSwinging] = useState(false);

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { liveInterval, liveLabel, type LiveState } from '@/lib/live';
+import { useLiveStreamConnected, type LiveTopic } from '@/lib/live-stream';
 
 function useDocumentHidden(): boolean {
   const [hidden, setHidden] = useState(
@@ -31,14 +32,16 @@ export interface Live {
   readonly togglePause: () => void;
 }
 
-export function useLive(options?: { intervalMs?: number }): Live {
+/** Avec `topic`, le sondage ralentit tant que le flux serveur pousse ce sujet. */
+export function useLive(options?: { intervalMs?: number; topic?: LiveTopic }): Live {
   const intervalMs = options?.intervalMs;
   const hidden = useDocumentHidden();
+  const streamed = useLiveStreamConnected() && options?.topic !== undefined;
   const [paused, setPaused] = useState(false);
 
   const stateOf = useCallback(
-    (failing: boolean): LiveState => ({ hidden, failing, paused }),
-    [hidden, paused],
+    (failing: boolean): LiveState => ({ hidden, failing, paused, streamed }),
+    [hidden, paused, streamed],
   );
 
   const refetchInterval = useCallback(

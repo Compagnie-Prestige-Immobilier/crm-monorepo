@@ -11,6 +11,7 @@ import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
 import { Role } from '@crm/database';
 
 import { ANY_AUTHENTICATED, Roles } from '../../common/decorators/roles.decorator.js';
+import { Cached } from '../../redis/cache.interceptor.js';
 import { ReferentielsService } from './referentiels.service.js';
 import {
   BanqueDto,
@@ -48,6 +49,7 @@ import {
 @ApiTags('referentiels')
 @ApiBearerAuth()
 @ApiErrors({ 400: true, 401: true, 403: true })
+@Cached(60, 'referentiels')
 @Controller({ path: 'referentiels', version: '1' })
 export class ReferentielsController {
   constructor(private readonly referentiels: ReferentielsService) {}

@@ -2,10 +2,10 @@
 
 Deux fichiers Compose, deux usages qui ne se ressemblent pas.
 
-| Fichier                          | Usage                                                                                                                                               |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `docker/docker-compose.yml`      | Développement. Postgres **seul**, sur le port hôte 5434. L'API et le web tournent sur la machine via `pnpm dev`, pour rester rechargeables à chaud. |
-| `docker/docker-compose.prod.yml` | **VPS nu**, sans Dokploy. La pile entière : Caddy, web, API, migrations, Postgres, sauvegardes.                                                     |
+| Fichier                          | Usage                                                                                                                                                          |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docker/docker-compose.yml`      | Développement. Postgres (port hôte 5434) et Redis (6381) **seuls**. L'API et le web tournent sur la machine via `pnpm dev`, pour rester rechargeables à chaud. |
+| `docker/docker-compose.prod.yml` | **VPS nu**, sans Dokploy. La pile entière : Caddy, web, API, migrations, Postgres, Redis, sauvegardes.                                                         |
 
 > **Ce dépôt n'est PAS déployé par `docker-compose.prod.yml`.** La production
 > tourne sur un hôte Dokploy, approvisionné par `dokploy/deploy.py`, et ce

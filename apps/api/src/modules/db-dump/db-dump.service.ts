@@ -17,6 +17,7 @@ import type { FastifyReply } from 'fastify';
 
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { LiveService } from '../live/live.service.js';
 import { isOpenApiGeneration, readEnv } from '../../env.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import {
@@ -89,6 +90,7 @@ export class DbDumpService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
     @Inject(DUMP_RUNNER) private readonly runner: DumpRunner,
+    private readonly live: LiveService,
   ) {}
 
   /** Rattrape les arrêts brutaux : au démarrage, toute réservation appartient à un processus mort. */
@@ -530,6 +532,7 @@ export class DbDumpService implements OnModuleInit {
       where: { key: SETTING_KEY, value: { contains: `"id":"${job.id}"` } },
       data: { value: JSON.stringify(job), updatedById: actorId },
     });
+    if (written.count === 1) this.live.emit('db-dump');
     return written.count === 1;
   }
 

@@ -18,7 +18,7 @@ function Command({ className, ...props }: React.ComponentProps<typeof CommandPri
     <CommandPrimitive
       data-slot="command"
       className={cn(
-        'flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground',
+        'flex h-full min-h-0 w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground',
         className,
       )}
       {...props}
@@ -56,7 +56,7 @@ function CommandInput({
   return (
     <div
       data-slot="command-input-wrapper"
-      className="flex h-11 items-center gap-2 border-b border-border px-3"
+      className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3"
     >
       <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
       <CommandPrimitive.Input
@@ -78,7 +78,7 @@ function CommandList({ className, ...props }: React.ComponentProps<typeof Comman
     <CommandPrimitive.List
       data-slot="command-list"
       className={cn(
-        'max-h-72 scroll-py-1 overflow-y-auto overflow-x-hidden scrollbar-thin',
+        'max-h-72 min-h-0 flex-1 scroll-py-1 overflow-y-auto overflow-x-hidden scrollbar-thin',
         className,
       )}
       {...props}
