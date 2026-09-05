@@ -31,6 +31,8 @@ export interface ComptageOuvertures {
   openedByName: string;
   jour: string;
   ouvertures: number;
+  qualifiees: number;
+  liberees: number;
   dureeMoyenneSecondes: number | null;
 }
 

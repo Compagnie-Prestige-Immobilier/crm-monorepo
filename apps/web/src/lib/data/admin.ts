@@ -259,7 +259,15 @@ const COUNT_KEYS = [
   'repCallbacksUpcoming',
   'repQuestioned',
   'repQualified',
+  'repFiches',
+  'repFichesJointes',
+  'repFichesNonJointes',
+  'repFichesAcceptees',
+  'repFichesARappeler',
+  'repFichesEligibles',
   'representantsContacted',
+  'fiches',
+  'fichesJointes',
   'calls',
   'confirmedCalls',
   'detectedCalls',
@@ -279,6 +287,9 @@ type ActivityCountKey = (typeof COUNT_KEYS)[number];
 type ActivityRateKey =
   | 'repContactRate'
   | 'repQualificationRate'
+  | 'repReachabilityRate'
+  | 'repAcceptanceRate'
+  | 'ficheReachRate'
   | 'reachRate'
   | 'confirmRate'
   | 'repConfirmRate'
@@ -330,15 +341,16 @@ export const ACTIVITY_COLUMNS: Record<ActivityFamille, ActivityColumn[]> = {
     { key: 'repUnloggedCalls', label: 'Non consignés' },
     { key: 'repConfirmRate', label: 'Confirmation', taux: true },
     { key: 'repAvgCallSeconds', label: 'Durée moy.', duree: true },
-    // « Joints » est la famille : le rendez-vous en est un détail, pas un voisin.
+    // « Joints » est la famille : les acceptés en sont un détail, pas un voisin.
     { key: 'repReached', label: 'Joints' },
-    { key: 'repCallback', label: 'dont rendez-vous' },
+    { key: 'repFichesAcceptees', label: 'Acceptés' },
+    { key: 'repFichesARappeler', label: 'À rappeler' },
     { key: 'repUnreachable', label: 'Injoignables' },
     { key: 'repCallbacksHonored', label: 'Rappels tenus' },
     { key: 'repCallbacksLate', label: 'Rappels en retard' },
     { key: 'repCallbacksUpcoming', label: 'Rappels à venir' },
-    { key: 'repContactRate', label: 'Taux de contact', taux: true },
-    { key: 'repQualificationRate', label: 'Qualification', taux: true },
+    { key: 'repReachabilityRate', label: 'Joignabilité', taux: true },
+    { key: 'repAcceptanceRate', label: 'Acceptation', taux: true },
     { key: 'representantsContacted', label: 'Représentants contactés' },
     { key: 'prospectsCreated', label: 'Prospects saisis' },
   ],
@@ -357,7 +369,7 @@ export const ACTIVITY_COLUMNS: Record<ActivityFamille, ActivityColumn[]> = {
     { key: 'callbacksHonored', label: 'Rappels tenus' },
     { key: 'callbacksLate', label: 'Rappels en retard' },
     { key: 'callbacksUpcoming', label: 'Rappels à venir' },
-    { key: 'reachRate', label: 'Joignabilité', taux: true },
+    { key: 'ficheReachRate', label: 'Joignabilité', taux: true },
     { key: 'prospectsCreated', label: 'Prospects saisis' },
   ],
 };
@@ -380,6 +392,9 @@ function compteursVides(): ActivityCounts {
     ...zeros,
     repContactRate: null,
     repQualificationRate: null,
+    repReachabilityRate: null,
+    repAcceptanceRate: null,
+    ficheReachRate: null,
     reachRate: null,
     confirmRate: null,
     repConfirmRate: null,
@@ -407,6 +422,9 @@ function calculerTaux<T extends ActivityCounts>(counts: T): T {
   counts.reachRate = rate(counts.calls - counts.unreachable, counts.calls);
   counts.repContactRate = rate(counts.repReached, counts.repCalls);
   counts.repQualificationRate = rate(counts.repQualified, counts.repQuestioned);
+  counts.repReachabilityRate = rate(counts.repFichesJointes, counts.repFiches);
+  counts.repAcceptanceRate = rate(counts.repFichesAcceptees, counts.repFichesEligibles);
+  counts.ficheReachRate = rate(counts.fichesJointes, counts.fiches);
   counts.confirmRate = rate(counts.confirmedCalls, counts.calls);
   counts.repConfirmRate = rate(counts.repConfirmedCalls, counts.repCalls);
   counts.avgCallSeconds = moyenne(counts.callSeconds, counts.confirmedCalls);

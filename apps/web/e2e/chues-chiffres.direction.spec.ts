@@ -19,9 +19,9 @@ function carte(page: Page, titre: string) {
 
 const CARTES_USINE = [
   'Taux de contact',
-  'Taux de rendez-vous',
+  'Taux de joignabilité des représentants',
+  'Taux d’acceptation',
   'Taux de qualification',
-  'Adhésions',
   'Par téléconseiller',
 ] as const;
 
