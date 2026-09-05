@@ -831,7 +831,7 @@ function Consignation({
         </summary>
         <dl className="mt-2 flex flex-col gap-1 text-[0.8125rem]">
           {KEYBOARD_MAP.filter(
-            ([keys]) => projet === 'CHUES' || (keys !== 'N' && keys !== 'R'),
+            ([keys]) => (projet === 'CHUES' && !verrouille) || (keys !== 'N' && keys !== 'R'),
           ).map(([keys, what]) => (
             <div key={keys} className="flex items-baseline gap-2">
               <dt className="w-24 shrink-0">
