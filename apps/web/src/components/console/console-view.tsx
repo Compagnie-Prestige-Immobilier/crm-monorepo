@@ -59,10 +59,13 @@ import { cn } from '@/lib/utils';
 
 type Projet = 'CHUES' | 'GRAND_PUBLIC';
 
+/** Seule issue encore atteignable au clavier une fois le dossier ouvert (EB-10). */
+const RAPPEL_KEY = '2';
+
 /** Ce que l'appel a donné, avant tout : la personne était-elle joignable. */
 const ISSUES: readonly { key: string; label: string; outcome: CallOutcome | 'JOIGNABLE' }[] = [
   { key: '1', label: 'Joignable', outcome: 'JOIGNABLE' },
-  { key: '2', label: CALL_OUTCOME_LABELS.CALLBACK, outcome: 'CALLBACK' },
+  { key: RAPPEL_KEY, label: CALL_OUTCOME_LABELS.CALLBACK, outcome: 'CALLBACK' },
   { key: '3', label: CALL_OUTCOME_LABELS.UNREACHABLE, outcome: 'UNREACHABLE' },
   { key: '4', label: CALL_OUTCOME_LABELS.WRONG_NUMBER, outcome: 'WRONG_NUMBER' },
   { key: '5', label: 'Autre', outcome: 'OTHER' },
@@ -77,7 +80,7 @@ const KEYBOARD_MAP: readonly (readonly [string, string])[] = [
   ['1 … 6', 'Échéance proposée, après 2'],
   ['0', 'Saisir une autre échéance, après 2'],
   ['Entrée', 'Valider'],
-  ['Échap', 'Annuler la saisie, ou revenir à la liste'],
+  ['Échap', 'Revenir en arrière, ou effacer la saisie en cours'],
   ['C', 'Copier le numéro'],
   ['N', 'Ajouter un prospect sur ce représentant'],
   ['R', 'Fiche du représentant'],
@@ -391,12 +394,35 @@ function ListeSkeleton() {
   );
 }
 
+function rattachements(prospect: ProspectRow, projet: Projet): string {
+  const parts = [prospect.banqueName, prospect.syndicatSigle, prospect.departementName];
+  if (projet === 'CHUES') parts.push(`Représentant ${prospect.representantName ?? 'aucun'}`);
+  return parts.filter((part) => part !== null && part !== '').join(' · ');
+}
+
 function resumeDernierAppel(prospect: ProspectRow): string {
   const commentaire = prospect.lastComment === null ? '' : ` · « ${prospect.lastComment} »`;
   if (prospect.lastAttemptAt === null) return `Jamais appelée.${commentaire}`;
   const issue =
     prospect.lastOutcome === null ? '' : ` · ${CALL_OUTCOME_LABELS[prospect.lastOutcome]}`;
   return `Dernier appel : ${formatDateTime(prospect.lastAttemptAt)}${issue}${commentaire}`;
+}
+
+/**
+ * L'étape visible, et elle seule : c'est elle qui tranche à qui vont les
+ * chiffres, Entrée et Échap quand le dossier et l'échéance coexistent.
+ */
+type Etape = 'issues' | 'dossier' | 'echeance' | null;
+
+function etapeCourante(
+  closed: boolean,
+  conversion: ConversionDraft | null,
+  slots: readonly CallbackSlot[] | null,
+): Etape {
+  if (closed) return null;
+  if (slots !== null) return 'echeance';
+  if (conversion !== null) return 'dossier';
+  return 'issues';
 }
 
 /**
@@ -438,11 +464,12 @@ function Consignation({
   const send = useMutation({
     mutationFn: async (draft: AttemptDraft) => {
       // EB-10 : le brouillon part AVANT la tentative, qui referme l'ouverture et
-      // ferait refuser toute écriture postérieure.
+      // ferait refuser toute écriture postérieure. Le dossier passe par lui et
+      // non par la tentative : incomplet, le serveur la refuserait en 400.
       if (draft.outcome === 'CALLBACK' && ouverture !== null) {
         await enregistrerBrouillon(ouverture.id, {
           comment: draft.comment,
-          ...(draft.conversion === undefined ? {} : { conversion: draft.conversion }),
+          ...(conversion === null ? {} : { conversion }),
         }).catch(() => {
           toast.error('Les réponses saisies n’ont pas pu être conservées. L’appel, lui, part.');
         });
@@ -533,11 +560,9 @@ function Consignation({
     [ouvrirDossier, startCallback, startOther, record],
   );
 
+  // L'échéance passe devant le dossier : ouverte par-dessus lui, c'est elle que
+  // le téléconseiller est en train de choisir.
   const validate = useCallback(() => {
-    if (conversion !== null) {
-      submitConversion();
-      return;
-    }
     if (slots !== null) {
       const iso = dakarLocalToIso(freeCallback);
       if (iso === null) {
@@ -547,9 +572,14 @@ function Consignation({
       record('CALLBACK', null, iso);
       return;
     }
+    if (conversion !== null) {
+      submitConversion();
+      return;
+    }
     if (draftOutcome !== null) record(draftOutcome, null);
   }, [conversion, submitConversion, slots, freeCallback, draftOutcome, record]);
 
+  const etape = etapeCourante(closed, conversion, slots);
   const saisieEnCours =
     conversion !== null || slots !== null || draftOutcome !== null || comment !== '';
 
@@ -560,6 +590,12 @@ function Consignation({
   useVerrouNavigation(verrouille, retenu);
 
   const annuler = useCallback(() => {
+    // L'échéance se referme seule : la jeter avec le dossier rempli au-dessous
+    // perdrait ce qu'EB-10 demande justement de garder.
+    if (slots !== null) {
+      setSlots(null);
+      return;
+    }
     if (!saisieEnCours) {
       // EB-08 : la fiche ouverte ne se quitte pas sans issue. Seul l'envoi la
       // referme, et le chronomètre s'arrête avec elle.
@@ -569,11 +605,10 @@ function Consignation({
     }
     setDraftOutcome(null);
     setComment('');
-    setSlots(null);
     setConversion(null);
     setConversionErrors({});
     commentRef.current?.blur();
-  }, [saisieEnCours, verrouille, retenu, onAbandon]);
+  }, [slots, saisieEnCours, verrouille, retenu, onAbandon]);
 
   const issueShortcuts: Record<string, () => void> = Object.fromEntries(
     ISSUES.map((issue) => [
@@ -597,8 +632,8 @@ function Consignation({
   };
 
   let digitShortcuts = issueShortcuts;
-  if (slots !== null) digitShortcuts = slotShortcuts;
-  if (conversion !== null) digitShortcuts = {};
+  if (etape === 'dossier') digitShortcuts = { [RAPPEL_KEY]: startCallback };
+  if (etape === 'echeance') digitShortcuts = slotShortcuts;
 
   useShortcuts({
     ...digitShortcuts,
@@ -653,12 +688,7 @@ function Consignation({
           </Button>
         </div>
 
-        <p className="text-[0.8125rem] text-muted-foreground">
-          {[prospect.banqueName, prospect.syndicatSigle, prospect.departementName]
-            .filter((part) => part !== null && part !== '')
-            .join(' · ')}
-          {projet === 'CHUES' ? ` · Représentant ${prospect.representantName ?? 'aucun'}` : ''}
-        </p>
+        <p className="text-[0.8125rem] text-muted-foreground">{rattachements(prospect, projet)}</p>
         <p className="text-[0.8125rem] text-muted-foreground">{resumeDernierAppel(prospect)}</p>
 
         {closed ? (
@@ -671,7 +701,7 @@ function Consignation({
           </div>
         ) : null}
 
-        {closed || conversion === null ? null : (
+        {etape !== 'dossier' || conversion === null ? null : (
           <>
             <p className="text-[0.8125rem] font-[600] text-muted-foreground">
               Joignable · son dossier, et la manière dont il adhère
@@ -686,15 +716,61 @@ function Consignation({
                 setConversion((draft) => (draft === null ? null : { ...draft, ...patch }));
               }}
             />
+          </>
+        )}
 
-            <Commentaire
-              value={comment}
-              obligatoire={false}
-              inputRef={commentRef}
-              onChange={setComment}
-              onValidate={validate}
-            />
+        {etape !== 'issues' ? null : (
+          <fieldset className="flex flex-col gap-2" disabled={send.isPending}>
+            <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
+              Comment s’est passé l’appel ?
+            </legend>
+            <div className="flex flex-wrap gap-2">
+              {ISSUES.map((issue) => (
+                <Button
+                  key={issue.key}
+                  variant={
+                    issue.outcome === 'OTHER' && draftOutcome === 'OTHER' ? 'default' : 'outline'
+                  }
+                  onClick={() => {
+                    choisir(issue.outcome);
+                  }}
+                >
+                  <Kbd>{issue.key}</Kbd>
+                  {issue.label}
+                </Button>
+              ))}
+            </div>
+          </fieldset>
+        )}
 
+        {etape !== 'echeance' || slots === null ? null : (
+          <PanneauEcheance
+            slots={slots}
+            now={now}
+            freeCallback={freeCallback}
+            surDossier={conversion !== null}
+            disabled={send.isPending}
+            inputRef={callbackRef}
+            onChoisir={(at) => {
+              record('CALLBACK', null, at);
+            }}
+            onFreeCallback={setFreeCallback}
+            onValidate={validate}
+          />
+        )}
+
+        {etape === null ? null : (
+          <Commentaire
+            value={comment}
+            obligatoire={draftOutcome === 'OTHER'}
+            inputRef={commentRef}
+            onChange={setComment}
+            onValidate={validate}
+          />
+        )}
+
+        {etape !== 'dossier' ? null : (
+          <>
             <div className="flex flex-wrap gap-2">
               <Button onClick={submitConversion} disabled={send.isPending}>
                 Enregistrer l’adhésion
@@ -709,6 +785,10 @@ function Consignation({
               >
                 Il refuse
               </Button>
+              <Button variant="outline" disabled={send.isPending} onClick={startCallback}>
+                À rappeler
+                <Kbd>{RAPPEL_KEY}</Kbd>
+              </Button>
               <Button
                 variant="ghost"
                 disabled={send.isPending}
@@ -721,101 +801,9 @@ function Consignation({
                 <Kbd>Échap</Kbd>
               </Button>
             </div>
-          </>
-        )}
-
-        {closed || conversion !== null ? null : (
-          <>
-            {slots !== null ? null : (
-              <fieldset className="flex flex-col gap-2" disabled={send.isPending}>
-                <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
-                  Comment s’est passé l’appel ?
-                </legend>
-                <div className="flex flex-wrap gap-2">
-                  {ISSUES.map((issue) => (
-                    <Button
-                      key={issue.key}
-                      variant={
-                        issue.outcome === 'OTHER' && draftOutcome === 'OTHER'
-                          ? 'default'
-                          : 'outline'
-                      }
-                      onClick={() => {
-                        choisir(issue.outcome);
-                      }}
-                    >
-                      <Kbd>{issue.key}</Kbd>
-                      {issue.label}
-                    </Button>
-                  ))}
-                </div>
-              </fieldset>
-            )}
-
-            {slots === null ? null : (
-              <fieldset className="flex flex-col gap-3" disabled={send.isPending}>
-                <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
-                  Quand rappeler
-                </legend>
-                <div className="flex flex-wrap gap-2">
-                  {slots.map((slot) => (
-                    <Button
-                      key={slot.key}
-                      variant="outline"
-                      className="h-auto flex-col items-start gap-0.5 py-2"
-                      onClick={() => {
-                        record('CALLBACK', null, slot.at);
-                      }}
-                    >
-                      <span className="flex items-center gap-2">
-                        <Kbd>{slot.key}</Kbd>
-                        {slot.label}
-                      </span>
-                      <span className="pl-7 text-[0.75rem] font-[400] text-muted-foreground">
-                        {formatCallbackAt(slot.at, now)}
-                      </span>
-                    </Button>
-                  ))}
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label
-                    htmlFor="console-callback-at"
-                    className="flex items-center gap-2 text-[0.875rem] font-[600]"
-                  >
-                    <Kbd>0</Kbd>
-                    Autre échéance
-                  </label>
-                  <Input
-                    id="console-callback-at"
-                    ref={callbackRef}
-                    type="datetime-local"
-                    className="max-w-64"
-                    value={freeCallback}
-                    onChange={(event) => {
-                      setFreeCallback(event.target.value);
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key !== 'Enter') return;
-                      event.preventDefault();
-                      validate();
-                    }}
-                  />
-                  <p className="text-[0.75rem] text-muted-foreground">
-                    Heure de Dakar (UTC+0), quel que soit le fuseau de ce poste. Échap revient aux
-                    issues.
-                  </p>
-                </div>
-              </fieldset>
-            )}
-
-            <Commentaire
-              value={comment}
-              obligatoire={draftOutcome === 'OTHER'}
-              inputRef={commentRef}
-              onChange={setComment}
-              onValidate={validate}
-            />
+            <p className="text-[0.8125rem] text-muted-foreground">
+              « À rappeler » garde ce dossier pour le prochain appel. « Annuler » l’efface.
+            </p>
           </>
         )}
       </section>
@@ -843,6 +831,91 @@ function Consignation({
         </dl>
       </details>
     </div>
+  );
+}
+
+/** L'échéance d'EB-10 : elle s'ouvre aussi PAR-DESSUS un dossier déjà rempli. */
+function PanneauEcheance({
+  slots,
+  now,
+  freeCallback,
+  surDossier,
+  disabled,
+  inputRef,
+  onChoisir,
+  onFreeCallback,
+  onValidate,
+}: {
+  slots: readonly CallbackSlot[];
+  now: number;
+  freeCallback: string;
+  surDossier: boolean;
+  disabled: boolean;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  onChoisir: (at: string) => void;
+  onFreeCallback: (value: string) => void;
+  onValidate: () => void;
+}) {
+  return (
+    <fieldset className="flex flex-col gap-3" disabled={disabled}>
+      <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
+        Quand rappeler
+      </legend>
+      {surDossier ? (
+        <p className="text-[0.8125rem] text-muted-foreground">
+          Vous retrouverez le dossier déjà rempli au prochain appel.
+        </p>
+      ) : null}
+      <div className="flex flex-wrap gap-2">
+        {slots.map((slot) => (
+          <Button
+            key={slot.key}
+            variant="outline"
+            className="h-auto flex-col items-start gap-0.5 py-2"
+            onClick={() => {
+              onChoisir(slot.at);
+            }}
+          >
+            <span className="flex items-center gap-2">
+              <Kbd>{slot.key}</Kbd>
+              {slot.label}
+            </span>
+            <span className="pl-7 text-[0.75rem] font-[400] text-muted-foreground">
+              {formatCallbackAt(slot.at, now)}
+            </span>
+          </Button>
+        ))}
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label
+          htmlFor="console-callback-at"
+          className="flex items-center gap-2 text-[0.875rem] font-[600]"
+        >
+          <Kbd>0</Kbd>
+          Autre échéance
+        </label>
+        <Input
+          id="console-callback-at"
+          ref={inputRef}
+          type="datetime-local"
+          className="max-w-64"
+          value={freeCallback}
+          onChange={(event) => {
+            onFreeCallback(event.target.value);
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter') return;
+            event.preventDefault();
+            onValidate();
+          }}
+        />
+        <p className="text-[0.75rem] text-muted-foreground">
+          Heure de Dakar (UTC+0), quel que soit le fuseau de ce poste.{' '}
+          {surDossier ? 'Échap revient au dossier.' : 'Échap revient aux issues.'}
+        </p>
+      </div>
+    </fieldset>
   );
 }
 

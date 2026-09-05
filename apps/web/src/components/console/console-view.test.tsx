@@ -1084,6 +1084,58 @@ describe('ConsoleView : l’ouverture confirmée d’une fiche', () => {
     expect(enregistrerBrouillon).toHaveBeenCalledWith('ouv-1', { comment: 'il est en réunion' });
   });
 
+  // Le scénario littéral d'EB-10 : occupé EN COURS DE SAISIE du dossier.
+  it('pose « À rappeler » depuis le dossier ouvert, et garde ce qui y est saisi', async () => {
+    const RENSEIGNE = prospect({
+      id: 'p-1',
+      nom: 'Neuve',
+      prenom: 'Fiche',
+      profession: 'Instituteur',
+    });
+    await renderConsole([RENSEIGNE]);
+
+    await userEvent.keyboard('1');
+    await userEvent.type(await screen.findByLabelText(/Durée dans l’établissement/u), '36');
+    await userEvent.type(screen.getByLabelText(/Commentaire/u), 'il rappelle après 17 h');
+    await userEvent.click(screen.getByRole('button', { name: /À rappeler/u }));
+    await userEvent.click(await screen.findByRole('button', { name: /Demain 9 h/u }));
+
+    await waitFor(() => {
+      expect(pushCallAttempt).toHaveBeenCalledTimes(1);
+    });
+    expect(enregistrerBrouillon).toHaveBeenCalledWith('ouv-1', {
+      comment: 'il rappelle après 17 h',
+      conversion: expect.objectContaining({
+        profession: 'Instituteur',
+        dureeEtablissementMois: '36',
+      }) as unknown,
+    });
+    // Le dossier incomplet ne voyage PAS dans la tentative : le serveur la refuserait.
+    expect(lastDraft().outcome).toBe('CALLBACK');
+    expect(lastDraft().conversion).toBeUndefined();
+  });
+
+  it('ouvre l’échéance au chiffre depuis le dossier, et Échap l’y ramène intact', async () => {
+    const RENSEIGNE = prospect({
+      id: 'p-1',
+      nom: 'Neuve',
+      prenom: 'Fiche',
+      profession: 'Instituteur',
+    });
+    await renderConsole([RENSEIGNE]);
+
+    await userEvent.keyboard('1');
+    await screen.findByText('Phase 3 · Conversion');
+    await userEvent.keyboard('2');
+    expect(await screen.findByText('Demain 9 h')).toBeTruthy();
+
+    await userEvent.keyboard('{Escape}');
+
+    expect(await screen.findByLabelText(/^Profession/u)).toHaveProperty('value', 'Instituteur');
+    expect(screen.queryByText('Demain 9 h')).toBeNull();
+    expect(pushCallAttempt).not.toHaveBeenCalled();
+  });
+
   it('rouvre le formulaire sur ce que le brouillon avait gardé', async () => {
     ouvrirFiche.mockRejectedValue(new Error('OUVERTURE_FICHE_DEJA_OUVERTE'));
     fetchOuvertureCourante.mockResolvedValue(
