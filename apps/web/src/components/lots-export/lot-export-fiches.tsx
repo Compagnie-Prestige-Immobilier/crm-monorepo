@@ -87,10 +87,10 @@ export function LotExportFiches({
       queryClient.setQueryData(queryKeys.lotsExportDetail(lot.id), detail);
       void queryClient.invalidateQueries({ queryKey: queryKeys.lotsExportDetail(lot.id) });
       setCochees([]);
-      toast.success('Fiches confiées.');
+      toast.success('Fiches attribuées.');
     },
     onError: (erreur) => {
-      toast.error(apiErrorText(erreur, 'Les fiches n’ont pas pu être confiées.'));
+      toast.error(apiErrorText(erreur, 'Les fiches n’ont pas pu être attribuées.'));
     },
   });
 
@@ -113,8 +113,8 @@ export function LotExportFiches({
           Fiches de la campagne
         </h3>
         <p className="mt-1 text-[0.875rem] text-muted-foreground">
-          Une fiche traitée reste à celui qui l’a appelée. Seules les fiches non traitées se
-          confient à quelqu’un d’autre.
+          Une fiche traitée reste à celui qui l’a appelée. Seules les fiches non traitées
+          s’attribuent à quelqu’un d’autre.
         </p>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -155,7 +155,7 @@ export function LotExportFiches({
             vers={vers}
             pending={reaffectation.isPending}
             onVers={setVers}
-            onConfier={() => {
+            onAttribuer={() => {
               reaffectation.mutate();
             }}
           />
@@ -296,7 +296,7 @@ function LigneFiche({
           <input
             type="checkbox"
             className="size-4 accent-primary"
-            aria-label={`Confier la fiche de ${fiche.fullName}`}
+            aria-label={`Attribuer la fiche de ${fiche.fullName}`}
             disabled={!deplacable(fiche)}
             checked={cochee}
             onChange={(event) => {
@@ -333,14 +333,14 @@ function BandeauReaffectation({
   vers,
   pending,
   onVers,
-  onConfier,
+  onAttribuer,
 }: {
   equipe: LotExportDetail['repartition'];
   nombre: number;
   vers: string;
   pending: boolean;
   onVers: (id: string) => void;
-  onConfier: () => void;
+  onAttribuer: () => void;
 }) {
   const items = equipe.map((ligne) => ({
     value: ligne.teleconseillerId,
@@ -349,7 +349,7 @@ function BandeauReaffectation({
   return (
     <div className="flex flex-wrap items-end gap-3 rounded-md border border-border bg-secondary/50 px-4 py-3">
       <p className="text-[0.875rem]">
-        <span className="tabular-nums">{nombre}</span> fiche{nombre > 1 ? 's' : ''} à confier à
+        <span className="tabular-nums">{nombre}</span> fiche{nombre > 1 ? 's' : ''} à attribuer à
       </p>
       <Select
         items={items}
@@ -358,7 +358,7 @@ function BandeauReaffectation({
           if (value !== null) onVers(value);
         }}
       >
-        <SelectTrigger className="w-56" aria-label="Confier les fiches à">
+        <SelectTrigger className="w-56" aria-label="Attribuer les fiches à">
           <SelectValue placeholder="Choisir un téléconseiller" />
         </SelectTrigger>
         <SelectContent>
@@ -369,9 +369,9 @@ function BandeauReaffectation({
           ))}
         </SelectContent>
       </Select>
-      <Button type="button" disabled={vers === TOUS || pending} onClick={onConfier}>
+      <Button type="button" disabled={vers === TOUS || pending} onClick={onAttribuer}>
         {pending ? <LoaderIcon className="size-4 animate-spin" aria-hidden="true" /> : null}
-        Confier
+        Attribuer
       </Button>
     </div>
   );
