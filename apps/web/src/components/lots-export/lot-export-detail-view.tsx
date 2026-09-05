@@ -196,8 +196,9 @@ export function LotExportDetailView({
             Programmes d’appel
           </h3>
           <p className="mt-1 text-[0.875rem] text-muted-foreground">
-            Capacité principale : {formatNumber(distribution.fichesParJour)} fiches par jour. Les
-            comptes supervision et direction en reçoivent 20 %.
+            Chacun reçoit son objectif quotidien, réglable plus bas. À défaut,{' '}
+            {formatNumber(distribution.fichesParJour)} fiches par jour, dont 20 % pour la
+            supervision et la direction.
           </p>
         </CardHeader>
         <CardContent>
