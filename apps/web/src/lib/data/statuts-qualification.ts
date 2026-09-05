@@ -104,13 +104,20 @@ export const statutDuSouhait = (
   return statuts.find((statut) => statut.code === code) ?? null;
 };
 
-export const statutsHorsQuestion = (
-  statuts: readonly StatutQualification[],
-): StatutQualification[] =>
-  statuts.filter(
-    (statut) =>
-      statut.code !== STATUTS_DE_LA_QUESTION.oui && statut.code !== STATUTS_DE_LA_QUESTION.non,
-  );
+/**
+ * La réponse que ce statut vaut, nulle quand il ne répond pas à la question.
+ * Le serveur refuse une relation qui contredit le statut pose
+ * (`REP_RELATION_STATUT_MISMATCH`) : choisir le statut doit donc poser la
+ * réponse, jamais la laisser diverger.
+ */
+export const souhaitDuStatut = (
+  statut: Pick<StatutQualification, 'code'> | null,
+): boolean | null => {
+  if (statut === null) return null;
+  if (statut.code === STATUTS_DE_LA_QUESTION.oui) return true;
+  if (statut.code === STATUTS_DE_LA_QUESTION.non) return false;
+  return null;
+};
 
 /** Vocabulaire de SAISIE : actifs seulement, servis dans l'ordre dicté. */
 export async function fetchStatutsQualification(

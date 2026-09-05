@@ -53,8 +53,8 @@ import {
   fetchStatutsQualification,
   libelleStatut,
   statutDuSouhait,
+  souhaitDuStatut,
   statutsDeLaBranche,
-  statutsHorsQuestion,
   type StatutQualification,
   type StatutQualificationEffect,
 } from '@/lib/data/statuts-qualification';
@@ -1154,8 +1154,9 @@ function Qualification({
 
   const joignable = resultat === 'JOIGNABLE';
   const branche = statutsDeLaBranche(referentielStatuts.data ?? [], joignable);
-  // Accepté et Refusé découlent de la réponse : ils ne se choisissent plus à part.
-  const statuts = joignable ? statutsHorsQuestion(branche) : branche;
+  // Accepté et Refusé restent dans la liste : le téléconseiller qui ne voit pas
+  // que la question les a posés les y cherche. Les choisir répond à la question.
+  const statuts = branche;
   const statutPose = joignable ? statutDuSouhait(branche, ambassadeur) : null;
   const statutChoisi = statuts.find((ligne) => ligne.id === statutId) ?? null;
   const statut = statutChoisi ?? statutPose;
@@ -1215,6 +1216,8 @@ function Qualification({
   const choisirStatut = (id: string | null): void => {
     setStatutId(id);
     const choisi = statuts.find((ligne) => ligne.id === id);
+    const souhait = souhaitDuStatut(choisi ?? null);
+    if (souhait !== null) setAmbassadeur(souhait);
     const reessai = choisi?.retryAfterMinutes ?? null;
     setRappelAt(
       reessai === null || choisi?.requiresCallback === true
