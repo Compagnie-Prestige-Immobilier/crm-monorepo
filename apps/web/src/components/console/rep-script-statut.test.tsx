@@ -7,15 +7,19 @@ import type * as ConsoleData from '@/lib/data/console';
 import type * as ReferenceData from '@/lib/data/reference';
 import type * as RepresentantsData from '@/lib/data/representants';
 import type { ScriptedRepresentant } from '@/lib/data/representants';
+import type * as OuverturesData from '@/lib/data/ouvertures';
 import type * as StatutsData from '@/lib/data/statuts-qualification';
 import type { StatutQualification } from '@/lib/data/statuts-qualification';
 import { renderWithQuery } from '@/test/render-query';
 
 const pushRepCallAttempt = vi.fn();
+const fetchRepresentant = vi.fn();
 const fetchRepresentants = vi.fn();
 const fetchRepresentantsAQualifier = vi.fn();
 const fetchReferenceData = vi.fn();
 const fetchStatutsQualification = vi.fn();
+const ouvrirFiche = vi.fn();
+const fetchOuvertureCourante = vi.fn();
 
 vi.mock('@/lib/data/console', async (importOriginal) => {
   const actual = await importOriginal<typeof ConsoleData>();
@@ -34,8 +38,18 @@ vi.mock('@/lib/data/representants', async (importOriginal) => {
   const actual = await importOriginal<typeof RepresentantsData>();
   return {
     ...actual,
+    fetchRepresentant: (...args: unknown[]) => fetchRepresentant(...args),
     fetchRepresentants: (...args: unknown[]) => fetchRepresentants(...args),
     fetchRepresentantsAQualifier: (...args: unknown[]) => fetchRepresentantsAQualifier(...args),
+  };
+});
+
+vi.mock('@/lib/data/ouvertures', async (importOriginal) => {
+  const actual = await importOriginal<typeof OuverturesData>();
+  return {
+    ...actual,
+    ouvrirFiche: (...args: unknown[]) => ouvrirFiche(...args) as unknown,
+    fetchOuvertureCourante: () => fetchOuvertureCourante() as unknown,
   };
 });
 
@@ -44,7 +58,7 @@ vi.mock('@/lib/data/statuts-qualification', async (importOriginal) => {
   return { ...actual, fetchStatutsQualification: () => fetchStatutsQualification() as unknown };
 });
 
-vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn(), info: vi.fn() } }));
 
 function statut(
   over: Partial<StatutQualification> & { id: string; requiresComment?: boolean },
@@ -143,10 +157,29 @@ const REPRESENTANT: ScriptedRepresentant = {
   nextCallbackAt: null,
 };
 
+const ouverture = (over: Partial<OuverturesData.OuvertureFiche> = {}) => ({
+  id: 'ouv-1',
+  openedById: 'u-1',
+  openedByName: 'Fatou Sow',
+  representantId: 'r-1',
+  prospectId: null,
+  ficheNom: 'Aminata Ndiaye',
+  openedAt: new Date().toISOString(),
+  closedAt: null,
+  dureeSecondes: null,
+  closingAttemptId: null,
+  draft: null,
+  releasedByName: null,
+  releasedAt: null,
+  ...over,
+});
+
 async function ouvrirQualification(): Promise<void> {
   renderWithQuery(<RepScript />);
   await userEvent.type(await screen.findByLabelText('Qui avez-vous appelé ?'), 'a');
   await userEvent.click(await screen.findByRole('button', { name: /Aminata Ndiaye/u }));
+  await userEvent.click(await screen.findByRole('button', { name: 'Ouvrir' }));
+  await screen.findByText(/Fiche ouverte depuis/u);
 }
 
 const repondre = async (label: string): Promise<void> => {
@@ -167,6 +200,7 @@ const choisirStatut = async (label: string): Promise<void> => {
 beforeEach(() => {
   pushRepCallAttempt.mockReset();
   pushRepCallAttempt.mockResolvedValue({ status: 'applied', attemptId: 'a-1', suggestion: null });
+  fetchRepresentant.mockReset();
   fetchRepresentants.mockReset();
   fetchRepresentantsAQualifier.mockReset();
   const page = {
@@ -182,6 +216,10 @@ beforeEach(() => {
   fetchReferenceData.mockResolvedValue({ syndicats: [] });
   fetchStatutsQualification.mockReset();
   fetchStatutsQualification.mockResolvedValue(STATUTS);
+  ouvrirFiche.mockReset();
+  ouvrirFiche.mockResolvedValue(ouverture());
+  fetchOuvertureCourante.mockReset();
+  fetchOuvertureCourante.mockResolvedValue(null);
 });
 
 describe('l’issue se dérive de l’effet du statut', () => {

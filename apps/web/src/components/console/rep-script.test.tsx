@@ -1,5 +1,6 @@
 import type { ApiClient } from '@crm/api-client';
 import { screen, waitFor, within } from '@testing-library/react';
+import Link from 'next/link';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -12,6 +13,7 @@ import type * as Phase2Data from '@/lib/data/phase2';
 import type * as ReferenceData from '@/lib/data/reference';
 import type * as RepresentantsData from '@/lib/data/representants';
 import type { ScriptedRepresentant } from '@/lib/data/representants';
+import type * as OuverturesData from '@/lib/data/ouvertures';
 import type * as StatutsData from '@/lib/data/statuts-qualification';
 import type { StatutQualification } from '@/lib/data/statuts-qualification';
 import { REP_CALL_OUTCOME_LABELS } from '@/lib/types';
@@ -19,14 +21,18 @@ import type { RepresentantFilters } from '@/lib/representant-filters';
 import { renderWithQuery } from '@/test/render-query';
 
 const pushRepCallAttempt = vi.fn();
+const fetchRepresentant = vi.fn();
 const fetchRepresentants = vi.fn();
 const fetchRepresentantsAQualifier = vi.fn();
 const fetchReferenceData = vi.fn();
 const fetchStatutsQualification = vi.fn();
+const ouvrirFiche = vi.fn();
+const fetchOuvertureCourante = vi.fn();
 const countPendingProspects = vi.fn();
 const fetchCallbacks = vi.fn();
 const toastError = vi.fn();
 const toastSuccess = vi.fn();
+const toastInfo = vi.fn();
 
 vi.mock('@/lib/data/console', async (importOriginal) => {
   const actual = await importOriginal<typeof ConsoleData>();
@@ -54,8 +60,18 @@ vi.mock('@/lib/data/representants', async (importOriginal) => {
   const actual = await importOriginal<typeof RepresentantsData>();
   return {
     ...actual,
+    fetchRepresentant: (...args: unknown[]) => fetchRepresentant(...args),
     fetchRepresentants: (...args: unknown[]) => fetchRepresentants(...args),
     fetchRepresentantsAQualifier: (...args: unknown[]) => fetchRepresentantsAQualifier(...args),
+  };
+});
+
+vi.mock('@/lib/data/ouvertures', async (importOriginal) => {
+  const actual = await importOriginal<typeof OuverturesData>();
+  return {
+    ...actual,
+    ouvrirFiche: (...args: unknown[]) => ouvrirFiche(...args) as unknown,
+    fetchOuvertureCourante: () => fetchOuvertureCourante() as unknown,
   };
 });
 
@@ -71,6 +87,9 @@ vi.mock('sonner', () => ({
     },
     success: (message: string) => {
       toastSuccess(message);
+    },
+    info: (message: string) => {
+      toastInfo(message);
     },
   },
 }));
@@ -177,9 +196,33 @@ async function renderListe(
   return view;
 }
 
-/** Ouvre la qualification de quelqu'un : la liste est là dès l'ouverture. */
-async function choisir(nom: RegExp): Promise<void> {
+const ouverture = (over: Partial<OuverturesData.OuvertureFiche> = {}) => ({
+  id: 'ouv-1',
+  openedById: 'u-1',
+  openedByName: 'Fatou Sow',
+  representantId: 'r-1',
+  prospectId: null,
+  ficheNom: 'Aminata Ndiaye',
+  openedAt: new Date().toISOString(),
+  closedAt: null,
+  dureeSecondes: null,
+  closingAttemptId: null,
+  draft: null,
+  releasedByName: null,
+  releasedAt: null,
+  ...over,
+});
+
+/** Désigne une fiche dans la liste, sans confirmer son ouverture. */
+async function viser(nom: RegExp): Promise<void> {
   await userEvent.click(await screen.findByRole('button', { name: nom }));
+}
+
+/** Ouvre la qualification de quelqu'un, confirmation comprise (EB-07). */
+async function choisir(nom: RegExp): Promise<void> {
+  await viser(nom);
+  await userEvent.click(await screen.findByRole('button', { name: 'Ouvrir' }));
+  await screen.findByText(/Fiche ouverte depuis/u);
 }
 
 const relationDemandee = (): unknown =>
@@ -237,11 +280,18 @@ beforeEach(() => {
     attemptId: 'a-1',
     suggestion: null,
   });
+  fetchRepresentant.mockReset();
   fetchRepresentants.mockReset();
   fetchRepresentantsAQualifier.mockReset();
   fetchRepresentants.mockResolvedValue(page([HORS_LISTE]));
   fetchStatutsQualification.mockReset();
   fetchStatutsQualification.mockResolvedValue(STATUTS);
+  ouvrirFiche.mockReset();
+  ouvrirFiche.mockImplementation((input: { representantId: string }) =>
+    Promise.resolve(ouverture({ representantId: input.representantId })),
+  );
+  fetchOuvertureCourante.mockReset();
+  fetchOuvertureCourante.mockResolvedValue(null);
   fetchReferenceData.mockReset();
   fetchReferenceData.mockResolvedValue({
     syndicats: [{ id: 'snd-saes', name: 'SAES', sigle: 'SAES', isActive: true, sortOrder: 1 }],
@@ -329,15 +379,14 @@ describe('RepScript : les questions restent, et on peut revenir', () => {
     expect(screen.queryByText('Souhaite-t-il être représentant CHUES ?')).toBeNull();
   });
 
-  it('revient à la liste sans rien envoyer', async () => {
+  // EB-08 : la fiche ouverte ne se quitte plus sans statut.
+  it('ne propose plus de revenir à la liste une fois la fiche ouverte', async () => {
     await renderListe();
     await choisir(/Aminata Ndiaye/u);
     await repondre('Injoignable');
 
-    await userEvent.click(screen.getByRole('button', { name: /Revenir à la liste/u }));
-
-    expect(screen.getByLabelText('Qui avez-vous appelé ?')).toBeTruthy();
-    expect(pushRepCallAttempt).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /Revenir à la liste/u })).toBeNull();
+    expect(screen.queryByLabelText('Qui avez-vous appelé ?')).toBeNull();
   });
 
   it('revient d’une étape à l’autre par « Étape précédente »', async () => {
@@ -577,49 +626,36 @@ describe('RepScript : la garde des relations déjà tranchées', () => {
   const ACCEPTE = rep({ id: 'r-7', fullName: 'Bineta Diop', relationStatus: 'AMBASSADEUR' });
   const REFUS = rep({ id: 'r-8', fullName: 'Cheikh Sow', relationStatus: 'REFUS' });
 
-  it('demande AVANT tout, sans montrer ni fiche ni question', async () => {
+  it('le dit dans la confirmation d’ouverture, avant toute saisie', async () => {
     await renderListe([ACCEPTE]);
-    await choisir(/Bineta Diop/u);
+    await viser(/Bineta Diop/u);
 
     const boite = await screen.findByRole('dialog');
     expect(boite.textContent).toContain(
       'Cette personne a déjà accepté d’être représentant CPI CHUES.',
     );
-    expect(boite.textContent).toContain('Voulez-vous quand même consigner un nouvel appel ?');
 
-    // Le seul titre à l'écran est celui de la boîte : ni le nom, ni le numéro.
+    // Ni la fiche ni les questions tant que l'ouverture n'est pas confirmée.
     expect(screen.queryByRole('heading', { name: 'Bineta Diop' })).toBeNull();
     expect(screen.queryByText('Comment s’est passé l’appel ?')).toBeNull();
-    expect(screen.queryByText('+221 77 123 45 67')).toBeNull();
+    expect(ouvrirFiche).not.toHaveBeenCalled();
   });
 
   it('nomme le refus plutôt que l’acceptation quand c’est un refus', async () => {
     await renderListe([REFUS]);
-    await choisir(/Cheikh Sow/u);
+    await viser(/Cheikh Sow/u);
 
     const boite = await screen.findByRole('dialog');
     expect(boite.textContent).toContain('Cette personne a déjà refusé.');
     expect(boite.textContent).not.toContain('a déjà accepté');
-    expect(boite.textContent).toContain('Voulez-vous quand même consigner un nouvel appel ?');
-    expect(screen.queryByText('Comment s’est passé l’appel ?')).toBeNull();
   });
 
-  it('découvre la fiche une fois la question tranchée, dans les deux cas', async () => {
+  it('découvre la fiche une fois l’ouverture confirmée', async () => {
     await renderListe([ACCEPTE]);
     await choisir(/Bineta Diop/u);
-    await userEvent.click(await screen.findByRole('button', { name: 'Continuer' }));
 
     expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Bineta Diop');
     expect(screen.getByText('Comment s’est passé l’appel ?')).toBeTruthy();
-  });
-
-  it('renvoie à la liste si l’on renonce', async () => {
-    await renderListe([REFUS]);
-    await choisir(/Cheikh Sow/u);
-    await userEvent.click(await screen.findByRole('button', { name: /Revenir à la liste/u }));
-
-    expect(screen.getByLabelText('Qui avez-vous appelé ?')).toBeTruthy();
-    expect(pushRepCallAttempt).not.toHaveBeenCalled();
   });
 
   it('n’avertit sur AUCUNE relation encore ouverte', async () => {
@@ -629,14 +665,93 @@ describe('RepScript : la garde des relations déjà tranchées', () => {
       const { unmount } = await renderListe([
         rep({ id: `r-${statut}`, fullName: 'Aminata Ndiaye', relationStatus: statut }),
       ]);
-      await choisir(/Aminata Ndiaye/u);
+      await viser(/Aminata Ndiaye/u);
 
-      if (screen.queryByRole('dialog') !== null) alertes.push(statut);
-      expect(screen.getByText('Comment s’est passé l’appel ?')).toBeTruthy();
+      const boite = await screen.findByRole('dialog');
+      if (boite.textContent?.includes('déjà') === true) alertes.push(statut);
       unmount();
     }
 
     expect(alertes).toEqual([]);
+  });
+});
+
+/** EB-07 à EB-09 : on confirme, on est tenu, et le temps se voit. */
+describe('RepScript : l’ouverture confirmée d’une fiche', () => {
+  it('demande confirmation en nommant la fiche, et n’ouvre rien avant', async () => {
+    await renderListe();
+    await viser(/Aminata Ndiaye/u);
+
+    const boite = await screen.findByRole('dialog');
+    expect(boite.textContent).toContain('Ouvrir la fiche de Aminata Ndiaye ?');
+    expect(boite.textContent).toContain('Vous ne pourrez pas la quitter sans la qualifier.');
+    expect(screen.getByRole('button', { name: 'Ouvrir' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Annuler' })).toBeTruthy();
+    expect(ouvrirFiche).not.toHaveBeenCalled();
+  });
+
+  it('renonce sans rien enregistrer', async () => {
+    await renderListe();
+    await viser(/Aminata Ndiaye/u);
+    await userEvent.click(await screen.findByRole('button', { name: 'Annuler' }));
+
+    expect(ouvrirFiche).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Qui avez-vous appelé ?')).toBeTruthy();
+  });
+
+  it('enregistre l’ouverture, puis montre le chronomètre', async () => {
+    await renderListe();
+    await choisir(/Aminata Ndiaye/u);
+
+    expect(ouvrirFiche.mock.calls[0]?.[0]).toMatchObject({ representantId: 'r-1' });
+    expect(screen.getByText(/Fiche ouverte depuis/u).textContent).toMatch(/\d\d:\d\d/u);
+  });
+
+  it('ferme l’ouverture avec la tentative : c’est ce qui arrête le chronomètre', async () => {
+    await renderListe();
+    await choisir(/Aminata Ndiaye/u);
+    await injoindre();
+    await userEvent.click(screen.getByRole('button', { name: 'Continuer' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(() => {
+      expect(pushRepCallAttempt).toHaveBeenCalledTimes(1);
+    });
+    expect(dernierEnvoi()).toMatchObject({ ouvertureId: 'ouv-1' });
+  });
+
+  // Next.js n'expose aucune API de blocage : le clic sur un lien est l'une des
+  // trois seules prises, avec la fermeture de l'onglet et le retour arrière.
+  it('retient un clic vers un autre écran tant qu’aucun statut n’est posé', async () => {
+    await renderListe();
+    renderWithQuery(
+      <Link href="/chues/rappels" data-testid="ailleurs">
+        Rappels
+      </Link>,
+    );
+    await choisir(/Aminata Ndiaye/u);
+
+    await userEvent.click(screen.getByTestId('ailleurs'));
+
+    expect(toastError.mock.calls.at(-1)?.[0]).toBe(
+      'Posez un statut de qualification avant de quitter cette fiche.',
+    );
+  });
+
+  // Le serveur refuse la seconde ouverture sans dire laquelle est tenue : sans
+  // ce rattrapage, le téléconseiller reste devant un refus qu'il ne peut pas lever.
+  it('rouvre la fiche déjà en main quand le verrou du serveur refuse', async () => {
+    ouvrirFiche.mockRejectedValue(new Error('OUVERTURE_FICHE_DEJA_OUVERTE'));
+    fetchOuvertureCourante.mockResolvedValue(
+      ouverture({ id: 'ouv-9', representantId: 'r-2', ficheNom: 'Ousmane Fall' }),
+    );
+    fetchRepresentant.mockResolvedValue(SECOND);
+
+    await renderListe();
+    await choisir(/Aminata Ndiaye/u);
+
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Ousmane Fall');
+    expect(toastInfo.mock.calls.at(-1)?.[0]).toContain('Ousmane Fall');
   });
 });
 
