@@ -5,12 +5,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/drafts/draft_form_mixin.dart';
+import '../../../core/ouvertures/ouverture_fiche_mixin.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/router/back_navigation.dart';
+import '../../../core/router/route_paths.dart';
 import '../../../core/sync/phase2_directory_sync.dart';
 import '../../../core/telephonie/appels_crm.dart';
 import '../../../core/utils/relative_time.dart';
@@ -20,6 +23,8 @@ import '../../../core/utils/phone.dart';
 import '../../../core/utils/whatsapp.dart' show kProfessionMaxLength;
 import '../../../data/local/database.dart';
 import '../../../data/repositories/draft_repository.dart';
+import '../../../data/repositories/ouverture_repository.dart';
+import '../../../data/repositories/reference_repository.dart';
 import '../../../data/repositories/write_repository.dart';
 import '../../../ui/widgets/cpi_action_bar.dart';
 import '../../../ui/widgets/cpi_choice_group.dart';
@@ -47,7 +52,7 @@ class Phase2Screen extends ConsumerStatefulWidget {
 }
 
 class _Phase2ScreenState extends ConsumerState<Phase2Screen>
-    with DraftFormMixin<Phase2Screen> {
+    with DraftFormMixin<Phase2Screen>, OuvertureFicheMixin<Phase2Screen> {
   final TextEditingController _phone = TextEditingController();
   final FocusNode _phoneFocus = FocusNode();
 
@@ -83,6 +88,10 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen>
     'Revenir à sa banque',
   ];
   bool _noteOuverte = false;
+
+  /// Ce que l'ouverture ou le verrou vient de dire. Bande et non toast : le
+  /// message doit rester lisible tant que l'appel n'est pas consigné.
+  String? _echecOuverture;
 
   bool get _recordingActive => _activeRecordingPath != null;
 
@@ -171,7 +180,96 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen>
     _form.clear();
     _comment.clear();
     await _runSearch(e164);
-    if (mounted) await _reprendreLeBrouillon();
+    if (!mounted) return;
+    await _reprendreLeBrouillon();
+    if (!mounted) return;
+    await _prendreLaFiche();
+  }
+
+  /// EB-07 : la confirmation se pose une fois la fiche IDENTIFIÉE. Tant
+  /// qu'aucune personne n'est désignée, il n'y a rien à ouvrir, rien à
+  /// verrouiller et rien à chronométrer : taper un numéro et chercher reste
+  /// libre.
+  ///
+  /// La fiche déjà tenue par ce compte se rouvre SANS redemander : c'est la
+  /// reprise après une fermeture ou un plantage, et chaque confirmation compte
+  /// une ouverture de plus.
+  Future<void> _prendreLaFiche() async {
+    final Phase2State phase2 = ref.read(phase2ControllerProvider);
+    final Phase2DirectoryData? entry = phase2.entry;
+    if (entry == null || phase2.stage != Phase2Stage.capture) return;
+    if (compteConnecte == null) return;
+
+    final OuverturesFicheData? deja = await ficheEnCours();
+    if (!mounted) return;
+    if (deja?.prospectId != entry.prospectId) {
+      final bool ouvrir = await confirmerLOuverture(
+        _nomDeLaFiche(phase2.prospect) ?? Phone.format(entry.phoneE164),
+      );
+      if (!mounted) return;
+      if (!ouvrir) {
+        await _viderPourLeSuivant();
+        return;
+      }
+    }
+
+    final OuvertureResultat resultat;
+    try {
+      resultat = await ouvrirLaFiche(prospectId: entry.prospectId);
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _echecOuverture = 'Ouverture impossible. $error');
+      return;
+    }
+    if (!mounted) return;
+    final FicheTenue? tenue = resultat.tenue;
+    if (tenue != null) await _proposerLaFicheTenue(tenue);
+  }
+
+  static String? _nomDeLaFiche(Prospect? fiche) {
+    if (fiche == null) return null;
+    final String nom = '${fiche.prenom} ${fiche.nom}'.trim();
+    return nom.isEmpty ? null : nom;
+  }
+
+  /// Le verrou refuse la seconde fiche sans dire laquelle il tient. Sans cette
+  /// issue, le téléconseiller reste devant un refus qu'il ne peut pas lever :
+  /// une fiche de représentant se reprend par sa route, celle d'un prospect en
+  /// rappelant son numéro.
+  Future<void> _proposerLaFicheTenue(FicheTenue tenue) async {
+    // Le dépôt se lit AVANT les attentes : après, le widget peut être démonté.
+    final ReferenceRepository refs = ref.read(referenceRepositoryProvider);
+    final String? representant = tenue.representantId;
+    final String? prospectId = tenue.prospectId;
+    final Prospect? prospect = prospectId == null
+        ? null
+        : await refs.prospectById(prospectId);
+    final String? nom = representant == null
+        ? _nomDeLaFiche(prospect) ?? tenue.ficheNom
+        : (await refs.representantById(representant))?.fullName ??
+              tenue.ficheNom;
+    final bool reprenable = representant != null || prospect != null;
+    if (!mounted) return;
+    final bool? reprendre = await cpiConfirm(
+      context,
+      title: 'Fiche en cours',
+      message: nom == null
+          ? 'Vous tenez déjà une fiche. Qualifiez-la avant d\'en ouvrir une autre.'
+          : 'Vous tenez déjà la fiche de $nom. Qualifiez-la avant d\'en ouvrir une autre.',
+      confirmLabel: reprenable ? 'Reprendre' : 'Revenir',
+      cancelLabel: 'Revenir',
+    );
+    if (!mounted) return;
+    if (reprendre == true && representant != null) {
+      context.go(Routes.representantQualificationFor(representant));
+      return;
+    }
+    await _viderPourLeSuivant();
+    if (reprendre == true && prospect != null) {
+      // Le champ relance la recherche, et la fiche déjà tenue se rouvre sans
+      // redemander.
+      _phone.text = Phone.editable(prospect.phoneE164);
+    }
   }
 
   /// Ce que le dernier appel à ce numéro avait laissé en chemin. Repris avant
@@ -210,6 +308,7 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen>
     setState(() {
       _step = 1;
       _noteOuverte = false;
+      _echecOuverture = null;
     });
     ref.read(phase2ControllerProvider.notifier).next();
     _phoneFocus.requestFocus();
@@ -248,9 +347,13 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen>
             recordingPath: _recordingPath,
             renseignements: _form.read(),
             rendezVousAt: rendezVousAt,
+            // Ferme l'ouverture et arrête le chronomètre, ici comme au serveur.
+            ouvertureId: ouverture?.id,
           );
       if (ok) {
         _recordingPath = null;
+        libererLeVerrou();
+        _echecOuverture = null;
         // EB-10 : un rappel promis garde les réponses pour la prochaine fois.
         // Un appel conclu, non : les rouvrir ferait ressaisir un dossier clos.
         if (reason.effect == CallEffects.scheduleCallback) {
@@ -307,15 +410,24 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen>
     final Widget screen = CpiScaffold(
       title: 'Consigner un appel',
       showTitle: false,
-      leading: etape == 1
+      leading: etape == 1 && !sousVerrou
           ? const CpiBackButton()
           : CpiHeaderAction(
               icon: PhosphorIconsRegular.arrowLeft,
-              label: _retours[etape],
-              onPressed: _peutReculer && !phase2.saving && !_confirme
-                  ? _precedent
-                  : null,
+              label: etape == 1 ? 'Retour' : _retours[etape],
+              onPressed: etape == 1
+                  ? _quitter
+                  : (_peutReculer && !phase2.saving && !_confirme
+                        ? _precedent
+                        : null),
             ),
+      banner: switch (_echecOuverture) {
+        final String message => CpiStatusBand(
+          text: message,
+          tone: CpiTone.warning,
+        ),
+        _ => null,
+      },
       footer: switch (etape) {
         1 => _EtapeUnAction(
           onContinue: () => _versLesRenseignements(banques, syndicats),
@@ -337,6 +449,7 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen>
           CpiSpacing.xl,
         ),
         children: <Widget>[
+          ?chronometre(Theme.of(context)),
           CpiStepHeader(
             step: etape,
             total: _etapes,
@@ -357,6 +470,7 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen>
                   focusNode: _phoneFocus,
                   onClear: _resetForNext,
                   onNext: _resetForNext,
+                  verrouille: sousVerrou,
                 ),
                 2 || 3 || 4 => _EtapeRenseignements(
                   etape: etape,
@@ -400,14 +514,30 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen>
     // l'étape 1, comme la flèche du bandeau.
     return CpiStepScope(
       first: etape == 1,
+      onExit: sousVerrou ? _quitter : null,
       onBack: _peutReculer && !_confirme ? _precedent : null,
       child: screen,
     );
   }
 
+  /// EB-08 : une fiche ouverte ne se quitte pas, elle se qualifie.
+  void _quitter() {
+    if (sousVerrou) {
+      setState(
+        () =>
+            _echecOuverture = 'Consignez cet appel avant de quitter la fiche.',
+      );
+      return;
+    }
+    popOrHome(context);
+  }
+
   void _precedent() => setState(() => _step = _etape - 1);
 
-  void _suivant() => setState(() => _step = _etape + 1);
+  void _suivant() {
+    setState(() => _step = _etape + 1);
+    unawaited(remonterLeBrouillon(collectDraftValues()));
+  }
 
   bool get _confirme =>
       ref.read(phase2ControllerProvider).stage == Phase2Stage.confirmed;
@@ -776,6 +906,7 @@ class _EtapeQui extends StatelessWidget {
     required this.focusNode,
     required this.onClear,
     required this.onNext,
+    required this.verrouille,
   });
 
   final Phase2State state;
@@ -783,6 +914,7 @@ class _EtapeQui extends StatelessWidget {
   final FocusNode focusNode;
   final VoidCallback onClear;
   final VoidCallback onNext;
+  final bool verrouille;
 
   @override
   Widget build(BuildContext context) => Column(
@@ -791,7 +923,9 @@ class _EtapeQui extends StatelessWidget {
       _PhoneBlock(
         controller: controller,
         focusNode: focusNode,
-        enabled: !state.saving,
+        // EB-08 : changer de numéro abandonnerait la fiche ouverte. Le champ se
+        // rouvre dès que l'appel est consigné.
+        enabled: !state.saving && !verrouille,
       ),
       const SizedBox(height: CpiSpacing.md),
       switch (state.stage) {
