@@ -15,6 +15,13 @@ export interface StatutQualificationSeed {
    */
   relationStatus: 'INCONNU' | 'CONTACTE' | 'AMBASSADEUR' | 'REFUS' | null;
   sortOrder: number;
+  /**
+   * Version de charge utile minimale sachant emettre ce code. Un statut qui
+   * exige un motif ne peut pas etre servi a un telephone qui ignore cette
+   * regle : il l'emettrait sans motif, le serveur refuserait, et un refus est
+   * definitif hors ligne.
+   */
+  minPayloadVersion: number;
 }
 
 /**
@@ -44,6 +51,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     priorite: 'HAUTE',
     relationStatus: 'AMBASSADEUR',
     sortOrder: 10,
+    minPayloadVersion: 6,
   },
   {
     code: 'REFUSE',
@@ -55,6 +63,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     priorite: 'BASSE',
     relationStatus: 'REFUS',
     sortOrder: 20,
+    minPayloadVersion: 6,
   },
   // Le seul qui exige une date : c'est lui qui arme l'alarme du telephone.
   {
@@ -67,6 +76,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     priorite: 'HAUTE',
     relationStatus: null,
     sortOrder: 30,
+    minPayloadVersion: 6,
   },
   {
     code: 'DECEDE',
@@ -78,6 +88,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     priorite: 'BASSE',
     relationStatus: null,
     sortOrder: 40,
+    minPayloadVersion: 6,
   },
   {
     code: 'RETRAITE',
@@ -89,6 +100,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     priorite: 'BASSE',
     relationStatus: null,
     sortOrder: 50,
+    minPayloadVersion: 6,
   },
   {
     code: 'HORS_CIBLE',
@@ -100,6 +112,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     priorite: 'BASSE',
     relationStatus: null,
     sortOrder: 60,
+    minPayloadVersion: 6,
   },
   {
     code: 'AFFECTE_AILLEURS',
@@ -111,6 +124,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     priorite: 'BASSE',
     relationStatus: null,
     sortOrder: 70,
+    minPayloadVersion: 6,
   },
   {
     code: 'FAUX_NUMERO',
@@ -122,6 +136,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     priorite: 'BASSE',
     relationStatus: null,
     sortOrder: 80,
+    minPayloadVersion: 6,
   },
   // Deux « Autre », un par famille, et `label` porte un index unique : les
   // libelles se distinguent en base, l'ecran les affiche sous l'en-tete de leur
@@ -136,6 +151,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     priorite: 'NORMALE',
     relationStatus: null,
     sortOrder: 90,
+    minPayloadVersion: 7,
   },
 
   // Non joint
@@ -149,6 +165,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     priorite: 'NORMALE',
     relationStatus: null,
     sortOrder: 110,
+    minPayloadVersion: 6,
   },
   // Le code est fige a la creation, pas le libelle : celui-ci disait
   // « Numero occupe » avant le Lot 1.
@@ -162,6 +179,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     priorite: 'NORMALE',
     relationStatus: null,
     sortOrder: 120,
+    minPayloadVersion: 6,
   },
   {
     code: 'MESSAGERIE',
@@ -173,6 +191,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     priorite: 'NORMALE',
     relationStatus: null,
     sortOrder: 130,
+    minPayloadVersion: 6,
   },
   {
     code: 'TELEPHONE_INDISPONIBLE',
@@ -184,6 +203,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     priorite: 'NORMALE',
     relationStatus: null,
     sortOrder: 140,
+    minPayloadVersion: 6,
   },
   // Le seul non joint qui ne repasse jamais.
   {
@@ -196,6 +216,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     priorite: 'BASSE',
     relationStatus: null,
     sortOrder: 150,
+    minPayloadVersion: 6,
   },
   {
     code: 'AUTRE_NON_JOINT',
@@ -207,6 +228,7 @@ export const STATUTS_QUALIFICATION: readonly StatutQualificationSeed[] = [
     priorite: 'NORMALE',
     relationStatus: null,
     sortOrder: 160,
+    minPayloadVersion: 7,
   },
 ];
 
