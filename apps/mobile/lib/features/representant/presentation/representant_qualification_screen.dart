@@ -2,18 +2,22 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:forui/forui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/notifications/rep_callback_notifications.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/router/back_navigation.dart';
+import '../../../core/router/route_paths.dart';
+import '../../../core/sync/api_port.dart' show OuvertureFicheDto;
 import '../../../core/telephonie/appels_crm.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/phone.dart';
 import '../../../core/utils/relative_time.dart';
 import '../../../core/utils/whatsapp.dart';
 import '../../../data/local/database.dart';
+import '../../../data/repositories/ouverture_repository.dart';
 import '../../../data/repositories/reference_repository.dart';
 import '../../../ui/widgets/cpi_action_bar.dart';
 import '../../../ui/widgets/cpi_choice_group.dart';
@@ -144,6 +148,18 @@ class _RepresentantQualificationScreenState
   bool saving = false;
   String? echec;
 
+  /// La fiche prise en main. Non nulle : le verrou tient, et l'écran refuse de
+  /// se fermer tant qu'aucun statut n'est posé.
+  OuverturesFicheData? ouverture;
+
+  /// Bat la seconde pour le chronomètre. La durée ne se stocke pas : elle se
+  /// lit entre l'ouverture et maintenant.
+  Timer? battement;
+
+  /// Ce que le verrou vient de refuser. Bande et non toast : le refus doit
+  /// rester lisible tant que le statut n'est pas posé.
+  String? refus;
+
   _Fiche? fiche;
 
   _Etape etape = _Etape.fiche;
@@ -182,6 +198,7 @@ class _RepresentantQualificationScreenState
     professionFocus.dispose();
     departementFocus.dispose();
     iefFocus.dispose();
+    battement?.cancel();
     super.dispose();
   }
 
@@ -231,6 +248,112 @@ class _RepresentantQualificationScreenState
       iefId = importee.iefId;
       ief.text = inspection?.name ?? '';
     });
+    await prendreLaFiche(importee);
+  }
+
+  /// Le nom tel qu'il se dit : le nom complet importé porte souvent déjà le
+  /// prénom, et le répéter donnerait « Ndiaye Awa Awa ».
+  static String nomComplet(String prenom, String nom) =>
+      prenom.isEmpty || nom.contains(prenom) ? nom : '$nom $prenom';
+
+  /// EB-07 et EB-08 : l'ouverture se confirme, s'enregistre, et pose le verrou.
+  ///
+  /// La fiche déjà tenue par ce compte se rouvre SANS redemander : c'est la
+  /// reprise après une fermeture ou un plantage, et chaque confirmation compte
+  /// une ouverture de plus.
+  Future<void> prendreLaFiche(_Fiche importee) async {
+    final String? moi = ref.read(authControllerProvider).userId;
+    if (moi == null || moi.isEmpty) return;
+    final OuvertureRepository ouvertures = ref.read(
+      ouvertureRepositoryProvider,
+    );
+    final OuverturesFicheData? deja = await ouvertures.courante(moi);
+    if (!mounted) return;
+    if (deja?.representantId != widget.representantId) {
+      final bool? ouvrir = await cpiConfirm(
+        context,
+        title:
+            'Ouvrir la fiche de ${nomComplet(importee.prenom, importee.nom)} ?',
+        message: 'Vous ne pourrez pas la quitter sans la qualifier.',
+        confirmLabel: 'Ouvrir',
+      );
+      if (!mounted) return;
+      if (ouvrir != true) {
+        popOrHome(context);
+        return;
+      }
+    }
+
+    final OuvertureResultat resultat;
+    try {
+      resultat = await ouvertures.ouvrir(
+        openedById: moi,
+        representantId: widget.representantId,
+      );
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => echec = 'Ouverture impossible. $error');
+      return;
+    }
+    if (!mounted) return;
+
+    final OuvertureFicheDto? tenue = resultat.tenue;
+    if (tenue != null) {
+      await proposerLaFicheTenue(tenue);
+      return;
+    }
+    setState(() => ouverture = resultat.ouverte);
+    battement?.cancel();
+    battement = Timer.periodic(const Duration(seconds: 1), (Timer _) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  /// Le serveur refuse la seconde fiche sans dire laquelle il tient. Sans
+  /// cette issue, le téléconseiller reste devant un refus qu'il ne peut pas
+  /// lever.
+  Future<void> proposerLaFicheTenue(OuvertureFicheDto tenue) async {
+    final String? autre = tenue.representantId;
+    final String? nom = autre == null
+        ? tenue.ficheNom
+        : (await ref.read(referenceRepositoryProvider).representantById(autre))
+                  ?.fullName ??
+              tenue.ficheNom;
+    if (!mounted) return;
+    final bool? reprendre = await cpiConfirm(
+      context,
+      title: 'Fiche en cours',
+      message: nom == null
+          ? 'Vous tenez déjà une fiche. Qualifiez-la avant d\'en ouvrir une autre.'
+          : 'Vous tenez déjà la fiche de $nom. Qualifiez-la avant d\'en ouvrir une autre.',
+      confirmLabel: autre == null ? 'Revenir' : 'Reprendre',
+      cancelLabel: 'Revenir',
+    );
+    if (!mounted) return;
+    if (reprendre == true && autre != null) {
+      context.go(Routes.representantQualificationFor(autre));
+      return;
+    }
+    popOrHome(context);
+  }
+
+  /// Le temps écoulé depuis l'ouverture confirmée. Nul tant qu'aucune fiche
+  /// n'est prise en main.
+  Duration? get tempsDeTraitement {
+    final OuverturesFicheData? prise = ouverture;
+    if (prise == null) return null;
+    final Duration ecoule = ref
+        .read(clockProvider)
+        .now()
+        .difference(prise.openedAt);
+    return ecoule.isNegative ? Duration.zero : ecoule;
+  }
+
+  static String chrono(Duration duree) {
+    final String mm = duree.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final String ss = duree.inSeconds.remainder(60).toString().padLeft(2, '0');
+    if (duree.inHours == 0) return '$mm:$ss';
+    return '${duree.inHours}:$mm:$ss';
   }
 
   /// Une personne proposée à la place de celle qu'on vient d'appeler : elle
@@ -432,7 +555,9 @@ class _RepresentantQualificationScreenState
   /// quand la réponse est complète : le bouton s'allume alors.
   String? get manque =>
       manqueResultat ??
-      (renseignementsExiges ? manqueVerification ?? manqueRenseignements : null) ??
+      (renseignementsExiges
+          ? manqueVerification ?? manqueRenseignements
+          : null) ??
       manqueEtape(_Etape.fin);
 
   static String? _ouiNon(bool? value) =>
@@ -501,19 +626,14 @@ class _RepresentantQualificationScreenState
       corrections.isNotEmpty ||
       suggestionCommencee;
 
-  Future<void> quitter() async {
-    if (!aSaisi) {
-      popOrHome(context);
+  /// EB-08 : une fiche ouverte ne se quitte pas, elle se qualifie. Le refus
+  /// remplace l'ancienne confirmation, qui ne freinait la sortie que si
+  /// quelque chose avait été saisi.
+  void quitter() {
+    if (ouverture != null) {
+      setState(() => refus = 'Posez un statut avant de quitter cette fiche.');
       return;
     }
-    final bool? partir = await cpiConfirm(
-      context,
-      title: 'Quitter sans enregistrer ?',
-      message: 'Votre réponse et votre commentaire seront perdus.',
-      confirmLabel: 'Quitter',
-      danger: true,
-    );
-    if (partir != true || !mounted) return;
     popOrHome(context);
   }
 
@@ -531,7 +651,7 @@ class _RepresentantQualificationScreenState
     final List<_Etape> etapes = parcours;
     final int index = etapes.indexOf(etape);
     if (index <= 0) {
-      unawaited(quitter());
+      quitter();
       return;
     }
     setState(() {
@@ -680,6 +800,9 @@ class _RepresentantQualificationScreenState
             createdById: moi,
             outcome: issue,
             statutQualificationId: statut?.id,
+            // Ferme l'ouverture et arrête le chronomètre, ici comme au serveur.
+            ouvertureId: ouverture?.id,
+            createdByName: ref.read(authControllerProvider).fullName,
             // Une question sans réponse n'est pas un refus : le statut la pose
             // désormais facultative, et le serveur comble ce silence lui-même.
             relationStatus: representantCHUES == null
@@ -745,6 +868,8 @@ class _RepresentantQualificationScreenState
         );
       }
       ref.read(syncCoordinatorProvider.notifier).nudge();
+      battement?.cancel();
+      ouverture = null;
       if (context.mounted) Navigator.of(context).pop();
     } on Object catch (error) {
       if (!context.mounted) return;
@@ -770,7 +895,7 @@ class _RepresentantQualificationScreenState
 
     return CpiStepScope(
       first: premiere,
-      onExit: () => unawaited(quitter()),
+      onExit: quitter,
       onBack: saving ? null : precedent,
       child: CpiScaffold(
         title: question,
@@ -780,18 +905,25 @@ class _RepresentantQualificationScreenState
           label: premiere ? 'Retour' : 'Étape précédente',
           onPressed: saving ? null : precedent,
         ),
-        banner: echec == null
-            ? null
-            : CpiStatusBand(
-                text: echec!,
-                tone: CpiTone.danger,
-                actionLabel: 'Réessayer',
-                onAction: () => unawaited(enregistrer(context)),
-              ),
+        banner: switch ((echec, refus)) {
+          (final String message, _) => CpiStatusBand(
+            text: message,
+            tone: CpiTone.danger,
+            actionLabel: 'Réessayer',
+            onAction: () => unawaited(enregistrer(context)),
+          ),
+          // Le statut posé lève le verrou : le refus n'a plus lieu d'être.
+          (_, final String message) when statutRetenu == null => CpiStatusBand(
+            text: message,
+            tone: CpiTone.warning,
+          ),
+          _ => null,
+        },
         footer: CpiActionBar(child: _pied(context)),
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
+            ?_chronometre(theme),
             CpiStepHeader(
               step: etapes.indexOf(etape) + 1,
               total: etapes.length,
@@ -806,6 +938,43 @@ class _RepresentantQualificationScreenState
                 _Etape.renseignements => _corpsRenseignements(theme),
                 _Etape.fin => _corpsFin(theme, representant),
               },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// EB-09 : le temps de traitement, visible du premier écran jusqu'à la
+  /// qualification. Distinct de la durée de communication du journal d'appels.
+  Widget? _chronometre(ThemeData theme) {
+    final Duration? ecoule = tempsDeTraitement;
+    if (ecoule == null) return null;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        CpiSpacing.md,
+        CpiSpacing.xs,
+        CpiSpacing.md,
+        0,
+      ),
+      child: Semantics(
+        liveRegion: true,
+        label: 'Fiche ouverte depuis ${ecoule.inMinutes} minutes',
+        excludeSemantics: true,
+        child: Row(
+          children: <Widget>[
+            Icon(
+              PhosphorIconsRegular.timer,
+              size: CpiSpacing.md,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: CpiSpacing.xs),
+            Text(
+              chrono(ecoule),
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
+              ),
             ),
           ],
         ),
