@@ -34,8 +34,10 @@ export function useVerrouNavigation(actif: boolean, prevenir: () => void): void 
 
     const surClic = (event: MouseEvent): void => {
       if (event.defaultPrevented || event.button !== 0) return;
+      // `Element` et non `HTMLElement` : une icone dans un lien est un
+      // `SVGElement`, et le clic atterrit sur elle.
       const cible = event.target;
-      if (!(cible instanceof HTMLElement) || cible.closest('a[href]') === null) return;
+      if (!(cible instanceof Element) || cible.closest('a[href]') === null) return;
       event.preventDefault();
       event.stopPropagation();
       alerte.current();
