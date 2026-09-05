@@ -23,6 +23,7 @@ import { PROSPECT_STATUT_TRANSITIONS, assertTransition } from '../../common/tran
 import { assertOwnership, isAdmin, ownerScope, prospectReadScope } from '../../common/scope.js';
 import { buildProspectWhere } from '../../common/prospect-where.js';
 import { listerDetections, type DeviceCallDetectionListDto } from '../../common/device-call.js';
+import { dureesDeTraitement } from '../ouvertures/ouvertures.service.js';
 import { ProspectSortField, SortOrder } from '../../common/dto/prospect-filter.dto.js';
 import type { ProspectQueryDto } from '../../common/dto/prospect-filter.dto.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
@@ -377,6 +378,7 @@ export class ProspectsService {
       },
       orderBy: [{ clientCreatedAt: 'desc' }, { id: 'desc' }],
     });
+    const durees = await dureesDeTraitement(this.prisma, { prospectId: id });
     return {
       items: rows.map((row) => ({
         id: row.id,
@@ -395,6 +397,7 @@ export class ProspectsService {
         performedById: row.performedById,
         performedByName: row.performedBy.fullName,
         clientCreatedAt: row.clientCreatedAt.toISOString(),
+        dureeTraitementSecondes: durees.get(row.id) ?? null,
       })),
     };
   }
