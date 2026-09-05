@@ -35,6 +35,7 @@ import 'package:crm_api_client/src/model/update_grand_public_consent_dto.dart';
 import 'package:crm_api_client/src/model/update_prospect_dto.dart';
 
 class ProspectsApi {
+
   final Dio _dio;
 
   const ProspectsApi(this._dio);
@@ -43,8 +44,8 @@ class ProspectsApi {
   /// Écrit la banque, le syndicat ET la ligne de &#x60;SegmentChange&#x60; dans la MÊME transaction. Le segment n’étant pas stocké, c’est le seul chemin qui laisse une trace de la conversion : la modification ordinaire écrirait les deux clés sans que rien ne distingue ensuite une fiche convertie d’une fiche née là.
   ///
   /// Parameters:
-  /// * [id]
-  /// * [changeProspectSegmentDto]
+  /// * [id] 
+  /// * [changeProspectSegmentDto] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -54,7 +55,7 @@ class ProspectsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [ProspectDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<ProspectDto>> changeProspectSegment({
+  Future<Response<ProspectDto>> changeProspectSegment({ 
     required String id,
     required ChangeProspectSegmentDto changeProspectSegmentDto,
     CancelToken? cancelToken,
@@ -64,18 +65,19 @@ class ProspectsApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/prospects/{id}/segment'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
+    final _path = r'/api/v1/prospects/{id}/segment'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'PATCH',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -87,9 +89,13 @@ class ProspectsApi {
 
     try {
       _bodyData = jsonEncode(changeProspectSegmentDto);
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -108,14 +114,9 @@ class ProspectsApi {
     ProspectDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<ProspectDto, ProspectDto>(
-              rawData,
-              'ProspectDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<ProspectDto, ProspectDto>(rawData, 'ProspectDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -139,11 +140,11 @@ class ProspectsApi {
   }
 
   /// Confirme une vente ou adhésion Grand Public.
-  ///
+  /// 
   ///
   /// Parameters:
-  /// * [id]
-  /// * [confirmGrandPublicConversionDto]
+  /// * [id] 
+  /// * [confirmGrandPublicConversionDto] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -153,7 +154,7 @@ class ProspectsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [ProspectDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<ProspectDto>> confirmGrandPublicConversion({
+  Future<Response<ProspectDto>> confirmGrandPublicConversion({ 
     required String id,
     required ConfirmGrandPublicConversionDto confirmGrandPublicConversionDto,
     CancelToken? cancelToken,
@@ -163,19 +164,19 @@ class ProspectsApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/prospects/{id}/parcours/grand-public/conversion'
-        .replaceAll(
-          '{'
-          r'id'
-          '}',
-          id.toString(),
-        );
+    final _path = r'/api/v1/prospects/{id}/parcours/grand-public/conversion'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -187,9 +188,13 @@ class ProspectsApi {
 
     try {
       _bodyData = jsonEncode(confirmGrandPublicConversionDto);
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -208,14 +213,9 @@ class ProspectsApi {
     ProspectDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<ProspectDto, ProspectDto>(
-              rawData,
-              'ProspectDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<ProspectDto, ProspectDto>(rawData, 'ProspectDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -239,10 +239,10 @@ class ProspectsApi {
   }
 
   /// Enregistre un prospect.
-  ///
+  /// 
   ///
   /// Parameters:
-  /// * [createProspectDto]
+  /// * [createProspectDto] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -252,7 +252,7 @@ class ProspectsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [ProspectDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<ProspectDto>> createProspect({
+  Future<Response<ProspectDto>> createProspect({ 
     required CreateProspectDto createProspectDto,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -264,10 +264,16 @@ class ProspectsApi {
     final _path = r'/api/v1/prospects';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -279,9 +285,13 @@ class ProspectsApi {
 
     try {
       _bodyData = jsonEncode(createProspectDto);
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -300,14 +310,9 @@ class ProspectsApi {
     ProspectDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<ProspectDto, ProspectDto>(
-              rawData,
-              'ProspectDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<ProspectDto, ProspectDto>(rawData, 'ProspectDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -331,10 +336,10 @@ class ProspectsApi {
   }
 
   /// Supprime logiquement un prospect ; le numéro redevient ressaisissable.
-  ///
+  /// 
   ///
   /// Parameters:
-  /// * [id]
+  /// * [id] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -344,7 +349,7 @@ class ProspectsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [OkDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<OkDto>> deleteProspect({
+  Future<Response<OkDto>> deleteProspect({ 
     required String id,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -353,18 +358,19 @@ class ProspectsApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/prospects/{id}'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
+    final _path = r'/api/v1/prospects/{id}'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'DELETE',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -382,10 +388,9 @@ class ProspectsApi {
     OkDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<OkDto, OkDto>(rawData, 'OkDto', growable: true);
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<OkDto, OkDto>(rawData, 'OkDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -409,10 +414,10 @@ class ProspectsApi {
   }
 
   /// Détail d’un prospect.
-  ///
+  /// 
   ///
   /// Parameters:
-  /// * [id]
+  /// * [id] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -422,7 +427,7 @@ class ProspectsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [ProspectDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<ProspectDto>> getProspect({
+  Future<Response<ProspectDto>> getProspect({ 
     required String id,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -431,18 +436,19 @@ class ProspectsApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/prospects/{id}'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
+    final _path = r'/api/v1/prospects/{id}'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -460,14 +466,9 @@ class ProspectsApi {
     ProspectDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<ProspectDto, ProspectDto>(
-              rawData,
-              'ProspectDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<ProspectDto, ProspectDto>(rawData, 'ProspectDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -491,10 +492,10 @@ class ProspectsApi {
   }
 
   /// Les tentatives d’appel consignées sur une fiche, de la plus récente à la plus ancienne.
-  ///
+  /// 
   ///
   /// Parameters:
-  /// * [id]
+  /// * [id] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -504,7 +505,7 @@ class ProspectsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [ProspectCallAttemptListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<ProspectCallAttemptListDto>> listProspectCallAttempts({
+  Future<Response<ProspectCallAttemptListDto>> listProspectCallAttempts({ 
     required String id,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -513,18 +514,19 @@ class ProspectsApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/prospects/{id}/call-attempts'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
+    final _path = r'/api/v1/prospects/{id}/call-attempts'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -542,14 +544,9 @@ class ProspectsApi {
     ProspectCallAttemptListDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<ProspectCallAttemptListDto, ProspectCallAttemptListDto>(
-              rawData,
-              'ProspectCallAttemptListDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<ProspectCallAttemptListDto, ProspectCallAttemptListDto>(rawData, 'ProspectCallAttemptListDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -576,7 +573,7 @@ class ProspectsApi {
   /// Une détection sans &#x60;attemptId&#x60; est un appel que personne n’a consigné : c’est elle qui alimente l’alerte de supervision.
   ///
   /// Parameters:
-  /// * [id]
+  /// * [id] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -586,7 +583,7 @@ class ProspectsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [DeviceCallDetectionListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<DeviceCallDetectionListDto>> listProspectDeviceCalls({
+  Future<Response<DeviceCallDetectionListDto>> listProspectDeviceCalls({ 
     required String id,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -595,18 +592,19 @@ class ProspectsApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/prospects/{id}/device-calls'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
+    final _path = r'/api/v1/prospects/{id}/device-calls'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -624,14 +622,9 @@ class ProspectsApi {
     DeviceCallDetectionListDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<DeviceCallDetectionListDto, DeviceCallDetectionListDto>(
-              rawData,
-              'DeviceCallDetectionListDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<DeviceCallDetectionListDto, DeviceCallDetectionListDto>(rawData, 'DeviceCallDetectionListDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -655,10 +648,10 @@ class ProspectsApi {
   }
 
   /// Bascules de segment déjà subies par une fiche, de la plus récente à la plus ancienne.
-  ///
+  /// 
   ///
   /// Parameters:
-  /// * [id]
+  /// * [id] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -668,7 +661,7 @@ class ProspectsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [SegmentChangeListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<SegmentChangeListDto>> listProspectSegmentChanges({
+  Future<Response<SegmentChangeListDto>> listProspectSegmentChanges({ 
     required String id,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -677,18 +670,19 @@ class ProspectsApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/prospects/{id}/segment-history'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
+    final _path = r'/api/v1/prospects/{id}/segment-history'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -706,14 +700,9 @@ class ProspectsApi {
     SegmentChangeListDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<SegmentChangeListDto, SegmentChangeListDto>(
-              rawData,
-              'SegmentChangeListDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<SegmentChangeListDto, SegmentChangeListDto>(rawData, 'SegmentChangeListDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -741,15 +730,15 @@ class ProspectsApi {
   ///
   /// Parameters:
   /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
-  /// * [representantId]
-  /// * [banqueId]
-  /// * [syndicatId]
-  /// * [departementId]
+  /// * [representantId] 
+  /// * [banqueId] 
+  /// * [syndicatId] 
+  /// * [departementId] 
   /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
   /// * [projet] - Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.
   /// * [type] - Grand Public : fonctionnaire, secteur privé, informel, diaspora.
   /// * [canalProvenanceId] - Grand Public : canal de provenance.
-  /// * [statut]
+  /// * [statut] 
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
@@ -760,10 +749,10 @@ class ProspectsApi {
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
-  /// * [page]
-  /// * [pageSize]
-  /// * [sortBy]
-  /// * [sortOrder]
+  /// * [page] 
+  /// * [pageSize] 
+  /// * [sortBy] 
+  /// * [sortOrder] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -773,7 +762,7 @@ class ProspectsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [ProspectListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<ProspectListDto>> listProspects({
+  Future<Response<ProspectListDto>> listProspects({ 
     String? search,
     String? representantId,
     String? banqueId,
@@ -808,10 +797,16 @@ class ProspectsApi {
     final _path = r'/api/v1/prospects';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -834,8 +829,7 @@ class ProspectsApi {
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (appelePar != null) r'appelePar': appelePar,
       if (lastCallById != null) r'lastCallById': lastCallById,
-      if (enrollmentCapturedById != null)
-        r'enrollmentCapturedById': enrollmentCapturedById,
+      if (enrollmentCapturedById != null) r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
@@ -858,14 +852,9 @@ class ProspectsApi {
     ProspectListDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<ProspectListDto, ProspectListDto>(
-              rawData,
-              'ProspectListDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<ProspectListDto, ProspectListDto>(rawData, 'ProspectListDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -889,10 +878,10 @@ class ProspectsApi {
   }
 
   /// Fusionne deux fiches désignant la même personne.
-  ///
+  /// 
   ///
   /// Parameters:
-  /// * [mergeProspectsDto]
+  /// * [mergeProspectsDto] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -902,7 +891,7 @@ class ProspectsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [ProspectDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<ProspectDto>> mergeProspects({
+  Future<Response<ProspectDto>> mergeProspects({ 
     required MergeProspectsDto mergeProspectsDto,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -914,10 +903,16 @@ class ProspectsApi {
     final _path = r'/api/v1/prospects/merge';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -929,9 +924,13 @@ class ProspectsApi {
 
     try {
       _bodyData = jsonEncode(mergeProspectsDto);
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -950,14 +949,9 @@ class ProspectsApi {
     ProspectDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<ProspectDto, ProspectDto>(
-              rawData,
-              'ProspectDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<ProspectDto, ProspectDto>(rawData, 'ProspectDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -981,10 +975,10 @@ class ProspectsApi {
   }
 
   /// Rattache des prospects à un autre représentant, ou à un autre commercial (ADMIN).
-  ///
+  /// 
   ///
   /// Parameters:
-  /// * [reassignProspectsDto]
+  /// * [reassignProspectsDto] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -994,7 +988,7 @@ class ProspectsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [ReassignResultDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<ReassignResultDto>> reassignProspects({
+  Future<Response<ReassignResultDto>> reassignProspects({ 
     required ReassignProspectsDto reassignProspectsDto,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -1006,10 +1000,16 @@ class ProspectsApi {
     final _path = r'/api/v1/prospects/reassign';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -1021,9 +1021,13 @@ class ProspectsApi {
 
     try {
       _bodyData = jsonEncode(reassignProspectsDto);
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -1042,14 +1046,9 @@ class ProspectsApi {
     ReassignResultDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<ReassignResultDto, ReassignResultDto>(
-              rawData,
-              'ReassignResultDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<ReassignResultDto, ReassignResultDto>(rawData, 'ReassignResultDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1073,11 +1072,11 @@ class ProspectsApi {
   }
 
   /// Trace l’accord ou le refus de poursuivre en Grand Public.
-  ///
+  /// 
   ///
   /// Parameters:
-  /// * [id]
-  /// * [updateGrandPublicConsentDto]
+  /// * [id] 
+  /// * [updateGrandPublicConsentDto] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -1087,7 +1086,7 @@ class ProspectsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [ProspectDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<ProspectDto>> updateGrandPublicConsent({
+  Future<Response<ProspectDto>> updateGrandPublicConsent({ 
     required String id,
     required UpdateGrandPublicConsentDto updateGrandPublicConsentDto,
     CancelToken? cancelToken,
@@ -1097,19 +1096,19 @@ class ProspectsApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/prospects/{id}/parcours/grand-public/consentement'
-        .replaceAll(
-          '{'
-          r'id'
-          '}',
-          id.toString(),
-        );
+    final _path = r'/api/v1/prospects/{id}/parcours/grand-public/consentement'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'PATCH',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -1121,9 +1120,13 @@ class ProspectsApi {
 
     try {
       _bodyData = jsonEncode(updateGrandPublicConsentDto);
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -1142,14 +1145,9 @@ class ProspectsApi {
     ProspectDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<ProspectDto, ProspectDto>(
-              rawData,
-              'ProspectDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<ProspectDto, ProspectDto>(rawData, 'ProspectDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1173,11 +1171,11 @@ class ProspectsApi {
   }
 
   /// Modifie un prospect.
-  ///
+  /// 
   ///
   /// Parameters:
-  /// * [id]
-  /// * [updateProspectDto]
+  /// * [id] 
+  /// * [updateProspectDto] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -1187,7 +1185,7 @@ class ProspectsApi {
   ///
   /// Returns a [Future] containing a [Response] with a [ProspectDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<ProspectDto>> updateProspect({
+  Future<Response<ProspectDto>> updateProspect({ 
     required String id,
     required UpdateProspectDto updateProspectDto,
     CancelToken? cancelToken,
@@ -1197,18 +1195,19 @@ class ProspectsApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/prospects/{id}'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
+    final _path = r'/api/v1/prospects/{id}'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'PATCH',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -1220,9 +1219,13 @@ class ProspectsApi {
 
     try {
       _bodyData = jsonEncode(updateProspectDto);
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -1241,14 +1244,9 @@ class ProspectsApi {
     ProspectDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<ProspectDto, ProspectDto>(
-              rawData,
-              'ProspectDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<ProspectDto, ProspectDto>(rawData, 'ProspectDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1270,4 +1268,5 @@ class ProspectsApi {
       extra: _response.extra,
     );
   }
+
 }

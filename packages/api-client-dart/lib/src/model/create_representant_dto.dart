@@ -9,6 +9,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'create_representant_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,92 +20,174 @@ part 'create_representant_dto.g.dart';
 class CreateRepresentantDto {
   /// Returns a new [CreateRepresentantDto] instance.
   CreateRepresentantDto({
-    this.id,
 
-    required this.fullName,
+     this.id,
 
-    this.prenom,
+    required  this.fullName,
 
-    this.etablissement,
+     this.prenom,
 
-    required this.phone,
+     this.etablissement,
 
-    required this.departementId,
+    required  this.phone,
 
-    this.iefId,
+    required  this.departementId,
 
-    this.notes,
+     this.iefId,
 
-    this.clientCreatedAt,
+     this.notes,
+
+     this.clientCreatedAt,
   });
 
-  /// Identifiant UUID v7 généré par le client. Fourni par le mobile pour que les prospects saisis hors ligne puissent le référencer avant toute synchronisation.
-  @JsonKey(name: r'id', required: false, includeIfNull: false)
+      /// Identifiant UUID v7 généré par le client. Fourni par le mobile pour que les prospects saisis hors ligne puissent le référencer avant toute synchronisation.
+  @JsonKey(
+    
+    name: r'id',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final String? id;
 
-  @JsonKey(name: r'fullName', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'fullName',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String fullName;
 
-  /// Prénom, quand il a été recueilli séparément du nom complet.
-  @JsonKey(name: r'prenom', required: false, includeIfNull: false)
+
+
+      /// Prénom, quand il a été recueilli séparément du nom complet.
+  @JsonKey(
+    
+    name: r'prenom',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final String? prenom;
 
-  /// Établissement où il exerce. Ni l’IEF ni le département.
-  @JsonKey(name: r'etablissement', required: false, includeIfNull: false)
+
+
+      /// Établissement où il exerce. Ni l’IEF ni le département.
+  @JsonKey(
+    
+    name: r'etablissement',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final String? etablissement;
 
-  /// Téléphone en saisie libre. Normalisé en E.164 par le serveur.
-  @JsonKey(name: r'phone', required: true, includeIfNull: false)
+
+
+      /// Téléphone en saisie libre. Normalisé en E.164 par le serveur.
+  @JsonKey(
+    
+    name: r'phone',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String phone;
 
-  @JsonKey(name: r'departementId', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'departementId',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String departementId;
 
-  /// IEF de rattachement. FACULTATIVE : les fiches saisies avant l’arrivée de ce référentiel n’en portent pas, et la rendre obligatoire les invaliderait rétroactivement. Le département reste obligatoire, il se déduit de l’IEF, jamais l’inverse.
-  @JsonKey(name: r'iefId', required: false, includeIfNull: false)
+
+
+      /// IEF de rattachement. FACULTATIVE : les fiches saisies avant l’arrivée de ce référentiel n’en portent pas, et la rendre obligatoire les invaliderait rétroactivement. Le département reste obligatoire, il se déduit de l’IEF, jamais l’inverse.
+  @JsonKey(
+    
+    name: r'iefId',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final String? iefId;
 
-  @JsonKey(name: r'notes', required: false, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'notes',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final String? notes;
 
-  /// Horodatage de la saisie sur le terrain. Défaut : maintenant. Distinct de createdAt, qui est l’arrivée en base.
-  @JsonKey(name: r'clientCreatedAt', required: false, includeIfNull: false)
+
+
+      /// Horodatage de la saisie sur le terrain. Défaut : maintenant. Distinct de createdAt, qui est l’arrivée en base.
+  @JsonKey(
+    
+    name: r'clientCreatedAt',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final DateTime? clientCreatedAt;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is CreateRepresentantDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [
-                id,
-                fullName,
-                prenom,
-                etablissement,
-                phone,
-                departementId,
-                iefId,
-                notes,
-                clientCreatedAt,
-              ],
-              [
-                other.id,
-                other.fullName,
-                other.prenom,
-                other.etablissement,
-                other.phone,
-                other.departementId,
-                other.iefId,
-                other.notes,
-                other.clientCreatedAt,
-              ],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([
+
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is CreateRepresentantDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            id,
+            fullName,
+            prenom,
+            etablissement,
+            phone,
+            departementId,
+            iefId,
+            notes,
+            clientCreatedAt,
+        ],
+        [
+            other.id,
+            other.fullName,
+            other.prenom,
+            other.etablissement,
+            other.phone,
+            other.departementId,
+            other.iefId,
+            other.notes,
+            other.clientCreatedAt,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
         id,
         fullName,
         prenom,
@@ -114,10 +197,9 @@ class CreateRepresentantDto {
         iefId,
         notes,
         clientCreatedAt,
-      ]);
+    ],);
 
-  factory CreateRepresentantDto.fromJson(Map<String, dynamic> json) =>
-      _$CreateRepresentantDtoFromJson(json);
+  factory CreateRepresentantDto.fromJson(Map<String, dynamic> json) => _$CreateRepresentantDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$CreateRepresentantDtoToJson(this);
 
@@ -125,4 +207,6 @@ class CreateRepresentantDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

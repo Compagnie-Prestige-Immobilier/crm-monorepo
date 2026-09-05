@@ -9,6 +9,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'visite_stat_mois_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -18,26 +19,62 @@ part 'visite_stat_mois_dto.g.dart';
 )
 class VisiteStatMoisDto {
   /// Returns a new [VisiteStatMoisDto] instance.
-  VisiteStatMoisDto({required this.month, required this.count});
+  VisiteStatMoisDto({
 
-  @JsonKey(name: r'month', required: true, includeIfNull: false)
+    required  this.month,
+
+    required  this.count,
+  });
+
+  @JsonKey(
+    
+    name: r'month',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String month;
 
-  @JsonKey(name: r'count', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'count',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num count;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is VisiteStatMoisDto &&
-            runtimeType == other.runtimeType &&
-            equals([month, count], [other.month, other.count]);
-  }
 
-  @override
-  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([month, count]);
 
-  factory VisiteStatMoisDto.fromJson(Map<String, dynamic> json) =>
-      _$VisiteStatMoisDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is VisiteStatMoisDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            month,
+            count,
+        ],
+        [
+            other.month,
+            other.count,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        month,
+        count,
+    ],);
+
+  factory VisiteStatMoisDto.fromJson(Map<String, dynamic> json) => _$VisiteStatMoisDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$VisiteStatMoisDtoToJson(this);
 
@@ -45,4 +82,6 @@ class VisiteStatMoisDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

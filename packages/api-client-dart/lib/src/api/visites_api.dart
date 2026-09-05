@@ -32,6 +32,7 @@ import 'package:crm_api_client/src/model/visite_sort_field.dart';
 import 'package:crm_api_client/src/model/visite_stats_dto.dart';
 
 class VisitesApi {
+
   final Dio _dio;
 
   const VisitesApi(this._dio);
@@ -40,7 +41,7 @@ class VisitesApi {
   /// Une correction faite au comptoir depuis la revue n’est jamais écrasée en silence : la ligne concernée est refusée et nommée dans le rapport, les autres s’appliquent quand même.
   ///
   /// Parameters:
-  /// * [id]
+  /// * [id] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -50,7 +51,7 @@ class VisitesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [ImportJobDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<ImportJobDto>> applyVisitesRegistreImport({
+  Future<Response<ImportJobDto>> applyVisitesRegistreImport({ 
     required String id,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -59,18 +60,19 @@ class VisitesApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/visites/import/{id}/apply'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
+    final _path = r'/api/v1/visites/import/{id}/apply'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -88,14 +90,9 @@ class VisitesApi {
     ImportJobDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<ImportJobDto, ImportJobDto>(
-              rawData,
-              'ImportJobDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>(rawData, 'ImportJobDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -122,7 +119,7 @@ class VisitesApi {
   /// La référence est engendrée par le serveur. Le téléphone est facultatif et accepté sous n’importe quelle forme : un numéro que la normalisation ne reconnaît pas est conservé tel quel, avec phoneE164 nul.
   ///
   /// Parameters:
-  /// * [createVisiteDto]
+  /// * [createVisiteDto] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -132,7 +129,7 @@ class VisitesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [VisiteDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<VisiteDto>> createVisite({
+  Future<Response<VisiteDto>> createVisite({ 
     required CreateVisiteDto createVisiteDto,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -144,10 +141,16 @@ class VisitesApi {
     final _path = r'/api/v1/visites';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -159,9 +162,13 @@ class VisitesApi {
 
     try {
       _bodyData = jsonEncode(createVisiteDto);
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -180,14 +187,9 @@ class VisitesApi {
     VisiteDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<VisiteDto, VisiteDto>(
-              rawData,
-              'VisiteDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<VisiteDto, VisiteDto>(rawData, 'VisiteDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -214,8 +216,8 @@ class VisitesApi {
   /// Le code est immuable : les visites déjà enregistrées le désignent.
   ///
   /// Parameters:
-  /// * [kind]
-  /// * [createVisiteReferentielDto]
+  /// * [kind] 
+  /// * [createVisiteReferentielDto] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -225,7 +227,7 @@ class VisitesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [VisiteReferentielDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<VisiteReferentielDto>> createVisiteReferentiel({
+  Future<Response<VisiteReferentielDto>> createVisiteReferentiel({ 
     required VisiteReferentielKind kind,
     required CreateVisiteReferentielDto createVisiteReferentielDto,
     CancelToken? cancelToken,
@@ -235,18 +237,19 @@ class VisitesApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/visites/referentiels/{kind}'.replaceAll(
-      '{'
-      r'kind'
-      '}',
-      kind.toString(),
-    );
+    final _path = r'/api/v1/visites/referentiels/{kind}'.replaceAll('{' r'kind' '}', kind.toString());
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -258,9 +261,13 @@ class VisitesApi {
 
     try {
       _bodyData = jsonEncode(createVisiteReferentielDto);
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -279,14 +286,9 @@ class VisitesApi {
     VisiteReferentielDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<VisiteReferentielDto, VisiteReferentielDto>(
-              rawData,
-              'VisiteReferentielDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<VisiteReferentielDto, VisiteReferentielDto>(rawData, 'VisiteReferentielDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -313,7 +315,7 @@ class VisitesApi {
   /// NE BLOQUE PAS : le classeur est écrit sur le volume, un travail &#x60;queued&#x60; est inscrit en &#x60;DRY_RUN&#x60;, et la réponse part. Le travail court en arrière-plan et détecte les différences ligne par ligne ; l’écran les lit par &#x60;GET /visites/import/{id}/revue&#x60;. Une ligne sans &#x60;N° REGISTRE&#x60; est une création ; un numéro renseigné et inconnu est refusé.
   ///
   /// Parameters:
-  /// * [file]
+  /// * [file] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -323,7 +325,7 @@ class VisitesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [ImportJobDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<ImportJobDto>> createVisitesRegistreImport({
+  Future<Response<ImportJobDto>> createVisitesRegistreImport({ 
     required MultipartFile file,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -335,10 +337,16 @@ class VisitesApi {
     final _path = r'/api/v1/visites/import';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -349,10 +357,16 @@ class VisitesApi {
     dynamic _bodyData;
 
     try {
-      _bodyData = FormData.fromMap(<String, dynamic>{r'file': file});
-    } catch (error, stackTrace) {
+      _bodyData = FormData.fromMap(<String, dynamic>{
+        r'file': file,
+      });
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -371,14 +385,9 @@ class VisitesApi {
     ImportJobDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<ImportJobDto, ImportJobDto>(
-              rawData,
-              'ImportJobDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>(rawData, 'ImportJobDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -402,10 +411,10 @@ class VisitesApi {
   }
 
   /// Une ligne du registre.
-  ///
+  /// 
   ///
   /// Parameters:
-  /// * [id]
+  /// * [id] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -415,7 +424,7 @@ class VisitesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [VisiteDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<VisiteDto>> getVisite({
+  Future<Response<VisiteDto>> getVisite({ 
     required String id,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -424,18 +433,19 @@ class VisitesApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/visites/{id}'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
+    final _path = r'/api/v1/visites/{id}'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -453,14 +463,9 @@ class VisitesApi {
     VisiteDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<VisiteDto, VisiteDto>(
-              rawData,
-              'VisiteDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<VisiteDto, VisiteDto>(rawData, 'VisiteDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -496,7 +501,7 @@ class VisitesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [VisiteReferentielUsageDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<VisiteReferentielUsageDto>> getVisiteReferentielUsage({
+  Future<Response<VisiteReferentielUsageDto>> getVisiteReferentielUsage({ 
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -507,10 +512,16 @@ class VisitesApi {
     final _path = r'/api/v1/visites/referentiels/usage';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -528,14 +539,9 @@ class VisitesApi {
     VisiteReferentielUsageDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<VisiteReferentielUsageDto, VisiteReferentielUsageDto>(
-              rawData,
-              'VisiteReferentielUsageDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<VisiteReferentielUsageDto, VisiteReferentielUsageDto>(rawData, 'VisiteReferentielUsageDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -573,7 +579,7 @@ class VisitesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [VisiteStatsDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<VisiteStatsDto>> getVisiteStats({
+  Future<Response<VisiteStatsDto>> getVisiteStats({ 
     required String from,
     required String to,
     CancelToken? cancelToken,
@@ -586,17 +592,26 @@ class VisitesApi {
     final _path = r'/api/v1/visites/statistiques';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
       validateStatus: validateStatus,
     );
 
-    final _queryParameters = <String, dynamic>{r'from': from, r'to': to};
+    final _queryParameters = <String, dynamic>{
+      r'from': from,
+      r'to': to,
+    };
 
     final _response = await _dio.request<Object>(
       _path,
@@ -610,14 +625,9 @@ class VisitesApi {
     VisiteStatsDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<VisiteStatsDto, VisiteStatsDto>(
-              rawData,
-              'VisiteStatsDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<VisiteStatsDto, VisiteStatsDto>(rawData, 'VisiteStatsDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -641,10 +651,10 @@ class VisitesApi {
   }
 
   /// État du travail, et son rapport quand il est terminé.
-  ///
+  /// 
   ///
   /// Parameters:
-  /// * [id]
+  /// * [id] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -654,7 +664,7 @@ class VisitesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [ImportJobDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<ImportJobDto>> getVisitesRegistreImport({
+  Future<Response<ImportJobDto>> getVisitesRegistreImport({ 
     required String id,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -663,18 +673,19 @@ class VisitesApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/visites/import/{id}'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
+    final _path = r'/api/v1/visites/import/{id}'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -692,14 +703,9 @@ class VisitesApi {
     ImportJobDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<ImportJobDto, ImportJobDto>(
-              rawData,
-              'ImportJobDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<ImportJobDto, ImportJobDto>(rawData, 'ImportJobDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -726,9 +732,9 @@ class VisitesApi {
   /// Une ligne par différence : &#x60;CREATE&#x60; pour une ligne sans numéro, &#x60;UPDATE&#x60; pour un numéro dont le contenu diverge. Les lignes identiques ne sont pas écrites, elles ne figurent pas ici.
   ///
   /// Parameters:
-  /// * [id]
-  /// * [page]
-  /// * [pageSize]
+  /// * [id] 
+  /// * [page] 
+  /// * [pageSize] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -738,7 +744,7 @@ class VisitesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [VisiteImportChangeListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<VisiteImportChangeListDto>> getVisitesRegistreImportRevue({
+  Future<Response<VisiteImportChangeListDto>> getVisitesRegistreImportRevue({ 
     required String id,
     num? page = 1,
     num? pageSize = 50,
@@ -749,18 +755,19 @@ class VisitesApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/visites/import/{id}/revue'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
+    final _path = r'/api/v1/visites/import/{id}/revue'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -784,14 +791,9 @@ class VisitesApi {
     VisiteImportChangeListDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<VisiteImportChangeListDto, VisiteImportChangeListDto>(
-              rawData,
-              'VisiteImportChangeListDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<VisiteImportChangeListDto, VisiteImportChangeListDto>(rawData, 'VisiteImportChangeListDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -815,11 +817,11 @@ class VisitesApi {
   }
 
   /// Une liste, entrées retirées comprises.
-  ///
+  /// 
   ///
   /// Parameters:
-  /// * [kind]
-  /// * [activeOnly]
+  /// * [kind] 
+  /// * [activeOnly] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -829,7 +831,7 @@ class VisitesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [VisiteReferentielListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<VisiteReferentielListDto>> listVisiteReferentiel({
+  Future<Response<VisiteReferentielListDto>> listVisiteReferentiel({ 
     required VisiteReferentielKind kind,
     bool? activeOnly = true,
     CancelToken? cancelToken,
@@ -839,18 +841,19 @@ class VisitesApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/visites/referentiels/{kind}'.replaceAll(
-      '{'
-      r'kind'
-      '}',
-      kind.toString(),
-    );
+    final _path = r'/api/v1/visites/referentiels/{kind}'.replaceAll('{' r'kind' '}', kind.toString());
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -873,14 +876,9 @@ class VisitesApi {
     VisiteReferentielListDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<VisiteReferentielListDto, VisiteReferentielListDto>(
-              rawData,
-              'VisiteReferentielListDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<VisiteReferentielListDto, VisiteReferentielListDto>(rawData, 'VisiteReferentielListDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -904,10 +902,10 @@ class VisitesApi {
   }
 
   /// Les quatre listes de l’accueil, en un appel.
-  ///
+  /// 
   ///
   /// Parameters:
-  /// * [activeOnly]
+  /// * [activeOnly] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -917,7 +915,7 @@ class VisitesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [VisiteReferentielsBundleDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<VisiteReferentielsBundleDto>> listVisiteReferentiels({
+  Future<Response<VisiteReferentielsBundleDto>> listVisiteReferentiels({ 
     bool? activeOnly = true,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -929,10 +927,16 @@ class VisitesApi {
     final _path = r'/api/v1/visites/referentiels';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -955,13 +959,9 @@ class VisitesApi {
     VisiteReferentielsBundleDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<
-              VisiteReferentielsBundleDto,
-              VisiteReferentielsBundleDto
-            >(rawData, 'VisiteReferentielsBundleDto', growable: true);
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<VisiteReferentielsBundleDto, VisiteReferentielsBundleDto>(rawData, 'VisiteReferentielsBundleDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -985,20 +985,20 @@ class VisitesApi {
   }
 
   /// Le registre, du plus récent au plus ancien.
-  ///
+  /// 
   ///
   /// Parameters:
-  /// * [from]
-  /// * [to]
-  /// * [entrepriseId]
-  /// * [directionId]
-  /// * [destinataireId]
-  /// * [objetId]
+  /// * [from] 
+  /// * [to] 
+  /// * [entrepriseId] 
+  /// * [directionId] 
+  /// * [destinataireId] 
+  /// * [objetId] 
   /// * [search] - Nom du visiteur, ou référence du registre.
-  /// * [page]
-  /// * [pageSize]
-  /// * [sortBy]
-  /// * [sortOrder]
+  /// * [page] 
+  /// * [pageSize] 
+  /// * [sortBy] 
+  /// * [sortOrder] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -1008,7 +1008,7 @@ class VisitesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [VisiteListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<VisiteListDto>> listVisites({
+  Future<Response<VisiteListDto>> listVisites({ 
     String? from,
     String? to,
     String? entrepriseId,
@@ -1030,10 +1030,16 @@ class VisitesApi {
     final _path = r'/api/v1/visites';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -1066,14 +1072,9 @@ class VisitesApi {
     VisiteListDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<VisiteListDto, VisiteListDto>(
-              rawData,
-              'VisiteListDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<VisiteListDto, VisiteListDto>(rawData, 'VisiteListDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1097,11 +1098,11 @@ class VisitesApi {
   }
 
   /// Fixe l’ordre d’affichage d’une liste.
-  ///
+  /// 
   ///
   /// Parameters:
-  /// * [kind]
-  /// * [reorderVisiteReferentielDto]
+  /// * [kind] 
+  /// * [reorderVisiteReferentielDto] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -1111,7 +1112,7 @@ class VisitesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [VisiteReferentielListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<VisiteReferentielListDto>> reorderVisiteReferentiel({
+  Future<Response<VisiteReferentielListDto>> reorderVisiteReferentiel({ 
     required VisiteReferentielKind kind,
     required ReorderVisiteReferentielDto reorderVisiteReferentielDto,
     CancelToken? cancelToken,
@@ -1121,18 +1122,19 @@ class VisitesApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/visites/referentiels/{kind}/reorder'.replaceAll(
-      '{'
-      r'kind'
-      '}',
-      kind.toString(),
-    );
+    final _path = r'/api/v1/visites/referentiels/{kind}/reorder'.replaceAll('{' r'kind' '}', kind.toString());
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -1144,9 +1146,13 @@ class VisitesApi {
 
     try {
       _bodyData = jsonEncode(reorderVisiteReferentielDto);
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -1165,14 +1171,9 @@ class VisitesApi {
     VisiteReferentielListDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<VisiteReferentielListDto, VisiteReferentielListDto>(
-              rawData,
-              'VisiteReferentielListDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<VisiteReferentielListDto, VisiteReferentielListDto>(rawData, 'VisiteReferentielListDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1199,9 +1200,9 @@ class VisitesApi {
   /// Jamais de suppression : le registre des années passées continue de désigner l’entrée.
   ///
   /// Parameters:
-  /// * [kind]
-  /// * [id]
-  /// * [setVisiteReferentielActiveDto]
+  /// * [kind] 
+  /// * [id] 
+  /// * [setVisiteReferentielActiveDto] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -1211,7 +1212,7 @@ class VisitesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [VisiteReferentielDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<VisiteReferentielDto>> setVisiteReferentielActive({
+  Future<Response<VisiteReferentielDto>> setVisiteReferentielActive({ 
     required VisiteReferentielKind kind,
     required String id,
     required SetVisiteReferentielActiveDto setVisiteReferentielActiveDto,
@@ -1222,25 +1223,19 @@ class VisitesApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/visites/referentiels/{kind}/{id}/active'
-        .replaceAll(
-          '{'
-          r'kind'
-          '}',
-          kind.toString(),
-        )
-        .replaceAll(
-          '{'
-          r'id'
-          '}',
-          id.toString(),
-        );
+    final _path = r'/api/v1/visites/referentiels/{kind}/{id}/active'.replaceAll('{' r'kind' '}', kind.toString()).replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -1252,9 +1247,13 @@ class VisitesApi {
 
     try {
       _bodyData = jsonEncode(setVisiteReferentielActiveDto);
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -1273,14 +1272,9 @@ class VisitesApi {
     VisiteReferentielDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<VisiteReferentielDto, VisiteReferentielDto>(
-              rawData,
-              'VisiteReferentielDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<VisiteReferentielDto, VisiteReferentielDto>(rawData, 'VisiteReferentielDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1307,8 +1301,8 @@ class VisitesApi {
   /// Coché par défaut à la détection : la directrice a exporté, corrigé et redéposé, son intention est d’appliquer. Cette route sert à RETIRER ce qu’elle ne veut pas.
   ///
   /// Parameters:
-  /// * [id]
-  /// * [setVisiteImportChangeSelectionDto]
+  /// * [id] 
+  /// * [setVisiteImportChangeSelectionDto] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -1318,10 +1312,9 @@ class VisitesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [OkDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<OkDto>> setVisitesRegistreImportSelection({
+  Future<Response<OkDto>> setVisitesRegistreImportSelection({ 
     required String id,
-    required SetVisiteImportChangeSelectionDto
-    setVisiteImportChangeSelectionDto,
+    required SetVisiteImportChangeSelectionDto setVisiteImportChangeSelectionDto,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -1329,18 +1322,19 @@ class VisitesApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/visites/import/{id}/revue'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
+    final _path = r'/api/v1/visites/import/{id}/revue'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'PATCH',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -1352,9 +1346,13 @@ class VisitesApi {
 
     try {
       _bodyData = jsonEncode(setVisiteImportChangeSelectionDto);
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -1373,10 +1371,9 @@ class VisitesApi {
     OkDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<OkDto, OkDto>(rawData, 'OkDto', growable: true);
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<OkDto, OkDto>(rawData, 'OkDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1403,8 +1400,8 @@ class VisitesApi {
   /// Ni la date ni la référence : elles fixent la ligne dans le registre.
   ///
   /// Parameters:
-  /// * [id]
-  /// * [updateVisiteDto]
+  /// * [id] 
+  /// * [updateVisiteDto] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -1414,7 +1411,7 @@ class VisitesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [VisiteDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<VisiteDto>> updateVisite({
+  Future<Response<VisiteDto>> updateVisite({ 
     required String id,
     required UpdateVisiteDto updateVisiteDto,
     CancelToken? cancelToken,
@@ -1424,18 +1421,19 @@ class VisitesApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/visites/{id}'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
+    final _path = r'/api/v1/visites/{id}'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'PATCH',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -1447,9 +1445,13 @@ class VisitesApi {
 
     try {
       _bodyData = jsonEncode(updateVisiteDto);
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -1468,14 +1470,9 @@ class VisitesApi {
     VisiteDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<VisiteDto, VisiteDto>(
-              rawData,
-              'VisiteDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<VisiteDto, VisiteDto>(rawData, 'VisiteDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1499,12 +1496,12 @@ class VisitesApi {
   }
 
   /// Renomme ou déplace une entrée.
-  ///
+  /// 
   ///
   /// Parameters:
-  /// * [kind]
-  /// * [id]
-  /// * [updateVisiteReferentielDto]
+  /// * [kind] 
+  /// * [id] 
+  /// * [updateVisiteReferentielDto] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -1514,7 +1511,7 @@ class VisitesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [VisiteReferentielDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<VisiteReferentielDto>> updateVisiteReferentiel({
+  Future<Response<VisiteReferentielDto>> updateVisiteReferentiel({ 
     required VisiteReferentielKind kind,
     required String id,
     required UpdateVisiteReferentielDto updateVisiteReferentielDto,
@@ -1525,25 +1522,19 @@ class VisitesApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/visites/referentiels/{kind}/{id}'
-        .replaceAll(
-          '{'
-          r'kind'
-          '}',
-          kind.toString(),
-        )
-        .replaceAll(
-          '{'
-          r'id'
-          '}',
-          id.toString(),
-        );
+    final _path = r'/api/v1/visites/referentiels/{kind}/{id}'.replaceAll('{' r'kind' '}', kind.toString()).replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'PATCH',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -1555,9 +1546,13 @@ class VisitesApi {
 
     try {
       _bodyData = jsonEncode(updateVisiteReferentielDto);
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -1576,14 +1571,9 @@ class VisitesApi {
     VisiteReferentielDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<VisiteReferentielDto, VisiteReferentielDto>(
-              rawData,
-              'VisiteReferentielDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<VisiteReferentielDto, VisiteReferentielDto>(rawData, 'VisiteReferentielDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -1605,4 +1595,5 @@ class VisitesApi {
       extra: _response.extra,
     );
   }
+
 }

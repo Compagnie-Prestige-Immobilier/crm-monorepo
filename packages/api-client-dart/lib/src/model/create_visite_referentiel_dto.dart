@@ -9,6 +9,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'create_visite_referentiel_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,19 +20,38 @@ part 'create_visite_referentiel_dto.g.dart';
 class CreateVisiteReferentielDto {
   /// Returns a new [CreateVisiteReferentielDto] instance.
   CreateVisiteReferentielDto({
-    required this.code,
 
-    required this.label,
+    required  this.code,
 
-    this.sortOrder = 100,
+    required  this.label,
+
+     this.sortOrder = 100,
   });
 
-  /// Majuscules, chiffres et tirets bas. Immuable une fois créé.
-  @JsonKey(name: r'code', required: true, includeIfNull: false)
+      /// Majuscules, chiffres et tirets bas. Immuable une fois créé.
+  @JsonKey(
+    
+    name: r'code',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String code;
 
-  @JsonKey(name: r'label', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'label',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String label;
+
+
 
   @JsonKey(
     defaultValue: 100,
@@ -39,24 +59,40 @@ class CreateVisiteReferentielDto {
     required: false,
     includeIfNull: false,
   )
+
+
   final num? sortOrder;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is CreateVisiteReferentielDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [code, label, sortOrder],
-              [other.code, other.label, other.sortOrder],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^ mapPropsToHashCode([code, label, sortOrder]);
 
-  factory CreateVisiteReferentielDto.fromJson(Map<String, dynamic> json) =>
-      _$CreateVisiteReferentielDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is CreateVisiteReferentielDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            code,
+            label,
+            sortOrder,
+        ],
+        [
+            other.code,
+            other.label,
+            other.sortOrder,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        code,
+        label,
+        sortOrder,
+    ],);
+
+  factory CreateVisiteReferentielDto.fromJson(Map<String, dynamic> json) => _$CreateVisiteReferentielDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$CreateVisiteReferentielDtoToJson(this);
 
@@ -64,4 +100,6 @@ class CreateVisiteReferentielDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

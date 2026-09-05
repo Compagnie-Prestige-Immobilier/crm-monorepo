@@ -9,6 +9,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'create_profession_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,22 +20,41 @@ part 'create_profession_dto.g.dart';
 class CreateProfessionDto {
   /// Returns a new [CreateProfessionDto] instance.
   CreateProfessionDto({
-    required this.code,
 
-    required this.label,
+    required  this.code,
 
-    this.isTeaching = false,
+    required  this.label,
 
-    this.position,
+     this.isTeaching = false,
 
-    this.isActive = true,
+     this.position,
+
+     this.isActive = true,
   });
 
-  @JsonKey(name: r'code', required: true, includeIfNull: false)
+  @JsonKey(
+    
+    name: r'code',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String code;
 
-  @JsonKey(name: r'label', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'label',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String label;
+
+
 
   @JsonKey(
     defaultValue: false,
@@ -42,12 +62,25 @@ class CreateProfessionDto {
     required: false,
     includeIfNull: false,
   )
+
+
   final bool? isTeaching;
 
-  // minimum: 0
-  // maximum: 9999
-  @JsonKey(name: r'position', required: false, includeIfNull: false)
+
+
+          // minimum: 0
+          // maximum: 9999
+  @JsonKey(
+    
+    name: r'position',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final num? position;
+
+
 
   @JsonKey(
     defaultValue: true,
@@ -55,31 +88,46 @@ class CreateProfessionDto {
     required: false,
     includeIfNull: false,
   )
+
+
   final bool? isActive;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is CreateProfessionDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [code, label, isTeaching, position, isActive],
-              [
-                other.code,
-                other.label,
-                other.isTeaching,
-                other.position,
-                other.isActive,
-              ],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([code, label, isTeaching, position, isActive]);
 
-  factory CreateProfessionDto.fromJson(Map<String, dynamic> json) =>
-      _$CreateProfessionDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is CreateProfessionDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            code,
+            label,
+            isTeaching,
+            position,
+            isActive,
+        ],
+        [
+            other.code,
+            other.label,
+            other.isTeaching,
+            other.position,
+            other.isActive,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        code,
+        label,
+        isTeaching,
+        position,
+        isActive,
+    ],);
+
+  factory CreateProfessionDto.fromJson(Map<String, dynamic> json) => _$CreateProfessionDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$CreateProfessionDtoToJson(this);
 
@@ -87,4 +135,6 @@ class CreateProfessionDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

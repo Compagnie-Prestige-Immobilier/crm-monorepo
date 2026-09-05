@@ -12,12 +12,13 @@ import 'package:dio/dio.dart';
 import 'package:crm_api_client/src/model/demo_workspace_status_dto.dart';
 
 class DemoApi {
+
   final Dio _dio;
 
   const DemoApi(this._dio);
 
   /// État du workspace démo.
-  ///
+  /// 
   ///
   /// Parameters:
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
@@ -29,7 +30,7 @@ class DemoApi {
   ///
   /// Returns a [Future] containing a [Response] with a [DemoWorkspaceStatusDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<DemoWorkspaceStatusDto>> getDemoWorkspaceStatus({
+  Future<Response<DemoWorkspaceStatusDto>> getDemoWorkspaceStatus({ 
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -40,10 +41,16 @@ class DemoApi {
     final _path = r'/api/v1/admin/demo';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -61,14 +68,9 @@ class DemoApi {
     DemoWorkspaceStatusDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<DemoWorkspaceStatusDto, DemoWorkspaceStatusDto>(
-              rawData,
-              'DemoWorkspaceStatusDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<DemoWorkspaceStatusDto, DemoWorkspaceStatusDto>(rawData, 'DemoWorkspaceStatusDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -92,7 +94,7 @@ class DemoApi {
   }
 
   /// Réinitialise le workspace démo.
-  ///
+  /// 
   ///
   /// Parameters:
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
@@ -104,7 +106,7 @@ class DemoApi {
   ///
   /// Returns a [Future] containing a [Response] with a [DemoWorkspaceStatusDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<DemoWorkspaceStatusDto>> resetDemoWorkspace({
+  Future<Response<DemoWorkspaceStatusDto>> resetDemoWorkspace({ 
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -115,10 +117,16 @@ class DemoApi {
     final _path = r'/api/v1/admin/demo/reset';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -136,14 +144,9 @@ class DemoApi {
     DemoWorkspaceStatusDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<DemoWorkspaceStatusDto, DemoWorkspaceStatusDto>(
-              rawData,
-              'DemoWorkspaceStatusDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<DemoWorkspaceStatusDto, DemoWorkspaceStatusDto>(rawData, 'DemoWorkspaceStatusDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -165,4 +168,5 @@ class DemoApi {
       extra: _response.extra,
     );
   }
+
 }

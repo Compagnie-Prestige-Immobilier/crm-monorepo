@@ -5,19 +5,20 @@
 // ignore_for_file: unused_element
 import 'package:json_annotation/json_annotation.dart';
 
+
 enum ImportKind {
-  @JsonValue(r'REPRESENTANTS')
-  REPRESENTANTS(r'REPRESENTANTS'),
-  @JsonValue(r'PROSPECTS')
-  PROSPECTS(r'PROSPECTS'),
-  @JsonValue(r'VISITES')
-  VISITES(r'VISITES'),
-  @JsonValue(r'PROSPECTS_GRAND_PUBLIC')
-  PROSPECTS_GRAND_PUBLIC(r'PROSPECTS_GRAND_PUBLIC'),
-  @JsonValue(r'VISITES_REGISTRE')
-  VISITES_REGISTRE(r'VISITES_REGISTRE'),
-  @JsonValue(r'unknown_default_open_api')
-  unknownDefaultOpenApi(r'unknown_default_open_api');
+      @JsonValue(r'REPRESENTANTS')
+      REPRESENTANTS(r'REPRESENTANTS'),
+      @JsonValue(r'PROSPECTS')
+      PROSPECTS(r'PROSPECTS'),
+      @JsonValue(r'VISITES')
+      VISITES(r'VISITES'),
+      @JsonValue(r'PROSPECTS_GRAND_PUBLIC')
+      PROSPECTS_GRAND_PUBLIC(r'PROSPECTS_GRAND_PUBLIC'),
+      @JsonValue(r'VISITES_REGISTRE')
+      VISITES_REGISTRE(r'VISITES_REGISTRE'),
+      @JsonValue(r'unknown_default_open_api')
+      unknownDefaultOpenApi(r'unknown_default_open_api');
 
   const ImportKind(this.value);
 

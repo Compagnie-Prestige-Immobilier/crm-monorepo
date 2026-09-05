@@ -11,6 +11,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'segment_change_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -21,130 +22,236 @@ part 'segment_change_dto.g.dart';
 class SegmentChangeDto {
   /// Returns a new [SegmentChangeDto] instance.
   SegmentChangeDto({
-    required this.id,
 
-    required this.prospectId,
+    required  this.id,
 
-    required this.fromSegment,
+    required  this.prospectId,
 
-    required this.toSegment,
+    required  this.fromSegment,
 
-    required this.fromBanqueId,
+    required  this.toSegment,
 
-    required this.toBanqueId,
+    required  this.fromBanqueId,
 
-    required this.fromSyndicatId,
+    required  this.toBanqueId,
 
-    required this.toSyndicatId,
+    required  this.fromSyndicatId,
 
-    required this.reason,
+    required  this.toSyndicatId,
 
-    required this.changedById,
+    required  this.reason,
 
-    required this.changedByName,
+    required  this.changedById,
 
-    required this.source_,
+    required  this.changedByName,
 
-    required this.changedAt,
+    required  this.source_,
+
+    required  this.changedAt,
   });
 
-  @JsonKey(name: r'id', required: true, includeIfNull: false)
+  @JsonKey(
+    
+    name: r'id',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String id;
 
-  @JsonKey(name: r'prospectId', required: true, includeIfNull: false)
-  final String prospectId;
+
 
   @JsonKey(
+    
+    name: r'prospectId',
+    required: true,
+    includeIfNull: false,
+  )
+
+
+  final String prospectId;
+
+
+
+  @JsonKey(
+    
     name: r'fromSegment',
     required: true,
     includeIfNull: false,
-    unknownEnumValue: BddSegment.unknownDefaultOpenApi,
+  unknownEnumValue: BddSegment.unknownDefaultOpenApi,
   )
+
+
   final BddSegment fromSegment;
 
+
+
   @JsonKey(
+    
     name: r'toSegment',
     required: true,
     includeIfNull: false,
-    unknownEnumValue: BddSegment.unknownDefaultOpenApi,
+  unknownEnumValue: BddSegment.unknownDefaultOpenApi,
   )
+
+
   final BddSegment toSegment;
 
-  @JsonKey(name: r'fromBanqueId', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'fromBanqueId',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String fromBanqueId;
 
-  @JsonKey(name: r'toBanqueId', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'toBanqueId',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String toBanqueId;
 
-  @JsonKey(name: r'fromSyndicatId', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'fromSyndicatId',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String fromSyndicatId;
 
-  @JsonKey(name: r'toSyndicatId', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'toSyndicatId',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String toSyndicatId;
 
-  @JsonKey(name: r'reason', required: true, includeIfNull: true)
+
+
+  @JsonKey(
+    
+    name: r'reason',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final String? reason;
 
-  @JsonKey(name: r'changedById', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'changedById',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String changedById;
 
-  @JsonKey(name: r'changedByName', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'changedByName',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String changedByName;
 
-  /// Le canal qui a écrit la bascule. Le panel écrit WEB.
+
+
+      /// Le canal qui a écrit la bascule. Le panel écrit WEB.
   @JsonKey(
+    
     name: r'source',
     required: true,
     includeIfNull: false,
-    unknownEnumValue: ChangeSource.unknownDefaultOpenApi,
+  unknownEnumValue: ChangeSource.unknownDefaultOpenApi,
   )
+
+
   final ChangeSource source_;
 
-  @JsonKey(name: r'changedAt', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'changedAt',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final DateTime changedAt;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is SegmentChangeDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [
-                id,
-                prospectId,
-                fromSegment,
-                toSegment,
-                fromBanqueId,
-                toBanqueId,
-                fromSyndicatId,
-                toSyndicatId,
-                reason,
-                changedById,
-                changedByName,
-                source_,
-                changedAt,
-              ],
-              [
-                other.id,
-                other.prospectId,
-                other.fromSegment,
-                other.toSegment,
-                other.fromBanqueId,
-                other.toBanqueId,
-                other.fromSyndicatId,
-                other.toSyndicatId,
-                other.reason,
-                other.changedById,
-                other.changedByName,
-                other.source_,
-                other.changedAt,
-              ],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([
+
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is SegmentChangeDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            id,
+            prospectId,
+            fromSegment,
+            toSegment,
+            fromBanqueId,
+            toBanqueId,
+            fromSyndicatId,
+            toSyndicatId,
+            reason,
+            changedById,
+            changedByName,
+            source_,
+            changedAt,
+        ],
+        [
+            other.id,
+            other.prospectId,
+            other.fromSegment,
+            other.toSegment,
+            other.fromBanqueId,
+            other.toBanqueId,
+            other.fromSyndicatId,
+            other.toSyndicatId,
+            other.reason,
+            other.changedById,
+            other.changedByName,
+            other.source_,
+            other.changedAt,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
         id,
         prospectId,
         fromSegment,
@@ -158,10 +265,9 @@ class SegmentChangeDto {
         changedByName,
         source_,
         changedAt,
-      ]);
+    ],);
 
-  factory SegmentChangeDto.fromJson(Map<String, dynamic> json) =>
-      _$SegmentChangeDtoFromJson(json);
+  factory SegmentChangeDto.fromJson(Map<String, dynamic> json) => _$SegmentChangeDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$SegmentChangeDtoToJson(this);
 
@@ -169,4 +275,6 @@ class SegmentChangeDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

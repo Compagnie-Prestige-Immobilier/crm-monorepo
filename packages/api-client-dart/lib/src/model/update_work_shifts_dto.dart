@@ -9,6 +9,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'update_work_shifts_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,54 +20,95 @@ part 'update_work_shifts_dto.g.dart';
 class UpdateWorkShiftsDto {
   /// Returns a new [UpdateWorkShiftsDto] instance.
   UpdateWorkShiftsDto({
-    required this.morningStart,
 
-    required this.morningEnd,
+    required  this.morningStart,
 
-    required this.afternoonStart,
+    required  this.morningEnd,
 
-    required this.afternoonEnd,
+    required  this.afternoonStart,
+
+    required  this.afternoonEnd,
   });
 
-  @JsonKey(name: r'morningStart', required: true, includeIfNull: false)
+  @JsonKey(
+    
+    name: r'morningStart',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String morningStart;
 
-  @JsonKey(name: r'morningEnd', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'morningEnd',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String morningEnd;
 
-  @JsonKey(name: r'afternoonStart', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'afternoonStart',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String afternoonStart;
 
-  @JsonKey(name: r'afternoonEnd', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'afternoonEnd',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String afternoonEnd;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is UpdateWorkShiftsDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [morningStart, morningEnd, afternoonStart, afternoonEnd],
-              [
-                other.morningStart,
-                other.morningEnd,
-                other.afternoonStart,
-                other.afternoonEnd,
-              ],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([
+
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is UpdateWorkShiftsDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            morningStart,
+            morningEnd,
+            afternoonStart,
+            afternoonEnd,
+        ],
+        [
+            other.morningStart,
+            other.morningEnd,
+            other.afternoonStart,
+            other.afternoonEnd,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
         morningStart,
         morningEnd,
         afternoonStart,
         afternoonEnd,
-      ]);
+    ],);
 
-  factory UpdateWorkShiftsDto.fromJson(Map<String, dynamic> json) =>
-      _$UpdateWorkShiftsDtoFromJson(json);
+  factory UpdateWorkShiftsDto.fromJson(Map<String, dynamic> json) => _$UpdateWorkShiftsDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$UpdateWorkShiftsDtoToJson(this);
 
@@ -74,4 +116,6 @@ class UpdateWorkShiftsDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

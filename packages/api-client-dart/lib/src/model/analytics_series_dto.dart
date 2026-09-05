@@ -10,6 +10,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'analytics_series_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,23 +20,45 @@ part 'analytics_series_dto.g.dart';
 )
 class AnalyticsSeriesDto {
   /// Returns a new [AnalyticsSeriesDto] instance.
-  AnalyticsSeriesDto({required this.buckets});
+  AnalyticsSeriesDto({
 
-  @JsonKey(name: r'buckets', required: true, includeIfNull: false)
+    required  this.buckets,
+  });
+
+  @JsonKey(
+    
+    name: r'buckets',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final List<TimeBucketDto> buckets;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is AnalyticsSeriesDto &&
-            runtimeType == other.runtimeType &&
-            equals([buckets], [other.buckets]);
-  }
 
-  @override
-  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([buckets]);
 
-  factory AnalyticsSeriesDto.fromJson(Map<String, dynamic> json) =>
-      _$AnalyticsSeriesDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is AnalyticsSeriesDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            buckets,
+        ],
+        [
+            other.buckets,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        buckets,
+    ],);
+
+  factory AnalyticsSeriesDto.fromJson(Map<String, dynamic> json) => _$AnalyticsSeriesDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$AnalyticsSeriesDtoToJson(this);
 
@@ -43,4 +66,6 @@ class AnalyticsSeriesDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

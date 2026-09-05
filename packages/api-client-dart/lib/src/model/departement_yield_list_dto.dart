@@ -10,6 +10,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'departement_yield_list_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,28 +20,64 @@ part 'departement_yield_list_dto.g.dart';
 )
 class DepartementYieldListDto {
   /// Returns a new [DepartementYieldListDto] instance.
-  DepartementYieldListDto({required this.items, required this.total});
+  DepartementYieldListDto({
 
-  /// Départements, du plus rentable.
-  @JsonKey(name: r'items', required: true, includeIfNull: false)
+    required  this.items,
+
+    required  this.total,
+  });
+
+      /// Départements, du plus rentable.
+  @JsonKey(
+    
+    name: r'items',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final List<DepartementYieldDto> items;
 
-  /// Prospects tous départements confondus.
-  @JsonKey(name: r'total', required: true, includeIfNull: false)
+
+
+      /// Prospects tous départements confondus.
+  @JsonKey(
+    
+    name: r'total',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num total;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is DepartementYieldListDto &&
-            runtimeType == other.runtimeType &&
-            equals([items, total], [other.items, other.total]);
-  }
 
-  @override
-  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([items, total]);
 
-  factory DepartementYieldListDto.fromJson(Map<String, dynamic> json) =>
-      _$DepartementYieldListDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is DepartementYieldListDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            items,
+            total,
+        ],
+        [
+            other.items,
+            other.total,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        items,
+        total,
+    ],);
+
+  factory DepartementYieldListDto.fromJson(Map<String, dynamic> json) => _$DepartementYieldListDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$DepartementYieldListDtoToJson(this);
 
@@ -48,4 +85,6 @@ class DepartementYieldListDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

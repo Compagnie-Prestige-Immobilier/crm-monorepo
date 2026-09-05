@@ -10,6 +10,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'purge_deletion_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,40 +21,79 @@ part 'purge_deletion_dto.g.dart';
 class PurgeDeletionDto {
   /// Returns a new [PurgeDeletionDto] instance.
   PurgeDeletionDto({
-    required this.key,
 
-    required this.label,
+    required  this.key,
 
-    required this.rows,
+    required  this.label,
+
+    required  this.rows,
   });
 
   @JsonKey(
+    
     name: r'key',
     required: true,
     includeIfNull: false,
-    unknownEnumValue: PurgeDomainKey.unknownDefaultOpenApi,
+  unknownEnumValue: PurgeDomainKey.unknownDefaultOpenApi,
   )
+
+
   final PurgeDomainKey key;
 
-  @JsonKey(name: r'label', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'label',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String label;
 
-  @JsonKey(name: r'rows', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'rows',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num rows;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is PurgeDeletionDto &&
-            runtimeType == other.runtimeType &&
-            equals([key, label, rows], [other.key, other.label, other.rows]);
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^ mapPropsToHashCode([key, label, rows]);
 
-  factory PurgeDeletionDto.fromJson(Map<String, dynamic> json) =>
-      _$PurgeDeletionDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is PurgeDeletionDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            key,
+            label,
+            rows,
+        ],
+        [
+            other.key,
+            other.label,
+            other.rows,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        key,
+        label,
+        rows,
+    ],);
+
+  factory PurgeDeletionDto.fromJson(Map<String, dynamic> json) => _$PurgeDeletionDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$PurgeDeletionDtoToJson(this);
 
@@ -61,4 +101,6 @@ class PurgeDeletionDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

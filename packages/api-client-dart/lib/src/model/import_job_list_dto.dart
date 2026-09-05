@@ -11,6 +11,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'import_job_list_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,26 +21,62 @@ part 'import_job_list_dto.g.dart';
 )
 class ImportJobListDto {
   /// Returns a new [ImportJobListDto] instance.
-  ImportJobListDto({required this.items, required this.meta});
+  ImportJobListDto({
 
-  @JsonKey(name: r'items', required: true, includeIfNull: false)
+    required  this.items,
+
+    required  this.meta,
+  });
+
+  @JsonKey(
+    
+    name: r'items',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final List<ImportJobDto> items;
 
-  @JsonKey(name: r'meta', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'meta',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final PageMetaDto meta;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is ImportJobListDto &&
-            runtimeType == other.runtimeType &&
-            equals([items, meta], [other.items, other.meta]);
-  }
 
-  @override
-  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([items, meta]);
 
-  factory ImportJobListDto.fromJson(Map<String, dynamic> json) =>
-      _$ImportJobListDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is ImportJobListDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            items,
+            meta,
+        ],
+        [
+            other.items,
+            other.meta,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        items,
+        meta,
+    ],);
+
+  factory ImportJobListDto.fromJson(Map<String, dynamic> json) => _$ImportJobListDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$ImportJobListDtoToJson(this);
 
@@ -47,4 +84,6 @@ class ImportJobListDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

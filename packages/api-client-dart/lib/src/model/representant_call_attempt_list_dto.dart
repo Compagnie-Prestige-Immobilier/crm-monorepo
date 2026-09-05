@@ -10,6 +10,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'representant_call_attempt_list_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,24 +20,46 @@ part 'representant_call_attempt_list_dto.g.dart';
 )
 class RepresentantCallAttemptListDto {
   /// Returns a new [RepresentantCallAttemptListDto] instance.
-  RepresentantCallAttemptListDto({required this.items});
+  RepresentantCallAttemptListDto({
 
-  /// Du plus récent au plus ancien.
-  @JsonKey(name: r'items', required: true, includeIfNull: false)
+    required  this.items,
+  });
+
+      /// Du plus récent au plus ancien.
+  @JsonKey(
+    
+    name: r'items',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final List<RepresentantCallAttemptDto> items;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is RepresentantCallAttemptListDto &&
-            runtimeType == other.runtimeType &&
-            equals([items], [other.items]);
-  }
 
-  @override
-  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([items]);
 
-  factory RepresentantCallAttemptListDto.fromJson(Map<String, dynamic> json) =>
-      _$RepresentantCallAttemptListDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is RepresentantCallAttemptListDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            items,
+        ],
+        [
+            other.items,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        items,
+    ],);
+
+  factory RepresentantCallAttemptListDto.fromJson(Map<String, dynamic> json) => _$RepresentantCallAttemptListDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$RepresentantCallAttemptListDtoToJson(this);
 
@@ -44,4 +67,6 @@ class RepresentantCallAttemptListDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

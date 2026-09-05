@@ -9,6 +9,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'update_canal_provenance_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -18,36 +19,82 @@ part 'update_canal_provenance_dto.g.dart';
 )
 class UpdateCanalProvenanceDto {
   /// Returns a new [UpdateCanalProvenanceDto] instance.
-  UpdateCanalProvenanceDto({this.label, this.position, this.isActive});
+  UpdateCanalProvenanceDto({
 
-  @JsonKey(name: r'label', required: false, includeIfNull: false)
+     this.label,
+
+     this.position,
+
+     this.isActive,
+  });
+
+  @JsonKey(
+    
+    name: r'label',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final String? label;
 
-  // minimum: 0
-  // maximum: 9999
-  @JsonKey(name: r'position', required: false, includeIfNull: false)
+
+
+          // minimum: 0
+          // maximum: 9999
+  @JsonKey(
+    
+    name: r'position',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final num? position;
 
-  /// Le retirer des listes, jamais le supprimer.
-  @JsonKey(name: r'isActive', required: false, includeIfNull: false)
+
+
+      /// Le retirer des listes, jamais le supprimer.
+  @JsonKey(
+    
+    name: r'isActive',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final bool? isActive;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is UpdateCanalProvenanceDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [label, position, isActive],
-              [other.label, other.position, other.isActive],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^ mapPropsToHashCode([label, position, isActive]);
 
-  factory UpdateCanalProvenanceDto.fromJson(Map<String, dynamic> json) =>
-      _$UpdateCanalProvenanceDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is UpdateCanalProvenanceDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            label,
+            position,
+            isActive,
+        ],
+        [
+            other.label,
+            other.position,
+            other.isActive,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        label,
+        position,
+        isActive,
+    ],);
+
+  factory UpdateCanalProvenanceDto.fromJson(Map<String, dynamic> json) => _$UpdateCanalProvenanceDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$UpdateCanalProvenanceDtoToJson(this);
 
@@ -55,4 +102,6 @@ class UpdateCanalProvenanceDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

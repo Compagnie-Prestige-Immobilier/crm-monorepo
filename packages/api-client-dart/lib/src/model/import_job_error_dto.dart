@@ -9,6 +9,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'import_job_error_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,48 +20,99 @@ part 'import_job_error_dto.g.dart';
 class ImportJobErrorDto {
   /// Returns a new [ImportJobErrorDto] instance.
   ImportJobErrorDto({
-    required this.rowNumber,
 
-    required this.column,
+    required  this.rowNumber,
 
-    required this.code,
+    required  this.column,
 
-    required this.message,
+    required  this.code,
+
+    required  this.message,
   });
 
-  /// Numéro de ligne DANS LE FICHIER, en-tête compris : ce qu’Excel affiche.
-  @JsonKey(name: r'rowNumber', required: true, includeIfNull: false)
+      /// Numéro de ligne DANS LE FICHIER, en-tête compris : ce qu’Excel affiche.
+  @JsonKey(
+    
+    name: r'rowNumber',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num rowNumber;
 
-  /// En-tête de la colonne fautive, quand le refus en désigne une.
-  @JsonKey(name: r'column', required: true, includeIfNull: true)
+
+
+      /// En-tête de la colonne fautive, quand le refus en désigne une.
+  @JsonKey(
+    
+    name: r'column',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final String? column;
 
-  /// Code stable du motif, pour que l’interface puisse le traduire.
-  @JsonKey(name: r'code', required: true, includeIfNull: false)
+
+
+      /// Code stable du motif, pour que l’interface puisse le traduire.
+  @JsonKey(
+    
+    name: r'code',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String code;
 
-  /// Motif lisible, prêt à afficher.
-  @JsonKey(name: r'message', required: true, includeIfNull: false)
+
+
+      /// Motif lisible, prêt à afficher.
+  @JsonKey(
+    
+    name: r'message',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String message;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is ImportJobErrorDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [rowNumber, column, code, message],
-              [other.rowNumber, other.column, other.code, other.message],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([rowNumber, column, code, message]);
 
-  factory ImportJobErrorDto.fromJson(Map<String, dynamic> json) =>
-      _$ImportJobErrorDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is ImportJobErrorDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            rowNumber,
+            column,
+            code,
+            message,
+        ],
+        [
+            other.rowNumber,
+            other.column,
+            other.code,
+            other.message,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        rowNumber,
+        column,
+        code,
+        message,
+    ],);
+
+  factory ImportJobErrorDto.fromJson(Map<String, dynamic> json) => _$ImportJobErrorDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$ImportJobErrorDtoToJson(this);
 
@@ -68,4 +120,6 @@ class ImportJobErrorDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

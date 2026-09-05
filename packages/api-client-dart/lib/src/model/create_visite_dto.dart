@@ -9,6 +9,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'create_visite_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,88 +20,170 @@ part 'create_visite_dto.g.dart';
 class CreateVisiteDto {
   /// Returns a new [CreateVisiteDto] instance.
   CreateVisiteDto({
-    required this.date,
 
-    this.time,
+    required  this.date,
 
-    required this.visitorName,
+     this.time,
 
-    this.phone,
+    required  this.visitorName,
 
-    required this.entrepriseId,
+     this.phone,
 
-    required this.objetId,
+    required  this.entrepriseId,
 
-    this.directionId,
+    required  this.objetId,
 
-    this.destinataireId,
+     this.directionId,
 
-    this.comment,
+     this.destinataireId,
+
+     this.comment,
   });
 
-  @JsonKey(name: r'date', required: true, includeIfNull: false)
+  @JsonKey(
+    
+    name: r'date',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String date;
 
-  /// Omise si elle n’a pas été relevée.
-  @JsonKey(name: r'time', required: false, includeIfNull: false)
+
+
+      /// Omise si elle n’a pas été relevée.
+  @JsonKey(
+    
+    name: r'time',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final String? time;
 
-  @JsonKey(name: r'visitorName', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'visitorName',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String visitorName;
 
-  /// Accepté sous n’importe quelle forme, y compris étrangère ou incomplète.
-  @JsonKey(name: r'phone', required: false, includeIfNull: false)
+
+
+      /// Accepté sous n’importe quelle forme, y compris étrangère ou incomplète.
+  @JsonKey(
+    
+    name: r'phone',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final String? phone;
 
-  @JsonKey(name: r'entrepriseId', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'entrepriseId',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String entrepriseId;
 
-  @JsonKey(name: r'objetId', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'objetId',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String objetId;
 
-  @JsonKey(name: r'directionId', required: false, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'directionId',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final String? directionId;
 
-  @JsonKey(name: r'destinataireId', required: false, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'destinataireId',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final String? destinataireId;
 
-  @JsonKey(name: r'comment', required: false, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'comment',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final String? comment;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is CreateVisiteDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [
-                date,
-                time,
-                visitorName,
-                phone,
-                entrepriseId,
-                objetId,
-                directionId,
-                destinataireId,
-                comment,
-              ],
-              [
-                other.date,
-                other.time,
-                other.visitorName,
-                other.phone,
-                other.entrepriseId,
-                other.objetId,
-                other.directionId,
-                other.destinataireId,
-                other.comment,
-              ],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([
+
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is CreateVisiteDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            date,
+            time,
+            visitorName,
+            phone,
+            entrepriseId,
+            objetId,
+            directionId,
+            destinataireId,
+            comment,
+        ],
+        [
+            other.date,
+            other.time,
+            other.visitorName,
+            other.phone,
+            other.entrepriseId,
+            other.objetId,
+            other.directionId,
+            other.destinataireId,
+            other.comment,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
         date,
         time,
         visitorName,
@@ -110,10 +193,9 @@ class CreateVisiteDto {
         directionId,
         destinataireId,
         comment,
-      ]);
+    ],);
 
-  factory CreateVisiteDto.fromJson(Map<String, dynamic> json) =>
-      _$CreateVisiteDtoFromJson(json);
+  factory CreateVisiteDto.fromJson(Map<String, dynamic> json) => _$CreateVisiteDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$CreateVisiteDtoToJson(this);
 
@@ -121,4 +203,6 @@ class CreateVisiteDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

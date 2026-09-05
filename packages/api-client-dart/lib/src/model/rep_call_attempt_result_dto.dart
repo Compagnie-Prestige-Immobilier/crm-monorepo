@@ -11,6 +11,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'rep_call_attempt_result_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -21,45 +22,80 @@ part 'rep_call_attempt_result_dto.g.dart';
 class RepCallAttemptResultDto {
   /// Returns a new [RepCallAttemptResultDto] instance.
   RepCallAttemptResultDto({
-    required this.status,
 
-    required this.attemptId,
+    required  this.status,
 
-    required this.suggestion,
+    required  this.attemptId,
+
+    required  this.suggestion,
   });
 
   @JsonKey(
+    
     name: r'status',
     required: true,
     includeIfNull: false,
-    unknownEnumValue: RepCallAttemptApplyStatus.unknownDefaultOpenApi,
+  unknownEnumValue: RepCallAttemptApplyStatus.unknownDefaultOpenApi,
   )
+
+
   final RepCallAttemptApplyStatus status;
 
-  @JsonKey(name: r'attemptId', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'attemptId',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String attemptId;
 
-  /// Ce que le numéro suggéré donne dans l’annuaire, dans la forme que la bannière de doublon du mobile sait déjà afficher. Nul si la tentative n’en portait pas.
-  @JsonKey(name: r'suggestion', required: true, includeIfNull: true)
+
+
+      /// Ce que le numéro suggéré donne dans l’annuaire, dans la forme que la bannière de doublon du mobile sait déjà afficher. Nul si la tentative n’en portait pas.
+  @JsonKey(
+    
+    name: r'suggestion',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final RepresentantLookupDto? suggestion;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is RepCallAttemptResultDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [status, attemptId, suggestion],
-              [other.status, other.attemptId, other.suggestion],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([status, attemptId, suggestion]);
 
-  factory RepCallAttemptResultDto.fromJson(Map<String, dynamic> json) =>
-      _$RepCallAttemptResultDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is RepCallAttemptResultDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            status,
+            attemptId,
+            suggestion,
+        ],
+        [
+            other.status,
+            other.attemptId,
+            other.suggestion,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        status,
+        attemptId,
+        suggestion,
+    ],);
+
+  factory RepCallAttemptResultDto.fromJson(Map<String, dynamic> json) => _$RepCallAttemptResultDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$RepCallAttemptResultDtoToJson(this);
 
@@ -67,4 +103,6 @@ class RepCallAttemptResultDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

@@ -9,6 +9,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'create_banque_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,20 +20,39 @@ part 'create_banque_dto.g.dart';
 class CreateBanqueDto {
   /// Returns a new [CreateBanqueDto] instance.
   CreateBanqueDto({
-    required this.name,
 
-    required this.shortName,
+    required  this.name,
 
-    this.isActive = true,
+    required  this.shortName,
 
-    this.sortOrder = 100,
+     this.isActive = true,
+
+     this.sortOrder = 100,
   });
 
-  @JsonKey(name: r'name', required: true, includeIfNull: false)
+  @JsonKey(
+    
+    name: r'name',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String name;
 
-  @JsonKey(name: r'shortName', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'shortName',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String shortName;
+
+
 
   @JsonKey(
     defaultValue: true,
@@ -40,7 +60,11 @@ class CreateBanqueDto {
     required: false,
     includeIfNull: false,
   )
+
+
   final bool? isActive;
+
+
 
   @JsonKey(
     defaultValue: 100,
@@ -48,25 +72,43 @@ class CreateBanqueDto {
     required: false,
     includeIfNull: false,
   )
+
+
   final num? sortOrder;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is CreateBanqueDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [name, shortName, isActive, sortOrder],
-              [other.name, other.shortName, other.isActive, other.sortOrder],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([name, shortName, isActive, sortOrder]);
 
-  factory CreateBanqueDto.fromJson(Map<String, dynamic> json) =>
-      _$CreateBanqueDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is CreateBanqueDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            name,
+            shortName,
+            isActive,
+            sortOrder,
+        ],
+        [
+            other.name,
+            other.shortName,
+            other.isActive,
+            other.sortOrder,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        name,
+        shortName,
+        isActive,
+        sortOrder,
+    ],);
+
+  factory CreateBanqueDto.fromJson(Map<String, dynamic> json) => _$CreateBanqueDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$CreateBanqueDtoToJson(this);
 
@@ -74,4 +116,6 @@ class CreateBanqueDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

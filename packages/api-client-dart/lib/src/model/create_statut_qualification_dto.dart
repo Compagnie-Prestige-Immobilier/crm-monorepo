@@ -12,6 +12,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'create_statut_qualification_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -22,35 +23,47 @@ part 'create_statut_qualification_dto.g.dart';
 class CreateStatutQualificationDto {
   /// Returns a new [CreateStatutQualificationDto] instance.
   CreateStatutQualificationDto({
-    required this.code,
 
-    required this.label,
+    required  this.label,
 
-    required this.effect,
+    required  this.effect,
 
-    this.requiresCallback = false,
+     this.requiresCallback = false,
 
-    this.retryAfterMinutes,
+     this.requiresComment = false,
 
-    this.priorite = PrioriteTraitement.NORMALE,
+     this.retryAfterMinutes,
 
-    this.relationStatus,
+     this.priorite = PrioriteTraitement.NORMALE,
+
+     this.relationStatus,
   });
 
-  /// Immuable : l’historique le référence.
-  @JsonKey(name: r'code', required: true, includeIfNull: false)
-  final String code;
+      /// Le code en est déduit, puis figé : majuscules, sans accents, espaces en tirets bas.
+  @JsonKey(
+    
+    name: r'label',
+    required: true,
+    includeIfNull: false,
+  )
 
-  @JsonKey(name: r'label', required: true, includeIfNull: false)
+
   final String label;
 
+
+
   @JsonKey(
+    
     name: r'effect',
     required: true,
     includeIfNull: false,
-    unknownEnumValue: StatutQualificationEffect.unknownDefaultOpenApi,
+  unknownEnumValue: StatutQualificationEffect.unknownDefaultOpenApi,
   )
+
+
   final StatutQualificationEffect effect;
+
+
 
   @JsonKey(
     defaultValue: false,
@@ -58,72 +71,105 @@ class CreateStatutQualificationDto {
     required: false,
     includeIfNull: false,
   )
+
+
   final bool? requiresCallback;
 
-  // minimum: 5
-  // maximum: 10080
-  @JsonKey(name: r'retryAfterMinutes', required: false, includeIfNull: false)
+
+
+  @JsonKey(
+    defaultValue: false,
+    name: r'requiresComment',
+    required: false,
+    includeIfNull: false,
+  )
+
+
+  final bool? requiresComment;
+
+
+
+          // minimum: 5
+          // maximum: 10080
+  @JsonKey(
+    
+    name: r'retryAfterMinutes',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final num? retryAfterMinutes;
+
+
 
   @JsonKey(
     defaultValue: PrioriteTraitement.NORMALE,
     name: r'priorite',
     required: false,
     includeIfNull: false,
-    unknownEnumValue: PrioriteTraitement.unknownDefaultOpenApi,
+  unknownEnumValue: PrioriteTraitement.unknownDefaultOpenApi,
   )
+
+
   final PrioriteTraitement? priorite;
 
-  /// Relation posée sur la fiche quand le client n’en envoie pas.
+
+
+      /// Relation posée sur la fiche quand le client n’en envoie pas.
   @JsonKey(
+    
     name: r'relationStatus',
     required: false,
     includeIfNull: false,
-    unknownEnumValue: RepresentantRelation.unknownDefaultOpenApi,
+  unknownEnumValue: RepresentantRelation.unknownDefaultOpenApi,
   )
+
+
   final RepresentantRelation? relationStatus;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is CreateStatutQualificationDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [
-                code,
-                label,
-                effect,
-                requiresCallback,
-                retryAfterMinutes,
-                priorite,
-                relationStatus,
-              ],
-              [
-                other.code,
-                other.label,
-                other.effect,
-                other.requiresCallback,
-                other.retryAfterMinutes,
-                other.priorite,
-                other.relationStatus,
-              ],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([
-        code,
+
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is CreateStatutQualificationDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            label,
+            effect,
+            requiresCallback,
+            requiresComment,
+            retryAfterMinutes,
+            priorite,
+            relationStatus,
+        ],
+        [
+            other.label,
+            other.effect,
+            other.requiresCallback,
+            other.requiresComment,
+            other.retryAfterMinutes,
+            other.priorite,
+            other.relationStatus,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
         label,
         effect,
         requiresCallback,
+        requiresComment,
         retryAfterMinutes,
         priorite,
         relationStatus,
-      ]);
+    ],);
 
-  factory CreateStatutQualificationDto.fromJson(Map<String, dynamic> json) =>
-      _$CreateStatutQualificationDtoFromJson(json);
+  factory CreateStatutQualificationDto.fromJson(Map<String, dynamic> json) => _$CreateStatutQualificationDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$CreateStatutQualificationDtoToJson(this);
 
@@ -131,4 +177,6 @@ class CreateStatutQualificationDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

@@ -11,6 +11,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'lot_export_summary_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -21,110 +22,202 @@ part 'lot_export_summary_dto.g.dart';
 class LotExportSummaryDto {
   /// Returns a new [LotExportSummaryDto] instance.
   LotExportSummaryDto({
-    required this.id,
 
-    required this.name,
+    required  this.id,
 
-    required this.cible,
+    required  this.name,
 
-    required this.projet,
+    required  this.cible,
 
-    required this.scopeLabel,
+    required  this.projet,
 
-    required this.itemCount,
+    required  this.scopeLabel,
 
-    required this.createdById,
+    required  this.itemCount,
 
-    required this.createdByName,
+    required  this.createdById,
 
-    required this.createdAt,
+    required  this.createdByName,
 
-    required this.callsSince,
+    required  this.createdAt,
 
-    required this.fichesAppelees,
+    required  this.callsSince,
+
+    required  this.fichesAppelees,
   });
 
-  @JsonKey(name: r'id', required: true, includeIfNull: false)
+  @JsonKey(
+    
+    name: r'id',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String id;
 
-  @JsonKey(name: r'name', required: true, includeIfNull: false)
-  final String name;
+
 
   @JsonKey(
+    
+    name: r'name',
+    required: true,
+    includeIfNull: false,
+  )
+
+
+  final String name;
+
+
+
+  @JsonKey(
+    
     name: r'cible',
     required: true,
     includeIfNull: false,
-    unknownEnumValue: LotExportCible.unknownDefaultOpenApi,
+  unknownEnumValue: LotExportCible.unknownDefaultOpenApi,
   )
+
+
   final LotExportCible cible;
 
+
+
   @JsonKey(
+    
     name: r'projet',
     required: true,
     includeIfNull: false,
-    unknownEnumValue: Projet.unknownDefaultOpenApi,
+  unknownEnumValue: Projet.unknownDefaultOpenApi,
   )
+
+
   final Projet projet;
 
-  @JsonKey(name: r'scopeLabel', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'scopeLabel',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String scopeLabel;
 
-  @JsonKey(name: r'itemCount', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'itemCount',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num itemCount;
 
-  @JsonKey(name: r'createdById', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'createdById',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String createdById;
 
-  @JsonKey(name: r'createdByName', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'createdByName',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String createdByName;
 
-  @JsonKey(name: r'createdAt', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'createdAt',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String createdAt;
 
-  @JsonKey(name: r'callsSince', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'callsSince',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num callsSince;
 
-  @JsonKey(name: r'fichesAppelees', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'fichesAppelees',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num fichesAppelees;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is LotExportSummaryDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [
-                id,
-                name,
-                cible,
-                projet,
-                scopeLabel,
-                itemCount,
-                createdById,
-                createdByName,
-                createdAt,
-                callsSince,
-                fichesAppelees,
-              ],
-              [
-                other.id,
-                other.name,
-                other.cible,
-                other.projet,
-                other.scopeLabel,
-                other.itemCount,
-                other.createdById,
-                other.createdByName,
-                other.createdAt,
-                other.callsSince,
-                other.fichesAppelees,
-              ],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([
+
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is LotExportSummaryDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            id,
+            name,
+            cible,
+            projet,
+            scopeLabel,
+            itemCount,
+            createdById,
+            createdByName,
+            createdAt,
+            callsSince,
+            fichesAppelees,
+        ],
+        [
+            other.id,
+            other.name,
+            other.cible,
+            other.projet,
+            other.scopeLabel,
+            other.itemCount,
+            other.createdById,
+            other.createdByName,
+            other.createdAt,
+            other.callsSince,
+            other.fichesAppelees,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
         id,
         name,
         cible,
@@ -136,10 +229,9 @@ class LotExportSummaryDto {
         createdAt,
         callsSince,
         fichesAppelees,
-      ]);
+    ],);
 
-  factory LotExportSummaryDto.fromJson(Map<String, dynamic> json) =>
-      _$LotExportSummaryDtoFromJson(json);
+  factory LotExportSummaryDto.fromJson(Map<String, dynamic> json) => _$LotExportSummaryDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$LotExportSummaryDtoToJson(this);
 
@@ -147,4 +239,6 @@ class LotExportSummaryDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

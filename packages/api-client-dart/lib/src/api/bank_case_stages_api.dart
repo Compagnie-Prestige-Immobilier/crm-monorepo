@@ -18,6 +18,7 @@ import 'package:crm_api_client/src/model/set_bank_case_stage_active_dto.dart';
 import 'package:crm_api_client/src/model/update_bank_case_stage_dto.dart';
 
 class BankCaseStagesApi {
+
   final Dio _dio;
 
   const BankCaseStagesApi(this._dio);
@@ -26,7 +27,7 @@ class BankCaseStagesApi {
   /// Le type n’est pas un paramètre : une seconde étape d’encaissement ou de rejet rendrait la règle financière ambiguë. Insérer au milieu décale les étapes suivantes.
   ///
   /// Parameters:
-  /// * [createBankCaseStageDto]
+  /// * [createBankCaseStageDto] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -36,7 +37,7 @@ class BankCaseStagesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [BankCaseStageDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<BankCaseStageDto>> createBankCaseStage({
+  Future<Response<BankCaseStageDto>> createBankCaseStage({ 
     required CreateBankCaseStageDto createBankCaseStageDto,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -48,10 +49,16 @@ class BankCaseStagesApi {
     final _path = r'/api/v1/bank-case-stages';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -63,9 +70,13 @@ class BankCaseStagesApi {
 
     try {
       _bodyData = jsonEncode(createBankCaseStageDto);
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -84,14 +95,9 @@ class BankCaseStagesApi {
     BankCaseStageDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<BankCaseStageDto, BankCaseStageDto>(
-              rawData,
-              'BankCaseStageDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<BankCaseStageDto, BankCaseStageDto>(rawData, 'BankCaseStageDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -115,7 +121,7 @@ class BankCaseStagesApi {
   }
 
   /// Étapes du workflow bancaire, dans l’ordre du flux.
-  ///
+  /// 
   ///
   /// Parameters:
   /// * [includeInactive] - Inclure les entrées désactivées. Utile à l’administration du workflow.
@@ -128,7 +134,7 @@ class BankCaseStagesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [BankCaseStageListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<BankCaseStageListDto>> listBankCaseStages({
+  Future<Response<BankCaseStageListDto>> listBankCaseStages({ 
     bool? includeInactive = false,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -140,10 +146,16 @@ class BankCaseStagesApi {
     final _path = r'/api/v1/bank-case-stages';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -166,14 +178,9 @@ class BankCaseStagesApi {
     BankCaseStageListDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<BankCaseStageListDto, BankCaseStageListDto>(
-              rawData,
-              'BankCaseStageListDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<BankCaseStageListDto, BankCaseStageListDto>(rawData, 'BankCaseStageListDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -200,7 +207,7 @@ class BankCaseStagesApi {
   /// La liste doit être EXHAUSTIVE (toutes les étapes ouvertes, actives ou non) et commencer par l’étape initiale. Le réordonnancement n’affecte que les transitions FUTURES : l’historique référence les étapes par identifiant et reste lisible tel quel.
   ///
   /// Parameters:
-  /// * [reorderBankCaseStagesDto]
+  /// * [reorderBankCaseStagesDto] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -210,7 +217,7 @@ class BankCaseStagesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [BankCaseStageListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<BankCaseStageListDto>> reorderBankCaseStages({
+  Future<Response<BankCaseStageListDto>> reorderBankCaseStages({ 
     required ReorderBankCaseStagesDto reorderBankCaseStagesDto,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -222,10 +229,16 @@ class BankCaseStagesApi {
     final _path = r'/api/v1/bank-case-stages/reorder';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -237,9 +250,13 @@ class BankCaseStagesApi {
 
     try {
       _bodyData = jsonEncode(reorderBankCaseStagesDto);
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -258,14 +275,9 @@ class BankCaseStagesApi {
     BankCaseStageListDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<BankCaseStageListDto, BankCaseStageListDto>(
-              rawData,
-              'BankCaseStageListDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<BankCaseStageListDto, BankCaseStageListDto>(rawData, 'BankCaseStageListDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -292,8 +304,8 @@ class BankCaseStagesApi {
   /// Refusé sur une étape système, et refusé tant que des dossiers stationnent sur l’étape : ils deviendraient invisibles du flux sans que personne ne soit averti qu’ils existent toujours.
   ///
   /// Parameters:
-  /// * [id]
-  /// * [setBankCaseStageActiveDto]
+  /// * [id] 
+  /// * [setBankCaseStageActiveDto] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -303,7 +315,7 @@ class BankCaseStagesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [BankCaseStageDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<BankCaseStageDto>> setBankCaseStageActive({
+  Future<Response<BankCaseStageDto>> setBankCaseStageActive({ 
     required String id,
     required SetBankCaseStageActiveDto setBankCaseStageActiveDto,
     CancelToken? cancelToken,
@@ -313,18 +325,19 @@ class BankCaseStagesApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/bank-case-stages/{id}/active'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
+    final _path = r'/api/v1/bank-case-stages/{id}/active'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -336,9 +349,13 @@ class BankCaseStagesApi {
 
     try {
       _bodyData = jsonEncode(setBankCaseStageActiveDto);
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -357,14 +374,9 @@ class BankCaseStagesApi {
     BankCaseStageDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<BankCaseStageDto, BankCaseStageDto>(
-              rawData,
-              'BankCaseStageDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<BankCaseStageDto, BankCaseStageDto>(rawData, 'BankCaseStageDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -391,8 +403,8 @@ class BankCaseStagesApi {
   /// Ni le code, ni le type, ni le drapeau initial : une étape déjà inscrite dans l’historique d’un dossier clos ne doit pas changer de nature rétroactivement.
   ///
   /// Parameters:
-  /// * [id]
-  /// * [updateBankCaseStageDto]
+  /// * [id] 
+  /// * [updateBankCaseStageDto] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -402,7 +414,7 @@ class BankCaseStagesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [BankCaseStageDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<BankCaseStageDto>> updateBankCaseStage({
+  Future<Response<BankCaseStageDto>> updateBankCaseStage({ 
     required String id,
     required UpdateBankCaseStageDto updateBankCaseStageDto,
     CancelToken? cancelToken,
@@ -412,18 +424,19 @@ class BankCaseStagesApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/bank-case-stages/{id}'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
+    final _path = r'/api/v1/bank-case-stages/{id}'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'PATCH',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -435,9 +448,13 @@ class BankCaseStagesApi {
 
     try {
       _bodyData = jsonEncode(updateBankCaseStageDto);
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -456,14 +473,9 @@ class BankCaseStagesApi {
     BankCaseStageDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<BankCaseStageDto, BankCaseStageDto>(
-              rawData,
-              'BankCaseStageDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<BankCaseStageDto, BankCaseStageDto>(rawData, 'BankCaseStageDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -485,4 +497,5 @@ class BankCaseStagesApi {
       extra: _response.extra,
     );
   }
+
 }

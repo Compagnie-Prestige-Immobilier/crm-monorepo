@@ -24,6 +24,7 @@ import 'package:crm_api_client/src/model/representant_suivi.dart';
 import 'package:crm_api_client/src/model/whatsapp_status.dart';
 
 class ExportApi {
+
   final Dio _dio;
 
   const ExportApi(this._dio);
@@ -41,7 +42,7 @@ class ExportApi {
   ///
   /// Returns a [Future] containing a [Response] with a [Uint8List] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<Uint8List>> downloadProspectsGrandPublicTemplateXlsx({
+  Future<Response<Uint8List>> downloadProspectsGrandPublicTemplateXlsx({ 
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -53,10 +54,16 @@ class ExportApi {
     final _options = Options(
       method: r'GET',
       responseType: ResponseType.bytes,
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -74,8 +81,9 @@ class ExportApi {
     Uint8List? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null ? null : rawData as Uint8List;
+final rawData = _response.data;
+_responseData = rawData == null ? null : rawData as Uint8List;
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -111,7 +119,7 @@ class ExportApi {
   ///
   /// Returns a [Future] containing a [Response] with a [Uint8List] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<Uint8List>> downloadProspectsTemplateXlsx({
+  Future<Response<Uint8List>> downloadProspectsTemplateXlsx({ 
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -123,10 +131,16 @@ class ExportApi {
     final _options = Options(
       method: r'GET',
       responseType: ResponseType.bytes,
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -144,8 +158,9 @@ class ExportApi {
     Uint8List? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null ? null : rawData as Uint8List;
+final rawData = _response.data;
+_responseData = rawData == null ? null : rawData as Uint8List;
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -181,7 +196,7 @@ class ExportApi {
   ///
   /// Returns a [Future] containing a [Response] with a [Uint8List] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<Uint8List>> downloadRepresentantsTemplateXlsx({
+  Future<Response<Uint8List>> downloadRepresentantsTemplateXlsx({ 
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -193,10 +208,16 @@ class ExportApi {
     final _options = Options(
       method: r'GET',
       responseType: ResponseType.bytes,
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -214,8 +235,9 @@ class ExportApi {
     Uint8List? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null ? null : rawData as Uint8List;
+final rawData = _response.data;
+_responseData = rawData == null ? null : rawData as Uint8List;
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -243,12 +265,12 @@ class ExportApi {
   ///
   /// Parameters:
   /// * [search] - Recherche libre sur la référence, le nom du client ou son téléphone.
-  /// * [stageId]
-  /// * [stageType]
+  /// * [stageId] 
+  /// * [stageType] 
   /// * [banqueId] - Banque de traitement du dossier.
   /// * [projet] - Parcours suivi par la fiche liée. Sans filtre, les deux projets sortent. Un même numéro peut suivre les deux.
   /// * [agentId] - Agent créateur OU dernier intervenant sur le dossier.
-  /// * [rejectionReasonId]
+  /// * [rejectionReasonId] 
   /// * [dateFrom] - Borne basse sur la création, incluse.
   /// * [dateTo] - Borne haute sur la création, incluse.
   /// * [amountMin] - Borne basse de montant. Montant en francs CFA, entier, exposé en chaîne. XOF n’a pas de décimales et un nombre JSON perdrait de la précision au-delà de 2^53.
@@ -262,7 +284,7 @@ class ExportApi {
   ///
   /// Returns a [Future] containing a [Response] with a [Uint8List] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<Uint8List>> exportBankCasesXlsx({
+  Future<Response<Uint8List>> exportBankCasesXlsx({ 
     String? search,
     String? stageId,
     BankStageType? stageType,
@@ -285,10 +307,16 @@ class ExportApi {
     final _options = Options(
       method: r'GET',
       responseType: ResponseType.bytes,
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -321,8 +349,9 @@ class ExportApi {
     Uint8List? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null ? null : rawData as Uint8List;
+final rawData = _response.data;
+_responseData = rawData == null ? null : rawData as Uint8List;
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -350,15 +379,15 @@ class ExportApi {
   ///
   /// Parameters:
   /// * [search] - Recherche libre sur le nom, le prénom ou le téléphone.
-  /// * [representantId]
-  /// * [banqueId]
-  /// * [syndicatId]
-  /// * [departementId]
+  /// * [representantId] 
+  /// * [banqueId] 
+  /// * [syndicatId] 
+  /// * [departementId] 
   /// * [commercialId] - Réservé à l’ADMIN : un COMMERCIAL reste borné à ses propres lignes.
   /// * [projet] - Le projet. ABSENT veut dire les deux : chaque écran de projet doit le poser, sinon CHUES et Grand Public se mélangent dans la même liste.
   /// * [type] - Grand Public : fonctionnaire, secteur privé, informel, diaspora.
   /// * [canalProvenanceId] - Grand Public : canal de provenance.
-  /// * [statut]
+  /// * [statut] 
   /// * [segment] - Segment logique : BDD1 = CHUES/CBAO, BDD2 = CHUES/autre banque, BDD3 = autre syndicat/CBAO, BDD4 = autre syndicat/autre banque.
   /// * [phase2Status] - Avancement de la phase 2. Dimension indépendante de `statut`.
   /// * [enrollmentMethod] - Méthode d’enrôlement obtenue en phase 2.
@@ -379,7 +408,7 @@ class ExportApi {
   ///
   /// Returns a [Future] containing a [Response] with a [Uint8List] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<Uint8List>> exportProspectsXlsx({
+  Future<Response<Uint8List>> exportProspectsXlsx({ 
     String? search,
     String? representantId,
     String? banqueId,
@@ -412,10 +441,16 @@ class ExportApi {
     final _options = Options(
       method: r'GET',
       responseType: ResponseType.bytes,
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -438,8 +473,7 @@ class ExportApi {
       if (enrollmentMethod != null) r'enrollmentMethod': enrollmentMethod,
       if (appelePar != null) r'appelePar': appelePar,
       if (lastCallById != null) r'lastCallById': lastCallById,
-      if (enrollmentCapturedById != null)
-        r'enrollmentCapturedById': enrollmentCapturedById,
+      if (enrollmentCapturedById != null) r'enrollmentCapturedById': enrollmentCapturedById,
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
@@ -459,8 +493,9 @@ class ExportApi {
     Uint8List? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null ? null : rawData as Uint8List;
+final rawData = _response.data;
+_responseData = rawData == null ? null : rawData as Uint8List;
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -487,18 +522,18 @@ class ExportApi {
   /// Mêmes critères que &#x60;GET /representants&#x60; : ce qui est exporté est exactement ce qui est affiché, cloisonnement par commercial compris.
   ///
   /// Parameters:
-  /// * [search]
-  /// * [departementId]
+  /// * [search] 
+  /// * [departementId] 
   /// * [iefId] - Filtre par IEF.
   /// * [commercialId] - Réservé à l’ADMIN.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [hasProspects] - true : au moins un prospect vivant. false : aucun (représentant dormant).
-  /// * [relationStatus]
+  /// * [relationStatus] 
   /// * [statutQualificationId] - Statut de qualification du dernier appel. Sert le filtre de l’annuaire ET le tirage d’un lot d’appels.
-  /// * [whatsappStatus]
-  /// * [hasWhatsapp]
-  /// * [suivi] - A_RAPPELER : un rappel promis reste dû (`nextCallbackAt`), tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien.
+  /// * [whatsappStatus] 
+  /// * [hasWhatsapp] 
+  /// * [suivi] - A_RAPPELER : un rappel reste dû (`nextCallbackAt`), promis ou automatique, tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien.
   /// * [lastCallById] - Qui a passé le dernier appel. Un téléconseiller y met son propre identifiant.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
@@ -509,7 +544,7 @@ class ExportApi {
   ///
   /// Returns a [Future] containing a [Response] with a [Uint8List] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<Uint8List>> exportRepresentantsXlsx({
+  Future<Response<Uint8List>> exportRepresentantsXlsx({ 
     String? search,
     String? departementId,
     String? iefId,
@@ -534,10 +569,16 @@ class ExportApi {
     final _options = Options(
       method: r'GET',
       responseType: ResponseType.bytes,
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -553,8 +594,7 @@ class ExportApi {
       if (dateTo != null) r'dateTo': dateTo,
       if (hasProspects != null) r'hasProspects': hasProspects,
       if (relationStatus != null) r'relationStatus': relationStatus,
-      if (statutQualificationId != null)
-        r'statutQualificationId': statutQualificationId,
+      if (statutQualificationId != null) r'statutQualificationId': statutQualificationId,
       if (whatsappStatus != null) r'whatsappStatus': whatsappStatus,
       if (hasWhatsapp != null) r'hasWhatsapp': hasWhatsapp,
       if (suivi != null) r'suivi': suivi,
@@ -573,8 +613,9 @@ class ExportApi {
     Uint8List? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null ? null : rawData as Uint8List;
+final rawData = _response.data;
+_responseData = rawData == null ? null : rawData as Uint8List;
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -601,12 +642,12 @@ class ExportApi {
   /// Une feuille « Registre », onze colonnes, &#x60;N° REGISTRE&#x60; en tête. Conçu pour revenir : déposé sur &#x60;POST /v1/visites/import&#x60;, l’aller-retour détecte les différences ligne par ligne avant de les appliquer.
   ///
   /// Parameters:
-  /// * [from]
-  /// * [to]
-  /// * [entrepriseId]
-  /// * [directionId]
-  /// * [destinataireId]
-  /// * [objetId]
+  /// * [from] 
+  /// * [to] 
+  /// * [entrepriseId] 
+  /// * [directionId] 
+  /// * [destinataireId] 
+  /// * [objetId] 
   /// * [search] - Nom du visiteur, ou référence du registre.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
@@ -617,7 +658,7 @@ class ExportApi {
   ///
   /// Returns a [Future] containing a [Response] with a [Uint8List] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<Uint8List>> exportVisitesXlsx({
+  Future<Response<Uint8List>> exportVisitesXlsx({ 
     String? from,
     String? to,
     String? entrepriseId,
@@ -636,10 +677,16 @@ class ExportApi {
     final _options = Options(
       method: r'GET',
       responseType: ResponseType.bytes,
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -668,8 +715,9 @@ class ExportApi {
     Uint8List? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null ? null : rawData as Uint8List;
+final rawData = _response.data;
+_responseData = rawData == null ? null : rawData as Uint8List;
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -691,4 +739,5 @@ class ExportApi {
       extra: _response.extra,
     );
   }
+
 }

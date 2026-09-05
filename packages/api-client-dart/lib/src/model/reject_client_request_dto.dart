@@ -9,6 +9,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'reject_client_request_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -18,24 +19,46 @@ part 'reject_client_request_dto.g.dart';
 )
 class RejectClientRequestDto {
   /// Returns a new [RejectClientRequestDto] instance.
-  RejectClientRequestDto({required this.reason});
+  RejectClientRequestDto({
 
-  /// Motif du refus, obligatoire et non vide. Un refus muet renvoie l’agent à son impasse de départ, ce que ce module existe précisément pour éviter.
-  @JsonKey(name: r'reason', required: true, includeIfNull: false)
+    required  this.reason,
+  });
+
+      /// Motif du refus, obligatoire et non vide. Un refus muet renvoie l’agent à son impasse de départ, ce que ce module existe précisément pour éviter.
+  @JsonKey(
+    
+    name: r'reason',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String reason;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is RejectClientRequestDto &&
-            runtimeType == other.runtimeType &&
-            equals([reason], [other.reason]);
-  }
 
-  @override
-  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([reason]);
 
-  factory RejectClientRequestDto.fromJson(Map<String, dynamic> json) =>
-      _$RejectClientRequestDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is RejectClientRequestDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            reason,
+        ],
+        [
+            other.reason,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        reason,
+    ],);
+
+  factory RejectClientRequestDto.fromJson(Map<String, dynamic> json) => _$RejectClientRequestDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$RejectClientRequestDtoToJson(this);
 
@@ -43,4 +66,6 @@ class RejectClientRequestDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

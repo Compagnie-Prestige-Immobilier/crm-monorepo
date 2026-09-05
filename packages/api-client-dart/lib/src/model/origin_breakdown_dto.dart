@@ -11,6 +11,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'origin_breakdown_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -21,40 +22,80 @@ part 'origin_breakdown_dto.g.dart';
 class OriginBreakdownDto {
   /// Returns a new [OriginBreakdownDto] instance.
   OriginBreakdownDto({
-    required this.items,
 
-    required this.byLabel,
+    required  this.items,
 
-    required this.total,
+    required  this.byLabel,
+
+    required  this.total,
   });
 
-  /// Premier niveau : la provenance.
-  @JsonKey(name: r'items', required: true, includeIfNull: false)
+      /// Premier niveau : la provenance.
+  @JsonKey(
+    
+    name: r'items',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final List<OriginCountDto> items;
 
-  /// Second niveau : le détail lisible, à provenance égale.
-  @JsonKey(name: r'byLabel', required: true, includeIfNull: false)
+
+
+      /// Second niveau : le détail lisible, à provenance égale.
+  @JsonKey(
+    
+    name: r'byLabel',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final List<OriginLabelCountDto> byLabel;
 
-  @JsonKey(name: r'total', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'total',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num total;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is OriginBreakdownDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [items, byLabel, total],
-              [other.items, other.byLabel, other.total],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^ mapPropsToHashCode([items, byLabel, total]);
 
-  factory OriginBreakdownDto.fromJson(Map<String, dynamic> json) =>
-      _$OriginBreakdownDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is OriginBreakdownDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            items,
+            byLabel,
+            total,
+        ],
+        [
+            other.items,
+            other.byLabel,
+            other.total,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        items,
+        byLabel,
+        total,
+    ],);
+
+  factory OriginBreakdownDto.fromJson(Map<String, dynamic> json) => _$OriginBreakdownDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$OriginBreakdownDtoToJson(this);
 
@@ -62,4 +103,6 @@ class OriginBreakdownDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

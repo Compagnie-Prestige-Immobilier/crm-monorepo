@@ -10,6 +10,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'bank_rejection_reason_list_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,23 +20,45 @@ part 'bank_rejection_reason_list_dto.g.dart';
 )
 class BankRejectionReasonListDto {
   /// Returns a new [BankRejectionReasonListDto] instance.
-  BankRejectionReasonListDto({required this.items});
+  BankRejectionReasonListDto({
 
-  @JsonKey(name: r'items', required: true, includeIfNull: false)
+    required  this.items,
+  });
+
+  @JsonKey(
+    
+    name: r'items',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final List<BankRejectionReasonDto> items;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is BankRejectionReasonListDto &&
-            runtimeType == other.runtimeType &&
-            equals([items], [other.items]);
-  }
 
-  @override
-  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([items]);
 
-  factory BankRejectionReasonListDto.fromJson(Map<String, dynamic> json) =>
-      _$BankRejectionReasonListDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is BankRejectionReasonListDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            items,
+        ],
+        [
+            other.items,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        items,
+    ],);
+
+  factory BankRejectionReasonListDto.fromJson(Map<String, dynamic> json) => _$BankRejectionReasonListDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$BankRejectionReasonListDtoToJson(this);
 
@@ -43,4 +66,6 @@ class BankRejectionReasonListDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

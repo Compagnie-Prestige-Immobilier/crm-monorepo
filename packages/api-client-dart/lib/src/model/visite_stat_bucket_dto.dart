@@ -9,6 +9,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'visite_stat_bucket_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,43 +20,95 @@ part 'visite_stat_bucket_dto.g.dart';
 class VisiteStatBucketDto {
   /// Returns a new [VisiteStatBucketDto] instance.
   VisiteStatBucketDto({
-    required this.id,
 
-    required this.code,
+    required  this.id,
 
-    required this.label,
+    required  this.code,
 
-    required this.count,
+    required  this.label,
+
+    required  this.count,
   });
 
-  @JsonKey(name: r'id', required: true, includeIfNull: false)
+  @JsonKey(
+    
+    name: r'id',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String id;
 
-  @JsonKey(name: r'code', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'code',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String code;
 
-  @JsonKey(name: r'label', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'label',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String label;
 
-  @JsonKey(name: r'count', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'count',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num count;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is VisiteStatBucketDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [id, code, label, count],
-              [other.id, other.code, other.label, other.count],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^ mapPropsToHashCode([id, code, label, count]);
 
-  factory VisiteStatBucketDto.fromJson(Map<String, dynamic> json) =>
-      _$VisiteStatBucketDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is VisiteStatBucketDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            id,
+            code,
+            label,
+            count,
+        ],
+        [
+            other.id,
+            other.code,
+            other.label,
+            other.count,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        id,
+        code,
+        label,
+        count,
+    ],);
+
+  factory VisiteStatBucketDto.fromJson(Map<String, dynamic> json) => _$VisiteStatBucketDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$VisiteStatBucketDtoToJson(this);
 
@@ -63,4 +116,6 @@ class VisiteStatBucketDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

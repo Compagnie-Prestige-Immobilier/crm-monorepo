@@ -18,6 +18,7 @@ import 'package:crm_api_client/src/model/rendered_template_dto.dart';
 import 'package:crm_api_client/src/model/update_notification_template_dto.dart';
 
 class NotificationTemplatesApi {
+
   final Dio _dio;
 
   const NotificationTemplatesApi(this._dio);
@@ -26,7 +27,7 @@ class NotificationTemplatesApi {
   /// &#x60;variables&#x60; n’est pas saisi : il est déduit du texte à chaque écriture. Une liste tenue à la main diverge du gabarit dès la première correction.
   ///
   /// Parameters:
-  /// * [createNotificationTemplateDto]
+  /// * [createNotificationTemplateDto] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -36,7 +37,7 @@ class NotificationTemplatesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [NotificationTemplateDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<NotificationTemplateDto>> createNotificationTemplate({
+  Future<Response<NotificationTemplateDto>> createNotificationTemplate({ 
     required CreateNotificationTemplateDto createNotificationTemplateDto,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -48,10 +49,16 @@ class NotificationTemplatesApi {
     final _path = r'/api/v1/notification-templates';
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -63,9 +70,13 @@ class NotificationTemplatesApi {
 
     try {
       _bodyData = jsonEncode(createNotificationTemplateDto);
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -84,14 +95,9 @@ class NotificationTemplatesApi {
     NotificationTemplateDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<NotificationTemplateDto, NotificationTemplateDto>(
-              rawData,
-              'NotificationTemplateDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<NotificationTemplateDto, NotificationTemplateDto>(rawData, 'NotificationTemplateDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -115,10 +121,10 @@ class NotificationTemplatesApi {
   }
 
   /// Un gabarit.
-  ///
+  /// 
   ///
   /// Parameters:
-  /// * [id]
+  /// * [id] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -128,7 +134,7 @@ class NotificationTemplatesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [NotificationTemplateDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<NotificationTemplateDto>> getNotificationTemplate({
+  Future<Response<NotificationTemplateDto>> getNotificationTemplate({ 
     required String id,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -137,18 +143,19 @@ class NotificationTemplatesApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/notification-templates/{id}'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
+    final _path = r'/api/v1/notification-templates/{id}'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -166,14 +173,9 @@ class NotificationTemplatesApi {
     NotificationTemplateDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<NotificationTemplateDto, NotificationTemplateDto>(
-              rawData,
-              'NotificationTemplateDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<NotificationTemplateDto, NotificationTemplateDto>(rawData, 'NotificationTemplateDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -197,10 +199,10 @@ class NotificationTemplatesApi {
   }
 
   /// Gabarits disponibles, avec leurs variables.
-  ///
+  /// 
   ///
   /// Parameters:
-  /// * [includeInactive]
+  /// * [includeInactive] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -210,7 +212,7 @@ class NotificationTemplatesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [NotificationTemplateListDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<NotificationTemplateListDto>> listNotificationTemplates({
+  Future<Response<NotificationTemplateListDto>> listNotificationTemplates({ 
     bool? includeInactive = false,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -222,10 +224,16 @@ class NotificationTemplatesApi {
     final _path = r'/api/v1/notification-templates';
     final _options = Options(
       method: r'GET',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -248,13 +256,9 @@ class NotificationTemplatesApi {
     NotificationTemplateListDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<
-              NotificationTemplateListDto,
-              NotificationTemplateListDto
-            >(rawData, 'NotificationTemplateListDto', growable: true);
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<NotificationTemplateListDto, NotificationTemplateListDto>(rawData, 'NotificationTemplateListDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -281,8 +285,8 @@ class NotificationTemplatesApi {
   /// Une variable manquante n’est PAS une erreur : le marqueur &#x60;{{nom}}&#x60; reste visible et son nom remonte dans &#x60;missing&#x60;, ce qui laisse l’interface avertir sans interrompre la frappe.
   ///
   /// Parameters:
-  /// * [id]
-  /// * [renderTemplateDto]
+  /// * [id] 
+  /// * [renderTemplateDto] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -292,7 +296,7 @@ class NotificationTemplatesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [RenderedTemplateDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<RenderedTemplateDto>> renderNotificationTemplate({
+  Future<Response<RenderedTemplateDto>> renderNotificationTemplate({ 
     required String id,
     required RenderTemplateDto renderTemplateDto,
     CancelToken? cancelToken,
@@ -302,18 +306,19 @@ class NotificationTemplatesApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/notification-templates/{id}/render'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
+    final _path = r'/api/v1/notification-templates/{id}/render'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'POST',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -325,9 +330,13 @@ class NotificationTemplatesApi {
 
     try {
       _bodyData = jsonEncode(renderTemplateDto);
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -346,14 +355,9 @@ class NotificationTemplatesApi {
     RenderedTemplateDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<RenderedTemplateDto, RenderedTemplateDto>(
-              rawData,
-              'RenderedTemplateDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<RenderedTemplateDto, RenderedTemplateDto>(rawData, 'RenderedTemplateDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -377,11 +381,11 @@ class NotificationTemplatesApi {
   }
 
   /// Modifie un gabarit.
-  ///
+  /// 
   ///
   /// Parameters:
-  /// * [id]
-  /// * [updateNotificationTemplateDto]
+  /// * [id] 
+  /// * [updateNotificationTemplateDto] 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -391,7 +395,7 @@ class NotificationTemplatesApi {
   ///
   /// Returns a [Future] containing a [Response] with a [NotificationTemplateDto] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<NotificationTemplateDto>> updateNotificationTemplate({
+  Future<Response<NotificationTemplateDto>> updateNotificationTemplate({ 
     required String id,
     required UpdateNotificationTemplateDto updateNotificationTemplateDto,
     CancelToken? cancelToken,
@@ -401,18 +405,19 @@ class NotificationTemplatesApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/api/v1/notification-templates/{id}'.replaceAll(
-      '{'
-      r'id'
-      '}',
-      id.toString(),
-    );
+    final _path = r'/api/v1/notification-templates/{id}'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'PATCH',
-      headers: <String, dynamic>{...?headers},
+      headers: <String, dynamic>{
+        ...?headers,
+      },
       extra: <String, dynamic>{
         'secure': <Map<String, String>>[
-          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearer',
+          },
         ],
         ...?extra,
       },
@@ -424,9 +429,13 @@ class NotificationTemplatesApi {
 
     try {
       _bodyData = jsonEncode(updateNotificationTemplateDto);
-    } catch (error, stackTrace) {
+
+    } catch(error, stackTrace) {
       throw DioException(
-        requestOptions: _options.compose(_dio.options, _path),
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
         type: DioExceptionType.unknown,
         error: error,
         stackTrace: stackTrace,
@@ -445,14 +454,9 @@ class NotificationTemplatesApi {
     NotificationTemplateDto? _responseData;
 
     try {
-      final rawData = _response.data;
-      _responseData = rawData == null
-          ? null
-          : deserialize<NotificationTemplateDto, NotificationTemplateDto>(
-              rawData,
-              'NotificationTemplateDto',
-              growable: true,
-            );
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<NotificationTemplateDto, NotificationTemplateDto>(rawData, 'NotificationTemplateDto', growable: true);
+
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -474,4 +478,5 @@ class NotificationTemplatesApi {
       extra: _response.extra,
     );
   }
+
 }

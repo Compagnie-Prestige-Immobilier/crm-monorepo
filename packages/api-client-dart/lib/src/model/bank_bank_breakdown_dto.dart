@@ -9,6 +9,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'bank_bank_breakdown_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -19,80 +20,153 @@ part 'bank_bank_breakdown_dto.g.dart';
 class BankBankBreakdownDto {
   /// Returns a new [BankBankBreakdownDto] instance.
   BankBankBreakdownDto({
-    required this.banqueId,
 
-    required this.label,
+    required  this.banqueId,
 
-    required this.cases,
+    required  this.label,
 
-    required this.cashed,
+    required  this.cases,
 
-    required this.rejected,
+    required  this.cashed,
 
-    required this.amountXof,
+    required  this.rejected,
 
-    required this.share,
+    required  this.amountXof,
 
-    required this.meanProcessingHours,
+    required  this.share,
+
+    required  this.meanProcessingHours,
   });
 
-  @JsonKey(name: r'banqueId', required: true, includeIfNull: false)
+  @JsonKey(
+    
+    name: r'banqueId',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String banqueId;
 
-  @JsonKey(name: r'label', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'label',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String label;
 
-  @JsonKey(name: r'cases', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'cases',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num cases;
 
-  @JsonKey(name: r'cashed', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'cashed',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num cashed;
 
-  @JsonKey(name: r'rejected', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'rejected',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num rejected;
 
-  @JsonKey(name: r'amountXof', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'amountXof',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String amountXof;
 
-  @JsonKey(name: r'share', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'share',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final num share;
 
-  /// Durée moyenne de traitement en heures, création → étape terminale.
-  @JsonKey(name: r'meanProcessingHours', required: true, includeIfNull: true)
+
+
+      /// Durée moyenne de traitement en heures, création → étape terminale.
+  @JsonKey(
+    
+    name: r'meanProcessingHours',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final num? meanProcessingHours;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is BankBankBreakdownDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [
-                banqueId,
-                label,
-                cases,
-                cashed,
-                rejected,
-                amountXof,
-                share,
-                meanProcessingHours,
-              ],
-              [
-                other.banqueId,
-                other.label,
-                other.cases,
-                other.cashed,
-                other.rejected,
-                other.amountXof,
-                other.share,
-                other.meanProcessingHours,
-              ],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([
+
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is BankBankBreakdownDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            banqueId,
+            label,
+            cases,
+            cashed,
+            rejected,
+            amountXof,
+            share,
+            meanProcessingHours,
+        ],
+        [
+            other.banqueId,
+            other.label,
+            other.cases,
+            other.cashed,
+            other.rejected,
+            other.amountXof,
+            other.share,
+            other.meanProcessingHours,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
         banqueId,
         label,
         cases,
@@ -101,10 +175,9 @@ class BankBankBreakdownDto {
         amountXof,
         share,
         meanProcessingHours,
-      ]);
+    ],);
 
-  factory BankBankBreakdownDto.fromJson(Map<String, dynamic> json) =>
-      _$BankBankBreakdownDtoFromJson(json);
+  factory BankBankBreakdownDto.fromJson(Map<String, dynamic> json) => _$BankBankBreakdownDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$BankBankBreakdownDtoToJson(this);
 
@@ -112,4 +185,6 @@ class BankBankBreakdownDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

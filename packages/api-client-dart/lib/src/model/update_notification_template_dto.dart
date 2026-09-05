@@ -10,6 +10,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'update_notification_template_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,74 +21,131 @@ part 'update_notification_template_dto.g.dart';
 class UpdateNotificationTemplateDto {
   /// Returns a new [UpdateNotificationTemplateDto] instance.
   UpdateNotificationTemplateDto({
-    this.name,
 
-    this.category,
+     this.name,
 
-    this.titleTemplate,
+     this.category,
 
-    this.bodyTemplate,
+     this.titleTemplate,
 
-    this.route,
+     this.bodyTemplate,
 
-    this.isActive,
+     this.route,
+
+     this.isActive,
   });
 
-  @JsonKey(name: r'name', required: false, includeIfNull: false)
+  @JsonKey(
+    
+    name: r'name',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final String? name;
 
+
+
   @JsonKey(
+    
     name: r'category',
     required: false,
     includeIfNull: false,
-    unknownEnumValue: NotificationCategory.unknownDefaultOpenApi,
+  unknownEnumValue: NotificationCategory.unknownDefaultOpenApi,
   )
+
+
   final NotificationCategory? category;
 
-  @JsonKey(name: r'titleTemplate', required: false, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'titleTemplate',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final String? titleTemplate;
 
-  @JsonKey(name: r'bodyTemplate', required: false, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'bodyTemplate',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final String? bodyTemplate;
 
-  /// Chaîne vide pour retirer le lien.
-  @JsonKey(name: r'route', required: false, includeIfNull: false)
+
+
+      /// Chaîne vide pour retirer le lien.
+  @JsonKey(
+    
+    name: r'route',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final String? route;
 
-  @JsonKey(name: r'isActive', required: false, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'isActive',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final bool? isActive;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is UpdateNotificationTemplateDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [name, category, titleTemplate, bodyTemplate, route, isActive],
-              [
-                other.name,
-                other.category,
-                other.titleTemplate,
-                other.bodyTemplate,
-                other.route,
-                other.isActive,
-              ],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([
+
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is UpdateNotificationTemplateDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            name,
+            category,
+            titleTemplate,
+            bodyTemplate,
+            route,
+            isActive,
+        ],
+        [
+            other.name,
+            other.category,
+            other.titleTemplate,
+            other.bodyTemplate,
+            other.route,
+            other.isActive,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
         name,
         category,
         titleTemplate,
         bodyTemplate,
         route,
         isActive,
-      ]);
+    ],);
 
-  factory UpdateNotificationTemplateDto.fromJson(Map<String, dynamic> json) =>
-      _$UpdateNotificationTemplateDtoFromJson(json);
+  factory UpdateNotificationTemplateDto.fromJson(Map<String, dynamic> json) => _$UpdateNotificationTemplateDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$UpdateNotificationTemplateDtoToJson(this);
 
@@ -95,4 +153,6 @@ class UpdateNotificationTemplateDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

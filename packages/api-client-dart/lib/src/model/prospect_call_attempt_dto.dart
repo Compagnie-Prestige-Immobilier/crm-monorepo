@@ -11,6 +11,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'prospect_call_attempt_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -21,150 +22,283 @@ part 'prospect_call_attempt_dto.g.dart';
 class ProspectCallAttemptDto {
   /// Returns a new [ProspectCallAttemptDto] instance.
   ProspectCallAttemptDto({
-    required this.id,
 
-    required this.outcome,
+    required  this.id,
 
-    required this.reasonLabel,
+    required  this.outcome,
 
-    required this.method,
+    required  this.reasonLabel,
 
-    required this.comment,
+    required  this.method,
 
-    required this.email,
+    required  this.comment,
 
-    required this.fonctionnaire,
+    required  this.email,
 
-    required this.engagementEnCours,
+    required  this.fonctionnaire,
 
-    required this.dureeEtablissementMois,
+    required  this.engagementEnCours,
 
-    required this.rendezVousAt,
+    required  this.dureeEtablissementMois,
 
-    required this.deviceCallType,
+    required  this.rendezVousAt,
 
-    required this.deviceCallDurationSeconds,
+    required  this.deviceCallType,
 
-    required this.deviceCallAt,
+    required  this.deviceCallDurationSeconds,
 
-    required this.performedById,
+    required  this.deviceCallAt,
 
-    required this.performedByName,
+    required  this.performedById,
 
-    required this.clientCreatedAt,
+    required  this.performedByName,
+
+    required  this.clientCreatedAt,
   });
 
-  @JsonKey(name: r'id', required: true, includeIfNull: false)
+  @JsonKey(
+    
+    name: r'id',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String id;
 
+
+
   @JsonKey(
+    
     name: r'outcome',
     required: true,
     includeIfNull: false,
-    unknownEnumValue: CallOutcome.unknownDefaultOpenApi,
+  unknownEnumValue: CallOutcome.unknownDefaultOpenApi,
   )
+
+
   final CallOutcome outcome;
 
-  /// Libellé du motif choisi.
-  @JsonKey(name: r'reasonLabel', required: true, includeIfNull: true)
+
+
+      /// Libellé du motif choisi.
+  @JsonKey(
+    
+    name: r'reasonLabel',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final String? reasonLabel;
 
+
+
   @JsonKey(
+    
     name: r'method',
     required: true,
     includeIfNull: true,
-    unknownEnumValue: EnrollmentMethod.unknownDefaultOpenApi,
+  unknownEnumValue: EnrollmentMethod.unknownDefaultOpenApi,
   )
+
+
   final EnrollmentMethod? method;
 
-  @JsonKey(name: r'comment', required: true, includeIfNull: true)
-  final String? comment;
 
-  @JsonKey(name: r'email', required: true, includeIfNull: true)
-  final String? email;
-
-  @JsonKey(name: r'fonctionnaire', required: true, includeIfNull: true)
-  final bool? fonctionnaire;
-
-  @JsonKey(name: r'engagementEnCours', required: true, includeIfNull: true)
-  final bool? engagementEnCours;
-
-  @JsonKey(name: r'dureeEtablissementMois', required: true, includeIfNull: true)
-  final num? dureeEtablissementMois;
-
-  @JsonKey(name: r'rendezVousAt', required: true, includeIfNull: true)
-  final DateTime? rendezVousAt;
-
-  @JsonKey(name: r'deviceCallType', required: true, includeIfNull: true)
-  final String? deviceCallType;
 
   @JsonKey(
+    
+    name: r'comment',
+    required: true,
+    includeIfNull: true,
+  )
+
+
+  final String? comment;
+
+
+
+  @JsonKey(
+    
+    name: r'email',
+    required: true,
+    includeIfNull: true,
+  )
+
+
+  final String? email;
+
+
+
+  @JsonKey(
+    
+    name: r'fonctionnaire',
+    required: true,
+    includeIfNull: true,
+  )
+
+
+  final bool? fonctionnaire;
+
+
+
+  @JsonKey(
+    
+    name: r'engagementEnCours',
+    required: true,
+    includeIfNull: true,
+  )
+
+
+  final bool? engagementEnCours;
+
+
+
+  @JsonKey(
+    
+    name: r'dureeEtablissementMois',
+    required: true,
+    includeIfNull: true,
+  )
+
+
+  final num? dureeEtablissementMois;
+
+
+
+  @JsonKey(
+    
+    name: r'rendezVousAt',
+    required: true,
+    includeIfNull: true,
+  )
+
+
+  final DateTime? rendezVousAt;
+
+
+
+  @JsonKey(
+    
+    name: r'deviceCallType',
+    required: true,
+    includeIfNull: true,
+  )
+
+
+  final String? deviceCallType;
+
+
+
+  @JsonKey(
+    
     name: r'deviceCallDurationSeconds',
     required: true,
     includeIfNull: true,
   )
+
+
   final num? deviceCallDurationSeconds;
 
-  @JsonKey(name: r'deviceCallAt', required: true, includeIfNull: true)
+
+
+  @JsonKey(
+    
+    name: r'deviceCallAt',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final DateTime? deviceCallAt;
 
-  @JsonKey(name: r'performedById', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'performedById',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String performedById;
 
-  @JsonKey(name: r'performedByName', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'performedByName',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String performedByName;
 
-  @JsonKey(name: r'clientCreatedAt', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'clientCreatedAt',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final DateTime clientCreatedAt;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is ProspectCallAttemptDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [
-                id,
-                outcome,
-                reasonLabel,
-                method,
-                comment,
-                email,
-                fonctionnaire,
-                engagementEnCours,
-                dureeEtablissementMois,
-                rendezVousAt,
-                deviceCallType,
-                deviceCallDurationSeconds,
-                deviceCallAt,
-                performedById,
-                performedByName,
-                clientCreatedAt,
-              ],
-              [
-                other.id,
-                other.outcome,
-                other.reasonLabel,
-                other.method,
-                other.comment,
-                other.email,
-                other.fonctionnaire,
-                other.engagementEnCours,
-                other.dureeEtablissementMois,
-                other.rendezVousAt,
-                other.deviceCallType,
-                other.deviceCallDurationSeconds,
-                other.deviceCallAt,
-                other.performedById,
-                other.performedByName,
-                other.clientCreatedAt,
-              ],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([
+
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is ProspectCallAttemptDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            id,
+            outcome,
+            reasonLabel,
+            method,
+            comment,
+            email,
+            fonctionnaire,
+            engagementEnCours,
+            dureeEtablissementMois,
+            rendezVousAt,
+            deviceCallType,
+            deviceCallDurationSeconds,
+            deviceCallAt,
+            performedById,
+            performedByName,
+            clientCreatedAt,
+        ],
+        [
+            other.id,
+            other.outcome,
+            other.reasonLabel,
+            other.method,
+            other.comment,
+            other.email,
+            other.fonctionnaire,
+            other.engagementEnCours,
+            other.dureeEtablissementMois,
+            other.rendezVousAt,
+            other.deviceCallType,
+            other.deviceCallDurationSeconds,
+            other.deviceCallAt,
+            other.performedById,
+            other.performedByName,
+            other.clientCreatedAt,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
         id,
         outcome,
         reasonLabel,
@@ -181,10 +315,9 @@ class ProspectCallAttemptDto {
         performedById,
         performedByName,
         clientCreatedAt,
-      ]);
+    ],);
 
-  factory ProspectCallAttemptDto.fromJson(Map<String, dynamic> json) =>
-      _$ProspectCallAttemptDtoFromJson(json);
+  factory ProspectCallAttemptDto.fromJson(Map<String, dynamic> json) => _$ProspectCallAttemptDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$ProspectCallAttemptDtoToJson(this);
 
@@ -192,4 +325,6 @@ class ProspectCallAttemptDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

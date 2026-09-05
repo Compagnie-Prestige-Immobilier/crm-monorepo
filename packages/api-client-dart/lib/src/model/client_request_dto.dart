@@ -10,6 +10,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'client_request_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -20,149 +21,299 @@ part 'client_request_dto.g.dart';
 class ClientRequestDto {
   /// Returns a new [ClientRequestDto] instance.
   ClientRequestDto({
-    required this.id,
 
-    required this.nom,
+    required  this.id,
 
-    required this.prenom,
+    required  this.nom,
 
-    required this.phoneE164,
+    required  this.prenom,
 
-    required this.note,
+    required  this.phoneE164,
 
-    required this.banqueId,
+    required  this.note,
 
-    required this.banqueName,
+    required  this.banqueId,
 
-    required this.requestedById,
+    required  this.banqueName,
 
-    required this.requestedByName,
+    required  this.requestedById,
 
-    required this.status,
+    required  this.requestedByName,
 
-    required this.reviewedById,
+    required  this.status,
 
-    required this.reviewedByName,
+    required  this.reviewedById,
 
-    required this.reviewedAt,
+    required  this.reviewedByName,
 
-    required this.rejectionNote,
+    required  this.reviewedAt,
 
-    required this.createdProspectId,
+    required  this.rejectionNote,
 
-    required this.createdAt,
+    required  this.createdProspectId,
 
-    required this.updatedAt,
+    required  this.createdAt,
+
+    required  this.updatedAt,
   });
 
-  @JsonKey(name: r'id', required: true, includeIfNull: false)
+  @JsonKey(
+    
+    name: r'id',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final String id;
 
-  @JsonKey(name: r'nom', required: true, includeIfNull: false)
-  final String nom;
 
-  @JsonKey(name: r'prenom', required: true, includeIfNull: false)
-  final String prenom;
-
-  /// Téléphone normalisé E.164.
-  @JsonKey(name: r'phoneE164', required: true, includeIfNull: false)
-  final String phoneE164;
-
-  @JsonKey(name: r'note', required: true, includeIfNull: true)
-  final String? note;
-
-  @JsonKey(name: r'banqueId', required: true, includeIfNull: false)
-  final String banqueId;
-
-  @JsonKey(name: r'banqueName', required: true, includeIfNull: false)
-  final String banqueName;
-
-  @JsonKey(name: r'requestedById', required: true, includeIfNull: false)
-  final String requestedById;
-
-  @JsonKey(name: r'requestedByName', required: true, includeIfNull: false)
-  final String requestedByName;
 
   @JsonKey(
+    
+    name: r'nom',
+    required: true,
+    includeIfNull: false,
+  )
+
+
+  final String nom;
+
+
+
+  @JsonKey(
+    
+    name: r'prenom',
+    required: true,
+    includeIfNull: false,
+  )
+
+
+  final String prenom;
+
+
+
+      /// Téléphone normalisé E.164.
+  @JsonKey(
+    
+    name: r'phoneE164',
+    required: true,
+    includeIfNull: false,
+  )
+
+
+  final String phoneE164;
+
+
+
+  @JsonKey(
+    
+    name: r'note',
+    required: true,
+    includeIfNull: true,
+  )
+
+
+  final String? note;
+
+
+
+  @JsonKey(
+    
+    name: r'banqueId',
+    required: true,
+    includeIfNull: false,
+  )
+
+
+  final String banqueId;
+
+
+
+  @JsonKey(
+    
+    name: r'banqueName',
+    required: true,
+    includeIfNull: false,
+  )
+
+
+  final String banqueName;
+
+
+
+  @JsonKey(
+    
+    name: r'requestedById',
+    required: true,
+    includeIfNull: false,
+  )
+
+
+  final String requestedById;
+
+
+
+  @JsonKey(
+    
+    name: r'requestedByName',
+    required: true,
+    includeIfNull: false,
+  )
+
+
+  final String requestedByName;
+
+
+
+  @JsonKey(
+    
     name: r'status',
     required: true,
     includeIfNull: false,
-    unknownEnumValue: ClientRequestStatus.unknownDefaultOpenApi,
+  unknownEnumValue: ClientRequestStatus.unknownDefaultOpenApi,
   )
+
+
   final ClientRequestStatus status;
 
-  @JsonKey(name: r'reviewedById', required: true, includeIfNull: true)
+
+
+  @JsonKey(
+    
+    name: r'reviewedById',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final String? reviewedById;
 
-  @JsonKey(name: r'reviewedByName', required: true, includeIfNull: true)
+
+
+  @JsonKey(
+    
+    name: r'reviewedByName',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final String? reviewedByName;
 
-  @JsonKey(name: r'reviewedAt', required: true, includeIfNull: true)
+
+
+  @JsonKey(
+    
+    name: r'reviewedAt',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final DateTime? reviewedAt;
 
-  @JsonKey(name: r'rejectionNote', required: true, includeIfNull: true)
+
+
+  @JsonKey(
+    
+    name: r'rejectionNote',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final String? rejectionNote;
 
-  /// Prospect issu de l’approbation. Nul tant que la demande n’a pas abouti.
-  @JsonKey(name: r'createdProspectId', required: true, includeIfNull: true)
+
+
+      /// Prospect issu de l’approbation. Nul tant que la demande n’a pas abouti.
+  @JsonKey(
+    
+    name: r'createdProspectId',
+    required: true,
+    includeIfNull: true,
+  )
+
+
   final String? createdProspectId;
 
-  @JsonKey(name: r'createdAt', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'createdAt',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final DateTime createdAt;
 
-  @JsonKey(name: r'updatedAt', required: true, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'updatedAt',
+    required: true,
+    includeIfNull: false,
+  )
+
+
   final DateTime updatedAt;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is ClientRequestDto &&
-            runtimeType == other.runtimeType &&
-            equals(
-              [
-                id,
-                nom,
-                prenom,
-                phoneE164,
-                note,
-                banqueId,
-                banqueName,
-                requestedById,
-                requestedByName,
-                status,
-                reviewedById,
-                reviewedByName,
-                reviewedAt,
-                rejectionNote,
-                createdProspectId,
-                createdAt,
-                updatedAt,
-              ],
-              [
-                other.id,
-                other.nom,
-                other.prenom,
-                other.phoneE164,
-                other.note,
-                other.banqueId,
-                other.banqueName,
-                other.requestedById,
-                other.requestedByName,
-                other.status,
-                other.reviewedById,
-                other.reviewedByName,
-                other.reviewedAt,
-                other.rejectionNote,
-                other.createdProspectId,
-                other.createdAt,
-                other.updatedAt,
-              ],
-            );
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^
-      mapPropsToHashCode([
+
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is ClientRequestDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            id,
+            nom,
+            prenom,
+            phoneE164,
+            note,
+            banqueId,
+            banqueName,
+            requestedById,
+            requestedByName,
+            status,
+            reviewedById,
+            reviewedByName,
+            reviewedAt,
+            rejectionNote,
+            createdProspectId,
+            createdAt,
+            updatedAt,
+        ],
+        [
+            other.id,
+            other.nom,
+            other.prenom,
+            other.phoneE164,
+            other.note,
+            other.banqueId,
+            other.banqueName,
+            other.requestedById,
+            other.requestedByName,
+            other.status,
+            other.reviewedById,
+            other.reviewedByName,
+            other.reviewedAt,
+            other.rejectionNote,
+            other.createdProspectId,
+            other.createdAt,
+            other.updatedAt,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
         id,
         nom,
         prenom,
@@ -180,10 +331,9 @@ class ClientRequestDto {
         createdProspectId,
         createdAt,
         updatedAt,
-      ]);
+    ],);
 
-  factory ClientRequestDto.fromJson(Map<String, dynamic> json) =>
-      _$ClientRequestDtoFromJson(json);
+  factory ClientRequestDto.fromJson(Map<String, dynamic> json) => _$ClientRequestDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$ClientRequestDtoToJson(this);
 
@@ -191,4 +341,6 @@ class ClientRequestDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+

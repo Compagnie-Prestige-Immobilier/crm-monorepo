@@ -9,6 +9,7 @@ import 'package:equatable/src/equatable_utils.dart';
 
 part 'update_visite_referentiel_dto.g.dart';
 
+
 @CopyWith()
 @JsonSerializable(
   checked: true,
@@ -18,27 +19,62 @@ part 'update_visite_referentiel_dto.g.dart';
 )
 class UpdateVisiteReferentielDto {
   /// Returns a new [UpdateVisiteReferentielDto] instance.
-  UpdateVisiteReferentielDto({this.label, this.sortOrder});
+  UpdateVisiteReferentielDto({
 
-  @JsonKey(name: r'label', required: false, includeIfNull: false)
+     this.label,
+
+     this.sortOrder,
+  });
+
+  @JsonKey(
+    
+    name: r'label',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final String? label;
 
-  @JsonKey(name: r'sortOrder', required: false, includeIfNull: false)
+
+
+  @JsonKey(
+    
+    name: r'sortOrder',
+    required: false,
+    includeIfNull: false,
+  )
+
+
   final num? sortOrder;
 
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is UpdateVisiteReferentielDto &&
-            runtimeType == other.runtimeType &&
-            equals([label, sortOrder], [other.label, other.sortOrder]);
-  }
 
-  @override
-  int get hashCode =>
-      runtimeType.hashCode ^ mapPropsToHashCode([label, sortOrder]);
 
-  factory UpdateVisiteReferentielDto.fromJson(Map<String, dynamic> json) =>
-      _$UpdateVisiteReferentielDtoFromJson(json);
+
+    bool operator ==(Object other) {
+      return identical(this, other) ||
+      other is UpdateVisiteReferentielDto &&
+      runtimeType == other.runtimeType &&
+      equals(
+        [
+            label,
+            sortOrder,
+        ],
+        [
+            other.label,
+            other.sortOrder,
+        ]
+      );
+    }
+
+
+    @override
+    int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([
+        label,
+        sortOrder,
+    ],);
+
+  factory UpdateVisiteReferentielDto.fromJson(Map<String, dynamic> json) => _$UpdateVisiteReferentielDtoFromJson(json);
 
   Map<String, dynamic> toJson() => _$UpdateVisiteReferentielDtoToJson(this);
 
@@ -46,4 +82,6 @@ class UpdateVisiteReferentielDto {
   String toString() {
     return toJson().toString();
   }
+
 }
+
