@@ -168,6 +168,7 @@ const ouverture = (over: Partial<OuverturesData.OuvertureFiche> = {}) => ({
   prospectId: 'p-1',
   ficheNom: 'Neuve Fiche',
   openedAt: new Date().toISOString(),
+  firstInputAt: null,
   closedAt: null,
   dureeSecondes: null,
   closingAttemptId: null,
@@ -1022,11 +1023,20 @@ describe('ConsoleView : l’ouverture confirmée d’une fiche', () => {
     expect(screen.getByLabelText('Quel prospect avez-vous appelé ?')).toBeTruthy();
   });
 
-  it('enregistre l’ouverture, puis montre le chronomètre', async () => {
+  it('enregistre l’ouverture sans démarrer le chronomètre', async () => {
     await renderConsole([NEUVE]);
 
     expect(ouvrirFiche.mock.calls[0]?.[0]).toMatchObject({ prospectId: 'p-1' });
-    expect(screen.getByText(/Fiche ouverte depuis/u).textContent).toMatch(/\d\d:\d\d/u);
+    expect(screen.queryByText(/En saisie depuis/u)).toBeNull();
+  });
+
+  // Le temps de lecture de la fiche et de son historique n'est pas du traitement.
+  it('démarre le chronomètre à la première lettre, pas à l’ouverture', async () => {
+    await renderConsole([NEUVE]);
+
+    await userEvent.type(screen.getByLabelText(/Commentaire/u), 'i');
+
+    expect((await screen.findByText(/En saisie depuis/u)).textContent).toMatch(/\d\d:\d\d/u);
   });
 
   it('ferme l’ouverture avec la tentative : c’est ce qui arrête le chronomètre', async () => {
@@ -1220,7 +1230,7 @@ describe('ConsoleView : l’ouverture confirmée d’une fiche', () => {
     await renderConsole([close]);
 
     expect(ouvrirFiche).not.toHaveBeenCalled();
-    expect(screen.queryByText(/Fiche ouverte depuis/u)).toBeNull();
+    expect(screen.queryByText(/En saisie depuis/u)).toBeNull();
     expect(screen.getByRole('button', { name: 'Revenir à la liste' })).toBeTruthy();
   });
 });
@@ -1230,7 +1240,12 @@ describe('ConsoleView : l’ouverture confirmée d’une fiche', () => {
 describe('ConsoleView : la fiche tenue au rechargement', () => {
   it('rouvre au montage la fiche que le serveur tient encore, brouillon compris', async () => {
     fetchOuvertureCourante.mockResolvedValue(
-      ouverture({ id: 'ouv-7', prospectId: 'p-1', draft: { comment: 'il est en réunion' } }),
+      ouverture({
+        id: 'ouv-7',
+        prospectId: 'p-1',
+        firstInputAt: new Date().toISOString(),
+        draft: { comment: 'il est en réunion' },
+      }),
     );
     fetchProspect.mockResolvedValue(NEUVE);
 
@@ -1238,20 +1253,23 @@ describe('ConsoleView : la fiche tenue au rechargement', () => {
 
     expect((await screen.findByRole('heading', { level: 2 })).textContent).toBe('Neuve Fiche');
     expect(screen.getByLabelText(/Commentaire/u)).toHaveProperty('value', 'il est en réunion');
-    expect(screen.getByText(/Fiche ouverte depuis/u)).toBeTruthy();
+    expect(screen.getByText(/En saisie depuis/u)).toBeTruthy();
     // Rouvrir n'est pas ouvrir : la fiche est déjà comptée, EB-07.
     expect(ouvrirFiche).not.toHaveBeenCalled();
   });
 
-  it('remet le chronomètre à l’heure de l’ouverture, pas à zéro', async () => {
+  it('remet le chronomètre à l’heure de la première saisie, pas à celle de l’ouverture', async () => {
     fetchOuvertureCourante.mockResolvedValue(
-      ouverture({ openedAt: new Date(Date.now() - 125_000).toISOString() }),
+      ouverture({
+        openedAt: new Date(Date.now() - 600_000).toISOString(),
+        firstInputAt: new Date(Date.now() - 125_000).toISOString(),
+      }),
     );
     fetchProspect.mockResolvedValue(NEUVE);
 
     await renderListe([NEUVE]);
 
-    expect((await screen.findByText(/Fiche ouverte depuis/u)).textContent).toContain('02:0');
+    expect((await screen.findByText(/En saisie depuis/u)).textContent).toContain('02:0');
   });
 
   it('reverrouille la navigation sur la fiche rouverte', async () => {
@@ -1310,9 +1328,11 @@ describe('ConsoleView : la saisie survit à une fermeture brutale', () => {
     masquerLOnglet();
 
     await waitFor(() => {
-      expect(enregistrerBrouillon).toHaveBeenCalledWith('ouv-1', {
-        comment: 'il rappelle ce soir',
-      });
+      expect(enregistrerBrouillon).toHaveBeenCalledWith(
+        'ouv-1',
+        { comment: 'il rappelle ce soir' },
+        expect.stringMatching(/^\d{4}-/u) as unknown,
+      );
     });
     // Dix-neuf frappes, une écriture : c'est l'anti-rafale qui les a réunies.
     expect(enregistrerBrouillon).toHaveBeenCalledTimes(1);
@@ -1327,10 +1347,14 @@ describe('ConsoleView : la saisie survit à une fermeture brutale', () => {
     masquerLOnglet();
 
     await waitFor(() => {
-      expect(enregistrerBrouillon).toHaveBeenCalledWith('ouv-1', {
-        comment: '',
-        conversion: expect.objectContaining({ dureeEtablissementMois: '36' }) as unknown,
-      });
+      expect(enregistrerBrouillon).toHaveBeenCalledWith(
+        'ouv-1',
+        {
+          comment: '',
+          conversion: expect.objectContaining({ dureeEtablissementMois: '36' }) as unknown,
+        },
+        expect.stringMatching(/^\d{4}-/u) as unknown,
+      );
     });
   });
 

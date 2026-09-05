@@ -493,7 +493,7 @@ function Consignation({
   const [now] = useState(() => Date.now());
   const verrouille = ouverture !== null && !closed;
 
-  useBrouillonAuto(ouverture, brouillonDe(comment, conversion));
+  const departChrono = useBrouillonAuto(ouverture, brouillonDe(comment, conversion));
 
   const send = useMutation({
     mutationFn: async (draft: AttemptDraft) => {
@@ -699,7 +699,7 @@ function Consignation({
         </Button>
       )}
 
-      {ouverture === null ? null : <Chrono openedAt={ouverture.openedAt} />}
+      {departChrono === null ? null : <Chrono firstInputAt={departChrono} />}
 
       <section aria-label="Fiche courante" className="flex flex-col gap-4">
         <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">{nomComplet}</h2>

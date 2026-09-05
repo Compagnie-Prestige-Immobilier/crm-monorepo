@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { enregistrerBrouillon, type OuvertureFiche } from '@/lib/data/ouvertures';
 
@@ -18,17 +18,23 @@ const ATTENTE_MAX_MS = 5_000;
  *
  * Un échec ne se dit pas : c'est un filet, pas une opération métier. La charge
  * refusée reste en attente et repart à la modification suivante.
+ *
+ * Rend le départ du chronomètre, nul tant que rien n'a été modifié. L'heure est
+ * relevée à la frappe et non à l'envoi, et part avec le brouillon : le serveur
+ * la retient telle quelle, donc elle reste sur l'horloge qui l'affiche.
  */
 export function useBrouillonAuto(
   ouverture: OuvertureFiche | null,
   draft: Record<string, unknown>,
-): void {
+): string | null {
   const ouvertureId = ouverture?.id ?? null;
   const serialise = JSON.stringify(draft);
   const aEcrire = useRef<string | null>(null);
   const ecrit = useRef<string | null>(null);
   const repos = useRef<ReturnType<typeof setTimeout> | null>(null);
   const plafond = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const premiereSaisie = useRef<string | null>(null);
+  const [saisie, setSaisie] = useState<string | null>(null);
 
   const annuler = useCallback(() => {
     if (repos.current !== null) clearTimeout(repos.current);
@@ -42,7 +48,11 @@ export function useBrouillonAuto(
     const charge = aEcrire.current;
     if (charge === null || ouvertureId === null) return;
     aEcrire.current = null;
-    void enregistrerBrouillon(ouvertureId, JSON.parse(charge) as Record<string, unknown>).then(
+    void enregistrerBrouillon(
+      ouvertureId,
+      JSON.parse(charge) as Record<string, unknown>,
+      premiereSaisie.current ?? undefined,
+    ).then(
       () => {
         ecrit.current = charge;
       },
@@ -62,6 +72,10 @@ export function useBrouillonAuto(
       return;
     }
     aEcrire.current = serialise;
+    if (premiereSaisie.current === null) {
+      premiereSaisie.current = new Date().toISOString();
+      setSaisie(premiereSaisie.current);
+    }
     if (repos.current !== null) clearTimeout(repos.current);
     repos.current = setTimeout(envoyer, REPOS_MS);
     plafond.current ??= setTimeout(envoyer, ATTENTE_MAX_MS);
@@ -79,4 +93,6 @@ export function useBrouillonAuto(
       annuler();
     };
   }, [annuler, envoyer]);
+
+  return ouverture?.firstInputAt ?? saisie;
 }
