@@ -49,6 +49,7 @@ import {
 import { fetchReferenceData } from '@/lib/data/reference';
 import { fetchRepresentantsAQualifier, type ScriptedRepresentant } from '@/lib/data/representants';
 import {
+  exigeMotif,
   fetchStatutsQualification,
   libelleStatut,
   statutDuSouhait,
@@ -616,11 +617,13 @@ function ChoixStatut({
   statuts,
   value,
   onChange,
+  onFerme,
   pose,
 }: {
   statuts: readonly StatutQualification[];
   value: string | null;
   onChange: (valeur: string | null) => void;
+  onFerme: () => void;
   pose: StatutQualification | null;
 }) {
   return (
@@ -634,6 +637,9 @@ function ChoixStatut({
         items={statuts.map((statut) => ({ value: statut.id, label: libelleStatut(statut) }))}
         value={value}
         onValueChange={onChange}
+        onOpenChangeComplete={(ouvert) => {
+          if (!ouvert) onFerme();
+        }}
       >
         <SelectTrigger id="rep-statut">
           <SelectValue placeholder={pose === null ? 'Choisir un statut' : libelleStatut(pose)} />
@@ -661,6 +667,7 @@ interface EtapeQuestionsProps {
   statuts: readonly StatutQualification[];
   statutId: string | null;
   onStatut: (valeur: string | null) => void;
+  onStatutFerme: () => void;
   statutPose: StatutQualification | null;
   exigeRappel: boolean;
   joignable: boolean;
@@ -670,12 +677,14 @@ interface EtapeQuestionsProps {
   rappel: { now: number; value: string | null; onChange: (valeur: string | null) => void };
   commentaire: string;
   onCommentaire: (valeur: string) => void;
+  inputRef: React.RefObject<HTMLTextAreaElement | null>;
+  motifObligatoire: boolean;
   manque: string | null;
   onContinuer: () => void;
 }
 
 /** La première étape : les questions, dans l'ordre où l'appel les pose. */
-function EtapeQuestions(props: EtapeQuestionsProps) {
+function EtapeQuestions({ inputRef, ...props }: EtapeQuestionsProps) {
   return (
     <div className="flex flex-col gap-5">
       <Question titre="Comment s’est passé l’appel ?">
@@ -695,6 +704,7 @@ function EtapeQuestions(props: EtapeQuestionsProps) {
           statuts={props.statuts}
           value={props.statutId}
           onChange={props.onStatut}
+          onFerme={props.onStatutFerme}
           pose={props.statutPose}
         />
       )}
@@ -713,13 +723,17 @@ function EtapeQuestions(props: EtapeQuestionsProps) {
       ) : null}
 
       {props.resultat === null ? null : (
-        <Question titre="Quelque chose à ajouter ? (facultatif)" anime>
+        <Question
+          titre={props.motifObligatoire ? 'Pourquoi ?' : 'Quelque chose à ajouter ? (facultatif)'}
+          anime
+        >
           <div className="flex flex-col gap-1.5">
             <label htmlFor="rep-commentaire" className="text-[0.875rem] font-[600]">
-              Commentaire
+              {props.motifObligatoire ? 'Motif' : 'Commentaire'}
             </label>
             <Textarea
               id="rep-commentaire"
+              ref={inputRef}
               rows={3}
               maxLength={2000}
               placeholder="En une phrase"
@@ -905,6 +919,7 @@ interface EtatManque {
   memeWhatsapp: boolean | null;
   whatsapp: string;
   rappelAt: string | null;
+  commentaire: string;
   proposeQuelquUn: boolean;
   suggestionCommencee: boolean;
   sugPhone: string;
@@ -946,6 +961,7 @@ function manqueDe(etat: EtatManque): string | null {
     if (script !== null) return script;
   }
   if (etat.statut === null) return 'Choisissez un statut de qualification';
+  if (exigeMotif(etat.statut) && etat.commentaire.trim() === '') return 'Écrivez le motif';
   if (dateDemandee(etat.statut) && etat.rappelAt === null) return 'Choisissez quand rappeler';
   // Le serveur jette une suggestion sans numéro : plutôt que d'effacer en
   // silence ce qui vient d'être dicté, l'enregistrement attend le numéro.
@@ -1051,6 +1067,7 @@ function Qualification({
   const [sugName, setSugName] = useState('');
   const [sugNote, setSugNote] = useState('');
   const [commentaire, setCommentaire] = useState('');
+  const commentaireRef = useRef<HTMLTextAreaElement>(null);
   const [edit, setEdit] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   // La garde du mobile : une relation DÉJÀ TRANCHÉE, acceptation comme refus,
@@ -1108,10 +1125,13 @@ function Qualification({
     memeWhatsapp,
     whatsapp,
     rappelAt,
+    commentaire,
     proposeQuelquUn,
     suggestionCommencee,
     sugPhone,
   });
+
+  const motifObligatoire = statut !== null && exigeMotif(statut);
 
   const enregistrer = (): void => {
     if (manque !== null || resultat === null || statut === null || send.isPending) return;
@@ -1227,6 +1247,11 @@ function Qualification({
           statuts={statuts}
           statutId={statutId}
           onStatut={choisirStatut}
+          onStatutFerme={() => {
+            // Le curseur part sur le motif, une fois le sélecteur refermé : sans
+            // cela l'obligation ne se voit pas. Il rend le focus en dernier.
+            if (motifObligatoire) commentaireRef.current?.focus();
+          }}
           statutPose={statutPose}
           exigeRappel={statut !== null && dateDemandee(statut)}
           joignable={joignable}
@@ -1254,6 +1279,8 @@ function Qualification({
           rappel={{ now, value: rappelAt, onChange: setRappelAt }}
           commentaire={commentaire}
           onCommentaire={setCommentaire}
+          inputRef={commentaireRef}
+          motifObligatoire={motifObligatoire}
           manque={manque}
           onContinuer={() => {
             setEtape(2);

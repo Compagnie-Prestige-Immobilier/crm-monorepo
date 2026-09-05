@@ -85,6 +85,13 @@ const LIBELLES_ABREGES: Record<string, string> = {
 export const libelleStatut = (statut: Pick<StatutQualification, 'code' | 'label'>): string =>
   LIBELLES_ABREGES[statut.code] ?? statut.label;
 
+/**
+ * Le statut réclame un motif écrit. Le client généré est encore en retard sur
+ * la colonne : sans elle, aucun statut n'en exige.
+ */
+export const exigeMotif = (statut: StatutQualification): boolean =>
+  (statut as { requiresComment?: boolean }).requiresComment === true;
+
 /** Les deux statuts que la question du script pose seule : ils ne se choisissent plus. */
 export const STATUTS_DE_LA_QUESTION = { oui: 'ACCEPTE', non: 'REFUSE' } as const;
 
