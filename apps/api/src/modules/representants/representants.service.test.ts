@@ -25,6 +25,7 @@ interface MockDb {
   >;
   representantRelationChange: Record<'create' | 'findMany', MockFn>;
   repCallAttempt: Record<'findMany', MockFn>;
+  ouvertureFiche: Record<'findMany', MockFn>;
   representantComment: Record<
     'findMany' | 'findUniqueOrThrow' | 'count' | 'createMany' | 'updateMany',
     MockFn
@@ -95,6 +96,7 @@ beforeEach(() => {
     },
     representantRelationChange: { create: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
     repCallAttempt: { findMany: vi.fn().mockResolvedValue([]) },
+    ouvertureFiche: { findMany: vi.fn().mockResolvedValue([]) },
     representantComment: {
       findMany: vi.fn().mockResolvedValue([]),
       findUniqueOrThrow: vi.fn(),
@@ -603,6 +605,14 @@ describe('historique des appels', () => {
       },
     ]);
 
+    db.ouvertureFiche.findMany.mockResolvedValue([
+      {
+        closingAttemptId: 'att-1',
+        firstInputAt: new Date('2026-08-05T10:00:00.000Z'),
+        closedAt: new Date('2026-08-05T10:07:00.000Z'),
+      },
+    ]);
+
     const result = await service.callHistory('rep-9');
 
     expect(result.items).toEqual([
@@ -629,6 +639,7 @@ describe('historique des appels', () => {
         deviceCallDurationSeconds: 92,
         deviceCallAt: '2026-08-05T10:00:14.000Z',
         clientCreatedAt: date.toISOString(),
+        dureeTraitementSecondes: 420,
       },
     ]);
     const args = db.repCallAttempt.findMany.mock.calls[0]?.[0] as { orderBy: unknown[] };

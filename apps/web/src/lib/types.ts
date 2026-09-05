@@ -108,6 +108,13 @@ export const readsOnly = (role: Role | undefined): boolean =>
 export const canExportProspects = (role: Role | undefined): boolean =>
   role === 'ADMIN' || role === 'COMMERCIAL' || role === 'DIRECTION';
 
+/**
+ * Miroir de `PARCOURS_ROLES` côté API : les seuls rôles qui peuvent ouvrir une
+ * fiche, donc les seuls à qui la barre supérieure a une ouverture à demander.
+ */
+export const peutTenirUneFiche = (role: Role | undefined): boolean =>
+  role === 'ADMIN' || role === 'COMMERCIAL' || role === 'SUPERVISEUR' || role === 'DIRECTION';
+
 /** Miroir de `@Roles` sur `GET /export/representants.xlsx`. */
 export const canExportRepresentants = (role: Role | undefined): boolean =>
   role === 'ADMIN' || role === 'COMMERCIAL' || role === 'SUPERVISEUR' || role === 'DIRECTION';

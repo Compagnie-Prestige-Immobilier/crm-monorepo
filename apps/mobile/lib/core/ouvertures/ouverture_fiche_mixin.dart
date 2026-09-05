@@ -23,8 +23,8 @@ mixin OuvertureFicheMixin<T extends ConsumerStatefulWidget>
   /// se fermer tant qu'aucun statut n'est posé.
   OuverturesFicheData? ouverture;
 
-  /// Bat la seconde. La durée ne se stocke pas : elle se lit entre l'ouverture
-  /// et maintenant.
+  /// Bat la seconde. La durée ne se stocke pas : elle se lit entre la première
+  /// saisie et maintenant.
   Timer? _battement;
 
   /// Le temps affiché, hors `setState` : un rebâti par seconde marquerait le
@@ -86,12 +86,38 @@ mixin OuvertureFicheMixin<T extends ConsumerStatefulWidget>
         );
     if (!mounted || resultat.ouverte == null) return resultat;
     setState(() => ouverture = resultat.ouverte);
-    ecoule.value = tempsDeTraitement ?? Duration.zero;
+    // Après un plantage, la fiche se rouvre avec sa borne : le chronomètre
+    // repart de la première saisie, jamais de zéro.
+    _suivreLeTemps();
+    return resultat;
+  }
+
+  /// EB-09 : le chronomètre part de la PREMIÈRE SAISIE, une lettre tapée ou une
+  /// case cochée. Lire la fiche, la faire défiler ou tourner une étape ne sont
+  /// pas du traitement.
+  ///
+  /// La borne se pose une seule fois, tenue par la base et non par l'écran :
+  /// rappelée à chaque frappe, elle ferait reculer le départ sans fin.
+  Future<void> premiereSaisie(Map<String, Object?> draft) async {
+    final OuverturesFicheData? prise = ouverture;
+    if (prise == null || prise.firstInputAt != null) return;
+    final OuverturesFicheData? posee = await ref
+        .read(ouvertureRepositoryProvider)
+        .marquerLaPremiereSaisie(id: prise.id, draft: draft);
+    if (!mounted || posee?.firstInputAt == null) return;
+    setState(() => ouverture = posee);
+    _suivreLeTemps();
+  }
+
+  void _suivreLeTemps() {
     _battement?.cancel();
+    _battement = null;
+    final Duration? passe = tempsDeTraitement;
+    if (passe == null) return;
+    ecoule.value = passe;
     _battement = Timer.periodic(const Duration(seconds: 1), (Timer _) {
       if (mounted) ecoule.value = tempsDeTraitement ?? Duration.zero;
     });
-    return resultat;
   }
 
   /// La qualification lève le verrou : elle a déjà fermé l'ouverture en base.
@@ -112,22 +138,19 @@ mixin OuvertureFicheMixin<T extends ConsumerStatefulWidget>
         .enregistrerBrouillon(id: prise.id, draft: draft);
   }
 
-  /// Le temps écoulé depuis l'ouverture confirmée. Nul tant qu'aucune fiche
-  /// n'est prise en main.
+  /// Le temps écoulé depuis la première saisie. Nul tant que la fiche n'a été
+  /// que lue : un chronomètre qui n'a pas démarré n'affiche pas zéro.
   Duration? get tempsDeTraitement {
-    final OuverturesFicheData? prise = ouverture;
-    if (prise == null) return null;
-    final Duration passe = ref
-        .read(clockProvider)
-        .now()
-        .difference(prise.openedAt);
+    final DateTime? depart = ouverture?.firstInputAt;
+    if (depart == null) return null;
+    final Duration passe = ref.read(clockProvider).now().difference(depart);
     return passe.isNegative ? Duration.zero : passe;
   }
 
-  /// EB-09 : le temps de traitement, visible jusqu'à la qualification.
+  /// EB-09 : le temps passé SUR LA FICHE, visible jusqu'à la qualification.
   /// Distinct de la durée de communication du journal d'appels.
   Widget? chronometre(ThemeData theme) {
-    if (ouverture == null) return null;
+    if (ouverture?.firstInputAt == null) return null;
     return ValueListenableBuilder<Duration>(
       valueListenable: ecoule,
       builder: (BuildContext context, Duration passe, Widget? _) =>
@@ -144,7 +167,7 @@ mixin OuvertureFicheMixin<T extends ConsumerStatefulWidget>
     ),
     child: Semantics(
       liveRegion: true,
-      label: 'Fiche ouverte depuis ${passe.inMinutes} minutes',
+      label: 'Temps sur la fiche : ${passe.inMinutes} minutes',
       excludeSemantics: true,
       child: Row(
         children: <Widget>[

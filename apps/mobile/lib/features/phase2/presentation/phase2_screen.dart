@@ -133,18 +133,41 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen>
       _phone.text = Phone.editable(prefill);
     }
     _phone.addListener(_onPhoneChanged);
-    _comment.addListener(markDraftDirty);
+    _comment.addListener(_saisie);
     _form.watch(() {
-      markDraftDirty();
+      _saisie();
       if (mounted) setState(() {});
     });
+  }
+
+  /// Une lettre tapée ou une case cochée : le brouillon est sale, et c'est de
+  /// là que part le chronomètre.
+  ///
+  /// Le formulaire s'écrit aussi tout seul : le vidage, la reprise du
+  /// brouillon et le pré-remplissage depuis la fiche notifient les mêmes
+  /// écouteurs sans que personne n'ait rien saisi.
+  void _saisie() {
+    markDraftDirty();
+    if (_ecritSeul) return;
+    unawaited(premiereSaisie(collectDraftValues()));
+  }
+
+  bool _ecritSeul = false;
+
+  void _sansSaisie(VoidCallback ecrire) {
+    _ecritSeul = true;
+    try {
+      ecrire();
+    } finally {
+      _ecritSeul = false;
+    }
   }
 
   @override
   void dispose() {
     if (!_savingRecording) _discardRecording();
     _phone.removeListener(_onPhoneChanged);
-    _comment.removeListener(markDraftDirty);
+    _comment.removeListener(_saisie);
     _phone.dispose();
     _phoneFocus.dispose();
     _comment.dispose();
@@ -177,8 +200,10 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen>
     }
     // Un autre numéro, c'est une autre personne : ses renseignements ne se
     // reprennent pas de l'appel précédent.
-    _form.clear();
-    _comment.clear();
+    _sansSaisie(() {
+      _form.clear();
+      _comment.clear();
+    });
     await _runSearch(e164);
     if (!mounted) return;
     await _reprendreLeBrouillon();
@@ -278,9 +303,11 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen>
     final DraftSnapshot? repris = await draftRepository.read(draftId);
     if (repris == null || !mounted) return;
     setState(() {
-      _form.applyDraft(repris.values);
-      final Object? comment = repris.values['comment'];
-      if (comment is String) _comment.text = comment;
+      _sansSaisie(() {
+        _form.applyDraft(repris.values);
+        final Object? comment = repris.values['comment'];
+        if (comment is String) _comment.text = comment;
+      });
     });
   }
 
@@ -303,8 +330,10 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen>
     _discardRecording();
     _lastSearched = null;
     _phone.clear();
-    _comment.clear();
-    _form.clear();
+    _sansSaisie(() {
+      _comment.clear();
+      _form.clear();
+    });
     setState(() {
       _step = 1;
       _noteOuverte = false;
@@ -479,7 +508,7 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen>
                   syndicats: syndicats,
                   tranches: tranches,
                   onChanged: () {
-                    markDraftDirty();
+                    _saisie();
                     setState(() {});
                   },
                 ),
@@ -544,11 +573,13 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen>
 
   void _versLesRenseignements(List<Banque> banques, List<Syndicat> syndicats) {
     final Phase2State phase2 = ref.read(phase2ControllerProvider);
-    _form.prefill(
-      phase2.prospect,
-      phoneE164: phase2.entry?.phoneE164 ?? '',
-      banques: banques,
-      syndicats: syndicats,
+    _sansSaisie(
+      () => _form.prefill(
+        phase2.prospect,
+        phoneE164: phase2.entry?.phoneE164 ?? '',
+        banques: banques,
+        syndicats: syndicats,
+      ),
     );
     setState(() => _step = 2);
   }

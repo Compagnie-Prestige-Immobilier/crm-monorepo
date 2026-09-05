@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -84,8 +85,18 @@ String? issueDuStatut(String effet) => const <String, String>{
 }[effet];
 
 /// La question qui pose le statut : oui rattache la personne, non la refuse.
-/// Le téléconseiller ne choisit plus ces deux statuts à part.
 const String kQuestionCHUES = 'Souhaite-t-il être représentant CHUES ?';
+
+/// La réponse que ce statut vaut, nulle quand il ne répond pas à la question.
+/// Le serveur refuse une relation qui contredit le statut posé
+/// (`REP_RELATION_STATUT_MISMATCH`) : choisir le statut dans la liste doit donc
+/// répondre à la question, jamais la laisser diverger.
+bool? souhaitDuStatut(StatutQualificationRow? statut) =>
+    switch (statut?.relationStatus) {
+      'AMBASSADEUR' => true,
+      'REFUS' => false,
+      _ => null,
+    };
 
 const String kQuestionManquante = 'Répondez à la question CHUES';
 
@@ -265,6 +276,19 @@ class _RepresentantQualificationScreenState
   void setState(VoidCallback fn) {
     super.setState(fn);
     markDraftDirty();
+    signalerLaSaisie();
+  }
+
+  /// Les réponses au dernier passage. Le chronomètre part d'une réponse qui a
+  /// CHANGÉ : le refus affiché, l'étape tournée et la fiche importée
+  /// redessinent l'écran sans que rien n'ait été saisi.
+  Map<String, Object?> dernieresReponses = const <String, Object?>{};
+
+  void signalerLaSaisie() {
+    final Map<String, Object?> reponses = collectDraftValues();
+    if (mapEquals(dernieresReponses, reponses)) return;
+    dernieresReponses = reponses;
+    unawaited(premiereSaisie(reponses));
   }
 
   @override
@@ -498,8 +522,9 @@ class _RepresentantQualificationScreenState
       ref.watch(statutsQualificationProvider).value ??
       const <StatutQualificationRow>[];
 
-  /// Les statuts que la branche choisie propose. Ceux qui posent une relation
-  /// n'y sont pas : c'est la question, et non une tuile, qui les pose.
+  /// Les statuts que la branche choisie propose. « Accepté » et « Refusé » y
+  /// sont : le téléconseiller qui ne voit pas que la question vient de les
+  /// poser les cherche là où il les a toujours choisis.
   List<StatutQualificationRow> get statutsProposes {
     final _Resultat? choix = resultat;
     if (choix == null) return const <StatutQualificationRow>[];
@@ -507,10 +532,7 @@ class _RepresentantQualificationScreenState
         ? _effetsJoignable
         : _effetsInjoignable;
     return statutsDuReferentiel
-        .where(
-          (StatutQualificationRow s) =>
-              admis.contains(s.effect) && s.relationStatus == null,
-        )
+        .where((StatutQualificationRow s) => admis.contains(s.effect))
         .toList(growable: false);
   }
 
@@ -1183,6 +1205,16 @@ class _RepresentantQualificationScreenState
                   : 'Commentaire',
               subtitle: entree.comment!.trim(),
             ),
+          // Le temps passé SUR LA FICHE, à ne pas confondre avec le temps
+          // passé AU TÉLÉPHONE. Nul pour un appel d'avant le chronomètre, et
+          // « 0 s » y serait un mensonge.
+          if (entree.dureeTraitementSecondes != null)
+            CpiRow(
+              title: 'Temps sur la fiche',
+              subtitle: chrono(
+                Duration(seconds: entree.dureeTraitementSecondes!),
+              ),
+            ),
         ]),
       ],
     ];
@@ -1246,6 +1278,8 @@ class _RepresentantQualificationScreenState
           value: statutChoisi,
           onChanged: (StatutQualificationRow statut) => setState(() {
             statutChoisi = statut;
+            final bool? souhait = souhaitDuStatut(statut);
+            if (souhait != null) representantCHUES = souhait;
             // Un numéro occupé se retente : le réessai arrive préréglé au
             // délai du statut, l'appelant le déplace s'il veut.
             final int? reessai = statut.retryAfterMinutes;

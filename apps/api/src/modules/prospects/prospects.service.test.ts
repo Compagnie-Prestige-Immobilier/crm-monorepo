@@ -35,6 +35,7 @@ interface PrismaMock {
   };
   prospectConversion: { upsert: ReturnType<typeof vi.fn> };
   callAttempt: { findMany: ReturnType<typeof vi.fn> };
+  ouvertureFiche: { findMany: ReturnType<typeof vi.fn> };
   $transaction: ReturnType<typeof vi.fn>;
   $queryRaw: ReturnType<typeof vi.fn>;
 }
@@ -59,6 +60,7 @@ function makePrisma(): PrismaMock {
     },
     prospectConversion: { upsert: vi.fn() },
     callAttempt: { findMany: vi.fn().mockResolvedValue([]) },
+    ouvertureFiche: { findMany: vi.fn().mockResolvedValue([]) },
     $transaction: vi.fn(),
     $queryRaw: vi.fn().mockResolvedValue([]),
   };
@@ -688,6 +690,14 @@ describe('lecture du SUPERVISEUR', () => {
       },
     ]);
 
+    prisma.ouvertureFiche.findMany.mockResolvedValue([
+      {
+        closingAttemptId: 'att-1',
+        firstInputAt: new Date('2026-08-05T10:00:00.000Z'),
+        closedAt: new Date('2026-08-05T10:03:20.000Z'),
+      },
+    ]);
+
     const result = await service(prisma).callHistory(superviseur, 'p-1');
 
     expect(result.items).toEqual([
@@ -708,6 +718,7 @@ describe('lecture du SUPERVISEUR', () => {
         deviceCallDurationSeconds: 92,
         deviceCallAt: '2026-08-05T10:00:14.000Z',
         clientCreatedAt: DATE.toISOString(),
+        dureeTraitementSecondes: 200,
       },
     ]);
   });

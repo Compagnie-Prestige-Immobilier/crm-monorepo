@@ -51,6 +51,17 @@ export class EnregistrerBrouillonDto {
   })
   @IsObject()
   draft!: OuvertureDraft;
+
+  @ApiPropertyOptional({
+    type: String,
+    format: 'date-time',
+    description:
+      'Heure du terrain de la première saisie. Le serveur ne la retient qu’une fois, à la première ' +
+      'requête ; les suivantes ne la déplacent pas. Absente, l’heure du serveur en tient lieu.',
+  })
+  @IsOptional()
+  @IsISO8601()
+  firstInputAt?: string;
 }
 
 export class OuvertureFicheDto {
@@ -66,6 +77,15 @@ export class OuvertureFicheDto {
     type: String,
     format: 'date-time',
     nullable: true,
+    description:
+      'Première saisie, le départ du chronomètre. Nulle tant que rien n’a été saisi ; posée une seule fois.',
+  })
+  firstInputAt!: string | null;
+
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
     description: 'Nul tant que la fiche est verrouillée.',
   })
   closedAt!: string | null;
@@ -74,7 +94,7 @@ export class OuvertureFicheDto {
     type: Number,
     nullable: true,
     description:
-      'Durée de traitement, lue entre les deux bornes et jamais stockée. Distincte de la durée de communication du journal d’appels.',
+      'Durée de traitement, lue entre `firstInputAt` et `closedAt` et jamais stockée. Nulle tant que l’une des deux manque : un chronomètre qui n’a pas démarré n’affiche pas zéro. Distincte de la durée de communication du journal d’appels.',
   })
   dureeSecondes!: number | null;
 
@@ -127,7 +147,8 @@ export class ComptageOuverturesJourDto {
   @ApiProperty({
     type: Number,
     nullable: true,
-    description: 'DMT du jour, en secondes. Nulle tant qu’aucune ouverture n’est fermée.',
+    description:
+      'DMT du jour, en secondes, lue entre la première saisie et la qualification. Les ouvertures fermées sans aucune saisie n’entrent pas au dénominateur. Nulle tant qu’aucune ne s’y prête.',
   })
   dureeMoyenneSecondes!: number | null;
 }

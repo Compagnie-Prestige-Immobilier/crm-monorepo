@@ -28,6 +28,7 @@ const ouverture = (
   prospectId: null,
   ficheNom: 'Aminata Ndiaye',
   openedAt: new Date(Date.now() - 20 * 60_000).toISOString(),
+  firstInputAt: null,
   closedAt: null,
   dureeSecondes: null,
   closingAttemptId: null,

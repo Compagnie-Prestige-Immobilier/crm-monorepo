@@ -165,6 +165,7 @@ const ouverture = (over: Partial<OuverturesData.OuvertureFiche> = {}) => ({
   prospectId: null,
   ficheNom: 'Aminata Ndiaye',
   openedAt: new Date().toISOString(),
+  firstInputAt: null,
   closedAt: null,
   dureeSecondes: null,
   closingAttemptId: null,
@@ -179,7 +180,7 @@ async function ouvrirQualification(): Promise<void> {
   await userEvent.type(await screen.findByLabelText('Qui avez-vous appelé ?'), 'a');
   await userEvent.click(await screen.findByRole('button', { name: /Aminata Ndiaye/u }));
   await userEvent.click(await screen.findByRole('button', { name: 'Ouvrir' }));
-  await screen.findByText(/Fiche ouverte depuis/u);
+  await screen.findByText(/Étape 1 sur 2/u);
 }
 
 const repondre = async (label: string): Promise<void> => {

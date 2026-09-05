@@ -59,6 +59,10 @@ abstract class _$RepresentantCallAttemptDtoCWProxy {
 
   RepresentantCallAttemptDto clientCreatedAt(DateTime clientCreatedAt);
 
+  RepresentantCallAttemptDto dureeTraitementSecondes(
+    num? dureeTraitementSecondes,
+  );
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `RepresentantCallAttemptDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -88,6 +92,7 @@ abstract class _$RepresentantCallAttemptDtoCWProxy {
     String performedById,
     String performedByName,
     DateTime clientCreatedAt,
+    num? dureeTraitementSecondes,
   });
 }
 
@@ -192,6 +197,11 @@ class _$RepresentantCallAttemptDtoCWProxyImpl
       this(clientCreatedAt: clientCreatedAt);
 
   @override
+  RepresentantCallAttemptDto dureeTraitementSecondes(
+    num? dureeTraitementSecondes,
+  ) => this(dureeTraitementSecondes: dureeTraitementSecondes);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `RepresentantCallAttemptDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -221,6 +231,7 @@ class _$RepresentantCallAttemptDtoCWProxyImpl
     Object? performedById = const $CopyWithPlaceholder(),
     Object? performedByName = const $CopyWithPlaceholder(),
     Object? clientCreatedAt = const $CopyWithPlaceholder(),
+    Object? dureeTraitementSecondes = const $CopyWithPlaceholder(),
   }) {
     return RepresentantCallAttemptDto(
       id: id == const $CopyWithPlaceholder()
@@ -316,6 +327,11 @@ class _$RepresentantCallAttemptDtoCWProxyImpl
           ? _value.clientCreatedAt
           // ignore: cast_nullable_to_non_nullable
           : clientCreatedAt as DateTime,
+      dureeTraitementSecondes:
+          dureeTraitementSecondes == const $CopyWithPlaceholder()
+          ? _value.dureeTraitementSecondes
+          // ignore: cast_nullable_to_non_nullable
+          : dureeTraitementSecondes as num?,
     );
   }
 }
@@ -359,6 +375,7 @@ RepresentantCallAttemptDto _$RepresentantCallAttemptDtoFromJson(
       'performedById',
       'performedByName',
       'clientCreatedAt',
+      'dureeTraitementSecondes',
     ],
   );
   final val = RepresentantCallAttemptDto(
@@ -418,6 +435,10 @@ RepresentantCallAttemptDto _$RepresentantCallAttemptDtoFromJson(
       'clientCreatedAt',
       (v) => DateTime.parse(v as String),
     ),
+    dureeTraitementSecondes: $checkedConvert(
+      'dureeTraitementSecondes',
+      (v) => v as num?,
+    ),
   );
   return val;
 });
@@ -448,6 +469,7 @@ Map<String, dynamic> _$RepresentantCallAttemptDtoToJson(
   'performedById': instance.performedById,
   'performedByName': instance.performedByName,
   'clientCreatedAt': instance.clientCreatedAt.toIso8601String(),
+  'dureeTraitementSecondes': instance.dureeTraitementSecondes,
 };
 
 const _$RepCallOutcomeEnumMap = {

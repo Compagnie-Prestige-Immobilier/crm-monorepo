@@ -3,12 +3,19 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, expect, it, vi } from 'vitest';
 
 import { UserMenu } from '@/components/layout/user-menu';
+import type * as OuverturesData from '@/lib/data/ouvertures';
 import { renderWithQuery } from '@/test/render-query';
 import { resetRouterMock, routerMock } from '@/test/router-mock';
 import type { SessionUser } from '@/lib/types';
 import { useVerrouNavigation } from '@/lib/use-verrou-navigation';
 
 const toastError = vi.fn();
+const fetchOuvertureCourante = vi.fn();
+
+vi.mock('@/lib/data/ouvertures', async (importOriginal) => {
+  const actual = await importOriginal<typeof OuverturesData>();
+  return { ...actual, fetchOuvertureCourante: () => fetchOuvertureCourante() as unknown };
+});
 
 vi.mock('sonner', () => ({
   toast: {
@@ -38,10 +45,31 @@ const ouvrirLeMenu = async (interaction: ReturnType<typeof userEvent.setup>): Pr
   await interaction.click(screen.getByRole('button', { name: 'Compte de Awa Fixture' }));
 };
 
+/** Ce que le serveur répond quand la fiche est encore en main, EB-08. */
+const ouverture = (over: Partial<OuverturesData.OuvertureFiche> = {}) => ({
+  id: 'ouv-1',
+  openedById: 'user-1',
+  openedByName: 'Awa Fixture',
+  representantId: null,
+  prospectId: 'p-1',
+  ficheNom: 'Neuve Fiche',
+  openedAt: new Date().toISOString(),
+  firstInputAt: null,
+  closedAt: null,
+  dureeSecondes: null,
+  closingAttemptId: null,
+  draft: null,
+  releasedByName: null,
+  releasedAt: null,
+  ...over,
+});
+
 beforeEach(() => {
   resetRouterMock();
   toastError.mockClear();
   vi.restoreAllMocks();
+  fetchOuvertureCourante.mockReset();
+  fetchOuvertureCourante.mockResolvedValue(null);
 });
 
 it('quitte le mode démo et revient au choix des espaces', async () => {
@@ -121,4 +149,64 @@ it('déconnecte quand aucune fiche n’est en main', async () => {
     expect(routerMock.replace).toHaveBeenCalledWith('/connexion');
   });
   expect(toastError).not.toHaveBeenCalled();
+});
+
+// EB-08 : hors des consoles, `ficheTenue()` ne sait rien. Un rechargement sur
+// une page tierce rendait la déconnexion possible, fiche verrouillée.
+it('refuse la déconnexion depuis une page tierce, fiche tenue sur le serveur', async () => {
+  const interaction = userEvent.setup();
+  const appel = vi
+    .spyOn(globalThis, 'fetch')
+    .mockResolvedValue(new Response(null, { status: 200 }));
+  fetchOuvertureCourante.mockResolvedValue(ouverture());
+  renderWithQuery(<UserMenu user={user} demoEnabled={false} />);
+
+  await ouvrirLeMenu(interaction);
+  await interaction.click(await screen.findByRole('menuitem', { name: 'Se déconnecter' }));
+
+  expect(toastError).toHaveBeenCalledWith(
+    'Vous avez une fiche en main. Qualifiez-la, ou demandez à un superviseur de la libérer.',
+  );
+  expect(appel).not.toHaveBeenCalled();
+  expect(routerMock.replace).not.toHaveBeenCalled();
+});
+
+it('mène à la fiche tenue plutôt que de laisser chercher', async () => {
+  const interaction = userEvent.setup();
+  fetchOuvertureCourante.mockResolvedValue(ouverture({ ficheNom: 'Neuve Fiche' }));
+  renderWithQuery(<UserMenu user={user} demoEnabled={false} />);
+
+  await ouvrirLeMenu(interaction);
+
+  const reprise = await screen.findByRole('menuitem', {
+    name: 'Reprendre la fiche de Neuve Fiche',
+  });
+  expect(reprise.getAttribute('href')).toBe('/chues/console');
+});
+
+it('mène au script quand la fiche tenue est un représentant', async () => {
+  const interaction = userEvent.setup();
+  fetchOuvertureCourante.mockResolvedValue(
+    ouverture({ prospectId: null, representantId: 'r-1', ficheNom: 'Aminata Ndiaye' }),
+  );
+  renderWithQuery(<UserMenu user={user} demoEnabled={false} />);
+
+  await ouvrirLeMenu(interaction);
+
+  const reprise = await screen.findByRole('menuitem', {
+    name: 'Reprendre la fiche de Aminata Ndiaye',
+  });
+  expect(reprise.getAttribute('href')).toBe('/chues/appels-representants');
+});
+
+// Ni la banque ni l'accueil ne peuvent ouvrir une fiche : leur demander la
+// sienne à chaque chargement de page serait une requête pour rien.
+it('ne demande pas d’ouverture aux rôles qui n’en tiennent jamais', async () => {
+  renderWithQuery(
+    <UserMenu user={{ ...user, role: 'BANQUE_FINANCE' } as SessionUser} demoEnabled={false} />,
+  );
+
+  await screen.findByRole('button', { name: 'Compte de Awa Fixture' });
+
+  expect(fetchOuvertureCourante).not.toHaveBeenCalled();
 });

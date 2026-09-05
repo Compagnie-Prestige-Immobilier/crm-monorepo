@@ -58,6 +58,8 @@ export const queryKeys = {
     ['visites', 'import', id, 'revue', page] as const,
 
   // ─── Phase 2 ──────────────────────────────────────────────────────────────
+  /** La fiche que l'appelant a en main : lue par la barre supérieure, écrite par les consoles. */
+  ouvertureCourante: ['ouvertures', 'courante'] as const,
   lotsExportRoot: ['lots-export'] as const,
   lotsExport: (filters: Record<string, unknown> = {}) => ['lots-export', filters] as const,
   lotsExportDetail: (id: string) => ['lots-export', 'detail', id] as const,

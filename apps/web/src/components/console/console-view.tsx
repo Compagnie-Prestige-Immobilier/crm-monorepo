@@ -53,6 +53,7 @@ import {
   type ProspectFilters,
   type ProspectRow,
 } from '@/lib/types';
+import { useBrouillonAuto } from '@/lib/use-brouillon-auto';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { navigationRetenue, useVerrouNavigation } from '@/lib/use-verrou-navigation';
 import { cn } from '@/lib/utils';
@@ -175,6 +176,7 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
       setVise(null);
       setDemandee(null);
       setOuverte(prise);
+      queryClient.setQueryData(queryKeys.ouvertureCourante, prise.ouverture);
     },
     onError: (error) => {
       void reprendreOuverte(reprendre, error);
@@ -192,6 +194,9 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
         onEnregistre={(nom) => {
           setConfirme(nom);
           revenir();
+          // La tentative a fermé l'ouverture : la barre supérieure lit ce cache
+          // pour refuser la déconnexion, et le laisser périmé l'y enfermerait.
+          queryClient.setQueryData(queryKeys.ouvertureCourante, null);
           void queryClient.invalidateQueries({ queryKey: ['prospects'] });
           void queryClient.invalidateQueries({ queryKey: callbackKeys.root });
         }}
@@ -264,6 +269,15 @@ interface Ouverte {
 }
 
 const nomDe = (prospect: ProspectRow): string => `${prospect.nom} ${prospect.prenom}`;
+
+/** Ce que `lireBrouillon` sait relire, et rien d'autre. */
+const brouillonDe = (
+  comment: string,
+  conversion: ConversionDraft | null,
+): Record<string, unknown> => ({
+  comment,
+  ...(conversion === null ? {} : { conversion }),
+});
 
 const aQualifier = (prospect: ProspectRow): boolean => prospect.phase2Status === 'PENDING';
 
@@ -479,16 +493,21 @@ function Consignation({
   const [now] = useState(() => Date.now());
   const verrouille = ouverture !== null && !closed;
 
+  const departChrono = useBrouillonAuto(ouverture, brouillonDe(comment, conversion));
+
   const send = useMutation({
     mutationFn: async (draft: AttemptDraft) => {
       // EB-10 : le brouillon part AVANT la tentative, qui referme l'ouverture et
       // ferait refuser toute écriture postérieure. Le dossier passe par lui et
       // non par la tentative : incomplet, le serveur la refuserait en 400.
       if (draft.outcome === 'CALLBACK' && ouverture !== null) {
-        await enregistrerBrouillon(ouverture.id, {
-          comment: draft.comment,
-          ...(conversion === null ? {} : { conversion }),
-        }).catch(() => {
+        // La borne vient d'ici et non de l'horloge du serveur : la base exige
+        // qu'elle suive `openedAt`, qui est l'heure de ce navigateur.
+        await enregistrerBrouillon(
+          ouverture.id,
+          brouillonDe(draft.comment, conversion),
+          departChrono ?? new Date().toISOString(),
+        ).catch(() => {
           toast.error('Les réponses saisies n’ont pas pu être conservées. L’appel, lui, part.');
         });
       }
@@ -684,7 +703,7 @@ function Consignation({
         </Button>
       )}
 
-      {ouverture === null ? null : <Chrono openedAt={ouverture.openedAt} />}
+      {departChrono === null ? null : <Chrono firstInputAt={departChrono} />}
 
       <section aria-label="Fiche courante" className="flex flex-col gap-4">
         <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">{nomComplet}</h2>

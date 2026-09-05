@@ -9,6 +9,7 @@ import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { formatDuration } from '@/lib/data/admin';
 import {
   fetchProspect,
   fetchProspectCallAttempts,
@@ -258,6 +259,11 @@ function AppelsProspect({ items }: { items: readonly Appel[] }) {
             · {appel.performedByName}
           </p>
           <p className="text-[0.8125rem] text-muted-foreground">{formatDeviceCall(appel)}</p>
+          {appel.dureeTraitementSecondes === null ? null : (
+            <p className="text-[0.8125rem] text-muted-foreground">
+              Traitement : {formatDuration(appel.dureeTraitementSecondes)}
+            </p>
+          )}
           <p className="text-[0.8125rem] text-muted-foreground">
             Fonctionnaire : {ouiNon(appel.fonctionnaire)} · Engagement en cours :{' '}
             {ouiNon(appel.engagementEnCours)}
