@@ -63,6 +63,8 @@ class RepresentantCallAttemptDto {
     required this.performedByName,
 
     required this.clientCreatedAt,
+
+    required this.dureeTraitementSecondes,
   });
 
   @JsonKey(name: r'id', required: true, includeIfNull: false)
@@ -149,6 +151,14 @@ class RepresentantCallAttemptDto {
   @JsonKey(name: r'clientCreatedAt', required: true, includeIfNull: false)
   final DateTime clientCreatedAt;
 
+  /// Temps de traitement de la fiche pour cet appel, en secondes : de la première saisie à la qualification. Nul quand l’appel a été consigné hors du parcours de fiche ouverte, ou sans aucune saisie. Distinct de `deviceCallDurationSeconds`, qui est la durée de communication.
+  @JsonKey(
+    name: r'dureeTraitementSecondes',
+    required: true,
+    includeIfNull: true,
+  )
+  final num? dureeTraitementSecondes;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is RepresentantCallAttemptDto &&
@@ -177,6 +187,7 @@ class RepresentantCallAttemptDto {
                 performedById,
                 performedByName,
                 clientCreatedAt,
+                dureeTraitementSecondes,
               ],
               [
                 other.id,
@@ -201,6 +212,7 @@ class RepresentantCallAttemptDto {
                 other.performedById,
                 other.performedByName,
                 other.clientCreatedAt,
+                other.dureeTraitementSecondes,
               ],
             );
   }
@@ -231,6 +243,7 @@ class RepresentantCallAttemptDto {
         performedById,
         performedByName,
         clientCreatedAt,
+        dureeTraitementSecondes,
       ]);
 
   factory RepresentantCallAttemptDto.fromJson(Map<String, dynamic> json) =>
