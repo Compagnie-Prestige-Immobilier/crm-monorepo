@@ -122,6 +122,16 @@ describe('ProspectDetailView', () => {
     expect(texte).toContain('Téléphone : Sortant · 1 min 32 · 14:02');
   });
 
+  // « Mes contacts » ouvre la fiche sur cette ancre. La retirer laisserait le
+  // lien valide et l'écran ouvert ailleurs, sans que rien ne le signale.
+  it('porte l’ancre « appels » que « Mes contacts » vise', async () => {
+    const { container } = renderWithQuery(<ProspectDetailView prospectId="p-1" role={ADMIN} />);
+
+    await screen.findByText('Appels');
+    const ancre = container.querySelector('#appels');
+    expect(ancre?.textContent).toContain('Appels');
+  });
+
   it('sort les relevés non consignés, et replie ceux qu’une tentative couvre déjà', async () => {
     fetchDeviceCalls.mockResolvedValue([
       {
