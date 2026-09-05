@@ -19,6 +19,7 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel,
+  confirmVariant = 'destructive',
   pending = false,
   children,
   onConfirm,
@@ -28,6 +29,8 @@ export function ConfirmDialog({
   title: ReactNode;
   description: ReactNode;
   confirmLabel: string;
+  /** Rouge par défaut : la plupart des confirmations d'ici détruisent quelque chose. */
+  confirmVariant?: 'default' | 'destructive';
   pending?: boolean;
   /** Ce que la confirmation coûte, quand le titre ne suffit pas à le dire. */
   children?: ReactNode;
@@ -60,7 +63,7 @@ export function ConfirmDialog({
           >
             Annuler
           </Button>
-          <Button type="button" variant="destructive" disabled={pending} onClick={onConfirm}>
+          <Button type="button" variant={confirmVariant} disabled={pending} onClick={onConfirm}>
             {pending ? <LoaderIcon className="size-4 animate-spin" aria-hidden="true" /> : null}
             {confirmLabel}
           </Button>

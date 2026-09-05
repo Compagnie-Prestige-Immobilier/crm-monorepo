@@ -16,7 +16,7 @@ export type UpdateStatutQualificationInput = Schemas['UpdateStatutQualificationD
  * appelant de cette version sait renvoyer ; le panel les sait tous, mais il
  * déclare quand même la sienne, comme le fera le terrain.
  */
-export const PANEL_PAYLOAD_VERSION = 6;
+export const PANEL_PAYLOAD_VERSION = 7;
 
 export const STATUT_QUALIFICATION_EFFECTS = [
   'REACHED',

@@ -591,6 +591,8 @@ export interface RepAnswer {
   readonly syndicat?: string;
   /** Statut choisi au script. C'est lui qui commande `outcome`, jamais l'inverse. */
   readonly statutQualificationId?: string;
+  /** L'ouverture que cette tentative ferme : c'est elle qui arrête le chronomètre. */
+  readonly ouvertureId?: string;
 }
 
 export function buildRepAttempt(

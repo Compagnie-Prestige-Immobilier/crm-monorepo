@@ -19,14 +19,7 @@ import { QueryErrorState } from '@/components/query-error-state';
 import { RelationBadge } from '@/components/representants/relation-badge';
 import { RepresentantFormDialog } from '@/components/representants/representant-form-dialog';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -46,8 +39,19 @@ import {
   repRelationSettled,
   type RepAnswer,
 } from '@/lib/data/console';
+import {
+  fetchOuvertureCourante,
+  formatChrono,
+  ouvrirFiche,
+  secondesEcoulees,
+  type OuvertureFiche,
+} from '@/lib/data/ouvertures';
 import { fetchReferenceData } from '@/lib/data/reference';
-import { fetchRepresentantsAQualifier, type ScriptedRepresentant } from '@/lib/data/representants';
+import {
+  fetchRepresentant,
+  fetchRepresentantsAQualifier,
+  type ScriptedRepresentant,
+} from '@/lib/data/representants';
 import {
   exigeMotif,
   fetchStatutsQualification,
@@ -67,6 +71,7 @@ import {
   type RepresentantRelation,
 } from '@/lib/representant-filters';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
+import { useVerrouNavigation } from '@/lib/use-verrou-navigation';
 import { cn } from '@/lib/utils';
 
 /** L'appel a abouti, ou non. Ce qu'il a donné se dit ensuite, au statut. */
@@ -160,7 +165,8 @@ const RELATION_ITEMS = [
 export function RepScript() {
   const queryClient = useQueryClient();
 
-  const [choisi, setChoisi] = useState<ScriptedRepresentant | null>(null);
+  const [choisi, setChoisi] = useState<Ouverte | null>(null);
+  const [aConfirmer, setAConfirmer] = useState<ScriptedRepresentant | null>(null);
   const [search, setSearch] = useState('');
   const [relation, setRelation] = useState<RepresentantRelation | null>(null);
   const [page, setPage] = useState(1);
@@ -182,21 +188,29 @@ export function RepScript() {
   const liste = annuaire.data?.items ?? [];
   const pageCount = annuaire.data?.pageCount ?? 1;
 
-  const ouvrir = useCallback((row: ScriptedRepresentant) => {
-    setConfirme(null);
-    setChoisi(row);
-  }, []);
+  const ouvrir = useMutation({
+    mutationFn: async (row: ScriptedRepresentant): Promise<Ouverte> => ({
+      representant: row,
+      ouverture: await ouvrirFiche({ representantId: row.id }),
+    }),
+    onSuccess: (ouverte) => {
+      setConfirme(null);
+      setAConfirmer(null);
+      setChoisi(ouverte);
+    },
+    onError: (error) => {
+      void reprendreOuverte(error, setChoisi, setAConfirmer);
+    },
+  });
 
-  const revenir = useCallback(() => {
-    setChoisi(null);
-  }, []);
+  const tranchee = aConfirmer === null ? null : relationTrancheeTexte(aConfirmer);
 
   if (choisi !== null) {
     return (
       <Qualification
-        key={choisi.id}
-        representant={choisi}
-        onAbandon={revenir}
+        key={choisi.ouverture.id}
+        representant={choisi.representant}
+        ouverture={choisi.ouverture}
         onEnregistre={(nom) => {
           setConfirme(nom);
           setChoisi(null);
@@ -239,12 +253,60 @@ export function RepScript() {
         annuaire={annuaire}
         liste={liste}
         critereEnCours={cherche !== '' || relation !== null}
-        onOuvrir={ouvrir}
+        onOuvrir={setAConfirmer}
       />
 
       {pageCount > 1 ? <Pages page={page} pageCount={pageCount} onPage={setPage} /> : null}
+
+      <ConfirmDialog
+        open={aConfirmer !== null}
+        onOpenChange={(next) => {
+          if (!next) setAConfirmer(null);
+        }}
+        title={`Ouvrir la fiche de ${aConfirmer?.fullName ?? ''} ?`}
+        description="Vous ne pourrez pas la quitter sans la qualifier."
+        confirmLabel="Ouvrir"
+        confirmVariant="default"
+        pending={ouvrir.isPending}
+        onConfirm={() => {
+          if (aConfirmer !== null) ouvrir.mutate(aConfirmer);
+        }}
+      >
+        {tranchee === null ? null : <p className="text-[0.9375rem]">{tranchee}</p>}
+      </ConfirmDialog>
     </div>
   );
+}
+
+/** La fiche ouverte et l'ouverture qui la verrouille : les deux vont ensemble. */
+interface Ouverte {
+  representant: ScriptedRepresentant;
+  ouverture: OuvertureFiche;
+}
+
+/**
+ * Le serveur refuse une seconde ouverture sans dire laquelle est tenue. Sans ce
+ * rattrapage, le téléconseiller reste bloqué devant un refus qu'il ne peut pas
+ * lever.
+ */
+async function reprendreOuverte(
+  error: unknown,
+  ouvrir: (ouverte: Ouverte) => void,
+  fermerLaBoite: (rien: null) => void,
+): Promise<void> {
+  const courante = await fetchOuvertureCourante().catch(() => null);
+  if (courante === null || courante.representantId === null) {
+    toastApiError(error, 'La fiche n’a pas pu être ouverte.');
+    return;
+  }
+  const representant = await fetchRepresentant(courante.representantId).catch(() => null);
+  if (representant === null) {
+    toast.error(`Vous avez déjà ${courante.ficheNom} en main. Qualifiez-la avant d’en ouvrir une.`);
+    return;
+  }
+  toast.info(`Vous aviez déjà ${courante.ficheNom} en main : la voici.`);
+  fermerLaBoite(null);
+  ouvrir({ representant, ouverture: courante });
 }
 
 function ResultatsAnnuaire({
@@ -815,40 +877,32 @@ function RecapAppel(props: RecapAppelProps) {
   );
 }
 
-/**
- * La question passe AVANT tout : ni nom, ni numéro, ni question tant qu'on n'a
- * pas répondu. C'est la boîte que le mobile ouvre par-dessus l'écran avant
- * toute saisie. Le titre dit LEQUEL des deux cas on a sous les yeux.
- */
-function AvertissementTranchee({
-  status,
-  onAbandon,
-  onContinuer,
-}: {
-  status: ScriptedRepresentant['relationStatus'];
-  onAbandon: () => void;
-  onContinuer: () => void;
-}) {
+/** Ce qu'une relation DÉJÀ TRANCHÉE ajoute à la confirmation d'ouverture. */
+function relationTrancheeTexte(row: ScriptedRepresentant): string | null {
+  if (!repRelationSettled(row)) return null;
+  return row.relationStatus === 'AMBASSADEUR'
+    ? 'Cette personne a déjà accepté d’être représentant CPI CHUES.'
+    : 'Cette personne a déjà refusé.';
+}
+
+/** Le temps passé sur la fiche, depuis l'ouverture confirmée jusqu'au statut. */
+function Chrono({ openedAt }: { openedAt: string }) {
+  const [secondes, setSecondes] = useState(() => secondesEcoulees(openedAt, Date.now()));
+
+  useEffect(() => {
+    const battement = setInterval(() => {
+      setSecondes(secondesEcoulees(openedAt, Date.now()));
+    }, 1000);
+    return () => {
+      clearInterval(battement);
+    };
+  }, [openedAt]);
+
   return (
-    <Dialog open onOpenChange={onAbandon}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>
-            {status === 'AMBASSADEUR'
-              ? 'Cette personne a déjà accepté d’être représentant CPI CHUES.'
-              : 'Cette personne a déjà refusé.'}
-          </DialogTitle>
-          <DialogDescription>Voulez-vous quand même consigner un nouvel appel ?</DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button variant="ghost" onClick={onAbandon}>
-            <ArrowLeftIcon aria-hidden="true" />
-            Revenir à la liste
-          </Button>
-          <Button onClick={onContinuer}>Continuer</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <p className="text-[0.8125rem] text-muted-foreground">
+      Fiche ouverte depuis{' '}
+      <span className="font-[600] tabular-nums text-foreground">{formatChrono(secondes)}</span>
+    </p>
   );
 }
 
@@ -1044,11 +1098,11 @@ function reponseDe(etat: EtatReponse): RepAnswer {
  */
 function Qualification({
   representant,
-  onAbandon,
+  ouverture,
   onEnregistre,
 }: {
   representant: ScriptedRepresentant;
-  onAbandon: () => void;
+  ouverture: OuvertureFiche;
   onEnregistre: (nom: string) => void;
 }) {
   const [etape, setEtape] = useState<1 | 2>(1);
@@ -1070,9 +1124,6 @@ function Qualification({
   const commentaireRef = useRef<HTMLTextAreaElement>(null);
   const [edit, setEdit] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  // La garde du mobile : une relation DÉJÀ TRANCHÉE, acceptation comme refus,
-  // ne se requalifie pas sans qu'on l'ait dit.
-  const [avertiTranchee, setAvertiTranchee] = useState(repRelationSettled(representant));
 
   const [now] = useState(() => Date.now());
 
@@ -1090,7 +1141,10 @@ function Qualification({
   });
 
   const send = useMutation({
-    mutationFn: (answer: RepAnswer) => pushRepCallAttempt(buildRepAttempt(representant.id, answer)),
+    mutationFn: (answer: RepAnswer) =>
+      pushRepCallAttempt(
+        buildRepAttempt(representant.id, { ...answer, ouvertureId: ouverture.id }),
+      ),
     onSuccess: () => {
       toast.success(`Appel enregistré pour ${representant.fullName}.`);
       onEnregistre(representant.fullName);
@@ -1185,13 +1239,21 @@ function Qualification({
     if (valeur === 'INJOIGNABLE') setRappelAt(null);
   };
 
+  const retenu = useCallback(() => {
+    toast.error('Posez un statut de qualification avant de quitter cette fiche.');
+  }, []);
+
+  useVerrouNavigation(true, retenu);
+
   const reculer = useCallback(() => {
     setEtape((courante) => {
       if (courante === 2) return 1;
-      onAbandon();
+      // EB-08 : la fiche ouverte ne se quitte pas sans statut. Seul « Enregistrer »
+      // la referme, et le chronomètre s'arrête avec elle.
+      retenu();
       return 1;
     });
-  }, [onAbandon]);
+  }, [retenu]);
 
   useShortcuts(
     {
@@ -1209,29 +1271,16 @@ function Qualification({
     !edit,
   );
 
-  /*
-    La question passe AVANT tout : ni nom, ni numéro, ni question tant qu'on n'a
-    pas répondu. C'est la boîte que le mobile ouvre par-dessus l'écran avant
-    toute saisie. Le titre dit LEQUEL des deux cas on a sous les yeux.
-  */
-  if (avertiTranchee) {
-    return (
-      <AvertissementTranchee
-        status={representant.relationStatus}
-        onAbandon={onAbandon}
-        onContinuer={() => {
-          setAvertiTranchee(false);
-        }}
-      />
-    );
-  }
-
   return (
     <div className="flex w-full flex-col gap-5">
-      <Button variant="ghost" className="self-start px-0" onClick={reculer}>
-        <ArrowLeftIcon aria-hidden="true" />
-        {etape === 1 ? 'Revenir à la liste' : 'Étape précédente'}
-      </Button>
+      {etape === 2 ? (
+        <Button variant="ghost" className="self-start px-0" onClick={reculer}>
+          <ArrowLeftIcon aria-hidden="true" />
+          Étape précédente
+        </Button>
+      ) : null}
+
+      <Chrono openedAt={ouverture.openedAt} />
 
       <EnTeteRepresentant representant={representant} />
 
