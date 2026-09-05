@@ -51,6 +51,7 @@ import {
   type PerimetreChiffres,
   type Projet,
 } from '@/lib/data/chiffres';
+import { fetchComptageOuvertures } from '@/lib/data/ouvertures';
 import {
   fetchDisposition,
   resetDisposition,
@@ -73,6 +74,12 @@ const CHARGEURS: Record<Jeu, (perimetre: PerimetreChiffres) => Promise<unknown>>
   methodes: fetchChiffresMethodes,
   banques: fetchChiffresBanques,
   campagne: fetchChiffresCampagne,
+  ouvertures: (perimetre) =>
+    fetchComptageOuvertures({
+      from: perimetre.plage.from,
+      to: perimetre.plage.to,
+      ...(perimetre.commercialId === null ? {} : { openedById: perimetre.commercialId }),
+    }),
 };
 
 const clefDeJeu = (jeu: Jeu, perimetre: PerimetreChiffres): readonly unknown[] => [
