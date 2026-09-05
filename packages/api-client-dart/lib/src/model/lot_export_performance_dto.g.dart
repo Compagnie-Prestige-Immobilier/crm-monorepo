@@ -11,6 +11,8 @@ abstract class _$LotExportPerformanceDtoCWProxy {
 
   LotExportPerformanceDto teleconseillerName(String teleconseillerName);
 
+  LotExportPerformanceDto objectif(num objectif);
+
   LotExportPerformanceDto assigned(num assigned);
 
   LotExportPerformanceDto treated(num treated);
@@ -30,6 +32,7 @@ abstract class _$LotExportPerformanceDtoCWProxy {
   LotExportPerformanceDto call({
     String teleconseillerId,
     String teleconseillerName,
+    num objectif,
     num assigned,
     num treated,
     num completionRate,
@@ -52,6 +55,9 @@ class _$LotExportPerformanceDtoCWProxyImpl
   @override
   LotExportPerformanceDto teleconseillerName(String teleconseillerName) =>
       this(teleconseillerName: teleconseillerName);
+
+  @override
+  LotExportPerformanceDto objectif(num objectif) => this(objectif: objectif);
 
   @override
   LotExportPerformanceDto assigned(num assigned) => this(assigned: assigned);
@@ -81,6 +87,7 @@ class _$LotExportPerformanceDtoCWProxyImpl
   LotExportPerformanceDto call({
     Object? teleconseillerId = const $CopyWithPlaceholder(),
     Object? teleconseillerName = const $CopyWithPlaceholder(),
+    Object? objectif = const $CopyWithPlaceholder(),
     Object? assigned = const $CopyWithPlaceholder(),
     Object? treated = const $CopyWithPlaceholder(),
     Object? completionRate = const $CopyWithPlaceholder(),
@@ -96,6 +103,10 @@ class _$LotExportPerformanceDtoCWProxyImpl
           ? _value.teleconseillerName
           // ignore: cast_nullable_to_non_nullable
           : teleconseillerName as String,
+      objectif: objectif == const $CopyWithPlaceholder()
+          ? _value.objectif
+          // ignore: cast_nullable_to_non_nullable
+          : objectif as num,
       assigned: assigned == const $CopyWithPlaceholder()
           ? _value.assigned
           // ignore: cast_nullable_to_non_nullable
@@ -140,6 +151,7 @@ LotExportPerformanceDto _$LotExportPerformanceDtoFromJson(
     requiredKeys: const [
       'teleconseillerId',
       'teleconseillerName',
+      'objectif',
       'assigned',
       'treated',
       'completionRate',
@@ -153,6 +165,7 @@ LotExportPerformanceDto _$LotExportPerformanceDtoFromJson(
       'teleconseillerName',
       (v) => v as String,
     ),
+    objectif: $checkedConvert('objectif', (v) => v as num),
     assigned: $checkedConvert('assigned', (v) => v as num),
     treated: $checkedConvert('treated', (v) => v as num),
     completionRate: $checkedConvert('completionRate', (v) => v as num),
@@ -170,6 +183,7 @@ Map<String, dynamic> _$LotExportPerformanceDtoToJson(
 ) => <String, dynamic>{
   'teleconseillerId': instance.teleconseillerId,
   'teleconseillerName': instance.teleconseillerName,
+  'objectif': instance.objectif,
   'assigned': instance.assigned,
   'treated': instance.treated,
   'completionRate': instance.completionRate,

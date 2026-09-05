@@ -13,6 +13,12 @@ export type CreateLotExportInput = Schemas['CreateLotExportDto'];
 export type LotExportPreview = Schemas['LotExportPreviewDto'];
 export type CampagnePerformance = Pick<LotExportDetail, 'name' | 'performance'>;
 export type LotExportQuery = NonNullable<operations['listLotsExport']['parameters']['query']>;
+export type LotExportFiche = Schemas['LotExportFicheDto'];
+export type LotExportFicheEtat = Schemas['LotExportFicheEtat'];
+export type UpdateLotExportInput = Schemas['UpdateLotExportDto'];
+export type LotExportFichesQuery = NonNullable<
+  operations['listLotExportFiches']['parameters']['query']
+>;
 
 /** Une campagne reste dans la coque de son projet ; un lot de représentants porte `CHUES`. */
 export function campagnesPath(projet: Projet): string {
@@ -50,6 +56,52 @@ export async function fetchLotExport(
   client: ApiClient = getApiClient(),
 ): Promise<LotExportDetail> {
   return unwrap(await client.GET('/api/v1/lots-export/{id}', { params: { path: { id } } }));
+}
+
+export async function updateLotExport(
+  id: string,
+  body: UpdateLotExportInput,
+  client: ApiClient = getApiClient(),
+): Promise<LotExportSummary> {
+  return unwrap(await client.PATCH('/api/v1/lots-export/{id}', { params: { path: { id } }, body }));
+}
+
+export async function fetchLotExportFiches(
+  id: string,
+  query: LotExportFichesQuery,
+  client: ApiClient = getApiClient(),
+): Promise<Paginated<LotExportFiche>> {
+  return flattenPage(
+    unwrap(
+      await client.GET('/api/v1/lots-export/{id}/fiches', { params: { path: { id }, query } }),
+    ),
+  );
+}
+
+export async function reaffecterFiches(
+  id: string,
+  body: { positions: number[]; versTeleconseillerId: string },
+  client: ApiClient = getApiClient(),
+): Promise<LotExportDetail> {
+  return unwrap(
+    await client.POST('/api/v1/lots-export/{id}/reaffectation', {
+      params: { path: { id } },
+      body,
+    }),
+  );
+}
+
+export async function retirerTeleconseiller(
+  id: string,
+  teleconseillerId: string,
+  client: ApiClient = getApiClient(),
+): Promise<LotExportDetail> {
+  return unwrap(
+    await client.POST('/api/v1/lots-export/{id}/retrait', {
+      params: { path: { id } },
+      body: { teleconseillerId },
+    }),
+  );
 }
 
 export async function deleteLotExport(

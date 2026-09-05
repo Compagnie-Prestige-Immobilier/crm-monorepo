@@ -174,6 +174,12 @@ enum PaymentMode {
 enum LotExportCible {
   REPRESENTANTS
   PROSPECTS
+  /// Dernier statut non joint, hors Injoignable definitif : la fiche n'a jamais
+  /// ete jointe et merite une nouvelle salve.
+  REPRESENTANTS_INJOIGNABLES
+  /// Les numeros donnes par un representant qui decline. Le lancement cree une
+  /// fiche representant pour chacun : `RepresentantSuggestion` n'en est pas une.
+  CONTACTS_RECOMMANDES
 }
 
 enum CallOutcome {
@@ -325,20 +331,24 @@ model User {
   importJobs     ImportJob[]     @relation("ImportJobRequestedBy")
   segmentChanges SegmentChange[] @relation("SegmentChangeChangedBy")
 
-  fichesOuvertes  OuvertureFiche[] @relation("OuvertureFicheOpenedBy")
-  fichesLiberees  OuvertureFiche[] @relation("OuvertureFicheReleasedBy")
+  fichesOuvertes OuvertureFiche[] @relation("OuvertureFicheOpenedBy")
+  fichesLiberees OuvertureFiche[] @relation("OuvertureFicheReleasedBy")
 
   scheduledCallbacks       ScheduledCallback[]          @relation("ScheduledCallbackAssignedTo")
   representantRelationsSet RepresentantRelationChange[] @relation("RepresentantRelationChangeChangedBy")
   representantComments     RepresentantComment[]        @relation("RepresentantCommentAuthor")
 
-  heartbeat AgentHeartbeat?
+  heartbeat     AgentHeartbeat?
   activitySlots AgentActivitySlot[]
 
   visitesEnregistrees Visite[]          @relation("VisiteCreatedBy")
   dashboardLayouts    DashboardLayout[] @relation("DashboardLayoutUser")
   lotsExport          LotExport[]       @relation("LotExportCreatedBy")
   lotExportItems      LotExportItem[]   @relation("LotExportItemAssignee")
+
+  reaffectationsRecues LotExportReaffectation[] @relation("LotExportReaffectationTo")
+  reaffectationsCedees LotExportReaffectation[] @relation("LotExportReaffectationFrom")
+  reaffectationsFaites LotExportReaffectation[] @relation("LotExportReaffectationBy")
 
   @@index([role, isActive])
   @@index([deletedAt])
@@ -561,15 +571,15 @@ model Representant {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  prospects           Prospect[]
-  repCallAttempts     RepCallAttempt[]
+  prospects            Prospect[]
+  repCallAttempts      RepCallAttempt[]
   deviceCallDetections DeviceCallDetection[]
-  relationChanges     RepresentantRelationChange[]
-  comments            RepresentantComment[]
-  suggestionsGiven    RepresentantSuggestion[]     @relation("RepresentantSuggestionSource")
-  suggestionsResolved RepresentantSuggestion[]     @relation("RepresentantSuggestionResolved")
-  lotItems            LotExportItem[]
-  ouvertures          OuvertureFiche[]
+  relationChanges      RepresentantRelationChange[]
+  comments             RepresentantComment[]
+  suggestionsGiven     RepresentantSuggestion[]     @relation("RepresentantSuggestionSource")
+  suggestionsResolved  RepresentantSuggestion[]     @relation("RepresentantSuggestionResolved")
+  lotItems             LotExportItem[]
+  ouvertures           OuvertureFiche[]
 
   @@index([phoneE164])
   @@index([createdById])
@@ -848,12 +858,12 @@ model Prospect {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  callAttempts       CallAttempt[]
+  callAttempts         CallAttempt[]
   deviceCallDetections DeviceCallDetection[]
-  scheduledCallbacks ScheduledCallback[]
-  lotItems           LotExportItem[]
-  bankCases          BankCase[]
-  clientRequests     ClientCreationRequest[]
+  scheduledCallbacks   ScheduledCallback[]
+  lotItems             LotExportItem[]
+  bankCases            BankCase[]
+  clientRequests       ClientCreationRequest[]
 
   segmentChanges SegmentChange[]
   journeys       ProspectJourney[]
@@ -1070,12 +1080,12 @@ model AgentHeartbeat {
 /// Dakar tronquée, stockée en UTC, les deux ne différant jamais.
 model AgentActivitySlot {
   userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   slot   DateTime
 
-  firstSeenAt  DateTime
-  lastSeenAt   DateTime
-  activeSeconds Int @default(0)
+  firstSeenAt   DateTime
+  lastSeenAt    DateTime
+  activeSeconds Int      @default(0)
 
   @@id([userId, slot])
   @@index([slot])
@@ -2443,7 +2453,8 @@ model LotExport {
   createdBy   User     @relation("LotExportCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   createdAt   DateTime @default(now())
 
-  items LotExportItem[]
+  items          LotExportItem[]
+  reaffectations LotExportReaffectation[]
 
   @@index([cible, createdAt])
   @@index([createdById, createdAt])
@@ -2473,6 +2484,33 @@ model LotExportItem {
   @@index([prospectId])
   @@index([lotId, assigneeId, day])
   @@map("lot_export_items")
+}
+
+/// Qui a deplace combien de fiches, de qui vers qui, et quand.
+///
+/// La repartition d'origine vit dans `LotExport.filters`, ecrasee a chaque
+/// reglage : sans cette table, un superviseur ne pourrait plus dire pourquoi un
+/// teleconseiller a rendu moins de fiches qu'il n'en avait recu.
+model LotExportReaffectation {
+  id    String    @id @default(uuid(7))
+  lotId String
+  lot   LotExport @relation(fields: [lotId], references: [id], onDelete: Cascade)
+
+  /// Nul quand les fiches n'etaient attribuees a personne.
+  fromAssigneeId String?
+  fromAssignee   User?   @relation("LotExportReaffectationFrom", fields: [fromAssigneeId], references: [id], onDelete: SetNull)
+  toAssigneeId   String
+  toAssignee     User    @relation("LotExportReaffectationTo", fields: [toAssigneeId], references: [id], onDelete: Restrict)
+
+  fiches Int
+
+  performedById String
+  performedBy   User   @relation("LotExportReaffectationBy", fields: [performedById], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@index([lotId, createdAt])
+  @@map("lot_export_reaffectations")
 }
 
 enum VisiteImportChangeKind {

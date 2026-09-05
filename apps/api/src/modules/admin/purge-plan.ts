@@ -10,6 +10,9 @@ export const PURGE_STEP_ORDER = [
   // liberateur en Restrict, et sa fiche en cascade.
   'ouverturesFiche',
   'callAttempts',
+  // Avant `commercialAccounts` : une reaffectation pointe son beneficiaire et
+  // son auteur en Restrict, et sa campagne en cascade.
+  'lotExportReaffectations',
   'lotExportItems',
   'lotsExport',
   // Avant `commercialAccounts` : un rappel planifié pointe son téléconseiller
@@ -120,7 +123,7 @@ export const PURGE_DOMAINS: readonly PurgeDomain[] = [
     key: 'lotsExport',
     label: 'Campagnes',
     hint: 'Campagnes de fiches réparties pour le terrain.',
-    steps: ['lotExportItems', 'lotsExport'],
+    steps: ['lotExportReaffectations', 'lotExportItems', 'lotsExport'],
     requires: [],
   },
   {

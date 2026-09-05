@@ -66,6 +66,8 @@ export const queryKeys = {
   lotsExportApercu: (critere: Record<string, unknown>) =>
     ['lots-export', 'apercu', critere] as const,
   lotsExportTeleconseillers: ['lots-export', 'teleconseillers'] as const,
+  lotsExportFiches: (id: string, filtres: Record<string, unknown> = {}) =>
+    ['lots-export', 'detail', id, 'fiches', filtres] as const,
 
   // ─── Banque & Finance ─────────────────────────────────────────────────────
   bankCasesRoot: ['bank-cases'] as const,

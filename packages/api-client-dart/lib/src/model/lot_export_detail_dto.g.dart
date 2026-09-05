@@ -39,6 +39,10 @@ abstract class _$LotExportDetailDtoCWProxy {
 
   LotExportDetailDto performance(List<LotExportPerformanceDto> performance);
 
+  LotExportDetailDto reaffectations(
+    List<LotExportReaffectationDto> reaffectations,
+  );
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `LotExportDetailDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -62,6 +66,7 @@ abstract class _$LotExportDetailDtoCWProxy {
     LotExportDistributionDto distribution,
     List<LotExportRepartitionDto> repartition,
     List<LotExportPerformanceDto> performance,
+    List<LotExportReaffectationDto> reaffectations,
   });
 }
 
@@ -129,6 +134,11 @@ class _$LotExportDetailDtoCWProxyImpl implements _$LotExportDetailDtoCWProxy {
       this(performance: performance);
 
   @override
+  LotExportDetailDto reaffectations(
+    List<LotExportReaffectationDto> reaffectations,
+  ) => this(reaffectations: reaffectations);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `LotExportDetailDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -152,6 +162,7 @@ class _$LotExportDetailDtoCWProxyImpl implements _$LotExportDetailDtoCWProxy {
     Object? distribution = const $CopyWithPlaceholder(),
     Object? repartition = const $CopyWithPlaceholder(),
     Object? performance = const $CopyWithPlaceholder(),
+    Object? reaffectations = const $CopyWithPlaceholder(),
   }) {
     return LotExportDetailDto(
       id: id == const $CopyWithPlaceholder()
@@ -219,6 +230,10 @@ class _$LotExportDetailDtoCWProxyImpl implements _$LotExportDetailDtoCWProxy {
           ? _value.performance
           // ignore: cast_nullable_to_non_nullable
           : performance as List<LotExportPerformanceDto>,
+      reaffectations: reaffectations == const $CopyWithPlaceholder()
+          ? _value.reaffectations
+          // ignore: cast_nullable_to_non_nullable
+          : reaffectations as List<LotExportReaffectationDto>,
     );
   }
 }
@@ -234,92 +249,99 @@ extension $LotExportDetailDtoCopyWith on LotExportDetailDto {
 // JsonSerializableGenerator
 // **************************************************************************
 
-LotExportDetailDto _$LotExportDetailDtoFromJson(Map<String, dynamic> json) =>
-    $checkedCreate('LotExportDetailDto', json, ($checkedConvert) {
-      $checkKeys(
-        json,
-        requiredKeys: const [
-          'id',
-          'name',
-          'cible',
-          'projet',
-          'scopeLabel',
-          'itemCount',
-          'createdById',
-          'createdByName',
-          'createdAt',
-          'callsSince',
-          'fichesAppelees',
-          'recentAttempts',
-          'callsByTeleconseiller',
-          'distribution',
-          'repartition',
-          'performance',
-        ],
-      );
-      final val = LotExportDetailDto(
-        id: $checkedConvert('id', (v) => v as String),
-        name: $checkedConvert('name', (v) => v as String),
-        cible: $checkedConvert(
-          'cible',
-          (v) => $enumDecode(
-            _$LotExportCibleEnumMap,
-            v,
-            unknownValue: LotExportCible.unknownDefaultOpenApi,
-          ),
-        ),
-        projet: $checkedConvert(
-          'projet',
-          (v) => $enumDecode(
-            _$ProjetEnumMap,
-            v,
-            unknownValue: Projet.unknownDefaultOpenApi,
-          ),
-        ),
-        scopeLabel: $checkedConvert('scopeLabel', (v) => v as String),
-        itemCount: $checkedConvert('itemCount', (v) => v as num),
-        createdById: $checkedConvert('createdById', (v) => v as String),
-        createdByName: $checkedConvert('createdByName', (v) => v as String),
-        createdAt: $checkedConvert('createdAt', (v) => v as String),
-        callsSince: $checkedConvert('callsSince', (v) => v as num),
-        fichesAppelees: $checkedConvert('fichesAppelees', (v) => v as num),
-        recentAttempts: $checkedConvert(
-          'recentAttempts',
-          (v) => (v as List<dynamic>)
-              .map(
-                (e) => LotExportAttemptDto.fromJson(e as Map<String, dynamic>),
-              )
-              .toList(),
-        ),
-        callsByTeleconseiller: $checkedConvert(
-          'callsByTeleconseiller',
-          (v) => v as Object,
-        ),
-        distribution: $checkedConvert(
-          'distribution',
-          (v) => LotExportDistributionDto.fromJson(v as Map<String, dynamic>),
-        ),
-        repartition: $checkedConvert(
-          'repartition',
-          (v) => (v as List<dynamic>)
-              .map(
-                (e) =>
-                    LotExportRepartitionDto.fromJson(e as Map<String, dynamic>),
-              )
-              .toList(),
-        ),
-        performance: $checkedConvert(
-          'performance',
-          (v) => (v as List<dynamic>)
-              .map(
-                (e) =>
-                    LotExportPerformanceDto.fromJson(e as Map<String, dynamic>),
-              )
-              .toList(),
-        ),
-      );
-      return val;
-    });
+LotExportDetailDto _$LotExportDetailDtoFromJson(
+  Map<String, dynamic> json,
+) => $checkedCreate('LotExportDetailDto', json, ($checkedConvert) {
+  $checkKeys(
+    json,
+    requiredKeys: const [
+      'id',
+      'name',
+      'cible',
+      'projet',
+      'scopeLabel',
+      'itemCount',
+      'createdById',
+      'createdByName',
+      'createdAt',
+      'callsSince',
+      'fichesAppelees',
+      'recentAttempts',
+      'callsByTeleconseiller',
+      'distribution',
+      'repartition',
+      'performance',
+      'reaffectations',
+    ],
+  );
+  final val = LotExportDetailDto(
+    id: $checkedConvert('id', (v) => v as String),
+    name: $checkedConvert('name', (v) => v as String),
+    cible: $checkedConvert(
+      'cible',
+      (v) => $enumDecode(
+        _$LotExportCibleEnumMap,
+        v,
+        unknownValue: LotExportCible.unknownDefaultOpenApi,
+      ),
+    ),
+    projet: $checkedConvert(
+      'projet',
+      (v) => $enumDecode(
+        _$ProjetEnumMap,
+        v,
+        unknownValue: Projet.unknownDefaultOpenApi,
+      ),
+    ),
+    scopeLabel: $checkedConvert('scopeLabel', (v) => v as String),
+    itemCount: $checkedConvert('itemCount', (v) => v as num),
+    createdById: $checkedConvert('createdById', (v) => v as String),
+    createdByName: $checkedConvert('createdByName', (v) => v as String),
+    createdAt: $checkedConvert('createdAt', (v) => v as String),
+    callsSince: $checkedConvert('callsSince', (v) => v as num),
+    fichesAppelees: $checkedConvert('fichesAppelees', (v) => v as num),
+    recentAttempts: $checkedConvert(
+      'recentAttempts',
+      (v) => (v as List<dynamic>)
+          .map((e) => LotExportAttemptDto.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    ),
+    callsByTeleconseiller: $checkedConvert(
+      'callsByTeleconseiller',
+      (v) => v as Object,
+    ),
+    distribution: $checkedConvert(
+      'distribution',
+      (v) => LotExportDistributionDto.fromJson(v as Map<String, dynamic>),
+    ),
+    repartition: $checkedConvert(
+      'repartition',
+      (v) => (v as List<dynamic>)
+          .map(
+            (e) => LotExportRepartitionDto.fromJson(e as Map<String, dynamic>),
+          )
+          .toList(),
+    ),
+    performance: $checkedConvert(
+      'performance',
+      (v) => (v as List<dynamic>)
+          .map(
+            (e) => LotExportPerformanceDto.fromJson(e as Map<String, dynamic>),
+          )
+          .toList(),
+    ),
+    reaffectations: $checkedConvert(
+      'reaffectations',
+      (v) => (v as List<dynamic>)
+          .map(
+            (e) =>
+                LotExportReaffectationDto.fromJson(e as Map<String, dynamic>),
+          )
+          .toList(),
+    ),
+  );
+  return val;
+});
 
 Map<String, dynamic> _$LotExportDetailDtoToJson(LotExportDetailDto instance) =>
     <String, dynamic>{
@@ -339,11 +361,14 @@ Map<String, dynamic> _$LotExportDetailDtoToJson(LotExportDetailDto instance) =>
       'distribution': instance.distribution.toJson(),
       'repartition': instance.repartition.map((e) => e.toJson()).toList(),
       'performance': instance.performance.map((e) => e.toJson()).toList(),
+      'reaffectations': instance.reaffectations.map((e) => e.toJson()).toList(),
     };
 
 const _$LotExportCibleEnumMap = {
   LotExportCible.REPRESENTANTS: 'REPRESENTANTS',
   LotExportCible.PROSPECTS: 'PROSPECTS',
+  LotExportCible.REPRESENTANTS_INJOIGNABLES: 'REPRESENTANTS_INJOIGNABLES',
+  LotExportCible.CONTACTS_RECOMMANDES: 'CONTACTS_RECOMMANDES',
   LotExportCible.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 
