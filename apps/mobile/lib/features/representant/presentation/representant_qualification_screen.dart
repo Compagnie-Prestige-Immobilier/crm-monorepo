@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -275,6 +276,19 @@ class _RepresentantQualificationScreenState
   void setState(VoidCallback fn) {
     super.setState(fn);
     markDraftDirty();
+    signalerLaSaisie();
+  }
+
+  /// Les réponses au dernier passage. Le chronomètre part d'une réponse qui a
+  /// CHANGÉ : le refus affiché, l'étape tournée et la fiche importée
+  /// redessinent l'écran sans que rien n'ait été saisi.
+  Map<String, Object?> dernieresReponses = const <String, Object?>{};
+
+  void signalerLaSaisie() {
+    final Map<String, Object?> reponses = collectDraftValues();
+    if (mapEquals(dernieresReponses, reponses)) return;
+    dernieresReponses = reponses;
+    unawaited(premiereSaisie(reponses));
   }
 
   @override
@@ -1190,6 +1204,16 @@ class _RepresentantQualificationScreenState
                   ? 'Motif'
                   : 'Commentaire',
               subtitle: entree.comment!.trim(),
+            ),
+          // Le temps passé SUR LA FICHE, à ne pas confondre avec le temps
+          // passé AU TÉLÉPHONE. Nul pour un appel d'avant le chronomètre, et
+          // « 0 s » y serait un mensonge.
+          if (entree.dureeTraitementSecondes != null)
+            CpiRow(
+              title: 'Temps sur la fiche',
+              subtitle: chrono(
+                Duration(seconds: entree.dureeTraitementSecondes!),
+              ),
             ),
         ]),
       ],

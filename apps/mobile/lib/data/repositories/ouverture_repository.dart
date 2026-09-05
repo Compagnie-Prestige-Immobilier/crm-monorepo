@@ -134,17 +134,105 @@ class OuvertureRepository {
     )..where((OuverturesFiche o) => o.id.equals(id))).write(
       OuverturesFicheCompanion(draft: Value<String?>(jsonEncode(draft))),
     );
+    final OuverturesFicheData? ligne = await parId(id);
+    await _pousserLeBrouillon(
+      id: id,
+      draft: draft,
+      firstInputAt: ligne?.firstInputAt,
+    );
+  }
+
+  /// Le départ du chronomètre, posé UNE SEULE FOIS : `first_input_at IS NULL`
+  /// tient l'invariant ici comme au serveur. Rappelée à chaque frappe, la
+  /// borne reculerait sans fin et la durée resterait éternellement d'une
+  /// seconde.
+  ///
+  /// L'heure vient du TERRAIN, comme `openedAt` : une saisie hors ligne peut
+  /// remonter des heures plus tard, et l'heure du serveur mesurerait alors le
+  /// délai de synchronisation, pas le travail.
+  Future<OuverturesFicheData?> marquerLaPremiereSaisie({
+    required String id,
+    required Map<String, Object?> draft,
+  }) async {
+    final DateTime at = _clock.now();
+    final int posees =
+        await (_db.update(_db.ouverturesFiche)..where(
+              (OuverturesFiche o) =>
+                  o.id.equals(id) &
+                  o.firstInputAt.isNull() &
+                  o.closedAt.isNull(),
+            ))
+            .write(
+              OuverturesFicheCompanion(firstInputAt: Value<DateTime?>(at)),
+            );
+    if (posees == 0) return parId(id);
+    final ApiException? echec = await _pousserLeBrouillon(
+      id: id,
+      draft: draft,
+      firstInputAt: at,
+    );
+    // La borne ne se rejoue pas au mieux, elle : une fiche traitée hors ligne
+    // et remontée le lendemain doit garder l'heure du terrain, sinon la DMT ne
+    // compte que les appels passés en ligne.
+    if (echec != null && echec.retryable) {
+      await _enfilerLaPremiereSaisie(id: id, draft: draft, firstInputAt: at);
+    }
+    return parId(id);
+  }
+
+  Future<ApiException?> _pousserLeBrouillon({
+    required String id,
+    required Map<String, Object?> draft,
+    required DateTime? firstInputAt,
+  }) async {
     try {
       await _api.enregistrerBrouillonOuverture(
         id: id,
-        corps: EnregistrerBrouillonDto(draft: _sansNuls(draft)),
+        corps: EnregistrerBrouillonDto(
+          draft: _sansNuls(draft),
+          firstInputAt: firstInputAt?.toUtc(),
+        ),
       );
+      return null;
     } on ApiException catch (error) {
       developer.log(
         'Brouillon d\'ouverture $id non remonté : ${error.code}',
         name: 'cpi.ouvertures',
       );
+      return error;
     }
+  }
+
+  Future<void> _enfilerLaPremiereSaisie({
+    required String id,
+    required Map<String, Object?> draft,
+    required DateTime firstInputAt,
+  }) async {
+    final OuverturesFicheData? ligne = await parId(id);
+    if (ligne == null) return;
+    await _db
+        .into(_db.outbox)
+        .insert(
+          OutboxCompanion.insert(
+            id: Ids.newId(),
+            // Même partition que l'ouverture : la borne ne peut pas atteindre
+            // le serveur avant la fiche qu'elle date.
+            dependencyKey: Value<String?>(
+              ligne.representantId ?? ligne.prospectId,
+            ),
+            entityType: ouvertureEntity,
+            entityId: id,
+            op: 'update',
+            payload: jsonEncode(<String, Object?>{
+              'firstInputAt': firstInputAt.toUtc().toIso8601String(),
+              'draft': _sansNuls(draft),
+            }),
+            payloadVersion: const Value<int>(SyncEngine.payloadVersion),
+            status: const Value<String>(OutboxStatus.pending),
+            nextAttemptAt: firstInputAt,
+            createdAt: firstInputAt,
+          ),
+        );
   }
 
   /// La qualification lève le verrou. Le serveur, lui, ferme par le champ
