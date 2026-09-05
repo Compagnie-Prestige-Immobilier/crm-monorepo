@@ -44,26 +44,24 @@ export function outcomeOf(effect: StatutQualificationEffect): RepCallOutcome {
 }
 
 /**
- * Les branches du script où le statut se propose. Déduites de l'effet et non
- * stockées : une colonne « joignable » divergerait à la première correction.
- * SCHEDULE_CALLBACK est dans les deux : on rappelle aussi qui on n'a pas joint.
+ * La famille du statut, déduite de l'effet et non stockée : une colonne
+ * « joignable » divergerait à la première correction. Un faux numéro est JOINT,
+ * la fiche est traitée ; un rappel convenu l'est aussi, et il est le seul joint
+ * qui repasse. Les deux familles PARTITIONNENT les effets : un statut se
+ * propose sous une seule branche du script.
  */
-const ABOUTI: readonly StatutQualificationEffect[] = [
+const JOINT: readonly StatutQualificationEffect[] = [
   StatutQualificationEffect.REACHED,
   StatutQualificationEffect.REFUSED,
   StatutQualificationEffect.SCHEDULE_CALLBACK,
-];
-
-const NON_ABOUTI: readonly StatutQualificationEffect[] = [
-  StatutQualificationEffect.UNREACHABLE,
   StatutQualificationEffect.WRONG_NUMBER,
-  StatutQualificationEffect.SCHEDULE_CALLBACK,
 ];
 
-export const branchesDe = (
+const NON_JOINT: readonly StatutQualificationEffect[] = [StatutQualificationEffect.UNREACHABLE];
+
+export const brancheDe = (
   effect: StatutQualificationEffect,
-): readonly (readonly StatutQualificationEffect[])[] =>
-  [ABOUTI, NON_ABOUTI].filter((branche) => branche.includes(effect));
+): readonly StatutQualificationEffect[] => (JOINT.includes(effect) ? JOINT : NON_JOINT);
 
 const toDto = (row: StatutQualification): StatutQualificationDto => ({
   id: row.id,
@@ -208,14 +206,14 @@ export class StatutsQualificationService {
     const existing = await this.statut(id);
 
     if (!input.isActive && existing.isActive) {
-      const restants = await Promise.all(
-        branchesDe(existing.effect).map((branche) =>
-          this.prisma.statutQualification.count({
-            where: { isActive: true, effect: { in: [...branche] }, id: { not: id } },
-          }),
-        ),
-      );
-      if (restants.includes(0)) {
+      const restants = await this.prisma.statutQualification.count({
+        where: {
+          isActive: true,
+          effect: { in: [...brancheDe(existing.effect)] },
+          id: { not: id },
+        },
+      });
+      if (restants === 0) {
         throw new ConflictException({
           code: StatutQualificationError.LAST_OF_BRANCH,
           message: `« ${existing.label} » est le dernier statut actif de sa branche : la retirer laisserait le script sans issue possible.`,
@@ -238,9 +236,8 @@ export class StatutsQualificationService {
    * l'autre.
    */
   private async rangSuivant(effect: StatutQualificationEffect): Promise<number> {
-    const branche = ABOUTI.includes(effect) ? ABOUTI : NON_ABOUTI;
     const dernier = await this.prisma.statutQualification.findFirst({
-      where: { effect: { in: [...branche] } },
+      where: { effect: { in: [...brancheDe(effect)] } },
       orderBy: { sortOrder: 'desc' },
       select: { sortOrder: true },
     });
