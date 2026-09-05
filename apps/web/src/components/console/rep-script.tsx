@@ -36,6 +36,7 @@ import {
   callbackHalfHours,
   callbackSlots,
   formatCallbackAt,
+  lireBrouillonRep,
   pushRepCallAttempt,
   repRelationSettled,
   type RepAnswer,
@@ -66,6 +67,7 @@ import {
   REPRESENTANT_RELATION_LABELS,
   type RepresentantRelation,
 } from '@/lib/representant-filters';
+import { useBrouillonAuto } from '@/lib/use-brouillon-auto';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { useVerrouNavigation } from '@/lib/use-verrou-navigation';
 import { cn } from '@/lib/utils';
@@ -1122,27 +1124,48 @@ function Qualification({
   ouverture: OuvertureFiche;
   onEnregistre: (nom: string) => void;
 }) {
+  const [repris] = useState(() => lireBrouillonRep(ouverture.draft));
   const [etape, setEtape] = useState<1 | 2>(1);
-  const [resultat, setResultat] = useState<Resultat | null>(null);
-  const [statutId, setStatutId] = useState<string | null>(null);
-  const [etablissementConfirme, setEtablissementConfirme] = useState<boolean | null>(null);
-  const [nouvelEtablissement, setNouvelEtablissement] = useState('');
-  const [contacte, setContacte] = useState<boolean | null>(null);
-  const [connaitUES, setConnaitUES] = useState<boolean | null>(null);
-  const [syndicatId, setSyndicatId] = useState<string | null>(null);
-  const [ambassadeur, setAmbassadeur] = useState<boolean | null>(null);
-  const [memeWhatsapp, setMemeWhatsapp] = useState<boolean | null>(null);
-  const [whatsapp, setWhatsapp] = useState('');
-  const [rappelAt, setRappelAt] = useState<string | null>(null);
-  const [sugPhone, setSugPhone] = useState('');
-  const [sugName, setSugName] = useState('');
-  const [sugNote, setSugNote] = useState('');
-  const [commentaire, setCommentaire] = useState('');
+  const [resultat, setResultat] = useState<Resultat | null>(repris.resultat);
+  const [statutId, setStatutId] = useState<string | null>(repris.statutId);
+  const [etablissementConfirme, setEtablissementConfirme] = useState<boolean | null>(
+    repris.etablissementConfirme,
+  );
+  const [nouvelEtablissement, setNouvelEtablissement] = useState(repris.nouvelEtablissement);
+  const [contacte, setContacte] = useState<boolean | null>(repris.contacte);
+  const [connaitUES, setConnaitUES] = useState<boolean | null>(repris.connaitUES);
+  const [syndicatId, setSyndicatId] = useState<string | null>(repris.syndicatId);
+  const [ambassadeur, setAmbassadeur] = useState<boolean | null>(repris.ambassadeur);
+  const [memeWhatsapp, setMemeWhatsapp] = useState<boolean | null>(repris.memeWhatsapp);
+  const [whatsapp, setWhatsapp] = useState(repris.whatsapp);
+  const [rappelAt, setRappelAt] = useState<string | null>(repris.rappelAt);
+  const [sugPhone, setSugPhone] = useState(repris.sugPhone);
+  const [sugName, setSugName] = useState(repris.sugName);
+  const [sugNote, setSugNote] = useState(repris.sugNote);
+  const [commentaire, setCommentaire] = useState(repris.commentaire);
   const commentaireRef = useRef<HTMLTextAreaElement>(null);
   const [edit, setEdit] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
 
   const [now] = useState(() => Date.now());
+
+  useBrouillonAuto(ouverture, {
+    resultat,
+    statutId,
+    etablissementConfirme,
+    nouvelEtablissement,
+    contacte,
+    connaitUES,
+    syndicatId,
+    ambassadeur,
+    memeWhatsapp,
+    whatsapp,
+    rappelAt,
+    sugPhone,
+    sugName,
+    sugNote,
+    commentaire,
+  });
 
   const reference = useQuery({
     queryKey: queryKeys.reference,

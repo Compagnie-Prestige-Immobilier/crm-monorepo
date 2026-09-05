@@ -18,6 +18,7 @@ import type * as StatutsData from '@/lib/data/statuts-qualification';
 import type { StatutQualification } from '@/lib/data/statuts-qualification';
 import { REP_CALL_OUTCOME_LABELS } from '@/lib/types';
 import type { RepresentantFilters } from '@/lib/representant-filters';
+import { masquerLOnglet } from '@/test/masquer-onglet';
 import { renderWithQuery } from '@/test/render-query';
 
 const pushRepCallAttempt = vi.fn();
@@ -29,6 +30,7 @@ const fetchReferenceData = vi.fn();
 const fetchStatutsQualification = vi.fn();
 const ouvrirFiche = vi.fn();
 const fetchOuvertureCourante = vi.fn();
+const enregistrerBrouillon = vi.fn();
 const countPendingProspects = vi.fn();
 const fetchCallbacks = vi.fn();
 const toastError = vi.fn();
@@ -74,6 +76,7 @@ vi.mock('@/lib/data/ouvertures', async (importOriginal) => {
     ...actual,
     ouvrirFiche: (...args: unknown[]) => ouvrirFiche(...args) as unknown,
     fetchOuvertureCourante: () => fetchOuvertureCourante() as unknown,
+    enregistrerBrouillon: (...args: unknown[]) => enregistrerBrouillon(...args) as unknown,
   };
 });
 
@@ -296,6 +299,8 @@ beforeEach(() => {
   );
   fetchOuvertureCourante.mockReset();
   fetchOuvertureCourante.mockResolvedValue(null);
+  enregistrerBrouillon.mockReset();
+  enregistrerBrouillon.mockResolvedValue(ouverture());
   fetchReferenceData.mockReset();
   fetchReferenceData.mockResolvedValue({
     syndicats: [{ id: 'snd-saes', name: 'SAES', sigle: 'SAES', isActive: true, sortOrder: 1 }],
@@ -1134,5 +1139,80 @@ describe('RepScript : la fiche tenue au rechargement', () => {
       );
     });
     expect(screen.queryByText(/Fiche ouverte depuis/u)).toBeNull();
+  });
+});
+
+// Une coupure de courant, un processus tué, un onglet fermé par le système : le
+// verrou tient sur le serveur, mais le script entier était encore dans l'écran.
+describe('RepScript : la saisie survit à une fermeture brutale', () => {
+  it('enregistre les réponses quand l’onglet passe en arrière-plan', async () => {
+    await renderListe();
+    await choisir(/Aminata Ndiaye/u);
+    await injoindre();
+    await userEvent.type(screen.getByLabelText('Commentaire'), 'ligne coupée');
+
+    expect(enregistrerBrouillon).not.toHaveBeenCalled();
+
+    masquerLOnglet();
+
+    await waitFor(() => {
+      expect(enregistrerBrouillon).toHaveBeenCalledTimes(1);
+    });
+    expect(enregistrerBrouillon.mock.calls.at(-1)?.[1]).toMatchObject({
+      resultat: 'INJOIGNABLE',
+      statutId: 's-4',
+      commentaire: 'ligne coupée',
+    });
+  });
+
+  it('rouvre le script sur ce que le brouillon avait gardé', async () => {
+    fetchOuvertureCourante.mockResolvedValue(
+      ouverture({
+        draft: {
+          resultat: 'JOIGNABLE',
+          statutId: 's-2',
+          etablissementConfirme: true,
+          contacte: true,
+          connaitUES: true,
+          ambassadeur: false,
+          commentaire: 'il refuse pour l’instant',
+        },
+      }),
+    );
+    fetchRepresentant.mockResolvedValue(PREMIER);
+
+    await renderListe();
+
+    expect((await screen.findByRole('heading', { level: 2 })).textContent).toBe('Aminata Ndiaye');
+    expect(screen.getByLabelText('Commentaire')).toHaveProperty(
+      'value',
+      'il refuse pour l’instant',
+    );
+    expect(screen.getByRole('button', { name: 'Joignable' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+    expect(
+      screen.getByRole('combobox', { name: /Statut de qualification/u }).textContent,
+    ).toContain('Refusé');
+  });
+
+  // Un brouillon d'une version antérieure a des champs que le script ne connaît
+  // plus : ceux qui restent lisibles valent mieux qu'un formulaire vidé.
+  it('garde d’un brouillon abîmé ce qui s’y lit encore', async () => {
+    fetchOuvertureCourante.mockResolvedValue(
+      ouverture({ draft: { resultat: 7, contacte: 'oui', commentaire: 'il rappelle demain' } }),
+    );
+    fetchRepresentant.mockResolvedValue(PREMIER);
+
+    await renderListe();
+
+    expect((await screen.findByRole('heading', { level: 2 })).textContent).toBe('Aminata Ndiaye');
+    expect(screen.getByRole('button', { name: 'Joignable' }).getAttribute('aria-pressed')).toBe(
+      'false',
+    );
+
+    await repondre('Injoignable');
+
+    expect(screen.getByLabelText('Commentaire')).toHaveProperty('value', 'il rappelle demain');
   });
 });

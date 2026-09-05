@@ -61,6 +61,10 @@ export async function fetchOuvertureCourante(
   return unwrap(await client.GET('/api/v1/ouvertures/courante')) as OuvertureFiche | null;
 }
 
+/**
+ * `keepalive` : cette écriture part souvent au moment où l'onglet disparaît, et
+ * le navigateur avorte les requêtes d'un document qu'il détruit.
+ */
 export async function enregistrerBrouillon(
   id: string,
   draft: Record<string, unknown>,
@@ -70,6 +74,7 @@ export async function enregistrerBrouillon(
     await client.PUT('/api/v1/ouvertures/{id}/brouillon', {
       params: { path: { id } },
       body: { draft },
+      keepalive: true,
     }),
   ) as OuvertureFiche;
 }

@@ -10,6 +10,7 @@ import type * as OuverturesData from '@/lib/data/ouvertures';
 import type * as ProspectsData from '@/lib/data/prospects';
 import type * as ReferenceData from '@/lib/data/reference';
 import type { CallOutcome, ProspectFilters, ProspectRow } from '@/lib/types';
+import { masquerLOnglet } from '@/test/masquer-onglet';
 import { prospectFixture } from '@/test/prospect-fixture';
 import { renderWithQuery } from '@/test/render-query';
 import { routerMock, setUrl } from '@/test/router-mock';
@@ -1293,5 +1294,50 @@ describe('ConsoleView : la fiche tenue au rechargement', () => {
     expect(await screen.findByRole('button', { name: /Neuve Fiche/ })).toBeTruthy();
     expect(toastError).not.toHaveBeenCalled();
     expect(toastInfo).not.toHaveBeenCalled();
+  });
+});
+
+// Une coupure de courant, un processus tué, un onglet fermé par le système : le
+// verrou tient sur le serveur, mais rien n'avait encore emporté la saisie.
+describe('ConsoleView : la saisie survit à une fermeture brutale', () => {
+  it('enregistre le brouillon quand l’onglet passe en arrière-plan', async () => {
+    await renderConsole([NEUVE]);
+
+    await userEvent.type(screen.getByLabelText(/Commentaire/u), 'il rappelle ce soir');
+    expect(enregistrerBrouillon).not.toHaveBeenCalled();
+
+    masquerLOnglet();
+
+    await waitFor(() => {
+      expect(enregistrerBrouillon).toHaveBeenCalledWith('ouv-1', {
+        comment: 'il rappelle ce soir',
+      });
+    });
+    // Dix-neuf frappes, une écriture : c'est l'anti-rafale qui les a réunies.
+    expect(enregistrerBrouillon).toHaveBeenCalledTimes(1);
+  });
+
+  it('emporte aussi le dossier ouvert, pas seulement le commentaire', async () => {
+    await renderConsole([NEUVE]);
+
+    await userEvent.keyboard('1');
+    await userEvent.type(await screen.findByLabelText(/Durée dans l’établissement/u), '36');
+
+    masquerLOnglet();
+
+    await waitFor(() => {
+      expect(enregistrerBrouillon).toHaveBeenCalledWith('ouv-1', {
+        comment: '',
+        conversion: expect.objectContaining({ dureeEtablissementMois: '36' }) as unknown,
+      });
+    });
+  });
+
+  it('n’écrit rien tant que la saisie n’a pas bougé', async () => {
+    await renderConsole([NEUVE]);
+
+    masquerLOnglet();
+
+    expect(enregistrerBrouillon).not.toHaveBeenCalled();
   });
 });

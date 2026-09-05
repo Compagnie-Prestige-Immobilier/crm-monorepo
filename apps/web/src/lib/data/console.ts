@@ -245,6 +245,54 @@ export function lireBrouillon(draft: unknown): BrouillonRepris {
   return { comment: lu.data.comment, conversion: lu.data.conversion ?? null };
 }
 
+const texte = z.string().catch('');
+const oui = z.boolean().nullable().catch(null);
+
+/** Le script de qualification d'un représentant, réponse par réponse. */
+const brouillonRepSchema = z.object({
+  resultat: z.enum(['JOIGNABLE', 'INJOIGNABLE']).nullable().catch(null),
+  statutId: z.string().nullable().catch(null),
+  etablissementConfirme: oui,
+  nouvelEtablissement: texte,
+  contacte: oui,
+  connaitUES: oui,
+  syndicatId: z.string().nullable().catch(null),
+  ambassadeur: oui,
+  memeWhatsapp: oui,
+  whatsapp: texte,
+  rappelAt: z.string().nullable().catch(null),
+  sugPhone: texte,
+  sugName: texte,
+  sugNote: texte,
+  commentaire: texte,
+});
+
+export type BrouillonRep = z.infer<typeof brouillonRepSchema>;
+
+const RIEN_REP: BrouillonRep = {
+  resultat: null,
+  statutId: null,
+  etablissementConfirme: null,
+  nouvelEtablissement: '',
+  contacte: null,
+  connaitUES: null,
+  syndicatId: null,
+  ambassadeur: null,
+  memeWhatsapp: null,
+  whatsapp: '',
+  rappelAt: null,
+  sugPhone: '',
+  sugName: '',
+  sugNote: '',
+  commentaire: '',
+};
+
+/** Même règle que `lireBrouillon` : un brouillon abîmé rend un script vierge. */
+export function lireBrouillonRep(draft: unknown): BrouillonRep {
+  const lu = brouillonRepSchema.safeParse(draft);
+  return lu.success ? lu.data : RIEN_REP;
+}
+
 /** Le formulaire s'ouvre déjà rempli de ce que la fiche sait : on ne redemande rien. */
 export function conversionFrom(
   prospect: ProspectRow,
