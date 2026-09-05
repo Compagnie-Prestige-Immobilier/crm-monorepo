@@ -1307,11 +1307,16 @@ model OuvertureFiche {
   prospect       Prospect?     @relation(fields: [prospectId], references: [id], onDelete: Cascade)
 
   /// Horloge du terrain, comme `clientCreatedAt` ailleurs : c'est elle qui
-  /// demarre le chronometre et qui date la journee de travail.
+  /// date la journee de travail.
   openedAt DateTime
+  /// Horloge du terrain de la PREMIERE saisie, celle qui demarre le
+  /// chronometre : le temps de lecture de la fiche n'est pas du traitement.
+  /// Posee une seule fois, jamais reecrite, sans quoi la borne reculerait a
+  /// chaque frappe. Nulle tant que rien n'a ete saisi.
+  firstInputAt DateTime?
   /// Nul tant que la fiche est verrouillee. La DMT est la difference avec
-  /// `openedAt`, jamais une colonne : une duree stockee se desaccorde de ses
-  /// deux bornes des la premiere correction.
+  /// `firstInputAt`, jamais une colonne : une duree stockee se desaccorde de
+  /// ses deux bornes des la premiere correction.
   closedAt DateTime?
 
   /// La tentative qui a leve le verrou. Sans cle etrangere : deux tables
