@@ -3,6 +3,7 @@ import 'package:cpi_go/core/providers/sync_coordinator.dart';
 import 'package:cpi_go/core/sync/clock.dart';
 import 'package:cpi_go/core/theme/app_theme.dart';
 import 'package:cpi_go/data/local/database.dart';
+import 'package:cpi_go/data/repositories/draft_repository.dart';
 import 'package:cpi_go/features/auth/auth_controller.dart';
 import 'package:cpi_go/features/auth/auth_state.dart';
 import 'package:cpi_go/features/representant/presentation/representant_qualification_screen.dart';
@@ -12,6 +13,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:cpi_go/ui/widgets/cpi_kit.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -231,6 +233,48 @@ void main() {
       await demonter(tester);
     },
   );
+
+  // EB-10 : ce qui a été saisi ne se perd pas. Le brouillon est rangé sous la
+  // fiche et rouvre le formulaire au rappel suivant.
+  testWidgets('la réponse déjà donnée se retrouve à la réouverture', (
+    WidgetTester tester,
+  ) async {
+    await monter(tester);
+    await tester.tap(find.text('Ouvrir'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    await tester.tap(find.text('Consigner l\'appel'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.text('Joignable'));
+    await tester.pump();
+    // Au-delà du repos du rebond de saisie : c'est lui qui écrit le brouillon.
+    await tester.pump(const Duration(milliseconds: 600));
+
+    // Même horloge que l'écran : lue avec l'horloge réelle, la ligne
+    // paraîtrait vieille de trois semaines et la lecture la supprimerait.
+    final DraftSnapshot? garde = await DraftRepository(
+      db,
+      clock: FakeClock(t0),
+    ).read('qualification:rep-1');
+    expect(garde?.values['resultat'], 'joignable');
+
+    await demonter(tester);
+    await monter(tester);
+    await tester.tap(find.text('Consigner l\'appel'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    // La réponse est revenue : l'étape ne réclame plus le résultat.
+    final CpiButton continuer = tester.widget<CpiButton>(
+      find.byWidgetPredicate(
+        (Widget w) => w is CpiButton && w.label == 'Continuer',
+      ),
+    );
+    expect(continuer.subtitle, isNull);
+    await demonter(tester);
+  });
 
   // Le verrou refuse la seconde fiche SANS dire laquelle il tient : l'écran
   // doit nommer celle qui est en main et proposer de la reprendre.

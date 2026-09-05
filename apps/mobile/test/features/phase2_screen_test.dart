@@ -8,6 +8,7 @@ import 'package:cpi_go/core/sync/phase2_directory_sync.dart';
 import 'package:cpi_go/core/theme/app_theme.dart';
 import 'package:cpi_go/core/theme/cpi_tokens.dart';
 import 'package:cpi_go/data/local/database.dart';
+import 'package:cpi_go/data/repositories/draft_repository.dart';
 import 'package:cpi_go/features/auth/auth_controller.dart';
 import 'package:cpi_go/features/auth/auth_state.dart';
 import 'package:cpi_go/features/phase2/presentation/call_audio_recorder.dart';
@@ -1499,6 +1500,73 @@ void main() {
 
     expect(find.textContaining('commentaire est obligatoire'), findsOneWidget);
     expect(await db.countMyAttempts().getSingle(), 0);
+  });
+
+  // EB-10 : changer de numéro effaçait la saisie. Elle est désormais écrite
+  // SOUS LE NUMÉRO qu'on quitte, avant que la clé ne change : après, elle se
+  // rangerait sous le numéro suivant, ou nulle part.
+  phase2TestWidgets('la saisie survit au changement de numéro', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(host());
+    await renseignements(tester, '771234567');
+    await remplir(tester, 'Nom', 'Sow');
+    await remplir(tester, 'Prénom', 'Awa');
+    // Le champ du numéro ne vit qu'à l'étape 1 : y revenir est le seul moyen
+    // d'appeler quelqu'un d'autre.
+    await reculer(tester);
+
+    await type(tester, '781234567');
+    await tester.pumpAndSettle();
+
+    // Même horloge que l'écran : lue avec l'horloge réelle, la ligne
+    // paraîtrait vieille de trois semaines et la lecture la supprimerait.
+    final DraftSnapshot? garde = await DraftRepository(
+      db,
+      clock: FakeClock(t0),
+    ).read('phase2:+221771234567');
+    expect(garde?.values['nom'], 'Sow');
+    expect(garde?.values['prenom'], 'Awa');
+    // L'autre numéro part d'un formulaire vide : c'est une autre personne.
+    expect(find.text('Sow'), findsNothing);
+  });
+
+  // Les clés du brouillon sont un contrat avec lui-même d'une version à
+  // l'autre : relues sous un autre nom, les réponses reviendraient vides.
+  test('le brouillon se relit champ par champ', () {
+    final Phase2FormFields fields = Phase2FormFields();
+    addTearDown(fields.dispose);
+    fields.applyDraft(<String, Object?>{
+      'nom': 'Sow',
+      'prenom': 'Awa',
+      'email': 'awa@exemple.sn',
+      'profession': 'Institutrice',
+      'duree': '36',
+      'banque': 'Banque Test',
+      'banqueId': 'bq-1',
+      'syndicat': 'Syndicat Test',
+      'syndicatId': 'sy-1',
+      'revenu': 'Revenu Test',
+      'incomeBandId': 'rev-1',
+      'dureeSystemeMois': 24,
+      'fonctionnaire': 'oui',
+      'engagementEnCours': 'non',
+    });
+
+    expect(fields.nom.text, 'Sow');
+    expect(fields.prenom.text, 'Awa');
+    expect(fields.email.text, 'awa@exemple.sn');
+    expect(fields.profession.text, 'Institutrice');
+    expect(fields.duree.text, '36');
+    expect(fields.banqueId, 'bq-1');
+    expect(fields.syndicatId, 'sy-1');
+    expect(fields.incomeBandId, 'rev-1');
+    expect(fields.dureeSystemeMois, 24);
+    expect(fields.fonctionnaire, Tri.oui);
+    expect(fields.engagementEnCours, Tri.non);
+    // Une valeur absente ne se devine pas : elle reste « non demandé ».
+    fields.applyDraft(const <String, Object?>{});
+    expect(fields.fonctionnaire, Tri.nonDemande);
   });
 }
 

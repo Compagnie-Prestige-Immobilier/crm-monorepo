@@ -8,6 +8,7 @@ import 'package:forui/forui.dart';
 import 'package:intl/intl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
+import '../../../core/drafts/draft_form_mixin.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/router/back_navigation.dart';
 import '../../../core/sync/phase2_directory_sync.dart';
@@ -18,6 +19,7 @@ import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/phone.dart';
 import '../../../core/utils/whatsapp.dart' show kProfessionMaxLength;
 import '../../../data/local/database.dart';
+import '../../../data/repositories/draft_repository.dart';
 import '../../../data/repositories/write_repository.dart';
 import '../../../ui/widgets/cpi_action_bar.dart';
 import '../../../ui/widgets/cpi_choice_group.dart';
@@ -44,7 +46,8 @@ class Phase2Screen extends ConsumerStatefulWidget {
   ConsumerState<Phase2Screen> createState() => _Phase2ScreenState();
 }
 
-class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
+class _Phase2ScreenState extends ConsumerState<Phase2Screen>
+    with DraftFormMixin<Phase2Screen> {
   final TextEditingController _phone = TextEditingController();
   final FocusNode _phoneFocus = FocusNode();
 
@@ -83,6 +86,34 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
 
   bool get _recordingActive => _activeRecordingPath != null;
 
+  /// EB-10 : la saisie survit au changement de numéro et à la mort de l'app.
+  /// Le brouillon est rangé SOUS LE NUMÉRO appelé : rappeler la même personne
+  /// rouvre ses réponses, appeler quelqu'un d'autre part d'un formulaire vide.
+  @override
+  String get draftId => 'phase2:${_lastSearched ?? ''}';
+
+  @override
+  String get draftFormKey => 'phase2_appel';
+
+  @override
+  String? get draftEntityId => _lastSearched;
+
+  @override
+  int get draftStep => _step;
+
+  @override
+  DraftRepository get draftRepository => ref.read(draftRepositoryProvider);
+
+  /// Sans numéro cherché, le brouillon n'appartient à personne.
+  @override
+  bool get draftIsEmpty => _lastSearched == null;
+
+  @override
+  Map<String, Object?> collectDraftValues() => <String, Object?>{
+    ..._form.toDraft(),
+    'comment': _comment.text,
+  };
+
   @override
   void initState() {
     super.initState();
@@ -93,7 +124,9 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
       _phone.text = Phone.editable(prefill);
     }
     _phone.addListener(_onPhoneChanged);
+    _comment.addListener(markDraftDirty);
     _form.watch(() {
+      markDraftDirty();
       if (mounted) setState(() {});
     });
   }
@@ -102,6 +135,7 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
   void dispose() {
     if (!_savingRecording) _discardRecording();
     _phone.removeListener(_onPhoneChanged);
+    _comment.removeListener(markDraftDirty);
     _phone.dispose();
     _phoneFocus.dispose();
     _comment.dispose();
@@ -113,23 +147,43 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
     final String raw = _phone.text;
     final PhoneResult parsed = Phone.parse(raw);
     if (parsed is! PhoneValid) {
-      if (_lastSearched != null) {
-        _discardRecording();
-        _lastSearched = null;
-        _noteOuverte = false;
-        ref.read(phase2ControllerProvider.notifier).next();
-      }
+      if (_lastSearched != null) unawaited(_changerDeNumero(null));
       return;
     }
     if (_lastSearched == parsed.e164) return;
+    unawaited(_changerDeNumero(parsed.e164));
+  }
+
+  /// La saisie du numéro qu'on quitte est écrite AVANT de changer de clé :
+  /// après, elle irait se ranger sous le numéro suivant, ou nulle part.
+  Future<void> _changerDeNumero(String? e164) async {
+    await flushDraft();
+    if (!mounted) return;
     _discardRecording();
-    _lastSearched = parsed.e164;
+    _lastSearched = e164;
     _noteOuverte = false;
+    if (e164 == null) {
+      ref.read(phase2ControllerProvider.notifier).next();
+      return;
+    }
     // Un autre numéro, c'est une autre personne : ses renseignements ne se
     // reprennent pas de l'appel précédent.
     _form.clear();
     _comment.clear();
-    unawaited(_runSearch(parsed.e164));
+    await _runSearch(e164);
+    if (mounted) await _reprendreLeBrouillon();
+  }
+
+  /// Ce que le dernier appel à ce numéro avait laissé en chemin. Repris avant
+  /// `prefill`, qui n'écrase jamais un champ déjà rempli.
+  Future<void> _reprendreLeBrouillon() async {
+    final DraftSnapshot? repris = await draftRepository.read(draftId);
+    if (repris == null || !mounted) return;
+    setState(() {
+      _form.applyDraft(repris.values);
+      final Object? comment = repris.values['comment'];
+      if (comment is String) _comment.text = comment;
+    });
   }
 
   Future<void> _runSearch(String e164) async {
@@ -141,7 +195,13 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
     }
   }
 
-  void _resetForNext() {
+  void _resetForNext() => unawaited(_viderPourLeSuivant());
+
+  /// Le brouillon du numéro qu'on quitte est écrit AVANT le vidage : sinon la
+  /// prochaine écriture rangerait un formulaire vide sous son nom.
+  Future<void> _viderPourLeSuivant() async {
+    await flushDraft();
+    if (!mounted) return;
     _discardRecording();
     _lastSearched = null;
     _phone.clear();
@@ -189,7 +249,17 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
             renseignements: _form.read(),
             rendezVousAt: rendezVousAt,
           );
-      if (ok) _recordingPath = null;
+      if (ok) {
+        _recordingPath = null;
+        // EB-10 : un rappel promis garde les réponses pour la prochaine fois.
+        // Un appel conclu, non : les rouvrir ferait ressaisir un dossier clos.
+        if (reason.effect == CallEffects.scheduleCallback) {
+          await flushDraft();
+        } else {
+          discardDraft();
+          await draftRepository.delete(draftId);
+        }
+      }
     } finally {
       _savingRecording = false;
       if (!mounted && !ok) _discardRecording();
@@ -294,7 +364,10 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen> {
                   banques: banques,
                   syndicats: syndicats,
                   tranches: tranches,
-                  onChanged: () => setState(() {}),
+                  onChanged: () {
+                    markDraftDirty();
+                    setState(() {});
+                  },
                 ),
                 _ => _EtapeResultat(
                   state: phase2,
@@ -546,6 +619,53 @@ class Phase2FormFields {
         ? prospect.dureeSystemeMois
         : null;
   }
+
+  /// Le brouillon, tel qu'il se range et se relit. Les libellés des listes
+  /// voyagent avec leur identifiant : sans eux, le champ se rouvrirait vide
+  /// alors que le choix, lui, serait fait.
+  Map<String, Object?> toDraft() => <String, Object?>{
+    'nom': nom.text,
+    'prenom': prenom.text,
+    'email': email.text,
+    'profession': profession.text,
+    'duree': duree.text,
+    'banque': banque.text,
+    'banqueId': banqueId,
+    'syndicat': syndicat.text,
+    'syndicatId': syndicatId,
+    'revenu': revenu.text,
+    'incomeBandId': incomeBandId,
+    'dureeSystemeMois': dureeSystemeMois,
+    'fonctionnaire': fonctionnaire.name,
+    'engagementEnCours': engagementEnCours.name,
+  };
+
+  void applyDraft(Map<String, Object?> valeurs) {
+    String texte(String cle) =>
+        valeurs[cle] is String ? valeurs[cle]! as String : '';
+    String? identifiant(String cle) =>
+        valeurs[cle] is String ? valeurs[cle]! as String : null;
+
+    nom.text = texte('nom');
+    prenom.text = texte('prenom');
+    email.text = texte('email');
+    profession.text = texte('profession');
+    duree.text = texte('duree');
+    banque.text = texte('banque');
+    banqueId = identifiant('banqueId');
+    syndicat.text = texte('syndicat');
+    syndicatId = identifiant('syndicatId');
+    revenu.text = texte('revenu');
+    incomeBandId = identifiant('incomeBandId');
+    dureeSystemeMois = valeurs['dureeSystemeMois'] is num
+        ? (valeurs['dureeSystemeMois']! as num).toInt()
+        : null;
+    fonctionnaire = _tri(valeurs['fonctionnaire']);
+    engagementEnCours = _tri(valeurs['engagementEnCours']);
+  }
+
+  static Tri _tri(Object? brut) =>
+      Tri.values.where((Tri t) => t.name == brut).firstOrNull ?? Tri.nonDemande;
 
   void clear() {
     for (final TextEditingController c in _controllers) {
