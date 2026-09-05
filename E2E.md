@@ -715,27 +715,27 @@ Réservé et **intouchable**, propriété des specs existantes :
 
 Alloué aux nouvelles specs, sans recouvrement :
 
-| Plage                             | Fichier                                                                                                                |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `+221 78 100 40 01` à `40 09`     | `chues-chiffres-taux.superviseur.spec.ts`                                                                              |
-| `+221 78 100 41 01` à `41 09`     | `chues-etape1.commercial.spec.ts`                                                                                      |
-| `+221 78 100 42 01` à `42 09`     | `chues-etape2.commercial.spec.ts`                                                                                      |
-| `+221 78 100 43 01` à `43 09`     | `chues-representants.commercial.spec.ts`                                                                               |
-| `+221 78 100 44 01` à `44 29`     | `chues-prospects.commercial.spec.ts`                                                                                   |
-| `+221 78 100 45 01` à `45 09`     | `chues-suggestions.commercial.spec.ts`                                                                                 |
-| `+221 78 100 46 01` à `46 09`     | `chues-rappels.commercial.spec.ts`                                                                                     |
-| `+221 78 100 47 01` à `47 09`     | `chues-import.spec.ts`                                                                                                 |
-| `+221 78 100 48 01` à `48 21`     | `chues-lots-export.spec.ts` (vingt représentants de réserve, plus le vingt-et-unième que CHU-LOT-09 crée après le lot) |
-| `+221 78 100 49 01` à `49 09`     | `chues-demandes.banque.spec.ts`                                                                                        |
-| `+221 78 100 50 01` à `50 09`     | specs de l'espace Accueil, si un numéro unique devient nécessaire                                                      |
-| `+221 78 100 51 01` à `51 09`     | `chues-dossiers.banque.spec.ts` (fiches client des dossiers)                                                           |
-| `+221781002000` à `+221781002019` | `grand-public-liste.spec.ts`                                                                                           |
-| `+221781002020` à `+221781002039` | `grand-public-saisie.spec.ts`                                                                                          |
-| `+221781002040` à `+221781002059` | `grand-public-fiche.spec.ts`                                                                                           |
-| `+221781002060` à `+221781002079` | `grand-public-rappels.spec.ts`                                                                                         |
-| `+221781002100` à `+221781002119` | `demo-isolement.spec.ts`                                                                                               |
-| `+221781002200` à `+221781002219` | `admin-utilisateurs.spec.ts`                                                                                           |
-| `+221781002220` à `+221781002229` | `admin-notifications.spec.ts`                                                                                          |
+| Plage                             | Fichier                                                                                                                                                                                                              |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `+221 78 100 40 01` à `40 09`     | `chues-chiffres-taux.superviseur.spec.ts`                                                                                                                                                                            |
+| `+221 78 100 41 01` à `41 09`     | `chues-etape1.commercial.spec.ts`                                                                                                                                                                                    |
+| `+221 78 100 42 01` à `42 09`     | `chues-etape2.commercial.spec.ts`                                                                                                                                                                                    |
+| `+221 78 100 43 01` à `43 09`     | `chues-representants.commercial.spec.ts`                                                                                                                                                                             |
+| `+221 78 100 44 01` à `44 29`     | `chues-prospects.commercial.spec.ts`                                                                                                                                                                                 |
+| `+221 78 100 45 01` à `45 09`     | `chues-suggestions.commercial.spec.ts`                                                                                                                                                                               |
+| `+221 78 100 46 01` à `46 09`     | `chues-rappels.commercial.spec.ts`                                                                                                                                                                                   |
+| `+221 78 100 47 01` à `47 09`     | `chues-import.spec.ts`                                                                                                                                                                                               |
+| `+221 78 100 48 01` à `48 22`     | `chues-lots-export.spec.ts` (vingt représentants de réserve, le vingt-et-unième que CHU-LOT-09 crée après le lot, et le vingt-deuxième qui ne porte AUCUNE fiche : il n'est que le contact recommandé de CHU-LOT-21) |
+| `+221 78 100 49 01` à `49 09`     | `chues-demandes.banque.spec.ts`                                                                                                                                                                                      |
+| `+221 78 100 50 01` à `50 09`     | specs de l'espace Accueil, si un numéro unique devient nécessaire                                                                                                                                                    |
+| `+221 78 100 51 01` à `51 09`     | `chues-dossiers.banque.spec.ts` (fiches client des dossiers)                                                                                                                                                         |
+| `+221781002000` à `+221781002019` | `grand-public-liste.spec.ts`                                                                                                                                                                                         |
+| `+221781002020` à `+221781002039` | `grand-public-saisie.spec.ts`                                                                                                                                                                                        |
+| `+221781002040` à `+221781002059` | `grand-public-fiche.spec.ts`                                                                                                                                                                                         |
+| `+221781002060` à `+221781002079` | `grand-public-rappels.spec.ts`                                                                                                                                                                                       |
+| `+221781002100` à `+221781002119` | `demo-isolement.spec.ts`                                                                                                                                                                                             |
+| `+221781002200` à `+221781002219` | `admin-utilisateurs.spec.ts`                                                                                                                                                                                         |
+| `+221781002220` à `+221781002229` | `admin-notifications.spec.ts`                                                                                                                                                                                        |
 
 Le registre des visites n'impose **aucune unicité** sur le champ `TELEPHONES` :
 les specs de l'espace Accueil gardent la valeur littérale `78 454 44 66` des
@@ -770,45 +770,45 @@ Aucun de ces cinq fichiers ne s'appelle `.anon.spec.ts` : ils consomment des
 
 ### 5.5 Espace Projet CHUES
 
-| Fichier                                   | Session                                    | Scénarios                                                                     | Ordre  | Préfixe de données                                                            | État                             |
-| ----------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------- | ------ | ----------------------------------------------------------------------------- | -------------------------------- |
-| `chues-hub.commercial.spec.ts`            | commercial                                 | CHU-HUB-01 à 06, CHU-HUB-08, CHU-TRV-01, CHU-TRV-05                           | libre  | aucune                                                                        | nouveau                          |
-| `chues-hub.banque.spec.ts`                | banque                                     | CHU-HUB-07                                                                    | libre  | aucune                                                                        | nouveau                          |
-| `chues-etape1.commercial.spec.ts`         | commercial                                 | CHU-ET1-01 à CHU-ET1-13                                                       | serial | `E2E-CHUES-ET1 `                                                              | nouveau                          |
-| `chues-etape1.banque.spec.ts`             | banque                                     | CHU-ET1-14                                                                    | libre  | aucune                                                                        | nouveau                          |
-| `chues-etape2.commercial.spec.ts`         | commercial                                 | CHU-ET2-01 à CHU-ET2-09                                                       | libre  | `E2E-CHUES-ET2 `                                                              | nouveau                          |
-| `chues-etape3.commercial.spec.ts`         | commercial                                 | CHU-ET3-01 à CHU-ET3-06                                                       | libre  | aucune                                                                        | nouveau, cible mouvante          |
-| `chues-chiffres.superviseur.spec.ts`      | superviseur                                | CHU-CHF-01, 05 à 12, 20, 21 ; CHU-TDB-01 ; CHU-TRV-03, 04, 06                 | libre  | aucune                                                                        | nouveau                          |
-| `chues-chiffres.direction.spec.ts`        | direction                                  | CHU-CHF-02                                                                    | libre  | aucune                                                                        | nouveau                          |
-| `chues-chiffres.commercial.spec.ts`       | commercial                                 | CHU-CHF-03                                                                    | libre  | aucune                                                                        | nouveau                          |
-| `chues-chiffres.banque.spec.ts`           | banque                                     | CHU-CHF-04                                                                    | libre  | aucune                                                                        | nouveau                          |
-| `chues-chiffres-taux.superviseur.spec.ts` | superviseur, préparation en admin          | CHU-CHF-13 à CHU-CHF-19                                                       | serial | `E2E-CHUES-TAUX `                                                             | nouveau                          |
-| `chues-disposition.superviseur.spec.ts`   | superviseur, lecture en direction          | CHU-DSP-01, 03 à 12                                                           | serial | disposition du compte SUPERVISEUR                                             | nouveau                          |
-| `chues-disposition.spec.ts`               | admin                                      | CHU-DSP-02                                                                    | libre  | aucune                                                                        | nouveau                          |
-| `chues-supervision.superviseur.spec.ts`   | superviseur                                | CHU-SUP-01 à CHU-SUP-07                                                       | libre  | aucune                                                                        | nouveau                          |
-| `chues-supervision.commercial.spec.ts`    | commercial                                 | CHU-SUP-08                                                                    | libre  | aucune                                                                        | nouveau                          |
-| `chues-rappels.commercial.spec.ts`        | commercial                                 | CHU-RAP-01 à 06, CHU-RAP-08                                                   | serial | `E2E-CHUES-RAP `                                                              | nouveau                          |
-| `chues-rappels.superviseur.spec.ts`       | superviseur                                | CHU-RAP-07                                                                    | libre  | aucune                                                                        | nouveau                          |
-| `chues-representants.commercial.spec.ts`  | commercial                                 | CHU-REP-01 à 05, CHU-REPD-01 à 05                                             | libre  | `E2E-CHUES-REP `                                                              | nouveau                          |
-| `chues-representants.superviseur.spec.ts` | superviseur                                | CHU-REP-06                                                                    | libre  | aucune                                                                        | nouveau                          |
-| `chues-representants.spec.ts`             | admin                                      | CHU-REP-07                                                                    | libre  | aucune                                                                        | nouveau                          |
-| `chues-import.spec.ts`                    | admin                                      | CHU-IMP-02 à CHU-IMP-05                                                       | libre  | `E2E-CHUES-IMP `                                                              | nouveau                          |
-| `chues-import.roles.spec.ts`              | commercial, superviseur, direction, banque | CHU-IMP-01                                                                    | libre  | aucune                                                                        | nouveau                          |
-| `chues-prospects.commercial.spec.ts`      | commercial                                 | CHU-PRO-01, 04 à 08                                                           | libre  | `E2E-CHUES-PRO `                                                              | nouveau                          |
-| `chues-prospects.commercial2.spec.ts`     | commercial2 (`fixture.fatou`)              | CHU-PRO-02                                                                    | libre  | lecture seule                                                                 | nouveau, **bloqué** §3.2         |
-| `chues-prospects.superviseur.spec.ts`     | superviseur                                | CHU-PRO-03                                                                    | libre  | aucune                                                                        | nouveau                          |
-| `chues-suggestions.commercial.spec.ts`    | commercial                                 | CHU-SUG-01 à CHU-SUG-05                                                       | serial | `E2E-CHUES-SUG `                                                              | nouveau                          |
-| `chues-suggestions.superviseur.spec.ts`   | superviseur                                | CHU-SUG-06                                                                    | libre  | aucune                                                                        | nouveau                          |
-| `chues-dossiers.banque.spec.ts`           | banque                                     | CHU-DOS-02 à 06, CHU-DOSN-01 à 05, CHU-DOSD-01 à 07, CHU-DOSX-01, CHU-DOSX-02 | serial | `E2E-CHUES-DOS-<horodatage>`                                                  | nouveau                          |
-| `chues-dossiers.roles.spec.ts`            | commercial, superviseur, direction, banque | CHU-DOS-01, CHU-DOSE-02, CHU-DOSX-03, CHU-BQ-04, CHU-DMC-02                   | libre  | aucune                                                                        | nouveau                          |
-| `chues-dossiers-etapes.spec.ts`           | admin                                      | CHU-DOSE-01, 03, 04                                                           | serial | aucune, référentiel remis dans son ordre                                      | nouveau                          |
-| `chues-banque.banque.spec.ts`             | banque                                     | CHU-BQ-01, 02, 03, 05                                                         | libre  | aucune                                                                        | nouveau                          |
-| `chues-demandes.banque.spec.ts`           | banque, arbitrage en admin                 | CHU-DMC-01, 03, 04                                                            | serial | `E2E-CHUES-DMC `                                                              | nouveau                          |
-| `chues-demandes.spec.ts`                  | admin                                      | CHU-DMC-05, CHU-DMC-06                                                        | libre  | aucune                                                                        | nouveau                          |
-| `chues-lots-export.spec.ts`               | admin                                      | CHU-LOT-01, 03 à 09                                                           | serial | `E2E-CHUES-LOT ` (représentants) ; **les lots créés ne sont pas nettoyables** | nouveau                          |
-| `chues-lots-export.roles.spec.ts`         | commercial, banque                         | CHU-LOT-02                                                                    | libre  | aucune                                                                        | nouveau                          |
-| `chues-accessibilite.spec.ts`             | commercial, superviseur                    | CHU-TRV-07                                                                    | libre  | aucune                                                                        | nouveau                          |
-| `prospects.spec.ts`                       | admin                                      | CHU-TRV-02                                                                    | libre  | aucune                                                                        | **existant, mainteneur central** |
+| Fichier                                   | Session                                    | Scénarios                                                                     | Ordre  | Préfixe de données                                                                                                                 | État                             |
+| ----------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| `chues-hub.commercial.spec.ts`            | commercial                                 | CHU-HUB-01 à 06, CHU-HUB-08, CHU-TRV-01, CHU-TRV-05                           | libre  | aucune                                                                                                                             | nouveau                          |
+| `chues-hub.banque.spec.ts`                | banque                                     | CHU-HUB-07                                                                    | libre  | aucune                                                                                                                             | nouveau                          |
+| `chues-etape1.commercial.spec.ts`         | commercial                                 | CHU-ET1-01 à CHU-ET1-13                                                       | serial | `E2E-CHUES-ET1 `                                                                                                                   | nouveau                          |
+| `chues-etape1.banque.spec.ts`             | banque                                     | CHU-ET1-14                                                                    | libre  | aucune                                                                                                                             | nouveau                          |
+| `chues-etape2.commercial.spec.ts`         | commercial                                 | CHU-ET2-01 à CHU-ET2-09                                                       | libre  | `E2E-CHUES-ET2 `                                                                                                                   | nouveau                          |
+| `chues-etape3.commercial.spec.ts`         | commercial                                 | CHU-ET3-01 à CHU-ET3-06                                                       | libre  | aucune                                                                                                                             | nouveau, cible mouvante          |
+| `chues-chiffres.superviseur.spec.ts`      | superviseur                                | CHU-CHF-01, 05 à 12, 20, 21 ; CHU-TDB-01 ; CHU-TRV-03, 04, 06                 | libre  | aucune                                                                                                                             | nouveau                          |
+| `chues-chiffres.direction.spec.ts`        | direction                                  | CHU-CHF-02                                                                    | libre  | aucune                                                                                                                             | nouveau                          |
+| `chues-chiffres.commercial.spec.ts`       | commercial                                 | CHU-CHF-03                                                                    | libre  | aucune                                                                                                                             | nouveau                          |
+| `chues-chiffres.banque.spec.ts`           | banque                                     | CHU-CHF-04                                                                    | libre  | aucune                                                                                                                             | nouveau                          |
+| `chues-chiffres-taux.superviseur.spec.ts` | superviseur, préparation en admin          | CHU-CHF-13 à CHU-CHF-19                                                       | serial | `E2E-CHUES-TAUX `                                                                                                                  | nouveau                          |
+| `chues-disposition.superviseur.spec.ts`   | superviseur, lecture en direction          | CHU-DSP-01, 03 à 12                                                           | serial | disposition du compte SUPERVISEUR                                                                                                  | nouveau                          |
+| `chues-disposition.spec.ts`               | admin                                      | CHU-DSP-02                                                                    | libre  | aucune                                                                                                                             | nouveau                          |
+| `chues-supervision.superviseur.spec.ts`   | superviseur                                | CHU-SUP-01 à CHU-SUP-07                                                       | libre  | aucune                                                                                                                             | nouveau                          |
+| `chues-supervision.commercial.spec.ts`    | commercial                                 | CHU-SUP-08                                                                    | libre  | aucune                                                                                                                             | nouveau                          |
+| `chues-rappels.commercial.spec.ts`        | commercial                                 | CHU-RAP-01 à 06, CHU-RAP-08                                                   | serial | `E2E-CHUES-RAP `                                                                                                                   | nouveau                          |
+| `chues-rappels.superviseur.spec.ts`       | superviseur                                | CHU-RAP-07                                                                    | libre  | aucune                                                                                                                             | nouveau                          |
+| `chues-representants.commercial.spec.ts`  | commercial                                 | CHU-REP-01 à 05, CHU-REPD-01 à 05                                             | libre  | `E2E-CHUES-REP `                                                                                                                   | nouveau                          |
+| `chues-representants.superviseur.spec.ts` | superviseur                                | CHU-REP-06                                                                    | libre  | aucune                                                                                                                             | nouveau                          |
+| `chues-representants.spec.ts`             | admin                                      | CHU-REP-07                                                                    | libre  | aucune                                                                                                                             | nouveau                          |
+| `chues-import.spec.ts`                    | admin                                      | CHU-IMP-02 à CHU-IMP-05                                                       | libre  | `E2E-CHUES-IMP `                                                                                                                   | nouveau                          |
+| `chues-import.roles.spec.ts`              | commercial, superviseur, direction, banque | CHU-IMP-01                                                                    | libre  | aucune                                                                                                                             | nouveau                          |
+| `chues-prospects.commercial.spec.ts`      | commercial                                 | CHU-PRO-01, 04 à 08                                                           | libre  | `E2E-CHUES-PRO `                                                                                                                   | nouveau                          |
+| `chues-prospects.commercial2.spec.ts`     | commercial2 (`fixture.fatou`)              | CHU-PRO-02                                                                    | libre  | lecture seule                                                                                                                      | nouveau, **bloqué** §3.2         |
+| `chues-prospects.superviseur.spec.ts`     | superviseur                                | CHU-PRO-03                                                                    | libre  | aucune                                                                                                                             | nouveau                          |
+| `chues-suggestions.commercial.spec.ts`    | commercial                                 | CHU-SUG-01 à CHU-SUG-05                                                       | serial | `E2E-CHUES-SUG `                                                                                                                   | nouveau                          |
+| `chues-suggestions.superviseur.spec.ts`   | superviseur                                | CHU-SUG-06                                                                    | libre  | aucune                                                                                                                             | nouveau                          |
+| `chues-dossiers.banque.spec.ts`           | banque                                     | CHU-DOS-02 à 06, CHU-DOSN-01 à 05, CHU-DOSD-01 à 07, CHU-DOSX-01, CHU-DOSX-02 | serial | `E2E-CHUES-DOS-<horodatage>`                                                                                                       | nouveau                          |
+| `chues-dossiers.roles.spec.ts`            | commercial, superviseur, direction, banque | CHU-DOS-01, CHU-DOSE-02, CHU-DOSX-03, CHU-BQ-04, CHU-DMC-02                   | libre  | aucune                                                                                                                             | nouveau                          |
+| `chues-dossiers-etapes.spec.ts`           | admin                                      | CHU-DOSE-01, 03, 04                                                           | serial | aucune, référentiel remis dans son ordre                                                                                           | nouveau                          |
+| `chues-banque.banque.spec.ts`             | banque                                     | CHU-BQ-01, 02, 03, 05                                                         | libre  | aucune                                                                                                                             | nouveau                          |
+| `chues-demandes.banque.spec.ts`           | banque, arbitrage en admin                 | CHU-DMC-01, 03, 04                                                            | serial | `E2E-CHUES-DMC `                                                                                                                   | nouveau                          |
+| `chues-demandes.spec.ts`                  | admin                                      | CHU-DMC-05, CHU-DMC-06                                                        | libre  | aucune                                                                                                                             | nouveau                          |
+| `chues-lots-export.spec.ts`               | admin, superviseur à partir de CHU-LOT-10  | CHU-LOT-01, 03 à 21                                                           | serial | `E2E-CHUES-LOT ` (représentants et campagnes de CHU-LOT-10 et suivants) ; les campagnes de CHU-LOT-03 à 09 ne sont pas nettoyables | nouveau                          |
+| `chues-lots-export.roles.spec.ts`         | commercial, banque                         | CHU-LOT-02                                                                    | libre  | aucune                                                                                                                             | nouveau                          |
+| `chues-accessibilite.spec.ts`             | commercial, superviseur                    | CHU-TRV-07                                                                    | libre  | aucune                                                                                                                             | nouveau                          |
+| `prospects.spec.ts`                       | admin                                      | CHU-TRV-02                                                                    | libre  | aucune                                                                                                                             | **existant, mainteneur central** |
 
 ### 5.6 Espace Admin
 
@@ -4224,24 +4224,36 @@ Contrat serveur : `POST /api/v1/lots-export` (ADMIN), `POST
 /api/v1/lots-export/{id}` (ADMIN, SUPERVISEUR, DIRECTION), `GET
 /{id}/programme.pdf?teleconseillerId=&jour=`, `GET /{id}/programmes.zip`, `GET
 /{id}/export.xlsx`. Les anciennes routes `fiches.zip` et `fiches/{position}.pdf`
-n'existent plus, et aucun `DELETE` de lot n'existe.
+n'existent plus.
 
-**NETTOYAGE IMPOSSIBLE.** Le nom du lot est FABRIQUÉ par le web (« Représentants,
-30 août 2026 à 14:02 ») : aucun préfixe `E2E-CHUES-LOT ` ne peut y être posé, et
-rien ne supprime un lot. Chaque exécution laisse un lot de plus en base ; il ne
-porte aucune donnée propre, il ne fait que référencer des représentants
-existants. Seule la réserve de représentants
-(`E2E-CHUES-LOT Rep 01` à `21`, `+221 78 100 48 01` à `48 21`) est idempotente.
+Le lot 3 (EB-14 à EB-19) a rouvert ce qui était fermé : `PATCH /{id}` renomme et
+règle les objectifs, `GET /{id}/fiches` liste, `POST /{id}/reaffectation` et
+`POST /{id}/retrait` déplacent, `DELETE /{id}` supprime (ADMIN seul), et la
+création passe à ADMIN et SUPERVISEUR.
 
-Réglage commun aux scénarios de création : cible « Représentants (CHUES) », trois
-comptes cochés (**Awa Fixture**, **Fatou Fixture**, **Superviseur Fixture** —
-l'API accepte COMMERCIAL et SUPERVISEUR), 3 fiches par jour, 2 jours, donc
-**18 places** et six cellules de trois.
+**NETTOYAGE PARTIEL.** CHU-LOT-03 à CHU-LOT-09 ne corrigent pas le nom proposé,
+FABRIQUÉ par le web (« Représentants non qualifiés, 30 août 2026 à 14:02 ») :
+aucun préfixe `E2E-CHUES-LOT ` ne peut y être posé, et chaque exécution laisse
+une campagne de plus en base. Elle ne porte aucune donnée propre, elle ne fait
+que référencer des représentants existants. Les campagnes de CHU-LOT-10 et
+suivants, elles, PORTENT le préfixe et le `beforeAll` retire celles de
+l'exécution précédente. La réserve de représentants
+(`E2E-CHUES-LOT Rep 01` à `21`, `+221 78 100 48 01` à `48 21`) est idempotente,
+et le numéro `48 22` n'est qu'un contact recommandé, sans fiche.
+
+Réglage commun à CHU-LOT-03 et CHU-LOT-05 : cible « Représentants (CHUES) »,
+trois comptes cochés (**Awa Fixture**, **Fatou Fixture**, **Superviseur
+Fixture** — l'API accepte COMMERCIAL et SUPERVISEUR), 3 fiches par jour,
+2 jours. La capacité est PONDÉRÉE par le rôle (`capaciteParJour` : supervision
+et direction reçoivent 20 %, au moins une), donc `(3 + 3 + 1) × 2` = **14
+places** : trois et trois pour les deux téléconseillers, une pour la
+supervision, chaque jour.
 
 **CHU-LOT-01 | P1 | la route rend la liste des lots et non l'ancien écran de campagnes**
 Session : ADMIN. Fichier : `chues-lots-export.spec.ts`.
-Assertions : `heading` niveau 1 « Lots d’export » ; la phrase qui dit qu'un lot
-« fige une sélection de fiches à une date donnée » ; bouton « Nouveau lot » ;
+Assertions : titre `Campagnes · CPI GO` ; `heading` niveau 1 « Campagnes » ; la
+phrase « Une campagne répartit des fiches entre les téléconseillers et suit leur
+traitement. » ; bouton « Nouvelle campagne » ;
 aucun texte « Distribuer les appels aux téléconseillers », « Répartition en
 tourniquet » ni « Lancer la campagne ».
 Échoue si : la migration est partiellement déployée et l'ancien écran revient sur
@@ -4262,13 +4274,13 @@ Origine : CHU LOT-2. Recouvrement assumé avec **ROL-27**, qui fige le même ren
 dans la matrice.
 
 **CHU-LOT-03 | P1 | le dialogue annonce la répartition avant de créer**
-Gestes : « Nouveau lot » ; dans le `dialog` « Nouveau lot d’export », `fieldset`
-« Que voulez-vous exporter ? » → radio « Représentants (CHUES) » ; `fieldset`
-« Téléconseillers » → « Tout décocher » puis les trois noms ; « Fiches par
-téléconseiller et par jour » = 3 ; « Nombre de jours » = 2.
+Gestes : « Nouvelle campagne » ; dans le `dialog` « Nouvelle campagne »,
+`fieldset` « Que voulez-vous exporter ? » → radio « Représentants (CHUES) » ;
+`fieldset` « Téléconseillers » → « Tout décocher » puis les trois noms ;
+« Fiches par jour, à défaut d’objectif » = 3 ; « Nombre de jours » = 2.
 Assertions : la réponse de `POST /api/v1/lots-export/apercu` — interceptée par
 `page.waitForResponse`, et sur la requête qui porte EXACTEMENT ce réglage, le
-champ étant temporisé — rend `places` 18 et `retenues` 18 ; l'`output` d'aperçu
+champ étant temporisé — rend `places` 14 et `retenues` 14 ; l'`output` d'aperçu
 porte « seront réparties » et le même nombre.
 Échoue si : l'aperçu est calculé côté navigateur et diverge du tirage réel ; ou le
 lot est créé sans que l'ADMIN ait vu ce qu'il fige.
@@ -4277,20 +4289,20 @@ Origine : CHU LOT-3.
 **CHU-LOT-04 | P1 | un lot sans téléconseiller est refusé**
 Gestes : ouvrir le dialogue, choisir une cible, « Tout décocher ».
 Assertions : « Cochez au moins un téléconseiller. » est visible et le bouton
-« Créer le lot » est désactivé ; « Tout cocher » le réactive.
+« Créer la campagne » est désactivé ; « Tout cocher » le réactive.
 Échoue si : un lot part sans destinataire et ses fiches ne sont données à
 personne.
 Note : remplace le scénario d'origine sur la longueur du nom, caduc — le nom
 n'est plus saisi.
 Origine : CHU LOT-4.
 
-**CHU-LOT-05 | P1 | la création fige dix-huit fiches et le détail rend le tourniquet**
-Assertions : `POST /api/v1/lots-export` répond **201**, `itemCount` vaut 18 et
+**CHU-LOT-05 | P1 | la création fige les places de la répartition et le détail rend le tourniquet**
+Assertions : `POST /api/v1/lots-export` répond **201**, `itemCount` vaut 14 et
 `name` commence par « Représentants » ; le détail s'ouvre
 (`/chues/campagnes/{id}`, `heading` niveau 2 portant le nom fabriqué) ; le
 `table` « Programmes d’appel » porte 3 `rowheader`, les `columnheader` « Jour 1 »
-et « Jour 2 », et « 3 » dans chacune des six cellules, chaque cellule portant un
-bouton « Programme de <nom>, jour <n> ».
+et « Jour 2 », et la capacité du compte dans chacune des six cellules (3, 3 et 1),
+chaque cellule portant un bouton « Programme de <nom>, jour <n> ».
 Échoue si : le plafond n'est pas appliqué, ou la répartition donne tout au premier
 coché.
 Origine : CHU LOT-5.
@@ -4341,6 +4353,117 @@ qu'un lot recalculé à cap plus large garderait les mêmes fiches.
 Échoue si : le lot est recalculé à chaque lecture et le terrain reçoit un document
 différent de celui qu'on lui avait annoncé.
 Origine : CHU LOT-9.
+
+**Réglage commun à CHU-LOT-10 et suivants** : session SUPERVISEUR, cible
+« Représentants (CHUES) », département = le PREMIER du référentiel, seul lieu de
+la réserve `E2E-CHUES-LOT Rep`. Trois comptes cochés, 3 fiches par jour, 1 jour,
+et un objectif de 4 pour **Awa Fixture** : `4 + 3 + 1` = **8 fiches**, quatre à
+Awa, trois à Fatou, une à la supervision. Les onze parcours s'enchaînent sur
+cette seule campagne, dans l'ordre où ils sont écrits.
+
+**CHU-LOT-10 | P1 | le nom proposé suit les critères, et c'est le nom corrigé qui ouvre le détail**
+EB-14 et EB-15. Gestes : « Nouvelle campagne » ; cible, département, trois
+comptes, « Objectif quotidien de Awa Fixture » = 4 ; lire le champ « Nom de la
+campagne » AVANT d'y toucher ; le remplacer par `E2E-CHUES-LOT campagne du
+superviseur` ; « Fiches par jour, à défaut d'objectif » = 3 ; « Créer la
+campagne ».
+Assertions : le nom proposé commence EXACTEMENT par « Représentants non
+qualifiés, département de <nom>, » et porte une suite (la date) ; `POST
+/api/v1/lots-export` répond **201**, `name` vaut le nom corrigé et `itemCount`
+vaut 8 ; le détail s'ouvre sur un `heading` niveau 2 portant ce nom.
+Échoue si : le champ arrive vide et l'auteur ne voit pas ce qu'on lui propose ;
+le nom corrigé ne part pas au serveur ; l'objectif saisi ne compte pas dans les
+places ; ou un superviseur ne peut pas créer.
+
+**CHU-LOT-11 | P1 | un superviseur ne peut supprimer aucune campagne**
+EB-15 : la création s'ouvre au superviseur, la suppression reste à
+l'administrateur seul.
+Assertions : sur le détail, aucun bouton « Supprimer <nom> » ; dans la liste
+filtrée sur le nom, le `link` de la campagne est visible ET aucun bouton dont le
+nom commence par « Supprimer ».
+Échoue si : les deux droits repartent du même drapeau, et le superviseur détruit
+la répartition que le terrain a déjà en main.
+Note : la présence du `link` est obligatoire. Sans elle, l'absence de bouton ne
+dirait que l'absence de liste.
+
+**CHU-LOT-12 | P1 | le renommage depuis le détail survit à un rechargement**
+EB-14. Gestes : « Renommer la campagne », « Nom de la campagne », « Enregistrer
+le nom ».
+Assertions : `PATCH /api/v1/lots-export/{id}` répond **200** ; le `heading`
+niveau 2 porte le nouveau nom, AVANT et APRÈS `page.reload()`.
+Échoue si : l'écran ne montre que sa propre saisie et rien n'est écrit.
+
+**CHU-LOT-13 | P2 | l'objectif saisi à la création se relit dans « Objectif par jour »**
+EB-17. Assertions : le `columnheader` « Objectif par jour » existe ; le champ
+« Objectif quotidien de Awa Fixture » de la table « Performance de la campagne »
+vaut 4 ; la ligne d'Awa porte « 0 sur 4 ».
+Échoue si : l'objectif propre est perdu et la capacité déduite du rôle le
+remplace.
+
+**CHU-LOT-14 | P2 | l'objectif se corrige depuis le détail et survit à un rechargement**
+EB-17. Gestes : porter l'objectif d'Awa à 5, puis QUITTER le champ.
+Assertions : `PATCH` répond **200** ; après `page.reload()`, le champ vaut 5.
+Échoue si : le champ n'enregistre qu'en apparence, ou le PATCH efface les
+objectifs des autres.
+
+**CHU-LOT-15 | P1 | le filtre par téléconseiller ne rend que les fiches de l'intéressé**
+EB-18. Assertions : la `table` « Fiches de la campagne » porte 8 `rowheader` ;
+après le filtre sur Awa Fixture, 4 `rowheader`, 4 cellules à son nom, et zéro à
+celui de Fatou.
+Échoue si : le filtre ne part pas au serveur et le superviseur croit lire le
+travail d'une seule personne.
+
+**CHU-LOT-16 | P1 | une fiche appelée passe à « Traitée », et le filtre par état la retrouve**
+EB-18. Précondition posée par l'API, qu'aucun écran du panel ne pose : un appel
+consigné par `POST /api/v1/rep-campaigns/attempts` SOUS LE COMPTE D'AWA, sur une
+de ses fiches, dont on vérifie d'abord qu'elle porte le préfixe du fichier.
+Assertions : filtre « Traitée » → une seule ligne, celle-là ; filtre « Non
+traitée » → sept lignes, et celle-là absente.
+Échoue si : l'état est calculé côté navigateur, ou le filtre ne part pas.
+
+**CHU-LOT-17 | P1 | une fiche traitée ne se coche pas**
+EB-16. Assertions : la case « Attribuer la fiche de <traitée> » est désactivée,
+et celle d'une fiche encore à faire ne l'est pas.
+Échoue si : une fiche déjà appelée se déplace, et le travail d'un téléconseiller
+passe au compteur d'un autre.
+
+**CHU-LOT-18 | P1 | les fiches cochées passent à un autre compte, et « Réaffectations » l'inscrit**
+EB-16. Gestes : filtrer sur Fatou Fixture, « Cocher toutes les fiches non
+traitées de la page », « Attribuer les fiches à » → Superviseur Fixture,
+« Attribuer ».
+Assertions : `POST /{id}/reaffectation` répond **200** ; le filtre sur Fatou ne
+rend plus rien (« Aucune fiche ne correspond à ces filtres. ») ; le filtre sur
+Superviseur Fixture rend 1 + 3 lignes, dont les trois noms relevés avant le
+geste ; le `heading` niveau 3 « Réaffectations » porte « 3 fiches de Fatou
+Fixture vers Superviseur Fixture ».
+Échoue si : le mouvement n'est pas tracé, et un superviseur qui voit un
+téléconseiller rendre moins qu'il n'a reçu n'a aucun moyen de dire pourquoi.
+
+**CHU-LOT-19 | P1 | un téléconseiller retiré rend ses fiches au reste de l'équipe**
+EB-16. Gestes : « Retirer Superviseur Fixture de la campagne », puis « Retirer »
+dans le `dialog` de confirmation.
+Assertions : avant, la supervision porte « 0 sur 4 » et Awa « 1 sur 4 » ; `POST
+/{id}/retrait` répond **200** ; après, aucun `rowheader` à son nom, Awa porte
+« 1 sur 6 » et Fatou « 0 sur 2 ». Les quatre fiches rendues repartent selon les
+objectifs en vigueur, Awa 5 et Fatou 3, donc deux et deux.
+Échoue si : un compte sans fiche reste affiché comme s'il travaillait encore, ou
+les fiches rendues se perdent.
+
+**CHU-LOT-20 | P2 | la cible « Représentants injoignables » compte ce que le serveur compte**
+EB-19. Assertions : la requête d'aperçu porte `cible` =
+`REPRESENTANTS_INJOIGNABLES` ; `eligible` est strictement positif ; l'`output`
+d'aperçu porte ce nombre et le mot « disponible » ; `scopeLabel` vaut
+« Représentants injoignables ».
+Échoue si : la cible envoyée n'est pas celle qui est cochée, ou le compte affiché
+n'est pas celui du serveur.
+
+**CHU-LOT-21 | P2 | la cible « Contacts recommandés » compte ce que le serveur compte**
+EB-19. Mêmes assertions, avec `CONTACTS_RECOMMANDES`.
+Précondition posée par le `beforeAll` : le volume de démonstration n'offre
+AUCUN contact recommandé en attente, et le scénario ne pourrait rien compter. Un
+appel consigné sur `E2E-CHUES-LOT Rep 01`, avec le numéro `+221 78 100 48 22` en
+`suggestedPhone`, lui en donne un. Ce numéro ne porte AUCUNE fiche : une
+suggestion qui en résout une sort de la cible.
 
 #### 7.4.18 Transverse CHUES
 
