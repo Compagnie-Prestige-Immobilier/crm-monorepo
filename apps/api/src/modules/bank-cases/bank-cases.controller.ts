@@ -5,6 +5,7 @@ import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
 import { Role } from '@crm/database';
 
 import { Roles } from '../../common/decorators/roles.decorator.js';
+import { Cached } from '../../redis/cache.interceptor.js';
 import {
   CurrentUser,
   type AuthenticatedUser,
@@ -77,6 +78,7 @@ export class BankCasesController {
   }
 
   @Get('analytics')
+  @Cached(60)
   @ApiOperation({
     operationId: 'getBankCaseAnalytics',
     summary: 'Tableau de bord Banque & Finance, avec le filtre de la liste.',

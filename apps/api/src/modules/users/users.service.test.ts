@@ -2,6 +2,7 @@ import { Role } from '@crm/database';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
+import { fakeRedisService } from '../../redis/fake-redis.js';
 import { UsersService } from './users.service.js';
 
 type MockFn = ReturnType<typeof vi.fn>;
@@ -60,7 +61,8 @@ beforeEach(() => {
   db.$transaction.mockImplementation((run: (tx: unknown) => unknown) => run(db));
 });
 
-const service = (): UsersService => new UsersService(db as unknown as PrismaService);
+const service = (): UsersService =>
+  new UsersService(db as unknown as PrismaService, fakeRedisService());
 
 describe('nature du compte créé', () => {
   it('cherche le doublon d’identifiants SANS cloisonner', async () => {
