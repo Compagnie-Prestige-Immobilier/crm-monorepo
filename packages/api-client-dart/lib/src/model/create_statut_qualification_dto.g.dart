@@ -7,13 +7,13 @@ part of 'create_statut_qualification_dto.dart';
 // **************************************************************************
 
 abstract class _$CreateStatutQualificationDtoCWProxy {
-  CreateStatutQualificationDto code(String code);
-
   CreateStatutQualificationDto label(String label);
 
   CreateStatutQualificationDto effect(StatutQualificationEffect effect);
 
   CreateStatutQualificationDto requiresCallback(bool? requiresCallback);
+
+  CreateStatutQualificationDto requiresComment(bool? requiresComment);
 
   CreateStatutQualificationDto retryAfterMinutes(num? retryAfterMinutes);
 
@@ -30,10 +30,10 @@ abstract class _$CreateStatutQualificationDtoCWProxy {
   /// CreateStatutQualificationDto(...).copyWith(id: 12, name: "My name")
   /// ````
   CreateStatutQualificationDto call({
-    String code,
     String label,
     StatutQualificationEffect effect,
     bool? requiresCallback,
+    bool? requiresComment,
     num? retryAfterMinutes,
     PrioriteTraitement? priorite,
     RepresentantRelation? relationStatus,
@@ -48,9 +48,6 @@ class _$CreateStatutQualificationDtoCWProxyImpl
   final CreateStatutQualificationDto _value;
 
   @override
-  CreateStatutQualificationDto code(String code) => this(code: code);
-
-  @override
   CreateStatutQualificationDto label(String label) => this(label: label);
 
   @override
@@ -60,6 +57,10 @@ class _$CreateStatutQualificationDtoCWProxyImpl
   @override
   CreateStatutQualificationDto requiresCallback(bool? requiresCallback) =>
       this(requiresCallback: requiresCallback);
+
+  @override
+  CreateStatutQualificationDto requiresComment(bool? requiresComment) =>
+      this(requiresComment: requiresComment);
 
   @override
   CreateStatutQualificationDto retryAfterMinutes(num? retryAfterMinutes) =>
@@ -82,19 +83,15 @@ class _$CreateStatutQualificationDtoCWProxyImpl
   /// CreateStatutQualificationDto(...).copyWith(id: 12, name: "My name")
   /// ````
   CreateStatutQualificationDto call({
-    Object? code = const $CopyWithPlaceholder(),
     Object? label = const $CopyWithPlaceholder(),
     Object? effect = const $CopyWithPlaceholder(),
     Object? requiresCallback = const $CopyWithPlaceholder(),
+    Object? requiresComment = const $CopyWithPlaceholder(),
     Object? retryAfterMinutes = const $CopyWithPlaceholder(),
     Object? priorite = const $CopyWithPlaceholder(),
     Object? relationStatus = const $CopyWithPlaceholder(),
   }) {
     return CreateStatutQualificationDto(
-      code: code == const $CopyWithPlaceholder()
-          ? _value.code
-          // ignore: cast_nullable_to_non_nullable
-          : code as String,
       label: label == const $CopyWithPlaceholder()
           ? _value.label
           // ignore: cast_nullable_to_non_nullable
@@ -107,6 +104,10 @@ class _$CreateStatutQualificationDtoCWProxyImpl
           ? _value.requiresCallback
           // ignore: cast_nullable_to_non_nullable
           : requiresCallback as bool?,
+      requiresComment: requiresComment == const $CopyWithPlaceholder()
+          ? _value.requiresComment
+          // ignore: cast_nullable_to_non_nullable
+          : requiresComment as bool?,
       retryAfterMinutes: retryAfterMinutes == const $CopyWithPlaceholder()
           ? _value.retryAfterMinutes
           // ignore: cast_nullable_to_non_nullable
@@ -138,9 +139,8 @@ extension $CreateStatutQualificationDtoCopyWith
 CreateStatutQualificationDto _$CreateStatutQualificationDtoFromJson(
   Map<String, dynamic> json,
 ) => $checkedCreate('CreateStatutQualificationDto', json, ($checkedConvert) {
-  $checkKeys(json, requiredKeys: const ['code', 'label', 'effect']);
+  $checkKeys(json, requiredKeys: const ['label', 'effect']);
   final val = CreateStatutQualificationDto(
-    code: $checkedConvert('code', (v) => v as String),
     label: $checkedConvert('label', (v) => v as String),
     effect: $checkedConvert(
       'effect',
@@ -152,6 +152,10 @@ CreateStatutQualificationDto _$CreateStatutQualificationDtoFromJson(
     ),
     requiresCallback: $checkedConvert(
       'requiresCallback',
+      (v) => v as bool? ?? false,
+    ),
+    requiresComment: $checkedConvert(
+      'requiresComment',
       (v) => v as bool? ?? false,
     ),
     retryAfterMinutes: $checkedConvert('retryAfterMinutes', (v) => v as num?),
@@ -180,10 +184,10 @@ CreateStatutQualificationDto _$CreateStatutQualificationDtoFromJson(
 Map<String, dynamic> _$CreateStatutQualificationDtoToJson(
   CreateStatutQualificationDto instance,
 ) => <String, dynamic>{
-  'code': instance.code,
   'label': instance.label,
   'effect': _$StatutQualificationEffectEnumMap[instance.effect]!,
   if (instance.requiresCallback case final value?) 'requiresCallback': value,
+  if (instance.requiresComment case final value?) 'requiresComment': value,
   if (instance.retryAfterMinutes case final value?) 'retryAfterMinutes': value,
   if (_$PrioriteTraitementEnumMap[instance.priorite] case final value?)
     'priorite': value,

@@ -11,6 +11,8 @@ abstract class _$UpdateStatutQualificationDtoCWProxy {
 
   UpdateStatutQualificationDto requiresCallback(bool? requiresCallback);
 
+  UpdateStatutQualificationDto requiresComment(bool? requiresComment);
+
   UpdateStatutQualificationDto retryAfterMinutes(num? retryAfterMinutes);
 
   UpdateStatutQualificationDto priorite(PrioriteTraitement? priorite);
@@ -28,6 +30,7 @@ abstract class _$UpdateStatutQualificationDtoCWProxy {
   UpdateStatutQualificationDto call({
     String? label,
     bool? requiresCallback,
+    bool? requiresComment,
     num? retryAfterMinutes,
     PrioriteTraitement? priorite,
     RepresentantRelation? relationStatus,
@@ -47,6 +50,10 @@ class _$UpdateStatutQualificationDtoCWProxyImpl
   @override
   UpdateStatutQualificationDto requiresCallback(bool? requiresCallback) =>
       this(requiresCallback: requiresCallback);
+
+  @override
+  UpdateStatutQualificationDto requiresComment(bool? requiresComment) =>
+      this(requiresComment: requiresComment);
 
   @override
   UpdateStatutQualificationDto retryAfterMinutes(num? retryAfterMinutes) =>
@@ -71,6 +78,7 @@ class _$UpdateStatutQualificationDtoCWProxyImpl
   UpdateStatutQualificationDto call({
     Object? label = const $CopyWithPlaceholder(),
     Object? requiresCallback = const $CopyWithPlaceholder(),
+    Object? requiresComment = const $CopyWithPlaceholder(),
     Object? retryAfterMinutes = const $CopyWithPlaceholder(),
     Object? priorite = const $CopyWithPlaceholder(),
     Object? relationStatus = const $CopyWithPlaceholder(),
@@ -84,6 +92,10 @@ class _$UpdateStatutQualificationDtoCWProxyImpl
           ? _value.requiresCallback
           // ignore: cast_nullable_to_non_nullable
           : requiresCallback as bool?,
+      requiresComment: requiresComment == const $CopyWithPlaceholder()
+          ? _value.requiresComment
+          // ignore: cast_nullable_to_non_nullable
+          : requiresComment as bool?,
       retryAfterMinutes: retryAfterMinutes == const $CopyWithPlaceholder()
           ? _value.retryAfterMinutes
           // ignore: cast_nullable_to_non_nullable
@@ -118,6 +130,7 @@ UpdateStatutQualificationDto _$UpdateStatutQualificationDtoFromJson(
   final val = UpdateStatutQualificationDto(
     label: $checkedConvert('label', (v) => v as String?),
     requiresCallback: $checkedConvert('requiresCallback', (v) => v as bool?),
+    requiresComment: $checkedConvert('requiresComment', (v) => v as bool?),
     retryAfterMinutes: $checkedConvert('retryAfterMinutes', (v) => v as num?),
     priorite: $checkedConvert(
       'priorite',
@@ -144,6 +157,7 @@ Map<String, dynamic> _$UpdateStatutQualificationDtoToJson(
 ) => <String, dynamic>{
   if (instance.label case final value?) 'label': value,
   if (instance.requiresCallback case final value?) 'requiresCallback': value,
+  if (instance.requiresComment case final value?) 'requiresComment': value,
   if (instance.retryAfterMinutes case final value?) 'retryAfterMinutes': value,
   if (_$PrioriteTraitementEnumMap[instance.priorite] case final value?)
     'priorite': value,

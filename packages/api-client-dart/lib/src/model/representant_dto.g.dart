@@ -77,6 +77,8 @@ abstract class _$RepresentantDtoCWProxy {
 
   RepresentantDto nextCallbackAt(DateTime? nextCallbackAt);
 
+  RepresentantDto nextCallbackOrigine(RappelOrigine? nextCallbackOrigine);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `RepresentantDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -118,6 +120,7 @@ abstract class _$RepresentantDtoCWProxy {
     String? lastCallById,
     String? lastCallByName,
     DateTime? nextCallbackAt,
+    RappelOrigine? nextCallbackOrigine,
   });
 }
 
@@ -252,6 +255,10 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
       this(nextCallbackAt: nextCallbackAt);
 
   @override
+  RepresentantDto nextCallbackOrigine(RappelOrigine? nextCallbackOrigine) =>
+      this(nextCallbackOrigine: nextCallbackOrigine);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `RepresentantDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -293,6 +300,7 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
     Object? lastCallById = const $CopyWithPlaceholder(),
     Object? lastCallByName = const $CopyWithPlaceholder(),
     Object? nextCallbackAt = const $CopyWithPlaceholder(),
+    Object? nextCallbackOrigine = const $CopyWithPlaceholder(),
   }) {
     return RepresentantDto(
       id: id == const $CopyWithPlaceholder()
@@ -434,6 +442,10 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
           ? _value.nextCallbackAt
           // ignore: cast_nullable_to_non_nullable
           : nextCallbackAt as DateTime?,
+      nextCallbackOrigine: nextCallbackOrigine == const $CopyWithPlaceholder()
+          ? _value.nextCallbackOrigine
+          // ignore: cast_nullable_to_non_nullable
+          : nextCallbackOrigine as RappelOrigine?,
     );
   }
 }
@@ -488,6 +500,7 @@ RepresentantDto _$RepresentantDtoFromJson(
       'lastCallById',
       'lastCallByName',
       'nextCallbackAt',
+      'nextCallbackOrigine',
     ],
   );
   final val = RepresentantDto(
@@ -568,6 +581,14 @@ RepresentantDto _$RepresentantDtoFromJson(
       'nextCallbackAt',
       (v) => v == null ? null : DateTime.parse(v as String),
     ),
+    nextCallbackOrigine: $checkedConvert(
+      'nextCallbackOrigine',
+      (v) => $enumDecodeNullable(
+        _$RappelOrigineEnumMap,
+        v,
+        unknownValue: RappelOrigine.unknownDefaultOpenApi,
+      ),
+    ),
   );
   return val;
 });
@@ -610,6 +631,7 @@ Map<String, dynamic> _$RepresentantDtoToJson(
   'lastCallById': instance.lastCallById,
   'lastCallByName': instance.lastCallByName,
   'nextCallbackAt': instance.nextCallbackAt?.toIso8601String(),
+  'nextCallbackOrigine': _$RappelOrigineEnumMap[instance.nextCallbackOrigine],
 };
 
 const _$RepresentantRelationEnumMap = {
@@ -646,4 +668,10 @@ const _$RepCallOutcomeEnumMap = {
   RepCallOutcome.WRONG_NUMBER: 'WRONG_NUMBER',
   RepCallOutcome.OTHER: 'OTHER',
   RepCallOutcome.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$RappelOrigineEnumMap = {
+  RappelOrigine.PROMIS: 'PROMIS',
+  RappelOrigine.AUTOMATIQUE: 'AUTOMATIQUE',
+  RappelOrigine.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
