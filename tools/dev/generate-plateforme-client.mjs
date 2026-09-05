@@ -12,7 +12,8 @@
 // le backend doit avoir vendor/, un .env et une base migrée.
 
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, existsSync } from 'node:fs';
+import { copyFileSync, existsSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -36,6 +37,18 @@ const spec = join(packageDir, 'openapi.json');
 const out = join(packageDir, 'src', 'generated', 'schema.ts');
 const generated = `packages/api-client-${plateforme}/src/generated`;
 
+// `pnpm exec` passe par un .cmd sous Windows, que Node refuse de lancer sans
+// shell. Le point d'entree JS du binaire se lance partout de la meme facon.
+// Resolution depuis le paquet cible : `tools/` n'est pas un espace de travail,
+// rien ne s'y resout.
+const requerir = createRequire(join(packageDir, 'package.json'));
+
+const binaire = (nom) => {
+  const manifeste = requerir.resolve(`${nom}/package.json`);
+  const { bin } = JSON.parse(readFileSync(manifeste, 'utf8'));
+  return join(dirname(manifeste), typeof bin === 'string' ? bin : bin[nom]);
+};
+
 const run = (command, args, cwd = packageDir) =>
   execFileSync(command, args, { cwd, stdio: 'inherit' });
 
@@ -51,11 +64,11 @@ if (flags.includes('--export')) {
   }
   run('php', ['artisan', 'scramble:export'], backend);
   copyFileSync(join(backend, 'api.json'), spec);
-  run('pnpm', ['exec', 'prettier', spec, '--write']);
+  run(process.execPath, [binaire('prettier'), spec, '--write']);
 }
 
-run('pnpm', ['exec', 'openapi-typescript', spec, '-o', out]);
-run('pnpm', ['exec', 'prettier', out, '--write']);
+run(process.execPath, [binaire('openapi-typescript'), spec, '-o', out]);
+run(process.execPath, [binaire('prettier'), out, '--write']);
 
 // Portillon anti-dérive, même contrat que packages/api-client/scripts/check-generated.mjs.
 const git = (args, stdio) => execFileSync('git', args, { cwd: repoRoot, stdio });

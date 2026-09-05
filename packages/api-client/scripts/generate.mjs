@@ -8,7 +8,8 @@
 // did nothing.
 
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -35,10 +36,18 @@ if (!existsSync(spec)) {
   process.exit(0);
 }
 
+// `pnpm exec` passe par un .cmd sous Windows, que Node refuse de lancer sans
+// shell. Le point d'entree JS du binaire se lance partout de la meme facon.
+const binaire = (nom) => {
+  const manifeste = createRequire(import.meta.url).resolve(`${nom}/package.json`);
+  const { bin } = JSON.parse(readFileSync(manifeste, 'utf8'));
+  return join(dirname(manifeste), typeof bin === 'string' ? bin : bin[nom]);
+};
+
 const run = (command, args) => {
   execFileSync(command, args, { cwd: packageDir, stdio: 'inherit' });
 };
 
-run('pnpm', ['exec', 'openapi-typescript', spec, '-o', out]);
-run('pnpm', ['exec', 'prettier', out, '--write']);
+run(process.execPath, [binaire('openapi-typescript'), spec, '-o', out]);
+run(process.execPath, [binaire('prettier'), out, '--write']);
 run('node', [join(packageDir, 'scripts', 'check-generated.mjs')]);

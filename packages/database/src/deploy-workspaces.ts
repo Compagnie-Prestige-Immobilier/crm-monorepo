@@ -1,4 +1,8 @@
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { PrismaClient, PrismaPg } from './index.js';
 
@@ -36,12 +40,17 @@ async function ensureSchema(workspace: string): Promise<void> {
   }
 }
 
+// `pnpm exec` passe par un .cmd sous Windows, que Node refuse de lancer sans
+// shell. Le point d'entree JS du binaire se lance partout de la meme facon.
+const manifeste = createRequire(import.meta.url).resolve('prisma/package.json');
+const prisma = join(dirname(manifeste), JSON.parse(readFileSync(manifeste, 'utf8')).bin.prisma);
+
 for (const workspace of WORKSPACES) {
   await ensureSchema(workspace);
   console.info(`Migrations sur le schema « ${workspace} »…`);
-  execFileSync('pnpm', ['exec', 'prisma', 'migrate', 'deploy'], {
+  execFileSync(process.execPath, [prisma, 'migrate', 'deploy'], {
     stdio: 'inherit',
-    cwd: new URL('..', import.meta.url).pathname,
+    cwd: fileURLToPath(new URL('..', import.meta.url)),
     env: { ...process.env, DATABASE_URL: urlFor(workspace) },
   });
 }
