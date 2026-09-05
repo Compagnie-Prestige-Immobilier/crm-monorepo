@@ -7,6 +7,7 @@ import 'package:forui/forui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/notifications/rep_callback_notifications.dart';
+import '../../../core/ouvertures/ouverture_fiche_mixin.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/router/back_navigation.dart';
 import '../../../core/router/route_paths.dart';
@@ -118,7 +119,9 @@ class RepresentantQualificationScreen extends ConsumerStatefulWidget {
 
 class _RepresentantQualificationScreenState
     extends ConsumerState<RepresentantQualificationScreen>
-    with DraftFormMixin<RepresentantQualificationScreen> {
+    with
+        DraftFormMixin<RepresentantQualificationScreen>,
+        OuvertureFicheMixin<RepresentantQualificationScreen> {
   final TextEditingController whatsapp = TextEditingController();
   final TextEditingController commentaire = TextEditingController();
   final TextEditingController suggestionTelephone = TextEditingController();
@@ -149,18 +152,6 @@ class _RepresentantQualificationScreenState
   DateTime? rappelAt;
   bool saving = false;
   String? echec;
-
-  /// La fiche prise en main. Non nulle : le verrou tient, et l'écran refuse de
-  /// se fermer tant qu'aucun statut n'est posé.
-  OuverturesFicheData? ouverture;
-
-  /// Bat la seconde pour le chronomètre. La durée ne se stocke pas : elle se
-  /// lit entre l'ouverture et maintenant.
-  Timer? battement;
-
-  /// Le temps affiché, hors `setState` : un rebâti par seconde marquerait le
-  /// brouillon sale sans qu'une seule réponse ait changé.
-  final ValueNotifier<Duration> ecoule = ValueNotifier<Duration>(Duration.zero);
 
   /// Ce que le verrou vient de refuser. Bande et non toast : le refus doit
   /// rester lisible tant que le statut n'est pas posé.
@@ -295,8 +286,6 @@ class _RepresentantQualificationScreenState
     professionFocus.dispose();
     departementFocus.dispose();
     iefFocus.dispose();
-    battement?.cancel();
-    ecoule.dispose();
     super.dispose();
   }
 
@@ -362,23 +351,15 @@ class _RepresentantQualificationScreenState
   /// reprise après une fermeture ou un plantage, et chaque confirmation compte
   /// une ouverture de plus.
   Future<void> prendreLaFiche(_Fiche importee) async {
-    final String? moi = ref.read(authControllerProvider).userId;
-    if (moi == null || moi.isEmpty) return;
-    final OuvertureRepository ouvertures = ref.read(
-      ouvertureRepositoryProvider,
-    );
-    final OuverturesFicheData? deja = await ouvertures.courante(moi);
+    if (compteConnecte == null) return;
+    final OuverturesFicheData? deja = await ficheEnCours();
     if (!mounted) return;
     if (deja?.representantId != widget.representantId) {
-      final bool? ouvrir = await cpiConfirm(
-        context,
-        title:
-            'Ouvrir la fiche de ${nomComplet(importee.prenom, importee.nom)} ?',
-        message: 'Vous ne pourrez pas la quitter sans la qualifier.',
-        confirmLabel: 'Ouvrir',
+      final bool ouvrir = await confirmerLOuverture(
+        nomComplet(importee.prenom, importee.nom),
       );
       if (!mounted) return;
-      if (ouvrir != true) {
+      if (!ouvrir) {
         popOrHome(context);
         return;
       }
@@ -386,10 +367,7 @@ class _RepresentantQualificationScreenState
 
     final OuvertureResultat resultat;
     try {
-      resultat = await ouvertures.ouvrir(
-        openedById: moi,
-        representantId: widget.representantId,
-      );
+      resultat = await ouvrirLaFiche(representantId: widget.representantId);
     } on Object catch (error) {
       if (!mounted) return;
       setState(() => echec = 'Ouverture impossible. $error');
@@ -398,16 +376,7 @@ class _RepresentantQualificationScreenState
     if (!mounted) return;
 
     final FicheTenue? tenue = resultat.tenue;
-    if (tenue != null) {
-      await proposerLaFicheTenue(tenue);
-      return;
-    }
-    setState(() => ouverture = resultat.ouverte);
-    ecoule.value = tempsDeTraitement ?? Duration.zero;
-    battement?.cancel();
-    battement = Timer.periodic(const Duration(seconds: 1), (Timer _) {
-      if (mounted) ecoule.value = tempsDeTraitement ?? Duration.zero;
-    });
+    if (tenue != null) await proposerLaFicheTenue(tenue);
   }
 
   /// Le serveur refuse la seconde fiche sans dire laquelle il tient. Sans
@@ -436,25 +405,6 @@ class _RepresentantQualificationScreenState
       return;
     }
     popOrHome(context);
-  }
-
-  /// Le temps écoulé depuis l'ouverture confirmée. Nul tant qu'aucune fiche
-  /// n'est prise en main.
-  Duration? get tempsDeTraitement {
-    final OuverturesFicheData? prise = ouverture;
-    if (prise == null) return null;
-    final Duration ecoule = ref
-        .read(clockProvider)
-        .now()
-        .difference(prise.openedAt);
-    return ecoule.isNegative ? Duration.zero : ecoule;
-  }
-
-  static String chrono(Duration duree) {
-    final String mm = duree.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final String ss = duree.inSeconds.remainder(60).toString().padLeft(2, '0');
-    if (duree.inHours == 0) return '$mm:$ss';
-    return '${duree.inHours}:$mm:$ss';
   }
 
   /// Une personne proposée à la place de celle qu'on vient d'appeler : elle
@@ -731,7 +681,7 @@ class _RepresentantQualificationScreenState
   /// remplace l'ancienne confirmation, qui ne freinait la sortie que si
   /// quelque chose avait été saisi.
   void quitter() {
-    if (ouverture != null) {
+    if (sousVerrou) {
       setState(() => refus = 'Posez un statut avant de quitter cette fiche.');
       return;
     }
@@ -747,18 +697,7 @@ class _RepresentantQualificationScreenState
       enAvant = true;
       etape = etapes[index + 1];
     });
-    unawaited(remonterLeBrouillon());
-  }
-
-  /// Le brouillon remonté au serveur, au passage d'étape et non à la frappe :
-  /// une remontée par lettre saisie noierait le lien. Au mieux : c'est la copie
-  /// locale qui rouvre le formulaire, celle-ci sert la reprise ailleurs.
-  Future<void> remonterLeBrouillon() async {
-    final OuverturesFicheData? prise = ouverture;
-    if (prise == null) return;
-    await ref
-        .read(ouvertureRepositoryProvider)
-        .enregistrerBrouillon(id: prise.id, draft: collectDraftValues());
+    unawaited(remonterLeBrouillon(collectDraftValues()));
   }
 
   void precedent() {
@@ -982,8 +921,7 @@ class _RepresentantQualificationScreenState
         );
       }
       ref.read(syncCoordinatorProvider.notifier).nudge();
-      battement?.cancel();
-      ouverture = null;
+      libererLeVerrou();
       // Un rappel promis garde les réponses pour le prochain appel; une fiche
       // qualifiée pour de bon les rouvrirait sans raison.
       discardDraft();
@@ -1041,7 +979,7 @@ class _RepresentantQualificationScreenState
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            ?_chronometre(theme),
+            ?chronometre(theme),
             CpiStepHeader(
               step: etapes.indexOf(etape) + 1,
               total: etapes.length,
@@ -1056,50 +994,6 @@ class _RepresentantQualificationScreenState
                 _Etape.renseignements => _corpsRenseignements(theme),
                 _Etape.fin => _corpsFin(theme, representant),
               },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// EB-09 : le temps de traitement, visible du premier écran jusqu'à la
-  /// qualification. Distinct de la durée de communication du journal d'appels.
-  Widget? _chronometre(ThemeData theme) {
-    if (ouverture == null) return null;
-    return ValueListenableBuilder<Duration>(
-      valueListenable: ecoule,
-      builder: (BuildContext context, Duration passe, Widget? _) =>
-          _bandeauChrono(theme, passe),
-    );
-  }
-
-  Widget _bandeauChrono(ThemeData theme, Duration passe) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        CpiSpacing.md,
-        CpiSpacing.xs,
-        CpiSpacing.md,
-        0,
-      ),
-      child: Semantics(
-        liveRegion: true,
-        label: 'Fiche ouverte depuis ${passe.inMinutes} minutes',
-        excludeSemantics: true,
-        child: Row(
-          children: <Widget>[
-            Icon(
-              PhosphorIconsRegular.timer,
-              size: CpiSpacing.md,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: CpiSpacing.xs),
-            Text(
-              chrono(passe),
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
-              ),
             ),
           ],
         ),

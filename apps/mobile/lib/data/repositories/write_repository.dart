@@ -865,6 +865,7 @@ class WriteRepository {
     required String prospectId,
     required String outcome,
     required String createdById,
+    String? ouvertureId,
     String? reasonCode,
     String? method,
     String? comment,
@@ -957,6 +958,20 @@ class WriteRepository {
         attemptId: entityId,
         now: now,
       );
+      // Le verrou se lève ici et pas dans l'écran : une qualification
+      // enregistrée par un autre chemin doit rendre la fiche elle aussi.
+      if (ouvertureId != null) {
+        await (_db.update(_db.ouverturesFiche)..where(
+              (OuverturesFiche o) =>
+                  o.id.equals(ouvertureId) & o.closedAt.isNull(),
+            ))
+            .write(
+              OuverturesFicheCompanion(
+                closedAt: Value<DateTime?>(now),
+                closingAttemptId: Value<String?>(entityId),
+              ),
+            );
+      }
       await _enqueue(
         dependencyKey: 'phase2:$prospectId',
         entityType: callAttemptEntity,
@@ -964,6 +979,9 @@ class WriteRepository {
         op: 'create',
         payload: <String, Object?>{
           'prospectId': prospectId,
+          // Ferme l'ouverture côté serveur, et c'est ce qui arrête le
+          // chronomètre. Une ouverture inconnue y est ignorée en silence.
+          'ouvertureId': ?ouvertureId,
           'outcome': reason.outcome,
           'reasonCode': reason.code,
           'method': ?method,

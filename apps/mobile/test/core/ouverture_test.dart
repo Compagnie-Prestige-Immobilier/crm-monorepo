@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:cpi_go/core/providers/app_providers.dart';
-import 'package:cpi_go/core/providers/sync_coordinator.dart';
 import 'package:cpi_go/core/sync/api_port.dart';
 import 'package:cpi_go/core/sync/clock.dart';
 import 'package:cpi_go/core/sync/outbox_status.dart';
