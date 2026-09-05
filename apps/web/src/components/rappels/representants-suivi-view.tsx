@@ -43,7 +43,8 @@ const VIDE: Record<
   A_RAPPELER: {
     icon: ClockIcon,
     title: 'Aucun représentant à rappeler',
-    description: 'Une échéance apparaît ici dès qu’un appel en promet une.',
+    description:
+      'Une échéance apparaît ici dès qu’un appel en promet une, ou dès qu’un numéro resté sans réponse revient en file.',
   },
   INJOIGNABLE: {
     icon: PhoneOffIcon,
@@ -97,7 +98,8 @@ export function RepresentantsSuiviView({
             Représentants à reprendre
           </h2>
           <p className="text-[0.875rem] text-muted-foreground">
-            Les rappels promis pendant la qualification et les numéros restés sans réponse.
+            Les rappels promis pendant la qualification, ceux que le référentiel a reprogrammés, et
+            les numéros restés sans réponse.
           </p>
         </div>
 
@@ -234,10 +236,29 @@ function Quand({
   const at = representant.nextCallbackAt;
   if (at === null) return <span className="text-muted-foreground">Sans échéance</span>;
 
+  const origine = origineDuRappel(representant);
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       <time dateTime={at}>{formatCallbackAt(at, now)}</time>
       {Date.parse(at) < now ? <Badge variant="destructive">En retard</Badge> : null}
+      {origine === null ? null : (
+        <Badge variant={origine === 'PROMIS' ? 'secondary' : 'outline'}>
+          {origine === 'PROMIS' ? 'Promis' : 'Automatique'}
+        </Badge>
+      )}
     </div>
   );
+}
+
+/**
+ * Un rappel promis se tient à l'heure dite, un rappel reprogrammé se déplace :
+ * confondus, le téléconseiller ne sait plus lequel il doit honorer.
+ * `nextCallbackOrigine` manque encore au client engendré.
+ */
+function origineDuRappel(representant: RepresentantRow): 'PROMIS' | 'AUTOMATIQUE' | null {
+  const { nextCallbackOrigine } = representant as {
+    nextCallbackOrigine?: 'PROMIS' | 'AUTOMATIQUE' | null;
+  };
+  return nextCallbackOrigine ?? null;
 }
