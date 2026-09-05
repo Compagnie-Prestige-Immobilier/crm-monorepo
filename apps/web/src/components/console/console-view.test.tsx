@@ -1094,6 +1094,58 @@ describe('ConsoleView : l’ouverture confirmée d’une fiche', () => {
     expect(screen.getByLabelText(/Commentaire/u)).toHaveProperty('value', 'il est en réunion');
   });
 
+  it('rouvre le dossier tel qu’il avait été rempli, et pas seulement le commentaire', async () => {
+    ouvrirFiche.mockRejectedValue(new Error('OUVERTURE_FICHE_DEJA_OUVERTE'));
+    fetchOuvertureCourante.mockResolvedValue(
+      ouverture({
+        ficheNom: 'Neuve Fiche',
+        draft: {
+          comment: 'il rappelle après 17 h',
+          conversion: {
+            projet: 'CHUES',
+            nom: 'Neuve',
+            prenom: 'Fiche',
+            email: '',
+            profession: 'Instituteur',
+            type: 'FONCTIONNAIRE',
+            dureeEtablissementMois: '36',
+            fonctionnaire: true,
+            syndicatId: 's-1',
+            banqueId: 'b-1',
+            engagementEnCours: false,
+            incomeBandId: 'i-1',
+            paymentMode: null,
+            dureeSystemeMois: '24',
+            method: null,
+            rendezVousAt: '',
+          },
+        },
+      }),
+    );
+    fetchProspect.mockResolvedValue(NEUVE);
+
+    await renderConsole([NEUVE]);
+
+    expect(await screen.findByLabelText(/^Profession/u)).toHaveProperty('value', 'Instituteur');
+    expect(screen.getByLabelText(/^Durée dans l’établissement/u)).toHaveProperty('value', '36');
+    expect(screen.getByRole('combobox', { name: /Banque/u }).textContent).toContain('CBAO');
+    expect(screen.getByLabelText(/Commentaire/u)).toHaveProperty('value', 'il rappelle après 17 h');
+  });
+
+  it('rouvre un formulaire vide plutôt que de casser sur un brouillon abîmé', async () => {
+    ouvrirFiche.mockRejectedValue(new Error('OUVERTURE_FICHE_DEJA_OUVERTE'));
+    fetchOuvertureCourante.mockResolvedValue(
+      ouverture({ ficheNom: 'Neuve Fiche', draft: { comment: 7, conversion: 'ancienne forme' } }),
+    );
+    fetchProspect.mockResolvedValue(NEUVE);
+
+    await renderConsole([NEUVE]);
+
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Neuve Fiche');
+    expect(screen.getByLabelText(/Commentaire/u)).toHaveProperty('value', '');
+    expect(screen.queryByLabelText(/^Profession/u)).toBeNull();
+  });
+
   // EB-07 : la consultation d'une fiche close ne compte pas, et l'ouvrir sous
   // verrou y enfermerait quelqu'un qui ne peut plus rien y consigner.
   it('n’ouvre ni ne verrouille une fiche déjà close', async () => {
