@@ -30,6 +30,8 @@ export function useVerrouNavigation(actif: boolean, prevenir: () => void): void 
 
     const avantFermeture = (event: BeforeUnloadEvent): void => {
       event.preventDefault();
+      // Safari, et Chrome avant la 119, ignorent `preventDefault()` seul.
+      event.returnValue = '';
     };
 
     const surClic = (event: MouseEvent): void => {

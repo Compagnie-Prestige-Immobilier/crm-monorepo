@@ -1059,6 +1059,8 @@ describe('ConsoleView : l’ouverture confirmée d’une fiche', () => {
   // ce rattrapage, le téléconseiller reste devant un refus qu'il ne peut pas lever.
   it('rouvre la fiche déjà en main quand le verrou du serveur refuse', async () => {
     ouvrirFiche.mockRejectedValue(new Error('OUVERTURE_FICHE_DEJA_OUVERTE'));
+    // Rien de tenu au montage : c'est le refus du serveur qu'on éprouve ici.
+    fetchOuvertureCourante.mockResolvedValueOnce(null);
     fetchOuvertureCourante.mockResolvedValue(
       ouverture({ id: 'ouv-9', prospectId: 'p-2', ficheNom: 'Rappel Fiche' }),
     );
@@ -1141,6 +1143,8 @@ describe('ConsoleView : l’ouverture confirmée d’une fiche', () => {
 
   it('rouvre le formulaire sur ce que le brouillon avait gardé', async () => {
     ouvrirFiche.mockRejectedValue(new Error('OUVERTURE_FICHE_DEJA_OUVERTE'));
+    // Rien de tenu au montage : c'est le refus du serveur qu'on éprouve ici.
+    fetchOuvertureCourante.mockResolvedValueOnce(null);
     fetchOuvertureCourante.mockResolvedValue(
       ouverture({ ficheNom: 'Neuve Fiche', draft: { comment: 'il est en réunion' } }),
     );
@@ -1153,6 +1157,8 @@ describe('ConsoleView : l’ouverture confirmée d’une fiche', () => {
 
   it('rouvre le dossier tel qu’il avait été rempli, et pas seulement le commentaire', async () => {
     ouvrirFiche.mockRejectedValue(new Error('OUVERTURE_FICHE_DEJA_OUVERTE'));
+    // Rien de tenu au montage : c'est le refus du serveur qu'on éprouve ici.
+    fetchOuvertureCourante.mockResolvedValueOnce(null);
     fetchOuvertureCourante.mockResolvedValue(
       ouverture({
         ficheNom: 'Neuve Fiche',
@@ -1191,6 +1197,8 @@ describe('ConsoleView : l’ouverture confirmée d’une fiche', () => {
 
   it('rouvre un formulaire vide plutôt que de casser sur un brouillon abîmé', async () => {
     ouvrirFiche.mockRejectedValue(new Error('OUVERTURE_FICHE_DEJA_OUVERTE'));
+    // Rien de tenu au montage : c'est le refus du serveur qu'on éprouve ici.
+    fetchOuvertureCourante.mockResolvedValueOnce(null);
     fetchOuvertureCourante.mockResolvedValue(
       ouverture({ ficheNom: 'Neuve Fiche', draft: { comment: 7, conversion: 'ancienne forme' } }),
     );
@@ -1212,5 +1220,78 @@ describe('ConsoleView : l’ouverture confirmée d’une fiche', () => {
     expect(ouvrirFiche).not.toHaveBeenCalled();
     expect(screen.queryByText(/Fiche ouverte depuis/u)).toBeNull();
     expect(screen.getByRole('button', { name: 'Revenir à la liste' })).toBeTruthy();
+  });
+});
+
+// EB-08 : le verrou vit sur le serveur, l'écran non. Ctrl+R, une URL retapée ou
+// un plantage laissaient le téléconseiller devant l'annuaire, fiche tenue.
+describe('ConsoleView : la fiche tenue au rechargement', () => {
+  it('rouvre au montage la fiche que le serveur tient encore, brouillon compris', async () => {
+    fetchOuvertureCourante.mockResolvedValue(
+      ouverture({ id: 'ouv-7', prospectId: 'p-1', draft: { comment: 'il est en réunion' } }),
+    );
+    fetchProspect.mockResolvedValue(NEUVE);
+
+    await renderListe([NEUVE, RAPPEL]);
+
+    expect((await screen.findByRole('heading', { level: 2 })).textContent).toBe('Neuve Fiche');
+    expect(screen.getByLabelText(/Commentaire/u)).toHaveProperty('value', 'il est en réunion');
+    expect(screen.getByText(/Fiche ouverte depuis/u)).toBeTruthy();
+    // Rouvrir n'est pas ouvrir : la fiche est déjà comptée, EB-07.
+    expect(ouvrirFiche).not.toHaveBeenCalled();
+  });
+
+  it('remet le chronomètre à l’heure de l’ouverture, pas à zéro', async () => {
+    fetchOuvertureCourante.mockResolvedValue(
+      ouverture({ openedAt: new Date(Date.now() - 125_000).toISOString() }),
+    );
+    fetchProspect.mockResolvedValue(NEUVE);
+
+    await renderListe([NEUVE]);
+
+    expect((await screen.findByText(/Fiche ouverte depuis/u)).textContent).toContain('02:0');
+  });
+
+  it('reverrouille la navigation sur la fiche rouverte', async () => {
+    fetchOuvertureCourante.mockResolvedValue(ouverture());
+    fetchProspect.mockResolvedValue(NEUVE);
+
+    await renderListe([NEUVE]);
+    await screen.findByRole('heading', { level: 2 });
+    renderWithQuery(
+      <Link href="/chues/rappels" data-testid="ailleurs">
+        Rappels
+      </Link>,
+    );
+
+    await userEvent.click(screen.getByTestId('ailleurs'));
+
+    expect(toastError.mock.calls.at(-1)?.[0]).toBe(
+      'Consignez l’appel avant de quitter cette fiche.',
+    );
+  });
+
+  // La fiche tenue est sur l'autre console : l'ignorer laisserait chercher.
+  it('dit où est la fiche quand elle est tenue sur un représentant', async () => {
+    fetchOuvertureCourante.mockResolvedValue(
+      ouverture({ prospectId: null, representantId: 'r-2', ficheNom: 'Ousmane Fall' }),
+    );
+
+    await renderListe([NEUVE]);
+
+    await waitFor(() => {
+      expect(toastError.mock.calls.at(-1)?.[0]).toBe(
+        'Vous avez Ousmane Fall en main sur « Qualifier un représentant ». Qualifiez-la avant d’ouvrir une fiche ici.',
+      );
+    });
+    expect(screen.queryByRole('heading', { level: 2 })).toBeNull();
+  });
+
+  it('laisse l’annuaire tranquille quand rien n’est tenu', async () => {
+    await renderListe([NEUVE]);
+
+    expect(await screen.findByRole('button', { name: /Neuve Fiche/ })).toBeTruthy();
+    expect(toastError).not.toHaveBeenCalled();
+    expect(toastInfo).not.toHaveBeenCalled();
   });
 });

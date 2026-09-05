@@ -149,6 +149,22 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
     setDemandee(null);
   }, []);
 
+  const reprendre = useCallback((prise: Ouverte) => {
+    setVise(null);
+    setDemandee(null);
+    setOuverte(prise);
+  }, []);
+
+  // EB-08 : le verrou vit sur le serveur, l'écran non. Sans cette reprise, un
+  // rechargement laisse le téléconseiller devant l'annuaire alors que sa fiche
+  // est toujours tenue.
+  const repriseFaite = useRef(false);
+  useEffect(() => {
+    if (repriseFaite.current) return;
+    repriseFaite.current = true;
+    void reprendreOuverte(reprendre);
+  }, [reprendre]);
+
   const ouvrir = useMutation({
     mutationFn: async (row: ProspectRow): Promise<Ouverte> => ({
       prospect: row,
@@ -161,11 +177,7 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
       setOuverte(prise);
     },
     onError: (error) => {
-      void reprendreOuverte(error, (prise) => {
-        setVise(null);
-        setDemandee(null);
-        setOuverte(prise);
-      });
+      void reprendreOuverte(reprendre, error);
     },
   });
 
@@ -256,17 +268,23 @@ const nomDe = (prospect: ProspectRow): string => `${prospect.nom} ${prospect.pre
 const aQualifier = (prospect: ProspectRow): boolean => prospect.phase2Status === 'PENDING';
 
 /**
- * Le serveur refuse une seconde ouverture sans dire laquelle est tenue. Sans ce
- * rattrapage, le téléconseiller reste bloqué devant un refus qu'il ne peut pas
- * lever.
+ * La fiche que le serveur tient encore, remise à l'écran telle quelle : au
+ * montage elle répare un rechargement, sur refus d'ouverture elle dit laquelle
+ * est tenue, que le serveur ne nomme pas.
  */
 async function reprendreOuverte(
-  error: unknown,
   reprendre: (prise: Ouverte) => void,
+  refus: unknown = null,
 ): Promise<void> {
   const courante = await fetchOuvertureCourante().catch(() => null);
-  if (courante === null || courante.prospectId === null) {
-    toastApiError(error, 'La fiche n’a pas pu être ouverte.');
+  if (courante === null) {
+    if (refus !== null) toastApiError(refus, 'La fiche n’a pas pu être ouverte.');
+    return;
+  }
+  if (courante.prospectId === null) {
+    toast.error(
+      `Vous avez ${courante.ficheNom} en main sur « Qualifier un représentant ». Qualifiez-la avant d’ouvrir une fiche ici.`,
+    );
     return;
   }
   const prospect = await fetchProspect(courante.prospectId).catch(() => null);

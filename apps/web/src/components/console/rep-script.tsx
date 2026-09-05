@@ -184,6 +184,21 @@ export function RepScript() {
   const liste = annuaire.data?.items ?? [];
   const pageCount = annuaire.data?.pageCount ?? 1;
 
+  const reprendre = useCallback((ouverte: Ouverte) => {
+    setAConfirmer(null);
+    setChoisi(ouverte);
+  }, []);
+
+  // EB-08 : le verrou vit sur le serveur, l'écran non. Sans cette reprise, un
+  // rechargement laisse le téléconseiller devant l'annuaire alors que sa fiche
+  // est toujours tenue.
+  const repriseFaite = useRef(false);
+  useEffect(() => {
+    if (repriseFaite.current) return;
+    repriseFaite.current = true;
+    void reprendreOuverte(reprendre);
+  }, [reprendre]);
+
   const ouvrir = useMutation({
     mutationFn: async (row: ScriptedRepresentant): Promise<Ouverte> => ({
       representant: row,
@@ -195,7 +210,7 @@ export function RepScript() {
       setChoisi(ouverte);
     },
     onError: (error) => {
-      void reprendreOuverte(error, setChoisi, setAConfirmer);
+      void reprendreOuverte(reprendre, error);
     },
   });
 
@@ -281,18 +296,23 @@ interface Ouverte {
 }
 
 /**
- * Le serveur refuse une seconde ouverture sans dire laquelle est tenue. Sans ce
- * rattrapage, le téléconseiller reste bloqué devant un refus qu'il ne peut pas
- * lever.
+ * La fiche que le serveur tient encore, remise à l'écran telle quelle : au
+ * montage elle répare un rechargement, sur refus d'ouverture elle dit laquelle
+ * est tenue, que le serveur ne nomme pas.
  */
 async function reprendreOuverte(
-  error: unknown,
   ouvrir: (ouverte: Ouverte) => void,
-  fermerLaBoite: (rien: null) => void,
+  refus: unknown = null,
 ): Promise<void> {
   const courante = await fetchOuvertureCourante().catch(() => null);
-  if (courante === null || courante.representantId === null) {
-    toastApiError(error, 'La fiche n’a pas pu être ouverte.');
+  if (courante === null) {
+    if (refus !== null) toastApiError(refus, 'La fiche n’a pas pu être ouverte.');
+    return;
+  }
+  if (courante.representantId === null) {
+    toast.error(
+      `Vous avez ${courante.ficheNom} en main sur « Convertir un prospect ». Consignez l’appel avant d’ouvrir une fiche ici.`,
+    );
     return;
   }
   const representant = await fetchRepresentant(courante.representantId).catch(() => null);
@@ -301,7 +321,6 @@ async function reprendreOuverte(
     return;
   }
   toast.info(`Vous aviez déjà ${courante.ficheNom} en main : la voici.`);
-  fermerLaBoite(null);
   ouvrir({ representant, ouverture: courante });
 }
 
