@@ -990,6 +990,8 @@ describe('ConsoleView : raccourcis annexes', () => {
 
     expect(carte()?.open).toBe(true);
     expect(screen.getByText('Copier le numéro')).toBeTruthy();
+    // Sous verrou, N et R ne mènent plus nulle part : les annoncer serait mentir.
+    expect(screen.queryByText('Fiche du représentant')).toBeNull();
     expect(screen.queryByText('↑ ↓')).toBeNull();
     expect(screen.queryByText('Espace')).toBeNull();
   });
