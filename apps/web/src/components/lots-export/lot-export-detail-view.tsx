@@ -367,6 +367,7 @@ function NomModifiable({ id, name }: { id: string; name: string }) {
     mutationFn: (nouveau: string) => updateLotExport(id, { name: nouveau }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.lotsExportRoot });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.lotsExportDetail(id) });
       setSaisie(null);
     },
     onError: (erreur) => {
