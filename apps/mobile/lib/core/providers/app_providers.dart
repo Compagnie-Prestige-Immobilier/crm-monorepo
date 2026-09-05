@@ -8,6 +8,7 @@ import 'package:drift/drift.dart'
         QueryRow,
         ResultSetImplementation,
         Variable;
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart' show DateUtils, immutable;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -65,6 +66,9 @@ final Provider<({Dio dio, CrmApiClient client})> apiClientProvider =
     Provider<({Dio dio, CrmApiClient client})>((Ref ref) {
       return ApiClientFactory.build(
         tokens: ref.watch(tokenStoreProvider),
+        // La trace HTTP est le seul moyen de voir, depuis le téléphone, si une
+        // requête est partie. Jamais en release : elle nomme les routes.
+        verboseLogs: kDebugMode,
         mutex: DatabaseRefreshMutex(ref.watch(appDatabaseProvider)),
         onSessionExpired: () {
           ref.read(authControllerProvider.notifier).onSessionExpired();
