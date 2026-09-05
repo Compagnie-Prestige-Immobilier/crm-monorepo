@@ -266,6 +266,7 @@ const COUNT_KEYS = [
   'unloggedCalls',
   'methodObtained',
   'unreachable',
+  'wrongNumber',
   'refused',
   'callback',
   'callbacksHonored',
@@ -329,8 +330,9 @@ export const ACTIVITY_COLUMNS: Record<ActivityFamille, ActivityColumn[]> = {
     { key: 'repUnloggedCalls', label: 'Non consignés' },
     { key: 'repConfirmRate', label: 'Confirmation', taux: true },
     { key: 'repAvgCallSeconds', label: 'Durée moy.', duree: true },
+    // « Joints » est la famille : le rendez-vous en est un détail, pas un voisin.
     { key: 'repReached', label: 'Joints' },
-    { key: 'repCallback', label: 'Rendez-vous' },
+    { key: 'repCallback', label: 'dont rendez-vous' },
     { key: 'repUnreachable', label: 'Injoignables' },
     { key: 'repCallbacksHonored', label: 'Rappels tenus' },
     { key: 'repCallbacksLate', label: 'Rappels en retard' },
@@ -349,6 +351,7 @@ export const ACTIVITY_COLUMNS: Record<ActivityFamille, ActivityColumn[]> = {
     { key: 'avgCallSeconds', label: 'Durée moy.', duree: true },
     { key: 'methodObtained', label: 'Méthodes' },
     { key: 'unreachable', label: 'Injoignables' },
+    { key: 'wrongNumber', label: 'Faux numéros' },
     { key: 'refused', label: 'Refus' },
     { key: 'callback', label: 'À rappeler' },
     { key: 'callbacksHonored', label: 'Rappels tenus' },
@@ -387,12 +390,10 @@ function compteursVides(): ActivityCounts {
   };
 }
 
-// Un faux numéro est un appel perdu comme un NRP : une seule colonne.
 // Distincts DANS une période, `representantsContacted` et `repQuestioned`
 // recomptent un représentant rappelé une autre période.
 function cumuler(into: ActivityCounts, row: ActivityRow): void {
   for (const key of COUNT_KEYS) into[key] += row[key];
-  into.unreachable += row.wrongNumber;
   into.callSeconds += (row.avgCallSeconds ?? 0) * row.confirmedCalls;
   into.repCallSeconds += (row.repAvgCallSeconds ?? 0) * row.repConfirmedCalls;
 }
