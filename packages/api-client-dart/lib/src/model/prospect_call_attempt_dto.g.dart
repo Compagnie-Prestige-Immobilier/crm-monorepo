@@ -41,6 +41,8 @@ abstract class _$ProspectCallAttemptDtoCWProxy {
 
   ProspectCallAttemptDto clientCreatedAt(DateTime clientCreatedAt);
 
+  ProspectCallAttemptDto dureeTraitementSecondes(num? dureeTraitementSecondes);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `ProspectCallAttemptDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -64,6 +66,7 @@ abstract class _$ProspectCallAttemptDtoCWProxy {
     String performedById,
     String performedByName,
     DateTime clientCreatedAt,
+    num? dureeTraitementSecondes,
   });
 }
 
@@ -136,6 +139,11 @@ class _$ProspectCallAttemptDtoCWProxyImpl
       this(clientCreatedAt: clientCreatedAt);
 
   @override
+  ProspectCallAttemptDto dureeTraitementSecondes(
+    num? dureeTraitementSecondes,
+  ) => this(dureeTraitementSecondes: dureeTraitementSecondes);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `ProspectCallAttemptDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -159,6 +167,7 @@ class _$ProspectCallAttemptDtoCWProxyImpl
     Object? performedById = const $CopyWithPlaceholder(),
     Object? performedByName = const $CopyWithPlaceholder(),
     Object? clientCreatedAt = const $CopyWithPlaceholder(),
+    Object? dureeTraitementSecondes = const $CopyWithPlaceholder(),
   }) {
     return ProspectCallAttemptDto(
       id: id == const $CopyWithPlaceholder()
@@ -227,6 +236,11 @@ class _$ProspectCallAttemptDtoCWProxyImpl
           ? _value.clientCreatedAt
           // ignore: cast_nullable_to_non_nullable
           : clientCreatedAt as DateTime,
+      dureeTraitementSecondes:
+          dureeTraitementSecondes == const $CopyWithPlaceholder()
+          ? _value.dureeTraitementSecondes
+          // ignore: cast_nullable_to_non_nullable
+          : dureeTraitementSecondes as num?,
     );
   }
 }
@@ -264,6 +278,7 @@ ProspectCallAttemptDto _$ProspectCallAttemptDtoFromJson(
       'performedById',
       'performedByName',
       'clientCreatedAt',
+      'dureeTraitementSecondes',
     ],
   );
   final val = ProspectCallAttemptDto(
@@ -312,6 +327,10 @@ ProspectCallAttemptDto _$ProspectCallAttemptDtoFromJson(
       'clientCreatedAt',
       (v) => DateTime.parse(v as String),
     ),
+    dureeTraitementSecondes: $checkedConvert(
+      'dureeTraitementSecondes',
+      (v) => v as num?,
+    ),
   );
   return val;
 });
@@ -335,6 +354,7 @@ Map<String, dynamic> _$ProspectCallAttemptDtoToJson(
   'performedById': instance.performedById,
   'performedByName': instance.performedByName,
   'clientCreatedAt': instance.clientCreatedAt.toIso8601String(),
+  'dureeTraitementSecondes': instance.dureeTraitementSecondes,
 };
 
 const _$CallOutcomeEnumMap = {

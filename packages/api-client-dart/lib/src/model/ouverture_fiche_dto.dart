@@ -33,6 +33,8 @@ class OuvertureFicheDto {
 
     required this.openedAt,
 
+    required this.firstInputAt,
+
     required this.closedAt,
 
     required this.dureeSecondes,
@@ -68,11 +70,15 @@ class OuvertureFicheDto {
   @JsonKey(name: r'openedAt', required: true, includeIfNull: false)
   final DateTime openedAt;
 
+  /// Première saisie, le départ du chronomètre. Nulle tant que rien n’a été saisi ; posée une seule fois.
+  @JsonKey(name: r'firstInputAt', required: true, includeIfNull: true)
+  final DateTime? firstInputAt;
+
   /// Nul tant que la fiche est verrouillée.
   @JsonKey(name: r'closedAt', required: true, includeIfNull: true)
   final DateTime? closedAt;
 
-  /// Durée de traitement, lue entre les deux bornes et jamais stockée. Distincte de la durée de communication du journal d’appels.
+  /// Durée de traitement, lue entre `firstInputAt` et `closedAt` et jamais stockée. Nulle tant que l’une des deux manque : un chronomètre qui n’a pas démarré n’affiche pas zéro. Distincte de la durée de communication du journal d’appels.
   @JsonKey(name: r'dureeSecondes', required: true, includeIfNull: true)
   final num? dureeSecondes;
 
@@ -102,6 +108,7 @@ class OuvertureFicheDto {
                 prospectId,
                 ficheNom,
                 openedAt,
+                firstInputAt,
                 closedAt,
                 dureeSecondes,
                 closingAttemptId,
@@ -117,6 +124,7 @@ class OuvertureFicheDto {
                 other.prospectId,
                 other.ficheNom,
                 other.openedAt,
+                other.firstInputAt,
                 other.closedAt,
                 other.dureeSecondes,
                 other.closingAttemptId,
@@ -138,6 +146,7 @@ class OuvertureFicheDto {
         prospectId,
         ficheNom,
         openedAt,
+        firstInputAt,
         closedAt,
         dureeSecondes,
         closingAttemptId,

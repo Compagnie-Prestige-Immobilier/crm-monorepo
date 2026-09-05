@@ -483,6 +483,17 @@ class ReferenceRepository {
     )..where((Prospects t) => t.id.equals(id))).getSingleOrNull();
   }
 
+  /// Le numéro d'une fiche de prospect, cherché comme l'écran d'appel la
+  /// cherche : l'annuaire d'abord, la fiche locale ensuite.
+  Future<String?> numeroDuProspect(String prospectId) async {
+    final Phase2DirectoryData? annuaire =
+        await (_db.select(_db.phase2Directory)
+              ..where((Phase2Directory t) => t.prospectId.equals(prospectId)))
+            .getSingleOrNull();
+    if (annuaire != null) return annuaire.phoneE164;
+    return (await prospectById(prospectId))?.phoneE164;
+  }
+
   Future<DateTime?> lastPulledAt() async {
     final SyncStateData? row = await (_db.select(
       _db.syncState,

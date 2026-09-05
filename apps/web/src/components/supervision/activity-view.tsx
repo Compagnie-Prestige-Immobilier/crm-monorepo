@@ -455,7 +455,7 @@ function FichesOuvertes({ range }: { range: ActivityRange }) {
               <TableHead>Téléconseiller</TableHead>
               <TableHead>Jour</TableHead>
               <TableHead className="text-right">Fiches ouvertes</TableHead>
-              <TableHead className="text-right">Durée moyenne</TableHead>
+              <TableHead className="text-right">Traitement moyen</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

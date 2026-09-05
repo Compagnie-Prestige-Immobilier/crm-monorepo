@@ -16,8 +16,10 @@ import type { ScriptedRepresentant } from '@/lib/data/representants';
 import type * as OuverturesData from '@/lib/data/ouvertures';
 import type * as StatutsData from '@/lib/data/statuts-qualification';
 import type { StatutQualification } from '@/lib/data/statuts-qualification';
+import { queryKeys } from '@/lib/query-keys';
 import { REP_CALL_OUTCOME_LABELS } from '@/lib/types';
 import type { RepresentantFilters } from '@/lib/representant-filters';
+import { masquerLOnglet } from '@/test/masquer-onglet';
 import { renderWithQuery } from '@/test/render-query';
 
 const pushRepCallAttempt = vi.fn();
@@ -29,6 +31,7 @@ const fetchReferenceData = vi.fn();
 const fetchStatutsQualification = vi.fn();
 const ouvrirFiche = vi.fn();
 const fetchOuvertureCourante = vi.fn();
+const enregistrerBrouillon = vi.fn();
 const countPendingProspects = vi.fn();
 const fetchCallbacks = vi.fn();
 const toastError = vi.fn();
@@ -74,6 +77,7 @@ vi.mock('@/lib/data/ouvertures', async (importOriginal) => {
     ...actual,
     ouvrirFiche: (...args: unknown[]) => ouvrirFiche(...args) as unknown,
     fetchOuvertureCourante: () => fetchOuvertureCourante() as unknown,
+    enregistrerBrouillon: (...args: unknown[]) => enregistrerBrouillon(...args) as unknown,
   };
 });
 
@@ -208,6 +212,7 @@ const ouverture = (over: Partial<OuverturesData.OuvertureFiche> = {}) => ({
   prospectId: null,
   ficheNom: 'Aminata Ndiaye',
   openedAt: new Date().toISOString(),
+  firstInputAt: null,
   closedAt: null,
   dureeSecondes: null,
   closingAttemptId: null,
@@ -226,7 +231,7 @@ async function viser(nom: RegExp): Promise<void> {
 async function choisir(nom: RegExp): Promise<void> {
   await viser(nom);
   await userEvent.click(await screen.findByRole('button', { name: 'Ouvrir' }));
-  await screen.findByText(/Fiche ouverte depuis/u);
+  await screen.findByText(/Étape 1 sur 2/u);
 }
 
 const relationDemandee = (): unknown =>
@@ -298,6 +303,8 @@ beforeEach(() => {
   );
   fetchOuvertureCourante.mockReset();
   fetchOuvertureCourante.mockResolvedValue(null);
+  enregistrerBrouillon.mockReset();
+  enregistrerBrouillon.mockResolvedValue(ouverture());
   fetchReferenceData.mockReset();
   fetchReferenceData.mockResolvedValue({
     syndicats: [{ id: 'snd-saes', name: 'SAES', sigle: 'SAES', isActive: true, sortOrder: 1 }],
@@ -705,12 +712,22 @@ describe('RepScript : l’ouverture confirmée d’une fiche', () => {
     expect(screen.getByLabelText('Qui avez-vous appelé ?')).toBeTruthy();
   });
 
-  it('enregistre l’ouverture, puis montre le chronomètre', async () => {
+  it('enregistre l’ouverture sans démarrer le chronomètre', async () => {
     await renderListe();
     await choisir(/Aminata Ndiaye/u);
 
     expect(ouvrirFiche.mock.calls[0]?.[0]).toMatchObject({ representantId: 'r-1' });
-    expect(screen.getByText(/Fiche ouverte depuis/u).textContent).toMatch(/\d\d:\d\d/u);
+    expect(screen.queryByText(/En saisie depuis/u)).toBeNull();
+  });
+
+  // Le temps de lecture du script et de l'historique n'est pas du traitement.
+  it('démarre le chronomètre à la première réponse, pas à l’ouverture', async () => {
+    await renderListe();
+    await choisir(/Aminata Ndiaye/u);
+
+    await repondre('Injoignable');
+
+    expect((await screen.findByText(/En saisie depuis/u)).textContent).toMatch(/\d\d:\d\d/u);
   });
 
   it('ferme l’ouverture avec la tentative : c’est ce qui arrête le chronomètre', async () => {
@@ -1106,20 +1123,22 @@ describe('RepScript : la fiche tenue au rechargement', () => {
     await renderListe();
 
     expect((await screen.findByRole('heading', { level: 2 })).textContent).toBe('Ousmane Fall');
-    expect(screen.getByText(/Fiche ouverte depuis/u)).toBeTruthy();
     // Rouvrir n'est pas ouvrir : la fiche est déjà comptée, EB-07.
     expect(ouvrirFiche).not.toHaveBeenCalled();
   });
 
-  it('remet le chronomètre à l’heure de l’ouverture, pas à zéro', async () => {
+  it('remet le chronomètre à l’heure de la première saisie, pas à celle de l’ouverture', async () => {
     fetchOuvertureCourante.mockResolvedValue(
-      ouverture({ openedAt: new Date(Date.now() - 125_000).toISOString() }),
+      ouverture({
+        openedAt: new Date(Date.now() - 600_000).toISOString(),
+        firstInputAt: new Date(Date.now() - 125_000).toISOString(),
+      }),
     );
     fetchRepresentant.mockResolvedValue(PREMIER);
 
     await renderListe();
 
-    expect((await screen.findByText(/Fiche ouverte depuis/u)).textContent).toContain('02:0');
+    expect((await screen.findByText(/En saisie depuis/u)).textContent).toContain('02:0');
   });
 
   // La fiche tenue est sur l'autre console : l'ignorer laisserait chercher.
@@ -1135,6 +1154,121 @@ describe('RepScript : la fiche tenue au rechargement', () => {
         'Vous avez Rappel Fiche en main sur « Convertir un prospect ». Consignez l’appel avant d’ouvrir une fiche ici.',
       );
     });
-    expect(screen.queryByText(/Fiche ouverte depuis/u)).toBeNull();
+    expect(screen.queryByText(/Étape 1 sur 2/u)).toBeNull();
+  });
+});
+
+// Une coupure de courant, un processus tué, un onglet fermé par le système : le
+// verrou tient sur le serveur, mais le script entier était encore dans l'écran.
+describe('RepScript : la saisie survit à une fermeture brutale', () => {
+  it('enregistre les réponses quand l’onglet passe en arrière-plan', async () => {
+    await renderListe();
+    await choisir(/Aminata Ndiaye/u);
+    await injoindre();
+    await userEvent.type(screen.getByLabelText('Commentaire'), 'ligne coupée');
+
+    expect(enregistrerBrouillon).not.toHaveBeenCalled();
+
+    masquerLOnglet();
+
+    await waitFor(() => {
+      expect(enregistrerBrouillon).toHaveBeenCalledTimes(1);
+    });
+    expect(enregistrerBrouillon.mock.calls.at(-1)?.[1]).toMatchObject({
+      resultat: 'INJOIGNABLE',
+      statutId: 's-4',
+      commentaire: 'ligne coupée',
+    });
+  });
+
+  // La borne du chronomètre est relevée à la frappe : l'anti-rafale retarde
+  // l'écriture, il ne doit pas retrancher sa seconde à la mesure.
+  it('date la première saisie de la frappe, pas de l’écriture', async () => {
+    await renderListe();
+    await choisir(/Aminata Ndiaye/u);
+
+    const avant = Date.now();
+    await repondre('Injoignable');
+    const apres = Date.now();
+
+    await waitFor(
+      () => {
+        expect(enregistrerBrouillon).toHaveBeenCalledTimes(1);
+      },
+      { timeout: 3_000 },
+    );
+    const pose = Date.parse(enregistrerBrouillon.mock.calls[0]?.[2] as string);
+    expect(pose).toBeGreaterThanOrEqual(avant);
+    expect(pose).toBeLessThanOrEqual(apres);
+  });
+
+  it('rouvre le script sur ce que le brouillon avait gardé', async () => {
+    fetchOuvertureCourante.mockResolvedValue(
+      ouverture({
+        draft: {
+          resultat: 'JOIGNABLE',
+          statutId: 's-2',
+          etablissementConfirme: true,
+          contacte: true,
+          connaitUES: true,
+          ambassadeur: false,
+          commentaire: 'il refuse pour l’instant',
+        },
+      }),
+    );
+    fetchRepresentant.mockResolvedValue(PREMIER);
+
+    await renderListe();
+
+    expect((await screen.findByRole('heading', { level: 2 })).textContent).toBe('Aminata Ndiaye');
+    expect(screen.getByLabelText('Commentaire')).toHaveProperty(
+      'value',
+      'il refuse pour l’instant',
+    );
+    expect(screen.getByRole('button', { name: 'Joignable' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+    expect(
+      screen.getByRole('combobox', { name: /Statut de qualification/u }).textContent,
+    ).toContain('Refusé');
+  });
+
+  // Un brouillon d'une version antérieure a des champs que le script ne connaît
+  // plus : ceux qui restent lisibles valent mieux qu'un formulaire vidé.
+  it('garde d’un brouillon abîmé ce qui s’y lit encore', async () => {
+    fetchOuvertureCourante.mockResolvedValue(
+      ouverture({ draft: { resultat: 7, contacte: 'oui', commentaire: 'il rappelle demain' } }),
+    );
+    fetchRepresentant.mockResolvedValue(PREMIER);
+
+    await renderListe();
+
+    expect((await screen.findByRole('heading', { level: 2 })).textContent).toBe('Aminata Ndiaye');
+    expect(screen.getByRole('button', { name: 'Joignable' }).getAttribute('aria-pressed')).toBe(
+      'false',
+    );
+
+    await repondre('Injoignable');
+
+    expect(screen.getByLabelText('Commentaire')).toHaveProperty('value', 'il rappelle demain');
+  });
+});
+
+// EB-08 : la barre supérieure refuse la déconnexion sur ce cache. Périmé dans
+// un sens il laisse partir sous verrou, dans l'autre il enferme sans fiche.
+describe('RepScript : ce que la barre supérieure lit du verrou', () => {
+  it('y publie la fiche ouverte, puis sa fermeture', async () => {
+    const { client } = await renderListe();
+    await choisir(/Aminata Ndiaye/u);
+
+    expect(client.getQueryData(queryKeys.ouvertureCourante)).toMatchObject({ id: 'ouv-1' });
+
+    await injoindre();
+    await userEvent.click(screen.getByRole('button', { name: 'Continuer' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(() => {
+      expect(client.getQueryData(queryKeys.ouvertureCourante)).toBeNull();
+    });
   });
 });

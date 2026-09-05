@@ -122,6 +122,7 @@ describe('RepresentantDetailView, les appels', () => {
         deviceCallType: null,
         deviceCallDurationSeconds: null,
         deviceCallAt: null,
+        dureeTraitementSecondes: null,
         clientCreatedAt: '2026-03-04T09:15:00.000Z',
       },
     ]);
@@ -137,6 +138,9 @@ describe('RepresentantDetailView, les appels', () => {
     expect(texte).toContain('Fatou Sarr');
     expect(texte).toContain('Rappeler après les examens');
     expect(texte).toContain('Téléphone : non confirmé');
+    // Un appel d'avant le parcours de fiche ouverte n'a pas de durée : « 0 s »
+    // en ferait un appel expédié.
+    expect(texte).not.toContain('Traitement');
   });
 
   it('montre la preuve du journal Android quand le téléphone a confirmé l’appel', async () => {
@@ -162,6 +166,7 @@ describe('RepresentantDetailView, les appels', () => {
         deviceCallType: 'sortant',
         deviceCallDurationSeconds: 92,
         deviceCallAt: '2026-03-04T14:02:00.000Z',
+        dureeTraitementSecondes: 180,
         clientCreatedAt: '2026-03-04T14:03:00.000Z',
       },
     ]);
@@ -170,6 +175,9 @@ describe('RepresentantDetailView, les appels', () => {
     const appels = await screen.findByRole('list', { name: 'Appels' });
     const texte = within(appels).getAllByRole('listitem')[0]?.textContent ?? '';
     expect(texte).toContain('Téléphone : Sortant · 1 min 32 · 14:02');
+    // Le temps passé sur la fiche et le temps passé au téléphone se lisent sur
+    // deux lignes : confondus, la DMT et la DMC diraient la même chose.
+    expect(texte).toContain('Traitement : 3 min');
   });
 
   it('sort les relevés non consignés, et replie ceux qu’une tentative couvre déjà', async () => {

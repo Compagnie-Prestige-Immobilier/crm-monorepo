@@ -22,7 +22,7 @@ class OuverturesApi {
   const OuverturesApi(this._dio);
 
   /// Fiches ouvertes par téléconseiller et par jour.
-  /// Porte aussi la durée moyenne de traitement, lue entre l’ouverture et la qualification. Un téléconseiller ne lit que son propre compte.
+  /// Porte aussi la durée moyenne de traitement, lue entre la première saisie et la qualification. Une fiche ouverte sans rien saisir n’entre pas au dénominateur. Un téléconseiller ne lit que son propre compte.
   ///
   /// Parameters:
   /// * [from] - Journée incluse.
@@ -110,7 +110,7 @@ class OuverturesApi {
   }
 
   /// Remplace le brouillon d’une fiche ouverte.
-  ///
+  /// La première requête démarre le chronomètre : elle pose &#x60;firstInputAt&#x60;, une seule fois. Les suivantes ne le déplacent pas, même si elles le renvoient.
   ///
   /// Parameters:
   /// * [id]

@@ -18,21 +18,26 @@ part 'enregistrer_brouillon_dto.g.dart';
 )
 class EnregistrerBrouillonDto {
   /// Returns a new [EnregistrerBrouillonDto] instance.
-  EnregistrerBrouillonDto({required this.draft});
+  EnregistrerBrouillonDto({required this.draft, this.firstInputAt});
 
   /// Remplace le brouillon précédent en entier.
   @JsonKey(name: r'draft', required: true, includeIfNull: false)
   final Map<String, Object> draft;
 
+  /// Heure du terrain de la première saisie. Le serveur ne la retient qu’une fois, à la première requête ; les suivantes ne la déplacent pas. Absente, l’heure du serveur en tient lieu.
+  @JsonKey(name: r'firstInputAt', required: false, includeIfNull: false)
+  final DateTime? firstInputAt;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is EnregistrerBrouillonDto &&
             runtimeType == other.runtimeType &&
-            equals([draft], [other.draft]);
+            equals([draft, firstInputAt], [other.draft, other.firstInputAt]);
   }
 
   @override
-  int get hashCode => runtimeType.hashCode ^ mapPropsToHashCode([draft]);
+  int get hashCode =>
+      runtimeType.hashCode ^ mapPropsToHashCode([draft, firstInputAt]);
 
   factory EnregistrerBrouillonDto.fromJson(Map<String, dynamic> json) =>
       _$EnregistrerBrouillonDtoFromJson(json);

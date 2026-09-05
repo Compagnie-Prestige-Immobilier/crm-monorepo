@@ -31,6 +31,7 @@ const ligne = (over: Record<string, unknown> = {}) => ({
   prospectId: null,
   prospect: null,
   openedAt: new Date('2026-09-01T09:00:00.000Z'),
+  firstInputAt: null,
   closedAt: null,
   closingAttemptId: null,
   draft: null,
@@ -227,18 +228,83 @@ describe('le brouillon et la fiche en main', () => {
     ).rejects.toMatchObject({ response: { code: 'OUVERTURE_DEJA_FERMEE' } });
   });
 
-  it('lit la durée de traitement entre les deux bornes, sans la stocker', async () => {
+  it('lit la durée de traitement de la première saisie à la qualification', async () => {
+    db.ouvertureFiche.findFirst.mockResolvedValue(
+      ligne({
+        firstInputAt: new Date('2026-09-01T09:02:00.000Z'),
+        closedAt: new Date('2026-09-01T09:04:30.000Z'),
+      }),
+    );
+
+    expect((await service.courante(AWA))?.dureeSecondes).toBe(150);
+  });
+
+  it('ne compte pas le temps de lecture : sans saisie, aucune durée', async () => {
     db.ouvertureFiche.findFirst.mockResolvedValue(
       ligne({ closedAt: new Date('2026-09-01T09:04:30.000Z') }),
     );
 
-    expect((await service.courante(AWA))?.dureeSecondes).toBe(270);
+    expect((await service.courante(AWA))?.dureeSecondes).toBeNull();
+  });
+
+  it('démarre le chronomètre à la première requête de brouillon', async () => {
+    db.ouvertureFiche.updateMany.mockResolvedValue({ count: 1 });
+    db.ouvertureFiche.findUniqueOrThrow.mockResolvedValue(ligne());
+
+    const rendu = await service.enregistrerBrouillon(AWA, OUVERTURE, {
+      draft: { syndicat: 'SUDES' },
+      firstInputAt: '2026-09-01T09:02:00.000Z',
+    });
+
+    const [args] = db.ouvertureFiche.updateMany.mock.calls[1] as [
+      { where: Record<string, unknown>; data: Record<string, unknown> },
+    ];
+    expect(args.where).toMatchObject({ openedById: AWA.id, closedAt: null, firstInputAt: null });
+    expect(args.data).toEqual({ firstInputAt: new Date('2026-09-01T09:02:00.000Z') });
+    expect(rendu.firstInputAt).toBe('2026-09-01T09:02:00.000Z');
+  });
+
+  // La borne est le DÉBUT du chronomètre : la déplacer à chaque frappe le
+  // ferait reculer sans fin, et la durée resterait d'une seconde.
+  it('ne repose pas le chronomètre quand une saisie a déjà eu lieu', async () => {
+    db.ouvertureFiche.updateMany.mockResolvedValue({ count: 1 });
+    db.ouvertureFiche.findUniqueOrThrow.mockResolvedValue(
+      ligne({ firstInputAt: new Date('2026-09-01T09:02:00.000Z') }),
+    );
+
+    const rendu = await service.enregistrerBrouillon(AWA, OUVERTURE, {
+      draft: { syndicat: 'SUDES' },
+      firstInputAt: '2026-09-01T09:07:00.000Z',
+    });
+
+    expect(db.ouvertureFiche.updateMany).toHaveBeenCalledTimes(1);
+    expect(rendu.firstInputAt).toBe('2026-09-01T09:02:00.000Z');
+  });
+
+  // `firstInputAt >= openedAt` est une contrainte CHECK : une horloge de
+  // terrain en retard avorterait la requête au lieu d'enregistrer la saisie.
+  it('ne laisse pas la première saisie précéder l’ouverture', async () => {
+    db.ouvertureFiche.updateMany.mockResolvedValue({ count: 1 });
+    db.ouvertureFiche.findUniqueOrThrow.mockResolvedValue(ligne());
+
+    await service.enregistrerBrouillon(AWA, OUVERTURE, {
+      draft: {},
+      firstInputAt: '2026-09-01T08:30:00.000Z',
+    });
+
+    const [args] = db.ouvertureFiche.updateMany.mock.calls[1] as [
+      { data: Record<string, unknown> },
+    ];
+    expect(args.data).toEqual({ firstInputAt: new Date('2026-09-01T09:00:00.000Z') });
   });
 });
 
 describe('la qualification lève le verrou', () => {
   it('ferme l’ouverture en y attachant la tentative', async () => {
-    db.ouvertureFiche.findUnique.mockResolvedValue({ openedAt: new Date('2026-09-01T09:00:00Z') });
+    db.ouvertureFiche.findUnique.mockResolvedValue({
+      openedAt: new Date('2026-09-01T09:00:00Z'),
+      firstInputAt: null,
+    });
 
     await fermerOuverture(db as unknown as Prisma.TransactionClient, {
       ouvertureId: OUVERTURE,
@@ -260,7 +326,10 @@ describe('la qualification lève le verrou', () => {
   // `closedAt >= openedAt` est une contrainte CHECK : une horloge qui recule
   // avorterait la transaction de la tentative entière.
   it('ne descend jamais la fermeture sous l’ouverture', async () => {
-    db.ouvertureFiche.findUnique.mockResolvedValue({ openedAt: new Date('2026-09-01T09:00:00Z') });
+    db.ouvertureFiche.findUnique.mockResolvedValue({
+      openedAt: new Date('2026-09-01T09:00:00Z'),
+      firstInputAt: null,
+    });
 
     await fermerOuverture(db as unknown as Prisma.TransactionClient, {
       ouvertureId: OUVERTURE,
@@ -273,6 +342,25 @@ describe('la qualification lève le verrou', () => {
       { data: Record<string, unknown> },
     ];
     expect(args.data.closedAt).toEqual(new Date('2026-09-01T09:00:00.000Z'));
+  });
+
+  it('ne descend pas non plus la fermeture sous la première saisie', async () => {
+    db.ouvertureFiche.findUnique.mockResolvedValue({
+      openedAt: new Date('2026-09-01T09:00:00Z'),
+      firstInputAt: new Date('2026-09-01T09:03:00Z'),
+    });
+
+    await fermerOuverture(db as unknown as Prisma.TransactionClient, {
+      ouvertureId: OUVERTURE,
+      openedById: AWA.id,
+      attemptId: 'att-1',
+      at: new Date('2026-09-01T09:01:00.000Z'),
+    });
+
+    const [args] = db.ouvertureFiche.updateMany.mock.calls[0] as [
+      { data: Record<string, unknown> },
+    ];
+    expect(args.data.closedAt).toEqual(new Date('2026-09-01T09:03:00.000Z'));
   });
 
   it('ignore une ouverture inconnue plutôt que de perdre la tentative', async () => {

@@ -389,6 +389,18 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
     final AuthController auth = ref.read(authControllerProvider.notifier);
     final SyncCoordinator sync = ref.read(syncCoordinatorProvider.notifier);
 
+    final bool tenue = await _tientUneFiche();
+    if (!context.mounted) return;
+    if (tenue) {
+      cpiToast(
+        context,
+        'Qualifiez la fiche ouverte avant de vous déconnecter. Un superviseur '
+        'peut la libérer.',
+        persistent: true,
+      );
+      return;
+    }
+
     final bool? partir = await _demanderLeDepart(context, pending, sync);
     if (partir != true) return;
 
@@ -399,6 +411,14 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
       if (!mounted || !context.mounted) return;
       cpiToast(context, 'Déconnexion impossible. Réessayez.', persistent: true);
     }
+  }
+
+  /// EB-08 : une fiche ouverte se qualifie, elle ne s'abandonne pas. Lue en
+  /// base et non au serveur : hors ligne le verrou tient quand même.
+  Future<bool> _tientUneFiche() async {
+    final String? moi = ref.read(authControllerProvider).userId;
+    if (moi == null || moi.isEmpty) return false;
+    return await ref.read(ouvertureRepositoryProvider).courante(moi) != null;
   }
 
   /// Partir n'est jamais silencieux : avec des saisies en attente la feuille

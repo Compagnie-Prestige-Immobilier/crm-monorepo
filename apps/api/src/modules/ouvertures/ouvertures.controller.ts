@@ -77,6 +77,8 @@ export class OuverturesController {
   @ApiOperation({
     operationId: 'enregistrerBrouillonOuverture',
     summary: 'Remplace le brouillon d’une fiche ouverte.',
+    description:
+      'La première requête démarre le chronomètre : elle pose `firstInputAt`, une seule fois. Les suivantes ne le déplacent pas, même si elles le renvoient.',
   })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, type: OuvertureFicheDto })
@@ -127,7 +129,7 @@ export class OuverturesController {
     operationId: 'compterOuvertures',
     summary: 'Fiches ouvertes par téléconseiller et par jour.',
     description:
-      'Porte aussi la durée moyenne de traitement, lue entre l’ouverture et la qualification. Un téléconseiller ne lit que son propre compte.',
+      'Porte aussi la durée moyenne de traitement, lue entre la première saisie et la qualification. Une fiche ouverte sans rien saisir n’entre pas au dénominateur. Un téléconseiller ne lit que son propre compte.',
   })
   @ApiResponse({ status: 200, type: ComptageOuverturesDto })
   comptage(

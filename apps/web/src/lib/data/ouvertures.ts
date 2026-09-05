@@ -17,6 +17,7 @@ export interface OuvertureFiche {
   prospectId: string | null;
   ficheNom: string;
   openedAt: string;
+  firstInputAt: string | null;
   closedAt: string | null;
   dureeSecondes: number | null;
   closingAttemptId: string | null;
@@ -61,15 +62,21 @@ export async function fetchOuvertureCourante(
   return unwrap(await client.GET('/api/v1/ouvertures/courante')) as OuvertureFiche | null;
 }
 
+/**
+ * `keepalive` : cette écriture part souvent au moment où l'onglet disparaît, et
+ * le navigateur avorte les requêtes d'un document qu'il détruit.
+ */
 export async function enregistrerBrouillon(
   id: string,
   draft: Record<string, unknown>,
+  firstInputAt?: string,
   client: ApiClient = getApiClient(),
 ): Promise<OuvertureFiche> {
   return unwrap(
     await client.PUT('/api/v1/ouvertures/{id}/brouillon', {
       params: { path: { id } },
-      body: { draft },
+      body: { draft, ...(firstInputAt === undefined ? {} : { firstInputAt }) },
+      keepalive: true,
     }),
   ) as OuvertureFiche;
 }
@@ -102,9 +109,8 @@ export async function fetchComptageOuvertures(
   ).items;
 }
 
-/** Le chronomètre d'EB-09, en secondes pleines depuis l'ouverture confirmée. */
-export function secondesEcoulees(openedAt: string, now: number): number {
-  return Math.max(0, Math.floor((now - Date.parse(openedAt)) / 1000));
+export function secondesEcoulees(depuis: string, now: number): number {
+  return Math.max(0, Math.floor((now - Date.parse(depuis)) / 1000));
 }
 
 export function formatChrono(secondes: number): string {

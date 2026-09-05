@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:developer' as developer;
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
@@ -34,6 +35,7 @@ void callbackDispatcher() {
         api: DioApi(
           ApiClientFactory.build(
             tokens: tokens,
+            verboseLogs: kDebugMode,
             mutex: DatabaseRefreshMutex(database),
           ).client,
         ),

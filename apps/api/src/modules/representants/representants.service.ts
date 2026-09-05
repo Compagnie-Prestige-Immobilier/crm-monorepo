@@ -17,6 +17,7 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import { normalizePhone } from '../../common/phone.js';
 import { assertOwnership, attributionScope, isAdmin } from '../../common/scope.js';
 import { listerDetections, type DeviceCallDetectionListDto } from '../../common/device-call.js';
+import { dureesDeTraitement } from '../ouvertures/ouvertures.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { OkDto } from '../../common/dto/ok.dto.js';
 import { RepresentantSortField, RepresentantSuivi } from './dto.js';
@@ -471,6 +472,7 @@ export class RepresentantsService {
       },
       orderBy: [{ clientCreatedAt: 'desc' }, { id: 'desc' }],
     });
+    const durees = await dureesDeTraitement(this.prisma, { representantId: id });
 
     return {
       items: rows.map((row) => ({
@@ -496,6 +498,7 @@ export class RepresentantsService {
         performedById: row.performedById,
         performedByName: row.performedBy.fullName,
         clientCreatedAt: row.clientCreatedAt.toISOString(),
+        dureeTraitementSecondes: durees.get(row.id) ?? null,
       })),
     };
   }

@@ -68,10 +68,12 @@ void phase2TestWidgets(String description, WidgetTesterCallback body) {
 void main() {
   late AppDatabase db;
   late FakeApi api;
+  late FakeClock horloge;
 
   setUp(() async {
     db = await openTestDatabase();
     api = FakeApi();
+    horloge = FakeClock(t0);
     await db
         .into(db.phase2Directory)
         .insert(
@@ -106,7 +108,7 @@ void main() {
       overrides: [
         appDatabaseProvider.overrideWithValue(db),
         apiPortProvider.overrideWithValue(api),
-        clockProvider.overrideWithValue(FakeClock(t0)),
+        clockProvider.overrideWithValue(horloge),
         if (directory != null)
           phase2DirectoryProvider.overrideWithValue(directory),
         // Session simulée. Sans elle, `recordCallAttempt` n'a pas d'auteur à
@@ -484,7 +486,40 @@ void main() {
     expect(ouverte.prospectId, 'pros-1');
     expect(ouverte.openedById, 'commercial-test');
     expect(ouverte.closedAt, isNull);
-    // EB-09 : le chronomètre court dès l'ouverture confirmée.
+    // EB-09 corrigé : la fiche n'a été que LUE, le chronomètre n'a pas démarré
+    // et n'affiche rien.
+    expect(ouverte.firstInputAt, isNull);
+    expect(find.text('00:00'), findsNothing);
+  });
+
+  // Le formulaire s'écrit aussi tout seul : passer à l'étape 2 le
+  // pré-remplit depuis la fiche connue. Ce n'est pas une saisie, et la borne
+  // posée là ferait compter le temps de lecture qu'on vient d'en retirer.
+  phase2TestWidgets('le chronomètre part de la première lettre, pas du '
+      'pré-remplissage', (WidgetTester tester) async {
+    await tester.pumpWidget(host());
+    await renseignements(tester, '771234567');
+
+    final String ouvertureId =
+        (await db.select(db.ouverturesFiche).get()).single.id;
+    expect(find.text('00:00'), findsNothing);
+    expect(
+      (await db.select(db.ouverturesFiche).get()).single.firstInputAt,
+      isNull,
+    );
+
+    horloge.advance(const Duration(minutes: 2));
+    await remplir(tester, 'Nom', 'Sow');
+    await tester.pump(const Duration(milliseconds: 600));
+
+    final DateTime saisie = t0.add(const Duration(minutes: 2));
+    expect(
+      (await db.select(db.ouverturesFiche).get()).single.firstInputAt,
+      saisie,
+    );
+    expect(api.premieresSaisies[ouvertureId], saisie.toUtc());
+
+    await tester.pump();
     expect(find.text('00:00'), findsOneWidget);
   });
 

@@ -712,19 +712,25 @@ class SyncEngine {
         if (decoded is! Map<String, dynamic>) {
           throw const FormatException('payload non objet');
         }
-        final Object? brut = decoded['openedAt'];
-        final DateTime? openedAt = brut is String
-            ? DateTime.tryParse(brut)
-            : null;
-        if (openedAt == null) throw const FormatException('openedAt illisible');
-        await _api.ouvrirFiche(
-          OuvrirFicheDto(
-            id: row.entityId,
-            openedAt: openedAt,
-            representantId: decoded['representantId'] as String?,
-            prospectId: decoded['prospectId'] as String?,
-          ),
-        );
+        if (row.op == 'update') {
+          await _remonterLaPremiereSaisie(row.entityId, decoded);
+        } else {
+          final Object? brut = decoded['openedAt'];
+          final DateTime? openedAt = brut is String
+              ? DateTime.tryParse(brut)
+              : null;
+          if (openedAt == null) {
+            throw const FormatException('openedAt illisible');
+          }
+          await _api.ouvrirFiche(
+            OuvrirFicheDto(
+              id: row.entityId,
+              openedAt: openedAt,
+              representantId: decoded['representantId'] as String?,
+              prospectId: decoded['prospectId'] as String?,
+            ),
+          );
+        }
         await _markDone(
           row,
           SyncOperationResultDto(
@@ -750,6 +756,28 @@ class SyncEngine {
       }
     }
     return _SendReport(acknowledged: acknowledged, keepGoing: true);
+  }
+
+  /// L'heure du TERRAIN de la première saisie, remontée après coup. Sans elle,
+  /// une fiche traitée hors ligne arriverait sans départ de chronomètre et la
+  /// DMT ne compterait que les appels passés en ligne.
+  Future<void> _remonterLaPremiereSaisie(
+    String id,
+    Map<String, dynamic> payload,
+  ) async {
+    final Object? brut = payload['firstInputAt'];
+    final DateTime? at = brut is String ? DateTime.tryParse(brut) : null;
+    if (at == null) throw const FormatException('firstInputAt illisible');
+    final Object? draft = payload['draft'];
+    await _api.enregistrerBrouillonOuverture(
+      id: id,
+      corps: EnregistrerBrouillonDto(
+        draft: draft is Map<String, dynamic>
+            ? Map<String, Object>.from(draft)
+            : const <String, Object>{},
+        firstInputAt: at,
+      ),
+    );
   }
 
   static const Set<String> _conflictCodes = <String>{

@@ -39,13 +39,21 @@ import 'route_guard.dart';
 import 'route_memory.dart';
 import 'route_paths.dart';
 
-class _AuthRefreshNotifier extends ChangeNotifier {
-  _AuthRefreshNotifier(Ref ref) {
+class _RouterRefreshNotifier extends ChangeNotifier {
+  _RouterRefreshNotifier(Ref ref) {
     ref.listen<AuthState>(authControllerProvider, (
       AuthState? previous,
       AuthState next,
     ) {
       if (previous?.status != next.status) notifyListeners();
+    });
+    // La fiche tenue est lue en base, donc APRÈS la première trame : sans ce
+    // réveil, le démarrage resterait sur l'écran mémorisé.
+    ref.listen<AsyncValue<String?>>(routeFicheTenueProvider, (
+      AsyncValue<String?>? previous,
+      AsyncValue<String?> next,
+    ) {
+      if (previous?.value != next.value) notifyListeners();
     });
   }
 }
@@ -57,6 +65,21 @@ final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'root',
 );
 
+/// EB-08 : la fiche tenue, quand la route demandée n'est pas la sienne. C'est
+/// elle que le démarrage rouvre, et elle qu'aucune autre route ne quitte.
+///
+/// Seul le CHEMIN compte : la fiche d'un prospect porte son numéro en
+/// paramètre, et le réécrire à chaque passage relancerait sa recherche. Un rôle
+/// qui n'a plus le droit de l'ouvrir n'y est pas renvoyé : le garde la
+/// rejetterait, et les deux règles se renverraient la balle sans fin.
+String? _ficheARouvrir(Ref ref, String demande, String? role) {
+  final String? fiche = ref.read(routeFicheTenueProvider).value;
+  if (fiche == null) return null;
+  final String chemin = Uri.parse(fiche).path;
+  if (chemin == demande || !RouteGuard.autorise(chemin, role)) return null;
+  return fiche;
+}
+
 GoRouterWidgetBuilder _chues(Widget Function(GoRouterState state) screen) {
   return (BuildContext context, GoRouterState state) =>
       ProjectScope(project: CpiProject.chues, child: screen(state));
@@ -64,7 +87,7 @@ GoRouterWidgetBuilder _chues(Widget Function(GoRouterState state) screen) {
 
 final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
   final RouteMemory memory = ref.watch(routeMemoryProvider);
-  final _AuthRefreshNotifier refresh = _AuthRefreshNotifier(ref);
+  final _RouterRefreshNotifier refresh = _RouterRefreshNotifier(ref);
   ref.onDispose(refresh.dispose);
 
   final AuthState depart = ref.read(authControllerProvider);
@@ -113,6 +136,9 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         }
         return next;
       }
+
+      final String? fiche = _ficheARouvrir(ref, state.uri.path, auth.role);
+      if (fiche != null) return fiche;
 
       // Un rôle qui n'ouvre qu'un projet n'a rien à choisir : le hub lui
       // demandait un geste de plus pour une seule porte. Le compte d'accueil
