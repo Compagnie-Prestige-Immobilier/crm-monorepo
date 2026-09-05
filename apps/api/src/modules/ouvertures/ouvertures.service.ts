@@ -37,8 +37,21 @@ function nomDeLaFiche(row: OuvertureRow): string {
   return `${row.prospect.prenom} ${row.prospect.nom}`.trim();
 }
 
+/**
+ * Le chronomètre court de la première saisie à la qualification : le temps de
+ * lecture de la fiche n'est pas du traitement. Nul tant qu'une borne manque,
+ * jamais zéro, sans quoi une fiche seulement consultée tirerait la DMT vers le
+ * bas.
+ */
+export function dureeTraitementSecondes(borne: {
+  firstInputAt: Date | null;
+  closedAt: Date | null;
+}): number | null {
+  if (borne.firstInputAt === null || borne.closedAt === null) return null;
+  return Math.round((borne.closedAt.getTime() - borne.firstInputAt.getTime()) / 1_000);
+}
+
 function toDto(row: OuvertureRow): OuvertureFicheDto {
-  const closedAt = row.closedAt;
   return {
     id: row.id,
     openedById: row.openedById,
@@ -47,14 +60,37 @@ function toDto(row: OuvertureRow): OuvertureFicheDto {
     prospectId: row.prospectId,
     ficheNom: nomDeLaFiche(row),
     openedAt: row.openedAt.toISOString(),
-    closedAt: closedAt?.toISOString() ?? null,
-    dureeSecondes:
-      closedAt === null ? null : Math.round((closedAt.getTime() - row.openedAt.getTime()) / 1_000),
+    firstInputAt: row.firstInputAt?.toISOString() ?? null,
+    closedAt: row.closedAt?.toISOString() ?? null,
+    dureeSecondes: dureeTraitementSecondes(row),
     closingAttemptId: row.closingAttemptId,
     draft: (row.draft as Record<string, unknown> | null) ?? null,
     releasedByName: row.releasedBy?.fullName ?? null,
     releasedAt: row.releasedAt?.toISOString() ?? null,
   };
+}
+
+/**
+ * Le temps de traitement de chaque appel de l'historique d'une fiche, indexé par
+ * la tentative qui a fermé l'ouverture. Les appels consignés hors du parcours de
+ * fiche ouverte, et ceux fermés sans aucune saisie, n'y figurent pas.
+ */
+export async function dureesDeTraitement(
+  prisma: Prisma.TransactionClient,
+  cible: { representantId: string } | { prospectId: string },
+): Promise<Map<string, number>> {
+  const rows = await prisma.ouvertureFiche.findMany({
+    where: { ...cible, closingAttemptId: { not: null }, firstInputAt: { not: null } },
+    select: { closingAttemptId: true, firstInputAt: true, closedAt: true },
+  });
+
+  const parTentative = new Map<string, number>();
+  for (const row of rows) {
+    const duree = dureeTraitementSecondes(row);
+    if (row.closingAttemptId === null || duree === null) continue;
+    parTentative.set(row.closingAttemptId, duree);
+  }
+  return parTentative;
 }
 
 /**
@@ -66,9 +102,9 @@ function toDto(row: OuvertureRow): OuvertureFicheDto {
  * par quelqu'un d'autre ne fait rien, elle ne fait pas échouer une tentative
  * venue du terrain.
  *
- * La borne de fermeture ne descend jamais sous l'ouverture : l'horloge d'un
- * appareil peut reculer, et la contrainte `closedAt >= openedAt` avorterait la
- * transaction entière.
+ * La borne de fermeture ne descend jamais sous la dernière borne posée :
+ * l'horloge d'un appareil peut reculer, et les contraintes `closedAt >=
+ * openedAt` et `closedAt >= firstInputAt` avorteraient la transaction entière.
  */
 export async function fermerOuverture(
   tx: Prisma.TransactionClient,
@@ -76,14 +112,15 @@ export async function fermerOuverture(
 ): Promise<void> {
   const ouverture = await tx.ouvertureFiche.findUnique({
     where: { id: input.ouvertureId },
-    select: { openedAt: true },
+    select: { openedAt: true, firstInputAt: true },
   });
   if (!ouverture) return;
 
+  const plancher = ouverture.firstInputAt ?? ouverture.openedAt;
   await tx.ouvertureFiche.updateMany({
     where: { id: input.ouvertureId, openedById: input.openedById, closedAt: null },
     data: {
-      closedAt: input.at < ouverture.openedAt ? ouverture.openedAt : input.at,
+      closedAt: input.at < plancher ? plancher : input.at,
       closingAttemptId: input.attemptId,
     },
   });
@@ -151,6 +188,12 @@ export class OuverturesService {
     return row ? toDto(row) : null;
   }
 
+  /**
+   * La première requête de brouillon EST la première saisie : c'est elle qui
+   * démarre le chronomètre. `firstInputAt` ne se pose donc qu'une fois, tenu
+   * ici par le `where` et non par l'écran, sinon chaque frappe repousserait le
+   * départ et la durée resterait éternellement d'une seconde.
+   */
   async enregistrerBrouillon(
     user: AuthenticatedUser,
     id: string,
@@ -166,7 +209,21 @@ export class OuverturesService {
       where: { id },
       include: OUVERTURE_INCLUDE,
     });
-    return toDto(row);
+    if (row.firstInputAt !== null) return toDto(row);
+
+    const saisi = body.firstInputAt ? new Date(body.firstInputAt) : new Date();
+    const firstInputAt = saisi < row.openedAt ? row.openedAt : saisi;
+    const pose = await this.prisma.ouvertureFiche.updateMany({
+      where: { id, openedById: user.id, closedAt: null, firstInputAt: null },
+      data: { firstInputAt },
+    });
+    if (pose.count === 1) return toDto({ ...row, firstInputAt });
+
+    const relu = await this.prisma.ouvertureFiche.findUniqueOrThrow({
+      where: { id },
+      include: OUVERTURE_INCLUDE,
+    });
+    return toDto(relu);
   }
 
   /** Les fiches restées ouvertes, celles que l'encadrement peut libérer. */
@@ -250,7 +307,8 @@ export class OuverturesService {
 
   /**
    * Fiches ouvertes par téléconseiller et par jour, avec la DMT qui se lit
-   * entre les deux bornes. Un téléconseiller ne lit que son propre compte.
+   * entre la première saisie et la qualification. Un téléconseiller ne lit que
+   * son propre compte.
    */
   async comptage(
     user: AuthenticatedUser,
@@ -269,7 +327,9 @@ export class OuverturesService {
         u."fullName"                                            AS "openedByName",
         to_char(date_trunc('day', o."openedAt"), 'YYYY-MM-DD')   AS jour,
         COUNT(*)::int                                           AS ouvertures,
-        AVG(EXTRACT(EPOCH FROM (o."closedAt" - o."openedAt")))::int AS "dureeMoyenneSecondes"
+        -- AVG ignore les NULL : une ouverture sans saisie sort du denominateur
+        -- au lieu d'y entrer avec une duree de zero.
+        AVG(EXTRACT(EPOCH FROM (o."closedAt" - o."firstInputAt")))::int AS "dureeMoyenneSecondes"
       FROM "ouvertures_fiche" o
       INNER JOIN "users" u ON u."id" = o."openedById"
       WHERE ${Prisma.join(filtres, ' AND ')}
