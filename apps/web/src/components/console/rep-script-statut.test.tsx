@@ -46,7 +46,9 @@ vi.mock('@/lib/data/statuts-qualification', async (importOriginal) => {
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
-function statut(over: Partial<StatutQualification> & { id: string }): StatutQualification {
+function statut(
+  over: Partial<StatutQualification> & { id: string; requiresComment?: boolean },
+): StatutQualification {
   return {
     code: 'ACCEPTE',
     label: 'Accepté',
@@ -88,8 +90,20 @@ const STATUTS: StatutQualification[] = [
     effect: 'UNREACHABLE',
   }),
   statut({ id: 's-7', code: 'DECEDE', label: 'Décédé', effect: 'REFUSED' }),
-  statut({ id: 's-8', code: 'AUTRE_JOINT', label: 'Autre joint', effect: 'REACHED' }),
-  statut({ id: 's-9', code: 'AUTRE_NON_JOINT', label: 'Autre non joint', effect: 'UNREACHABLE' }),
+  statut({
+    id: 's-8',
+    code: 'AUTRE_JOINT',
+    label: 'Autre joint',
+    effect: 'REACHED',
+    requiresComment: true,
+  }),
+  statut({
+    id: 's-9',
+    code: 'AUTRE_NON_JOINT',
+    label: 'Autre non joint',
+    effect: 'UNREACHABLE',
+    requiresComment: true,
+  }),
 ];
 
 const REPRESENTANT: ScriptedRepresentant = {
@@ -490,5 +504,52 @@ describe('la question « Souhaite-t-il être représentant CHUES ? »', () => {
       statutQualificationId: 's-3',
       relationStatus: 'REFUS',
     });
+  });
+});
+
+/** EB-04 : « Autre » ne dit rien tant que le motif n'est pas écrit. */
+describe('le statut qui exige un motif', () => {
+  it('retient l’enregistrement tant que le motif est vide, et le dit', async () => {
+    await ouvrirQualification();
+    await repondre('Injoignable');
+    await choisirStatut('Autre');
+
+    expect(screen.getByLabelText('Motif')).toBeTruthy();
+    expect(screen.getByText('Écrivez le motif')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Continuer' }).hasAttribute('disabled')).toBe(true);
+  });
+
+  it('met le curseur sur le motif, sans quoi l’obligation ne se voit pas', async () => {
+    await ouvrirQualification();
+    await repondre('Injoignable');
+    await choisirStatut('Autre');
+
+    expect(document.activeElement).toBe(screen.getByLabelText('Motif'));
+  });
+
+  it('envoie le motif écrit avec la tentative', async () => {
+    await ouvrirQualification();
+    await repondre('Injoignable');
+    await choisirStatut('Autre');
+    await userEvent.type(screen.getByLabelText('Motif'), 'Ligne coupée deux fois');
+    await userEvent.click(screen.getByRole('button', { name: 'Continuer' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(() => {
+      expect(pushRepCallAttempt).toHaveBeenCalledTimes(1);
+    });
+    expect(pushRepCallAttempt.mock.calls[0]?.[0]).toMatchObject({
+      statutQualificationId: 's-9',
+      comment: 'Ligne coupée deux fois',
+    });
+  });
+
+  it('n’exige rien d’un statut qui ne réclame pas de motif', async () => {
+    await ouvrirQualification();
+    await repondre('Injoignable');
+    await choisirStatut('Injoignable définitif');
+
+    expect(screen.getByLabelText('Commentaire')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Continuer' }).hasAttribute('disabled')).toBe(false);
   });
 });
