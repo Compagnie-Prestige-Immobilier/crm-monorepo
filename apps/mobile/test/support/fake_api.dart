@@ -353,17 +353,77 @@ class FakeApi implements ApiPort {
 
   @override
   Future<RepCallAttemptResultDto> recordRepCallAttempt(
-    CreateRepCallAttemptDto attempt,
-  ) async {
+    CreateRepCallAttemptDto attempt, {
+    String? ouvertureId,
+  }) async {
     final ApiException? failure = failNextRepCallAttempt;
     failNextRepCallAttempt = null;
     if (failure != null) throw failure;
     repCallAttempts.add(attempt);
+    fermeturesRecues.add(ouvertureId);
     return RepCallAttemptResultDto(
       status: RepCallAttemptApplyStatus.applied,
       attemptId: attempt.id,
       suggestion: null,
     );
+  }
+
+  /// Les ouvertures fermées par une tentative, dans l'ordre reçu. Un nul dit
+  /// que la tentative n'en fermait aucune.
+  final List<String?> fermeturesRecues = <String?>[];
+
+  final List<OuvertureFicheDto> ouvertures = <OuvertureFicheDto>[];
+
+  /// Posé pour faire répondre le verrou au prochain `ouvrirFiche`.
+  ApiException? failNextOuvrirFiche;
+
+  /// Ce que `GET /v1/ouvertures/courante` rend.
+  OuvertureFicheDto? courante;
+
+  final Map<String, Map<String, Object?>> brouillons =
+      <String, Map<String, Object?>>{};
+
+  @override
+  Future<OuvertureFicheDto> ouvrirFiche({
+    required String id,
+    required DateTime openedAt,
+    String? representantId,
+    String? prospectId,
+    Map<String, Object?>? draft,
+  }) async {
+    final ApiException? failure = failNextOuvrirFiche;
+    failNextOuvrirFiche = null;
+    if (failure != null) throw failure;
+    final OuvertureFicheDto dto = OuvertureFicheDto(
+      id: id,
+      openedById: 'user-1',
+      openedAt: openedAt,
+      representantId: representantId,
+      prospectId: prospectId,
+      draft: draft,
+    );
+    ouvertures.add(dto);
+    courante = dto;
+    return dto;
+  }
+
+  /// Posé pour faire échouer la prochaine lecture de la fiche courante.
+  ApiException? failNextOuvertureCourante;
+
+  @override
+  Future<OuvertureFicheDto?> ouvertureCourante() async {
+    final ApiException? failure = failNextOuvertureCourante;
+    failNextOuvertureCourante = null;
+    if (failure != null) throw failure;
+    return courante;
+  }
+
+  @override
+  Future<void> enregistrerBrouillonOuverture({
+    required String id,
+    required Map<String, Object?> draft,
+  }) async {
+    brouillons[id] = draft;
   }
 
   @override
@@ -745,8 +805,27 @@ class ExplodingApi implements ApiPort {
 
   @override
   Future<RepCallAttemptResultDto> recordRepCallAttempt(
-    CreateRepCallAttemptDto attempt,
-  ) => _boom();
+    CreateRepCallAttemptDto attempt, {
+    String? ouvertureId,
+  }) => _boom();
+
+  @override
+  Future<OuvertureFicheDto> ouvrirFiche({
+    required String id,
+    required DateTime openedAt,
+    String? representantId,
+    String? prospectId,
+    Map<String, Object?>? draft,
+  }) => _boom();
+
+  @override
+  Future<OuvertureFicheDto?> ouvertureCourante() => _boom();
+
+  @override
+  Future<void> enregistrerBrouillonOuverture({
+    required String id,
+    required Map<String, Object?> draft,
+  }) => _boom();
 
   @override
   Future<Phase2DirectoryPage> pullPhase2Directory({

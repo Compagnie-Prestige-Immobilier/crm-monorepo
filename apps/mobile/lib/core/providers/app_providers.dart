@@ -17,6 +17,7 @@ import '../../ui/widgets/activity_chart.dart' show ActivityDay;
 import '../../data/local/database.dart';
 import '../../data/local/refresh_mutex_db.dart';
 import '../../data/repositories/draft_repository.dart';
+import '../../data/repositories/ouverture_repository.dart';
 import '../../data/repositories/reference_repository.dart';
 import '../../data/repositories/visites_repository.dart';
 import '../../data/repositories/write_repository.dart';
@@ -122,6 +123,34 @@ final Provider<DraftRepository> draftRepositoryProvider =
 final Provider<ReferenceRepository> referenceRepositoryProvider =
     Provider<ReferenceRepository>((Ref ref) {
       return ReferenceRepository(ref.watch(appDatabaseProvider));
+    });
+
+final Provider<OuvertureRepository> ouvertureRepositoryProvider =
+    Provider<OuvertureRepository>((Ref ref) {
+      return OuvertureRepository(
+        ref.watch(appDatabaseProvider),
+        ref.watch(apiPortProvider),
+        clock: ref.watch(clockProvider),
+      );
+    });
+
+/// La fiche que ce compte tient encore. C'est elle qui rouvre le formulaire
+/// après un plantage, verrou actif.
+final StreamProvider<OuverturesFicheData?> ouvertureCouranteProvider =
+    StreamProvider<OuverturesFicheData?>((Ref ref) {
+      final String moi = _moi(ref);
+      if (moi.isEmpty) return Stream<OuverturesFicheData?>.value(null);
+      return ref.watch(ouvertureRepositoryProvider).watchCourante(moi);
+    });
+
+final historiqueRepresentantProvider =
+    StreamProvider.family<List<HistoriqueRepresentantResult>, String>((
+      Ref ref,
+      String representantId,
+    ) {
+      return ref
+          .watch(referenceRepositoryProvider)
+          .watchHistoriqueRepresentant(representantId);
     });
 
 final NotifierProvider<AuthController, AuthState> authControllerProvider =

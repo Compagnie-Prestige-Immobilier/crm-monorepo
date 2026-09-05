@@ -1147,6 +1147,7 @@ class _WritesEspion extends WriteRepository {
   int appels = 0;
   String? outcome;
   String? statutQualificationId;
+  String? ouvertureId;
   String? relationStatus;
   String? suggestedPhone;
   String? suggestedName;
@@ -1175,10 +1176,13 @@ class _WritesEspion extends WriteRepository {
     bool? numeroConfirme,
     String? numeroSaisi,
     String? statutQualificationId,
+    String? ouvertureId,
+    String? createdByName,
     String? id,
   }) async {
     appels++;
     this.outcome = outcome;
+    this.ouvertureId = ouvertureId;
     this.statutQualificationId = statutQualificationId;
     this.relationStatus = relationStatus;
     this.callbackAt = callbackAt;
@@ -1205,6 +1209,8 @@ class _WritesEspion extends WriteRepository {
       numeroConfirme: numeroConfirme,
       numeroSaisi: numeroSaisi,
       statutQualificationId: statutQualificationId,
+      ouvertureId: ouvertureId,
+      createdByName: createdByName,
       id: id,
     );
   }

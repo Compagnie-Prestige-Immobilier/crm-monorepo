@@ -325,6 +325,14 @@ class ReferenceRepository {
         .watch();
   }
 
+  /// L'historique des qualifications d'une fiche, du plus récent au plus
+  /// ancien. Lecture seule : une entrée passée ne se modifie jamais.
+  Stream<List<HistoriqueRepresentantResult>> watchHistoriqueRepresentant(
+    String representantId,
+  ) {
+    return _db.historiqueRepresentant(representantId: representantId).watch();
+  }
+
   Stream<List<ProspectSyncViewData>> watchAllProspects({
     String? search,
     String? projet,
