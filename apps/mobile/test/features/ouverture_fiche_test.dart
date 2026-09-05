@@ -6,6 +6,7 @@ import 'package:cpi_go/data/local/database.dart';
 import 'package:cpi_go/data/repositories/draft_repository.dart';
 import 'package:cpi_go/features/auth/auth_controller.dart';
 import 'package:cpi_go/features/auth/auth_state.dart';
+import 'package:cpi_go/features/reglages/presentation/reglages_screen.dart';
 import 'package:cpi_go/features/representant/presentation/representant_qualification_screen.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
@@ -273,6 +274,80 @@ void main() {
       ),
     );
     expect(continuer.subtitle, isNull);
+    await demonter(tester);
+  });
+
+  Future<void> monterReglages(WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 6000);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          appDatabaseProvider.overrideWithValue(db),
+          apiPortProvider.overrideWithValue(api),
+          clockProvider.overrideWithValue(horloge),
+          sharedPreferencesProvider.overrideWithValue(prefs),
+          authControllerProvider.overrideWith(_Connecte.new),
+          syncCoordinatorProvider.overrideWith(_SyncInerte.new),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light,
+          locale: const Locale('fr'),
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          supportedLocales: const <Locale>[Locale('fr')],
+          home: const ReglagesScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+  }
+
+  Future<void> seDeconnecter(WidgetTester tester) async {
+    final Finder ligne = find.text('Se déconnecter');
+    await tester.ensureVisible(ligne);
+    await tester.pump();
+    await tester.tap(ligne);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+  }
+
+  // EB-08 : partir en laissant une fiche ouverte la verrouillerait pour tout le
+  // monde, et personne d'autre que l'encadrement ne peut la libérer. Le message
+  // dit les deux seules issues.
+  testWidgets('la déconnexion est refusée tant qu\'une fiche est tenue', (
+    WidgetTester tester,
+  ) async {
+    await db
+        .into(db.ouverturesFiche)
+        .insert(
+          OuverturesFicheCompanion.insert(
+            id: 'ouv-en-cours',
+            openedById: 'u-1',
+            representantId: const Value<String?>('rep-1'),
+            openedAt: t0,
+          ),
+        );
+
+    await monterReglages(tester);
+    await seDeconnecter(tester);
+
+    expect(find.textContaining('Qualifiez la fiche ouverte'), findsOneWidget);
+    expect(find.text('Se déconnecter ?'), findsNothing);
+    await demonter(tester);
+  });
+
+  testWidgets('sans fiche tenue, la déconnexion se confirme comme avant', (
+    WidgetTester tester,
+  ) async {
+    await monterReglages(tester);
+    await seDeconnecter(tester);
+
+    expect(find.text('Se déconnecter ?'), findsOneWidget);
     await demonter(tester);
   });
 
