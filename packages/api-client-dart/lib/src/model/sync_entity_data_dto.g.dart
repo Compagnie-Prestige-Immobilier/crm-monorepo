@@ -87,6 +87,8 @@ abstract class _$SyncEntityDataDtoCWProxy {
 
   SyncEntityDataDto prospectId(String? prospectId);
 
+  SyncEntityDataDto ouvertureId(String? ouvertureId);
+
   SyncEntityDataDto outcome(CallOutcome? outcome);
 
   SyncEntityDataDto reasonCode(String? reasonCode);
@@ -178,6 +180,7 @@ abstract class _$SyncEntityDataDtoCWProxy {
     String? relaisPhoneE164,
     DateTime? clientCreatedAt,
     String? prospectId,
+    String? ouvertureId,
     CallOutcome? outcome,
     String? reasonCode,
     EnrollmentMethod? method,
@@ -354,6 +357,10 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
       this(prospectId: prospectId);
 
   @override
+  SyncEntityDataDto ouvertureId(String? ouvertureId) =>
+      this(ouvertureId: ouvertureId);
+
+  @override
   SyncEntityDataDto outcome(CallOutcome? outcome) => this(outcome: outcome);
 
   @override
@@ -479,6 +486,7 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
     Object? relaisPhoneE164 = const $CopyWithPlaceholder(),
     Object? clientCreatedAt = const $CopyWithPlaceholder(),
     Object? prospectId = const $CopyWithPlaceholder(),
+    Object? ouvertureId = const $CopyWithPlaceholder(),
     Object? outcome = const $CopyWithPlaceholder(),
     Object? reasonCode = const $CopyWithPlaceholder(),
     Object? method = const $CopyWithPlaceholder(),
@@ -662,6 +670,10 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
           ? _value.prospectId
           // ignore: cast_nullable_to_non_nullable
           : prospectId as String?,
+      ouvertureId: ouvertureId == const $CopyWithPlaceholder()
+          ? _value.ouvertureId
+          // ignore: cast_nullable_to_non_nullable
+          : ouvertureId as String?,
       outcome: outcome == const $CopyWithPlaceholder()
           ? _value.outcome
           // ignore: cast_nullable_to_non_nullable
@@ -869,6 +881,7 @@ SyncEntityDataDto _$SyncEntityDataDtoFromJson(
       (v) => v == null ? null : DateTime.parse(v as String),
     ),
     prospectId: $checkedConvert('prospectId', (v) => v as String?),
+    ouvertureId: $checkedConvert('ouvertureId', (v) => v as String?),
     outcome: $checkedConvert(
       'outcome',
       (v) => $enumDecodeNullable(
@@ -983,6 +996,7 @@ Map<String, dynamic> _$SyncEntityDataDtoToJson(
   if (instance.clientCreatedAt?.toIso8601String() case final value?)
     'clientCreatedAt': value,
   if (instance.prospectId case final value?) 'prospectId': value,
+  if (instance.ouvertureId case final value?) 'ouvertureId': value,
   if (_$CallOutcomeEnumMap[instance.outcome] case final value?)
     'outcome': value,
   if (instance.reasonCode case final value?) 'reasonCode': value,
