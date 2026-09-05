@@ -86,6 +86,7 @@ export function LotExportFiches({
     onSuccess: (detail) => {
       queryClient.setQueryData(queryKeys.lotsExportDetail(lot.id), detail);
       void queryClient.invalidateQueries({ queryKey: queryKeys.lotsExportDetail(lot.id) });
+      void queryClient.invalidateQueries({ queryKey: ['lots-export', 'detail', lot.id, 'fiches'] });
       setCochees([]);
       toast.success('Fiches attribuées.');
     },
