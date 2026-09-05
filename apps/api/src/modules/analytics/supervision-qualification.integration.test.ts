@@ -9,6 +9,7 @@ import { v7 as uuidv7 } from 'uuid';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
+import { outcomeOf as outcomeDe } from '../referentiels/statuts-qualification.service.js';
 import type { SupervisionActivityRowDto } from './supervision.dto.js';
 import { SupervisionActivityService } from './supervision.service.js';
 import { WorkShiftsService } from './work-shifts.service.js';
@@ -372,5 +373,106 @@ describe('qualifier un représentant : les chiffres d’Alice', () => {
     });
 
     expect(items).toEqual([]);
+  });
+});
+
+/**
+ * EB-33 : une fiche pèse UNE fois, sur son dernier statut. Le jeu semé compte
+ * six appels pour trois fiches : rep1 refusée par Alice, rep2 acceptée par
+ * Bineta après deux appels d'Alice, rep3 en faux numéro après un injoignable.
+ */
+describe('les taux par fiche', () => {
+  it('trois fiches pour six appels, attribuées à qui a posé le dernier statut', async () => {
+    const { totals, pourAlice, pourBineta } = await surLeJeu(
+      async ({ service, alice, bineta }) => {
+        const resultat = await service.activite(FENETRE);
+        return {
+          totals: resultat.totals,
+          pourAlice: de(resultat.items, alice),
+          pourBineta: de(resultat.items, bineta),
+        };
+      },
+    );
+
+    expect(totals.repCalls).toBe(6);
+    expect(totals.repFiches).toBe(3);
+    expect(totals.repFichesJointes).toBe(3);
+    expect(totals.repFichesNonJointes).toBe(0);
+    expect(totals.repReachabilityRate).toBe(100);
+
+    expect(pourAlice?.repFiches).toBe(2);
+    expect(pourAlice?.repFichesRefusees).toBe(1);
+    expect(pourAlice?.repFichesAcceptees).toBe(0);
+    expect(pourBineta?.repFiches).toBe(1);
+    expect(pourBineta?.repFichesAcceptees).toBe(1);
+  });
+
+  it('le faux numéro est joint mais sort du dénominateur d’acceptation', async () => {
+    const totals = await surLeJeu(async ({ service }) => (await service.activite(FENETRE)).totals);
+
+    expect(totals.repFichesEligibles).toBe(2);
+    expect(totals.repFichesAcceptees).toBe(1);
+    expect(totals.repAcceptanceRate).toBe(50);
+  });
+
+  it('avec le référentiel : décédé joint hors éligibles, injoignable définitif non joint, à rappeler éligible', async () => {
+    const totals = await surLeJeu(async ({ service, tx, alice }) => {
+      await tx.repCallAttempt.deleteMany({});
+      const reps = await tx.representant.findMany({ select: { id: true }, orderBy: { id: 'asc' } });
+      const codes = ['DECEDE', 'INJOIGNABLE_DEFINITIF', 'A_RAPPELER'] as const;
+      for (const [index, code] of codes.entries()) {
+        const statut = await tx.statutQualification.findUniqueOrThrow({
+          where: { code },
+          select: { id: true, effect: true },
+        });
+        await tx.repCallAttempt.create({
+          data: {
+            id: uuidv7(),
+            representantId: reps[index]!.id,
+            performedById: alice,
+            outcome: outcomeDe(statut.effect),
+            statutQualificationId: statut.id,
+            clientCreatedAt: heure(9 + index),
+            ...(code === 'A_RAPPELER' ? { callbackAt: heure(15) } : {}),
+          },
+        });
+      }
+      return (await service.activite(FENETRE)).totals;
+    });
+
+    expect(totals.repFiches).toBe(3);
+    expect(totals.repFichesJointes).toBe(2);
+    expect(totals.repFichesNonJointes).toBe(1);
+    expect(totals.repFichesARappeler).toBe(1);
+    expect(totals.repFichesEligibles).toBe(1);
+    expect(totals.repFichesAcceptees).toBe(0);
+    expect(totals.repAcceptanceRate).toBe(0);
+    expect(totals.repCallbackFicheRate).toBe(33.3);
+    expect(totals.repReachabilityRate).toBe(66.7);
+  });
+
+  it('la répartition des statuts porte la famille de chacun', async () => {
+    const statuts = await surLeJeu(
+      async ({ service }) => (await service.activite(FENETRE)).repQualificationStatuses,
+    );
+
+    const famille = (code: string): string | undefined =>
+      statuts?.items.find((item) => item.code === code)?.famille;
+    expect(famille('FAUX_NUMERO')).toBe('JOINT');
+    expect(famille('A_RAPPELER')).toBe('JOINT');
+    expect(famille('PAS_DE_REPONSE')).toBe('NON_JOINT');
+  });
+
+  it('fenêtre vide : zéro fiche, taux à null', async () => {
+    const totals = await surLeJeu(
+      async ({ service }) =>
+        (await service.activite({ actFrom: '2026-04-01', actTo: '2026-04-30' })).totals,
+    );
+
+    expect(totals.repFiches).toBe(0);
+    expect(totals.repReachabilityRate).toBeNull();
+    expect(totals.repAcceptanceRate).toBeNull();
+    expect(totals.fiches).toBe(0);
+    expect(totals.ficheReachRate).toBeNull();
   });
 });

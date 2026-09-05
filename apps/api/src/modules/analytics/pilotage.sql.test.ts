@@ -2,7 +2,7 @@ import { StatutQualificationEffect } from '@crm/database';
 import { describe, expect, it } from 'vitest';
 
 import { brancheDe, outcomeOf } from '../referentiels/statuts-qualification.service.js';
-import { REP_JOINT_OUTCOMES, REP_LIVE_OUTCOMES } from './pilotage.sql.js';
+import { REP_JOINT_EFFECTS, REP_JOINT_OUTCOMES, REP_LIVE_OUTCOMES } from './pilotage.sql.js';
 
 const estJoint = (effect: StatutQualificationEffect): boolean =>
   brancheDe(effect).includes(StatutQualificationEffect.REACHED);
@@ -12,6 +12,7 @@ describe('la famille jointe du référentiel commande le compteur du pilotage', 
     '%s est compté joint si et seulement si le référentiel le range là',
     (effect) => {
       expect(REP_JOINT_OUTCOMES.sql.includes(`'${outcomeOf(effect)}'`)).toBe(estJoint(effect));
+      expect(REP_JOINT_EFFECTS.sql.includes(`'${effect}'`)).toBe(estJoint(effect));
     },
   );
 

@@ -225,6 +225,8 @@ const ADMISES: readonly string[] = [
   'OuverturesController.liberer',
 
   'SupervisionController.activite',
+  'SupervisionController.campagnes',
+  'SupervisionController.representants',
   'SupervisionController.creneaux',
   'SupervisionController.updateCreneaux',
   'UsersController.list',
