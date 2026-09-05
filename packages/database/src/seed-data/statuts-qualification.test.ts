@@ -99,10 +99,9 @@ describe('statuts de qualification du Lot 1', () => {
   });
 
   it('fait repasser tout non joint en file, sauf « Injoignable définitif »', () => {
-    for (const statut of nonJoints) {
-      const attendu = statut.code === 'INJOIGNABLE_DEFINITIF' ? null : expect.any(Number);
-      expect(statut.retryAfterMinutes, statut.code).toEqual(attendu);
-    }
+    expect(nonJoints.filter((s) => s.retryAfterMinutes === null).map((s) => s.code)).toEqual([
+      'INJOIGNABLE_DEFINITIF',
+    ]);
   });
 
   it('ne fait repasser aucun joint : leur fiche est traitée', () => {
