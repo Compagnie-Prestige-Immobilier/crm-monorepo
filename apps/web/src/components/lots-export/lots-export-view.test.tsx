@@ -87,7 +87,7 @@ beforeEach(() => {
 
 describe('LotsExportView, la liste', () => {
   it('dit à quoi sert une campagne, et ce qu’il faut faire quand il n’y en a aucune', async () => {
-    renderWithQuery(<LotsExportView canCreate projet="CHUES" />);
+    renderWithQuery(<LotsExportView canCreate canDelete projet="CHUES" />);
 
     expect(await screen.findByText('Aucune campagne pour l’instant.')).toBeTruthy();
     expect(screen.getByText(/répartit des fiches entre les téléconseillers/)).toBeTruthy();
@@ -96,7 +96,7 @@ describe('LotsExportView, la liste', () => {
 
   it('annonce les appels passés sur les fiches depuis la création', async () => {
     fetchLotsExport.mockReturnValue(Promise.resolve(UN_LOT));
-    renderWithQuery(<LotsExportView canCreate projet="CHUES" />);
+    renderWithQuery(<LotsExportView canCreate canDelete projet="CHUES" />);
 
     expect(await screen.findByText('128 appels sur 91 fiches depuis la création.')).toBeTruthy();
     expect(screen.getByText(/CHUES, segment BDD2 ·/)).toBeTruthy();
@@ -107,14 +107,14 @@ describe('LotsExportView, la liste', () => {
   });
 
   it('cache la création à qui n’y a pas droit', async () => {
-    renderWithQuery(<LotsExportView canCreate={false} projet="CHUES" />);
+    renderWithQuery(<LotsExportView canCreate={false} canDelete={false} projet="CHUES" />);
 
     expect(await screen.findByText('Aucune campagne pour l’instant.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Nouvelle campagne' })).toBeNull();
   });
 
   it('ne demande que les campagnes du projet de la coque', async () => {
-    renderWithQuery(<LotsExportView canCreate projet="CHUES" />);
+    renderWithQuery(<LotsExportView canCreate canDelete projet="CHUES" />);
 
     await waitFor(() => {
       expect(fetchLotsExport).toHaveBeenLastCalledWith(
@@ -137,7 +137,7 @@ describe('LotsExportView, la liste', () => {
         ],
       }),
     );
-    renderWithQuery(<LotsExportView canCreate projet="GRAND_PUBLIC" />);
+    renderWithQuery(<LotsExportView canCreate canDelete projet="GRAND_PUBLIC" />);
 
     const lien = await screen.findByRole('link', { name: /Prospects Grand Public/ });
     expect(lien.getAttribute('href')).toBe('/grand-public/campagnes/lot-1');
@@ -152,7 +152,7 @@ async function ouvrirLaCreation(
   projet: 'CHUES' | 'GRAND_PUBLIC' = 'CHUES',
 ): Promise<ReturnType<typeof userEvent.setup>> {
   const user = userEvent.setup();
-  renderWithQuery(<LotsExportView canCreate projet={projet} />);
+  renderWithQuery(<LotsExportView canCreate canDelete projet={projet} />);
   await user.click(await screen.findByRole('button', { name: 'Nouvelle campagne' }));
   return user;
 }
@@ -187,23 +187,47 @@ describe('LotCreateDialog, la création', () => {
     });
   });
 
-  it('inclut supervision et direction en annonçant leur capacité réduite', async () => {
+  // EB-17 : la capacité réduite de la supervision et de la direction ne se dit
+  // plus dans le libellé du compte, mais dans l'objectif proposé en regard.
+  it('inclut supervision et direction en proposant leur capacité réduite', async () => {
     fetchTeleconseillers.mockReturnValue(
       Promise.resolve([
         { id: 'u-supervision', fullName: 'Superviseur Fixture', role: 'SUPERVISEUR' },
-        { id: 'u-direction', fullName: 'Direction Fixture', role: 'DIRECTION' },
+        { id: 'u-awa', fullName: 'Awa Fixture', role: 'COMMERCIAL' },
       ]),
     );
 
     await ouvrirLaCreation();
 
-    expect(
-      await screen.findByRole('checkbox', { name: 'Superviseur Fixture (20 %)' }),
-    ).toHaveProperty('checked', true);
-    expect(screen.getByRole('checkbox', { name: 'Direction Fixture (20 %)' })).toHaveProperty(
+    expect(await screen.findByRole('checkbox', { name: 'Superviseur Fixture' })).toHaveProperty(
       'checked',
       true,
     );
+    expect(
+      screen
+        .getByLabelText('Objectif quotidien de Superviseur Fixture')
+        .getAttribute('placeholder'),
+    ).toBe('10');
+    expect(
+      screen.getByLabelText('Objectif quotidien de Awa Fixture').getAttribute('placeholder'),
+    ).toBe('50');
+  });
+
+  // EB-17 : l'objectif saisi part avec la répartition et prime, côté serveur,
+  // sur la pondération par rôle.
+  it('envoie l’objectif propre à un téléconseiller', async () => {
+    const user = await ouvrirLaCreation();
+    await user.type(await screen.findByLabelText('Objectif quotidien de Awa Fixture'), '12');
+
+    await waitFor(() => {
+      expect(previewLotExport).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          distribution: expect.objectContaining({
+            objectifs: [{ teleconseillerId: 'u-awa', fichesParJour: 12 }],
+          }),
+        }),
+      );
+    });
   });
 
   it('n’envoie que les comptes restés cochés', async () => {
@@ -269,7 +293,7 @@ describe('LotCreateDialog, la création', () => {
 
   it('envoie les nombres saisis pour les fiches et les jours', async () => {
     const user = await ouvrirLaCreation();
-    const fiches = await screen.findByLabelText('Fiches par téléconseiller et par jour');
+    const fiches = await screen.findByLabelText('Fiches par jour, à défaut d’objectif');
     await user.clear(fiches);
     await user.type(fiches, '30');
     await user.clear(screen.getByLabelText('Nombre de jours'));
@@ -284,24 +308,57 @@ describe('LotCreateDialog, la création', () => {
     });
   });
 
-  it('ne demande aucun nom : le lot est nommé depuis la cible et la date', async () => {
+  // EB-14 : le nom fabriqué depuis la cible et la date n'est plus qu'une
+  // proposition. Sans champ, la campagne restait nommée d'après des critères
+  // que son auteur est le seul à savoir traduire.
+  it('propose le nom fabriqué depuis la cible et la date, et l’envoie tel quel', async () => {
     const user = await ouvrirLaCreation();
 
-    expect(screen.queryByLabelText(/Nom de la campagne/)).toBeNull();
-    await creerLeLot(user);
+    const champ = await screen.findByLabelText(/Nom de la campagne/);
+    expect((champ as HTMLInputElement).value.startsWith('Prospects CHUES, ')).toBe(true);
 
+    await creerLeLot(user);
     await waitFor(() => {
       expect(createLotExport).toHaveBeenCalled();
     });
     const corps = createLotExport.mock.calls[0]?.[0] as { name: string };
     expect(corps.name.startsWith('Prospects CHUES, ')).toBe(true);
-    expect(corps.name.length).toBeGreaterThanOrEqual(3);
     expect(corps.name.length).toBeLessThanOrEqual(120);
+  });
+
+  it('envoie le nom corrigé, et non celui qui était proposé', async () => {
+    const user = await ouvrirLaCreation();
+    const champ = await screen.findByLabelText(/Nom de la campagne/);
+    await user.clear(champ);
+    await user.type(champ, 'Rentrée Thiès');
+
+    await creerLeLot(user);
+    await waitFor(() => {
+      expect(createLotExport).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Rentrée Thiès' }),
+      );
+    });
+  });
+
+  it('refuse de créer une campagne au nom trop court', async () => {
+    const user = await ouvrirLaCreation();
+    const bouton = await screen.findByRole('button', { name: 'Créer la campagne' });
+    // L'équipe lue et l'aperçu compté : sans cette attente, le bouton serait
+    // désactivé pour une autre raison que le nom, et le test ne prouverait rien.
+    await waitFor(() => {
+      expect(bouton.hasAttribute('disabled')).toBe(false);
+    });
+
+    const champ = await screen.findByLabelText(/Nom de la campagne/);
+    await user.clear(champ);
+    await user.type(champ, 'ab');
+
+    expect(bouton.hasAttribute('disabled')).toBe(true);
   });
 
   it('envoie les critères de la cible, jamais la seule cible', async () => {
     const user = await ouvrirLaCreation();
-    await user.click(await screen.findByRole('radio', { name: /Représentants/ }));
+    await user.click(await screen.findByRole('radio', { name: /^Représentants \(CHUES\)/ }));
 
     await waitFor(() => {
       expect(previewLotExport).toHaveBeenLastCalledWith(
@@ -326,7 +383,7 @@ describe('LotCreateDialog, la création', () => {
 
   it('laisse décocher l’exclusion des représentants déjà qualifiés', async () => {
     const user = await ouvrirLaCreation();
-    await user.click(await screen.findByRole('radio', { name: /Représentants/ }));
+    await user.click(await screen.findByRole('radio', { name: /^Représentants \(CHUES\)/ }));
     await user.click(
       await screen.findByRole('checkbox', {
         name: 'Exclure les représentants déjà qualifiés (ambassadeur ou refus)',

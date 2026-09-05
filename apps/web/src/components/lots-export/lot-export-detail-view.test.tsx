@@ -36,6 +36,7 @@ const LOT = {
     {
       teleconseillerId: 'u-awa',
       teleconseillerName: 'Awa Fixture',
+      objectif: 50,
       assigned: 90,
       treated: 72,
       completionRate: 80,
@@ -45,6 +46,7 @@ const LOT = {
     {
       teleconseillerId: 'u-fatou',
       teleconseillerName: 'Fatou Fixture',
+      objectif: 30,
       assigned: 50,
       treated: 19,
       completionRate: 38,
@@ -88,6 +90,7 @@ const LOT = {
       rendezVousAt: null,
     },
   ],
+  reaffectations: [],
 };
 
 beforeEach(() => {
@@ -96,7 +99,7 @@ beforeEach(() => {
 
 describe('LotExportDetailView', () => {
   it('dit l’issue d’un appel en français, et jamais le code du serveur', async () => {
-    renderWithQuery(<LotExportDetailView id="lot-1" />);
+    renderWithQuery(<LotExportDetailView peutRegler id="lot-1" />);
 
     expect(await screen.findByText('Joint')).toBeTruthy();
     expect(screen.queryByText('REACHED')).toBeNull();
@@ -104,7 +107,7 @@ describe('LotExportDetailView', () => {
   });
 
   it('rapporte les appels au nombre de fiches figées', async () => {
-    renderWithQuery(<LotExportDetailView id="lot-1" />);
+    renderWithQuery(<LotExportDetailView peutRegler id="lot-1" />);
 
     expect(
       await screen.findByText(
@@ -115,7 +118,7 @@ describe('LotExportDetailView', () => {
   });
 
   it('sépare les fiches traitées des appels hors attribution', async () => {
-    renderWithQuery(<LotExportDetailView id="lot-1" />);
+    renderWithQuery(<LotExportDetailView peutRegler id="lot-1" />);
 
     const tableau = await screen.findByRole('table', { name: 'Performance de la campagne' });
     const awa = within(tableau).getByRole('row', { name: /Awa Fixture/ });
@@ -126,7 +129,7 @@ describe('LotExportDetailView', () => {
 
   it('passe le classeur par le téléchargement authentifié, et non par un lien nu', async () => {
     const user = userEvent.setup();
-    renderWithQuery(<LotExportDetailView id="lot-1" />);
+    renderWithQuery(<LotExportDetailView peutRegler id="lot-1" />);
 
     await user.click(await screen.findByRole('button', { name: 'Classeur Excel' }));
     await waitFor(() => {
@@ -145,7 +148,7 @@ describe('LotExportDetailView', () => {
 
   it('donne un programme par téléconseiller et par jour', async () => {
     const user = userEvent.setup();
-    renderWithQuery(<LotExportDetailView id="lot-1" />);
+    renderWithQuery(<LotExportDetailView peutRegler id="lot-1" />);
 
     const grille = await screen.findByRole('table', { name: 'Programmes d’appel' });
     expect(within(grille).getByRole('rowheader', { name: 'Awa Fixture' })).toBeTruthy();
@@ -169,7 +172,7 @@ describe('LotExportDetailView', () => {
   });
 
   it('dit la répartition dans l’en-tête', async () => {
-    renderWithQuery(<LotExportDetailView id="lot-1" />);
+    renderWithQuery(<LotExportDetailView peutRegler id="lot-1" />);
 
     expect(
       await screen.findByText(
@@ -190,7 +193,7 @@ describe('LotExportDetailView', () => {
         recentAttempts: [],
       }),
     );
-    renderWithQuery(<LotExportDetailView id="lot-1" />);
+    renderWithQuery(<LotExportDetailView peutRegler id="lot-1" />);
 
     expect(await screen.findByText('Aucun appel consigné depuis la création.')).toBeTruthy();
   });
