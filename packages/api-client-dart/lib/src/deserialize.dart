@@ -217,6 +217,7 @@ import 'package:crm_api_client/src/model/supervision_rep_statut_dto.dart';
 import 'package:crm_api_client/src/model/supervision_rep_statuts_dto.dart';
 import 'package:crm_api_client/src/model/supervision_score_dto.dart';
 import 'package:crm_api_client/src/model/supervision_teleconseiller_dto.dart';
+import 'package:crm_api_client/src/model/suppression_dto.dart';
 import 'package:crm_api_client/src/model/switch_workspace_dto.dart';
 import 'package:crm_api_client/src/model/sync_changes_dto.dart';
 import 'package:crm_api_client/src/model/sync_deletion_dto.dart';
@@ -1023,6 +1024,9 @@ ReturnType deserialize<ReturnType, BaseType>(
       return SupervisionTeleconseillerDto.fromJson(
             value as Map<String, dynamic>,
           )
+          as ReturnType;
+    case 'SuppressionDto':
+      return SuppressionDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'SwitchWorkspaceDto':
       return SwitchWorkspaceDto.fromJson(value as Map<String, dynamic>)
