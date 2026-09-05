@@ -25,13 +25,25 @@ export interface DispositionWidget {
 }
 
 export interface DispositionLayout {
-  version: 1;
+  version: 2;
   preset: DashboardPreset;
   widgets: DispositionWidget[];
 }
 
-const LAYOUT_VERSION = 1;
+const LAYOUT_VERSION = 2;
 const MAX_WIDGETS = 40;
+
+/**
+ * Version 1 : ces trois clés mesuraient par tentative sous d'autres noms.
+ * `taux-de-contact` et `taux-de-qualification` existent toujours en version 2,
+ * avec le sens de l'expression de besoins (EB-33) : relire une version 1 sans
+ * cette table les afficherait avec un autre chiffre.
+ */
+const RENOMMAGES_V1: Readonly<Record<string, DashboardSource>> = {
+  'taux-de-contact': 'taux-de-joignabilite-representants',
+  'taux-de-qualification': 'taux-d-acceptation',
+  'a-rappeler': 'taux-de-rappel',
+};
 
 const MARQUE_SET = new Set<string>(DASHBOARD_MARQUES);
 const PRESET_SET = new Set<string>(DASHBOARD_PRESETS);
@@ -113,14 +125,31 @@ const SOURCE_MARQUES: Record<DashboardSource, ReglesDeMarque> = {
   },
 
   'taux-de-contact': TAUX,
-  'a-rappeler': TAUX,
-  'taux-de-qualification': TAUX,
+  'taux-de-joignabilite-representants': TAUX,
+  'taux-d-acceptation': TAUX,
+  'taux-de-rappel': TAUX,
   'repartition-statuts-qualification': CLASSEMENT,
+  'joints-non-joints': { defaut: 'barres-verticales', compatibles: CATEGORIE_MARQUES },
+  'statuts-par-famille': { defaut: 'barres-empilees', compatibles: COMPOSITION_MARQUES },
+  'joignabilite-par-creneau': MATRICE,
+  'taux-d-exploitation': { defaut: 'camembert', compatibles: CATEGORIE_MARQUES },
+  'exploitation-par-campagne': {
+    defaut: 'barres-100',
+    compatibles: ['barres-100', 'barres-empilees', 'tableau'],
+  },
+  'representants-par-departement': CLASSEMENT,
+  'representants-par-ief': CLASSEMENT,
+  'representants-jamais-appeles': CHIFFRE,
+  'representants-injoignables': CHIFFRE,
   'taux-de-joignabilite': TAUX,
   'prospects-notes': { defaut: 'tuile', compatibles: CHIFFRE_MARQUES },
   adhesions: CHIFFRE,
   'reste-a-appeler': { defaut: 'tuile', compatibles: ['tuile'] },
   'fiches-ouvertes': MATRICE,
+  'taux-de-qualification': TAUX,
+  'duree-moyenne-sur-la-fiche': CHIFFRE,
+  'duree-moyenne-de-communication': CHIFFRE,
+  'appels-par-jour': { defaut: 'courbe', compatibles: SERIE_TEMPORELLE_MARQUES },
   'par-teleconseiller': { defaut: 'tableau', compatibles: ['tableau'] },
   'couverture-derniere-campagne': {
     defaut: 'barres-100',
@@ -178,7 +207,7 @@ function toWidget(raw: Record<string, unknown>): DispositionWidget | null {
 export function parseLayout(value: unknown): DispositionLayout | null {
   if (typeof value !== 'object' || value === null) return null;
   const record = value as Record<string, unknown>;
-  if (record.version !== LAYOUT_VERSION) return null;
+  if (record.version !== LAYOUT_VERSION && record.version !== 1) return null;
   if (!Array.isArray(record.widgets)) return null;
 
   const preset =
@@ -190,10 +219,12 @@ export function parseLayout(value: unknown): DispositionLayout | null {
   for (const raw of record.widgets as unknown[]) {
     if (typeof raw !== 'object' || raw === null) continue;
     const widget = toWidget(raw as Record<string, unknown>);
-    if (widget !== null) widgets.push(widget);
+    if (widget === null) continue;
+    if (record.version === 1) widget.source = RENOMMAGES_V1[widget.source] ?? widget.source;
+    widgets.push(widget);
   }
 
-  return { version: 1, preset, widgets };
+  return { version: LAYOUT_VERSION, preset, widgets };
 }
 
 /**
@@ -251,7 +282,7 @@ export function resolveLayout(
   const widgets = sanitize(ecran, parsed.widgets);
   // Un compte peut vouloir un écran vide ; une disposition par défaut vide retombe sur l'usine.
   if (widgets.length === 0 && !options.videAutorise) return null;
-  return { version: 1, preset: parsed.preset, widgets };
+  return { version: LAYOUT_VERSION, preset: parsed.preset, widgets };
 }
 
 /**
@@ -273,9 +304,9 @@ const USINE: Record<DashboardEcran, readonly WidgetUsine[]> = {
   ],
   chues: [
     'taux-de-contact',
-    'a-rappeler',
+    'taux-de-joignabilite-representants',
+    'taux-d-acceptation',
     'taux-de-qualification',
-    'adhesions',
     {
       source: 'repartition-statuts-qualification',
       taille: 'pleine',
@@ -322,7 +353,7 @@ export function dispositionUsine(
 ): DispositionLayout {
   const sources = voitLesMontants ? [...USINE[ecran], ...USINE_DIRECTION[ecran]] : USINE[ecran];
   return {
-    version: 1,
+    version: LAYOUT_VERSION,
     preset: 'essentiel',
     widgets: sanitize(ecran, sources.map(widgetUsine)),
   };

@@ -15,6 +15,8 @@ abstract class _$SupervisionRepStatutDtoCWProxy {
 
   SupervisionRepStatutDto isActive(bool isActive);
 
+  SupervisionRepStatutDto famille(FamilleStatut famille);
+
   SupervisionRepStatutDto count(num count);
 
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SupervisionRepStatutDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
@@ -28,6 +30,7 @@ abstract class _$SupervisionRepStatutDtoCWProxy {
     String code,
     String label,
     bool isActive,
+    FamilleStatut famille,
     num count,
   });
 }
@@ -52,6 +55,10 @@ class _$SupervisionRepStatutDtoCWProxyImpl
   SupervisionRepStatutDto isActive(bool isActive) => this(isActive: isActive);
 
   @override
+  SupervisionRepStatutDto famille(FamilleStatut famille) =>
+      this(famille: famille);
+
+  @override
   SupervisionRepStatutDto count(num count) => this(count: count);
 
   @override
@@ -66,6 +73,7 @@ class _$SupervisionRepStatutDtoCWProxyImpl
     Object? code = const $CopyWithPlaceholder(),
     Object? label = const $CopyWithPlaceholder(),
     Object? isActive = const $CopyWithPlaceholder(),
+    Object? famille = const $CopyWithPlaceholder(),
     Object? count = const $CopyWithPlaceholder(),
   }) {
     return SupervisionRepStatutDto(
@@ -85,6 +93,10 @@ class _$SupervisionRepStatutDtoCWProxyImpl
           ? _value.isActive
           // ignore: cast_nullable_to_non_nullable
           : isActive as bool,
+      famille: famille == const $CopyWithPlaceholder()
+          ? _value.famille
+          // ignore: cast_nullable_to_non_nullable
+          : famille as FamilleStatut,
       count: count == const $CopyWithPlaceholder()
           ? _value.count
           // ignore: cast_nullable_to_non_nullable
@@ -109,13 +121,21 @@ SupervisionRepStatutDto _$SupervisionRepStatutDtoFromJson(
 ) => $checkedCreate('SupervisionRepStatutDto', json, ($checkedConvert) {
   $checkKeys(
     json,
-    requiredKeys: const ['id', 'code', 'label', 'isActive', 'count'],
+    requiredKeys: const ['id', 'code', 'label', 'isActive', 'famille', 'count'],
   );
   final val = SupervisionRepStatutDto(
     id: $checkedConvert('id', (v) => v as String),
     code: $checkedConvert('code', (v) => v as String),
     label: $checkedConvert('label', (v) => v as String),
     isActive: $checkedConvert('isActive', (v) => v as bool),
+    famille: $checkedConvert(
+      'famille',
+      (v) => $enumDecode(
+        _$FamilleStatutEnumMap,
+        v,
+        unknownValue: FamilleStatut.unknownDefaultOpenApi,
+      ),
+    ),
     count: $checkedConvert('count', (v) => v as num),
   );
   return val;
@@ -128,5 +148,12 @@ Map<String, dynamic> _$SupervisionRepStatutDtoToJson(
   'code': instance.code,
   'label': instance.label,
   'isActive': instance.isActive,
+  'famille': _$FamilleStatutEnumMap[instance.famille]!,
   'count': instance.count,
+};
+
+const _$FamilleStatutEnumMap = {
+  FamilleStatut.JOINT: 'JOINT',
+  FamilleStatut.NON_JOINT: 'NON_JOINT',
+  FamilleStatut.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

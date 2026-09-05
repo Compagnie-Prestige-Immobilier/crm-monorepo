@@ -48,9 +48,19 @@ const SOURCES_VISITES = [
  */
 const SOURCES_QUALIFICATION = [
   'taux-de-contact',
-  'a-rappeler',
-  'taux-de-qualification',
+  'taux-de-joignabilite-representants',
+  'taux-d-acceptation',
+  'taux-de-rappel',
   'repartition-statuts-qualification',
+  'joints-non-joints',
+  'statuts-par-famille',
+  'joignabilite-par-creneau',
+  'taux-d-exploitation',
+  'exploitation-par-campagne',
+  'representants-par-departement',
+  'representants-par-ief',
+  'representants-jamais-appeles',
+  'representants-injoignables',
 ] as const;
 
 /**
@@ -67,6 +77,10 @@ const SOURCES_PROSPECTS = [
   'adhesions',
   'reste-a-appeler',
   'fiches-ouvertes',
+  'taux-de-qualification',
+  'duree-moyenne-sur-la-fiche',
+  'duree-moyenne-de-communication',
+  'appels-par-jour',
   'par-teleconseiller',
   'couverture-derniere-campagne',
   'hors-attribution-derniere-campagne',

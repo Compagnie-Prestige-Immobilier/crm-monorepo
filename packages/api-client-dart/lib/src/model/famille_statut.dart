@@ -5,15 +5,15 @@
 // ignore_for_file: unused_element
 import 'package:json_annotation/json_annotation.dart';
 
-enum LotExportCible {
-  @JsonValue(r'REPRESENTANTS')
-  REPRESENTANTS(r'REPRESENTANTS'),
-  @JsonValue(r'PROSPECTS')
-  PROSPECTS(r'PROSPECTS'),
+enum FamilleStatut {
+  @JsonValue(r'JOINT')
+  JOINT(r'JOINT'),
+  @JsonValue(r'NON_JOINT')
+  NON_JOINT(r'NON_JOINT'),
   @JsonValue(r'unknown_default_open_api')
   unknownDefaultOpenApi(r'unknown_default_open_api');
 
-  const LotExportCible(this.value);
+  const FamilleStatut(this.value);
 
   final String value;
 
