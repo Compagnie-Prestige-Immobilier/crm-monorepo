@@ -15,6 +15,7 @@ import 'package:crm_api_client/src/model/enrolement_reglages_dto.dart';
 import 'package:crm_api_client/src/model/inscription_plateforme_detail_dto.dart';
 import 'package:crm_api_client/src/model/inscriptions_page_dto.dart';
 import 'package:crm_api_client/src/model/projet.dart';
+import 'package:crm_api_client/src/model/suppression_dto.dart';
 import 'package:crm_api_client/src/model/tirage_dto.dart';
 import 'package:crm_api_client/src/model/update_enrolement_reglages_dto.dart';
 
@@ -22,6 +23,97 @@ class EnrolementApi {
   final Dio _dio;
 
   const EnrolementApi(this._dio);
+
+  /// Retire une inscription du miroir.
+  ///
+  ///
+  /// Parameters:
+  /// * [projet]
+  /// * [id]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [SuppressionDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<SuppressionDto>> deleteEnrolementInscription({
+    required Projet projet,
+    required String id,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/enrolement/{projet}/inscriptions/{id}'
+        .replaceAll(
+          '{'
+          r'projet'
+          '}',
+          projet.toString(),
+        )
+        .replaceAll(
+          '{'
+          r'id'
+          '}',
+          id.toString(),
+        );
+    final _options = Options(
+      method: r'DELETE',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    SuppressionDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<SuppressionDto, SuppressionDto>(
+              rawData,
+              'SuppressionDto',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<SuppressionDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
 
   /// Les indicateurs d’enrôlement du projet.
   ///
@@ -486,6 +578,88 @@ class EnrolementApi {
     }
 
     return Response<TirageDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Vide le miroir du projet.
+  /// Rien n’est touché sur la plateforme : le tirage suivant relit tout. Vider puis tirer sert à vérifier la conformité de ce que montre le CRM.
+  ///
+  /// Parameters:
+  /// * [projet]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [SuppressionDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<SuppressionDto>> purgeEnrolementInscriptions({
+    required Projet projet,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/enrolement/{projet}/inscriptions'.replaceAll(
+      '{'
+      r'projet'
+      '}',
+      projet.toString(),
+    );
+    final _options = Options(
+      method: r'DELETE',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    SuppressionDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<SuppressionDto, SuppressionDto>(
+              rawData,
+              'SuppressionDto',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<SuppressionDto>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

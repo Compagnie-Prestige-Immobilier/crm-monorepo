@@ -493,6 +493,30 @@ export class EnrolementService {
     }
     return Object.assign(versDto(ligne), { chargeUtile: ligne.chargeUtile });
   }
+
+  // ── Effacement ────────────────────────────────────────────────────────────
+
+  /**
+   * Le miroir se vide sans conséquence : le tirage suivant relit la plateforme
+   * en entier. Vider puis tirer est la façon de vérifier que le CRM montre bien
+   * ce que la plateforme porte aujourd'hui.
+   */
+  async purger(projet: Projet): Promise<number> {
+    const { count } = await this.prisma.inscriptionPlateforme.deleteMany({ where: { projet } });
+    this.logger.warn(`Miroir ${projet} vidé : ${String(count)} inscriptions supprimées.`);
+    return count;
+  }
+
+  async supprimer(projet: Projet, id: string): Promise<number> {
+    const { count } = await this.prisma.inscriptionPlateforme.deleteMany({ where: { id, projet } });
+    if (count === 0) {
+      throw new NotFoundException({
+        code: 'INSCRIPTION_INTROUVABLE',
+        message: 'Cette inscription n’existe pas pour ce projet.',
+      });
+    }
+    return count;
+  }
 }
 
 function filtreRapproche(rapproche: boolean | undefined): Prisma.InscriptionPlateformeWhereInput {
