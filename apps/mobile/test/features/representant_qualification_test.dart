@@ -452,15 +452,56 @@ void main() {
     await demonter(tester);
   });
 
-  // EB-02 : le statut découle de la réponse, il ne se choisit plus à part.
-  testWidgets('Accepté et Refusé ne se proposent pas en tuile', (
+  // EB-02 : la question pose le statut, mais qui ne l'a pas vue le cherche
+  // dans la liste. Les deux y restent.
+  testWidgets('Accepté et Refusé se proposent aussi en tuile', (
     WidgetTester tester,
   ) async {
     await ouvrir(tester);
 
     await taper(tester, find.text('Joignable'));
-    expect(tuile('Statut de qualification', 'Accepté'), findsNothing);
-    expect(tuile('Statut de qualification', 'Refusé'), findsNothing);
+    expect(tuile('Statut de qualification', 'Accepté'), findsOneWidget);
+    expect(tuile('Statut de qualification', 'Refusé'), findsOneWidget);
+
+    await demonter(tester);
+  });
+
+  // Le serveur refuse une relation qui contredit le statut posé
+  // (`REP_RELATION_STATUT_MISMATCH`), et hors ligne ce refus est définitif :
+  // choisir le statut dans la liste doit répondre à la question.
+  testWidgets('le statut choisi dans la liste répond à la question', (
+    WidgetTester tester,
+  ) async {
+    await ouvrir(tester);
+
+    await taper(tester, find.text('Joignable'));
+    await statut(tester, 'Refusé');
+    await etapeSuivante(tester);
+    await envoyer(tester);
+
+    expect(writes.statutQualificationId, 'sq-refuse');
+    expect(writes.relationStatus, 'REFUS');
+    expect(writes.outcome, 'REFUSED');
+
+    await demonter(tester);
+  });
+
+  // La réponse déjà donnée suit le statut : « Oui » puis « Refusé » enverrait
+  // sinon un rattachement que le statut contredit.
+  testWidgets('le statut de la liste corrige la réponse déjà donnée', (
+    WidgetTester tester,
+  ) async {
+    await ouvrir(tester);
+    await accepteComplet(tester);
+    await etapePrecedente(tester);
+    await etapePrecedente(tester);
+    await etapePrecedente(tester);
+    await statut(tester, 'Refusé');
+    await etapeSuivante(tester);
+    await envoyer(tester);
+
+    expect(writes.statutQualificationId, 'sq-refuse');
+    expect(writes.relationStatus, 'REFUS');
 
     await demonter(tester);
   });
