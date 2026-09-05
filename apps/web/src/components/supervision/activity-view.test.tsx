@@ -9,7 +9,7 @@ import { renderWithQuery } from '@/test/render-query';
 
 vi.mock('@/lib/data/admin', async () => {
   const actual = await vi.importActual<typeof AdminModule>('@/lib/data/admin');
-  return { ...actual, fetchSupervisionActivite: fetchMock };
+  return { ...actual, fetchSupervisionActivite: fetchMock, fetchWorkShifts: shiftsMock };
 });
 
 vi.mock('@/lib/csv', async () => {
@@ -22,9 +22,11 @@ vi.mock('@/lib/data/ouvertures', () => ({ fetchComptageOuvertures: comptageMock 
 const fetchMock = vi.hoisted(() => vi.fn());
 const downloadMock = vi.hoisted(() => vi.fn());
 const comptageMock = vi.hoisted(() => vi.fn());
+const shiftsMock = vi.hoisted(() => vi.fn());
 
 beforeEach(() => {
   comptageMock.mockResolvedValue([]);
+  shiftsMock.mockResolvedValue({ shifts: [], updatedAt: null });
 });
 
 const ALICE = '11111111-1111-1111-1111-111111111111';
@@ -68,6 +70,19 @@ function payload(overrides: Partial<AdminModule.SupervisionActivity> = {}) {
         repQuestioned: 5,
         repQualified: 4,
         repQualificationRate: 80,
+        fiches: 4,
+        fichesJointes: 3,
+        ficheReachRate: 75,
+        repFiches: 5,
+        repFichesJointes: 3,
+        repFichesNonJointes: 2,
+        repFichesAcceptees: 4,
+        repFichesRefusees: 0,
+        repFichesARappeler: 2,
+        repFichesEligibles: 5,
+        repReachabilityRate: 60,
+        repAcceptanceRate: 80,
+        repCallbackFicheRate: 40,
         inboundCalls: 1,
         missedCalls: 2,
         callbacksHonored: 1,
@@ -150,6 +165,9 @@ describe('tableau d’activité des téléconseillers', () => {
             unreachable: 3,
             wrongNumber: 0,
             reachRate: 0,
+            fiches: 3,
+            fichesJointes: 0,
+            ficheReachRate: 0,
           } as AdminModule.ActivityRow,
         ],
       }),
@@ -173,8 +191,10 @@ describe('tableau d’activité des téléconseillers', () => {
     });
     const chues = within(rowOf('Alice Diop')).getAllByRole('cell');
     expect(chues[0]?.textContent).toBe('10');
-    expect(chues[12]?.textContent).toBe('60 %');
-    expect(chues[13]?.textContent).toBe('80 %');
+    expect(chues[7]?.textContent).toBe('4');
+    expect(chues[8]?.textContent).toBe('2');
+    expect(chues[13]?.textContent).toBe('60 %');
+    expect(chues[14]?.textContent).toBe('80 %');
     expect(screen.queryByRole('button', { name: /Faux numéros/u })).toBeNull();
     unmount();
 
@@ -199,7 +219,7 @@ describe('tableau d’activité des téléconseillers', () => {
     await waitFor(() => {
       expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
     });
-    expect(within(rowOf('Alice Diop')).getAllByRole('cell')).toHaveLength(16);
+    expect(within(rowOf('Alice Diop')).getAllByRole('cell')).toHaveLength(17);
 
     await userEvent.click(screen.getByRole('button', { name: 'Appels prospects' }));
 
@@ -322,7 +342,7 @@ describe('tableau d’activité des téléconseillers', () => {
       expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
     });
     expect(screen.getByRole('button', { name: /Représentants contactés/u })).toBeTruthy();
-    expect(within(rowOf('Alice Diop')).getAllByRole('cell')).toHaveLength(16);
+    expect(within(rowOf('Alice Diop')).getAllByRole('cell')).toHaveLength(17);
 
     await userEvent.click(screen.getByRole('button', { name: 'Exporter en CSV' }));
 
@@ -443,6 +463,41 @@ describe('rendement sur la période', () => {
   });
 });
 
+describe('efficacité par créneau', () => {
+  // EB-33 : une ligne par téléconseiller, une colonne par créneau. Le
+  // tableau ne dit plus « le matin de l'équipe », il dit « le matin d'Alice ».
+  it('croise chaque téléconseiller avec chaque créneau', async () => {
+    shiftsMock.mockResolvedValue({
+      shifts: [
+        { key: 'morning', label: 'Matin', start: '09:00', end: '14:00' },
+        { key: 'afternoon', label: 'Après-midi', start: '15:00', end: '18:00' },
+      ],
+      updatedAt: null,
+    });
+    fetchMock.mockImplementation((input: { shift?: { start: string } }) =>
+      Promise.resolve(
+        input.shift?.start === '15:00'
+          ? payload({ items: [], totals: { ...payload().items[0], repCalls: 0 } as never })
+          : payload({ totals: payload().items[0] as never }),
+      ),
+    );
+
+    renderWithQuery(<ActivityView projet="CHUES" />);
+
+    const table = await screen.findByRole('table', { name: 'Efficacité par créneau' });
+    await waitFor(() => {
+      expect(within(table).getByText('Alice Diop')).toBeTruthy();
+    });
+    const alice = within(table).getByText('Alice Diop').closest('tr') as HTMLElement;
+    const cellules = within(alice)
+      .getAllByRole('cell')
+      .map((cell) => cell.textContent);
+    expect(cellules).toEqual(['Alice Diop', '10', '60 %', '4', '0', 'Sans objet', '0']);
+    const bineta = within(table).getByText('Bineta Fall').closest('tr') as HTMLElement;
+    expect(within(bineta).getAllByRole('cell')[2]?.textContent).toBe('Sans objet');
+  });
+});
+
 describe('fiches ouvertes, par téléconseiller et par jour', () => {
   const table = (): HTMLElement =>
     screen.getByRole('table', { name: /Fiches ouvertes, par téléconseiller et par jour/u });
@@ -455,6 +510,8 @@ describe('fiches ouvertes, par téléconseiller et par jour', () => {
         openedByName: 'Alice Diop',
         jour: '2026-08-17',
         ouvertures: 12,
+        qualifiees: 11,
+        liberees: 0,
         dureeMoyenneSecondes: 180,
       },
       {
@@ -462,6 +519,8 @@ describe('fiches ouvertes, par téléconseiller et par jour', () => {
         openedByName: 'Bineta Fall',
         jour: '2026-08-17',
         ouvertures: 3,
+        qualifiees: 0,
+        liberees: 1,
         dureeMoyenneSecondes: null,
       },
     ]);
