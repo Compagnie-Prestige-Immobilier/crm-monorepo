@@ -2117,6 +2117,10 @@ model StatutQualification {
   /// La date du rappel est exigee par CETTE ligne, jamais par le code.
   requiresCallback Boolean @default(false)
 
+  /// Le motif est exige par CETTE ligne. Meme nom et meme role que sur
+  /// `CallOutcomeReason` : « Autre » ne dit rien tant qu'on ne l'a pas ecrit.
+  requiresComment Boolean @default(false)
+
   /// Un numero occupe se retente : l'app propose d'elle-meme un reessai apres
   /// ce delai, modifiable au moment de l'appel. Nul : pas de reessai propose.
   retryAfterMinutes Int?
