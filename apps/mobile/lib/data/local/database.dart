@@ -14,7 +14,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 31;
+  int get schemaVersion => 32;
 
   /// Les colonnes ajoutées à `call_attempts` par la v19. Déclarées ici parce
   /// que TROIS paliers recopient cette table : chacun engendre sa forme
@@ -375,6 +375,13 @@ class AppDatabase extends _$AppDatabase {
           statutsQualification,
           statutsQualification.relationStatus,
         );
+      }
+      if (from < 32 && to >= 32) {
+        await m.createTable(ouverturesFiche);
+        await m.createIndex(ouverturesFicheVerrouUnique);
+        await m.createIndex(ouverturesFicheCibleIdx);
+        await m.createTable(repCallAttempts);
+        await m.createIndex(repCallAttemptsRepresentantIdx);
       }
     },
     beforeOpen: (OpeningDetails details) async {

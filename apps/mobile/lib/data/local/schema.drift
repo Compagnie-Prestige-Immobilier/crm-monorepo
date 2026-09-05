@@ -1138,3 +1138,79 @@ appelSaisiEntre:
     SELECT COUNT(*) FROM call_attempts
     WHERE prospect_id = :prospectId
       AND unixepoch(client_created_at) BETWEEN :debutSecondes AND :finSecondes;
+
+-- ── Ouverture de fiche ───────────────────────────────────────────────────────
+--
+-- Une fiche prise en main par un téléconseiller. La ligne naît à la
+-- confirmation d'ouverture, avec l'horloge du TERRAIN, et le verrou tient tant
+-- que `closed_at` est nul : la qualification le lève, l'encadrement peut le
+-- libérer depuis le web.
+--
+-- La durée de traitement NE SE STOCKE PAS : elle se lit entre `opened_at` et
+-- `closed_at`. `closing_attempt_id` n'a pas de clé étrangère, la tentative qui
+-- ferme vit dans deux tables selon la cible.
+CREATE TABLE ouvertures_fiche (
+    id TEXT NOT NULL PRIMARY KEY,
+    opened_by_id TEXT NOT NULL,
+    representant_id TEXT NULL,
+    prospect_id TEXT NULL,
+    opened_at DATETIME NOT NULL,
+    closed_at DATETIME NULL,
+    closing_attempt_id TEXT NULL,
+    -- Les réponses déjà saisies, en JSON. Remplacées en entier à chaque
+    -- écriture, comme sur la route serveur.
+    draft TEXT NULL,
+    released_by_id TEXT NULL,
+    released_by_name TEXT NULL,
+    released_at DATETIME NULL,
+    CHECK ((representant_id IS NULL) <> (prospect_id IS NULL))
+);
+
+-- Index UNIQUE **partiel**, copie conforme du serveur : une personne ne traite
+-- pas deux fiches à la fois. Le verrou est par TÉLÉCONSEILLER et non par fiche.
+CREATE UNIQUE INDEX ouvertures_fiche_verrou_unique
+    ON ouvertures_fiche (opened_by_id) WHERE closed_at IS NULL;
+
+CREATE INDEX ouvertures_fiche_cible_idx
+    ON ouvertures_fiche (representant_id, opened_at);
+
+ouvertureCourante:
+    SELECT * FROM ouvertures_fiche
+    WHERE opened_by_id = :openedById AND closed_at IS NULL
+    LIMIT 1;
+
+-- ── Historique des qualifications d'un représentant ──────────────────────────
+--
+-- Ce que la tentative a dit, gardé en local pour être relu HORS LIGNE à
+-- l'ouverture suivante de la fiche. Le référentiel porte le libellé du statut
+-- et dit si le commentaire est un motif : les recopier ici les figerait le jour
+-- où l'administrateur renomme.
+CREATE TABLE rep_call_attempts (
+    id TEXT NOT NULL PRIMARY KEY,
+    representant_id TEXT NOT NULL,
+    created_by_id TEXT NULL,
+    created_by_name TEXT NULL,
+    outcome TEXT NOT NULL,
+    statut_qualification_id TEXT NULL,
+    relation_status TEXT NULL,
+    comment TEXT NULL,
+    contacte BOOLEAN NULL,
+    connait_ues BOOLEAN NULL,
+    syndicat TEXT NULL,
+    etablissement TEXT NULL,
+    callback_at DATETIME NULL,
+    client_created_at DATETIME NOT NULL
+);
+
+CREATE INDEX rep_call_attempts_representant_idx
+    ON rep_call_attempts (representant_id, client_created_at DESC);
+
+historiqueRepresentant:
+    SELECT a.*,
+           sq.label AS statut_label,
+           sq.effect AS statut_effect,
+           sq.requires_comment AS statut_requires_comment
+    FROM rep_call_attempts AS a
+    LEFT JOIN statuts_qualification AS sq ON sq.id = a.statut_qualification_id
+    WHERE a.representant_id = :representantId
+    ORDER BY a.client_created_at DESC;
