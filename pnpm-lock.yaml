@@ -296,6 +296,12 @@ importers:
 
   apps/api:
     dependencies:
+      '@crm/api-client-chues':
+        specifier: workspace:*
+        version: link:../../packages/api-client-chues
+      '@crm/api-client-grand-public':
+        specifier: workspace:*
+        version: link:../../packages/api-client-grand-public
       '@crm/database':
         specifier: workspace:*
         version: link:../../packages/database
