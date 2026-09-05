@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common';
 import { Projet } from '@crm/database';
 import { beforeEach, describe, expect, it } from 'vitest';
 
@@ -86,6 +87,16 @@ class FakePrisma {
       const fusion = { ...this.inscriptions[index], ...update } as LigneStockee;
       this.inscriptions[index] = fusion;
       return Promise.resolve(fusion);
+    },
+    deleteMany: ({ where }: { where: { projet: Projet; id?: string } }) => {
+      const restants = this.inscriptions.filter(
+        (ligne) =>
+          !(ligne.projet === where.projet && (where.id === undefined || ligne.id === where.id)),
+      );
+      const count = this.inscriptions.length - restants.length;
+      this.inscriptions.length = 0;
+      this.inscriptions.push(...restants);
+      return Promise.resolve({ count });
     },
     updateMany: ({
       where,
@@ -459,6 +470,43 @@ describe('tirage d’une plateforme d’enrôlement', () => {
     expect(
       prisma.inscriptions.find((ligne) => ligne.identifiantDistant === 'c-1')?.disparueLe,
     ).toBeNull();
+  });
+
+  it('VIDE le miroir d’un seul projet et REDÉPOSE tout au tirage suivant', async () => {
+    await service.tirer(Projet.CHUES);
+    prisma.inscriptions.push({
+      ...(prisma.inscriptions[0] as LigneStockee),
+      id: 'gp-garde',
+      projet: Projet.GRAND_PUBLIC,
+      identifiantDistant: 'gp-1',
+    });
+
+    const supprimees = await service.purger(Projet.CHUES);
+
+    expect(supprimees).toBe(2);
+    expect(prisma.inscriptions.map((ligne) => ligne.id)).toEqual(['gp-garde']);
+
+    // Vider puis tirer est le contrôle de conformité : la plateforme est
+    // relue en entier, donc le miroir se reconstruit tel quel.
+    const apres = await service.tirer(Projet.CHUES);
+    expect({ lus: apres.lus, crees: apres.crees, misAJour: apres.misAJour }).toEqual({
+      lus: 2,
+      crees: 2,
+      misAJour: 0,
+    });
+  });
+
+  it('SUPPRIME une inscription du projet, et refuse celle d’un autre projet', async () => {
+    await service.tirer(Projet.CHUES);
+    const cible = prisma.inscriptions[0] as LigneStockee;
+
+    await expect(service.supprimer(Projet.GRAND_PUBLIC, cible.id)).rejects.toThrow(
+      NotFoundException,
+    );
+    expect(prisma.inscriptions).toHaveLength(2);
+
+    expect(await service.supprimer(Projet.CHUES, cible.id)).toBe(1);
+    expect(prisma.inscriptions).toHaveLength(1);
   });
 
   it('consigne durée, volumes et rapprochements du dernier tirage', async () => {

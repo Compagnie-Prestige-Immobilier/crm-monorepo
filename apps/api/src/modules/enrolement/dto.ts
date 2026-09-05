@@ -206,6 +206,10 @@ export class TirageDto {
   @ApiProperty({ type: String, nullable: true }) erreur!: string | null;
 }
 
+export class SuppressionDto {
+  @ApiProperty({ type: Number }) supprimees!: number;
+}
+
 export class SerieJourDto {
   @ApiProperty({ type: String, format: 'date' }) jour!: string;
   @ApiProperty({ type: Number }) inscriptions!: number;

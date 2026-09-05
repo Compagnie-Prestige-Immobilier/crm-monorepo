@@ -3070,7 +3070,11 @@ export interface paths {
     get: operations['listEnrolementInscriptions'];
     put?: never;
     post?: never;
-    delete?: never;
+    /**
+     * Vide le miroir du projet.
+     * @description Rien n’est touché sur la plateforme : le tirage suivant relit tout. Vider puis tirer sert à vérifier la conformité de ce que montre le CRM.
+     */
+    delete: operations['purgeEnrolementInscriptions'];
     options?: never;
     head?: never;
     patch?: never;
@@ -3087,7 +3091,8 @@ export interface paths {
     get: operations['getEnrolementInscription'];
     put?: never;
     post?: never;
-    delete?: never;
+    /** Retire une inscription du miroir. */
+    delete: operations['deleteEnrolementInscription'];
     options?: never;
     head?: never;
     patch?: never;
@@ -7185,6 +7190,9 @@ export interface components {
       rapproches: number;
       disparues: number;
       erreur: string | null;
+    };
+    SuppressionDto: {
+      supprimees: number;
     };
   };
   responses: never;
@@ -18621,6 +18629,63 @@ export interface operations {
       };
     };
   };
+  purgeEnrolementInscriptions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projet: components['schemas']['Projet'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SuppressionDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Ressource introuvable, ou supprimée. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
   getEnrolementInscription: {
     parameters: {
       query?: never;
@@ -18639,6 +18704,64 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['InscriptionPlateformeDetailDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Ressource introuvable, ou supprimée. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  deleteEnrolementInscription: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projet: components['schemas']['Projet'];
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SuppressionDto'];
         };
       };
       /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
