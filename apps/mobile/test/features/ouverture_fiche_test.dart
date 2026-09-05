@@ -129,9 +129,14 @@ void main() {
     await demonter(tester);
   });
 
-  // EB-09 : le chronomètre part de l'ouverture confirmée, il est visible, et il
-  // ne se stocke nulle part.
-  testWidgets('le chronomètre compte depuis l\'ouverture', (
+  // EB-09 corrigé : le chronomètre part de la PREMIÈRE SAISIE. Le temps de
+  // lecture de la fiche, son historique et le dernier commentaire ne sont pas
+  // du traitement, et ils gonflaient la DMT sur les fiches les mieux
+  // renseignées.
+  //
+  // Tant que rien n'est saisi, le chronomètre n'affiche RIEN : « 00:00 »
+  // laisserait croire qu'il compte alors qu'il n'a pas démarré.
+  testWidgets('le chronomètre ne part qu\'à la première saisie', (
     WidgetTester tester,
   ) async {
     await monter(tester);
@@ -139,7 +144,30 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
+    expect(find.byIcon(PhosphorIconsRegular.timer), findsNothing);
+    expect(find.text('00:00'), findsNothing);
+    expect((await ouvertures()).single.firstInputAt, isNull);
+
+    // Lire la fiche puis tourner l'étape ne modifie aucune réponse.
+    horloge.advance(const Duration(minutes: 5));
+    await tester.tap(find.text('Consigner l\'appel'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+
+    expect(find.byIcon(PhosphorIconsRegular.timer), findsNothing);
+    expect((await ouvertures()).single.firstInputAt, isNull);
+
+    await tester.tap(find.text('Joignable'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+
+    final DateTime saisie = t0.add(const Duration(minutes: 5));
+    expect((await ouvertures()).single.firstInputAt, saisie);
     expect(find.text('00:00'), findsOneWidget);
+    // L'heure du TERRAIN part avec le brouillon : une saisie hors ligne peut
+    // remonter des heures plus tard, et l'heure du serveur mesurerait alors le
+    // délai de synchronisation.
+    expect(api.premieresSaisies.values.single, saisie.toUtc());
 
     horloge.advance(const Duration(minutes: 3, seconds: 12));
     await tester.pump(const Duration(seconds: 1));
@@ -148,6 +176,33 @@ void main() {
     horloge.advance(const Duration(hours: 1));
     await tester.pump(const Duration(seconds: 1));
     expect(find.text('1:03:12'), findsOneWidget);
+    await demonter(tester);
+  });
+
+  // La borne se pose UNE SEULE FOIS : renvoyée à chaque frappe, elle ferait
+  // reculer le départ sans fin et la durée resterait éternellement d'une
+  // seconde.
+  testWidgets('la borne ne recule pas à la frappe suivante', (
+    WidgetTester tester,
+  ) async {
+    await monter(tester);
+    await tester.tap(find.text('Ouvrir'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.text('Consigner l\'appel'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.text('Joignable'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+
+    horloge.advance(const Duration(minutes: 4));
+    await tester.tap(find.text('Injoignable'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+
+    expect((await ouvertures()).single.firstInputAt, t0);
+    expect(find.text('04:00'), findsOneWidget);
     await demonter(tester);
   });
 
@@ -187,13 +242,18 @@ void main() {
             id: 'ouv-en-cours',
             openedById: 'u-1',
             representantId: const Value<String?>('rep-1'),
-            openedAt: t0.subtract(const Duration(minutes: 2)),
+            openedAt: t0.subtract(const Duration(minutes: 9)),
+            firstInputAt: Value<DateTime?>(
+              t0.subtract(const Duration(minutes: 2)),
+            ),
           ),
         );
 
     await monter(tester);
 
     expect(find.text('Ouvrir la fiche de Ousmane Fall ?'), findsNothing);
+    // Le chronomètre repart de la première saisie, jamais de zéro ni de
+    // l'heure d'ouverture.
     expect(find.text('02:00'), findsOneWidget);
     expect((await ouvertures()).single.id, 'ouv-en-cours');
     await demonter(tester);

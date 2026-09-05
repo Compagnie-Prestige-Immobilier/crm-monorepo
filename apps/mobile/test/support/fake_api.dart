@@ -379,6 +379,10 @@ class FakeApi implements ApiPort {
   /// Ce que `GET /v1/ouvertures/courante` rend.
   OuvertureFicheDto? courante;
 
+  /// L'heure du TERRAIN de la première saisie, telle que l'appareil l'envoie.
+  /// L'heure du serveur mesurerait le délai de synchronisation, pas le travail.
+  final Map<String, DateTime> premieresSaisies = <String, DateTime>{};
+
   final Map<String, Map<String, Object>> brouillons =
       <String, Map<String, Object>>{};
 
@@ -416,6 +420,8 @@ class FakeApi implements ApiPort {
     required EnregistrerBrouillonDto corps,
   }) async {
     brouillons[id] = corps.draft;
+    final DateTime? saisie = corps.firstInputAt;
+    if (saisie != null) premieresSaisies[id] = saisie;
   }
 
   @override
