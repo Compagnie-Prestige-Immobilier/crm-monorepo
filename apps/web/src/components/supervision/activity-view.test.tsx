@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ActivityView } from '@/components/supervision/activity-view';
 import type * as CsvModule from '@/lib/csv';
@@ -17,8 +17,15 @@ vi.mock('@/lib/csv', async () => {
   return { ...actual, downloadCsv: downloadMock };
 });
 
+vi.mock('@/lib/data/ouvertures', () => ({ fetchComptageOuvertures: comptageMock }));
+
 const fetchMock = vi.hoisted(() => vi.fn());
 const downloadMock = vi.hoisted(() => vi.fn());
+const comptageMock = vi.hoisted(() => vi.fn());
+
+beforeEach(() => {
+  comptageMock.mockResolvedValue([]);
+});
 
 const ALICE = '11111111-1111-1111-1111-111111111111';
 const BINETA = '22222222-2222-2222-2222-222222222222';
@@ -433,5 +440,54 @@ describe('rendement sur la période', () => {
     await render([]);
 
     expect(screen.getByText(/un dimanche ou un congé ne fait pas baisser la note/u)).toBeTruthy();
+  });
+});
+
+describe('fiches ouvertes, par téléconseiller et par jour', () => {
+  const table = (): HTMLElement =>
+    screen.getByRole('table', { name: /Fiches ouvertes, par téléconseiller et par jour/u });
+
+  it('compte les ouvertures du jour et la durée moyenne de traitement', async () => {
+    fetchMock.mockResolvedValue(payload());
+    comptageMock.mockResolvedValue([
+      {
+        openedById: ALICE,
+        openedByName: 'Alice Diop',
+        jour: '2026-08-17',
+        ouvertures: 12,
+        dureeMoyenneSecondes: 180,
+      },
+      {
+        openedById: BINETA,
+        openedByName: 'Bineta Fall',
+        jour: '2026-08-17',
+        ouvertures: 3,
+        dureeMoyenneSecondes: null,
+      },
+    ]);
+
+    renderWithQuery(<ActivityView projet="CHUES" />);
+
+    await waitFor(() => {
+      expect(table()).toBeTruthy();
+    });
+    const lignes = within(table()).getAllByRole('row').slice(1);
+    expect(lignes[0]?.textContent).toContain('Alice Diop');
+    expect(lignes[0]?.textContent).toContain('12');
+    expect(lignes[0]?.textContent).toContain('3 min');
+    expect(lignes[1]?.textContent).toContain('Bineta Fall');
+    expect(lignes[1]?.textContent).toContain('Sans objet');
+  });
+
+  it('dit quoi faire quand aucune fiche n’a été ouverte sur la période', async () => {
+    fetchMock.mockResolvedValue(payload());
+
+    renderWithQuery(<ActivityView projet="CHUES" />);
+
+    await waitFor(() => {
+      expect(
+        within(table()).getByText('Aucune fiche ouverte sur la période. Élargissez les dates.'),
+      ).toBeTruthy();
+    });
   });
 });
