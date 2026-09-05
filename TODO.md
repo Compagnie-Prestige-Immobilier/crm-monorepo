@@ -6,32 +6,8 @@ leur état vérifié dans le code de `dev` le 5 septembre 2026.
 Lire ce fichier avant d'ouvrir un chantier. S'il contredit le code, c'est le
 code qui a raison : corriger le fichier.
 
-**20 faites, 5 partielles, 14 absentes.** Les lots 1 et 3 sont livrés en
+**25 faites, 1 partielle, 13 absentes.** Les lots 1, 2 et 3 sont livrés en
 entier, le lot 7 à une ventilation près. Les lots 4 et 6 n'ont pas commencé.
-
-## Lot 2, indicateurs et tableau de bord
-
-- [ ] EB-33 Définition des taux. Faits : fiches ouvertes par téléconseiller et
-      par jour, DMC, DMT, affichage « Sans objet » sans dénominateur. Manquent :
-      taux de joignabilité PAR FICHE sur le dernier statut (aujourd'hui calculé
-      par tentative, `supervision.service.ts:881`), taux de qualification
-      (qualifiées / ouvertes, n'existe nulle part), taux d'exploitation, et le
-      croisement téléconseiller x créneau horaire (`activity-view.tsx:591` ne
-      croise que l'équipe entière). Partiels : taux de contact borné à la
-      dernière campagne et plafonné à 100 %, taux d'acceptation et taux de
-      rappel côté représentants seulement.
-- [ ] EB-34 Diagrammes. La répartition des statuts en circulaire existe
-      (`sources.ts:278`). Manquent le taux d'exploitation par campagne et les
-      deux histogrammes joint / non joint.
-- [ ] EB-35 La colonne « Rendez-vous » du tableau par téléconseiller compte
-      encore le taux de rappel (`sources.ts:97,140`). La renommer « Acceptés »
-      et compter les fiches au statut Accepté.
-- [ ] EB-36 Catalogue de cartes. Représentants, prospects, appels, fiches et
-      enrôlement sont couverts. Manquent les campagnes au-delà de la dernière,
-      et les rappels honorés, en retard, à venir.
-- [ ] EB-37 La permission de lecture du journal d'appels n'est demandée que
-      depuis l'écran de diagnostic. La demander à la première ouverture de
-      fiche, et signaler le refus en supervision et sur l'accueil.
 
 ## Lot 4, conversion et paramètres
 
@@ -90,6 +66,29 @@ reprise comprises. Pièges déjà payés :
 - Sous verrou, la déconnexion et le changement d'espace sont REFUSÉS : la fiche
   resterait verrouillée côté serveur, hors de vue.
 
+### Lot 2 en entier, indicateurs et tableau de bord
+
+Branche `feat/lot2-indicateurs`. EB-33 à EB-37 sont dans le code. Pièges
+déjà payés :
+
+- Les taux se lisent PAR FICHE, sur le dernier statut de la fenêtre, attribués
+  à qui l'a posé (`REP_FICHE_COLONNES`, `pilotage.sql.ts`). Une fiche par
+  fenêtre : sommable entre téléconseillers d'une même fenêtre, pas entre
+  fenêtres. Le tableau par créneau interroge une fenêtre par créneau : une
+  fiche appelée matin et après-midi compte dans les deux.
+- Le taux de contact se calcule sur les fiches CONFIÉES par les campagnes de
+  la période (`campagnes.service.ts`). EB-17 remplacera ce dénominateur par
+  l'objectif du téléconseiller.
+- La disposition est en `version: 2`. Une version 1 relue renomme
+  `taux-de-contact`, `taux-de-qualification` et `a-rappeler`, dont le sens a
+  changé (`RENOMMAGES_V1`, `dashboard-layout.ts`).
+- La permission du journal d'appels se demande UNE fois, à la première
+  ouverture de fiche, et l'appareil déclare son état à chaque synchronisation
+  (`journalAppelsAutorise` sur le battement de cœur).
+- Les specs Playwright `chues-chiffres*.spec.ts` portent les nouveaux titres
+  mais leurs valeurs attendues datent du calcul par tentative : à reprendre
+  avec le jeu de données avant de les relancer.
+
 ### Lot 3 en entier, campagnes
 
 Branche `feat/lot2-compagnes`.
@@ -142,7 +141,8 @@ Merges `2c508581` et `5e9458af`. Deux pièges qui se reproduisent :
 
 ## Exploitation
 
-- [ ] Appliquer la migration `20260905090000_inscriptions_plateforme` hors local.
+- [ ] Appliquer les migrations `20260905090000_inscriptions_plateforme` et
+      `20260905200000_journal_appels_dans_le_battement` hors local.
 - [ ] Délivrer le jeton machine Grand Public : `php artisan integration:token crm`
       dans son conteneur. C'est la dernière variable manquante ; l'URL et le
       couple CHUES sont posés et vérifiés. Sans jeton, le connecteur ne tire pas

@@ -29,6 +29,8 @@ class SyncPushDto {
     this.pendingOps,
 
     this.appVersion,
+
+    this.journalAppelsAutorise,
   });
 
   /// Identifiant du lot. Doit être répété à l’identique dans l’en-tête Idempotency-Key.
@@ -52,6 +54,14 @@ class SyncPushDto {
   @JsonKey(name: r'appVersion', required: false, includeIfNull: false)
   final String? appVersion;
 
+  /// Lecture du journal d’appels accordée sur l’appareil. Sans elle, la durée de communication n’est jamais relevée. Facultatif sans limite de temps.
+  @JsonKey(
+    name: r'journalAppelsAutorise',
+    required: false,
+    includeIfNull: false,
+  )
+  final bool? journalAppelsAutorise;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is SyncPushDto &&
@@ -63,6 +73,7 @@ class SyncPushDto {
                 operations,
                 pendingOps,
                 appVersion,
+                journalAppelsAutorise,
               ],
               [
                 other.clientBatchId,
@@ -70,6 +81,7 @@ class SyncPushDto {
                 other.operations,
                 other.pendingOps,
                 other.appVersion,
+                other.journalAppelsAutorise,
               ],
             );
   }
@@ -83,6 +95,7 @@ class SyncPushDto {
         operations,
         pendingOps,
         appVersion,
+        journalAppelsAutorise,
       ]);
 
   factory SyncPushDto.fromJson(Map<String, dynamic> json) =>
