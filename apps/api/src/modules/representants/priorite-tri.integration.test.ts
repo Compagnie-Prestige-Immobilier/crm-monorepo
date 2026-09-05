@@ -50,9 +50,16 @@ const creer = async (statutQualificationId: string | null): Promise<void> => {
   });
 };
 
-const statutId = async (code: string): Promise<string> =>
-  (await prisma.statutQualification.findUniqueOrThrow({ where: { code }, select: { id: true } }))
-    .id;
+// Par PRIORITÉ et non par code : ce test ne mesure que l'ordre des paliers, et
+// les codes du référentiel se renomment sans le concerner.
+const statutId = async (priorite: PrioriteTraitement): Promise<string> =>
+  (
+    await prisma.statutQualification.findFirstOrThrow({
+      where: { priorite, isSystem: true },
+      orderBy: { code: 'asc' },
+      select: { id: true },
+    })
+  ).id;
 
 beforeAll(async () => {
   await cleanup();
@@ -76,9 +83,9 @@ beforeAll(async () => {
   commercialId = commercial.id;
 
   await creer(null);
-  await creer(await statutId('NON_ELIGIBLE'));
-  await creer(await statutId('INTERESSE'));
-  await creer(await statutId('TRES_INTERESSE'));
+  await creer(await statutId(PrioriteTraitement.BASSE));
+  await creer(await statutId(PrioriteTraitement.NORMALE));
+  await creer(await statutId(PrioriteTraitement.HAUTE));
 });
 
 afterAll(async () => {
