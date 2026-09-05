@@ -6,6 +6,9 @@ export const PURGE_STEP_ORDER = [
   // Avant `commercialAccounts` : une détection pointe son téléconseiller en
   // Restrict, et sa fiche en cascade.
   'deviceCallDetections',
+  // Avant `commercialAccounts` : une ouverture pointe son teleconseiller et son
+  // liberateur en Restrict, et sa fiche en cascade.
+  'ouverturesFiche',
   'callAttempts',
   'lotExportItems',
   'lotsExport',
@@ -96,8 +99,14 @@ export const PURGE_DOMAINS: readonly PurgeDomain[] = [
   {
     key: 'tentatives',
     label: 'Tentatives d’appel',
-    hint: 'Historique des appels passés, consignés ou seulement vus par le téléphone.',
-    steps: ['repSuggestions', 'repCallAttempts', 'callAttempts', 'deviceCallDetections'],
+    hint: 'Appels consignés, appels seulement vus par le téléphone, et ouvertures de fiche.',
+    steps: [
+      'repSuggestions',
+      'repCallAttempts',
+      'callAttempts',
+      'deviceCallDetections',
+      'ouverturesFiche',
+    ],
     requires: [],
   },
   {
