@@ -9,7 +9,6 @@ import 'package:cpi_go/core/sync/token_store.dart';
 import 'package:cpi_go/data/local/database.dart';
 import 'package:cpi_go/data/repositories/ouverture_repository.dart';
 import 'package:cpi_go/data/repositories/write_repository.dart';
-import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/db_fixture.dart';
