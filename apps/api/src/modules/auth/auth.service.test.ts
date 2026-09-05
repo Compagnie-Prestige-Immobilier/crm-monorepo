@@ -1,4 +1,4 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Role } from '@crm/database';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -61,7 +61,7 @@ function firstArg(fn: ReturnType<typeof vi.fn>): PrismaCallArgs {
 
 let prisma: PrismaMock;
 let auth: AuthService;
-const demo = { ensureSeeded: vi.fn().mockResolvedValue(undefined) };
+const demo = { assertEnabled: vi.fn(), ensureSeeded: vi.fn().mockResolvedValue(undefined) };
 
 beforeEach(() => {
   prisma = {
@@ -75,6 +75,7 @@ beforeEach(() => {
     auditLog: { create: vi.fn().mockResolvedValue({}) },
     $transaction: vi.fn((cb: (tx: unknown) => unknown) => cb(prisma)),
   };
+  demo.assertEnabled.mockClear();
   demo.ensureSeeded.mockClear();
   auth = new AuthService(
     prisma as unknown as PrismaService,
@@ -96,6 +97,15 @@ describe('changement d’espace', () => {
 
   it('ne touche pas à la factory pour l’espace public', async () => {
     await auth.switchWorkspace('com-alice', 'public');
+    expect(demo.ensureSeeded).not.toHaveBeenCalled();
+  });
+
+  it('n’engendre rien quand l’espace démo est fermé', async () => {
+    demo.assertEnabled.mockImplementation(() => {
+      throw new ForbiddenException('fermé');
+    });
+
+    await expect(auth.switchWorkspace('com-alice', 'demo')).rejects.toThrow(ForbiddenException);
     expect(demo.ensureSeeded).not.toHaveBeenCalled();
   });
 });

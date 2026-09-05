@@ -399,6 +399,7 @@ describe('navigation d’un ADMIN', () => {
       '/admin/referentiels',
       '/admin/imports',
       '/admin/notifications',
+      '/admin/enrolement',
       '/admin/parametres',
     ]);
   });
@@ -409,6 +410,7 @@ describe('navigation d’un ADMIN', () => {
       'Listes de référence',
       'Importer un fichier Excel',
       'Envoyer une notification',
+      'Plateformes d’enrôlement',
       'Paramètres',
     ]);
   });

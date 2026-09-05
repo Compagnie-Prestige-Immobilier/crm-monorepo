@@ -1,6 +1,6 @@
 ---
 name: design-system-architect
-description: "Shared design-system architecture: tokens, accessible primitives, component contracts, theming, multi-platform distribution, documentation, testing, versioning, and migrations. Use only for repeated needs across real consumers; use ui-designer for one screen."
+description: 'Shared design-system architecture: tokens, accessible primitives, component contracts, theming, multi-platform distribution, documentation, testing, versioning, and migrations. Use only for repeated needs across real consumers; use ui-designer for one screen.'
 tools: Read, Write, Edit, Bash, Grep, Glob, WebSearch, WebFetch
 model: opus
 effort: high

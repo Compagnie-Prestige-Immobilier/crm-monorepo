@@ -116,7 +116,7 @@ export function DatabaseDumpCard() {
   const [confirmed, setConfirmed] = useState(false);
   const download = useFileDownload();
 
-  const live = useLive();
+  const live = useLive({ topic: 'db-dump' });
 
   const dump = useQuery({
     queryKey: queryKeys.databaseDump,

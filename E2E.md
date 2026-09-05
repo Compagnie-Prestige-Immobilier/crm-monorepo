@@ -176,12 +176,12 @@ Déduit de la comparaison entre les fichiers de test et
 « Qualifier un représentant », « Ajouter un prospect », « Convertir un
 prospect », « Représentants », « Tableau de bord », « Lots d'export ».
 
-| Fichier existant | Libellés attendus, périmés | Lignes |
-| --- | --- | --- |
-| `e2e/roles.anon.spec.ts` | « 1 · Appeler les représentants », « 2 · Noter un prospect », « 3 · Appeler les prospects », « Mes représentants », « Chiffres », « Campagnes » | 195, 301 à 303, 312, 321, 322 |
-| `e2e/accessibility.spec.ts` | table de routes sur les **anciennes** racines ; `/console` → « Appeler les prospects » et « Carte clavier » ; `/campagnes` → « Campagnes » | 27, 28, 32 à 35 |
-| `e2e/prospects.spec.ts` | « Chiffres » niveau 1 ; `/console` → « Appeler les prospects » ; `/campagnes` → « Campagnes » | 30, 119, 122, 126, 127 |
-| `e2e/console.spec.ts` | ne porte plus que la rafale de saisie et la cascade géographique ; l'étape 3 vit dans `chues-etape3.commercial.spec.ts` | |
+| Fichier existant            | Libellés attendus, périmés                                                                                                                      | Lignes                        |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| `e2e/roles.anon.spec.ts`    | « 1 · Appeler les représentants », « 2 · Noter un prospect », « 3 · Appeler les prospects », « Mes représentants », « Chiffres », « Campagnes » | 195, 301 à 303, 312, 321, 322 |
+| `e2e/accessibility.spec.ts` | table de routes sur les **anciennes** racines ; `/console` → « Appeler les prospects » et « Carte clavier » ; `/campagnes` → « Campagnes »      | 27, 28, 32 à 35               |
+| `e2e/prospects.spec.ts`     | « Chiffres » niveau 1 ; `/console` → « Appeler les prospects » ; `/campagnes` → « Campagnes »                                                   | 30, 119, 122, 126, 127        |
+| `e2e/console.spec.ts`       | ne porte plus que la rafale de saisie et la cascade géographique ; l'étape 3 vit dans `chues-etape3.commercial.spec.ts`                         |                               |
 
 - Consigne : **aucun agent ne corrige ces fichiers.** Ils sont signalés au
   mainteneur central (§3.6), qui seul décide de leur mise à jour. Un agent qui
@@ -222,11 +222,11 @@ valeur par défaut `entryLabel = 'Organiser les graphiques'`, et `ChiffresView`
 passe `entryLabel="Composer l'écran"`. Les deux libellés coexistent donc, un par
 écran :
 
-| Écran | Entrée du mode | Retour à la disposition d'origine |
-| --- | --- | --- |
-| `/accueil/tableau-de-bord` | « Organiser les graphiques » | « Revenir à la disposition par défaut » |
-| `/chues/statistiques` | « Composer l'écran » | « Revenir à l'écran par défaut » |
-| `/grand-public/statistiques` | « Composer l'écran » | « Revenir à l'écran par défaut » |
+| Écran                        | Entrée du mode               | Retour à la disposition d'origine       |
+| ---------------------------- | ---------------------------- | --------------------------------------- |
+| `/accueil/tableau-de-bord`   | « Organiser les graphiques » | « Revenir à la disposition par défaut » |
+| `/chues/statistiques`        | « Composer l'écran »         | « Revenir à l'écran par défaut »        |
+| `/grand-public/statistiques` | « Composer l'écran »         | « Revenir à l'écran par défaut »        |
 
 - Consigne : ce n'est **pas** un défaut applicatif mais un piège de rédaction.
   Un agent qui écrit « Organiser » sur un écran `ChiffresView` produit un rouge
@@ -314,15 +314,15 @@ L'arbre de travail est à mi-chemin.
 
 ### 2.2 Scénarios concernés, par identifiant
 
-| Lot | Scénarios | État |
-| --- | --- | --- |
-| Étape 3, `/chues/console` | **CHU-ET3-01** à **CHU-ET3-06** | CHU-ET3-01 écrivable aujourd'hui et **attendu rouge** ; les cinq autres décrivent la cible de `Plan.md` §4.2.3 |
-| Lots d'export | **CHU-LOT-01** à **CHU-LOT-09** | **livrés** : les neuf sont écrits contre l'écran réparti du §7.4.17, plus aucun n'est en attente |
-| Campagne Grand Public | **ROL-30** | écrit sur la cible : détail de lot, aucune notion d'assignation |
-| Rappels vers la console | **CHU-RAP-04**, **CHU-RAP-08** | écrivables, **attendus rouges** tant que la console est un talon |
-| Pastille « À faire maintenant » | **CHU-HUB-06** | `Plan.md` prévoit de la supprimer ; si elle a disparu, rouge et rapport |
-| Carte « Reste à appeler » | **CHU-CHF-01**, **CHU-DSP-04** | `Plan.md` §D3 prévoit de la supprimer |
-| Entrée « Lots d'export » de la barre | **ROL-08**, **ROL-09**, **ROL-10**, **ACC-COQ-04** | l'entrée peut disparaître entièrement |
+| Lot                                  | Scénarios                                          | État                                                                                                           |
+| ------------------------------------ | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Étape 3, `/chues/console`            | **CHU-ET3-01** à **CHU-ET3-06**                    | CHU-ET3-01 écrivable aujourd'hui et **attendu rouge** ; les cinq autres décrivent la cible de `Plan.md` §4.2.3 |
+| Lots d'export                        | **CHU-LOT-01** à **CHU-LOT-09**                    | **livrés** : les neuf sont écrits contre l'écran réparti du §7.4.17, plus aucun n'est en attente               |
+| Campagne Grand Public                | **ROL-30**                                         | écrit sur la cible : détail de lot, aucune notion d'assignation                                                |
+| Rappels vers la console              | **CHU-RAP-04**, **CHU-RAP-08**                     | écrivables, **attendus rouges** tant que la console est un talon                                               |
+| Pastille « À faire maintenant »      | **CHU-HUB-06**                                     | `Plan.md` prévoit de la supprimer ; si elle a disparu, rouge et rapport                                        |
+| Carte « Reste à appeler »            | **CHU-CHF-01**, **CHU-DSP-04**                     | `Plan.md` §D3 prévoit de la supprimer                                                                          |
+| Entrée « Lots d'export » de la barre | **ROL-08**, **ROL-09**, **ROL-10**, **ACC-COQ-04** | l'entrée peut disparaître entièrement                                                                          |
 
 ### 2.3 Consignes, sans exception
 
@@ -368,14 +368,14 @@ matrice des rôles ne tourne.
 Un seul projet `setup`, un seul fichier `e2e/auth.setup.ts`, six connexions
 séquentielles dans un même passage, sous le plafond de dix par minute.
 
-| Rôle | Compte | Fichier d'état |
-| --- | --- | --- |
-| ADMIN | `admin@cpi.sn` | `e2e/.auth/admin.json` |
-| ACCUEIL | `fixture.accueil@cpi.sn` | `e2e/.auth/accueil.json` |
-| SUPERVISEUR | `fixture.superviseur@cpi.sn` | `e2e/.auth/superviseur.json` |
-| DIRECTION | `fixture.direction@cpi.sn` | `e2e/.auth/direction.json` |
-| COMMERCIAL | `fixture.awa@cpi.sn` | `e2e/.auth/commercial.json` |
-| BANQUE_FINANCE | `fixture.banque@cpi.sn` | `e2e/.auth/banque.json` |
+| Rôle           | Compte                       | Fichier d'état               |
+| -------------- | ---------------------------- | ---------------------------- |
+| ADMIN          | `admin@cpi.sn`               | `e2e/.auth/admin.json`       |
+| ACCUEIL        | `fixture.accueil@cpi.sn`     | `e2e/.auth/accueil.json`     |
+| SUPERVISEUR    | `fixture.superviseur@cpi.sn` | `e2e/.auth/superviseur.json` |
+| DIRECTION      | `fixture.direction@cpi.sn`   | `e2e/.auth/direction.json`   |
+| COMMERCIAL     | `fixture.awa@cpi.sn`         | `e2e/.auth/commercial.json`  |
+| BANQUE_FINANCE | `fixture.banque@cpi.sn`      | `e2e/.auth/banque.json`      |
 
 Contraintes :
 
@@ -706,36 +706,36 @@ Un `afterAll` ne porte jamais d'assertion.
 
 Réservé et **intouchable**, propriété des specs existantes :
 
-| Plage | Propriétaire |
-| --- | --- |
-| `+221781000001` | représentant « Ibrahima Fixture », `e2e/fixtures.ts` |
-| `+221781001000` à `+221781001029` | trente prospects de `e2e/fixtures.ts`, dont le client bancaire `+221781001000` |
-| `+221 78 100 90 0x` | rafale de `e2e/console.spec.ts` |
-| `+2217701000xx` et `+2217702000xx` | jeu de démonstration |
+| Plage                              | Propriétaire                                                                   |
+| ---------------------------------- | ------------------------------------------------------------------------------ |
+| `+221781000001`                    | représentant « Ibrahima Fixture », `e2e/fixtures.ts`                           |
+| `+221781001000` à `+221781001029`  | trente prospects de `e2e/fixtures.ts`, dont le client bancaire `+221781001000` |
+| `+221 78 100 90 0x`                | rafale de `e2e/console.spec.ts`                                                |
+| `+2217701000xx` et `+2217702000xx` | jeu de démonstration                                                           |
 
 Alloué aux nouvelles specs, sans recouvrement :
 
-| Plage | Fichier |
-| --- | --- |
-| `+221 78 100 40 01` à `40 09` | `chues-chiffres-taux.superviseur.spec.ts` |
-| `+221 78 100 41 01` à `41 09` | `chues-etape1.commercial.spec.ts` |
-| `+221 78 100 42 01` à `42 09` | `chues-etape2.commercial.spec.ts` |
-| `+221 78 100 43 01` à `43 09` | `chues-representants.commercial.spec.ts` |
-| `+221 78 100 44 01` à `44 29` | `chues-prospects.commercial.spec.ts` |
-| `+221 78 100 45 01` à `45 09` | `chues-suggestions.commercial.spec.ts` |
-| `+221 78 100 46 01` à `46 09` | `chues-rappels.commercial.spec.ts` |
-| `+221 78 100 47 01` à `47 09` | `chues-import.spec.ts` |
-| `+221 78 100 48 01` à `48 21` | `chues-lots-export.spec.ts` (vingt représentants de réserve, plus le vingt-et-unième que CHU-LOT-09 crée après le lot) |
-| `+221 78 100 49 01` à `49 09` | `chues-demandes.banque.spec.ts` |
-| `+221 78 100 50 01` à `50 09` | specs de l'espace Accueil, si un numéro unique devient nécessaire |
-| `+221 78 100 51 01` à `51 09` | `chues-dossiers.banque.spec.ts` (fiches client des dossiers) |
-| `+221781002000` à `+221781002019` | `grand-public-liste.spec.ts` |
-| `+221781002020` à `+221781002039` | `grand-public-saisie.spec.ts` |
-| `+221781002040` à `+221781002059` | `grand-public-fiche.spec.ts` |
-| `+221781002060` à `+221781002079` | `grand-public-rappels.spec.ts` |
-| `+221781002100` à `+221781002119` | `demo-isolement.spec.ts` |
-| `+221781002200` à `+221781002219` | `admin-utilisateurs.spec.ts` |
-| `+221781002220` à `+221781002229` | `admin-notifications.spec.ts` |
+| Plage                             | Fichier                                                                                                                |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `+221 78 100 40 01` à `40 09`     | `chues-chiffres-taux.superviseur.spec.ts`                                                                              |
+| `+221 78 100 41 01` à `41 09`     | `chues-etape1.commercial.spec.ts`                                                                                      |
+| `+221 78 100 42 01` à `42 09`     | `chues-etape2.commercial.spec.ts`                                                                                      |
+| `+221 78 100 43 01` à `43 09`     | `chues-representants.commercial.spec.ts`                                                                               |
+| `+221 78 100 44 01` à `44 29`     | `chues-prospects.commercial.spec.ts`                                                                                   |
+| `+221 78 100 45 01` à `45 09`     | `chues-suggestions.commercial.spec.ts`                                                                                 |
+| `+221 78 100 46 01` à `46 09`     | `chues-rappels.commercial.spec.ts`                                                                                     |
+| `+221 78 100 47 01` à `47 09`     | `chues-import.spec.ts`                                                                                                 |
+| `+221 78 100 48 01` à `48 21`     | `chues-lots-export.spec.ts` (vingt représentants de réserve, plus le vingt-et-unième que CHU-LOT-09 crée après le lot) |
+| `+221 78 100 49 01` à `49 09`     | `chues-demandes.banque.spec.ts`                                                                                        |
+| `+221 78 100 50 01` à `50 09`     | specs de l'espace Accueil, si un numéro unique devient nécessaire                                                      |
+| `+221 78 100 51 01` à `51 09`     | `chues-dossiers.banque.spec.ts` (fiches client des dossiers)                                                           |
+| `+221781002000` à `+221781002019` | `grand-public-liste.spec.ts`                                                                                           |
+| `+221781002020` à `+221781002039` | `grand-public-saisie.spec.ts`                                                                                          |
+| `+221781002040` à `+221781002059` | `grand-public-fiche.spec.ts`                                                                                           |
+| `+221781002060` à `+221781002079` | `grand-public-rappels.spec.ts`                                                                                         |
+| `+221781002100` à `+221781002119` | `demo-isolement.spec.ts`                                                                                               |
+| `+221781002200` à `+221781002219` | `admin-utilisateurs.spec.ts`                                                                                           |
+| `+221781002220` à `+221781002229` | `admin-notifications.spec.ts`                                                                                          |
 
 Le registre des visites n'impose **aucune unicité** sur le champ `TELEPHONES` :
 les specs de l'espace Accueil gardent la valeur littérale `78 454 44 66` des
@@ -743,122 +743,122 @@ scénarios, sans consommer de plage.
 
 ### 5.3 Matrice des rôles
 
-| Fichier | Session | Scénarios | Ordre | Données | État |
-| --- | --- | --- | --- | --- | --- |
-| `roles-espaces.spec.ts` | les six, un `test` par rôle | ROL-01 à ROL-06 | libre | aucune | nouveau |
-| `roles-navigation.spec.ts` | les six | ROL-07 à ROL-16 | libre | aucune | nouveau |
-| `roles-refus.spec.ts` | les six | ROL-17 à ROL-22 | libre | aucune | nouveau |
-| `roles-renvois.spec.ts` | admin, direction, superviseur, accueil, banque, commercial | ROL-23 à ROL-27 | libre | aucune | nouveau |
-| `roles-trous.spec.ts` | commercial, banque, admin | ROL-28 à ROL-30 | libre | aucune | nouveau |
+| Fichier                    | Session                                                    | Scénarios       | Ordre | Données | État    |
+| -------------------------- | ---------------------------------------------------------- | --------------- | ----- | ------- | ------- |
+| `roles-espaces.spec.ts`    | les six, un `test` par rôle                                | ROL-01 à ROL-06 | libre | aucune  | nouveau |
+| `roles-navigation.spec.ts` | les six                                                    | ROL-07 à ROL-16 | libre | aucune  | nouveau |
+| `roles-refus.spec.ts`      | les six                                                    | ROL-17 à ROL-22 | libre | aucune  | nouveau |
+| `roles-renvois.spec.ts`    | admin, direction, superviseur, accueil, banque, commercial | ROL-23 à ROL-27 | libre | aucune  | nouveau |
+| `roles-trous.spec.ts`      | commercial, banque, admin                                  | ROL-28 à ROL-30 | libre | aucune  | nouveau |
 
 Aucun de ces cinq fichiers ne s'appelle `.anon.spec.ts` : ils consomment des
 états de session (§3.3).
 
 ### 5.4 Espace Accueil, connexion, hub et coque
 
-| Fichier | Session | Scénarios | Ordre | Préfixe de données | État |
-| --- | --- | --- | --- | --- | --- |
-| `accueil-connexion.anon.spec.ts` | aucune, projet `chromium-anonyme` | ACC-CNX-01 à ACC-CNX-09 | libre | aucune | nouveau |
-| `accueil-session.spec.ts` | admin, accueil | ACC-CNX-10 à ACC-CNX-14 | libre | aucune | nouveau |
-| `accueil-espaces.spec.ts` | admin, accueil | ACC-HUB-01 à ACC-HUB-05 | libre | aucune | nouveau |
-| `accueil-coque.spec.ts` | admin, accueil | ACC-COQ-01 à ACC-COQ-12 | libre | aucune | nouveau |
-| `accueil-registre.spec.ts` | accueil | ACC-REG-01 à ACC-REG-18 | serial | `E2E-ACC-REG-<RUN>` | nouveau |
-| `accueil-impression.spec.ts` | accueil | ACC-IMP-01 à ACC-IMP-07 | libre | `E2E-ACC-IMP-<RUN>` | nouveau |
-| `accueil-tableau-de-bord.spec.ts` | accueil | ACC-TDB-01 à ACC-TDB-14 | serial | disposition du compte ACCUEIL | nouveau |
-| `accueil-listes.spec.ts` | direction | ACC-LST-01 à ACC-LST-12 | serial | code `E2E_ACC_LST_<RUN>_<KIND>`, libellé `E2E ACC LST <RUN> …` | nouveau |
-| `accueil-import.spec.ts` | direction | ACC-XLS-01 à ACC-XLS-12 | serial | `E2E-ACC-XLS-<RUN>` | nouveau |
+| Fichier                           | Session                           | Scénarios               | Ordre  | Préfixe de données                                             | État    |
+| --------------------------------- | --------------------------------- | ----------------------- | ------ | -------------------------------------------------------------- | ------- |
+| `accueil-connexion.anon.spec.ts`  | aucune, projet `chromium-anonyme` | ACC-CNX-01 à ACC-CNX-09 | libre  | aucune                                                         | nouveau |
+| `accueil-session.spec.ts`         | admin, accueil                    | ACC-CNX-10 à ACC-CNX-14 | libre  | aucune                                                         | nouveau |
+| `accueil-espaces.spec.ts`         | admin, accueil                    | ACC-HUB-01 à ACC-HUB-05 | libre  | aucune                                                         | nouveau |
+| `accueil-coque.spec.ts`           | admin, accueil                    | ACC-COQ-01 à ACC-COQ-12 | libre  | aucune                                                         | nouveau |
+| `accueil-registre.spec.ts`        | accueil                           | ACC-REG-01 à ACC-REG-18 | serial | `E2E-ACC-REG-<RUN>`                                            | nouveau |
+| `accueil-impression.spec.ts`      | accueil                           | ACC-IMP-01 à ACC-IMP-07 | libre  | `E2E-ACC-IMP-<RUN>`                                            | nouveau |
+| `accueil-tableau-de-bord.spec.ts` | accueil                           | ACC-TDB-01 à ACC-TDB-14 | serial | disposition du compte ACCUEIL                                  | nouveau |
+| `accueil-listes.spec.ts`          | direction                         | ACC-LST-01 à ACC-LST-12 | serial | code `E2E_ACC_LST_<RUN>_<KIND>`, libellé `E2E ACC LST <RUN> …` | nouveau |
+| `accueil-import.spec.ts`          | direction                         | ACC-XLS-01 à ACC-XLS-12 | serial | `E2E-ACC-XLS-<RUN>`                                            | nouveau |
 
 ### 5.5 Espace Projet CHUES
 
-| Fichier | Session | Scénarios | Ordre | Préfixe de données | État |
-| --- | --- | --- | --- | --- | --- |
-| `chues-hub.commercial.spec.ts` | commercial | CHU-HUB-01 à 06, CHU-HUB-08, CHU-TRV-01, CHU-TRV-05 | libre | aucune | nouveau |
-| `chues-hub.banque.spec.ts` | banque | CHU-HUB-07 | libre | aucune | nouveau |
-| `chues-etape1.commercial.spec.ts` | commercial | CHU-ET1-01 à CHU-ET1-13 | serial | `E2E-CHUES-ET1 ` | nouveau |
-| `chues-etape1.banque.spec.ts` | banque | CHU-ET1-14 | libre | aucune | nouveau |
-| `chues-etape2.commercial.spec.ts` | commercial | CHU-ET2-01 à CHU-ET2-09 | libre | `E2E-CHUES-ET2 ` | nouveau |
-| `chues-etape3.commercial.spec.ts` | commercial | CHU-ET3-01 à CHU-ET3-06 | libre | aucune | nouveau, cible mouvante |
-| `chues-chiffres.superviseur.spec.ts` | superviseur | CHU-CHF-01, 05 à 12, 20, 21 ; CHU-TDB-01 ; CHU-TRV-03, 04, 06 | libre | aucune | nouveau |
-| `chues-chiffres.direction.spec.ts` | direction | CHU-CHF-02 | libre | aucune | nouveau |
-| `chues-chiffres.commercial.spec.ts` | commercial | CHU-CHF-03 | libre | aucune | nouveau |
-| `chues-chiffres.banque.spec.ts` | banque | CHU-CHF-04 | libre | aucune | nouveau |
-| `chues-chiffres-taux.superviseur.spec.ts` | superviseur, préparation en admin | CHU-CHF-13 à CHU-CHF-19 | serial | `E2E-CHUES-TAUX ` | nouveau |
-| `chues-disposition.superviseur.spec.ts` | superviseur, lecture en direction | CHU-DSP-01, 03 à 12 | serial | disposition du compte SUPERVISEUR | nouveau |
-| `chues-disposition.spec.ts` | admin | CHU-DSP-02 | libre | aucune | nouveau |
-| `chues-supervision.superviseur.spec.ts` | superviseur | CHU-SUP-01 à CHU-SUP-07 | libre | aucune | nouveau |
-| `chues-supervision.commercial.spec.ts` | commercial | CHU-SUP-08 | libre | aucune | nouveau |
-| `chues-rappels.commercial.spec.ts` | commercial | CHU-RAP-01 à 06, CHU-RAP-08 | serial | `E2E-CHUES-RAP ` | nouveau |
-| `chues-rappels.superviseur.spec.ts` | superviseur | CHU-RAP-07 | libre | aucune | nouveau |
-| `chues-representants.commercial.spec.ts` | commercial | CHU-REP-01 à 05, CHU-REPD-01 à 05 | libre | `E2E-CHUES-REP ` | nouveau |
-| `chues-representants.superviseur.spec.ts` | superviseur | CHU-REP-06 | libre | aucune | nouveau |
-| `chues-representants.spec.ts` | admin | CHU-REP-07 | libre | aucune | nouveau |
-| `chues-import.spec.ts` | admin | CHU-IMP-02 à CHU-IMP-05 | libre | `E2E-CHUES-IMP ` | nouveau |
-| `chues-import.roles.spec.ts` | commercial, superviseur, direction, banque | CHU-IMP-01 | libre | aucune | nouveau |
-| `chues-prospects.commercial.spec.ts` | commercial | CHU-PRO-01, 04 à 08 | libre | `E2E-CHUES-PRO ` | nouveau |
-| `chues-prospects.commercial2.spec.ts` | commercial2 (`fixture.fatou`) | CHU-PRO-02 | libre | lecture seule | nouveau, **bloqué** §3.2 |
-| `chues-prospects.superviseur.spec.ts` | superviseur | CHU-PRO-03 | libre | aucune | nouveau |
-| `chues-suggestions.commercial.spec.ts` | commercial | CHU-SUG-01 à CHU-SUG-05 | serial | `E2E-CHUES-SUG ` | nouveau |
-| `chues-suggestions.superviseur.spec.ts` | superviseur | CHU-SUG-06 | libre | aucune | nouveau |
-| `chues-dossiers.banque.spec.ts` | banque | CHU-DOS-02 à 06, CHU-DOSN-01 à 05, CHU-DOSD-01 à 07, CHU-DOSX-01, CHU-DOSX-02 | serial | `E2E-CHUES-DOS-<horodatage>` | nouveau |
-| `chues-dossiers.roles.spec.ts` | commercial, superviseur, direction, banque | CHU-DOS-01, CHU-DOSE-02, CHU-DOSX-03, CHU-BQ-04, CHU-DMC-02 | libre | aucune | nouveau |
-| `chues-dossiers-etapes.spec.ts` | admin | CHU-DOSE-01, 03, 04 | serial | aucune, référentiel remis dans son ordre | nouveau |
-| `chues-banque.banque.spec.ts` | banque | CHU-BQ-01, 02, 03, 05 | libre | aucune | nouveau |
-| `chues-demandes.banque.spec.ts` | banque, arbitrage en admin | CHU-DMC-01, 03, 04 | serial | `E2E-CHUES-DMC ` | nouveau |
-| `chues-demandes.spec.ts` | admin | CHU-DMC-05, CHU-DMC-06 | libre | aucune | nouveau |
-| `chues-lots-export.spec.ts` | admin | CHU-LOT-01, 03 à 09 | serial | `E2E-CHUES-LOT ` (représentants) ; **les lots créés ne sont pas nettoyables** | nouveau |
-| `chues-lots-export.roles.spec.ts` | commercial, banque | CHU-LOT-02 | libre | aucune | nouveau |
-| `chues-accessibilite.spec.ts` | commercial, superviseur | CHU-TRV-07 | libre | aucune | nouveau |
-| `prospects.spec.ts` | admin | CHU-TRV-02 | libre | aucune | **existant, mainteneur central** |
+| Fichier                                   | Session                                    | Scénarios                                                                     | Ordre  | Préfixe de données                                                            | État                             |
+| ----------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------- | ------ | ----------------------------------------------------------------------------- | -------------------------------- |
+| `chues-hub.commercial.spec.ts`            | commercial                                 | CHU-HUB-01 à 06, CHU-HUB-08, CHU-TRV-01, CHU-TRV-05                           | libre  | aucune                                                                        | nouveau                          |
+| `chues-hub.banque.spec.ts`                | banque                                     | CHU-HUB-07                                                                    | libre  | aucune                                                                        | nouveau                          |
+| `chues-etape1.commercial.spec.ts`         | commercial                                 | CHU-ET1-01 à CHU-ET1-13                                                       | serial | `E2E-CHUES-ET1 `                                                              | nouveau                          |
+| `chues-etape1.banque.spec.ts`             | banque                                     | CHU-ET1-14                                                                    | libre  | aucune                                                                        | nouveau                          |
+| `chues-etape2.commercial.spec.ts`         | commercial                                 | CHU-ET2-01 à CHU-ET2-09                                                       | libre  | `E2E-CHUES-ET2 `                                                              | nouveau                          |
+| `chues-etape3.commercial.spec.ts`         | commercial                                 | CHU-ET3-01 à CHU-ET3-06                                                       | libre  | aucune                                                                        | nouveau, cible mouvante          |
+| `chues-chiffres.superviseur.spec.ts`      | superviseur                                | CHU-CHF-01, 05 à 12, 20, 21 ; CHU-TDB-01 ; CHU-TRV-03, 04, 06                 | libre  | aucune                                                                        | nouveau                          |
+| `chues-chiffres.direction.spec.ts`        | direction                                  | CHU-CHF-02                                                                    | libre  | aucune                                                                        | nouveau                          |
+| `chues-chiffres.commercial.spec.ts`       | commercial                                 | CHU-CHF-03                                                                    | libre  | aucune                                                                        | nouveau                          |
+| `chues-chiffres.banque.spec.ts`           | banque                                     | CHU-CHF-04                                                                    | libre  | aucune                                                                        | nouveau                          |
+| `chues-chiffres-taux.superviseur.spec.ts` | superviseur, préparation en admin          | CHU-CHF-13 à CHU-CHF-19                                                       | serial | `E2E-CHUES-TAUX `                                                             | nouveau                          |
+| `chues-disposition.superviseur.spec.ts`   | superviseur, lecture en direction          | CHU-DSP-01, 03 à 12                                                           | serial | disposition du compte SUPERVISEUR                                             | nouveau                          |
+| `chues-disposition.spec.ts`               | admin                                      | CHU-DSP-02                                                                    | libre  | aucune                                                                        | nouveau                          |
+| `chues-supervision.superviseur.spec.ts`   | superviseur                                | CHU-SUP-01 à CHU-SUP-07                                                       | libre  | aucune                                                                        | nouveau                          |
+| `chues-supervision.commercial.spec.ts`    | commercial                                 | CHU-SUP-08                                                                    | libre  | aucune                                                                        | nouveau                          |
+| `chues-rappels.commercial.spec.ts`        | commercial                                 | CHU-RAP-01 à 06, CHU-RAP-08                                                   | serial | `E2E-CHUES-RAP `                                                              | nouveau                          |
+| `chues-rappels.superviseur.spec.ts`       | superviseur                                | CHU-RAP-07                                                                    | libre  | aucune                                                                        | nouveau                          |
+| `chues-representants.commercial.spec.ts`  | commercial                                 | CHU-REP-01 à 05, CHU-REPD-01 à 05                                             | libre  | `E2E-CHUES-REP `                                                              | nouveau                          |
+| `chues-representants.superviseur.spec.ts` | superviseur                                | CHU-REP-06                                                                    | libre  | aucune                                                                        | nouveau                          |
+| `chues-representants.spec.ts`             | admin                                      | CHU-REP-07                                                                    | libre  | aucune                                                                        | nouveau                          |
+| `chues-import.spec.ts`                    | admin                                      | CHU-IMP-02 à CHU-IMP-05                                                       | libre  | `E2E-CHUES-IMP `                                                              | nouveau                          |
+| `chues-import.roles.spec.ts`              | commercial, superviseur, direction, banque | CHU-IMP-01                                                                    | libre  | aucune                                                                        | nouveau                          |
+| `chues-prospects.commercial.spec.ts`      | commercial                                 | CHU-PRO-01, 04 à 08                                                           | libre  | `E2E-CHUES-PRO `                                                              | nouveau                          |
+| `chues-prospects.commercial2.spec.ts`     | commercial2 (`fixture.fatou`)              | CHU-PRO-02                                                                    | libre  | lecture seule                                                                 | nouveau, **bloqué** §3.2         |
+| `chues-prospects.superviseur.spec.ts`     | superviseur                                | CHU-PRO-03                                                                    | libre  | aucune                                                                        | nouveau                          |
+| `chues-suggestions.commercial.spec.ts`    | commercial                                 | CHU-SUG-01 à CHU-SUG-05                                                       | serial | `E2E-CHUES-SUG `                                                              | nouveau                          |
+| `chues-suggestions.superviseur.spec.ts`   | superviseur                                | CHU-SUG-06                                                                    | libre  | aucune                                                                        | nouveau                          |
+| `chues-dossiers.banque.spec.ts`           | banque                                     | CHU-DOS-02 à 06, CHU-DOSN-01 à 05, CHU-DOSD-01 à 07, CHU-DOSX-01, CHU-DOSX-02 | serial | `E2E-CHUES-DOS-<horodatage>`                                                  | nouveau                          |
+| `chues-dossiers.roles.spec.ts`            | commercial, superviseur, direction, banque | CHU-DOS-01, CHU-DOSE-02, CHU-DOSX-03, CHU-BQ-04, CHU-DMC-02                   | libre  | aucune                                                                        | nouveau                          |
+| `chues-dossiers-etapes.spec.ts`           | admin                                      | CHU-DOSE-01, 03, 04                                                           | serial | aucune, référentiel remis dans son ordre                                      | nouveau                          |
+| `chues-banque.banque.spec.ts`             | banque                                     | CHU-BQ-01, 02, 03, 05                                                         | libre  | aucune                                                                        | nouveau                          |
+| `chues-demandes.banque.spec.ts`           | banque, arbitrage en admin                 | CHU-DMC-01, 03, 04                                                            | serial | `E2E-CHUES-DMC `                                                              | nouveau                          |
+| `chues-demandes.spec.ts`                  | admin                                      | CHU-DMC-05, CHU-DMC-06                                                        | libre  | aucune                                                                        | nouveau                          |
+| `chues-lots-export.spec.ts`               | admin                                      | CHU-LOT-01, 03 à 09                                                           | serial | `E2E-CHUES-LOT ` (représentants) ; **les lots créés ne sont pas nettoyables** | nouveau                          |
+| `chues-lots-export.roles.spec.ts`         | commercial, banque                         | CHU-LOT-02                                                                    | libre  | aucune                                                                        | nouveau                          |
+| `chues-accessibilite.spec.ts`             | commercial, superviseur                    | CHU-TRV-07                                                                    | libre  | aucune                                                                        | nouveau                          |
+| `prospects.spec.ts`                       | admin                                      | CHU-TRV-02                                                                    | libre  | aucune                                                                        | **existant, mainteneur central** |
 
 ### 5.6 Espace Admin
 
-| Fichier | Session | Scénarios | Ordre | Préfixe de données | État |
-| --- | --- | --- | --- | --- | --- |
-| `admin-utilisateurs.spec.ts` | admin | ADM-USR-01 à ADM-USR-17 | serial | `E2E-ADM-USR-`, `e2e-adm-usr-*@cpi.test` | nouveau |
-| `admin-referentiels.spec.ts` | admin | ADM-REF-01 à ADM-REF-12 | serial | `E2E-ADM-REF-`, abréviation `E2EREF` | nouveau |
-| `admin-issues-appel.spec.ts` | admin | ADM-ISS-01 à ADM-ISS-07 | serial | `E2E-ADM-ISS-`, code `E2EISS` | nouveau |
-| `admin-imports.spec.ts` | admin | ADM-IMP-01 à ADM-IMP-08 | libre | `E2E-ADM-IMP-` (fichiers déposés, aucune ligne appliquée) | nouveau |
-| `admin-notifications.spec.ts` | admin | ADM-NOT-01 à ADM-NOT-10 | serial | `E2E-ADM-NOT-` | nouveau |
-| `admin-parametres.spec.ts` | admin, plus les cinq autres pour ADM-PAR-05 | ADM-ROOT-01, ADM-PAR-01 à ADM-PAR-05 | libre | aucune | nouveau |
-| `android-release.spec.ts` | admin | ADM-APK-01 à ADM-APK-18 | serial | `E2E-APK-`, fixtures `cpi-go-v7.apk`/`cpi-go-v12.apk` (900 000 à 999 999 réservés aux APK fabriqués) ; **non relançable** sans réamorçage : `assertPublishable` compare à toutes les releases, retirées comprises | nouveau |
+| Fichier                       | Session                                     | Scénarios                            | Ordre  | Préfixe de données                                                                                                                                                                                                | État    |
+| ----------------------------- | ------------------------------------------- | ------------------------------------ | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| `admin-utilisateurs.spec.ts`  | admin                                       | ADM-USR-01 à ADM-USR-17              | serial | `E2E-ADM-USR-`, `e2e-adm-usr-*@cpi.test`                                                                                                                                                                          | nouveau |
+| `admin-referentiels.spec.ts`  | admin                                       | ADM-REF-01 à ADM-REF-12              | serial | `E2E-ADM-REF-`, abréviation `E2EREF`                                                                                                                                                                              | nouveau |
+| `admin-issues-appel.spec.ts`  | admin                                       | ADM-ISS-01 à ADM-ISS-07              | serial | `E2E-ADM-ISS-`, code `E2EISS`                                                                                                                                                                                     | nouveau |
+| `admin-imports.spec.ts`       | admin                                       | ADM-IMP-01 à ADM-IMP-08              | libre  | `E2E-ADM-IMP-` (fichiers déposés, aucune ligne appliquée)                                                                                                                                                         | nouveau |
+| `admin-notifications.spec.ts` | admin                                       | ADM-NOT-01 à ADM-NOT-10              | serial | `E2E-ADM-NOT-`                                                                                                                                                                                                    | nouveau |
+| `admin-parametres.spec.ts`    | admin, plus les cinq autres pour ADM-PAR-05 | ADM-ROOT-01, ADM-PAR-01 à ADM-PAR-05 | libre  | aucune                                                                                                                                                                                                            | nouveau |
+| `android-release.spec.ts`     | admin                                       | ADM-APK-01 à ADM-APK-18              | serial | `E2E-APK-`, fixtures `cpi-go-v7.apk`/`cpi-go-v12.apk` (900 000 à 999 999 réservés aux APK fabriqués) ; **non relançable** sans réamorçage : `assertPublishable` compare à toutes les releases, retirées comprises | nouveau |
 
 ### 5.7 Espace Projet Grand Public
 
-| Fichier | Session | Scénarios | Ordre | Préfixe de données | État |
-| --- | --- | --- | --- | --- | --- |
-| `grand-public-liste.spec.ts` | admin, superviseur, direction | GP-01 à GP-12 | libre | `E2E-GP-LST-` | nouveau |
-| `grand-public-saisie.spec.ts` | admin, commercial, superviseur | GP-13 à GP-21 | serial | `E2E-GP-SAI-` | nouveau |
-| `grand-public-fiche.spec.ts` | admin, superviseur | GP-22 à GP-28 | serial | `E2E-GP-FIC-` | nouveau |
-| `grand-public-console.spec.ts` | commercial, superviseur, direction | GP-29, GP-30 | libre | aucune | nouveau |
-| `grand-public-rappels.spec.ts` | commercial, superviseur | GP-31 à GP-33 | libre | `E2E-GP-RAP-` | nouveau |
-| `grand-public-chiffres.spec.ts` | admin, superviseur, direction | GP-34 à GP-45 | serial | `E2E-GPC-`, dispositions du compte | nouveau |
+| Fichier                         | Session                            | Scénarios     | Ordre  | Préfixe de données                 | État    |
+| ------------------------------- | ---------------------------------- | ------------- | ------ | ---------------------------------- | ------- |
+| `grand-public-liste.spec.ts`    | admin, superviseur, direction      | GP-01 à GP-12 | libre  | `E2E-GP-LST-`                      | nouveau |
+| `grand-public-saisie.spec.ts`   | admin, commercial, superviseur     | GP-13 à GP-21 | serial | `E2E-GP-SAI-`                      | nouveau |
+| `grand-public-fiche.spec.ts`    | admin, superviseur                 | GP-22 à GP-28 | serial | `E2E-GP-FIC-`                      | nouveau |
+| `grand-public-console.spec.ts`  | commercial, superviseur, direction | GP-29, GP-30  | libre  | aucune                             | nouveau |
+| `grand-public-rappels.spec.ts`  | commercial, superviseur            | GP-31 à GP-33 | libre  | `E2E-GP-RAP-`                      | nouveau |
+| `grand-public-chiffres.spec.ts` | admin, superviseur, direction      | GP-34 à GP-45 | serial | `E2E-GPC-`, dispositions du compte | nouveau |
 
 ### 5.8 Espace démo et transversal
 
-| Fichier | Session | Scénarios | Ordre | Préfixe de données | État |
-| --- | --- | --- | --- | --- | --- |
-| `demo-isolement.spec.ts` | admin, banque | DEMO-01 à DEMO-09 | serial, **exécuté en dernier** | `E2E-DEMO-` | nouveau, seul propriétaire de l'espace démo |
-| `transversal-notifications.spec.ts` | les six | TRA-01 à TRA-03 | libre | aucune | nouveau |
-| `transversal-pannes.spec.ts` | admin, contexte jetable pour TRA-04 | TRA-04 à TRA-08 | serial | aucune | nouveau |
-| `transversal-erreurs.spec.ts` | admin | TRA-09, TRA-10 | libre | aucune | nouveau |
-| `transversal-mobile.spec.ts` | admin | TRA-11, TRA-12 | libre | aucune | nouveau |
-| `accessibilite-grand-public.spec.ts` | admin | TRA-13 | libre | aucune | nouveau |
-| `accessibilite-modales.spec.ts` | admin, superviseur | TRA-14, TRA-15 | libre | aucune | nouveau |
-| `accessibilite-roles-themes.spec.ts` | accueil, commercial, admin | TRA-16 à TRA-18 | libre | aucune | nouveau |
+| Fichier                              | Session                             | Scénarios         | Ordre                          | Préfixe de données | État                                        |
+| ------------------------------------ | ----------------------------------- | ----------------- | ------------------------------ | ------------------ | ------------------------------------------- |
+| `demo-isolement.spec.ts`             | admin, banque                       | DEMO-01 à DEMO-09 | serial, **exécuté en dernier** | `E2E-DEMO-`        | nouveau, seul propriétaire de l'espace démo |
+| `transversal-notifications.spec.ts`  | les six                             | TRA-01 à TRA-03   | libre                          | aucune             | nouveau                                     |
+| `transversal-pannes.spec.ts`         | admin, contexte jetable pour TRA-04 | TRA-04 à TRA-08   | serial                         | aucune             | nouveau                                     |
+| `transversal-erreurs.spec.ts`        | admin                               | TRA-09, TRA-10    | libre                          | aucune             | nouveau                                     |
+| `transversal-mobile.spec.ts`         | admin                               | TRA-11, TRA-12    | libre                          | aucune             | nouveau                                     |
+| `accessibilite-grand-public.spec.ts` | admin                               | TRA-13            | libre                          | aucune             | nouveau                                     |
+| `accessibilite-modales.spec.ts`      | admin, superviseur                  | TRA-14, TRA-15    | libre                          | aucune             | nouveau                                     |
+| `accessibilite-roles-themes.spec.ts` | accueil, commercial, admin          | TRA-16 à TRA-18   | libre                          | aucune             | nouveau                                     |
 
 ### 5.9 Collisions résolues
 
-| Collision | Résolution |
-| --- | --- |
-| Deux fichiers propriétaires de l'espace démo (`accueil-demo-isolation.spec.ts` et `demo-isolement.spec.ts`) | Un seul : `demo-isolement.spec.ts`. Les scénarios d'isolement de l'espace Accueil sont fusionnés dans DEMO-05, DEMO-06 et DEMO-07 |
-| Deux fichiers propriétaires de l'atterrissage par rôle (`accueil-espaces-roles.spec.ts` et la matrice) | Un seul : `roles-espaces.spec.ts` pour ROL-01 à ROL-06. `accueil-espaces.spec.ts` garde le comportement propre au hub (paramètre `retour`, rechargement, boucle, clavier) |
-| `roles-matrice.anon.spec.ts` avec `storageState` | Nom abandonné : le suffixe `.anon` réserve le projet anonyme. Cinq fichiers `roles-*.spec.ts` |
-| Projets `chromium-<role>` contre `test.use({ storageState })` | `test.use({ storageState })` ; aucun projet supplémentaire (§3.3) |
-| `e2e/roles.setup.ts` contre `e2e/auth.setup.ts` | Un seul fichier, `e2e/auth.setup.ts`, déjà porteur des six sessions |
-| Préfixe `E2E-GP-` pour cinq fichiers Grand Public | Sous-préfixes `E2E-GP-LST-`, `E2E-GP-SAI-`, `E2E-GP-FIC-`, `E2E-GP-RAP-`, `E2E-GPC-` |
-| Préfixe `E2E-ACC-DEMO-` contre `E2E-DEMO-` | Un seul : `E2E-DEMO-`, avec la variante `E2E-DEMO-VIS-` pour la visite écrite en démo |
-| `RUN` horodaté contre suffixe stable | `RUN` quand la donnée ne peut pas être supprimée, suffixe stable quand elle peut l'être (§5.1) |
-| Téléphones `+221781002100` et `+221781002101` de l'espace démo contre la plage des comptes admin | La plage démo reste `2100..2119` ; les comptes de `admin-utilisateurs` prennent `2200..2219` |
+| Collision                                                                                                   | Résolution                                                                                                                                                                |
+| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Deux fichiers propriétaires de l'espace démo (`accueil-demo-isolation.spec.ts` et `demo-isolement.spec.ts`) | Un seul : `demo-isolement.spec.ts`. Les scénarios d'isolement de l'espace Accueil sont fusionnés dans DEMO-05, DEMO-06 et DEMO-07                                         |
+| Deux fichiers propriétaires de l'atterrissage par rôle (`accueil-espaces-roles.spec.ts` et la matrice)      | Un seul : `roles-espaces.spec.ts` pour ROL-01 à ROL-06. `accueil-espaces.spec.ts` garde le comportement propre au hub (paramètre `retour`, rechargement, boucle, clavier) |
+| `roles-matrice.anon.spec.ts` avec `storageState`                                                            | Nom abandonné : le suffixe `.anon` réserve le projet anonyme. Cinq fichiers `roles-*.spec.ts`                                                                             |
+| Projets `chromium-<role>` contre `test.use({ storageState })`                                               | `test.use({ storageState })` ; aucun projet supplémentaire (§3.3)                                                                                                         |
+| `e2e/roles.setup.ts` contre `e2e/auth.setup.ts`                                                             | Un seul fichier, `e2e/auth.setup.ts`, déjà porteur des six sessions                                                                                                       |
+| Préfixe `E2E-GP-` pour cinq fichiers Grand Public                                                           | Sous-préfixes `E2E-GP-LST-`, `E2E-GP-SAI-`, `E2E-GP-FIC-`, `E2E-GP-RAP-`, `E2E-GPC-`                                                                                      |
+| Préfixe `E2E-ACC-DEMO-` contre `E2E-DEMO-`                                                                  | Un seul : `E2E-DEMO-`, avec la variante `E2E-DEMO-VIS-` pour la visite écrite en démo                                                                                     |
+| `RUN` horodaté contre suffixe stable                                                                        | `RUN` quand la donnée ne peut pas être supprimée, suffixe stable quand elle peut l'être (§5.1)                                                                            |
+| Téléphones `+221781002100` et `+221781002101` de l'espace démo contre la plage des comptes admin            | La plage démo reste `2100..2119` ; les comptes de `admin-utilisateurs` prennent `2200..2219`                                                                              |
 
 ---
 
@@ -891,7 +891,7 @@ voir avec le défaut cherché.
 
 ### 6.3 Pièges de sélecteur déjà payés dans ce dépôt
 
-- `getByRole('alert')` seul attrape aussi le *route-announcer* de Next et la
+- `getByRole('alert')` seul attrape aussi le _route-announcer_ de Next et la
   région vide du `Toaster` de Sonner. Filtrer :
   `page.locator('form').getByRole('alert')` ou
   `page.getByRole('alert').filter({ hasText: '…' })`.
@@ -1035,14 +1035,14 @@ portent « Réservé à d’autres profils ». Les destinations sont calculées 
 vérifient **par un clic sur la tuile**, jamais en tapant l'URL, puisque c'est le
 lien de la tuile qui porte le calcul.
 
-| Rôle | Tuiles ouvertes | Tuiles grisées | Destination et repère d'arrivée |
-| --- | --- | --- | --- |
-| ADMIN | Accueil, Projet CHUES, Projet Grand Public, Admin | aucune | `/accueil` (bouton « Ajouter une visite ») · `/chues/statistiques` (titre du document contenant « Chiffres ») · `/grand-public/statistiques` (bouton « Composer l’écran ») · `/admin/commerciaux` (titre du document « Téléconseillers ») |
-| DIRECTION | Accueil, Projet CHUES, Projet Grand Public | Admin | `/accueil` · `/chues/statistiques` · `/grand-public/statistiques`, mêmes repères |
-| SUPERVISEUR | Projet CHUES, Projet Grand Public | Accueil, Admin | `/chues/statistiques` · `/grand-public/statistiques` |
-| COMMERCIAL | Projet CHUES, Projet Grand Public | Accueil, Admin | `/chues` (texte « Trois étapes, dans l’ordre. ») · `/grand-public/console` (titre de page « Rechercher une fiche ») |
-| ACCUEIL | Accueil | CHUES, Grand Public, Admin | `/accueil` (bouton « Ajouter une visite ») |
-| BANQUE_FINANCE | Projet CHUES | Accueil, Grand Public, Admin | `/chues/banque` (titre du document contenant « Tableau de bord bancaire ») |
+| Rôle           | Tuiles ouvertes                                   | Tuiles grisées               | Destination et repère d'arrivée                                                                                                                                                                                                           |
+| -------------- | ------------------------------------------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ADMIN          | Accueil, Projet CHUES, Projet Grand Public, Admin | aucune                       | `/accueil` (bouton « Ajouter une visite ») · `/chues/statistiques` (titre du document contenant « Chiffres ») · `/grand-public/statistiques` (bouton « Composer l’écran ») · `/admin/commerciaux` (titre du document « Téléconseillers ») |
+| DIRECTION      | Accueil, Projet CHUES, Projet Grand Public        | Admin                        | `/accueil` · `/chues/statistiques` · `/grand-public/statistiques`, mêmes repères                                                                                                                                                          |
+| SUPERVISEUR    | Projet CHUES, Projet Grand Public                 | Accueil, Admin               | `/chues/statistiques` · `/grand-public/statistiques`                                                                                                                                                                                      |
+| COMMERCIAL     | Projet CHUES, Projet Grand Public                 | Accueil, Admin               | `/chues` (texte « Trois étapes, dans l’ordre. ») · `/grand-public/console` (titre de page « Rechercher une fiche »)                                                                                                                       |
+| ACCUEIL        | Accueil                                           | CHUES, Grand Public, Admin   | `/accueil` (bouton « Ajouter une visite »)                                                                                                                                                                                                |
+| BANQUE_FINANCE | Projet CHUES                                      | Accueil, Grand Public, Admin | `/chues/banque` (titre du document contenant « Tableau de bord bancaire »)                                                                                                                                                                |
 
 Assertions communes aux six scénarios :
 
@@ -1134,24 +1134,24 @@ Source de vérité : `apps/web/src/components/layout/nav-items.ts`. La barre est
 
 **Coque CHUES**
 
-| Rôle | Barre principale, dans l'ordre | Sous « Plus » | Absentes |
-| --- | --- | --- | --- |
-| COMMERCIAL | Mon travail, Qualifier un représentant, Ajouter un prospect, Convertir un prospect, Rappels promis | Contacts recommandés, Représentants, Prospects | Tableau de bord, Mon équipe, Lots d’export, Dossiers bancaires, Utilisateurs, Listes de référence, Paramètres |
-| SUPERVISEUR | Tableau de bord, Qualifier un représentant, Ajouter un prospect, Convertir un prospect, Rappels promis, Mon équipe | Contacts recommandés, Représentants, Prospects, Lots d’export | Mon travail, Dossiers bancaires, Utilisateurs, Listes de référence, Paramètres, Créations de client à valider |
-| DIRECTION | identique à SUPERVISEUR | identique | identique |
-| ADMIN | Tableau de bord, Prospects, Représentants, Lots d’export, Dossiers bancaires | Les trois étapes, Équipes, Rappels, Contacts recommandés, Vue d’ensemble bancaire, Créations de client à valider, Exporter les dossiers, Étapes des dossiers | Mon travail, Mes demandes de création |
-| BANQUE_FINANCE | Vue d’ensemble, Dossiers bancaires, Ouvrir un dossier, Mes demandes de création | Exporter les dossiers | tout le reste |
-| ACCUEIL | coque fermée | sans objet | sans objet |
+| Rôle           | Barre principale, dans l'ordre                                                                                     | Sous « Plus »                                                                                                                                                | Absentes                                                                                                      |
+| -------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| COMMERCIAL     | Mon travail, Qualifier un représentant, Ajouter un prospect, Convertir un prospect, Rappels promis                 | Contacts recommandés, Représentants, Prospects                                                                                                               | Tableau de bord, Mon équipe, Lots d’export, Dossiers bancaires, Utilisateurs, Listes de référence, Paramètres |
+| SUPERVISEUR    | Tableau de bord, Qualifier un représentant, Ajouter un prospect, Convertir un prospect, Rappels promis, Mon équipe | Contacts recommandés, Représentants, Prospects, Lots d’export                                                                                                | Mon travail, Dossiers bancaires, Utilisateurs, Listes de référence, Paramètres, Créations de client à valider |
+| DIRECTION      | identique à SUPERVISEUR                                                                                            | identique                                                                                                                                                    | identique                                                                                                     |
+| ADMIN          | Tableau de bord, Prospects, Représentants, Lots d’export, Dossiers bancaires                                       | Les trois étapes, Équipes, Rappels, Contacts recommandés, Vue d’ensemble bancaire, Créations de client à valider, Exporter les dossiers, Étapes des dossiers | Mon travail, Mes demandes de création                                                                         |
+| BANQUE_FINANCE | Vue d’ensemble, Dossiers bancaires, Ouvrir un dossier, Mes demandes de création                                    | Exporter les dossiers                                                                                                                                        | tout le reste                                                                                                 |
+| ACCUEIL        | coque fermée                                                                                                       | sans objet                                                                                                                                                   | sans objet                                                                                                    |
 
 **Coque Grand Public**
 
-| Rôle | Barre principale | Sous « Plus » | Absentes |
-| --- | --- | --- | --- |
-| COMMERCIAL | Appeler les prospects, Rappels promis, Noter un prospect | Mes prospects | Tableau de bord |
-| SUPERVISEUR | Tableau de bord, Prospects | Rappels | Noter un prospect, Appeler les prospects |
-| DIRECTION | identique à SUPERVISEUR | identique | identique |
-| ADMIN | Tableau de bord, Prospects | Rappels, Appeler les prospects, Noter un prospect | aucune |
-| ACCUEIL, BANQUE_FINANCE | coque fermée | sans objet | sans objet |
+| Rôle                    | Barre principale                                         | Sous « Plus »                                     | Absentes                                 |
+| ----------------------- | -------------------------------------------------------- | ------------------------------------------------- | ---------------------------------------- |
+| COMMERCIAL              | Appeler les prospects, Rappels promis, Noter un prospect | Mes prospects                                     | Tableau de bord                          |
+| SUPERVISEUR             | Tableau de bord, Prospects                               | Rappels                                           | Noter un prospect, Appeler les prospects |
+| DIRECTION               | identique à SUPERVISEUR                                  | identique                                         | identique                                |
+| ADMIN                   | Tableau de bord, Prospects                               | Rappels, Appeler les prospects, Noter un prospect | aucune                                   |
+| ACCUEIL, BANQUE_FINANCE | coque fermée                                             | sans objet                                        | sans objet                               |
 
 **Coque Admin** : ADMIN seul. Utilisateurs, Listes de référence, Importer un
 fichier Excel, Envoyer une notification, Paramètres. Aucun repli.
@@ -1250,61 +1250,61 @@ Relevé exhaustif de `guardRoles([...])` dans chaque `page.tsx`.
 `A` = ADMIN, `D` = DIRECTION, `S` = SUPERVISEUR, `C` = COMMERCIAL,
 `Ac` = ACCUEIL, `B` = BANQUE_FINANCE.
 
-| Route | Autorisés | Refusés | Comportement du refus |
-| --- | --- | --- | --- |
-| `/espaces` | tous | aucun | sans objet |
-| `/accueil` | ADMIN, DIRECTION, ACCUEIL (layout) | « Le registre des visites » | ROL-28 |
-| `/accueil/tableau-de-bord` | A, D, Ac | S, C, B | Accès refusé |
-| `/accueil/listes` | A, D | S, C, B, Ac | Accès refusé, « La gestion des listes du registre » |
-| `/accueil/import` | A, D | S, C, B, Ac | Accès refusé, « L’import du registre des visites » |
-| `/admin` | A | autres | renvoi vers `coqueHomePath` du rôle |
-| `/admin/commerciaux` | A | D, S, C, Ac, B | Accès refusé, « La gestion des comptes » |
-| `/admin/imports` | A | autres | Accès refusé, « Les imports de masse » |
-| `/admin/notifications` | A | autres | D, S, Ac, B **renvoyés** vers `/notifications` ; C : Accès refusé |
-| `/admin/parametres` | A | autres | Accès refusé, « Les paramètres de la plateforme » |
-| `/admin/referentiels` | A | autres | Accès refusé, « La gestion des référentiels » |
-| `/admin/referentiels/issues-appel` | A | autres | Accès refusé, « Le référentiel des issues d’appel » |
-| `/chues` | A, C, S, D, B | Ac | B **renvoyé** vers `/chues/banque` ; Ac : Accès refusé |
-| `/chues/appels-representants` | A, C, S, D | Ac, B | Accès refusé, « Les appels aux représentants » |
-| `/chues/banque` | A, B | D, S, C, Ac | Accès refusé, « Le tableau de bord bancaire » |
-| `/chues/campagnes` et `/chues/campagnes/[id]` | A, S, D | C, Ac, B | **renvoi vers `/chues`** |
-| `/chues/console` | A, C, S, D | Ac, B | Accès refusé |
-| `/chues/demandes-clients` | A, B | D, S, C, Ac | Accès refusé, « Le suivi des demandes de création » |
-| `/chues/dossiers` | A, B | D, S, C, Ac | Accès refusé, « Le suivi des dossiers bancaires » |
-| `/chues/dossiers/[id]` | A, B | autres | Accès refusé |
-| `/chues/dossiers/etapes` | A | autres | Accès refusé, « La configuration du flux bancaire » |
-| `/chues/dossiers/export` | A, B | autres | Accès refusé, « L’export des dossiers bancaires » |
-| `/chues/dossiers/nouveau` | A, B | autres | Accès refusé |
-| `/chues/prospects` et `/chues/prospects/nouveau` | A, C, S, D | Ac, B | Accès refusé |
-| `/chues/rappels` | A, C, S, D | Ac, B | Accès refusé |
-| `/chues/representants` et `/chues/representants/[id]` | A, C, S, D | Ac, B | Accès refusé |
-| `/chues/representants/import` | A | autres | Accès refusé, « L’import de représentants » |
-| `/chues/statistiques` | A, S, D | C, Ac, B | Accès refusé, « Les chiffres du projet CHUES » |
-| `/chues/suggestions` | A, C, S, D | Ac, B | Accès refusé |
-| `/chues/supervision` | A, S, D | C, Ac, B | Accès refusé, « La supervision » |
-| `/chues/tableau-de-bord` | sans objet | sans objet | `permanentRedirect` vers `/chues/statistiques` |
-| `/grand-public` | A, D, S, C | Ac, B | Accès refusé, « Le projet Grand Public » |
-| `/grand-public/[id]` | A, D, S, C | Ac, B | Accès refusé, « La fiche d’un prospect » |
-| `/grand-public/campagnes/[id]` | A, S, D | C, Ac, B | **renvoi vers `/chues`** |
-| `/grand-public/console` | A, C | D, S, Ac, B | Accès refusé, « La file d’appel Grand Public » |
-| `/grand-public/nouveau` | A, C | D, S, Ac, B | Accès refusé, « La saisie d’un prospect Grand Public » |
-| `/grand-public/rappels` | A, C, S, D | Ac, B | Accès refusé, « La file des rappels » |
-| `/grand-public/statistiques` | A, S, D | C, Ac, B | Accès refusé, « Les chiffres du projet Grand Public » |
-| `/grand-public/tableau-de-bord` | sans objet | sans objet | `permanentRedirect` vers `/grand-public/statistiques` |
-| `/notifications` | A, D, S, B, Ac | C | A **renvoyé** vers `/admin/notifications?onglet=reception` ; C : Accès refusé |
+| Route                                                 | Autorisés                          | Refusés                     | Comportement du refus                                                         |
+| ----------------------------------------------------- | ---------------------------------- | --------------------------- | ----------------------------------------------------------------------------- |
+| `/espaces`                                            | tous                               | aucun                       | sans objet                                                                    |
+| `/accueil`                                            | ADMIN, DIRECTION, ACCUEIL (layout) | « Le registre des visites » | ROL-28                                                                        |
+| `/accueil/tableau-de-bord`                            | A, D, Ac                           | S, C, B                     | Accès refusé                                                                  |
+| `/accueil/listes`                                     | A, D                               | S, C, B, Ac                 | Accès refusé, « La gestion des listes du registre »                           |
+| `/accueil/import`                                     | A, D                               | S, C, B, Ac                 | Accès refusé, « L’import du registre des visites »                            |
+| `/admin`                                              | A                                  | autres                      | renvoi vers `coqueHomePath` du rôle                                           |
+| `/admin/commerciaux`                                  | A                                  | D, S, C, Ac, B              | Accès refusé, « La gestion des comptes »                                      |
+| `/admin/imports`                                      | A                                  | autres                      | Accès refusé, « Les imports de masse »                                        |
+| `/admin/notifications`                                | A                                  | autres                      | D, S, Ac, B **renvoyés** vers `/notifications` ; C : Accès refusé             |
+| `/admin/parametres`                                   | A                                  | autres                      | Accès refusé, « Les paramètres de la plateforme »                             |
+| `/admin/referentiels`                                 | A                                  | autres                      | Accès refusé, « La gestion des référentiels »                                 |
+| `/admin/referentiels/issues-appel`                    | A                                  | autres                      | Accès refusé, « Le référentiel des issues d’appel »                           |
+| `/chues`                                              | A, C, S, D, B                      | Ac                          | B **renvoyé** vers `/chues/banque` ; Ac : Accès refusé                        |
+| `/chues/appels-representants`                         | A, C, S, D                         | Ac, B                       | Accès refusé, « Les appels aux représentants »                                |
+| `/chues/banque`                                       | A, B                               | D, S, C, Ac                 | Accès refusé, « Le tableau de bord bancaire »                                 |
+| `/chues/campagnes` et `/chues/campagnes/[id]`         | A, S, D                            | C, Ac, B                    | **renvoi vers `/chues`**                                                      |
+| `/chues/console`                                      | A, C, S, D                         | Ac, B                       | Accès refusé                                                                  |
+| `/chues/demandes-clients`                             | A, B                               | D, S, C, Ac                 | Accès refusé, « Le suivi des demandes de création »                           |
+| `/chues/dossiers`                                     | A, B                               | D, S, C, Ac                 | Accès refusé, « Le suivi des dossiers bancaires »                             |
+| `/chues/dossiers/[id]`                                | A, B                               | autres                      | Accès refusé                                                                  |
+| `/chues/dossiers/etapes`                              | A                                  | autres                      | Accès refusé, « La configuration du flux bancaire »                           |
+| `/chues/dossiers/export`                              | A, B                               | autres                      | Accès refusé, « L’export des dossiers bancaires »                             |
+| `/chues/dossiers/nouveau`                             | A, B                               | autres                      | Accès refusé                                                                  |
+| `/chues/prospects` et `/chues/prospects/nouveau`      | A, C, S, D                         | Ac, B                       | Accès refusé                                                                  |
+| `/chues/rappels`                                      | A, C, S, D                         | Ac, B                       | Accès refusé                                                                  |
+| `/chues/representants` et `/chues/representants/[id]` | A, C, S, D                         | Ac, B                       | Accès refusé                                                                  |
+| `/chues/representants/import`                         | A                                  | autres                      | Accès refusé, « L’import de représentants »                                   |
+| `/chues/statistiques`                                 | A, S, D                            | C, Ac, B                    | Accès refusé, « Les chiffres du projet CHUES »                                |
+| `/chues/suggestions`                                  | A, C, S, D                         | Ac, B                       | Accès refusé                                                                  |
+| `/chues/supervision`                                  | A, S, D                            | C, Ac, B                    | Accès refusé, « La supervision »                                              |
+| `/chues/tableau-de-bord`                              | sans objet                         | sans objet                  | `permanentRedirect` vers `/chues/statistiques`                                |
+| `/grand-public`                                       | A, D, S, C                         | Ac, B                       | Accès refusé, « Le projet Grand Public »                                      |
+| `/grand-public/[id]`                                  | A, D, S, C                         | Ac, B                       | Accès refusé, « La fiche d’un prospect »                                      |
+| `/grand-public/campagnes/[id]`                        | A, S, D                            | C, Ac, B                    | **renvoi vers `/chues`**                                                      |
+| `/grand-public/console`                               | A, C                               | D, S, Ac, B                 | Accès refusé, « La file d’appel Grand Public »                                |
+| `/grand-public/nouveau`                               | A, C                               | D, S, Ac, B                 | Accès refusé, « La saisie d’un prospect Grand Public »                        |
+| `/grand-public/rappels`                               | A, C, S, D                         | Ac, B                       | Accès refusé, « La file des rappels »                                         |
+| `/grand-public/statistiques`                          | A, S, D                            | C, Ac, B                    | Accès refusé, « Les chiffres du projet Grand Public »                         |
+| `/grand-public/tableau-de-bord`                       | sans objet                         | sans objet                  | `permanentRedirect` vers `/grand-public/statistiques`                         |
+| `/notifications`                                      | A, D, S, B, Ac                     | C                           | A **renvoyé** vers `/admin/notifications?onglet=reception` ; C : Accès refusé |
 
 **ROL-17 à ROL-21 | P1 | balayage des URL interdites, un scénario par rôle**
 Fichier : `roles-refus.spec.ts`. Un `test()` par rôle, table paramétrée
 `for (const route of ROUTES_REFUSEES[role])`, message d'assertion nommant la
 route.
 
-| Identifiant | Session |
-| --- | --- |
-| ROL-17 | DIRECTION |
-| ROL-18 | SUPERVISEUR |
-| ROL-19 | COMMERCIAL |
-| ROL-20 | ACCUEIL |
-| ROL-21 | BANQUE_FINANCE |
+| Identifiant | Session        |
+| ----------- | -------------- |
+| ROL-17      | DIRECTION      |
+| ROL-18      | SUPERVISEUR    |
+| ROL-19      | COMMERCIAL     |
+| ROL-20      | ACCUEIL        |
+| ROL-21      | BANQUE_FINANCE |
 
 Assertions, pour **chaque** route : les deux sens du §6.5, c'est-à-dire le refus
 lisible (« Accès refusé » niveau 2, l'alerte contient le libellé du rôle en
@@ -3030,57 +3030,57 @@ figée : `2026-02-03` (§8, **Q-03**). URL utilisée :
 
 Cinq représentants créés en session ADMIN (`POST /api/v1/representants`) :
 
-| Fiche | Nom complet | Téléphone |
-| --- | --- | --- |
-| R1 | `E2E-CHUES-TAUX Rep Un` | `+221781004001` |
-| R2 | `E2E-CHUES-TAUX Rep Deux` | `+221781004002` |
-| R3 | `E2E-CHUES-TAUX Rep Trois` | `+221781004003` |
-| R4 | `E2E-CHUES-TAUX Rep Quatre` | `+221781004004` |
-| R5 | `E2E-CHUES-TAUX Rep Cinq` | `+221781004005` |
+| Fiche | Nom complet                 | Téléphone       |
+| ----- | --------------------------- | --------------- |
+| R1    | `E2E-CHUES-TAUX Rep Un`     | `+221781004001` |
+| R2    | `E2E-CHUES-TAUX Rep Deux`   | `+221781004002` |
+| R3    | `E2E-CHUES-TAUX Rep Trois`  | `+221781004003` |
+| R4    | `E2E-CHUES-TAUX Rep Quatre` | `+221781004004` |
+| R5    | `E2E-CHUES-TAUX Rep Cinq`   | `+221781004005` |
 
 Cinq tentatives envoyées **en session SUPERVISEUR** sur
 `POST /api/v1/rep-campaigns/attempts`, avec des `id` UUID v7 **constants, écrits
 en dur dans le spec** : le champ est la clé d'idempotence, donc une relance ne
 double aucun compteur.
 
-| Sur | `outcome` | `clientCreatedAt` | Compté |
-| --- | --- | --- | --- |
-| R1 | `REACHED` (+ `relationStatus: AMBASSADEUR`) | `2026-02-03T10:00:00.000Z` | oui |
-| R2 | `REFUSED` (+ `relationStatus: REFUS`) | `2026-02-03T11:00:00.000Z` | oui |
-| R3 | `CALLBACK` (+ `callbackAt` J+1) | `2026-02-03T12:00:00.000Z` | oui |
-| R4 | `UNREACHABLE` | `2026-02-03T23:59:59.999Z` | oui, borne haute incluse |
-| R5 | `UNREACHABLE` | `2026-02-04T00:00:00.000Z` | **non**, hors fenêtre |
+| Sur | `outcome`                                   | `clientCreatedAt`          | Compté                   |
+| --- | ------------------------------------------- | -------------------------- | ------------------------ |
+| R1  | `REACHED` (+ `relationStatus: AMBASSADEUR`) | `2026-02-03T10:00:00.000Z` | oui                      |
+| R2  | `REFUSED` (+ `relationStatus: REFUS`)       | `2026-02-03T11:00:00.000Z` | oui                      |
+| R3  | `CALLBACK` (+ `callbackAt` J+1)             | `2026-02-03T12:00:00.000Z` | oui                      |
+| R4  | `UNREACHABLE`                               | `2026-02-03T23:59:59.999Z` | oui, borne haute incluse |
+| R5  | `UNREACHABLE`                               | `2026-02-04T00:00:00.000Z` | **non**, hors fenêtre    |
 
 Résultats attendus, dérivés de `supervision.service.ts` et `pilotage.sql.ts`
 (`REP_LIVE_OUTCOMES = REACHED, REFUSED, CALLBACK, UNREACHABLE`,
 `REP_ANSWERED_OUTCOMES = REACHED, REFUSED`, `rate(v, t) = null si t = 0, sinon
 arrondi à 0,1 %`) :
 
-| Champ | Calcul | Valeur |
-| --- | --- | --- |
-| `repCalls` | R1+R2+R3+R4 | 4 |
-| `repReached` | R1+R2 | 2 |
-| `repCallback` | R3 | 1 |
-| `repUnreachable` | R4 | 1 |
-| `repContactRate` | 2/4 | 50, soit « 50,0 % » |
-| `repCallbackRate` | 1/4 | 25, soit « 25,0 % » |
-| `repQuestioned` | représentants distincts dont la dernière réponse de la fenêtre est REACHED ou REFUSED : R1, R2 | 2 |
-| `repQualified` | parmi eux, dernière réponse REACHED : R1 | 1 |
-| `repQualificationRate` | 1/2 | 50, soit « 50,0 % » |
-| `calls` | aucun appel de prospect ce jour-là | 0 |
-| `prospectsCreated` | aucune saisie ce jour-là | 0 |
-| `methodObtained` | aucune | 0 |
-| `reachRate` | `rate(0, 0)` | `null`, soit « Sans objet » attendu |
+| Champ                  | Calcul                                                                                         | Valeur                              |
+| ---------------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------- |
+| `repCalls`             | R1+R2+R3+R4                                                                                    | 4                                   |
+| `repReached`           | R1+R2                                                                                          | 2                                   |
+| `repCallback`          | R3                                                                                             | 1                                   |
+| `repUnreachable`       | R4                                                                                             | 1                                   |
+| `repContactRate`       | 2/4                                                                                            | 50, soit « 50,0 % »                 |
+| `repCallbackRate`      | 1/4                                                                                            | 25, soit « 25,0 % »                 |
+| `repQuestioned`        | représentants distincts dont la dernière réponse de la fenêtre est REACHED ou REFUSED : R1, R2 | 2                                   |
+| `repQualified`         | parmi eux, dernière réponse REACHED : R1                                                       | 1                                   |
+| `repQualificationRate` | 1/2                                                                                            | 50, soit « 50,0 % »                 |
+| `calls`                | aucun appel de prospect ce jour-là                                                             | 0                                   |
+| `prospectsCreated`     | aucune saisie ce jour-là                                                                       | 0                                   |
+| `methodObtained`       | aucune                                                                                         | 0                                   |
+| `reachRate`            | `rate(0, 0)`                                                                                   | `null`, soit « Sans objet » attendu |
 
 Rendu attendu sur les cartes d'usine (marques de `dashboard-layout.ts`) :
 
-| Carte | Titre affiché | Marque | Chiffre | Détail |
-| --- | --- | --- | --- | --- |
-| `taux-de-contact` | « Taux de contact » | `tuile` | 50,0 % | « 2 joints sur 4 appels » |
-| `a-rappeler` | « Taux de rendez-vous » | `tuile` | 25,0 % | « 1 rendez-vous sur 4 appels » |
-| `taux-de-qualification` | « Taux de qualification » | `tuile` | 50,0 % | « 1 acceptent sur 2 interrogés » |
-| `adhesions` | « Adhésions » | `tuile` | 0 | « sur 0 appels de conversion » |
-| `par-teleconseiller` | « Par téléconseiller » | `tableau` | ligne « Superviseur Fixture » : 4, 50,0 %, 25,0 %, 50,0 %, 0, 0 ; pied « Équipe » identique | colonnes « Appels », « Contact », « Rendez-vous », « Qualification », « Prospects notés », « Adhésions » |
+| Carte                   | Titre affiché             | Marque    | Chiffre                                                                                     | Détail                                                                                                   |
+| ----------------------- | ------------------------- | --------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `taux-de-contact`       | « Taux de contact »       | `tuile`   | 50,0 %                                                                                      | « 2 joints sur 4 appels »                                                                                |
+| `a-rappeler`            | « Taux de rendez-vous »   | `tuile`   | 25,0 %                                                                                      | « 1 rendez-vous sur 4 appels »                                                                           |
+| `taux-de-qualification` | « Taux de qualification » | `tuile`   | 50,0 %                                                                                      | « 1 acceptent sur 2 interrogés »                                                                         |
+| `adhesions`             | « Adhésions »             | `tuile`   | 0                                                                                           | « sur 0 appels de conversion »                                                                           |
+| `par-teleconseiller`    | « Par téléconseiller »    | `tableau` | ligne « Superviseur Fixture » : 4, 50,0 %, 25,0 %, 50,0 %, 0, 0 ; pied « Équipe » identique | colonnes « Appels », « Contact », « Rendez-vous », « Qualification », « Prospects notés », « Adhésions » |
 
 La colonne « Appels » du tableau vaut `repCalls + calls` = 4 + 0 = 4 : elle
 mélange volontairement les deux familles d'appels, et c'est ce contrat qu'il faut
@@ -4458,18 +4458,18 @@ Interdits : `admin@cpi.sn`, tous les `fixture.*`, tout compte préexistant.
 **Piège de filtre par défaut** : la liste s'ouvre filtrée sur `COMMERCIAL`
 (§1.10).
 
-| Élément | Libellé exact |
-| --- | --- |
-| Bouton de création | `Nouvel utilisateur` |
-| Champ de recherche | label `Recherche`, placeholder `Nom, e-mail, identifiant…` |
-| Filtre rôle | label `Rôle` : `Tous les rôles`, `Administrateur`, `Téléconseiller`, `Banque & Finance`, `Supervision`, `Direction`, `Accueil` |
-| Filtre état | label `État du compte` : `Tous`, `Actifs`, `Désactivés` |
-| Colonnes | `Utilisateur`, `Identifiants`, `Prospects`, `Dernière connexion` |
-| État vide | `Aucun compte ne correspond à ces critères.` puis `Élargissez la recherche ou créez un compte.` |
-| Menu de ligne | `Actions pour <nom complet>` |
-| Entrées du menu | `Modifier`, `Réinitialiser le mot de passe`, `Désactiver le compte` ou `Réactiver le compte` |
-| Badges | `Désactivé`, `Jamais connecté` |
-| Erreur de liste | `Liste des comptes non chargée.` |
+| Élément            | Libellé exact                                                                                                                  |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| Bouton de création | `Nouvel utilisateur`                                                                                                           |
+| Champ de recherche | label `Recherche`, placeholder `Nom, e-mail, identifiant…`                                                                     |
+| Filtre rôle        | label `Rôle` : `Tous les rôles`, `Administrateur`, `Téléconseiller`, `Banque & Finance`, `Supervision`, `Direction`, `Accueil` |
+| Filtre état        | label `État du compte` : `Tous`, `Actifs`, `Désactivés`                                                                        |
+| Colonnes           | `Utilisateur`, `Identifiants`, `Prospects`, `Dernière connexion`                                                               |
+| État vide          | `Aucun compte ne correspond à ces critères.` puis `Élargissez la recherche ou créez un compte.`                                |
+| Menu de ligne      | `Actions pour <nom complet>`                                                                                                   |
+| Entrées du menu    | `Modifier`, `Réinitialiser le mot de passe`, `Désactiver le compte` ou `Réactiver le compte`                                   |
+| Badges             | `Désactivé`, `Jamais connecté`                                                                                                 |
+| Erreur de liste    | `Liste des comptes non chargée.`                                                                                               |
 
 Dialogue de création : titre `Nouvel utilisateur`, description
 `Le rôle décide de ce que le compte pourra consulter.`, champs `Nom complet`,
@@ -4657,11 +4657,11 @@ Six onglets : `Banques`, `Syndicats`, `Départements`, `Professions`, `Revenus`,
 (`?recherche=…`), et l'onglet `banques` n'écrit pas de paramètre. Lien en tête :
 `Issues d’appel` vers `/admin/referentiels/issues-appel`.
 
-| Onglet | Titre | Description | Création | Placeholder | États vides |
-| --- | --- | --- | --- | --- | --- |
-| Banques | `Banques` | `Domiciliation bancaire du prospect.` | `Nouvelle banque` | `Abréviation ou nom complet…` | `Aucune banque enregistrée.` / `Aucune banque ne correspond à cette recherche.` |
-| Syndicats | `Syndicats` | `Appartenance syndicale du prospect.` | `Nouveau syndicat` | `Sigle, nom ou secteur…` | `Aucun syndicat enregistré.` / `Aucun syndicat ne correspond à cette recherche.` |
-| Départements | `Départements` | `Triés par région, puis par nom.` | `Nouveau département` | `Département, code ou région…` | `Aucun département enregistré.` / `Aucun département ne correspond à cette recherche.` |
+| Onglet       | Titre          | Description                           | Création              | Placeholder                    | États vides                                                                            |
+| ------------ | -------------- | ------------------------------------- | --------------------- | ------------------------------ | -------------------------------------------------------------------------------------- |
+| Banques      | `Banques`      | `Domiciliation bancaire du prospect.` | `Nouvelle banque`     | `Abréviation ou nom complet…`  | `Aucune banque enregistrée.` / `Aucune banque ne correspond à cette recherche.`        |
+| Syndicats    | `Syndicats`    | `Appartenance syndicale du prospect.` | `Nouveau syndicat`    | `Sigle, nom ou secteur…`       | `Aucun syndicat enregistré.` / `Aucun syndicat ne correspond à cette recherche.`       |
+| Départements | `Départements` | `Triés par région, puis par nom.`     | `Nouveau département` | `Département, code ou région…` | `Aucun département enregistré.` / `Aucun département ne correspond à cette recherche.` |
 
 Validation : `Le nom est obligatoire.`, `L'abréviation est obligatoire.`,
 `Le sigle est obligatoire.`, `Le code est obligatoire.`,
@@ -5111,14 +5111,14 @@ Route : `/admin/parametres`, carte `Version Android`. Session : ADMIN. Fichier :
 **Fixtures binaires, déjà versionnées et petites**, dans
 `apps/api/src/modules/app-updates/fixtures/` :
 
-| Fichier | Taille | Ce qu'il éprouve |
-| --- | --- | --- |
-| `cpi-go-v7.apk` | 8,1 Ko | APK valide, paquet `sn.cpi.go`, clé de test `9434b1f9…f3909` |
-| `cpi-go-v12.apk` | 8,1 Ko | même clé, `versionCode` supérieur |
-| `cpi-go-v12-autre-cle.apk` | 8,1 Ko | autre clé (`3a22ee16…928a6`), `APK_SIGNER_MISMATCH` |
-| `cpi-go-v7-non-signe.apk` | 683 o | aucun bloc de signature v2/v3, `APK_UNSIGNED` |
-| `autre-editeur-v99.apk` | 691 o | paquet étranger, `APK_FOREIGN_PACKAGE` |
-| `manifeste-illisible.apk` | 199 o | manifeste illisible, `APK_MANIFEST_UNREADABLE` |
+| Fichier                    | Taille | Ce qu'il éprouve                                             |
+| -------------------------- | ------ | ------------------------------------------------------------ |
+| `cpi-go-v7.apk`            | 8,1 Ko | APK valide, paquet `sn.cpi.go`, clé de test `9434b1f9…f3909` |
+| `cpi-go-v12.apk`           | 8,1 Ko | même clé, `versionCode` supérieur                            |
+| `cpi-go-v12-autre-cle.apk` | 8,1 Ko | autre clé (`3a22ee16…928a6`), `APK_SIGNER_MISMATCH`          |
+| `cpi-go-v7-non-signe.apk`  | 683 o  | aucun bloc de signature v2/v3, `APK_UNSIGNED`                |
+| `autre-editeur-v99.apk`    | 691 o  | paquet étranger, `APK_FOREIGN_PACKAGE`                       |
+| `manifeste-illisible.apk`  | 199 o  | manifeste illisible, `APK_MANIFEST_UNREADABLE`               |
 
 **Ne pas fabriquer de nouvel APK** : générer un keystore ajouterait une
 dépendance sur `apksigner` et les build-tools Android sur la machine de test.
@@ -5176,15 +5176,15 @@ encart `Build <n> · Signataire <empreinte courte>`, bouton `Retirer`. Toasts :
 
 Messages d'erreur serveur, relayés tels quels par `apiErrorText` :
 
-| Code | Extrait à asserter |
-| --- | --- |
-| `APK_MANIFEST_UNREADABLE` (400) | `Le manifeste de cet APK est illisible` |
-| `APK_FOREIGN_PACKAGE` (422) | `et non « sn.cpi.go »` |
-| `APK_VERSION_NOT_GREATER` (422) | `Une publication doit être STRICTEMENT supérieure` |
-| `APK_UNSIGNED` (422) | `ne porte pas de bloc de signature v2/v3 lisible` |
-| `APK_SIGNER_MISMATCH` (422) | `Android refuse une mise à jour signée par une autre clé` |
-| `APK_RELEASE_UNKNOWN` (404) | `Aucune release en ligne ne porte le versionCode` |
-| `APK_LAST_RELEASE` (409) | `C’est la seule release en ligne` |
+| Code                            | Extrait à asserter                                        |
+| ------------------------------- | --------------------------------------------------------- |
+| `APK_MANIFEST_UNREADABLE` (400) | `Le manifeste de cet APK est illisible`                   |
+| `APK_FOREIGN_PACKAGE` (422)     | `et non « sn.cpi.go »`                                    |
+| `APK_VERSION_NOT_GREATER` (422) | `Une publication doit être STRICTEMENT supérieure`        |
+| `APK_UNSIGNED` (422)            | `ne porte pas de bloc de signature v2/v3 lisible`         |
+| `APK_SIGNER_MISMATCH` (422)     | `Android refuse une mise à jour signée par une autre clé` |
+| `APK_RELEASE_UNKNOWN` (404)     | `Aucune release en ligne ne porte le versionCode`         |
+| `APK_LAST_RELEASE` (409)        | `C’est la seule release en ligne`                         |
 
 Existant : `android-release-card.test.tsx` couvre déjà en Vitest la progression,
 la fenêtre de confirmation, le refus de signataire, l'annulation, la survie de la
@@ -5869,12 +5869,12 @@ le schéma `demo` est vidé, dix-sept tables de référence sont recopiées depu
 `public` (dont `users` : les comptes de démonstration sont donc les mêmes que
 ceux de la base publique), puis la fabrique crée :
 
-| Objet | Quantité | Repère |
-| --- | --- | --- |
-| Représentants | 8 | `Représentant Démo 01` à `08`, `+221770100001..0008` |
-| Prospects | 16 | `Prospect Démo 01` à `16`, `+221770200001..0016` ; les 8 premiers CHUES, les 8 suivants Grand Public (prénom `Grand Public`, situation `INFORMEL`) |
-| Campagnes | 2 | `Campagne de démonstration`, `Campagne Grand Public de démonstration` |
-| Dossiers bancaires | 3 | `DEMO-001`, `DEMO-002`, `DEMO-003` |
+| Objet              | Quantité | Repère                                                                                                                                             |
+| ------------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Représentants      | 8        | `Représentant Démo 01` à `08`, `+221770100001..0008`                                                                                               |
+| Prospects          | 16       | `Prospect Démo 01` à `16`, `+221770200001..0016` ; les 8 premiers CHUES, les 8 suivants Grand Public (prénom `Grand Public`, situation `INFORMEL`) |
+| Campagnes          | 2        | `Campagne de démonstration`, `Campagne Grand Public de démonstration`                                                                              |
+| Dossiers bancaires | 3        | `DEMO-001`, `DEMO-002`, `DEMO-003`                                                                                                                 |
 
 Les compteurs de la carte `Espace démo` portent donc `représentants = 8`,
 `prospects = 16`, `campagnes = 2`, `dossiers bancaires = 3`, et `comptes` = le
@@ -6211,40 +6211,40 @@ Colonne « Qui répond » : **navigateur** (l'agent l'observe lui-même avant
 d'écrire), **mainteneur** (décision d'infrastructure ou d'environnement),
 **produit** (décision du propriétaire produit).
 
-| # | Question exacte | Scénarios bloqués | Qui répond |
-| --- | --- | --- | --- |
-| **Q-01** | Sur `/chues/statistiques`, la carte « Représentants joints » affiche-t-elle « 50 », « 50 % » ou « 50,0 % » ? La phrase « des appels aboutissent » est-elle visible à l'œil, ou seulement en `sr-only` ? | CHU-CHF-13, CHU-CHF-14, CHU-CHF-15 | navigateur |
-| **Q-02** | Sur une période sans aucun appel, la carte « Représentants joints » affiche-t-elle « 0 » ou une mention « Sans objet » ? | CHU-CHF-17 | navigateur, puis **produit** si l'écart est confirmé |
-| **Q-03** | Sur une base amorcée, `GET /api/v1/supervision/activite` avec `actFrom=2026-02-03T00:00:00.000Z` et `actTo=2026-02-03T23:59:59.999Z` rend-il des totaux nuls avant que le spec ne pose ses données ? Sinon, quelle journée est libre ? | CHU-CHF-13 à CHU-CHF-19 | navigateur ou API |
-| **Q-04** | `/chues/console` porte-t-elle deux `<h1>` (barre supérieure « Convertir un prospect » et page « Rechercher une fiche ») ? Lequel `getByRole('heading', { level: 1 })` trouve-t-il en premier ? | CHU-ET3-01 | navigateur |
-| **Q-05** | Après désactivation d'une entrée de liste du registre, apparaît-elle encore dans le combobox `ENTREPRISE` du bloc `Filtres avancés` de `/accueil` ? Les deux composants tirent le même `GET /visites/referentiels` avec `activeOnly=true`. | ACC-LST-12 | navigateur, puis **produit** : le dialogue promet « Reste disponible en filtre et en export » |
-| **Q-06** | `GET /api/v1/visites?periode=tout&pageSize=1` renvoie quel `meta.total` sur une base fraîchement amorcée ? | ACC-REG-17, ACC-IMP-06, ACC-IMP-07, ACC-XLS-09, ACC-XLS-10 | **mainteneur** : décider d'un semis dédié ou déclarer ces scénarios non joués |
-| **Q-07** | Combien de prospects CHUES la base de développement contient-elle ? | CHU-PRO-07 | **mainteneur** |
-| **Q-08** | `GET /api/v1/visites/statistiques?from=2026-12-31&to=2026-01-01` renvoie-t-il 400 avec `VISITE_STATS_RANGE_INVALID`, ou 200 avec un total nul ? | ACC-TDB-04 (portée réelle de la garde) | navigateur ou API |
-| **Q-09** | Quel nom accessible Playwright expose-t-il pour un `FilterCombobox` requis ? Le calcul attendu est `ENTREPRISE Obligatoire Choisir`, mais l'espacement dépend du navigateur. | ACC-REG-03, ACC-REG-05, ACC-REG-14 | navigateur |
-| **Q-10** | Quel est le nom accessible exact du bouton de la cloche à zéro non-lue, et à au moins une ? Il vient de `bellLabel(unreadCount)` dans `lib/data/inbox.ts`. | ACC-COQ-09, TRA-03 | navigateur |
-| **Q-11** | La connexion à `/connexion` avec `fixture.accueil@cpi.sn` et la valeur de `SEED_FIXTURE_PASSWORD` du `.env` aboutit-elle sur `/espaces`, et le compte est-il actif ? | tous les scénarios en session ACCUEIL | **mainteneur** (§3.1) |
-| **Q-12** | La charge falsifiée décrite fait-elle apparaître « Cet écran n’a pas pu s’afficher » ? Sinon, quel autre point d'entrée du périmètre lève une exception de rendu ? | ACC-COQ-12, TRA-10 | navigateur |
-| **Q-13** | Quelle est la liste `nav.getByRole('link').allTextContents()` réellement rendue pour un ADMIN sur `/chues`, replis fermés ? `navSections` concatène deux blocs écrits à des endroits différents de `nav-items.ts`. | ROL-09 | navigateur |
-| **Q-14** | Cliquer `Ouvrir l’impression` avec la portée « La page affichée » laisse-t-il la page interactive, ou la suite du test se bloque-t-elle en Chromium headless ? | ACC-IMP-04, ACC-IMP-06 (repli : `emulateMedia` sans jamais cliquer) | navigateur |
-| **Q-15** | La base amorcée contient-elle au moins un lot d'export ouvrable par son identifiant, ou faut-il en créer un ? | ROL-27, ROL-30 | **mainteneur** |
-| **Q-16** | `DB_DUMP_ENABLED` est-elle posée sur l'environnement de test, et la carte « Export intégral de la base » est-elle rendue ? | ADM-PAR-04, DEMO-09 | **mainteneur** (§3.4) |
-| **Q-17** | Les trois pastilles de période de la supervision s'appellent-elles « Aujourd’hui », « Cette semaine », « 7 derniers jours », et la quatrième « Période personnalisée » ? `PERIOD_LABELS` vit dans `lib/data/admin.ts`. | CHU-SUP-03 | navigateur |
-| **Q-18** | `A_APPELER`, `APPELE` et `ABANDONNE` s'affichent-ils « À appeler », « Appelé », « Abandonné » ? `SUGGESTION_STATUS_LABELS` vit dans `lib/data/suggestions.ts`. | CHU-SUG-03, CHU-SUG-04 | navigateur |
-| **Q-19** | Un rappel promis par un superviseur apparaît-il dans la file, et son auteur figure-t-il dans le filtre « Téléconseiller » ? `rappels-view.tsx` demande `fetchUsers({ role: 'COMMERCIAL' })` alors que `/chues/statistiques` inclut désormais SUPERVISEUR et DIRECTION dans le plateau. | CHU-RAP-07 | navigateur, puis **produit** : les deux écrans donneraient deux définitions du plateau |
-| **Q-20** | « 0 » et « -5000 » laissent-ils le bouton « Confirmer l’encaissement » désactivé ? `workspaces.spec.ts` ne vérifie que le champ vide. | CHU-DOSD-01, CHU-DOSD-02 | navigateur |
-| **Q-21** | Deux onglets qui avancent le même dossier produisent quel résultat : deux transitions, un refus nommé, ou un saut d'étape ? Aucune trace d'un jeton de version dans le détail lu. | CHU-DOSD-07 | navigateur, puis **produit** |
-| **Q-22** | ~~Cliquer « Excel » sur un lot déclenche-t-il un événement `download` Playwright, ou une navigation ?~~ **RÉPONDU** : `download` Playwright, dans les trois cas. Le serveur pose `Content-Disposition: attachment` sur `export.xlsx`, `programme.pdf` et `programmes.zip` (`lots-export.controller.ts`), et le web ne navigue pas : `useFileDownload` récupère le corps puis clique une ancre `download`. Le nom du fichier vient donc du web (`lotProgrammeFileName`, `lotExportFileName`), pas de l'en-tête. | CHU-LOT-06, CHU-LOT-07, CHU-LOT-08 | **répondu** |
-| **Q-23** | Que dit exactement le toast `CPI GO <?> publiée.` après la publication de `cpi-go-v7.apk` ? Le `versionName` n'a pas été extrait du manifeste. | ADM-APK-01, ADM-APK-13, ADM-APK-14 | navigateur ; lire la valeur une fois et la figer en constante nommée, jamais un `/CPI GO .+ publiée\./` |
-| **Q-24** | `/admin/commerciaux?page=2` affiche-t-il la deuxième page (seule l'interface manque) ou ignore-t-il le paramètre (la lecture aussi est cassée) ? | ADM-USR-17 | navigateur, puis **produit** |
-| **Q-25** | Quel texte exact s'affiche quand un téléphone de prospect Grand Public est déjà pris, et nomme-t-il la fiche existante avec un lien ? | GP-15 | navigateur |
-| **Q-26** | `/grand-public/<non-uuid>` affiche-t-il le titre `Requête refusée` de `QueryErrorState` ou le repli `Cette fiche n’a pas pu être chargée.` ? Les deux chemins existent selon que l'erreur est levée au rendu serveur ou côté client. | GP-27 | navigateur |
-| **Q-27** | Le compteur `comptes` de la carte « Espace démo » doit-il être figé, ou seulement comparé au décompte lu par l'API sur `public` au même instant ? Il recopie les utilisateurs de `public`, dont le nombre dépend de ce que les autres specs ont créé. | DEMO-03 | **mainteneur** ; recommandation : le comparer, ne pas le figer, et le dire en commentaire |
-| **Q-28** | Après `POST /admin/demo/reset`, la liste `ENTREPRISE` du formulaire de saisie du registre, en espace démo, est-elle non vide, et quelles sont ses entrées ? | DEMO-05 | navigateur |
-| **Q-29** | Après `page.context().clearCookies()`, une action cliente rend-elle `Session expirée. Rechargez la page.` dans un toast, ou le prochain rendu serveur renvoie-t-il directement vers `/connexion` sans que le message apparaisse jamais ? Le layout du panel est `force-dynamic`. | TRA-04 | navigateur |
-| **Q-30** | La carte titrée « Reste à appeler » affiche-t-elle le nombre d'appels déjà consignés ? Son extraction lit `activite.totals.calls` avec la légende « appels consignés sur la période ». | CHU-CHF-01, CHU-DSP-04 | navigateur, puis **produit** : `Plan.md` §D3 prévoit de supprimer la carte |
-| **Q-31** | ~~`getByRole('combobox', { name: 'Cible' })` trouve-t-il le `<select>` brut de la création de lot ?~~ **SANS OBJET** : il n'y a plus de `<select>` brut. La cible se choisit en `radio` dans un `fieldset` « Que voulez-vous exporter ? », l'équipe en `checkbox` dans un `fieldset` « Téléconseillers ». Les deux champs nombre sont visés par `getByLabel` : le nom accessible est figé par le contrat d'écran, le type de l'`input` ne l'est pas. | CHU-LOT-03, CHU-LOT-04 | **répondu** |
-| **Q-32** | Quelle valeur porte réellement `SEED_FIXTURE_PASSWORD` sur l'environnement de test au moment de l'exécution, et l'alignement de `e2e/fixtures.ts` et `e2e/auth.setup.ts` est-il committé ? | **tout** : sans réponse, les cinq états de session non-admin ne se posent pas et rien de la matrice des rôles ne tourne | **mainteneur** (§3.1). C'est le **premier blocage à lever** |
+| #        | Question exacte                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Scénarios bloqués                                                                                                       | Qui répond                                                                                              |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| **Q-01** | Sur `/chues/statistiques`, la carte « Représentants joints » affiche-t-elle « 50 », « 50 % » ou « 50,0 % » ? La phrase « des appels aboutissent » est-elle visible à l'œil, ou seulement en `sr-only` ?                                                                                                                                                                                                                                                                                                        | CHU-CHF-13, CHU-CHF-14, CHU-CHF-15                                                                                      | navigateur                                                                                              |
+| **Q-02** | Sur une période sans aucun appel, la carte « Représentants joints » affiche-t-elle « 0 » ou une mention « Sans objet » ?                                                                                                                                                                                                                                                                                                                                                                                       | CHU-CHF-17                                                                                                              | navigateur, puis **produit** si l'écart est confirmé                                                    |
+| **Q-03** | Sur une base amorcée, `GET /api/v1/supervision/activite` avec `actFrom=2026-02-03T00:00:00.000Z` et `actTo=2026-02-03T23:59:59.999Z` rend-il des totaux nuls avant que le spec ne pose ses données ? Sinon, quelle journée est libre ?                                                                                                                                                                                                                                                                         | CHU-CHF-13 à CHU-CHF-19                                                                                                 | navigateur ou API                                                                                       |
+| **Q-04** | `/chues/console` porte-t-elle deux `<h1>` (barre supérieure « Convertir un prospect » et page « Rechercher une fiche ») ? Lequel `getByRole('heading', { level: 1 })` trouve-t-il en premier ?                                                                                                                                                                                                                                                                                                                 | CHU-ET3-01                                                                                                              | navigateur                                                                                              |
+| **Q-05** | Après désactivation d'une entrée de liste du registre, apparaît-elle encore dans le combobox `ENTREPRISE` du bloc `Filtres avancés` de `/accueil` ? Les deux composants tirent le même `GET /visites/referentiels` avec `activeOnly=true`.                                                                                                                                                                                                                                                                     | ACC-LST-12                                                                                                              | navigateur, puis **produit** : le dialogue promet « Reste disponible en filtre et en export »           |
+| **Q-06** | `GET /api/v1/visites?periode=tout&pageSize=1` renvoie quel `meta.total` sur une base fraîchement amorcée ?                                                                                                                                                                                                                                                                                                                                                                                                     | ACC-REG-17, ACC-IMP-06, ACC-IMP-07, ACC-XLS-09, ACC-XLS-10                                                              | **mainteneur** : décider d'un semis dédié ou déclarer ces scénarios non joués                           |
+| **Q-07** | Combien de prospects CHUES la base de développement contient-elle ?                                                                                                                                                                                                                                                                                                                                                                                                                                            | CHU-PRO-07                                                                                                              | **mainteneur**                                                                                          |
+| **Q-08** | `GET /api/v1/visites/statistiques?from=2026-12-31&to=2026-01-01` renvoie-t-il 400 avec `VISITE_STATS_RANGE_INVALID`, ou 200 avec un total nul ?                                                                                                                                                                                                                                                                                                                                                                | ACC-TDB-04 (portée réelle de la garde)                                                                                  | navigateur ou API                                                                                       |
+| **Q-09** | Quel nom accessible Playwright expose-t-il pour un `FilterCombobox` requis ? Le calcul attendu est `ENTREPRISE Obligatoire Choisir`, mais l'espacement dépend du navigateur.                                                                                                                                                                                                                                                                                                                                   | ACC-REG-03, ACC-REG-05, ACC-REG-14                                                                                      | navigateur                                                                                              |
+| **Q-10** | Quel est le nom accessible exact du bouton de la cloche à zéro non-lue, et à au moins une ? Il vient de `bellLabel(unreadCount)` dans `lib/data/inbox.ts`.                                                                                                                                                                                                                                                                                                                                                     | ACC-COQ-09, TRA-03                                                                                                      | navigateur                                                                                              |
+| **Q-11** | La connexion à `/connexion` avec `fixture.accueil@cpi.sn` et la valeur de `SEED_FIXTURE_PASSWORD` du `.env` aboutit-elle sur `/espaces`, et le compte est-il actif ?                                                                                                                                                                                                                                                                                                                                           | tous les scénarios en session ACCUEIL                                                                                   | **mainteneur** (§3.1)                                                                                   |
+| **Q-12** | La charge falsifiée décrite fait-elle apparaître « Cet écran n’a pas pu s’afficher » ? Sinon, quel autre point d'entrée du périmètre lève une exception de rendu ?                                                                                                                                                                                                                                                                                                                                             | ACC-COQ-12, TRA-10                                                                                                      | navigateur                                                                                              |
+| **Q-13** | Quelle est la liste `nav.getByRole('link').allTextContents()` réellement rendue pour un ADMIN sur `/chues`, replis fermés ? `navSections` concatène deux blocs écrits à des endroits différents de `nav-items.ts`.                                                                                                                                                                                                                                                                                             | ROL-09                                                                                                                  | navigateur                                                                                              |
+| **Q-14** | Cliquer `Ouvrir l’impression` avec la portée « La page affichée » laisse-t-il la page interactive, ou la suite du test se bloque-t-elle en Chromium headless ?                                                                                                                                                                                                                                                                                                                                                 | ACC-IMP-04, ACC-IMP-06 (repli : `emulateMedia` sans jamais cliquer)                                                     | navigateur                                                                                              |
+| **Q-15** | La base amorcée contient-elle au moins un lot d'export ouvrable par son identifiant, ou faut-il en créer un ?                                                                                                                                                                                                                                                                                                                                                                                                  | ROL-27, ROL-30                                                                                                          | **mainteneur**                                                                                          |
+| **Q-16** | `DB_DUMP_ENABLED` est-elle posée sur l'environnement de test, et la carte « Export intégral de la base » est-elle rendue ?                                                                                                                                                                                                                                                                                                                                                                                     | ADM-PAR-04, DEMO-09                                                                                                     | **mainteneur** (§3.4)                                                                                   |
+| **Q-17** | Les trois pastilles de période de la supervision s'appellent-elles « Aujourd’hui », « Cette semaine », « 7 derniers jours », et la quatrième « Période personnalisée » ? `PERIOD_LABELS` vit dans `lib/data/admin.ts`.                                                                                                                                                                                                                                                                                         | CHU-SUP-03                                                                                                              | navigateur                                                                                              |
+| **Q-18** | `A_APPELER`, `APPELE` et `ABANDONNE` s'affichent-ils « À appeler », « Appelé », « Abandonné » ? `SUGGESTION_STATUS_LABELS` vit dans `lib/data/suggestions.ts`.                                                                                                                                                                                                                                                                                                                                                 | CHU-SUG-03, CHU-SUG-04                                                                                                  | navigateur                                                                                              |
+| **Q-19** | Un rappel promis par un superviseur apparaît-il dans la file, et son auteur figure-t-il dans le filtre « Téléconseiller » ? `rappels-view.tsx` demande `fetchUsers({ role: 'COMMERCIAL' })` alors que `/chues/statistiques` inclut désormais SUPERVISEUR et DIRECTION dans le plateau.                                                                                                                                                                                                                         | CHU-RAP-07                                                                                                              | navigateur, puis **produit** : les deux écrans donneraient deux définitions du plateau                  |
+| **Q-20** | « 0 » et « -5000 » laissent-ils le bouton « Confirmer l’encaissement » désactivé ? `workspaces.spec.ts` ne vérifie que le champ vide.                                                                                                                                                                                                                                                                                                                                                                          | CHU-DOSD-01, CHU-DOSD-02                                                                                                | navigateur                                                                                              |
+| **Q-21** | Deux onglets qui avancent le même dossier produisent quel résultat : deux transitions, un refus nommé, ou un saut d'étape ? Aucune trace d'un jeton de version dans le détail lu.                                                                                                                                                                                                                                                                                                                              | CHU-DOSD-07                                                                                                             | navigateur, puis **produit**                                                                            |
+| **Q-22** | ~~Cliquer « Excel » sur un lot déclenche-t-il un événement `download` Playwright, ou une navigation ?~~ **RÉPONDU** : `download` Playwright, dans les trois cas. Le serveur pose `Content-Disposition: attachment` sur `export.xlsx`, `programme.pdf` et `programmes.zip` (`lots-export.controller.ts`), et le web ne navigue pas : `useFileDownload` récupère le corps puis clique une ancre `download`. Le nom du fichier vient donc du web (`lotProgrammeFileName`, `lotExportFileName`), pas de l'en-tête. | CHU-LOT-06, CHU-LOT-07, CHU-LOT-08                                                                                      | **répondu**                                                                                             |
+| **Q-23** | Que dit exactement le toast `CPI GO <?> publiée.` après la publication de `cpi-go-v7.apk` ? Le `versionName` n'a pas été extrait du manifeste.                                                                                                                                                                                                                                                                                                                                                                 | ADM-APK-01, ADM-APK-13, ADM-APK-14                                                                                      | navigateur ; lire la valeur une fois et la figer en constante nommée, jamais un `/CPI GO .+ publiée\./` |
+| **Q-24** | `/admin/commerciaux?page=2` affiche-t-il la deuxième page (seule l'interface manque) ou ignore-t-il le paramètre (la lecture aussi est cassée) ?                                                                                                                                                                                                                                                                                                                                                               | ADM-USR-17                                                                                                              | navigateur, puis **produit**                                                                            |
+| **Q-25** | Quel texte exact s'affiche quand un téléphone de prospect Grand Public est déjà pris, et nomme-t-il la fiche existante avec un lien ?                                                                                                                                                                                                                                                                                                                                                                          | GP-15                                                                                                                   | navigateur                                                                                              |
+| **Q-26** | `/grand-public/<non-uuid>` affiche-t-il le titre `Requête refusée` de `QueryErrorState` ou le repli `Cette fiche n’a pas pu être chargée.` ? Les deux chemins existent selon que l'erreur est levée au rendu serveur ou côté client.                                                                                                                                                                                                                                                                           | GP-27                                                                                                                   | navigateur                                                                                              |
+| **Q-27** | Le compteur `comptes` de la carte « Espace démo » doit-il être figé, ou seulement comparé au décompte lu par l'API sur `public` au même instant ? Il recopie les utilisateurs de `public`, dont le nombre dépend de ce que les autres specs ont créé.                                                                                                                                                                                                                                                          | DEMO-03                                                                                                                 | **mainteneur** ; recommandation : le comparer, ne pas le figer, et le dire en commentaire               |
+| **Q-28** | Après `POST /admin/demo/reset`, la liste `ENTREPRISE` du formulaire de saisie du registre, en espace démo, est-elle non vide, et quelles sont ses entrées ?                                                                                                                                                                                                                                                                                                                                                    | DEMO-05                                                                                                                 | navigateur                                                                                              |
+| **Q-29** | Après `page.context().clearCookies()`, une action cliente rend-elle `Session expirée. Rechargez la page.` dans un toast, ou le prochain rendu serveur renvoie-t-il directement vers `/connexion` sans que le message apparaisse jamais ? Le layout du panel est `force-dynamic`.                                                                                                                                                                                                                               | TRA-04                                                                                                                  | navigateur                                                                                              |
+| **Q-30** | La carte titrée « Reste à appeler » affiche-t-elle le nombre d'appels déjà consignés ? Son extraction lit `activite.totals.calls` avec la légende « appels consignés sur la période ».                                                                                                                                                                                                                                                                                                                         | CHU-CHF-01, CHU-DSP-04                                                                                                  | navigateur, puis **produit** : `Plan.md` §D3 prévoit de supprimer la carte                              |
+| **Q-31** | ~~`getByRole('combobox', { name: 'Cible' })` trouve-t-il le `<select>` brut de la création de lot ?~~ **SANS OBJET** : il n'y a plus de `<select>` brut. La cible se choisit en `radio` dans un `fieldset` « Que voulez-vous exporter ? », l'équipe en `checkbox` dans un `fieldset` « Téléconseillers ». Les deux champs nombre sont visés par `getByLabel` : le nom accessible est figé par le contrat d'écran, le type de l'`input` ne l'est pas.                                                           | CHU-LOT-03, CHU-LOT-04                                                                                                  | **répondu**                                                                                             |
+| **Q-32** | Quelle valeur porte réellement `SEED_FIXTURE_PASSWORD` sur l'environnement de test au moment de l'exécution, et l'alignement de `e2e/fixtures.ts` et `e2e/auth.setup.ts` est-il committé ?                                                                                                                                                                                                                                                                                                                     | **tout** : sans réponse, les cinq états de session non-admin ne se posent pas et rien de la matrice des rôles ne tourne | **mainteneur** (§3.1). C'est le **premier blocage à lever**                                             |
 
 ---
 
@@ -6252,91 +6252,91 @@ d'écrire), **mainteneur** (décision d'infrastructure ou d'environnement),
 
 ### 9.1 Par domaine et par priorité
 
-| Domaine | Préfixe | P1 | P2 | P3 | Total |
-| --- | --- | --- | --- | --- | --- |
-| Matrice des rôles | `ROL-` | 24 | 6 | 0 | **30** |
-| Connexion, hub, coque, espace Accueil | `ACC-` | 37 | 46 | 11 | **94** |
-| Espace Projet CHUES | `CHU-` | 75 | 84 | 11 | **170** |
-| Espace Admin | `ADM-` | 43 | 26 | 9 | **78** |
-| Espace Projet Grand Public | `GP-` | 27 | 18 | 0 | **45** |
-| Espace démo | `DEMO-` | 8 | 1 | 0 | **9** |
-| Transversal et accessibilité | `TRA-` | 10 | 7 | 1 | **18** |
-| **Total** | | **224** | **188** | **32** | **444** |
+| Domaine                               | Préfixe | P1      | P2      | P3     | Total   |
+| ------------------------------------- | ------- | ------- | ------- | ------ | ------- |
+| Matrice des rôles                     | `ROL-`  | 24      | 6       | 0      | **30**  |
+| Connexion, hub, coque, espace Accueil | `ACC-`  | 37      | 46      | 11     | **94**  |
+| Espace Projet CHUES                   | `CHU-`  | 75      | 84      | 11     | **170** |
+| Espace Admin                          | `ADM-`  | 43      | 26      | 9      | **78**  |
+| Espace Projet Grand Public            | `GP-`   | 27      | 18      | 0      | **45**  |
+| Espace démo                           | `DEMO-` | 8       | 1       | 0      | **9**   |
+| Transversal et accessibilité          | `TRA-`  | 10      | 7       | 1      | **18**  |
+| **Total**                             |         | **224** | **188** | **32** | **444** |
 
 ### 9.2 Par sous-domaine
 
-| Sous-domaine | Identifiants | Total |
-| --- | --- | --- |
-| Atterrissage et tuiles | ROL-01 à ROL-06 | 6 |
-| Navigation par rôle et coque | ROL-07 à ROL-16 | 10 |
-| Balayage des routes interdites | ROL-17 à ROL-22 | 6 |
-| Renvois | ROL-23 à ROL-27 | 5 |
-| Trous relevés | ROL-28 à ROL-30 | 3 |
-| Connexion, session, redirections | ACC-CNX-01 à 14 | 14 |
-| Hub des espaces | ACC-HUB-01 à 05 | 5 |
-| Coque du panel | ACC-COQ-01 à 12 | 12 |
-| Registre des visites | ACC-REG-01 à 18 | 18 |
-| Impression du registre | ACC-IMP-01 à 07 | 7 |
-| Tableau de bord des visites | ACC-TDB-01 à 14 | 14 |
-| Listes du registre | ACC-LST-01 à 12 | 12 |
-| Import du registre | ACC-XLS-01 à 12 | 12 |
-| Mon travail | CHU-HUB-01 à 08 | 8 |
-| Étape 1, qualification | CHU-ET1-01 à 14 | 14 |
-| Étape 2, saisie | CHU-ET2-01 à 09 | 9 |
-| Étape 3, conversion | CHU-ET3-01 à 06 | 6 |
-| Chiffres CHUES | CHU-CHF-01 à 21 | 21 |
-| Composition et disposition CHUES | CHU-DSP-01 à 12 | 12 |
-| Ancienne route de tableau de bord | CHU-TDB-01 | 1 |
-| Supervision | CHU-SUP-01 à 08 | 8 |
-| Rappels promis | CHU-RAP-01 à 08 | 8 |
-| Représentants, liste | CHU-REP-01 à 07 | 7 |
-| Représentants, fiche | CHU-REPD-01 à 05 | 5 |
-| Import des représentants | CHU-IMP-01 à 05 | 5 |
-| Prospects CHUES | CHU-PRO-01 à 08 | 8 |
-| Contacts recommandés | CHU-SUG-01 à 06 | 6 |
-| Dossiers, liste | CHU-DOS-01 à 06 | 6 |
-| Dossiers, ouverture | CHU-DOSN-01 à 05 | 5 |
-| Dossiers, détail | CHU-DOSD-01 à 07 | 7 |
-| Dossiers, étapes | CHU-DOSE-01 à 04 | 4 |
-| Dossiers, export | CHU-DOSX-01 à 03 | 3 |
-| Tableau de bord bancaire | CHU-BQ-01 à 05 | 5 |
-| Demandes de création | CHU-DMC-01 à 06 | 6 |
-| Lots d'export | CHU-LOT-01 à 09 | 9 |
-| Transverse CHUES | CHU-TRV-01 à 07 | 7 |
-| Racine Admin | ADM-ROOT-01 | 1 |
-| Comptes utilisateurs | ADM-USR-01 à 17 | 17 |
-| Listes de référence | ADM-REF-01 à 12 | 12 |
-| Issues d'appel | ADM-ISS-01 à 07 | 7 |
-| Imports de masse | ADM-IMP-01 à 08 | 8 |
-| Notifications | ADM-NOT-01 à 10 | 10 |
-| Paramètres | ADM-PAR-01 à 05 | 5 |
-| Publication Android | ADM-APK-01 à 18 | 18 |
-| Grand Public, liste | GP-01 à 12 | 12 |
-| Grand Public, saisie | GP-13 à 21 | 9 |
-| Grand Public, fiche | GP-22 à 28 | 7 |
-| Grand Public, console | GP-29, GP-30 | 2 |
-| Grand Public, rappels | GP-31 à 33 | 3 |
-| Grand Public, chiffres | GP-34 à 45 | 12 |
-| Espace démo | DEMO-01 à 09 | 9 |
-| Notifications hors coque | TRA-01 à 03 | 3 |
-| Session, pannes, codes d'erreur | TRA-04 à 08 | 5 |
-| 404 et erreur de rendu | TRA-09, TRA-10 | 2 |
-| Largeur mobile | TRA-11, TRA-12 | 2 |
-| Accessibilité axe | TRA-13 à 18 | 6 |
+| Sous-domaine                      | Identifiants     | Total |
+| --------------------------------- | ---------------- | ----- |
+| Atterrissage et tuiles            | ROL-01 à ROL-06  | 6     |
+| Navigation par rôle et coque      | ROL-07 à ROL-16  | 10    |
+| Balayage des routes interdites    | ROL-17 à ROL-22  | 6     |
+| Renvois                           | ROL-23 à ROL-27  | 5     |
+| Trous relevés                     | ROL-28 à ROL-30  | 3     |
+| Connexion, session, redirections  | ACC-CNX-01 à 14  | 14    |
+| Hub des espaces                   | ACC-HUB-01 à 05  | 5     |
+| Coque du panel                    | ACC-COQ-01 à 12  | 12    |
+| Registre des visites              | ACC-REG-01 à 18  | 18    |
+| Impression du registre            | ACC-IMP-01 à 07  | 7     |
+| Tableau de bord des visites       | ACC-TDB-01 à 14  | 14    |
+| Listes du registre                | ACC-LST-01 à 12  | 12    |
+| Import du registre                | ACC-XLS-01 à 12  | 12    |
+| Mon travail                       | CHU-HUB-01 à 08  | 8     |
+| Étape 1, qualification            | CHU-ET1-01 à 14  | 14    |
+| Étape 2, saisie                   | CHU-ET2-01 à 09  | 9     |
+| Étape 3, conversion               | CHU-ET3-01 à 06  | 6     |
+| Chiffres CHUES                    | CHU-CHF-01 à 21  | 21    |
+| Composition et disposition CHUES  | CHU-DSP-01 à 12  | 12    |
+| Ancienne route de tableau de bord | CHU-TDB-01       | 1     |
+| Supervision                       | CHU-SUP-01 à 08  | 8     |
+| Rappels promis                    | CHU-RAP-01 à 08  | 8     |
+| Représentants, liste              | CHU-REP-01 à 07  | 7     |
+| Représentants, fiche              | CHU-REPD-01 à 05 | 5     |
+| Import des représentants          | CHU-IMP-01 à 05  | 5     |
+| Prospects CHUES                   | CHU-PRO-01 à 08  | 8     |
+| Contacts recommandés              | CHU-SUG-01 à 06  | 6     |
+| Dossiers, liste                   | CHU-DOS-01 à 06  | 6     |
+| Dossiers, ouverture               | CHU-DOSN-01 à 05 | 5     |
+| Dossiers, détail                  | CHU-DOSD-01 à 07 | 7     |
+| Dossiers, étapes                  | CHU-DOSE-01 à 04 | 4     |
+| Dossiers, export                  | CHU-DOSX-01 à 03 | 3     |
+| Tableau de bord bancaire          | CHU-BQ-01 à 05   | 5     |
+| Demandes de création              | CHU-DMC-01 à 06  | 6     |
+| Lots d'export                     | CHU-LOT-01 à 09  | 9     |
+| Transverse CHUES                  | CHU-TRV-01 à 07  | 7     |
+| Racine Admin                      | ADM-ROOT-01      | 1     |
+| Comptes utilisateurs              | ADM-USR-01 à 17  | 17    |
+| Listes de référence               | ADM-REF-01 à 12  | 12    |
+| Issues d'appel                    | ADM-ISS-01 à 07  | 7     |
+| Imports de masse                  | ADM-IMP-01 à 08  | 8     |
+| Notifications                     | ADM-NOT-01 à 10  | 10    |
+| Paramètres                        | ADM-PAR-01 à 05  | 5     |
+| Publication Android               | ADM-APK-01 à 18  | 18    |
+| Grand Public, liste               | GP-01 à 12       | 12    |
+| Grand Public, saisie              | GP-13 à 21       | 9     |
+| Grand Public, fiche               | GP-22 à 28       | 7     |
+| Grand Public, console             | GP-29, GP-30     | 2     |
+| Grand Public, rappels             | GP-31 à 33       | 3     |
+| Grand Public, chiffres            | GP-34 à 45       | 12    |
+| Espace démo                       | DEMO-01 à 09     | 9     |
+| Notifications hors coque          | TRA-01 à 03      | 3     |
+| Session, pannes, codes d'erreur   | TRA-04 à 08      | 5     |
+| 404 et erreur de rendu            | TRA-09, TRA-10   | 2     |
+| Largeur mobile                    | TRA-11, TRA-12   | 2     |
+| Accessibilité axe                 | TRA-13 à 18      | 6     |
 
 ### 9.3 Par fichier de spec
 
 **72 fichiers**, dont **71 nouveaux** et **1 existant** confié au mainteneur
 central (`prospects.spec.ts`, pour CHU-TRV-02).
 
-| Bloc | Fichiers | Scénarios |
-| --- | --- | --- |
-| Matrice des rôles (§5.3) | 5 | 30 |
-| Espace Accueil (§5.4) | 9 | 94 |
-| Espace CHUES (§5.5) | 37 | 170 |
-| Espace Admin (§5.6) | 7 | 78 |
-| Grand Public (§5.7) | 6 | 45 |
-| Démo et transversal (§5.8) | 8 | 27 |
+| Bloc                       | Fichiers | Scénarios |
+| -------------------------- | -------- | --------- |
+| Matrice des rôles (§5.3)   | 5        | 30        |
+| Espace Accueil (§5.4)      | 9        | 94        |
+| Espace CHUES (§5.5)        | 37       | 170       |
+| Espace Admin (§5.6)        | 7        | 78        |
+| Grand Public (§5.7)        | 6        | 45        |
+| Démo et transversal (§5.8) | 8        | 27        |
 
 Répartition la plus lourde : `chues-dossiers.banque.spec.ts` (19 scénarios),
 `admin-utilisateurs.spec.ts` (17), `ADM-APK` dans `android-release.spec.ts` (18),
@@ -6346,13 +6346,13 @@ pas et ne le rend pas partiellement sans déclarer ce qu'il n'a pas écrit.
 
 ### 9.4 Écrivables maintenant contre cible mouvante
 
-| État | Nombre | Détail |
-| --- | --- | --- |
-| Écrivables maintenant | **439** | tout le reste, lots d'export compris (§7.4.17 livré) |
-| Cible mouvante, à ne pas écrire tant que le lot web n'est pas livré | **5** | CHU-ET3-02 à CHU-ET3-06 |
-| Écrivables aujourd'hui **mais** marqués cible mouvante (l'attente peut changer sous le test) | 4 | CHU-ET3-01, ROL-30, CHU-HUB-06, ACC-COQ-04 |
-| Bloqués par un prérequis d'infrastructure | 1 | CHU-PRO-02 (septième état de session, §3.2) |
-| Conditionnels à la volumétrie, déclarés non joués si le seuil n'est pas atteint | 7 | ACC-REG-17, ACC-IMP-06, ACC-IMP-07, ACC-XLS-09, ACC-XLS-10, CHU-PRO-07, CHU-REP-05 |
+| État                                                                                         | Nombre  | Détail                                                                             |
+| -------------------------------------------------------------------------------------------- | ------- | ---------------------------------------------------------------------------------- |
+| Écrivables maintenant                                                                        | **439** | tout le reste, lots d'export compris (§7.4.17 livré)                               |
+| Cible mouvante, à ne pas écrire tant que le lot web n'est pas livré                          | **5**   | CHU-ET3-02 à CHU-ET3-06                                                            |
+| Écrivables aujourd'hui **mais** marqués cible mouvante (l'attente peut changer sous le test) | 4       | CHU-ET3-01, ROL-30, CHU-HUB-06, ACC-COQ-04                                         |
+| Bloqués par un prérequis d'infrastructure                                                    | 1       | CHU-PRO-02 (septième état de session, §3.2)                                        |
+| Conditionnels à la volumétrie, déclarés non joués si le seuil n'est pas atteint              | 7       | ACC-REG-17, ACC-IMP-06, ACC-IMP-07, ACC-XLS-09, ACC-XLS-10, CHU-PRO-07, CHU-REP-05 |
 
 ### 9.5 Attendus rouges en l'état du dépôt
 
@@ -6360,14 +6360,14 @@ Ces scénarios doivent être écrits et **laissés rouges**. Un agent qui les re
 verts a soit corrigé l'application (interdit, §4.2.4), soit assoupli son
 assertion (interdit, §4.5).
 
-| Cause | Scénarios | Nombre |
-| --- | --- | --- |
-| Virgule SQL de `supervision.service.ts:259` (§1.1) | CHU-CHF-01, CHU-CHF-02, CHU-CHF-05 à CHU-CHF-21, CHU-DSP-01 à CHU-DSP-12, CHU-SUP-01 à CHU-SUP-07, CHU-TRV-03, CHU-TRV-04, ROL-26 (partie CHUES) | 41 |
-| Lien mort `/grand-public/prospects` (§1.5) | ROL-29 | 1 |
-| Console vidée, `?fiche=` ignoré (§2.1) | CHU-ET3-01, CHU-RAP-04, CHU-RAP-08 | 3 |
-| Aucune pagination sur `/admin/commerciaux` (§1.10) | ADM-USR-17 | 1 |
-| Aucun état vide sur les issues d'appel (§1.11) | ADM-ISS-07 | 1 |
-| **Total attendu rouge** | | **48** |
+| Cause                                              | Scénarios                                                                                                                                        | Nombre |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------ |
+| Virgule SQL de `supervision.service.ts:259` (§1.1) | CHU-CHF-01, CHU-CHF-02, CHU-CHF-05 à CHU-CHF-21, CHU-DSP-01 à CHU-DSP-12, CHU-SUP-01 à CHU-SUP-07, CHU-TRV-03, CHU-TRV-04, ROL-26 (partie CHUES) | 41     |
+| Lien mort `/grand-public/prospects` (§1.5)         | ROL-29                                                                                                                                           | 1      |
+| Console vidée, `?fiche=` ignoré (§2.1)             | CHU-ET3-01, CHU-RAP-04, CHU-RAP-08                                                                                                               | 3      |
+| Aucune pagination sur `/admin/commerciaux` (§1.10) | ADM-USR-17                                                                                                                                       | 1      |
+| Aucun état vide sur les issues d'appel (§1.11)     | ADM-ISS-07                                                                                                                                       | 1      |
+| **Total attendu rouge**                            |                                                                                                                                                  | **48** |
 
 Les scénarios CHU-CHF-03 et CHU-CHF-04 (refus de rôle) ne touchent pas
 l'endpoint cassé : ils doivent passer. CHU-SUP-08 non plus.
@@ -6384,23 +6384,23 @@ Quinze doublons réels ont été fusionnés, chacun gardant **l'union** des
 assertions et des cas limites, jamais leur intersection. Le total final est donc
 de **444**.
 
-| Identifiant retenu | Identifiants d'origine fusionnés | Motif |
-| --- | --- | --- |
-| ROL-01 | ADM ROLE-01 + ACC B1 + ACC B2 | même tuiles, mêmes destinations pour l'ADMIN |
-| ROL-02 | ADM ROLE-02 + ACC B6 | idem pour la DIRECTION |
-| ROL-05 | ADM ROLE-05 + ACC B5 | idem pour l'ACCUEIL |
-| ROL-01 à ROL-06 | ACC B7 réparti sur les six | la table d'atterrissage par rôle est la même que les destinations de tuile |
-| ROL-16 | ADM ROLE-16 + ACC C1 | même barre, même rôle, mêmes absences |
-| ROL-24 | ADM ROLE-24 + volet ADMIN de ACC A13 | même renvoi `/notifications` vers `/admin/notifications?onglet=reception` |
-| ROL-26 | ADM ROLE-26 + ADM GP-47 + CHU TDB-1 | même `permanentRedirect`, deux routes |
-| ROL-29 | ADM ROLE-29 + ADM GP-30 | doublon interne au plan Admin, GP-30 renvoyait à ROLE-29 |
-| ROL-17 à ROL-21 | ADM ROLE-17 à ROLE-21 + CHU TRV-3 | TRV-3 décrivait exactement le balayage rôle par route interdite |
-| DEMO-05 | ADM DEMO-05 + ACC I1 | isolement démo vers public, union des deux écrans d'écriture |
-| DEMO-06 | ADM DEMO-06 + ACC I2 | isolement public vers démo, idem |
-| DEMO-07 | ADM DEMO-07 + ACC I3 | la réinitialisation n'atteint pas le public, union visites et prospects |
-| TRA-03 | ADM TR-03 + ACC C11 | cloche par rôle, union des six rôles et de la destination du lien |
-| TRA-10 | ADM TR-11 + ADM TR-12 | TR-12 était la clause de repli de TR-11, pas un scénario |
-| non repris | ADM TR-04 | pur renvoi à `prospects.spec.ts` ; déjà couvert par ACC-CNX-12 et CHU-TRV-01 (il n'était pas compté dans les 183) |
+| Identifiant retenu | Identifiants d'origine fusionnés     | Motif                                                                                                             |
+| ------------------ | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| ROL-01             | ADM ROLE-01 + ACC B1 + ACC B2        | même tuiles, mêmes destinations pour l'ADMIN                                                                      |
+| ROL-02             | ADM ROLE-02 + ACC B6                 | idem pour la DIRECTION                                                                                            |
+| ROL-05             | ADM ROLE-05 + ACC B5                 | idem pour l'ACCUEIL                                                                                               |
+| ROL-01 à ROL-06    | ACC B7 réparti sur les six           | la table d'atterrissage par rôle est la même que les destinations de tuile                                        |
+| ROL-16             | ADM ROLE-16 + ACC C1                 | même barre, même rôle, mêmes absences                                                                             |
+| ROL-24             | ADM ROLE-24 + volet ADMIN de ACC A13 | même renvoi `/notifications` vers `/admin/notifications?onglet=reception`                                         |
+| ROL-26             | ADM ROLE-26 + ADM GP-47 + CHU TDB-1  | même `permanentRedirect`, deux routes                                                                             |
+| ROL-29             | ADM ROLE-29 + ADM GP-30              | doublon interne au plan Admin, GP-30 renvoyait à ROLE-29                                                          |
+| ROL-17 à ROL-21    | ADM ROLE-17 à ROLE-21 + CHU TRV-3    | TRV-3 décrivait exactement le balayage rôle par route interdite                                                   |
+| DEMO-05            | ADM DEMO-05 + ACC I1                 | isolement démo vers public, union des deux écrans d'écriture                                                      |
+| DEMO-06            | ADM DEMO-06 + ACC I2                 | isolement public vers démo, idem                                                                                  |
+| DEMO-07            | ADM DEMO-07 + ACC I3                 | la réinitialisation n'atteint pas le public, union visites et prospects                                           |
+| TRA-03             | ADM TR-03 + ACC C11                  | cloche par rôle, union des six rôles et de la destination du lien                                                 |
+| TRA-10             | ADM TR-11 + ADM TR-12                | TR-12 était la clause de repli de TR-11, pas un scénario                                                          |
+| non repris         | ADM TR-04                            | pur renvoi à `prospects.spec.ts` ; déjà couvert par ACC-CNX-12 et CHU-TRV-01 (il n'était pas compté dans les 183) |
 
 **Ce qui n'a pas été fusionné, et pourquoi.** Les trois tableaux de bord
 composables (`/accueil/tableau-de-bord`, `/chues/statistiques`,
@@ -6417,14 +6417,3 @@ ADM-PAR-05, GP-20, GP-30) ne sont pas absorbés par le balayage ROL-17 à ROL-21
 le balayage prouve le refus et l'absence de chargement de données, ces scénarios
 prouvent la phrase exacte qui nomme l'écran. Le recouvrement est signalé sur
 chaque entrée.
-
-
-
-
-
-
-
-
-
-
-

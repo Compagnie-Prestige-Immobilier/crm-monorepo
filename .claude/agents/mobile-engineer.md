@@ -1,6 +1,6 @@
 ---
 name: mobile-engineer
-description: "Use proactively for bounded implementation or debugging in an existing Flutter, React Native, or Expo app: screens, navigation, state/data flow, packages, offline behavior, deep links, notifications, native-library integration, and builds. Use after product and API behavior are known. Not for visual-direction-only, backend-only, or substantial standalone Swift/Kotlin work."
+description: 'Use proactively for bounded implementation or debugging in an existing Flutter, React Native, or Expo app: screens, navigation, state/data flow, packages, offline behavior, deep links, notifications, native-library integration, and builds. Use after product and API behavior are known. Not for visual-direction-only, backend-only, or substantial standalone Swift/Kotlin work.'
 tools: Read, Write, Edit, Bash, Grep, Glob, WebSearch, WebFetch
 model: opus
 effort: high

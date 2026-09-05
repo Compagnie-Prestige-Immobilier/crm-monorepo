@@ -48,6 +48,8 @@ export const envSchema = z
 
     DATABASE_URL: z.url(),
     DATABASE_POOL_SIZE: z.coerce.number().int().min(2).default(10),
+    /** Absent : aucun cache, tout retombe sur Postgres. Obligatoire en production. */
+    REDIS_URL: z.url().optional(),
 
     JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 characters'),
     JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),
@@ -99,9 +101,32 @@ export const envSchema = z
     DB_DUMP_DIR: z.string().min(1).default('./storage/db-dumps'),
 
     DB_DUMP_ENABLED: booleanFlag(false),
+
+    DEMO_WORKSPACE_ENABLED: booleanFlag(false),
+
+    /**
+     * Les deux plateformes d'enrôlement, en LECTURE seule. `servers[0].url` des
+     * specs porte déjà `/api` : l'URL attendue est donc `https://<hôte>/api`.
+     *
+     * Vides par défaut, et c'est le cas normal en développement comme en test :
+     * le connecteur ne tire alors rien et l'écran d'administration le dit, au
+     * lieu de faire échouer le démarrage de toute l'API.
+     */
+    PLATEFORME_CHUES_URL: z.union([z.url(), z.literal('')]).default(''),
+    PLATEFORME_CHUES_TOKEN: z.string().default(''),
+    PLATEFORME_GRAND_PUBLIC_URL: z.union([z.url(), z.literal('')]).default(''),
+    PLATEFORME_GRAND_PUBLIC_TOKEN: z.string().default(''),
   })
   .superRefine((env, context) => {
     if (env.NODE_ENV !== 'production') return;
+
+    if (!env.REDIS_URL) {
+      context.addIssue({
+        code: 'custom',
+        path: ['REDIS_URL'],
+        message: 'REDIS_URL is required in production',
+      });
+    }
 
     if (env.JWT_ACCESS_SECRET === env.JWT_REFRESH_SECRET) {
       context.addIssue({
@@ -119,12 +144,49 @@ export const envSchema = z
       });
     }
 
+    // La fabrique de démonstration écrit neuf cent mille lignes : elle n'a rien
+    // à faire sur la base qui porte les vraies fiches.
+    if (env.DEMO_WORKSPACE_ENABLED) {
+      context.addIssue({
+        code: 'custom',
+        path: ['DEMO_WORKSPACE_ENABLED'],
+        message: 'DEMO_WORKSPACE_ENABLED must be false in production',
+      });
+    }
+
     for (const origin of env.API_CORS_ORIGINS) {
       if (!origin.startsWith('https://')) {
         context.addIssue({
           code: 'custom',
           path: ['API_CORS_ORIGINS'],
           message: `Production CORS origins must use https: ${origin}`,
+        });
+      }
+    }
+
+    // Une URL sans jeton tirerait en anonyme et remonterait un 401 toutes les
+    // quinze minutes, sans que personne ne sache que le jeton n'a jamais été posé.
+    const plateformes = [
+      [
+        'PLATEFORME_CHUES_URL',
+        'PLATEFORME_CHUES_TOKEN',
+        env.PLATEFORME_CHUES_URL,
+        env.PLATEFORME_CHUES_TOKEN,
+      ],
+      [
+        'PLATEFORME_GRAND_PUBLIC_URL',
+        'PLATEFORME_GRAND_PUBLIC_TOKEN',
+        env.PLATEFORME_GRAND_PUBLIC_URL,
+        env.PLATEFORME_GRAND_PUBLIC_TOKEN,
+      ],
+    ] as const;
+
+    for (const [cleUrl, cleJeton, url, jeton] of plateformes) {
+      if (url !== '' && jeton.trim() === '') {
+        context.addIssue({
+          code: 'custom',
+          path: [cleJeton],
+          message: `${cleJeton} is required when ${cleUrl} is set`,
         });
       }
     }

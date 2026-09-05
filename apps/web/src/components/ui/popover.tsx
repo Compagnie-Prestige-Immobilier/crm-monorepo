@@ -56,7 +56,7 @@ function PopoverContent({
   alignOffset,
   side,
   sideOffset = 4,
-  collisionPadding = 0,
+  collisionPadding = 8,
   ...props
 }: PopoverContentProps) {
   const anchor = useContext(PopoverAnchorContext)?.anchor ?? undefined;
@@ -74,7 +74,11 @@ function PopoverContent({
         <PopoverPrimitive.Popup
           data-slot="popover-content"
           className={cn(
-            'z-50 w-72 origin-(--transform-origin) rounded-md',
+            // Sans `--available-height`, un popover ouvert en bas d'écran
+            // dépassait la fenêtre : sa fin était hors d'atteinte, et rien ne
+            // défilait puisque rien ne débordait d'un conteneur.
+            'z-50 flex max-h-(--available-height) w-72 flex-col overflow-y-auto',
+            'origin-(--transform-origin) rounded-md',
             'border border-border bg-popover p-1 text-popover-foreground shadow-elev-lg',
             'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
             'duration-150 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95',

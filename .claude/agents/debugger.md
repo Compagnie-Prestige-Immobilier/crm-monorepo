@@ -1,6 +1,6 @@
 ---
 name: debugger
-description: "Use proactively for a bounded unexplained failure: crash, wrong output, regression, build/test failure, race, leak, intermittent issue, or environment-specific behavior. Reproduces, isolates hypotheses, proves root cause, fixes the earliest shared cause, and leaves a regression check. Not for speculative optimization or broad refactoring."
+description: 'Use proactively for a bounded unexplained failure: crash, wrong output, regression, build/test failure, race, leak, intermittent issue, or environment-specific behavior. Reproduces, isolates hypotheses, proves root cause, fixes the earliest shared cause, and leaves a regression check. Not for speculative optimization or broad refactoring.'
 tools: Read, Write, Edit, Bash, Grep, Glob, WebSearch, WebFetch
 model: opus
 effort: high

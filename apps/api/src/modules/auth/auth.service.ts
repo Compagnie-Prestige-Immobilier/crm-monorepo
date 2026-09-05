@@ -165,7 +165,10 @@ export class AuthService {
         message: 'Ce compte est désactivé. Contactez un administrateur.',
       });
     }
-    if (workspace === 'demo') await this.demo.ensureSeeded();
+    if (workspace === 'demo') {
+      this.demo.assertEnabled();
+      await this.demo.ensureSeeded();
+    }
     return this.issue(user, randomUUID(), userAgent, workspace);
   }
 

@@ -70,6 +70,7 @@ function rep(over: Partial<RepresentantRow> & { id: string }): RepresentantRow {
     lastCallById: 'u-1',
     lastCallByName: 'Fatou Sow',
     nextCallbackAt: null,
+    nextCallbackOrigine: null,
     ...over,
   };
 }

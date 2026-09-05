@@ -15,7 +15,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import type { SessionUser } from '@/lib/types';
 
-export function Topbar({ user }: { user: SessionUser }) {
+export function Topbar({ user, demoEnabled }: { user: SessionUser; demoEnabled: boolean }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
@@ -69,7 +69,7 @@ export function Topbar({ user }: { user: SessionUser }) {
           droit sur un refus de permission. */}
       {hasInbox(user.role) ? <NotificationBell href={inboxPathFor(user.role)} /> : null}
       <ThemeToggle />
-      <UserMenu user={user} />
+      <UserMenu user={user} demoEnabled={demoEnabled} />
     </header>
   );
 }

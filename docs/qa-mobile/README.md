@@ -2,13 +2,13 @@
 
 Campagne du 30 août 2026, sur le commit `e8baacd` avec l'arbre de travail modifié (retrait des campagnes, migration ForUI en cours). Cinq testeurs en compétition, chacun sur un domaine, avec preuve obligatoire pour chaque défaut ; les rapports ont été contre-vérifiés par sondage sur le code (aucune affirmation sondée n'était fausse).
 
-| Rapport | Domaine | Défauts | Dont bloquants / majeurs | Méthode |
-| --- | --- | --- | --- | --- |
-| [securite-session.md](securite-session.md) | authentification, session, mise à jour, permissions, stockage | 11 | 1 / 4 | lecture + HTTP réel |
-| [synchronisation.md](synchronisation.md) | sync, hors ligne, base locale, idempotence, tombstones | 7 | 1 / 6 | tests Flutter + HTTP réel |
-| [formulaires.md](formulaires.md) | validations, brouillons, anti-double-envoi, écarts client/serveur | 9 | 0 / 4 | tests Flutter + HTTP réel |
-| [navigation-ui.md](navigation-ui.md) | navigation, états, accessibilité, responsive, textes | 19 | 0 / 7 | lecture (5 cosmétiques) |
-| [emulateur.md](emulateur.md) | boîte noire sur émulateur (13 parcours non couverts, listés) | 8 | 1 / 2 | émulateur Android, build debug |
+| Rapport                                    | Domaine                                                           | Défauts | Dont bloquants / majeurs | Méthode                        |
+| ------------------------------------------ | ----------------------------------------------------------------- | ------- | ------------------------ | ------------------------------ |
+| [securite-session.md](securite-session.md) | authentification, session, mise à jour, permissions, stockage     | 11      | 1 / 4                    | lecture + HTTP réel            |
+| [synchronisation.md](synchronisation.md)   | sync, hors ligne, base locale, idempotence, tombstones            | 7       | 1 / 6                    | tests Flutter + HTTP réel      |
+| [formulaires.md](formulaires.md)           | validations, brouillons, anti-double-envoi, écarts client/serveur | 9       | 0 / 4                    | tests Flutter + HTTP réel      |
+| [navigation-ui.md](navigation-ui.md)       | navigation, états, accessibilité, responsive, textes              | 19      | 0 / 7                    | lecture (5 cosmétiques)        |
+| [emulateur.md](emulateur.md)               | boîte noire sur émulateur (13 parcours non couverts, listés)      | 8       | 1 / 2                    | émulateur Android, build debug |
 
 ## À corriger en premier
 

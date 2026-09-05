@@ -44,7 +44,7 @@ const ecranDe = (ouverture: OuvertureFiche) =>
     ? { href: '/chues/console', Icone: HeadsetIcon }
     : { href: '/chues/appels-representants', Icone: PhoneCallIcon };
 
-export function UserMenu({ user }: { user: SessionUser }) {
+export function UserMenu({ user, demoEnabled }: { user: SessionUser; demoEnabled: boolean }) {
   const router = useRouter();
   const [pending, setPending] = useState<'workspace' | 'logout' | null>(null);
 
@@ -141,17 +141,21 @@ export function UserMenu({ user }: { user: SessionUser }) {
           <KeyRoundIcon aria-hidden="true" />
           Mot de passe
         </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          disabled={pending !== null}
-          closeOnClick={false}
-          onClick={() => {
-            void switchWorkspace();
-          }}
-        >
-          <FlaskConicalIcon aria-hidden="true" />
-          {workspaceLabel}
-        </DropdownMenuItem>
+        {demoEnabled ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              disabled={pending !== null}
+              closeOnClick={false}
+              onClick={() => {
+                void switchWorkspace();
+              }}
+            >
+              <FlaskConicalIcon aria-hidden="true" />
+              {workspaceLabel}
+            </DropdownMenuItem>
+          </>
+        ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           variant="destructive"

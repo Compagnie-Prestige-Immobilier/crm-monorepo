@@ -65,6 +65,27 @@ services:
     networks: [cpi-go]
     logging: *logging
 
+  # Cache des agrégats. Mémoire bornée et persistance coupée par l'API à la
+  # connexion (redis.service.ts), même réglage ici et sur Dokploy. L'API démarre
+  # et sert sans lui ; il n'est donc attendu qu'en `started`.
+  redis:
+    image: redis:8-alpine
+    container_name: cpi-go-redis
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD:?REDIS_PASSWORD doit être défini dans infra/docker/.env}
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli -a "$$REDIS_PASSWORD" ping | grep -q PONG']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    networks: [cpi-go]
+    logging: *logging
+
   # Service éphémère : applique les migrations puis sort en 0. `api` et `web`
   # attendent sa terminaison réussie, ce qui garantit qu'aucune requête n'est
   # servie contre un schéma périmé. `restart: "no"` est explicite : une
@@ -99,9 +120,13 @@ services:
       NODE_ENV: production
       PORT: '3001'
       DATABASE_URL: postgresql://${POSTGRES_USER:-crm}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-crm}?schema=public
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       # Swagger fermé en production : le contrat est publié par la CI, pas par
       # le serveur de production.
       API_DOCS_ENABLED: 'false'
+      # Espace de démonstration fermé : sa fabrique engendre neuf cent mille
+      # lignes fictives, à tenir hors de la base qui porte les vraies fiches.
+      DEMO_WORKSPACE_ENABLED: 'false'
       # Les APK publiés depuis le panel doivent survivre à une nouvelle image.
       APK_RELEASE_DIR: /repo/storage/releases
       # Exports intégraux de la base. Même motif que ci-dessus : le fichier vit
@@ -117,6 +142,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_started
       migrate:
         condition: service_completed_successfully
     # Sonde HTTP sur la route de disponibilité réelle. Le commentaire qui

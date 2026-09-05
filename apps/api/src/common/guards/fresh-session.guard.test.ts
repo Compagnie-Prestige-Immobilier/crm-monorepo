@@ -11,7 +11,9 @@ import { Roles } from '../decorators/roles.decorator.js';
 import { WorkspaceContext } from '../../workspaces/workspace.js';
 import { fakeWorkspace } from '../../workspaces/fake-workspace.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { FreshSessionGuard } from './fresh-session.guard.js';
+import { FakeRedis, fakeRedisService } from '../../redis/fake-redis.js';
+import { RedisService } from '../../redis/redis.service.js';
+import { FreshSessionGuard, freshUserKey } from './fresh-session.guard.js';
 import { RolesGuard } from './roles.guard.js';
 
 const ADMIN_URL = '/api/v1/essai/admin';
@@ -66,17 +68,20 @@ class EssaiController {
 
 let app: NestFastifyApplication;
 let users: FakeUsers;
+let redis: RedisService;
 
 beforeEach(async () => {
   users = new FakeUsers();
+  redis = fakeRedisService(new FakeRedis());
 
   @Global()
   @Module({
     providers: [
       { provide: PrismaService, useValue: users.asService() },
       { provide: WorkspaceContext, useValue: fakeWorkspace() },
+      { provide: RedisService, useValue: redis },
     ],
-    exports: [PrismaService, WorkspaceContext],
+    exports: [PrismaService, WorkspaceContext, RedisService],
   })
   class FakePrismaModule {}
 
@@ -148,6 +153,18 @@ describe('rôle rétrogradé pendant la vie du jeton', () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json<{ role: string }>().role).toBe(Role.ADMIN);
+  });
+});
+
+describe('cache de l’autorité', () => {
+  it('relit la base une fois, puis sert le cache jusqu’à la purge', async () => {
+    expect((await app.inject({ method: 'GET', url: ADMIN_URL })).statusCode).toBe(200);
+
+    users.row = { role: Role.ADMIN, isActive: false, deletedAt: null };
+    expect((await app.inject({ method: 'GET', url: ADMIN_URL })).statusCode).toBe(200);
+
+    await redis.bust(freshUserKey(TOKEN_USER.id));
+    expect((await app.inject({ method: 'GET', url: ADMIN_URL })).statusCode).toBe(401);
   });
 });
 

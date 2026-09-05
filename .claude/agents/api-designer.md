@@ -1,6 +1,6 @@
 ---
 name: api-designer
-description: "Use proactively to design or repair a bounded machine-consumable API contract before implementation: REST/OpenAPI, GraphQL, RPC/Protobuf, AsyncAPI events, webhooks, pagination, errors, versioning, and compatibility. Not for endpoint implementation, database design, product semantics, or speculative platform redesign."
+description: 'Use proactively to design or repair a bounded machine-consumable API contract before implementation: REST/OpenAPI, GraphQL, RPC/Protobuf, AsyncAPI events, webhooks, pagination, errors, versioning, and compatibility. Not for endpoint implementation, database design, product semantics, or speculative platform redesign.'
 tools: Read, Write, Edit, Bash, Grep, Glob, WebSearch, WebFetch
 model: opus
 effort: high

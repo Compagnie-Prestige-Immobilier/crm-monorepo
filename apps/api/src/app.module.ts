@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule, seconds } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
@@ -7,6 +7,8 @@ import { resolve } from 'node:path';
 
 import { envSchema, readEnv } from './env.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { CacheInterceptor } from './redis/cache.interceptor.js';
+import { RedisModule } from './redis/redis.module.js';
 import { FreshSessionGuard } from './common/guards/fresh-session.guard.js';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
 import { RolesGuard } from './common/guards/roles.guard.js';
@@ -17,6 +19,7 @@ import { CallbacksModule } from './modules/callbacks/callbacks.module.js';
 import { ClientRequestsModule } from './modules/client-requests/client-requests.module.js';
 import { DbDumpModule } from './modules/db-dump/db-dump.module.js';
 import { DemoModule } from './modules/demo/demo.module.js';
+import { EnrolementModule } from './modules/enrolement/enrolement.module.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
 import { OuverturesModule } from './modules/ouvertures/ouvertures.module.js';
 import { Phase2Module } from './modules/phase2/phase2.module.js';
@@ -35,6 +38,7 @@ import { AppUpdatesModule } from './modules/app-updates/app-updates.module.js';
 import { VisitesModule } from './modules/visites/visites.module.js';
 import { DashboardsModule } from './modules/dashboards/dashboards.module.js';
 import { LotsExportModule } from './modules/lots-export/lots-export.module.js';
+import { LiveModule } from './modules/live/live.module.js';
 
 const env = readEnv();
 const apiLogPath = resolve(import.meta.dirname, '../../../logs/api.log');
@@ -95,6 +99,8 @@ const apiLogPath = resolve(import.meta.dirname, '../../../logs/api.log');
       throttlers: [{ name: 'default', ttl: seconds(60), limit: env.API_GLOBAL_RATE_LIMIT }],
     }),
     PrismaModule,
+    RedisModule,
+    LiveModule,
     AuthModule,
     HealthModule,
     UsersModule,
@@ -120,12 +126,14 @@ const apiLogPath = resolve(import.meta.dirname, '../../../logs/api.log');
     VisitesModule,
     DashboardsModule,
     LotsExportModule,
+    EnrolementModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: FreshSessionGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_INTERCEPTOR, useClass: CacheInterceptor },
   ],
 })
 export class AppModule {}
