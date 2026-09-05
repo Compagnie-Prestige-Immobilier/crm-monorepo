@@ -147,6 +147,60 @@ describe('ouvrir une fiche', () => {
   });
 });
 
+/**
+ * EB-10 : ce qui a été saisi avant « À rappeler » doit revenir au rappel, deux
+ * jours plus tard, dans une AUTRE ouverture.
+ */
+describe('le brouillon repris au rappel', () => {
+  const creation = (): { data: Record<string, unknown> } =>
+    (db.ouvertureFiche.create.mock.calls[0] as [{ data: Record<string, unknown> }])[0];
+
+  it('reprend le brouillon de la dernière ouverture close de la même fiche', async () => {
+    db.ouvertureFiche.findFirst.mockResolvedValue({ draft: { syndicat: 'SUDES', etape: 2 } });
+
+    await service.ouvrir(AWA, corps());
+
+    const [lecture] = db.ouvertureFiche.findFirst.mock.calls[0] as [
+      { where: Record<string, unknown>; orderBy: unknown },
+    ];
+    expect(lecture.where).toMatchObject({
+      openedById: AWA.id,
+      representantId: REP,
+      closedAt: { not: null },
+    });
+    expect(lecture.orderBy).toEqual([{ openedAt: 'desc' }, { id: 'desc' }]);
+    expect(creation().data.draft).toEqual({ syndicat: 'SUDES', etape: 2 });
+  });
+
+  it('cherche le précédent brouillon d’un prospect sur SA fiche', async () => {
+    const prospectId = '0198e000-0000-7000-8000-000000000009';
+    db.prospect.findFirst.mockResolvedValue({ id: prospectId });
+
+    await service.ouvrir(AWA, corps({ representantId: undefined, prospectId }));
+
+    const [lecture] = db.ouvertureFiche.findFirst.mock.calls[0] as [
+      { where: Record<string, unknown> },
+    ];
+    expect(lecture.where).toMatchObject({ prospectId, openedById: AWA.id });
+    expect(lecture.where.representantId).toBeNull();
+  });
+
+  it('laisse la fiche vide quand la précédente ouverture n’a rien gardé', async () => {
+    db.ouvertureFiche.findFirst.mockResolvedValue({ draft: null });
+
+    await service.ouvrir(AWA, corps());
+
+    expect(creation().data.draft).toBe(Prisma.DbNull);
+  });
+
+  it('garde le brouillon envoyé par le client, sans aller en chercher un autre', async () => {
+    await service.ouvrir(AWA, corps({ draft: { syndicat: 'SAES' } }));
+
+    expect(db.ouvertureFiche.findFirst).not.toHaveBeenCalled();
+    expect(creation().data.draft).toEqual({ syndicat: 'SAES' });
+  });
+});
+
 describe('le brouillon et la fiche en main', () => {
   it('rend la fiche ouverte avec ses réponses déjà saisies', async () => {
     db.ouvertureFiche.findFirst.mockResolvedValue(ligne({ draft: { syndicat: 'SUDES' } }));
