@@ -78,7 +78,6 @@ import {
   type ActivitySortKey,
   type PeriodPreset,
   type SortDirection,
-  type SupervisionActivity,
   type SupervisionGranularity,
   type SupervisionScore,
   type UpdateWorkShifts,
@@ -94,13 +93,13 @@ import { cn } from '@/lib/utils';
 const TUILES: Record<ActivityFamille, { key: ActivityKey; icon: LucideIcon }[]> = {
   representants: [
     { key: 'repCalls', icon: PhoneCallIcon },
-    { key: 'repContactRate', icon: PhoneOffIcon },
-    { key: 'repCallback', icon: TargetIcon },
+    { key: 'repReachabilityRate', icon: PhoneOffIcon },
+    { key: 'repFichesAcceptees', icon: TargetIcon },
     { key: 'prospectsCreated', icon: UserPlusIcon },
   ],
   prospects: [
     { key: 'calls', icon: PhoneCallIcon },
-    { key: 'reachRate', icon: PhoneOffIcon },
+    { key: 'ficheReachRate', icon: PhoneOffIcon },
     { key: 'methodObtained', icon: TargetIcon },
     { key: 'prospectsCreated', icon: UserPlusIcon },
   ],
@@ -637,13 +636,39 @@ function ShiftComparison({
 
   if (shiftsQuery.isPending || shifts.length === 0) return null;
 
-  type ApiCounts = SupervisionActivity['totals'];
-  const callsOf = (counts: ApiCounts): number =>
+  // EB-33 : une ligne par téléconseiller, un groupe de colonnes par créneau.
+  // Chaque créneau est une fenêtre à part : une fiche appelée le matin et
+  // l'après-midi compte dans les deux.
+  const parCreneau = results.map((result) =>
+    result.data === undefined ? [] : activityLines(result.data),
+  );
+  const personnes = [...new Map(parCreneau.flat().map((ligne) => [ligne.id, ligne.name]))]
+    .sort(([, a], [, b]) => a.localeCompare(b, 'fr'));
+  type Compteurs = Pick<
+    ActivityCounts,
+    | 'repCalls'
+    | 'calls'
+    | 'repFichesAcceptees'
+    | 'methodObtained'
+    | 'repReachabilityRate'
+    | 'ficheReachRate'
+  >;
+  const ligneDe = (index: number, id: string): Compteurs | undefined =>
+    parCreneau[index]?.find((ligne) => ligne.id === id);
+  const totauxDe = (index: number): Compteurs | undefined => results[index]?.data?.totals;
+
+  const callsOf = (counts: Compteurs): number =>
     famille === 'representants' ? counts.repCalls : counts.calls;
-  const successOf = (counts: ApiCounts): number =>
-    famille === 'representants' ? counts.repReached : counts.methodObtained;
-  const rateOf = (counts: ApiCounts): number | null =>
-    famille === 'representants' ? counts.repContactRate : counts.reachRate;
+  const successOf = (counts: Compteurs): number =>
+    famille === 'representants' ? counts.repFichesAcceptees : counts.methodObtained;
+  const rateOf = (counts: Compteurs): number | null =>
+    famille === 'representants' ? counts.repReachabilityRate : counts.ficheReachRate;
+
+  const cellules = (counts: Compteurs | undefined): [string, string, string] => [
+    formatNumber(counts === undefined ? 0 : callsOf(counts)),
+    formatRateOrNone(counts === undefined ? null : rateOf(counts)),
+    formatNumber(counts === undefined ? 0 : successOf(counts)),
+  ];
 
   return (
     <Card>
@@ -655,7 +680,8 @@ function ShiftComparison({
               Efficacité par créneau
             </h2>
             <p className="mt-1 text-[0.8125rem] text-muted-foreground">
-              Appels par heure et résultat des appels, sur la période choisie.
+              Appels, joignabilité et {famille === 'representants' ? 'acceptés' : 'méthodes'} de
+              chaque téléconseiller, créneau par créneau, sur la période choisie.
             </p>
           </div>
           <Button
@@ -720,45 +746,59 @@ function ShiftComparison({
           </form>
         ) : null}
 
-        <Table>
+        <Table aria-label="Efficacité par créneau">
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead>Créneau</TableHead>
-              <TableHead className="text-right">Appels</TableHead>
-              <TableHead className="text-right">Appels/h</TableHead>
-              <TableHead className="text-right">
-                {famille === 'representants' ? 'Joints' : 'Méthodes'}
-              </TableHead>
-              <TableHead className="text-right">Taux</TableHead>
-              <TableHead className="text-right">Prospects saisis</TableHead>
+              <TableHead rowSpan={2}>Téléconseiller</TableHead>
+              {shifts.map((shift) => (
+                <TableHead key={shift.key} colSpan={3} className="text-center">
+                  {shift.label} · {shift.start}–{shift.end}
+                </TableHead>
+              ))}
+            </TableRow>
+            <TableRow className="hover:bg-transparent">
+              {shifts.flatMap((shift) => [
+                <TableHead key={`${shift.key}-appels`} className="text-right">
+                  Appels
+                </TableHead>,
+                <TableHead key={`${shift.key}-taux`} className="text-right">
+                  Joignabilité
+                </TableHead>,
+                <TableHead key={`${shift.key}-succes`} className="text-right">
+                  {famille === 'representants' ? 'Acceptés' : 'Méthodes'}
+                </TableHead>,
+              ])}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {shifts.map((shift, index) => {
-              const counts = results[index]?.data?.totals;
-              const duration = (shiftMinutes(shift.start, shift.end) / 60) * rangeDays(range);
-              const calls = counts === undefined ? 0 : callsOf(counts);
-              return (
-                <TableRow key={shift.key}>
-                  <TableCell className="font-[600]">
-                    {shift.label} · {shift.start}–{shift.end}
+            {personnes.map(([id, nom]) => (
+              <TableRow key={id}>
+                <TableCell className="font-[600]">{nom}</TableCell>
+                {shifts.flatMap((shift, index) =>
+                  cellules(ligneDe(index, id)).map((texte, colonne) => (
+                    <TableCell
+                      key={`${shift.key}-${String(colonne)}`}
+                      className="text-right tabular-nums"
+                    >
+                      {texte}
+                    </TableCell>
+                  )),
+                )}
+              </TableRow>
+            ))}
+            <TableRow className="font-[600]">
+              <TableCell>Équipe</TableCell>
+              {shifts.flatMap((shift, index) =>
+                cellules(totauxDe(index)).map((texte, colonne) => (
+                  <TableCell
+                    key={`${shift.key}-${String(colonne)}`}
+                    className="text-right tabular-nums"
+                  >
+                    {texte}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">{formatNumber(calls)}</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatDecimal(duration === 0 ? 0 : calls / duration)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatNumber(counts === undefined ? 0 : successOf(counts))}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatRateOrNone(counts === undefined ? null : rateOf(counts))}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatNumber(counts?.prospectsCreated ?? 0)}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
+                )),
+              )}
+            </TableRow>
           </TableBody>
         </Table>
       </CardContent>
@@ -788,18 +828,6 @@ function TimeField({
       />
     </div>
   );
-}
-
-function shiftMinutes(start: string, end: string): number {
-  const [startHour = 0, startMinute = 0] = start.split(':').map(Number);
-  const [endHour = 0, endMinute = 0] = end.split(':').map(Number);
-  return endHour * 60 + endMinute - startHour * 60 - startMinute;
-}
-
-function rangeDays(range: ActivityRange): number {
-  const from = Date.parse(`${range.from}T00:00:00.000Z`);
-  const to = Date.parse(`${range.to}T00:00:00.000Z`);
-  return Math.max(1, Math.floor((to - from) / 86_400_000) + 1);
 }
 
 function dureeAffichee(secondes: number): string {

@@ -27,6 +27,9 @@ vi.mock('@/lib/data/chiffres', () => ({
   fetchChiffresMethodes: vi.fn<() => Promise<never>>(),
   fetchChiffresBanques: vi.fn<() => Promise<never>>(),
   fetchChiffresCampagne: vi.fn<() => Promise<never>>(),
+  fetchChiffresCampagnes: vi.fn<() => Promise<never>>(),
+  fetchChiffresCreneaux: vi.fn<() => Promise<never>>(),
+  fetchChiffresRepresentants: vi.fn<() => Promise<never>>(),
   fetchChiffresEnrolement: vi.fn<() => Promise<never>>(),
 }));
 
@@ -70,6 +73,19 @@ const totaux = {
   repQuestioned: 21,
   repQualified: 14,
   repQualificationRate: 66.7,
+  fiches: 32,
+  fichesJointes: 28,
+  ficheReachRate: 87.5,
+  repFiches: 20,
+  repFichesJointes: 14,
+  repFichesNonJointes: 6,
+  repFichesAcceptees: 8,
+  repFichesRefusees: 4,
+  repFichesARappeler: 2,
+  repFichesEligibles: 12,
+  repReachabilityRate: 70,
+  repAcceptanceRate: 66.7,
+  repCallbackFicheRate: 10,
 };
 
 const activite = {
@@ -164,6 +180,8 @@ describe('l’écran Chiffres, du squelette aux chiffres', () => {
             openedByName: 'Awa Sy',
             jour: '2026-08-27',
             ouvertures: 12,
+            qualifiees: 10,
+            liberees: 1,
             dureeMoyenneSecondes: 240,
           },
           {
@@ -171,6 +189,8 @@ describe('l’écran Chiffres, du squelette aux chiffres', () => {
             openedByName: 'Moussa Ba',
             jour: '2026-08-26',
             ouvertures: 5,
+            qualifiees: 0,
+            liberees: 0,
             dureeMoyenneSecondes: null,
           },
         ],
@@ -200,6 +220,8 @@ describe('l’écran Chiffres, du squelette aux chiffres', () => {
         openedByName: 'Awa Sy',
         jour: '2026-08-27',
         ouvertures: 12,
+        qualifiees: 12,
+        liberees: 0,
         dureeMoyenneSecondes: 240,
       },
     ]);
@@ -283,9 +305,10 @@ describe('l’écran Chiffres, du squelette aux chiffres', () => {
     const tableau = await screen.findByRole('table', { name: 'Par téléconseiller' });
     for (const entete of [
       'Appels représentants',
-      'Contact',
-      'Rendez-vous',
-      'Qualification',
+      'Joignabilité',
+      'Acceptés',
+      'À rappeler',
+      'Acceptation',
       'Méthodes obtenues',
     ]) {
       expect(within(tableau).getByRole('columnheader', { name: entete })).toBeTruthy();
@@ -295,7 +318,7 @@ describe('l’écran Chiffres, du squelette aux chiffres', () => {
       within(awa)
         .getAllByRole('cell')
         .map((cellule) => cellule.textContent),
-    ).toEqual(['30', '70,0 %', '20,0 %', '66,7 %', '26', '12']);
+    ).toEqual(['30', '70,0 %', '8', '2', '66,7 %', '26', '12']);
     const equipe = within(tableau).getByRole('row', { name: /Équipe/u });
     expect(within(equipe).getAllByRole('cell')[1]?.textContent).toBe('70,0 %');
     // Moussa n'a rien fait : des taux « Sans objet », jamais « 0 % ».
@@ -313,7 +336,7 @@ describe('l’écran Chiffres, du squelette aux chiffres', () => {
     const tableau = await screen.findByRole('table', { name: 'Par téléconseiller' });
     expect(within(tableau).getByRole('columnheader', { name: 'Appels prospects' })).toBeTruthy();
     expect(within(tableau).getByRole('columnheader', { name: 'Joignabilité' })).toBeTruthy();
-    expect(within(tableau).queryByRole('columnheader', { name: 'Qualification' })).toBeNull();
+    expect(within(tableau).queryByRole('columnheader', { name: 'Acceptation' })).toBeNull();
     const awa = within(tableau).getByRole('row', { name: /Awa Sy/u });
     expect(
       within(awa)
@@ -378,7 +401,9 @@ describe('l’écran Chiffres, du squelette aux chiffres', () => {
   // Un représentant syndical n'existe pas hors CHUES : ces cartes seraient à zéro.
   it('n’offre pas la qualification des représentants au Grand Public', async () => {
     setUrl('/grand-public/statistiques');
-    dispositionMock.mockResolvedValue(disposition(['prospects-notes', 'taux-de-contact']));
+    dispositionMock.mockResolvedValue(
+      disposition(['prospects-notes', 'taux-de-joignabilite-representants']),
+    );
     activiteMock.mockResolvedValue(activite);
 
     renderWithQuery(<ChiffresView ecran="grand-public" role={SUPERVISEUR} />);
@@ -393,10 +418,12 @@ describe('l’écran Chiffres, du squelette aux chiffres', () => {
   // seul info-bulle, doit dire de quels appels elle parle.
   it('nomme la famille d’appels dans le titre et dans le vide de chaque taux', async () => {
     setUrl('/chues/statistiques');
-    dispositionMock.mockResolvedValue(disposition(['taux-de-contact', 'taux-de-joignabilite']));
+    dispositionMock.mockResolvedValue(
+      disposition(['taux-de-joignabilite-representants', 'taux-de-joignabilite']),
+    );
     activiteMock.mockResolvedValue({
       ...activite,
-      totals: { ...totaux, calls: 0, reachRate: null },
+      totals: { ...totaux, fiches: 0, fichesJointes: 0, ficheReachRate: null },
     });
 
     renderWithQuery(<ChiffresView ecran="chues" role={SUPERVISEUR} />);
@@ -411,13 +438,13 @@ describe('l’écran Chiffres, du squelette aux chiffres', () => {
 
   it('une tuile de taux met le nombre en grand et le pourcentage en dessous', async () => {
     setUrl('/chues/statistiques');
-    dispositionMock.mockResolvedValue(disposition(['taux-de-contact']));
+    dispositionMock.mockResolvedValue(disposition(['taux-de-joignabilite-representants']));
     activiteMock.mockResolvedValue(activite);
 
     renderWithQuery(<ChiffresView ecran="chues" role={SUPERVISEUR} />);
 
-    expect((await screen.findAllByText('21')).length).toBeGreaterThan(0);
-    expect(screen.getByText('70,0 % · 21 joints sur 30 appels')).toBeTruthy();
+    expect((await screen.findAllByText('14')).length).toBeGreaterThan(0);
+    expect(screen.getByText('70,0 % · 14 joints sur 20 fiches')).toBeTruthy();
     expect(screen.queryByText('70,0 %')).toBeNull();
   });
 });

@@ -2,7 +2,7 @@ import type { ApiClient, components } from '@crm/api-client';
 import { unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
-import type { ActivityRange } from '@/lib/data/admin';
+import { fetchWorkShifts, type ActivityRange, type WorkShifts } from '@/lib/data/admin';
 import { fetchDerniereCampagne, type CampagnePerformance } from '@/lib/data/lots-export';
 
 type Schemas = components['schemas'];
@@ -17,7 +17,15 @@ export type ChiffresRendement = Schemas['DepartementYieldListDto'];
 export type ChiffresMethodes = Schemas['EnrollmentMethodListDto'];
 export type ChiffresBanques = Schemas['NamedCountListDto'];
 export type ChiffresCampagne = CampagnePerformance | null;
+export type ChiffresCampagnes = Schemas['SupervisionCampagnesDto'];
+export type ChiffresRepresentants = Schemas['StockRepresentantsDto'];
 export type ChiffresEnrolement = Schemas['EnrolementIndicateursDto'];
+
+/** L'activité relue créneau par créneau, dans l'ordre des créneaux. */
+export interface ChiffresCreneaux {
+  creneaux: WorkShifts['shifts'];
+  activites: ChiffresActivite[];
+}
 
 /** Le périmètre commun à toutes les requêtes de l'écran. */
 export interface PerimetreChiffres {
@@ -46,22 +54,60 @@ const filtresProspect = (
   ...(perimetre.commercialId === null ? {} : { commercialId: perimetre.commercialId }),
 });
 
+const filtresSupervision = (
+  perimetre: PerimetreChiffres,
+): { actFrom: string; actTo: string; projet: Projet; commercialId?: string } => ({
+  ...bornes(perimetre.plage),
+  projet: perimetre.projet,
+  ...(perimetre.commercialId === null ? {} : { commercialId: perimetre.commercialId }),
+});
+
 export async function fetchChiffresActivite(
   perimetre: PerimetreChiffres,
   client: ApiClient = getApiClient(),
+  creneau?: { start: string; end: string },
 ): Promise<ChiffresActivite> {
   return unwrap(
     await client.GET('/api/v1/supervision/activite', {
       params: {
         query: {
-          ...bornes(perimetre.plage),
+          ...filtresSupervision(perimetre),
           granularity: 'day',
-          projet: perimetre.projet,
-          ...(perimetre.commercialId === null ? {} : { commercialId: perimetre.commercialId }),
+          ...(creneau === undefined ? {} : { timeFrom: creneau.start, timeTo: creneau.end }),
         },
       },
     }),
   );
+}
+
+export async function fetchChiffresCreneaux(
+  perimetre: PerimetreChiffres,
+  client: ApiClient = getApiClient(),
+): Promise<ChiffresCreneaux> {
+  const creneaux = (await fetchWorkShifts(client)).shifts;
+  const activites = await Promise.all(
+    creneaux.map((creneau) => fetchChiffresActivite(perimetre, client, creneau)),
+  );
+  return { creneaux, activites };
+}
+
+export async function fetchChiffresCampagnes(
+  perimetre: PerimetreChiffres,
+  client: ApiClient = getApiClient(),
+): Promise<ChiffresCampagnes> {
+  return unwrap(
+    await client.GET('/api/v1/supervision/campagnes', {
+      params: { query: filtresSupervision(perimetre) },
+    }),
+  );
+}
+
+/** Le stock ne se borne ni à une période ni à un téléconseiller. */
+export async function fetchChiffresRepresentants(
+  _perimetre: PerimetreChiffres,
+  client: ApiClient = getApiClient(),
+): Promise<ChiffresRepresentants> {
+  return unwrap(await client.GET('/api/v1/supervision/representants'));
 }
 
 export async function fetchChiffresEntonnoir(

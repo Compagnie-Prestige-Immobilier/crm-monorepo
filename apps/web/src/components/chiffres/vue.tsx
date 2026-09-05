@@ -45,11 +45,14 @@ import {
   fetchChiffresActivite,
   fetchChiffresBanques,
   fetchChiffresCampagne,
+  fetchChiffresCampagnes,
+  fetchChiffresCreneaux,
   fetchChiffresDelais,
   fetchChiffresEnrolement,
   fetchChiffresEntonnoir,
   fetchChiffresMethodes,
   fetchChiffresRendement,
+  fetchChiffresRepresentants,
   type PerimetreChiffres,
   type Projet,
 } from '@/lib/data/chiffres';
@@ -78,6 +81,9 @@ const CHARGEURS: Record<Jeu, (perimetre: PerimetreChiffres) => Promise<unknown>>
   methodes: fetchChiffresMethodes,
   banques: fetchChiffresBanques,
   campagne: fetchChiffresCampagne,
+  campagnes: fetchChiffresCampagnes,
+  creneaux: fetchChiffresCreneaux,
+  representants: fetchChiffresRepresentants,
   ouvertures: (perimetre) =>
     fetchComptageOuvertures({
       from: perimetre.plage.from,

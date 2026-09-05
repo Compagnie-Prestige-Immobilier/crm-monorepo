@@ -26,9 +26,9 @@ function carte(page: Page, titre: string) {
 
 const CARTES_USINE = [
   'Taux de contact',
-  'Taux de rendez-vous',
+  'Taux de joignabilité des représentants',
+  'Taux d’acceptation',
   'Taux de qualification',
-  'Adhésions',
   'Par téléconseiller',
 ] as const;
 
@@ -248,12 +248,13 @@ test('CHU-CHF-12 · le tableau « Par téléconseiller » nomme tout le plateau'
 
   for (const entete of [
     'Téléconseiller',
-    'Appels',
-    'Contact',
-    'Rendez-vous',
-    'Qualification',
-    'Prospects notés',
-    'Adhésions',
+    'Appels représentants',
+    'Joignabilité',
+    'Acceptés',
+    'À rappeler',
+    'Acceptation',
+    'Prospects saisis',
+    'Méthodes obtenues',
   ]) {
     await expect(tableau.getByRole('columnheader', { name: entete, exact: true })).toBeVisible();
   }

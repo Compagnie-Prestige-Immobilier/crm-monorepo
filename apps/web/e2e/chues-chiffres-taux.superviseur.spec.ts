@@ -80,7 +80,11 @@ const TENTATIVES = [
   },
 ] as const;
 
-const TITRES_DE_TAUX = ['Taux de contact', 'Taux de rendez-vous', 'Taux de qualification'] as const;
+const TITRES_DE_TAUX = [
+  'Taux de joignabilité des représentants',
+  'Taux d’acceptation',
+  'Taux de qualification',
+] as const;
 
 let superviseurId = '';
 let awaId = '';
