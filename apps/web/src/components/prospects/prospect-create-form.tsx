@@ -78,6 +78,7 @@ export function ProspectCreateForm({
   const [callingCode, setCallingCode] = useState('221');
   const [banqueId, setBanqueId] = useState<string | null>(null);
   const [syndicatId, setSyndicatId] = useState<string | null>(null);
+  const [etablissement, setEtablissement] = useState('');
   const [repId, setRepId] = useState<string | null>(representantId);
   const [repSearch, setRepSearch] = useState('');
   const [createdRep, setCreatedRep] = useState<FilterOption | null>(null);
@@ -161,6 +162,7 @@ export function ProspectCreateForm({
         ...(repId === null ? {} : { representantId: repId }),
         ...(banqueId === null ? {} : { banqueId }),
         ...(syndicatId === null ? {} : { syndicatId }),
+        ...(etablissement.trim() === '' ? {} : { etablissement: etablissement.trim() }),
       },
       andNext,
     });
@@ -247,6 +249,20 @@ export function ProspectCreateForm({
           )}
         </Field>
       </div>
+
+      <Field label="Établissement">
+        {(props) => (
+          <Input
+            {...props}
+            value={etablissement}
+            maxLength={160}
+            autoComplete="off"
+            onChange={(event) => {
+              setEtablissement(event.target.value);
+            }}
+          />
+        )}
+      </Field>
 
       <InternationalPhoneField
         value={phone}

@@ -12,12 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { ConversionDraft, ConversionErrors } from '@/lib/data/console';
-import {
-  DUREES_MOIS,
-  formatDureeMois,
-  PROSPECT_TYPE_LABELS,
-  PROSPECT_TYPES,
-} from '@/lib/data/grand-public';
+import { PROSPECT_TYPE_LABELS, PROSPECT_TYPES } from '@/lib/data/grand-public';
 import { fetchBanques, fetchIncomeBands, fetchSyndicats } from '@/lib/data/reference';
 import { formatPhone, withRetired } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
@@ -31,11 +26,15 @@ import { cn } from '@/lib/utils';
 
 const REFERENCE_STALE_TIME = 300_000;
 
-/** La prise de rendez-vous en tête : c'est l'issue que l'appel cherche. */
+/**
+ * Le RDV CPI en tête : c'est l'issue que l'appel cherche. « Vocal ou messagerie
+ * électronique » n'est plus proposée, l'e-mail et WhatsApp l'ont remplacée.
+ */
 const METHOD_ORDER: readonly EnrollmentMethod[] = [
   'APPOINTMENT',
-  'VOICE_OR_ELECTRONIC_MESSAGING',
   'PLATFORM',
+  'EMAIL',
+  'WHATSAPP',
   'PHYSICAL',
 ];
 
@@ -43,8 +42,6 @@ const PAIEMENTS: readonly { value: PaymentMode; label: string }[] = [
   { value: 'COMPTANT', label: 'Comptant' },
   { value: 'ECHELONNE', label: 'Échelonné' },
 ];
-
-const DUREES = DUREES_MOIS.map((mois) => ({ value: String(mois), label: formatDureeMois(mois) }));
 
 /**
  * Sur CHUES le prospect est enseignant : ni situation ni mode de paiement, et
@@ -156,7 +153,7 @@ export function ConversionFields({
       </Field>
 
       <Field
-        label="Durée dans l’établissement (mois)"
+        label="Durée dans la fonction (mois)"
         required={complet}
         error={errors.dureeEtablissementMois}
         description="Ancienneté au poste, pas la durée du système de paiement."
@@ -272,32 +269,36 @@ export function ConversionFields({
               value={draft.paymentMode ?? ''}
               placeholder="Choisir un mode"
               onChange={(value) => {
-                const paymentMode = value as PaymentMode;
-                onChange({
-                  paymentMode,
-                  ...(paymentMode === 'ECHELONNE' ? {} : { dureeSystemeMois: '' }),
-                });
+                onChange({ paymentMode: value as PaymentMode });
               }}
             />
           )}
         </Field>
       )}
 
-      {complet || draft.paymentMode === 'ECHELONNE' ? (
-        <Field
-          label="Durée du système de paiement"
-          required={complet}
-          error={errors.dureeSystemeMois}
-        >
+      <ChoixOuiNon
+        label="Ce numéro est un numéro WhatsApp"
+        name="console-numero-whatsapp"
+        value={draft.numeroEstWhatsapp}
+        nonDemande={false}
+        error={errors.numeroEstWhatsapp}
+        onChange={(numeroEstWhatsapp) => {
+          onChange({
+            numeroEstWhatsapp,
+            whatsappE164: numeroEstWhatsapp ? phoneE164 : '',
+          });
+        }}
+      />
+
+      {draft.numeroEstWhatsapp === false ? (
+        <Field label="Numéro WhatsApp" required error={errors.whatsappE164}>
           {(props) => (
-            <Liste
-              id={props.id}
-              describedBy={props['aria-describedby']}
-              items={DUREES}
-              value={draft.dureeSystemeMois}
-              placeholder="Choisir une durée"
-              onChange={(dureeSystemeMois) => {
-                onChange({ dureeSystemeMois });
+            <Input
+              {...props}
+              inputMode="tel"
+              value={draft.whatsappE164}
+              onChange={(event) => {
+                onChange({ whatsappE164: event.target.value });
               }}
             />
           )}

@@ -370,7 +370,7 @@ describe('colonnes', () => {
     expect(cell('Nom')).toBe('Un');
     expect(cell('Segment')).toBe('BDD1');
     expect(cell('Statut phase 3 (conversion)')).toBe('Méthode obtenue');
-    expect(cell('Méthode d’enrôlement')).toBe('Plateforme');
+    expect(cell('Méthode d’enrôlement')).toBe('Plateforme en ligne');
     expect(cell('Méthode obtenue par')).toBe('Omar Ba');
     expect(cell('Dernier résultat')).toBe('Méthode obtenue');
     expect(cell('Dernier commentaire')).toBe('Accepte la plateforme');

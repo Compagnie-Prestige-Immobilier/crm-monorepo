@@ -19715,6 +19715,179 @@
         "tags": ["lots-export"]
       }
     },
+    "/api/v1/parametres/enrolement": {
+      "get": {
+        "operationId": "getParametresEnrolement",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParametresPublicsDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ce que le téléconseiller dicte au prospect selon la méthode retenue.",
+        "tags": ["parametres"]
+      }
+    },
+    "/api/v1/parametres/chues": {
+      "get": {
+        "operationId": "getParametresChues",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParametresChuesDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Paramètres CHUES.",
+        "tags": ["parametres"]
+      },
+      "put": {
+        "operationId": "putParametresChues",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateParametresChuesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParametresChuesDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Modifie les paramètres CHUES.",
+        "tags": ["parametres"]
+      }
+    },
     "/api/v1/enrolement/{projet}/inscriptions": {
       "get": {
         "operationId": "listEnrolementInscriptions",
@@ -23272,7 +23445,14 @@
       },
       "EnrollmentMethod": {
         "type": "string",
-        "enum": ["PLATFORM", "PHYSICAL", "VOICE_OR_ELECTRONIC_MESSAGING", "APPOINTMENT"]
+        "enum": [
+          "PLATFORM",
+          "PHYSICAL",
+          "VOICE_OR_ELECTRONIC_MESSAGING",
+          "APPOINTMENT",
+          "EMAIL",
+          "WHATSAPP"
+        ]
       },
       "ProspectSortField": {
         "type": "string",
@@ -23469,6 +23649,11 @@
             "type": "string",
             "nullable": true,
             "description": "Libellé du référentiel, ou l’employeur saisi en clair à défaut."
+          },
+          "etablissement": {
+            "type": "string",
+            "nullable": true,
+            "description": "Établissement où il exerce."
           },
           "typeContrat": {
             "nullable": true,
@@ -23682,6 +23867,7 @@
           "paymentMode",
           "employeurId",
           "employeur",
+          "etablissement",
           "typeContrat",
           "ancienneteMois",
           "lieuActivite",
@@ -23921,6 +24107,11 @@
             "type": "string",
             "maxLength": 160,
             "description": "Employeur en clair, si hors référentiel."
+          },
+          "etablissement": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Établissement où il exerce. Facultatif, et sur les deux projets."
           },
           "typeContrat": {
             "description": "Secteur privé : nature du contrat.",
@@ -24190,6 +24381,11 @@
             "nullable": true
           },
           "employeur": {
+            "type": "string",
+            "maxLength": 160,
+            "nullable": true
+          },
+          "etablissement": {
             "type": "string",
             "maxLength": 160,
             "nullable": true
@@ -31238,7 +31434,14 @@
           },
           "method": {
             "type": "string",
-            "enum": ["PLATFORM", "PHYSICAL", "VOICE_OR_ELECTRONIC_MESSAGING", "APPOINTMENT"],
+            "enum": [
+              "PLATFORM",
+              "PHYSICAL",
+              "VOICE_OR_ELECTRONIC_MESSAGING",
+              "APPOINTMENT",
+              "EMAIL",
+              "WHATSAPP"
+            ],
             "nullable": true
           },
           "comment": {
@@ -31456,6 +31659,114 @@
           "repartition",
           "performance"
         ]
+      },
+      "ParametresPublicsDto": {
+        "type": "object",
+        "properties": {
+          "plateformeUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Adresse de la plateforme d’enrôlement en ligne, dictée au prospect."
+          },
+          "email": {
+            "type": "string",
+            "nullable": true,
+            "description": "Adresse électronique CHUES à laquelle le prospect envoie son dossier."
+          },
+          "whatsappE164": {
+            "type": "string",
+            "nullable": true,
+            "description": "Numéro WhatsApp de la cellule d’enrôlement qui recontacte le prospect."
+          }
+        },
+        "required": ["plateformeUrl", "email", "whatsappE164"]
+      },
+      "ParametresChuesDto": {
+        "type": "object",
+        "properties": {
+          "plateformeUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Adresse de la plateforme d’enrôlement en ligne, dictée au prospect."
+          },
+          "email": {
+            "type": "string",
+            "nullable": true,
+            "description": "Adresse électronique CHUES à laquelle le prospect envoie son dossier."
+          },
+          "whatsappE164": {
+            "type": "string",
+            "nullable": true,
+            "description": "Numéro WhatsApp de la cellule d’enrôlement qui recontacte le prospect."
+          },
+          "chuesApiUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "chuesApiTokenPose": {
+            "type": "boolean"
+          },
+          "grandPublicApiUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "grandPublicApiTokenPose": {
+            "type": "boolean"
+          },
+          "heriteDeLEnvironnement": {
+            "type": "boolean",
+            "description": "Les réglages du connecteur viennent encore de l’environnement, faute d’avoir été saisis ici. Les poser en base les fait primer."
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "plateformeUrl",
+          "email",
+          "whatsappE164",
+          "chuesApiUrl",
+          "chuesApiTokenPose",
+          "grandPublicApiUrl",
+          "grandPublicApiTokenPose",
+          "heriteDeLEnvironnement",
+          "updatedAt"
+        ]
+      },
+      "UpdateParametresChuesDto": {
+        "type": "object",
+        "properties": {
+          "plateformeUrl": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 254
+          },
+          "whatsappE164": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "chuesApiUrl": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "chuesApiToken": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "grandPublicApiUrl": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "grandPublicApiToken": {
+            "type": "string",
+            "maxLength": 500
+          }
+        }
       },
       "InscriptionPlateformeDto": {
         "type": "object",

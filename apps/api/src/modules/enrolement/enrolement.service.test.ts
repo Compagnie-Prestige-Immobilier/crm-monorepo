@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import { EnrolementService, type ConfigEnrolement } from './enrolement.service.js';
+import type { ParametresService } from '../parametres/parametres.service.js';
 
 interface LigneStockee {
   id: string;
@@ -205,11 +206,15 @@ const cheminDe = (input: RequestInfo | URL): string =>
 const rechercheDe = (input: RequestInfo | URL): string =>
   new URL(input instanceof Request ? input.url : String(input)).search;
 
+/**
+ * Le service lit sa configuration au travers des parametres, qui font primer la
+ * base sur l'environnement. Le double n'en garde que ce que le tirage emploie.
+ */
 function configAvec(
   fetchChues: typeof globalThis.fetch,
   fetchGrandPublic: typeof globalThis.fetch = fetchChues,
-): ConfigEnrolement {
-  return {
+): ParametresService {
+  const config: ConfigEnrolement = {
     [Projet.CHUES]: {
       url: 'https://chues.test/api',
       token: 'jeton-chues',
@@ -223,6 +228,9 @@ function configAvec(
       pauseMs: 0,
     },
   };
+  return {
+    configPlateforme: (projet: Projet) => Promise.resolve(config[projet]),
+  } as unknown as ParametresService;
 }
 
 const fetchChuesNominal: typeof globalThis.fetch = (input) => {

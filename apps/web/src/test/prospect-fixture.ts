@@ -33,6 +33,7 @@ export function prospectFixture(over: Partial<ProspectRow> & { id: string }): Pr
     paymentMode: null,
     employeurId: null,
     employeur: null,
+    etablissement: null,
     typeContrat: null,
     ancienneteMois: null,
     lieuActivite: null,

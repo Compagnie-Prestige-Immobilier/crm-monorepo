@@ -195,7 +195,7 @@ describe('méthode d’enrôlement', () => {
 
     expect(error.code).toBe(ProspectImportError.ENROLLMENT_METHOD_UNKNOWN);
     expect(error.column).toBe(H.enrollmentMethod);
-    expect(error.message).toContain('Plateforme');
+    expect(error.message).toContain('Plateforme en ligne');
     expect(error.message).toContain('Vocal ou messagerie électronique');
   });
 
@@ -229,14 +229,16 @@ describe('méthode d’enrôlement', () => {
 describe('modèle de la colonne « Méthode d’enrôlement »', () => {
   it('propose les libellés français, jamais les jetons techniques', () => {
     expect(ENROLLMENT_METHOD_TOKENS).toEqual([
-      'Plateforme',
+      'Plateforme en ligne',
       'Physique',
       'Vocal ou messagerie électronique',
-      'Prise de rendez-vous',
+      'RDV CPI',
+      'Envoi par e-mail',
+      'WhatsApp',
     ]);
 
     const colonne = PROSPECTS_IMPORT_COLUMNS.find((column) => column.header === H.enrollmentMethod);
-    expect(colonne?.sample).toBe('Plateforme');
+    expect(colonne?.sample).toBe('Plateforme en ligne');
     expect(colonne?.help).not.toContain('VOICE_OR_ELECTRONIC_MESSAGING');
   });
 });

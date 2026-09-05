@@ -46,6 +46,9 @@ const prospectRow = (): Record<string, unknown> => ({
   rev: 3,
   updatedAt: new Date('2026-08-01T09:00:00.000Z'),
   lastCallAt: null,
+  // Une fiche qui arrive a la conversion porte normalement sa tranche de
+  // revenu ; le cas contraire est couvert par « revenu mensuel obligatoire ».
+  incomeBandId: 'i-1',
 });
 
 /** L'état de phase 2 vit sur le parcours, plus sur la fiche. */
@@ -623,5 +626,66 @@ describe('périmètre par campagne', () => {
       (call) => call[0].where,
     );
     expect(wheres.some((where) => 'OR' in where)).toBe(false);
+  });
+});
+
+describe('revenu mensuel obligatoire', () => {
+  beforeEach(() => {
+    prepare();
+  });
+
+  const sansTranche = (): void => {
+    tx.prospect.findFirst.mockResolvedValue({ ...prospectRow(), incomeBandId: null });
+    tx.prospect.update.mockResolvedValue({ ...prospectRow(), incomeBandId: null, rev: 4 });
+  };
+
+  it('REFUSE la conversion quand aucune tranche ne se trouve nulle part', async () => {
+    sansTranche();
+
+    await expect(apply(priseDeRendezVous)).rejects.toMatchObject({
+      response: { code: 'PHASE2_INCOME_BAND_REQUIRED' },
+    });
+  });
+
+  it('accepte la conversion quand l’appel apporte la tranche', async () => {
+    sansTranche();
+    tx.prospect.update.mockResolvedValue({ ...prospectRow(), incomeBandId: 'i-9', rev: 4 });
+
+    await expect(apply({ ...priseDeRendezVous, incomeBandId: 'i-9' })).resolves.toBeDefined();
+  });
+
+  it('accepte la conversion quand la fiche porte deja la tranche', async () => {
+    await expect(apply(priseDeRendezVous)).resolves.toBeDefined();
+  });
+
+  /**
+   * La regle ne vaut QUE pour la conversion : un injoignable sans tranche doit
+   * pouvoir s'enregistrer, sinon le teleconseiller ne peut plus clore l'appel.
+   */
+  it('laisse passer une issue qui ne convertit pas', async () => {
+    sansTranche();
+
+    await expect(apply({ outcome: CallOutcome.UNREACHABLE })).resolves.toBeDefined();
+  });
+});
+
+describe('numero WhatsApp recueilli a la conversion', () => {
+  beforeEach(() => {
+    prepare();
+  });
+
+  const ecritSurLaFiche = (): Record<string, unknown> =>
+    (tx.prospect.update.mock.calls[0] as [{ data: Record<string, unknown> }])[0].data;
+
+  it('recopie sur la FICHE le numero WhatsApp, normalise en E.164', async () => {
+    await apply({ ...priseDeRendezVous, whatsappE164: '77 123 45 67' });
+
+    expect(ecritSurLaFiche()).toMatchObject({ whatsappE164: '+221771234567' });
+  });
+
+  it('ne touche pas au numero WhatsApp quand la question n’a pas ete posee', async () => {
+    await apply(priseDeRendezVous);
+
+    expect(ecritSurLaFiche()).not.toHaveProperty('whatsappE164');
   });
 });

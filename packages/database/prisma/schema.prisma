@@ -90,10 +90,16 @@ enum Phase2Status {
 enum EnrollmentMethod {
   PLATFORM
   PHYSICAL
+  /// Remplacee par EMAIL et WHATSAPP, qui disent par quel canal le prospect
+  /// recoit les consignes. Plus aucune ecriture ne la produit et le formulaire
+  /// ne l'offre plus ; elle reste declaree le temps qu'une version publiee
+  /// puisse encore etre rembobinee. Voir docs/migrations-en-attente.md.
   VOICE_OR_ELECTRONIC_MESSAGING
   /// Prise de rendez-vous. Seule methode qui exige une date : `rendezVousAt`
   /// sur la tentative, contrainte CHECK comprise.
   APPOINTMENT
+  EMAIL
+  WHATSAPP
 }
 
 // BDD1..BDD4 ne sont PAS quatre bases physiques : ce sont des segments calculés
@@ -325,14 +331,14 @@ model User {
   importJobs     ImportJob[]     @relation("ImportJobRequestedBy")
   segmentChanges SegmentChange[] @relation("SegmentChangeChangedBy")
 
-  fichesOuvertes  OuvertureFiche[] @relation("OuvertureFicheOpenedBy")
-  fichesLiberees  OuvertureFiche[] @relation("OuvertureFicheReleasedBy")
+  fichesOuvertes OuvertureFiche[] @relation("OuvertureFicheOpenedBy")
+  fichesLiberees OuvertureFiche[] @relation("OuvertureFicheReleasedBy")
 
   scheduledCallbacks       ScheduledCallback[]          @relation("ScheduledCallbackAssignedTo")
   representantRelationsSet RepresentantRelationChange[] @relation("RepresentantRelationChangeChangedBy")
   representantComments     RepresentantComment[]        @relation("RepresentantCommentAuthor")
 
-  heartbeat AgentHeartbeat?
+  heartbeat     AgentHeartbeat?
   activitySlots AgentActivitySlot[]
 
   visitesEnregistrees Visite[]          @relation("VisiteCreatedBy")
@@ -561,15 +567,15 @@ model Representant {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  prospects           Prospect[]
-  repCallAttempts     RepCallAttempt[]
+  prospects            Prospect[]
+  repCallAttempts      RepCallAttempt[]
   deviceCallDetections DeviceCallDetection[]
-  relationChanges     RepresentantRelationChange[]
-  comments            RepresentantComment[]
-  suggestionsGiven    RepresentantSuggestion[]     @relation("RepresentantSuggestionSource")
-  suggestionsResolved RepresentantSuggestion[]     @relation("RepresentantSuggestionResolved")
-  lotItems            LotExportItem[]
-  ouvertures          OuvertureFiche[]
+  relationChanges      RepresentantRelationChange[]
+  comments             RepresentantComment[]
+  suggestionsGiven     RepresentantSuggestion[]     @relation("RepresentantSuggestionSource")
+  suggestionsResolved  RepresentantSuggestion[]     @relation("RepresentantSuggestionResolved")
+  lotItems             LotExportItem[]
+  ouvertures           OuvertureFiche[]
 
   @@index([phoneE164])
   @@index([createdById])
@@ -760,6 +766,12 @@ model Prospect {
   employeurRef Employeur? @relation(fields: [employeurId], references: [id], onDelete: Restrict)
   employeur    String?
 
+  /// L'etablissement ou il exerce, en clair et facultatif. Distinct de
+  /// `employeur` : l'employeur est l'entite qui paie, l'etablissement le lieu
+  /// d'exercice, et un enseignant paye par le ministere en change sans changer
+  /// d'employeur.
+  etablissement String?
+
   typeContrat TypeContrat?
 
   /// Anciennete chez l'employeur, en mois. Distincte de `dureeSystemeMois`, qui
@@ -770,8 +782,12 @@ model Prospect {
   lieuActivite String?
   modeEpargne  ModeEpargne?
 
-  /// Diaspora. `whatsappE164` est souvent le seul numero joignable, et le relais
-  /// est la personne a contacter au Senegal.
+  /// Diaspora pour le pays, la ville et le relais, qui est la personne a
+  /// contacter au Senegal.
+  ///
+  /// `whatsappE164` sort de ce cadre depuis la conversion : elle demande si le
+  /// numero de la fiche porte WhatsApp, et recopie ici celui qu'on peut
+  /// joindre. Nul quand la question n'a pas ete posee.
   paysResidenceId String?
   paysResidence   Pays?   @relation(fields: [paysResidenceId], references: [id], onDelete: Restrict)
   villeResidence  String?
@@ -848,12 +864,12 @@ model Prospect {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  callAttempts       CallAttempt[]
+  callAttempts         CallAttempt[]
   deviceCallDetections DeviceCallDetection[]
-  scheduledCallbacks ScheduledCallback[]
-  lotItems           LotExportItem[]
-  bankCases          BankCase[]
-  clientRequests     ClientCreationRequest[]
+  scheduledCallbacks   ScheduledCallback[]
+  lotItems             LotExportItem[]
+  bankCases            BankCase[]
+  clientRequests       ClientCreationRequest[]
 
   segmentChanges SegmentChange[]
   journeys       ProspectJourney[]
@@ -1070,12 +1086,12 @@ model AgentHeartbeat {
 /// Dakar tronquée, stockée en UTC, les deux ne différant jamais.
 model AgentActivitySlot {
   userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   slot   DateTime
 
-  firstSeenAt  DateTime
-  lastSeenAt   DateTime
-  activeSeconds Int @default(0)
+  firstSeenAt   DateTime
+  lastSeenAt    DateTime
+  activeSeconds Int      @default(0)
 
   @@id([userId, slot])
   @@index([slot])

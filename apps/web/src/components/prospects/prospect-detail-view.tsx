@@ -117,8 +117,9 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
         <CardContent>
           <dl className="grid gap-3 text-[0.8125rem] sm:grid-cols-4">
             <Ligne label="WhatsApp">
-              {prospect.whatsappE164 === null ? NO_VALUE : formatPhone(prospect.whatsappE164)}
+              {prospect.whatsappE164 === null ? NO_VALUE : <LienWhatsapp e164={prospect.whatsappE164} />}
             </Ligne>
+            <Ligne label="Établissement">{prospect.etablissement ?? NO_VALUE}</Ligne>
             <Ligne label="Profession">{prospect.profession ?? NO_VALUE}</Ligne>
             <Ligne label="Banque">{prospect.banqueName ?? NO_VALUE}</Ligne>
             <Ligne label="Syndicat">{prospect.syndicatSigle ?? NO_VALUE}</Ligne>
@@ -287,5 +288,24 @@ function AppelsProspect({ items }: { items: readonly Appel[] }) {
         </li>
       ))}
     </ol>
+  );
+}
+
+/**
+ * `wa.me` ouvre la conversation dans WhatsApp Web ou dans l'application, selon
+ * ce que le poste a. Le numero y va sans `+` ni separateur, seule forme que le
+ * lien accepte.
+ */
+function LienWhatsapp({ e164 }: { e164: string }) {
+  return (
+    <a
+      href={`https://wa.me/${e164.replace(/\D/gu, '')}`}
+      target="_blank"
+      rel="noreferrer noopener"
+      className="rounded-sm font-[600] underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+    >
+      {formatPhone(e164)}
+      <span className="sr-only"> : écrire sur WhatsApp</span>
+    </a>
   );
 }

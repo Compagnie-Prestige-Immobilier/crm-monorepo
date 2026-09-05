@@ -1,8 +1,9 @@
-import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Prisma, Projet } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { ParametresService } from '../parametres/parametres.service.js';
 import { inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
 import { isOpenApiGeneration } from '../../env.js';
 import {
@@ -120,7 +121,7 @@ export class EnrolementService {
 
   constructor(
     private readonly prisma: PrismaService,
-    @Inject(ENROLEMENT_CONFIG) private readonly config: ConfigEnrolement,
+    private readonly parametres: ParametresService,
   ) {}
 
   // ── Réglages ──────────────────────────────────────────────────────────────
@@ -132,7 +133,7 @@ export class EnrolementService {
       projet,
       frequenceMinutes: stockes.frequenceMinutes,
       repriseDepuis: stockes.repriseDepuis,
-      configuree: this.configuree(projet),
+      configuree: await this.configuree(projet),
       dernierTirage: stockes.dernierTirage,
       updatedAt: ligne?.updatedAt.toISOString() ?? null,
     };
@@ -167,8 +168,8 @@ export class EnrolementService {
     });
   }
 
-  private configuree(projet: Projet): boolean {
-    const config = this.config[projet];
+  private async configuree(projet: Projet): Promise<boolean> {
+    const config = await this.parametres.configPlateforme(projet);
     return config.url.trim() !== '' && config.token.trim() !== '';
   }
 
@@ -179,7 +180,7 @@ export class EnrolementService {
     if (isOpenApiGeneration()) return;
 
     for (const projet of [Projet.CHUES, Projet.GRAND_PUBLIC]) {
-      if (!this.configuree(projet)) continue;
+      if (!(await this.configuree(projet))) continue;
       const reglages = await this.reglages(projet);
       if (!estEchu(reglages, now)) continue;
       await this.tirer(projet);
@@ -211,7 +212,7 @@ export class EnrolementService {
 
     try {
       const reglages = await this.reglages(projet);
-      const lignes = await lirePlateforme(projet, this.config[projet]);
+      const lignes = await lirePlateforme(projet, await this.parametres.configPlateforme(projet));
       const retenues = filtrerDepuis(lignes, reglages.repriseDepuis);
       lus = retenues.length;
 

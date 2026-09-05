@@ -167,3 +167,48 @@ Côté `schema.prisma`, retirer alors : `User.departementId` et sa relation,
 `Departement.notifications`, la valeur `DEPARTEMENT` de `NotificationAudience`,
 puis le cas `DEPARTEMENT` de `apps/api/src/modules/notifications/audience.ts`
 et l'erreur `audienceDepartementRetired`.
+
+---
+
+## 2. Retrait de « Vocal ou messagerie electronique »
+
+**Retenue le 6 septembre 2026.** Ecrite avec le lot 4, tenue hors de sa version.
+
+### Ce qu'elle supprime
+
+La valeur `VOICE_OR_ELECTRONIC_MESSAGING` du type `EnrollmentMethod`.
+
+### Pourquoi c'est justifie sur le fond
+
+Elle ne disait pas par quel canal le prospect recoit ses consignes, alors que le
+teleconseiller doit lui lire soit l'adresse CHUES soit le numero WhatsApp.
+`EMAIL` et `WHATSAPP` l'ont remplacee, le formulaire de conversion ne l'offre
+plus, et `20260906090100_lot4_reprise_des_methodes` a bascule ses lignes vers
+`EMAIL`. Plus aucune ecriture ne la produit, ce qui se verifie :
+
+```sql
+SELECT count(*) FROM prospects WHERE "enrollmentMethod" = 'VOICE_OR_ELECTRONIC_MESSAGING'
+UNION ALL SELECT count(*) FROM prospect_journeys WHERE "enrollmentMethod" = 'VOICE_OR_ELECTRONIC_MESSAGING'
+UNION ALL SELECT count(*) FROM call_attempts WHERE "method" = 'VOICE_OR_ELECTRONIC_MESSAGING';
+```
+
+Ces trois comptes doivent etre nuls. Sinon la migration n'est PAS prete :
+quelque chose ecrit encore l'ancienne valeur.
+
+### Pourquoi elle est retenue malgre tout
+
+Retirer une valeur d'un type enumere PostgreSQL exige de recreer le type et de
+reecrire les trois colonnes qui le portent. L'operation n'est pas reversible
+sans restauration, et la version publiee au moment de la redaction lit encore
+cette valeur : un retour arriere la retrouverait absente du type et echouerait.
+
+Le referentiel la garde donc declaree, `ENROLLMENT_METHOD_ORDER` comprise, pour
+que les fiches historiques restent lisibles et comptees.
+
+### Condition exacte de liberation
+
+Les deux :
+
+1. la requete ci-dessus rend trois zeros en production ;
+2. une version qui ignore cette valeur tourne depuis assez longtemps pour
+   qu'un retour arriere vers une version anterieure soit exclu.

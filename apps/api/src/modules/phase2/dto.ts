@@ -300,10 +300,27 @@ export class CallAttemptOpDto {
   @IsEnum(ProspectType)
   type?: ProspectType;
 
-  @ApiPropertyOptional({ format: 'uuid', description: 'Corrige la tranche de revenu DU PROSPECT.' })
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description:
+      'Corrige la tranche de revenu DU PROSPECT. Obligatoire à la conversion : sur une issue ' +
+      'qui clôt sur la méthode obtenue, la fiche doit en porter une, ici ou déjà en base.',
+  })
   @IsOptional()
   @IsUUID()
   incomeBandId?: string;
+
+  @ApiPropertyOptional({
+    maxLength: 40,
+    description:
+      'Numéro WhatsApp DU PROSPECT. La conversion demande si le numéro de la fiche porte ' +
+      'WhatsApp ; sinon le téléconseiller saisit celui qui le porte. Normalisé en E.164.',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(6)
+  @MaxLength(40)
+  whatsappE164?: string;
 
   @ApiPropertyOptional({
     enum: PaymentMode,
@@ -318,7 +335,10 @@ export class CallAttemptOpDto {
     type: Number,
     minimum: 1,
     maximum: 300,
-    description: 'Corrige la durée du système de paiement DU PROSPECT, en MOIS.',
+    description:
+      'Corrige la durée du système de paiement DU PROSPECT, en MOIS. Le formulaire de ' +
+      'conversion ne la demande plus ; le champ reste admis pour les tentatives que le ' +
+      'mobile a mises en file avant la bascule.',
   })
   @IsOptional()
   @Type(() => Number)

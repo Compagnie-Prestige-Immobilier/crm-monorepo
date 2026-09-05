@@ -3179,6 +3179,41 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/parametres/enrolement': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Ce que le téléconseiller dicte au prospect selon la méthode retenue. */
+    get: operations['getParametresEnrolement'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/parametres/chues': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Paramètres CHUES. */
+    get: operations['getParametresChues'];
+    /** Modifie les paramètres CHUES. */
+    put: operations['putParametresChues'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/enrolement/{projet}/inscriptions': {
     parameters: {
       query?: never;
@@ -4299,7 +4334,13 @@ export interface components {
     /** @enum {string} */
     Phase2Status: 'PENDING' | 'METHOD_OBTAINED' | 'REFUSED' | 'WRONG_NUMBER';
     /** @enum {string} */
-    EnrollmentMethod: 'PLATFORM' | 'PHYSICAL' | 'VOICE_OR_ELECTRONIC_MESSAGING' | 'APPOINTMENT';
+    EnrollmentMethod:
+      | 'PLATFORM'
+      | 'PHYSICAL'
+      | 'VOICE_OR_ELECTRONIC_MESSAGING'
+      | 'APPOINTMENT'
+      | 'EMAIL'
+      | 'WHATSAPP';
     /** @enum {string} */
     ProspectSortField: 'createdAt' | 'clientCreatedAt' | 'nom' | 'prenom' | 'statut' | 'lastCallAt';
     /** @enum {string} */
@@ -4367,6 +4408,8 @@ export interface components {
       employeurId: string | null;
       /** @description Libellé du référentiel, ou l’employeur saisi en clair à défaut. */
       employeur: string | null;
+      /** @description Établissement où il exerce. */
+      etablissement: string | null;
       typeContrat: components['schemas']['TypeContrat'] | null;
       /** @description Ancienneté chez l’employeur, en MOIS. */
       ancienneteMois: number | null;
@@ -4501,6 +4544,8 @@ export interface components {
       employeurId?: string;
       /** @description Employeur en clair, si hors référentiel. */
       employeur?: string;
+      /** @description Établissement où il exerce. Facultatif, et sur les deux projets. */
+      etablissement?: string;
       /** @description Secteur privé : nature du contrat. */
       typeContrat?: components['schemas']['TypeContrat'];
       /** @description Ancienneté chez l’employeur, en MOIS. Distincte de `dureeSystemeMois`. */
@@ -4620,6 +4665,7 @@ export interface components {
       /** Format: uuid */
       employeurId?: string | null;
       employeur?: string | null;
+      etablissement?: string | null;
       typeContrat?: components['schemas']['TypeContrat'] | null;
       ancienneteMois?: number | null;
       lieuActivite?: string | null;
@@ -7242,7 +7288,14 @@ export interface components {
         | 'WRONG_NUMBER'
         | 'OTHER';
       /** @enum {string|null} */
-      method: 'PLATFORM' | 'PHYSICAL' | 'VOICE_OR_ELECTRONIC_MESSAGING' | 'APPOINTMENT' | null;
+      method:
+        | 'PLATFORM'
+        | 'PHYSICAL'
+        | 'VOICE_OR_ELECTRONIC_MESSAGING'
+        | 'APPOINTMENT'
+        | 'EMAIL'
+        | 'WHATSAPP'
+        | null;
       comment: string | null;
       performedByName: string;
       createdAt: string;
@@ -7295,6 +7348,39 @@ export interface components {
       distribution: components['schemas']['LotExportDistributionDto'];
       repartition: components['schemas']['LotExportRepartitionDto'][];
       performance: components['schemas']['LotExportPerformanceDto'][];
+    };
+    ParametresPublicsDto: {
+      /** @description Adresse de la plateforme d’enrôlement en ligne, dictée au prospect. */
+      plateformeUrl: string | null;
+      /** @description Adresse électronique CHUES à laquelle le prospect envoie son dossier. */
+      email: string | null;
+      /** @description Numéro WhatsApp de la cellule d’enrôlement qui recontacte le prospect. */
+      whatsappE164: string | null;
+    };
+    ParametresChuesDto: {
+      /** @description Adresse de la plateforme d’enrôlement en ligne, dictée au prospect. */
+      plateformeUrl: string | null;
+      /** @description Adresse électronique CHUES à laquelle le prospect envoie son dossier. */
+      email: string | null;
+      /** @description Numéro WhatsApp de la cellule d’enrôlement qui recontacte le prospect. */
+      whatsappE164: string | null;
+      chuesApiUrl: string | null;
+      chuesApiTokenPose: boolean;
+      grandPublicApiUrl: string | null;
+      grandPublicApiTokenPose: boolean;
+      /** @description Les réglages du connecteur viennent encore de l’environnement, faute d’avoir été saisis ici. Les poser en base les fait primer. */
+      heriteDeLEnvironnement: boolean;
+      /** Format: date-time */
+      updatedAt: string | null;
+    };
+    UpdateParametresChuesDto: {
+      plateformeUrl?: string;
+      email?: string;
+      whatsappE164?: string;
+      chuesApiUrl?: string;
+      chuesApiToken?: string;
+      grandPublicApiUrl?: string;
+      grandPublicApiToken?: string;
     };
     InscriptionPlateformeDto: {
       /** Format: uuid */
@@ -19139,6 +19225,148 @@ export interface operations {
       };
       /** @description LOT_EXPORT_NOT_FOUND. */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getParametresEnrolement: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ParametresPublicsDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getParametresChues: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ParametresChuesDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  putParametresChues: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateParametresChuesDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ParametresChuesDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
         headers: {
           [name: string]: unknown;
         };

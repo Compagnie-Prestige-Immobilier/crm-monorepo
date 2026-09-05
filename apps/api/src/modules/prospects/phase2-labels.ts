@@ -49,11 +49,14 @@ export const PHASE2_STATUS_LABELS: Readonly<Record<Phase2Status, string>> = {
 };
 
 export const ENROLLMENT_METHOD_LABELS: Readonly<Record<EnrollmentMethod, string>> = {
-  [EnrollmentMethod.PLATFORM]: 'Plateforme',
+  [EnrollmentMethod.PLATFORM]: 'Plateforme en ligne',
   [EnrollmentMethod.PHYSICAL]: 'Physique',
   [EnrollmentMethod.VOICE_OR_ELECTRONIC_MESSAGING]: 'Vocal ou messagerie électronique',
-  [EnrollmentMethod.APPOINTMENT]: 'Prise de rendez-vous',
+  [EnrollmentMethod.APPOINTMENT]: 'RDV CPI',
+  [EnrollmentMethod.EMAIL]: 'Envoi par e-mail',
+  [EnrollmentMethod.WHATSAPP]: 'WhatsApp',
 };
+
 
 export const CALL_OUTCOME_LABELS: Readonly<Record<CallOutcome, string>> = {
   [CallOutcome.METHOD_OBTAINED]: 'Méthode obtenue',
@@ -71,9 +74,17 @@ export const PHASE2_STATUS_ORDER: readonly Phase2Status[] = [
   Phase2Status.WRONG_NUMBER,
 ];
 
+/**
+ * Le referentiel entier, imports et indicateurs compris. « Vocal ou messagerie
+ * electronique » y reste : des fiches la portent encore, et l'omettre les
+ * rendrait invisibles au comptage. Le formulaire de conversion, lui, ne
+ * l'offre plus.
+ */
 export const ENROLLMENT_METHOD_ORDER: readonly EnrollmentMethod[] = [
   EnrollmentMethod.PLATFORM,
   EnrollmentMethod.PHYSICAL,
   EnrollmentMethod.VOICE_OR_ELECTRONIC_MESSAGING,
   EnrollmentMethod.APPOINTMENT,
+  EnrollmentMethod.EMAIL,
+  EnrollmentMethod.WHATSAPP,
 ];

@@ -164,7 +164,6 @@ export const COMMENT_MAX_LENGTH = 2_000;
 export const EMAIL_MAX_LENGTH = 160;
 export const NAME_MAX_LENGTH = 120;
 export const DUREE_ETABLISSEMENT_MAX_MOIS = 600;
-export const DUREE_SYSTEME_MAX_MOIS = 300;
 
 /** Même tolérance que le serveur : le rendez-vous se juge sur l'horodatage terrain. */
 const RENDEZ_VOUS_SKEW_MS = 5 * 60_000;
@@ -195,9 +194,12 @@ export interface ConversionDraft {
   readonly engagementEnCours: boolean | null;
   readonly incomeBandId: string;
   readonly paymentMode: PaymentMode | null;
-  readonly dureeSystemeMois: string;
   readonly method: EnrollmentMethod | null;
   readonly rendezVousAt: string;
+  /** Le numéro de la fiche porte-t-il WhatsApp. Nul : question pas encore posée. */
+  readonly numeroEstWhatsapp: boolean | null;
+  /** Renseigné seulement quand le numéro de la fiche ne porte PAS WhatsApp. */
+  readonly whatsappE164: string;
 }
 
 export type ConversionField = Exclude<keyof ConversionDraft, 'projet'>;
@@ -217,9 +219,10 @@ const conversionSchema: z.ZodType<ConversionDraft> = z.object({
   engagementEnCours: z.boolean().nullable(),
   incomeBandId: z.string(),
   paymentMode: z.enum(['COMPTANT', 'ECHELONNE']).nullable(),
-  dureeSystemeMois: z.string(),
   method: z.enum(ENROLLMENT_METHODS).nullable(),
   rendezVousAt: z.string(),
+  numeroEstWhatsapp: z.boolean().nullable(),
+  whatsappE164: z.string(),
 });
 
 const brouillonSchema = z.object({
@@ -312,9 +315,10 @@ export function conversionFrom(
     engagementEnCours: null,
     incomeBandId: prospect.incomeBandId ?? '',
     paymentMode: prospect.paymentMode,
-    dureeSystemeMois: prospect.dureeSystemeMois === null ? '' : String(prospect.dureeSystemeMois),
     method,
     rendezVousAt: '',
+    numeroEstWhatsapp: null,
+    whatsappE164: '',
   };
 }
 
@@ -388,14 +392,10 @@ function dossierErreurs(draft: ConversionDraft, complet: boolean): ConversionErr
     errors.dureeEtablissementMois = `La durée s’exprime en mois entiers, de 0 à ${String(DUREE_ETABLISSEMENT_MAX_MOIS)}.`;
   }
 
-  const systeme = draft.dureeSystemeMois.trim();
-  if (complet && systeme === '') {
-    errors.dureeSystemeMois = 'Choisissez la durée du système de paiement.';
-  } else if (
-    systeme !== '' &&
-    (!/^\d+$/u.test(systeme) || Number(systeme) < 1 || Number(systeme) > DUREE_SYSTEME_MAX_MOIS)
-  ) {
-    errors.dureeSystemeMois = `La durée du système s’exprime en mois entiers, de 1 à ${String(DUREE_SYSTEME_MAX_MOIS)}.`;
+  if (draft.numeroEstWhatsapp === null) {
+    errors.numeroEstWhatsapp = 'Dites si ce numéro est un numéro WhatsApp.';
+  } else if (draft.numeroEstWhatsapp === false && draft.whatsappE164.trim() === '') {
+    errors.whatsappE164 = 'Écrivez le numéro WhatsApp.';
   }
 
   return errors;
@@ -449,6 +449,10 @@ export const CONVERSION_ERRORS: Readonly<
   PHASE2_EMAIL_INVALID: {
     field: 'email',
     message: 'Cette adresse électronique n’en est pas une.',
+  },
+  PHASE2_INCOME_BAND_REQUIRED: {
+    field: 'incomeBandId',
+    message: 'La tranche de revenu mensuel est obligatoire pour convertir.',
   },
   PHASE2_DUREE_ETABLISSEMENT_INVALID: {
     field: 'dureeEtablissementMois',
@@ -530,7 +534,7 @@ function conversionData(draft: ConversionDraft): SyncEntityData {
   const email = draft.email.trim();
   const profession = draft.profession.trim();
   const mois = draft.dureeEtablissementMois.trim();
-  const systeme = draft.dureeSystemeMois.trim();
+  const whatsapp = draft.whatsappE164.trim();
   const rendezVousAt =
     draft.method === 'APPOINTMENT' ? dakarLocalToIso(draft.rendezVousAt.trim()) : null;
 
@@ -544,11 +548,11 @@ function conversionData(draft: ConversionDraft): SyncEntityData {
     ...(draft.banqueId === '' ? {} : { banqueId: draft.banqueId }),
     ...(draft.incomeBandId === '' ? {} : { incomeBandId: draft.incomeBandId }),
     ...(draft.paymentMode === null ? {} : { paymentMode: draft.paymentMode }),
-    ...(systeme === '' ? {} : { dureeSystemeMois: Number(systeme) }),
     ...(mois === '' ? {} : { dureeEtablissementMois: Number(mois) }),
     ...(draft.fonctionnaire === null ? {} : { fonctionnaire: draft.fonctionnaire }),
     ...(draft.engagementEnCours === null ? {} : { engagementEnCours: draft.engagementEnCours }),
     ...(rendezVousAt === null ? {} : { rendezVousAt }),
+    ...(whatsapp === '' ? {} : { whatsappE164: whatsapp }),
   };
 }
 

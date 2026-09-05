@@ -140,8 +140,8 @@ describe('buildAttemptBatch', () => {
       type: 'FONCTIONNAIRE',
       incomeBandId: 'i-1',
       paymentMode: 'ECHELONNE',
-      dureeSystemeMois: 24,
       dureeEtablissementMois: 36,
+      whatsappE164: '+221771234567',
       fonctionnaire: true,
       engagementEnCours: false,
       rendezVousAt: '2026-09-01T10:30:00.000Z',
@@ -169,7 +169,8 @@ describe('buildAttemptBatch', () => {
           type: null,
           incomeBandId: '',
           paymentMode: null,
-          dureeSystemeMois: '',
+          numeroEstWhatsapp: null,
+          whatsappE164: '',
         },
       },
     });
@@ -187,7 +188,7 @@ describe('buildAttemptBatch', () => {
       'type',
       'incomeBandId',
       'paymentMode',
-      'dureeSystemeMois',
+      'whatsappE164',
       'rendezVousAt',
     ]) {
       expect(data).not.toHaveProperty(field);
@@ -225,9 +226,10 @@ function conversion(over: Partial<ConversionDraft> = {}): ConversionDraft {
     engagementEnCours: false,
     incomeBandId: 'i-1',
     paymentMode: 'ECHELONNE',
-    dureeSystemeMois: '24',
     method: 'PLATFORM',
     rendezVousAt: '',
+    numeroEstWhatsapp: true,
+    whatsappE164: '+221771234567',
     ...over,
   };
 }
@@ -291,17 +293,18 @@ describe('validateConversion', () => {
       banqueId: '',
       engagementEnCours: null,
       incomeBandId: '',
-      dureeSystemeMois: '',
+      numeroEstWhatsapp: null,
+      whatsappE164: '',
     });
 
     expect(Object.keys(validateConversion(vide, NOW)).sort()).toEqual(
       [
         'banqueId',
         'dureeEtablissementMois',
-        'dureeSystemeMois',
         'engagementEnCours',
         'fonctionnaire',
         'incomeBandId',
+        'numeroEstWhatsapp',
         'prenom',
         'profession',
         'syndicatId',
@@ -330,22 +333,31 @@ describe('validateConversion', () => {
       banqueId: '',
       engagementEnCours: null,
       incomeBandId: '',
-      dureeSystemeMois: '',
     });
 
     expect(validateConversion(vide, NOW)).toEqual({});
   });
 
-  it('borne la durée du système à des mois entiers de 1 à 300', () => {
-    for (const mois of ['0', '301', '12,5']) {
+  it('exige de dire si le numéro porte WhatsApp, sur les deux projets', () => {
+    for (const projet of ['CHUES', 'GRAND_PUBLIC'] as const) {
       expect(
-        validateConversion(conversion({ dureeSystemeMois: mois }), NOW).dureeSystemeMois,
-      ).toMatch(/mois entiers/);
+        validateConversion(conversion({ projet, numeroEstWhatsapp: null }), NOW).numeroEstWhatsapp,
+      ).toMatch(/WhatsApp/);
     }
+  });
+
+  it('réclame le numéro WhatsApp quand celui de la fiche n’en porte pas', () => {
     expect(
-      validateConversion(conversion({ projet: 'GRAND_PUBLIC', dureeSystemeMois: '' }), NOW)
-        .dureeSystemeMois,
-    ).toBeUndefined();
+      validateConversion(conversion({ numeroEstWhatsapp: false, whatsappE164: '' }), NOW)
+        .whatsappE164,
+    ).toMatch(/Écrivez le numéro WhatsApp/);
+
+    expect(
+      validateConversion(
+        conversion({ numeroEstWhatsapp: false, whatsappE164: '77 987 65 43' }),
+        NOW,
+      ),
+    ).toEqual({});
   });
 
   it('exige la date du rendez-vous, et elle seule, sur APPOINTMENT', () => {

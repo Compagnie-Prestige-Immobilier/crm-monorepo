@@ -140,4 +140,6 @@ export const queryKeys = {
   enrolementIndicateurs: (projet: string, filtres: Record<string, unknown>) =>
     ['enrolement', 'indicateurs', projet, filtres] as const,
   enrolementReglages: (projet: string) => ['enrolement', 'reglages', projet] as const,
+  parametresChues: ['parametres', 'chues'] as const,
+  parametresEnrolement: ['parametres', 'enrolement'] as const,
 };

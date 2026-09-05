@@ -6,6 +6,7 @@ import { PermissionDenied } from '@/components/permission-denied';
 import { DemoModeCard } from '@/components/settings/demo-mode-card';
 import { AndroidReleaseCard } from '@/components/settings/android-release-card';
 import { DatabaseDumpSection } from '@/components/settings/database-dump-section';
+import { ParametresChuesCard } from '@/components/settings/parametres-chues-card';
 import { PurgeCard } from '@/components/settings/purge-card';
 import { getServerApiClient } from '@/lib/api/server';
 import { fetchDemoStatus } from '@/lib/data/demo';
@@ -41,6 +42,8 @@ export default async function ParametresPage() {
       <p className="text-[0.9375rem] text-muted-foreground">
         Ces actions portent sur les données de tous les utilisateurs.
       </p>
+
+      <ParametresChuesCard />
 
       {demoEnabled ? (
         <HydrationBoundary state={dehydrate(queryClient)}>

@@ -14,6 +14,7 @@ import {
 } from '@crm/database';
 
 import { attributionScope } from '../../common/scope.js';
+import { normalizePhone } from '../../common/phone.js';
 import { rattacherDetections } from '../../common/device-call.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { normalizeAttempt, systemReasonFor, type AttemptReason } from './attempt-rules.js';
@@ -32,6 +33,7 @@ interface ProspectState {
   rev: number;
   updatedAt: Date;
   lastCallAt: Date | null;
+  incomeBandId: string | null;
 }
 
 /** L'état de phase 2 vit sur le PARCOURS ; la fiche ne porte plus que sa révision. */
@@ -49,6 +51,7 @@ const PROSPECT_STATE_SELECT = {
   rev: true,
   updatedAt: true,
   lastCallAt: true,
+  incomeBandId: true,
 } satisfies Prisma.ProspectSelect;
 
 const JOURNEY_STATE_SELECT = {
@@ -96,6 +99,23 @@ const alreadyCompleted = (state: ProspectPhase2StateDto): ConflictException =>
       'Ce prospect a déjà été traité par un autre appel. Votre saisie est conservée localement comme conflit ; seul un administrateur peut corriger le dossier.',
     state,
   });
+
+// Le revenu mensuel conditionne le montage du dossier : une conversion sans lui
+// oblige a rappeler le prospect pour une question deja posee. Verifie sur la
+// fiche APRES correction, pas sur l'operation : le teleconseiller n'a rien a
+// ressaisir quand la tranche est deja en base.
+function assertRevenuRenseigne(
+  attempt: ReturnType<typeof normalizeAttempt>,
+  prospect: { readonly incomeBandId: string | null },
+): void {
+  if (attempt.phase2Status !== Phase2Status.METHOD_OBTAINED) return;
+  if ((prospect.incomeBandId ?? null) !== null) return;
+
+  throw new BadRequestException({
+    code: 'PHASE2_INCOME_BAND_REQUIRED',
+    message: 'La tranche de revenu mensuel est obligatoire pour convertir un prospect.',
+  });
+}
 
 // Une tentative arrivée hors ligne peut être plus ancienne que le dernier appel
 // connu : elle ne réécrit pas la fiche.
@@ -170,6 +190,7 @@ export class Phase2SyncService {
     });
 
     const corrige = await this.correctProspect(tx, user.id, op, prospect);
+    assertRevenuRenseigne(attempt, corrige);
     await this.scheduleCallback(tx, user.id, op, attempt);
 
     if (!attempt.terminal || attempt.phase2Status === null) {
@@ -224,6 +245,7 @@ export class Phase2SyncService {
       ...(op.syndicatId === undefined ? {} : { syndicatId: op.syndicatId }),
       ...(op.type === undefined ? {} : { type: op.type }),
       ...(op.incomeBandId === undefined ? {} : { incomeBandId: op.incomeBandId }),
+      ...(op.whatsappE164 === undefined ? {} : { whatsappE164: normalizePhone(op.whatsappE164) }),
       ...(op.paymentMode === undefined ? {} : { paymentMode: op.paymentMode }),
       ...(op.dureeSystemeMois === undefined ? {} : { dureeSystemeMois: op.dureeSystemeMois }),
     };

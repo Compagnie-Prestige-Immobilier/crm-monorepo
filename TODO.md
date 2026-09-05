@@ -1,13 +1,13 @@
 # TODO
 
 Les 39 exigences de l'expression de besoins CHUES du 4 septembre 2026, avec
-leur état vérifié dans le code de `dev` le 5 septembre 2026.
+leur état vérifié dans le code le 6 septembre 2026.
 
 Lire ce fichier avant d'ouvrir un chantier. S'il contredit le code, c'est le
 code qui a raison : corriger le fichier.
 
-**14 faites, 5 partielles, 20 absentes.** Le lot 1 est livré en entier, le lot 7
-à une ventilation près. Les lots 3, 4 et 6 n'ont pas commencé.
+**21 faites, 5 partielles, 13 absentes.** Les lots 1 et 4 sont livrés en entier,
+le lot 7 à une ventilation près. Les lots 3 et 6 n'ont pas commencé.
 
 ## Lot 2, indicateurs et tableau de bord
 
@@ -53,19 +53,26 @@ Aucune des six exigences n'est commencée.
 
 ## Lot 4, conversion et paramètres
 
-Aucune des sept exigences n'est commencée.
+Les sept exigences sont dans le code. Voir `docs/lot4-conversion-et-parametres.md`
+pour ce qui a été tranché et ce qui reste à faire tourner.
 
-- [ ] EB-20 Champ « Établissement » à la création d'un prospect. Absent en base.
-- [ ] EB-21 Revenu mensuel obligatoire côté API. `incomeBandId` est
-      `@IsOptional`, seul l'écran l'impose.
-- [ ] EB-22 « Durée dans la fonction » et retrait de la durée du système de
-      paiement.
-- [ ] EB-23 Numéro WhatsApp à la conversion. N'existe que pour la diaspora.
-- [ ] EB-24 Méthodes d'enrôlement recomposées, plus la migration des valeurs
-      existantes. L'enum n'a ni WHATSAPP ni fusion RDV CPI / Physique.
-- [ ] EB-26 Bouton « Écrire sur WhatsApp ». Aucun lien `wa.me` dans le dépôt.
-- [ ] EB-29 Page « Paramètres CHUES ». Les réglages du connecteur vivent en
-      variables d'environnement, pas en base.
+- [x] EB-20 Champ « Établissement » à la création d'un prospect. Colonne
+      `prospects.etablissement`, facultative, sur les deux projets.
+- [x] EB-21 Revenu mensuel obligatoire côté API. Vérifié sur la fiche APRÈS
+      correction : rien à ressaisir quand la tranche est déjà en base.
+      `PHASE2_INCOME_BAND_REQUIRED`.
+- [x] EB-22 « Durée dans la fonction », et la durée du système de paiement
+      quitte le formulaire de conversion. La colonne reste : imports Grand
+      Public, exports et sync mobile l'écrivent encore.
+- [x] EB-23 Numéro WhatsApp à la conversion, question « ce numéro est un numéro
+      WhatsApp » comprise.
+- [x] EB-24 `EMAIL` et `WHATSAPP` ajoutées, « Vocal ou messagerie
+      électronique » retirée du formulaire et ses lignes reprises vers `EMAIL`.
+      `PHYSICAL` reste distincte, décision du 6 septembre 2026.
+- [x] EB-26 Le numéro WhatsApp de la fiche est un lien `wa.me`.
+- [x] EB-29 Page « Paramètres CHUES » dans l'écran d'administration : lien de la
+      plateforme, adresse CHUES, numéro WhatsApp, et les accès des deux
+      plateformes. La base prime sur l'environnement.
 
 ## Lot 5, rôles
 
@@ -139,6 +146,13 @@ Merges `2c508581` et `5e9458af`. Deux pièges qui se reproduisent :
 ## Exploitation
 
 - [ ] Appliquer la migration `20260905090000_inscriptions_plateforme` hors local.
+- [ ] Appliquer les deux migrations du lot 4,
+      `20260906090000_lot4_etablissement_et_canaux` puis
+      `20260906090100_lot4_reprise_des_methodes`, DANS CET ORDRE : PostgreSQL
+      refuse d'employer une valeur d'énumération dans la transaction qui la crée.
+- [ ] Régénérer le client Dart sur une machine qui porte un JDK 17+. Les champs
+      `etablissement` et `whatsappE164` manquent au mobile tant que ce n'est pas
+      fait.
 - [ ] Délivrer le jeton machine Grand Public : `php artisan integration:token crm`
       dans son conteneur. C'est la dernière variable manquante ; l'URL et le
       couple CHUES sont posés et vérifiés. Sans jeton, le connecteur ne tire pas

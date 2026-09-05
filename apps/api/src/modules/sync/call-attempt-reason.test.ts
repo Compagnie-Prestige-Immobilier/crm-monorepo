@@ -238,6 +238,8 @@ describe('renseignements de conversion dans un lot', () => {
     profession: 'Enseignant',
     banqueId: 'banque-2',
     syndicatId: 'syndicat-2',
+    // La conversion ne part pas sans tranche de revenu, et la fiche n'en porte pas.
+    incomeBandId: 'tranche-2',
   };
 
   it('la tentative porte les faits de l’appel, la fiche porte l’identité', async () => {

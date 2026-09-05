@@ -145,6 +145,15 @@ export class CreateProspectDto {
   employeur?: string;
 
   @ApiPropertyOptional({
+    maxLength: 160,
+    description: 'Établissement où il exerce. Facultatif, et sur les deux projets.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  etablissement?: string;
+
+  @ApiPropertyOptional({
     enum: TypeContrat,
     enumName: 'TypeContrat',
     description: 'Secteur privé : nature du contrat.',
@@ -263,6 +272,7 @@ const EFFACABLES = [
   'canalProvenanceId',
   'employeurId',
   'employeur',
+  'etablissement',
   'typeContrat',
   'ancienneteMois',
   'lieuActivite',
@@ -318,6 +328,12 @@ export class UpdateProspectDto extends PartialType(OmitType(CreateProspectDto, E
   @IsString()
   @MaxLength(160)
   employeur?: string | null;
+
+  @ApiPropertyOptional({ type: String, maxLength: 160, nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  etablissement?: string | null;
 
   @ApiPropertyOptional({ enum: TypeContrat, enumName: 'TypeContrat', nullable: true })
   @IsOptional()
@@ -430,6 +446,9 @@ export class ProspectDto {
     description: 'Libellé du référentiel, ou l’employeur saisi en clair à défaut.',
   })
   employeur!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, description: 'Établissement où il exerce.' })
+  etablissement!: string | null;
 
   @ApiProperty({ enum: TypeContrat, enumName: 'TypeContrat', nullable: true })
   typeContrat!: TypeContrat | null;
