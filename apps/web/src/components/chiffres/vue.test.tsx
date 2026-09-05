@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { ChiffresView } from '@/components/chiffres/vue';
 import { catalogueDe } from '@/components/chiffres/sources';
+import type * as ConsoleModule from '@/lib/data/console';
 import type * as DispositionModule from '@/lib/data/disposition';
 import type { Role } from '@/lib/types';
 import { renderWithQuery } from '@/test/render-query';
@@ -14,6 +15,7 @@ const SUPERVISEUR: Role = 'SUPERVISEUR';
 const activiteMock = vi.hoisted(() => vi.fn<() => Promise<unknown>>());
 const dispositionMock = vi.hoisted(() => vi.fn<() => Promise<unknown>>());
 const comptageMock = vi.hoisted(() => vi.fn<() => Promise<unknown>>());
+const callbacksMock = vi.hoisted(() => vi.fn<() => Promise<unknown>>());
 
 // Seuls les jeux des cartes POSÉES doivent partir : les autres rejettent, et
 // une requête de trop ferait rougir le test au lieu de passer inaperçue.
@@ -28,6 +30,11 @@ vi.mock('@/lib/data/chiffres', () => ({
 }));
 
 vi.mock('@/lib/data/ouvertures', () => ({ fetchComptageOuvertures: comptageMock }));
+
+vi.mock('@/lib/data/console', async (importOriginal) => {
+  const actual = await importOriginal<typeof ConsoleModule>();
+  return { ...actual, fetchCallbacks: callbacksMock };
+});
 
 vi.mock('@/lib/data/disposition', async () => {
   const actual = await vi.importActual<typeof DispositionModule>('@/lib/data/disposition');
@@ -200,6 +207,26 @@ describe('l’écran Chiffres, du squelette aux chiffres', () => {
     expect(await screen.findByText('Awa Sy')).toBeTruthy();
     expect(screen.getByText('12')).toBeTruthy();
     expect(activiteMock).not.toHaveBeenCalled();
+  });
+
+  // EB-13 : la rubrique « À rappeler » s'atteint AUSSI depuis le tableau de
+  // bord, avec son compteur.
+  it('mène à la file de rappel, avec le compte du jour', async () => {
+    setUrl('/chues/statistiques');
+    dispositionMock.mockResolvedValue(disposition(['prospects-notes']));
+    activiteMock.mockResolvedValue(activite);
+    callbacksMock.mockResolvedValue({
+      items: [{ id: 'c-1' }, { id: 'c-2' }],
+      serverTime: '2026-08-28T09:00:00.000Z',
+    });
+
+    renderWithQuery(<ChiffresView ecran="chues" role={SUPERVISEUR} />);
+
+    const lien = await screen.findByRole('link', { name: /À rappeler/u });
+    expect(lien.getAttribute('href')).toBe('/chues/rappels');
+    await waitFor(() => {
+      expect(lien.textContent).toContain('2 aujourd’hui');
+    });
   });
 
   it('affiche les cartes posées une fois la requête revenue', async () => {
