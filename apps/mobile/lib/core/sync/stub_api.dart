@@ -101,8 +101,33 @@ class StubApi implements ApiPort {
 
   @override
   Future<RepCallAttemptResultDto> recordRepCallAttempt(
-    CreateRepCallAttemptDto attempt,
-  ) async {
+    CreateRepCallAttemptDto attempt, {
+    String? ouvertureId,
+  }) async {
+    throw const ApiException('api_not_configured', kind: FailureKind.retryable);
+  }
+
+  @override
+  Future<OuvertureFicheDto> ouvrirFiche({
+    required String id,
+    required DateTime openedAt,
+    String? representantId,
+    String? prospectId,
+    Map<String, Object?>? draft,
+  }) async {
+    throw const ApiException('api_not_configured', kind: FailureKind.retryable);
+  }
+
+  @override
+  Future<OuvertureFicheDto?> ouvertureCourante() async {
+    throw const ApiException('api_not_configured', kind: FailureKind.retryable);
+  }
+
+  @override
+  Future<void> enregistrerBrouillonOuverture({
+    required String id,
+    required Map<String, Object?> draft,
+  }) async {
     throw const ApiException('api_not_configured', kind: FailureKind.retryable);
   }
 
