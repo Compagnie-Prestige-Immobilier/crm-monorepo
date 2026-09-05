@@ -11,6 +11,7 @@ import {
   PrismaPg,
   Projet,
   ProspectStatut,
+  RappelOrigine,
   RepCallOutcome,
   RepresentantRelation,
   ScheduledCallbackStatus,
@@ -354,6 +355,7 @@ function fiche(rang: number, fullName: string, contexte: Contexte) {
     lastCallAt: dernier?.clientCreatedAt ?? null,
     lastCallById: auteurId,
     nextCallbackAt: dernier?.callbackAt ?? null,
+    nextCallbackOrigine: dernier?.callbackAt ? RappelOrigine.PROMIS : null,
   };
 }
 
