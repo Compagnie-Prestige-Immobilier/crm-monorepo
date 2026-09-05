@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:cpi_go/core/providers/app_providers.dart';
+import 'package:cpi_go/core/providers/sync_coordinator.dart';
 import 'package:cpi_go/core/sync/api_port.dart';
 import 'package:cpi_go/core/sync/clock.dart';
 import 'package:cpi_go/core/sync/outbox_status.dart';
@@ -9,12 +11,15 @@ import 'package:cpi_go/core/sync/token_store.dart';
 import 'package:cpi_go/data/local/database.dart';
 import 'package:cpi_go/data/repositories/ouverture_repository.dart';
 import 'package:cpi_go/data/repositories/write_repository.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/db_fixture.dart';
 import '../support/fake_api.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   late AppDatabase db;
   late FakeApi api;
   late OuvertureRepository ouvertures;
@@ -203,5 +208,28 @@ void main() {
     );
 
     expect((await ouvertures.reconcilier('user-1'))?.id, resultat.ouverte!.id);
+  });
+
+  // La réconciliation existait sans appelant : le verrou d'un téléconseiller
+  // dont la fiche a été libérée tenait jusqu'à la réinstallation.
+  test('le cycle de synchronisation rend la main tout seul', () async {
+    await ouvertures.ouvrir(openedById: 'user-1', representantId: 'rep-1');
+    api.courante = null;
+
+    final ProviderContainer container = ProviderContainer(
+      overrides: [
+        appDatabaseProvider.overrideWithValue(db),
+        apiPortProvider.overrideWithValue(api),
+        tokenStoreProvider.overrideWithValue(
+          InMemoryTokenStore(refreshToken: 'jeton', userId: 'user-1'),
+        ),
+        clockProvider.overrideWithValue(FakeClock(t0)),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(syncCoordinatorProvider.notifier).run();
+
+    expect(await ouvertures.courante('user-1'), isNull);
   });
 }
