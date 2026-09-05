@@ -12,7 +12,7 @@ import {
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
-import { copyPhone } from '@/components/console/console-ui';
+import { Chrono, copyPhone } from '@/components/console/console-ui';
 import { useShortcuts } from '@/components/console/use-shortcuts';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { QueryErrorState } from '@/components/query-error-state';
@@ -40,13 +40,7 @@ import {
   repRelationSettled,
   type RepAnswer,
 } from '@/lib/data/console';
-import {
-  fetchOuvertureCourante,
-  formatChrono,
-  ouvrirFiche,
-  secondesEcoulees,
-  type OuvertureFiche,
-} from '@/lib/data/ouvertures';
+import { fetchOuvertureCourante, ouvrirFiche, type OuvertureFiche } from '@/lib/data/ouvertures';
 import { fetchReferenceData } from '@/lib/data/reference';
 import {
   fetchRepresentant,
@@ -907,27 +901,6 @@ function HistoriqueAppels({ representantId }: { representantId: string }) {
         <AppelsRepresentant items={appels.data} />
       </div>
     </section>
-  );
-}
-
-/** Le temps passé sur la fiche, depuis l'ouverture confirmée jusqu'au statut. */
-function Chrono({ openedAt }: { openedAt: string }) {
-  const [secondes, setSecondes] = useState(() => secondesEcoulees(openedAt, Date.now()));
-
-  useEffect(() => {
-    const battement = setInterval(() => {
-      setSecondes(secondesEcoulees(openedAt, Date.now()));
-    }, 1000);
-    return () => {
-      clearInterval(battement);
-    };
-  }, [openedAt]);
-
-  return (
-    <p className="text-[0.8125rem] text-muted-foreground">
-      Fiche ouverte depuis{' '}
-      <span className="font-[600] tabular-nums text-foreground">{formatChrono(secondes)}</span>
-    </p>
   );
 }
 

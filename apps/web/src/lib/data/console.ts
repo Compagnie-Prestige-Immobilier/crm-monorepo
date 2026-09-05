@@ -376,6 +376,8 @@ export interface AttemptDraft {
   readonly comment: string;
   readonly callbackAt?: string | null;
   readonly conversion?: ConversionDraft;
+  /** L'ouverture que cette tentative referme, et dont elle arrête le chronomètre. */
+  readonly ouvertureId?: string;
 }
 
 /** Miroir de `apps/api/src/modules/phase2/attempt-rules.ts` : un écart sort en 400 sec. */
@@ -488,6 +490,9 @@ export function buildAttemptBatch(input: AttemptInput): SyncPushBody {
           ...(comment === '' ? {} : { comment }),
           ...(callbackAt === null ? {} : { callbackAt }),
           ...(input.draft.conversion === undefined ? {} : conversionData(input.draft.conversion)),
+          ...(input.draft.ouvertureId === undefined
+            ? {}
+            : { ouvertureId: input.draft.ouvertureId }),
           clientCreatedAt: input.at,
         },
       },

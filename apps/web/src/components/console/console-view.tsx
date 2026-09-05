@@ -7,11 +7,12 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
-import { copyPhone, Kbd } from '@/components/console/console-ui';
+import { Chrono, copyPhone, Kbd } from '@/components/console/console-ui';
 import { ConversionFields } from '@/components/console/conversion-fields';
 import { useShortcuts } from '@/components/console/use-shortcuts';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
@@ -32,6 +33,12 @@ import {
   type ConversionDraft,
   type ConversionErrors,
 } from '@/lib/data/console';
+import {
+  enregistrerBrouillon,
+  fetchOuvertureCourante,
+  ouvrirFiche,
+  type OuvertureFiche,
+} from '@/lib/data/ouvertures';
 import { fetchProspect, fetchProspects } from '@/lib/data/prospects';
 import { EMPTY_FILTERS } from '@/lib/filters';
 import { dakarLocalToIso, formatDateTime, formatPhone } from '@/lib/format';
@@ -46,6 +53,7 @@ import {
   type ProspectRow,
 } from '@/lib/types';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
+import { useVerrouNavigation } from '@/lib/use-verrou-navigation';
 import { cn } from '@/lib/utils';
 
 type Projet = 'CHUES' | 'GRAND_PUBLIC';
@@ -99,7 +107,8 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
 
-  const [choisi, setChoisi] = useState<ProspectRow | null>(null);
+  const [ouverte, setOuverte] = useState<Ouverte | null>(null);
+  const [vise, setVise] = useState<ProspectRow | null>(null);
   const [demandee, setDemandee] = useState<string | null>(searchParams.get('fiche'));
   const [search, setSearch] = useState('');
   const [confirme, setConfirme] = useState<string | null>(null);
@@ -112,25 +121,56 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
     retry: false,
   });
 
-  const courante = choisi ?? (demandee === null ? null : (parLien.data ?? null));
+  const venuDesRappels = demandee === null ? null : (parLien.data ?? null);
+  const aConfirmer =
+    vise ?? (venuDesRappels !== null && aQualifier(venuDesRappels) ? venuDesRappels : null);
+  // Une fiche close ne peut plus recevoir de statut : l'ouvrir sous verrou y
+  // enfermerait le téléconseiller. Elle se consulte, elle ne se compte pas.
+  const consultee =
+    ouverte ??
+    (venuDesRappels !== null && !aQualifier(venuDesRappels)
+      ? { prospect: venuDesRappels, ouverture: null }
+      : null);
 
   const annuaire = useQuery({
     queryKey: queryKeys.prospects(annuaireFilters(projet, cherche)),
     queryFn: () => fetchProspects(annuaireFilters(projet, cherche)),
-    enabled: courante === null,
+    enabled: consultee === null && aConfirmer === null,
     placeholderData: (previous) => previous,
   });
 
   const revenir = useCallback(() => {
-    setChoisi(null);
+    setOuverte(null);
+    setVise(null);
     setDemandee(null);
   }, []);
 
-  if (courante !== null) {
+  const ouvrir = useMutation({
+    mutationFn: async (row: ProspectRow): Promise<Ouverte> => ({
+      prospect: row,
+      ouverture: await ouvrirFiche({ prospectId: row.id }),
+    }),
+    onSuccess: (prise) => {
+      setConfirme(null);
+      setVise(null);
+      setDemandee(null);
+      setOuverte(prise);
+    },
+    onError: (error) => {
+      void reprendreOuverte(error, (prise) => {
+        setVise(null);
+        setDemandee(null);
+        setOuverte(prise);
+      });
+    },
+  });
+
+  if (consultee !== null) {
     return (
       <Consignation
-        key={courante.id}
-        prospect={courante}
+        key={consultee.prospect.id}
+        prospect={consultee.prospect}
+        ouverture={consultee.ouverture}
         projet={projet}
         onAbandon={revenir}
         onEnregistre={(nom) => {
@@ -176,11 +216,62 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
         projet={projet}
         onChoisir={(row) => {
           setConfirme(null);
-          setChoisi(row);
+          if (aQualifier(row)) setVise(row);
+          else setOuverte({ prospect: row, ouverture: null });
+        }}
+      />
+
+      <ConfirmDialog
+        open={aConfirmer !== null}
+        onOpenChange={(next) => {
+          if (next) return;
+          setVise(null);
+          setDemandee(null);
+        }}
+        title={`Ouvrir la fiche de ${aConfirmer === null ? '' : nomDe(aConfirmer)} ?`}
+        description="Vous ne pourrez pas la quitter sans la qualifier."
+        confirmLabel="Ouvrir"
+        confirmVariant="default"
+        pending={ouvrir.isPending}
+        onConfirm={() => {
+          if (aConfirmer !== null) ouvrir.mutate(aConfirmer);
         }}
       />
     </div>
   );
+}
+
+/** La fiche et l'ouverture qui la verrouille. Nulle quand la fiche est close. */
+interface Ouverte {
+  prospect: ProspectRow;
+  ouverture: OuvertureFiche | null;
+}
+
+const nomDe = (prospect: ProspectRow): string => `${prospect.nom} ${prospect.prenom}`;
+
+const aQualifier = (prospect: ProspectRow): boolean => prospect.phase2Status === 'PENDING';
+
+/**
+ * Le serveur refuse une seconde ouverture sans dire laquelle est tenue. Sans ce
+ * rattrapage, le téléconseiller reste bloqué devant un refus qu'il ne peut pas
+ * lever.
+ */
+async function reprendreOuverte(
+  error: unknown,
+  reprendre: (prise: Ouverte) => void,
+): Promise<void> {
+  const courante = await fetchOuvertureCourante().catch(() => null);
+  if (courante === null || courante.prospectId === null) {
+    toastApiError(error, 'La fiche n’a pas pu être ouverte.');
+    return;
+  }
+  const prospect = await fetchProspect(courante.prospectId).catch(() => null);
+  if (prospect === null) {
+    toast.error(`Vous avez déjà ${courante.ficheNom} en main. Qualifiez-la avant d’en ouvrir une.`);
+    return;
+  }
+  toast.info(`Vous aviez déjà ${courante.ficheNom} en main : la voici.`);
+  reprendre({ prospect, ouverture: courante });
 }
 
 function ListeAnnuaire({
@@ -313,11 +404,13 @@ function resumeDernierAppel(prospect: ProspectRow): string {
  */
 function Consignation({
   prospect,
+  ouverture,
   projet,
   onAbandon,
   onEnregistre,
 }: {
   prospect: ProspectRow;
+  ouverture: OuvertureFiche | null;
   projet: Projet;
   onAbandon: () => void;
   onEnregistre: (nom: string) => void;
@@ -326,7 +419,7 @@ function Consignation({
   const commentRef = useRef<HTMLTextAreaElement>(null);
   const callbackRef = useRef<HTMLInputElement>(null);
 
-  const [comment, setComment] = useState('');
+  const [comment, setComment] = useState(() => commentaireDuBrouillon(ouverture));
   const [draftOutcome, setDraftOutcome] = useState<CallOutcome | null>(null);
   const [conversion, setConversion] = useState<ConversionDraft | null>(null);
   const [conversionErrors, setConversionErrors] = useState<ConversionErrors>({});
@@ -335,12 +428,25 @@ function Consignation({
   const [refusee, setRefusee] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
 
-  const nomComplet = `${prospect.nom} ${prospect.prenom}`;
+  const nomComplet = nomDe(prospect);
   const closed = prospect.phase2Status !== 'PENDING' || refusee;
   const [now] = useState(() => Date.now());
+  const verrouille = ouverture !== null && !closed;
 
   const send = useMutation({
-    mutationFn: (draft: AttemptDraft) => pushCallAttempt(newAttemptInput(prospect.id, draft)),
+    mutationFn: async (draft: AttemptDraft) => {
+      // EB-10 : le brouillon part AVANT la tentative, qui referme l'ouverture et
+      // ferait refuser toute écriture postérieure.
+      if (draft.outcome === 'CALLBACK' && ouverture !== null) {
+        await enregistrerBrouillon(ouverture.id, {
+          comment: draft.comment,
+          ...(draft.conversion === undefined ? {} : { conversion: draft.conversion }),
+        }).catch(() => {
+          toast.error('Les réponses saisies n’ont pas pu être conservées. L’appel, lui, part.');
+        });
+      }
+      return pushCallAttempt(newAttemptInput(prospect.id, draft));
+    },
     onSuccess: () => {
       onEnregistre(nomComplet);
     },
@@ -374,6 +480,7 @@ function Consignation({
         comment,
         callbackAt,
         ...(renseignements === undefined ? {} : { conversion: renseignements }),
+        ...(ouverture === null ? {} : { ouvertureId: ouverture.id }),
       };
       const problem = validateAttempt(draft);
       if (problem !== null) {
@@ -382,7 +489,7 @@ function Consignation({
       }
       send.mutate(draft);
     },
-    [closed, send, comment],
+    [closed, send, comment, ouverture],
   );
 
   const ouvrirDossier = useCallback(() => {
@@ -444,9 +551,18 @@ function Consignation({
   const saisieEnCours =
     conversion !== null || slots !== null || draftOutcome !== null || comment !== '';
 
+  const retenu = useCallback(() => {
+    toast.error('Consignez l’appel avant de quitter cette fiche.');
+  }, []);
+
+  useVerrouNavigation(verrouille, retenu);
+
   const annuler = useCallback(() => {
     if (!saisieEnCours) {
-      onAbandon();
+      // EB-08 : la fiche ouverte ne se quitte pas sans issue. Seul l'envoi la
+      // referme, et le chronomètre s'arrête avec elle.
+      if (verrouille) retenu();
+      else onAbandon();
       return;
     }
     setDraftOutcome(null);
@@ -455,7 +571,7 @@ function Consignation({
     setConversion(null);
     setConversionErrors({});
     commentRef.current?.blur();
-  }, [saisieEnCours, onAbandon]);
+  }, [saisieEnCours, verrouille, retenu, onAbandon]);
 
   const issueShortcuts: Record<string, () => void> = Object.fromEntries(
     ISSUES.map((issue) => [
@@ -504,10 +620,14 @@ function Consignation({
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
-      <Button variant="ghost" className="self-start px-0" onClick={onAbandon}>
-        <ArrowLeftIcon aria-hidden="true" />
-        Revenir à la liste
-      </Button>
+      {verrouille ? null : (
+        <Button variant="ghost" className="self-start px-0" onClick={onAbandon}>
+          <ArrowLeftIcon aria-hidden="true" />
+          Revenir à la liste
+        </Button>
+      )}
+
+      {ouverture === null ? null : <Chrono openedAt={ouverture.openedAt} />}
 
       <section aria-label="Fiche courante" className="flex flex-col gap-4">
         <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">{nomComplet}</h2>
@@ -720,6 +840,12 @@ function Consignation({
       </details>
     </div>
   );
+}
+
+/** Ce qu'une ouverture reprise garde de la saisie interrompue. */
+function commentaireDuBrouillon(ouverture: OuvertureFiche | null): string {
+  const comment = ouverture?.draft?.comment;
+  return typeof comment === 'string' ? comment : '';
 }
 
 function Commentaire({
