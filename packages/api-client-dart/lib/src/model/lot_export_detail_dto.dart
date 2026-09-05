@@ -5,6 +5,7 @@
 // ignore_for_file: unused_element
 import 'package:crm_api_client/src/model/projet.dart';
 import 'package:crm_api_client/src/model/lot_export_distribution_dto.dart';
+import 'package:crm_api_client/src/model/lot_export_reaffectation_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_attempt_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_repartition_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_cible.dart';
@@ -56,6 +57,8 @@ class LotExportDetailDto {
     required this.repartition,
 
     required this.performance,
+
+    required this.reaffectations,
   });
 
   @JsonKey(name: r'id', required: true, includeIfNull: false)
@@ -116,6 +119,9 @@ class LotExportDetailDto {
   @JsonKey(name: r'performance', required: true, includeIfNull: false)
   final List<LotExportPerformanceDto> performance;
 
+  @JsonKey(name: r'reaffectations', required: true, includeIfNull: false)
+  final List<LotExportReaffectationDto> reaffectations;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is LotExportDetailDto &&
@@ -138,6 +144,7 @@ class LotExportDetailDto {
                 distribution,
                 repartition,
                 performance,
+                reaffectations,
               ],
               [
                 other.id,
@@ -156,6 +163,7 @@ class LotExportDetailDto {
                 other.distribution,
                 other.repartition,
                 other.performance,
+                other.reaffectations,
               ],
             );
   }
@@ -180,6 +188,7 @@ class LotExportDetailDto {
         distribution,
         repartition,
         performance,
+        reaffectations,
       ]);
 
   factory LotExportDetailDto.fromJson(Map<String, dynamic> json) =>

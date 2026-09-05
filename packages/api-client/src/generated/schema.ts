@@ -3176,6 +3176,58 @@ export interface paths {
     delete: operations['deleteLotExport'];
     options?: never;
     head?: never;
+    /** Renomme une campagne et règle les objectifs. */
+    patch: operations['updateLotExport'];
+    trace?: never;
+  };
+  '/api/v1/lots-export/{id}/fiches': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Liste les fiches d’une campagne, avec leur état et le statut posé. */
+    get: operations['listLotExportFiches'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/lots-export/{id}/reaffectation': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Confie des fiches non traitées à un autre téléconseiller. */
+    post: operations['reaffecterLotExport'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/lots-export/{id}/retrait': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Retire un téléconseiller et redistribue ses fiches non traitées. */
+    post: operations['retirerTeleconseillerLotExport'];
+    delete?: never;
+    options?: never;
+    head?: never;
     patch?: never;
     trace?: never;
   };
@@ -7064,7 +7116,8 @@ export interface components {
       widgets: components['schemas']['DispositionWidgetDto'][];
     };
     /** @enum {string} */
-    LotExportCible: 'REPRESENTANTS' | 'PROSPECTS';
+    LotExportCible:
+      'REPRESENTANTS' | 'PROSPECTS' | 'REPRESENTANTS_INJOIGNABLES' | 'CONTACTS_RECOMMANDES';
     RepresentantExportQueryDto: {
       search?: string;
       /** Format: uuid */
@@ -7175,12 +7228,18 @@ export interface components {
       /** @description Projet du lot. Il est porté par la campagne et ne se devine pas après coup. */
       projet: components['schemas']['Projet'];
     };
+    LotExportObjectifDto: {
+      /** Format: uuid */
+      teleconseillerId: string;
+      fichesParJour: number;
+    };
     LotExportDistributionInputDto: {
       teleconseillerIds: string[];
       /** @default 50 */
       fichesParJour: number;
       /** @default 1 */
       jours: number;
+      objectifs?: components['schemas']['LotExportObjectifDto'][];
     };
     CreateLotExportDto: {
       name: string;
@@ -7270,11 +7329,21 @@ export interface components {
       /** Format: uuid */
       teleconseillerId: string;
       teleconseillerName: string;
+      objectif: number;
       assigned: number;
       treated: number;
       completionRate: number;
       assignedCalls: number;
       outsideAssignmentCalls: number;
+    };
+    LotExportReaffectationDto: {
+      /** Format: uuid */
+      id: string;
+      fromName: string | null;
+      toName: string;
+      fiches: number;
+      performedByName: string;
+      createdAt: string;
     };
     LotExportDetailDto: {
       /** Format: uuid */
@@ -7295,6 +7364,39 @@ export interface components {
       distribution: components['schemas']['LotExportDistributionDto'];
       repartition: components['schemas']['LotExportRepartitionDto'][];
       performance: components['schemas']['LotExportPerformanceDto'][];
+      reaffectations: components['schemas']['LotExportReaffectationDto'][];
+    };
+    UpdateLotExportDto: {
+      name?: string;
+      objectifs?: components['schemas']['LotExportObjectifDto'][];
+    };
+    /** @enum {string} */
+    LotExportFicheEtat: 'NON_TRAITEE' | 'TRAITEE' | 'A_RAPPELER';
+    LotExportFicheDto: {
+      position: number;
+      jour: number;
+      /** Format: uuid */
+      ficheId: string | null;
+      fullName: string;
+      phoneE164: string;
+      /** Format: uuid */
+      teleconseillerId: string | null;
+      teleconseillerName: string;
+      etat: components['schemas']['LotExportFicheEtat'];
+      statutLabel: string | null;
+    };
+    LotExportFichesDto: {
+      items: components['schemas']['LotExportFicheDto'][];
+      meta: components['schemas']['PageMetaDto'];
+    };
+    ReaffecterLotExportDto: {
+      positions: number[];
+      /** Format: uuid */
+      versTeleconseillerId: string;
+    };
+    RetirerTeleconseillerDto: {
+      /** Format: uuid */
+      teleconseillerId: string;
     };
     InscriptionPlateformeDto: {
       /** Format: uuid */
@@ -19109,6 +19211,251 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description LOT_EXPORT_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  updateLotExport: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateLotExportDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LotExportSummaryDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description LOT_EXPORT_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listLotExportFiches: {
+    parameters: {
+      query?: {
+        teleconseillerId?: string;
+        etat?: components['schemas']['LotExportFicheEtat'];
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LotExportFichesDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description LOT_EXPORT_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  reaffecterLotExport: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ReaffecterLotExportDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LotExportDetailDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description LOT_EXPORT_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  retirerTeleconseillerLotExport: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RetirerTeleconseillerDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LotExportDetailDto'];
+        };
       };
       /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
       400: {
