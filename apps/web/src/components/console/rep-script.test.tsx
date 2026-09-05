@@ -212,6 +212,7 @@ const ouverture = (over: Partial<OuverturesData.OuvertureFiche> = {}) => ({
   prospectId: null,
   ficheNom: 'Aminata Ndiaye',
   openedAt: new Date().toISOString(),
+  firstInputAt: null,
   closedAt: null,
   dureeSecondes: null,
   closingAttemptId: null,
@@ -230,7 +231,7 @@ async function viser(nom: RegExp): Promise<void> {
 async function choisir(nom: RegExp): Promise<void> {
   await viser(nom);
   await userEvent.click(await screen.findByRole('button', { name: 'Ouvrir' }));
-  await screen.findByText(/Fiche ouverte depuis/u);
+  await screen.findByText(/Étape 1 sur 2/u);
 }
 
 const relationDemandee = (): unknown =>
@@ -711,12 +712,22 @@ describe('RepScript : l’ouverture confirmée d’une fiche', () => {
     expect(screen.getByLabelText('Qui avez-vous appelé ?')).toBeTruthy();
   });
 
-  it('enregistre l’ouverture, puis montre le chronomètre', async () => {
+  it('enregistre l’ouverture sans démarrer le chronomètre', async () => {
     await renderListe();
     await choisir(/Aminata Ndiaye/u);
 
     expect(ouvrirFiche.mock.calls[0]?.[0]).toMatchObject({ representantId: 'r-1' });
-    expect(screen.getByText(/Fiche ouverte depuis/u).textContent).toMatch(/\d\d:\d\d/u);
+    expect(screen.queryByText(/En saisie depuis/u)).toBeNull();
+  });
+
+  // Le temps de lecture du script et de l'historique n'est pas du traitement.
+  it('démarre le chronomètre à la première réponse, pas à l’ouverture', async () => {
+    await renderListe();
+    await choisir(/Aminata Ndiaye/u);
+
+    await repondre('Injoignable');
+
+    expect((await screen.findByText(/En saisie depuis/u)).textContent).toMatch(/\d\d:\d\d/u);
   });
 
   it('ferme l’ouverture avec la tentative : c’est ce qui arrête le chronomètre', async () => {
@@ -1112,20 +1123,22 @@ describe('RepScript : la fiche tenue au rechargement', () => {
     await renderListe();
 
     expect((await screen.findByRole('heading', { level: 2 })).textContent).toBe('Ousmane Fall');
-    expect(screen.getByText(/Fiche ouverte depuis/u)).toBeTruthy();
     // Rouvrir n'est pas ouvrir : la fiche est déjà comptée, EB-07.
     expect(ouvrirFiche).not.toHaveBeenCalled();
   });
 
-  it('remet le chronomètre à l’heure de l’ouverture, pas à zéro', async () => {
+  it('remet le chronomètre à l’heure de la première saisie, pas à celle de l’ouverture', async () => {
     fetchOuvertureCourante.mockResolvedValue(
-      ouverture({ openedAt: new Date(Date.now() - 125_000).toISOString() }),
+      ouverture({
+        openedAt: new Date(Date.now() - 600_000).toISOString(),
+        firstInputAt: new Date(Date.now() - 125_000).toISOString(),
+      }),
     );
     fetchRepresentant.mockResolvedValue(PREMIER);
 
     await renderListe();
 
-    expect((await screen.findByText(/Fiche ouverte depuis/u)).textContent).toContain('02:0');
+    expect((await screen.findByText(/En saisie depuis/u)).textContent).toContain('02:0');
   });
 
   // La fiche tenue est sur l'autre console : l'ignorer laisserait chercher.
@@ -1141,7 +1154,7 @@ describe('RepScript : la fiche tenue au rechargement', () => {
         'Vous avez Rappel Fiche en main sur « Convertir un prospect ». Consignez l’appel avant d’ouvrir une fiche ici.',
       );
     });
-    expect(screen.queryByText(/Fiche ouverte depuis/u)).toBeNull();
+    expect(screen.queryByText(/Étape 1 sur 2/u)).toBeNull();
   });
 });
 
@@ -1166,6 +1179,27 @@ describe('RepScript : la saisie survit à une fermeture brutale', () => {
       statutId: 's-4',
       commentaire: 'ligne coupée',
     });
+  });
+
+  // La borne du chronomètre est relevée à la frappe : l'anti-rafale retarde
+  // l'écriture, il ne doit pas retrancher sa seconde à la mesure.
+  it('date la première saisie de la frappe, pas de l’écriture', async () => {
+    await renderListe();
+    await choisir(/Aminata Ndiaye/u);
+
+    const avant = Date.now();
+    await repondre('Injoignable');
+    const apres = Date.now();
+
+    await waitFor(
+      () => {
+        expect(enregistrerBrouillon).toHaveBeenCalledTimes(1);
+      },
+      { timeout: 3_000 },
+    );
+    const pose = Date.parse(enregistrerBrouillon.mock.calls[0]?.[2] as string);
+    expect(pose).toBeGreaterThanOrEqual(avant);
+    expect(pose).toBeLessThanOrEqual(apres);
   });
 
   it('rouvre le script sur ce que le brouillon avait gardé', async () => {

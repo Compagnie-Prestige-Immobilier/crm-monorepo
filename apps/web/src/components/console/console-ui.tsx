@@ -28,22 +28,25 @@ export function copyPhone(phoneE164: string): void {
   );
 }
 
-/** Le temps passé sur la fiche, depuis l'ouverture confirmée jusqu'au statut. */
-export function Chrono({ openedAt }: { openedAt: string }) {
-  const [secondes, setSecondes] = useState(() => secondesEcoulees(openedAt, Date.now()));
+/**
+ * Le temps de traitement : de la première saisie au statut, la lecture de la
+ * fiche exclue. Rien saisi, rien à montrer : l'appelant ne le monte pas.
+ */
+export function Chrono({ firstInputAt }: { firstInputAt: string }) {
+  const [secondes, setSecondes] = useState(() => secondesEcoulees(firstInputAt, Date.now()));
 
   useEffect(() => {
     const battement = setInterval(() => {
-      setSecondes(secondesEcoulees(openedAt, Date.now()));
+      setSecondes(secondesEcoulees(firstInputAt, Date.now()));
     }, 1000);
     return () => {
       clearInterval(battement);
     };
-  }, [openedAt]);
+  }, [firstInputAt]);
 
   return (
     <p className="text-[0.8125rem] text-muted-foreground">
-      Fiche ouverte depuis{' '}
+      En saisie depuis{' '}
       <span className="font-[600] tabular-nums text-foreground">{formatChrono(secondes)}</span>
     </p>
   );

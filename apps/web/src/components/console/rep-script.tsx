@@ -1153,7 +1153,7 @@ function Qualification({
 
   const [now] = useState(() => Date.now());
 
-  useBrouillonAuto(ouverture, {
+  const departChrono = useBrouillonAuto(ouverture, {
     resultat,
     statutId,
     etablissementConfirme,
@@ -1327,7 +1327,7 @@ function Qualification({
         </Button>
       ) : null}
 
-      <Chrono openedAt={ouverture.openedAt} />
+      {departChrono === null ? null : <Chrono firstInputAt={departChrono} />}
 
       <EnTeteRepresentant representant={representant} />
 
