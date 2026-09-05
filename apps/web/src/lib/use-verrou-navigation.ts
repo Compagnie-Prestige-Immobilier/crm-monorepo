@@ -2,10 +2,21 @@
 
 import { useEffect, useRef } from 'react';
 
+let retenue: (() => void) | null = null;
+
+/**
+ * Une navigation lancée par le code n'est vue par aucun écouteur du DOM : elle
+ * demande ce garde, à appeler avant tout `router.push`.
+ */
+export function navigationRetenue(): boolean {
+  if (retenue === null) return false;
+  retenue();
+  return true;
+}
+
 /**
  * Next.js App Router n'expose aucune API de blocage. Trois prises seulement :
- * la fermeture de l'onglet, le clic sur un lien, et le retour arrière. Une
- * navigation lancée par le code, elle, passe outre.
+ * la fermeture de l'onglet, le clic sur un lien, et le retour arrière.
  */
 export function useVerrouNavigation(actif: boolean, prevenir: () => void): void {
   const alerte = useRef(prevenir);
@@ -35,12 +46,18 @@ export function useVerrouNavigation(actif: boolean, prevenir: () => void): void 
       alerte.current();
     };
 
+    const notre = (): void => {
+      alerte.current();
+    };
+    retenue = notre;
+
     window.history.pushState(null, '', window.location.href);
     window.addEventListener('beforeunload', avantFermeture);
     document.addEventListener('click', surClic, true);
     window.addEventListener('popstate', surRetour);
 
     return () => {
+      if (retenue === notre) retenue = null;
       window.removeEventListener('beforeunload', avantFermeture);
       document.removeEventListener('click', surClic, true);
       window.removeEventListener('popstate', surRetour);

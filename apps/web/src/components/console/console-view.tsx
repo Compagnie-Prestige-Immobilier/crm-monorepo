@@ -53,7 +53,7 @@ import {
   type ProspectRow,
 } from '@/lib/types';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
-import { useVerrouNavigation } from '@/lib/use-verrou-navigation';
+import { navigationRetenue, useVerrouNavigation } from '@/lib/use-verrou-navigation';
 import { cn } from '@/lib/utils';
 
 type Projet = 'CHUES' | 'GRAND_PUBLIC';
@@ -606,10 +606,12 @@ function Consignation({
       copyPhone(prospect.phoneE164);
     },
     n: () => {
+      if (navigationRetenue()) return;
       const rep = prospect.representantId;
       if (rep) router.push(`/chues/prospects/nouveau?rep=${encodeURIComponent(rep)}`);
     },
     r: () => {
+      if (navigationRetenue()) return;
       const rep = prospect.representantId;
       if (rep) router.push(`/chues/representants/${encodeURIComponent(rep)}`);
     },
