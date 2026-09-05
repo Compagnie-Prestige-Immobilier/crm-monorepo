@@ -1112,8 +1112,61 @@ class _RepresentantQualificationScreenState
             },
           ),
         ]),
+        ..._historique(theme),
       ],
     );
+  }
+
+  /// EB-11 : ce que les appels précédents ont dit, en LECTURE SEULE. Une
+  /// entrée passée ne se modifie jamais ; qualifier de nouveau en ajoute une.
+  ///
+  /// Le libellé et le caractère obligatoire du motif viennent du référentiel,
+  /// joint à la volée : recopiés dans l'historique, ils figeraient le jour où
+  /// l'administrateur renomme.
+  List<Widget> _historique(ThemeData theme) {
+    final List<HistoriqueRepresentantResult> entrees =
+        ref
+            .watch(historiqueRepresentantProvider(widget.representantId))
+            .value ??
+        const <HistoriqueRepresentantResult>[];
+    if (entrees.isEmpty) return const <Widget>[];
+    return <Widget>[
+      const SizedBox(height: CpiSpacing.md),
+      Text('Historique', style: theme.textTheme.titleSmall),
+      for (final HistoriqueRepresentantResult entree in entrees) ...<Widget>[
+        const SizedBox(height: CpiSpacing.sm),
+        CpiCard.rows(<CpiRow>[
+          CpiRow(
+            title: relativeTime(entree.clientCreatedAt),
+            subtitle: entree.createdByName,
+          ),
+          CpiRow(
+            title: 'Statut',
+            subtitle:
+                entree.statutLabel ?? libelleIssueRepresentant(entree.outcome),
+          ),
+          if (entree.contacte != null)
+            CpiRow(title: 'A été contacté', subtitle: _ouiNon(entree.contacte)),
+          if (entree.connaitUes != null)
+            CpiRow(
+              title: 'Connaît l\'UES',
+              subtitle: _ouiNon(entree.connaitUes),
+            ),
+          if (entree.relationStatus != null)
+            CpiRow(
+              title: kQuestionCHUES,
+              subtitle: _ouiNon(entree.relationStatus == 'AMBASSADEUR'),
+            ),
+          if ((entree.comment ?? '').trim().isNotEmpty)
+            CpiRow(
+              title: (entree.statutRequiresComment ?? false)
+                  ? 'Motif'
+                  : 'Commentaire',
+              subtitle: entree.comment!.trim(),
+            ),
+        ]),
+      ],
+    ];
   }
 
   /// Étape 2 : le résultat de l'appel et le statut qui le résume.
