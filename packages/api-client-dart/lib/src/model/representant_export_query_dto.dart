@@ -102,7 +102,7 @@ class RepresentantExportQueryDto {
   @JsonKey(name: r'hasWhatsapp', required: false, includeIfNull: false)
   final bool? hasWhatsapp;
 
-  /// A_RAPPELER : un rappel promis reste dû (`nextCallbackAt`), tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien.
+  /// A_RAPPELER : un rappel reste dû (`nextCallbackAt`), promis ou automatique, tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien.
   @JsonKey(
     name: r'suivi',
     required: false,

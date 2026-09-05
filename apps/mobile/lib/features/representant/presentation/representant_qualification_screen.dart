@@ -2,18 +2,24 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:forui/forui.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/notifications/rep_callback_notifications.dart';
+import '../../../core/ouvertures/ouverture_fiche_mixin.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/router/back_navigation.dart';
+import '../../../core/router/route_paths.dart';
 import '../../../core/telephonie/appels_crm.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/phone.dart';
 import '../../../core/utils/relative_time.dart';
 import '../../../core/utils/whatsapp.dart';
 import '../../../data/local/database.dart';
+import '../../../core/drafts/draft_form_mixin.dart';
+import '../../../data/repositories/draft_repository.dart';
+import '../../../data/repositories/ouverture_repository.dart';
 import '../../../data/repositories/reference_repository.dart';
 import '../../../ui/widgets/cpi_action_bar.dart';
 import '../../../ui/widgets/cpi_choice_group.dart';
@@ -53,28 +59,18 @@ typedef _Fiche = ({
   String? iefId,
 });
 
-/// Les effets proposés par branche. `SCHEDULE_CALLBACK` est dans les DEUX : on
-/// rappelle aussi qui on n'a pas joint.
+/// Les effets proposés par branche. La règle tient à l'EFFET et jamais au
+/// libellé, que l'administrateur renomme. Un numéro faux a bien été composé et
+/// a répondu : il est joint. Un rappel promis se prend en parlant, il n'est
+/// donc plus proposé à qui n'a pas décroché.
 const Set<String> _effetsJoignable = <String>{
   'REACHED',
   'REFUSED',
   'SCHEDULE_CALLBACK',
-};
-
-const Set<String> _effetsInjoignable = <String>{
-  'UNREACHABLE',
   'WRONG_NUMBER',
-  'SCHEDULE_CALLBACK',
 };
 
-/// Ces effets closent l'appel : les renseignements ne sont plus demandés.
-/// La regle tient a l'EFFET et jamais au libelle, que l'administrateur renomme.
-const Set<String> _effetsSansScript = <String>{'REFUSED', 'SCHEDULE_CALLBACK'};
-
-/// Sans statut le script est exige en entier, comme avant que le referentiel
-/// existe : c'est lui qui portait alors l'issue.
-bool _scriptExige(StatutQualificationRow? statut) =>
-    statut == null || !_effetsSansScript.contains(statut.effect);
+const Set<String> _effetsInjoignable = <String>{'UNREACHABLE'};
 
 /// L'issue que porte un statut. Le serveur fait la MÊME dérivation et refuse
 /// une issue qui la contredit (`REP_OUTCOME_STATUT_MISMATCH`) : les deux
@@ -87,11 +83,25 @@ String? issueDuStatut(String effet) => const <String, String>{
   'WRONG_NUMBER': 'WRONG_NUMBER',
 }[effet];
 
+/// La question qui pose le statut : oui rattache la personne, non la refuse.
+/// Le téléconseiller ne choisit plus ces deux statuts à part.
+const String kQuestionCHUES = 'Souhaite-t-il être représentant CHUES ?';
+
+const String kQuestionManquante = 'Répondez à la question CHUES';
+
+/// Les deux « Autre » portent leur famille dans le libellé parce que le serveur
+/// exige un libellé unique. Sous une branche déjà choisie, la répéter serait
+/// redondant.
+String libelleStatut(StatutQualificationRow statut) =>
+    statut.code == 'AUTRE_JOINT' || statut.code == 'AUTRE_NON_JOINT'
+    ? 'Autre'
+    : statut.label;
+
 /// L'issue d'un appareil dont le référentiel n'est pas descendu : ce que ce
 /// script tirait de ses questions avant que le statut existe.
-String _issueSansStatut({required bool joignable, required bool ambassadeur}) {
+String _issueSansStatut({required bool joignable, required bool accepte}) {
   if (!joignable) return 'UNREACHABLE';
-  return ambassadeur ? 'REACHED' : 'REFUSED';
+  return accepte ? 'REACHED' : 'REFUSED';
 }
 
 class RepresentantQualificationScreen extends ConsumerStatefulWidget {
@@ -108,7 +118,10 @@ class RepresentantQualificationScreen extends ConsumerStatefulWidget {
 }
 
 class _RepresentantQualificationScreenState
-    extends ConsumerState<RepresentantQualificationScreen> {
+    extends ConsumerState<RepresentantQualificationScreen>
+    with
+        DraftFormMixin<RepresentantQualificationScreen>,
+        OuvertureFicheMixin<RepresentantQualificationScreen> {
   final TextEditingController whatsapp = TextEditingController();
   final TextEditingController commentaire = TextEditingController();
   final TextEditingController suggestionTelephone = TextEditingController();
@@ -135,15 +148,101 @@ class _RepresentantQualificationScreenState
   String? departementId;
   String? iefId;
   String whatsappStatus = WhatsappStatus.nonDemande.code;
-  bool? ambassadeur;
+  bool? representantCHUES;
   DateTime? rappelAt;
   bool saving = false;
   String? echec;
+
+  /// Ce que le verrou vient de refuser. Bande et non toast : le refus doit
+  /// rester lisible tant que le statut n'est pas posé.
+  String? refus;
 
   _Fiche? fiche;
 
   _Etape etape = _Etape.fiche;
   bool enAvant = true;
+
+  /// EB-10 : ce qui a été saisi survit à « À rappeler » et à la mort de l'app.
+  /// Le brouillon est rangé SOUS LA FICHE : au rappel, le formulaire se rouvre
+  /// avec les réponses du dernier appel.
+  @override
+  String get draftId => 'qualification:${widget.representantId}';
+
+  @override
+  String get draftFormKey => 'representant_qualification';
+
+  @override
+  String? get draftEntityId => widget.representantId;
+
+  @override
+  int get draftStep => parcours.indexOf(etape);
+
+  @override
+  DraftRepository get draftRepository => ref.read(draftRepositoryProvider);
+
+  @override
+  bool get draftIsEmpty => !aSaisi;
+
+  @override
+  Map<String, Object?> collectDraftValues() => <String, Object?>{
+    'resultat': resultat?.name,
+    'statutCode': statutChoisi?.code,
+    'aEteContacte': aEteContacte,
+    'connaitUES': connaitUES,
+    'representantCHUES': representantCHUES,
+    'commentaire': commentaire.text,
+    'rappelAt': rappelAt?.toIso8601String(),
+    'whatsappStatus': whatsappStatus,
+    'whatsapp': whatsapp.text,
+    'prenom': prenom.text,
+    'nom': nom.text,
+    'telephone': telephone.text,
+    'etablissement': etablissement.text,
+    'profession': profession.text,
+    'syndicat': syndicatNom.text,
+    'suggestionTelephone': suggestionTelephone.text,
+    'suggestionNom': suggestionNom.text,
+    'suggestionNote': suggestionNote.text,
+  };
+
+  /// Le brouillon du dernier appel, repris APRÈS la fiche importée : c'est lui
+  /// qui a raison, il porte ce que le téléconseiller avait déjà corrigé.
+  Future<void> reprendreLeBrouillon() async {
+    final DraftSnapshot? repris = await draftRepository.read(draftId);
+    if (repris == null || !mounted) return;
+    final Map<String, Object?> valeurs = repris.values;
+    String texte(String cle) =>
+        valeurs[cle] is String ? valeurs[cle]! as String : '';
+    bool? oui(String cle) =>
+        valeurs[cle] is bool ? valeurs[cle]! as bool : null;
+
+    setState(() {
+      resultat = _Resultat.values
+          .where((_Resultat r) => r.name == valeurs['resultat'])
+          .firstOrNull;
+      statutChoisi = statutsDuReferentiel
+          .where((StatutQualificationRow r) => r.code == valeurs['statutCode'])
+          .firstOrNull;
+      aEteContacte = oui('aEteContacte');
+      connaitUES = oui('connaitUES');
+      representantCHUES = oui('representantCHUES');
+      commentaire.text = texte('commentaire');
+      rappelAt = DateTime.tryParse(texte('rappelAt'));
+      if (texte('whatsappStatus').isNotEmpty) {
+        whatsappStatus = texte('whatsappStatus');
+      }
+      whatsapp.text = texte('whatsapp');
+      if (texte('prenom').isNotEmpty) prenom.text = texte('prenom');
+      if (texte('nom').isNotEmpty) nom.text = texte('nom');
+      if (texte('telephone').isNotEmpty) telephone.text = texte('telephone');
+      etablissement.text = texte('etablissement');
+      profession.text = texte('profession');
+      syndicatNom.text = texte('syndicat');
+      suggestionTelephone.text = texte('suggestionTelephone');
+      suggestionNom.text = texte('suggestionNom');
+      suggestionNote.text = texte('suggestionNote');
+    });
+  }
 
   static const Map<_Etape, String> questions = <_Etape, String>{
     _Etape.fiche: 'Avant l\'appel',
@@ -157,6 +256,15 @@ class _RepresentantQualificationScreenState
   void initState() {
     super.initState();
     unawaited(semerLaFiche());
+  }
+
+  /// Toute réponse qui redessine l'écran salit le brouillon. Le poser ici
+  /// plutôt qu'à chacun des trente `setState` de cet écran est ce qui garantit
+  /// qu'aucune n'est oubliée.
+  @override
+  void setState(VoidCallback fn) {
+    super.setState(fn);
+    markDraftDirty();
   }
 
   @override
@@ -227,19 +335,110 @@ class _RepresentantQualificationScreenState
       iefId = importee.iefId;
       ief.text = inspection?.name ?? '';
     });
+    await reprendreLeBrouillon();
+    if (!mounted) return;
+    await prendreLaFiche(importee);
+  }
+
+  /// Le nom tel qu'il se dit : le nom complet importé porte souvent déjà le
+  /// prénom, et le répéter donnerait « Ndiaye Awa Awa ».
+  static String nomComplet(String prenom, String nom) =>
+      prenom.isEmpty || nom.contains(prenom) ? nom : '$nom $prenom';
+
+  /// EB-07 et EB-08 : l'ouverture se confirme, s'enregistre, et pose le verrou.
+  ///
+  /// La fiche déjà tenue par ce compte se rouvre SANS redemander : c'est la
+  /// reprise après une fermeture ou un plantage, et chaque confirmation compte
+  /// une ouverture de plus.
+  Future<void> prendreLaFiche(_Fiche importee) async {
+    if (compteConnecte == null) return;
+    final OuverturesFicheData? deja = await ficheEnCours();
+    if (!mounted) return;
+    if (deja?.representantId != widget.representantId) {
+      final bool ouvrir = await confirmerLOuverture(
+        nomComplet(importee.prenom, importee.nom),
+      );
+      if (!mounted) return;
+      if (!ouvrir) {
+        popOrHome(context);
+        return;
+      }
+    }
+
+    final OuvertureResultat resultat;
+    try {
+      resultat = await ouvrirLaFiche(representantId: widget.representantId);
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => echec = 'Ouverture impossible. $error');
+      return;
+    }
+    if (!mounted) return;
+
+    final FicheTenue? tenue = resultat.tenue;
+    if (tenue != null) await proposerLaFicheTenue(tenue);
+  }
+
+  /// Le serveur refuse la seconde fiche sans dire laquelle il tient. Sans
+  /// cette issue, le téléconseiller reste devant un refus qu'il ne peut pas
+  /// lever.
+  Future<void> proposerLaFicheTenue(FicheTenue tenue) async {
+    final String? autre = tenue.representantId;
+    final String? nom = autre == null
+        ? tenue.ficheNom
+        : (await ref.read(referenceRepositoryProvider).representantById(autre))
+                  ?.fullName ??
+              tenue.ficheNom;
+    if (!mounted) return;
+    final bool? reprendre = await cpiConfirm(
+      context,
+      title: 'Fiche en cours',
+      message: nom == null
+          ? 'Vous tenez déjà une fiche. Qualifiez-la avant d\'en ouvrir une autre.'
+          : 'Vous tenez déjà la fiche de $nom. Qualifiez-la avant d\'en ouvrir une autre.',
+      confirmLabel: autre == null ? 'Revenir' : 'Reprendre',
+      cancelLabel: 'Revenir',
+    );
+    if (!mounted) return;
+    if (reprendre == true && autre != null) {
+      context.go(Routes.representantQualificationFor(autre));
+      return;
+    }
+    popOrHome(context);
   }
 
   /// Une personne proposée à la place de celle qu'on vient d'appeler : elle
-  /// n'a de sens que sur un refus, dit par le statut ou par l'ambassadeur.
+  /// n'a de sens que sur un refus, dit par le statut ou par la question.
   bool get proposeQuelquUn =>
       resultat == _Resultat.joignable &&
       (statutChoisi?.effect == 'REFUSED' ||
-          (renseignementsExiges && ambassadeur == false));
+          (renseignementsExiges && representantCHUES == false));
 
-  /// Un « à rappeler » ou un refus se consigne sans les six questions : elles
-  /// ne sont posées qu'à qui a accepté de parler.
+  /// Le script n'est posé qu'à qui a accepté de parler et de qui rien n'a
+  /// encore été tranché : un statut choisi à part dit déjà ce qu'il en est.
   bool get renseignementsExiges =>
-      resultat == _Resultat.joignable && _scriptExige(statutChoisi);
+      resultat == _Resultat.joignable && statutChoisi == null;
+
+  /// Le statut que pose la réponse à la question, pris dans le référentiel par
+  /// la relation qu'il engage : le code n'est pas un contrat du client.
+  StatutQualificationRow? statutParRelation(String relation) {
+    for (final StatutQualificationRow s in statutsDuReferentiel) {
+      if (s.relationStatus == relation) return s;
+    }
+    return null;
+  }
+
+  /// Ce qui part avec la tentative : le statut choisi à part, ou celui que la
+  /// question vient de poser.
+  StatutQualificationRow? get statutRetenu {
+    final StatutQualificationRow? choisi = statutChoisi;
+    if (choisi != null) return choisi;
+    return switch (representantCHUES) {
+      true => statutParRelation('AMBASSADEUR'),
+      false => statutParRelation('REFUS'),
+      null => null,
+    };
+  }
 
   /// La vérification se fait AU TÉLÉPHONE, avec la personne au bout du fil :
   /// elle suit donc le même sort que le script, jamais un injoignable ni un
@@ -292,20 +491,26 @@ class _RepresentantQualificationScreenState
       ? '1 champ corrigé'
       : '${corrections.length} champs corrigés';
 
-  /// Les statuts que la branche choisie propose, dans l'ordre servi. Lu SOUS
-  /// `build` : `ref.watch` est ce qui fait reparaître la liste quand la
-  /// synchronisation la ramène.
+  /// Le référentiel descendu, dans l'ordre servi. Lu SOUS `build` :
+  /// `ref.watch` est ce qui fait reparaître la liste quand la synchronisation
+  /// la ramène.
+  List<StatutQualificationRow> get statutsDuReferentiel =>
+      ref.watch(statutsQualificationProvider).value ??
+      const <StatutQualificationRow>[];
+
+  /// Les statuts que la branche choisie propose. Ceux qui posent une relation
+  /// n'y sont pas : c'est la question, et non une tuile, qui les pose.
   List<StatutQualificationRow> get statutsProposes {
     final _Resultat? choix = resultat;
     if (choix == null) return const <StatutQualificationRow>[];
     final Set<String> admis = choix == _Resultat.joignable
         ? _effetsJoignable
         : _effetsInjoignable;
-    final List<StatutQualificationRow> tous =
-        ref.watch(statutsQualificationProvider).value ??
-        const <StatutQualificationRow>[];
-    return tous
-        .where((StatutQualificationRow s) => admis.contains(s.effect))
+    return statutsDuReferentiel
+        .where(
+          (StatutQualificationRow s) =>
+              admis.contains(s.effect) && s.relationStatus == null,
+        )
         .toList(growable: false);
   }
 
@@ -336,7 +541,14 @@ class _RepresentantQualificationScreenState
       statutChoisi?.retryAfterMinutes != null &&
       !(statutChoisi?.requiresCallback ?? false);
 
+  /// Le statut exige de dire pourquoi. Le commentaire porte ce motif : le
+  /// serveur refuse la tentative sans lui.
+  bool get motifExige => statutRetenu?.requiresComment ?? false;
+
   String? get manqueFin {
+    if (motifExige && commentaire.text.trim().isEmpty) {
+      return 'Écrivez le motif';
+    }
     if (dateDemandee && rappelAt == null) {
       return reessai
           ? 'Choisissez quand réessayer'
@@ -352,9 +564,12 @@ class _RepresentantQualificationScreenState
 
   String? get manqueResultat {
     if (resultat == null) return 'Choisissez d\'abord le résultat';
-    // Le référentiel n'est pas encore descendu : la qualification reste
-    // possible sans lui, comme sur un appareil qui ne le connaît pas.
-    if (statutChoisi == null && statutsProposes.isNotEmpty) {
+    // Sur la branche jointe le statut est facultatif : la question le pose.
+    // Le référentiel pas encore descendu laisse aussi passer, comme sur un
+    // appareil qui ne le connaît pas.
+    if (resultat == _Resultat.injoignable &&
+        statutChoisi == null &&
+        statutsProposes.isNotEmpty) {
       return 'Choisissez un statut';
     }
     return null;
@@ -383,7 +598,7 @@ class _RepresentantQualificationScreenState
   String? get manqueRenseignements {
     if (aEteContacte == null) return 'Dites s\'il a été contacté';
     if (connaitUES == null) return 'Dites s\'il connaît l\'UES';
-    if (ambassadeur == null) return 'Dites s\'il est ambassadeur';
+    if (representantCHUES == null) return kQuestionManquante;
     return null;
   }
 
@@ -391,7 +606,9 @@ class _RepresentantQualificationScreenState
   /// quand la réponse est complète : le bouton s'allume alors.
   String? get manque =>
       manqueResultat ??
-      (renseignementsExiges ? manqueVerification ?? manqueRenseignements : null) ??
+      (renseignementsExiges
+          ? manqueVerification ?? manqueRenseignements
+          : null) ??
       manqueEtape(_Etape.fin);
 
   static String? _ouiNon(bool? value) =>
@@ -427,7 +644,7 @@ class _RepresentantQualificationScreenState
         ],
         CpiRecapLine('A été contacté', _ouiNon(aEteContacte)),
         CpiRecapLine('Connaît l\'UES', _ouiNon(connaitUES)),
-        CpiRecapLine('Ambassadeur', _ouiNon(ambassadeur)),
+        CpiRecapLine(kQuestionCHUES, _ouiNon(representantCHUES)),
       ],
       if (proposeQuelquUn && suggestionCommencee)
         CpiRecapLine(
@@ -437,14 +654,20 @@ class _RepresentantQualificationScreenState
             suggestionNom.text.trim(),
           ].where((String s) => s.isNotEmpty).join(' · '),
         ),
-      CpiRecapLine('Statut', statutChoisi?.label),
+      CpiRecapLine('Statut', switch (statutRetenu) {
+        null => null,
+        final StatutQualificationRow s => libelleStatut(s),
+      }),
       if (rappelAt != null)
         CpiRecapLine(
           reessai ? 'Réessai' : 'Rappel',
           quandRappeler(context, rappelAt!, DateTime.now()),
         ),
-      if (commentaire.text.trim().isNotEmpty)
-        CpiRecapLine('Commentaire', commentaire.text.trim()),
+      if (motifExige || commentaire.text.trim().isNotEmpty)
+        CpiRecapLine(
+          motifExige ? 'Motif' : 'Commentaire',
+          commentaire.text.trim(),
+        ),
     ];
   }
 
@@ -454,19 +677,14 @@ class _RepresentantQualificationScreenState
       corrections.isNotEmpty ||
       suggestionCommencee;
 
-  Future<void> quitter() async {
-    if (!aSaisi) {
-      popOrHome(context);
+  /// EB-08 : une fiche ouverte ne se quitte pas, elle se qualifie. Le refus
+  /// remplace l'ancienne confirmation, qui ne freinait la sortie que si
+  /// quelque chose avait été saisi.
+  void quitter() {
+    if (sousVerrou) {
+      setState(() => refus = 'Posez un statut avant de quitter cette fiche.');
       return;
     }
-    final bool? partir = await cpiConfirm(
-      context,
-      title: 'Quitter sans enregistrer ?',
-      message: 'Votre réponse et votre commentaire seront perdus.',
-      confirmLabel: 'Quitter',
-      danger: true,
-    );
-    if (partir != true || !mounted) return;
     popOrHome(context);
   }
 
@@ -474,17 +692,19 @@ class _RepresentantQualificationScreenState
     final List<_Etape> etapes = parcours;
     final int index = etapes.indexOf(etape);
     if (index + 1 >= etapes.length) return;
+    markDraftDirty();
     setState(() {
       enAvant = true;
       etape = etapes[index + 1];
     });
+    unawaited(remonterLeBrouillon(collectDraftValues()));
   }
 
   void precedent() {
     final List<_Etape> etapes = parcours;
     final int index = etapes.indexOf(etape);
     if (index <= 0) {
-      unawaited(quitter());
+      quitter();
       return;
     }
     setState(() {
@@ -578,14 +798,14 @@ class _RepresentantQualificationScreenState
 
     final bool joignable = choix == _Resultat.joignable;
     final bool renseigne = renseignementsExiges;
-    final bool ambassadeurOui = renseigne && ambassadeur == true;
+    final bool accepte = representantCHUES == true;
 
     // Sans statut, l'issue reste celle que ce script tirait de ses questions :
     // c'est ce que consigne un appareil dont le référentiel n'est pas descendu.
-    final StatutQualificationRow? statut = statutChoisi;
+    final StatutQualificationRow? statut = statutRetenu;
     final String issue =
         (statut == null ? null : issueDuStatut(statut.effect)) ??
-        _issueSansStatut(joignable: joignable, ambassadeur: ambassadeurOui);
+        _issueSansStatut(joignable: joignable, accepte: accepte);
 
     final String? moi = ref.read(authControllerProvider).userId;
     final _Fiche? avant = renseigne ? fiche : null;
@@ -633,11 +853,14 @@ class _RepresentantQualificationScreenState
             createdById: moi,
             outcome: issue,
             statutQualificationId: statut?.id,
+            // Ferme l'ouverture et arrête le chronomètre, ici comme au serveur.
+            ouvertureId: ouverture?.id,
+            createdByName: ref.read(authControllerProvider).fullName,
             // Une question sans réponse n'est pas un refus : le statut la pose
             // désormais facultative, et le serveur comble ce silence lui-même.
-            relationStatus: !renseigne || ambassadeur == null
+            relationStatus: representantCHUES == null
                 ? null
-                : (ambassadeurOui ? 'AMBASSADEUR' : 'REFUS'),
+                : (accepte ? 'AMBASSADEUR' : 'REFUS'),
             whatsappStatus: avant != null && whatsappCorrige(avant)
                 ? whatsappStatus
                 : null,
@@ -657,11 +880,11 @@ class _RepresentantQualificationScreenState
                 ? null
                 : Phone.toE164(telephone.text) == avant.phoneE164,
             numeroSaisi: renseigne ? telephone.text : null,
-            contacte: renseigne ? aEteContacte : null,
-            connaitUES: renseigne ? connaitUES : null,
+            contacte: aEteContacte,
+            connaitUES: connaitUES,
             syndicat: renseigne ? syndicatNom.text : null,
-            // Seulement quand la personne appelée n'est pas ambassadeur :
-            // ailleurs, la question de la remplaçante n'a pas été posée.
+            // Seulement quand la personne appelée a dit non : ailleurs, la
+            // question de la remplaçante n'a pas été posée.
             suggestedPhone: proposeQuelquUn
                 ? Phone.toE164(suggestionTelephone.text)
                 : null,
@@ -698,6 +921,11 @@ class _RepresentantQualificationScreenState
         );
       }
       ref.read(syncCoordinatorProvider.notifier).nudge();
+      libererLeVerrou();
+      // Un rappel promis garde les réponses pour le prochain appel; une fiche
+      // qualifiée pour de bon les rouvrirait sans raison.
+      discardDraft();
+      if (rappelAt == null) await draftRepository.delete(draftId);
       if (context.mounted) Navigator.of(context).pop();
     } on Object catch (error) {
       if (!context.mounted) return;
@@ -723,7 +951,7 @@ class _RepresentantQualificationScreenState
 
     return CpiStepScope(
       first: premiere,
-      onExit: () => unawaited(quitter()),
+      onExit: quitter,
       onBack: saving ? null : precedent,
       child: CpiScaffold(
         title: question,
@@ -733,18 +961,25 @@ class _RepresentantQualificationScreenState
           label: premiere ? 'Retour' : 'Étape précédente',
           onPressed: saving ? null : precedent,
         ),
-        banner: echec == null
-            ? null
-            : CpiStatusBand(
-                text: echec!,
-                tone: CpiTone.danger,
-                actionLabel: 'Réessayer',
-                onAction: () => unawaited(enregistrer(context)),
-              ),
+        banner: switch ((echec, refus)) {
+          (final String message, _) => CpiStatusBand(
+            text: message,
+            tone: CpiTone.danger,
+            actionLabel: 'Réessayer',
+            onAction: () => unawaited(enregistrer(context)),
+          ),
+          // Le statut posé lève le verrou : le refus n'a plus lieu d'être.
+          (_, final String message) when statutRetenu == null => CpiStatusBand(
+            text: message,
+            tone: CpiTone.warning,
+          ),
+          _ => null,
+        },
         footer: CpiActionBar(child: _pied(context)),
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
+            ?chronometre(theme),
             CpiStepHeader(
               step: etapes.indexOf(etape) + 1,
               total: etapes.length,
@@ -896,8 +1131,61 @@ class _RepresentantQualificationScreenState
             },
           ),
         ]),
+        ..._historique(theme),
       ],
     );
+  }
+
+  /// EB-11 : ce que les appels précédents ont dit, en LECTURE SEULE. Une
+  /// entrée passée ne se modifie jamais ; qualifier de nouveau en ajoute une.
+  ///
+  /// Le libellé et le caractère obligatoire du motif viennent du référentiel,
+  /// joint à la volée : recopiés dans l'historique, ils figeraient le jour où
+  /// l'administrateur renomme.
+  List<Widget> _historique(ThemeData theme) {
+    final List<HistoriqueRepresentantResult> entrees =
+        ref
+            .watch(historiqueRepresentantProvider(widget.representantId))
+            .value ??
+        const <HistoriqueRepresentantResult>[];
+    if (entrees.isEmpty) return const <Widget>[];
+    return <Widget>[
+      const SizedBox(height: CpiSpacing.md),
+      Text('Historique', style: theme.textTheme.titleSmall),
+      for (final HistoriqueRepresentantResult entree in entrees) ...<Widget>[
+        const SizedBox(height: CpiSpacing.sm),
+        CpiCard.rows(<CpiRow>[
+          CpiRow(
+            title: relativeTime(entree.clientCreatedAt),
+            subtitle: entree.createdByName,
+          ),
+          CpiRow(
+            title: 'Statut',
+            subtitle:
+                entree.statutLabel ?? libelleIssueRepresentant(entree.outcome),
+          ),
+          if (entree.contacte != null)
+            CpiRow(title: 'A été contacté', subtitle: _ouiNon(entree.contacte)),
+          if (entree.connaitUes != null)
+            CpiRow(
+              title: 'Connaît l\'UES',
+              subtitle: _ouiNon(entree.connaitUes),
+            ),
+          if (entree.relationStatus != null)
+            CpiRow(
+              title: kQuestionCHUES,
+              subtitle: _ouiNon(entree.relationStatus == 'AMBASSADEUR'),
+            ),
+          if ((entree.comment ?? '').trim().isNotEmpty)
+            CpiRow(
+              title: (entree.statutRequiresComment ?? false)
+                  ? 'Motif'
+                  : 'Commentaire',
+              subtitle: entree.comment!.trim(),
+            ),
+        ]),
+      ],
+    ];
   }
 
   /// Étape 2 : le résultat de l'appel et le statut qui le résume.
@@ -967,7 +1255,7 @@ class _RepresentantQualificationScreenState
           }),
           options: <(StatutQualificationRow, String)>[
             for (final StatutQualificationRow s in statutsProposes)
-              (s, s.label),
+              (s, libelleStatut(s)),
           ],
         ),
       ],
@@ -1160,13 +1448,11 @@ class _RepresentantQualificationScreenState
         value: connaitUES,
         onChanged: (bool value) => setState(() => connaitUES = value),
       ),
-      // Ambassadeur : c'est l'ancien « représentant CPI CHUES », mapping
-      // outcome/relationStatus inchangé.
       const SizedBox(height: CpiSpacing.md),
       _OuiNon(
-        label: 'Ambassadeur ?',
-        value: ambassadeur,
-        onChanged: (bool value) => setState(() => ambassadeur = value),
+        label: kQuestionCHUES,
+        value: representantCHUES,
+        onChanged: (bool value) => setState(() => representantCHUES = value),
       ),
     ],
   );
@@ -1234,7 +1520,7 @@ class _RepresentantQualificationScreenState
         const SizedBox(height: CpiSpacing.lg),
       ],
       CpiField(
-        label: 'Commentaire (facultatif)',
+        label: motifExige ? 'Motif' : 'Commentaire (facultatif)',
         controller: commentaire,
         hint: 'En une phrase',
         maxLength: 2000,

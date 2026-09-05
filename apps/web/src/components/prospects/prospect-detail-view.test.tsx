@@ -89,7 +89,7 @@ describe('ProspectDetailView', () => {
     expect(texte).toContain('Awa Sy');
     expect(texte).toContain('Fonctionnaire : Oui');
     expect(texte).toContain('24 mois');
-    expect(texte).toContain('Préfère la plateforme');
+    expect(texte).toContain('Commentaire : Préfère la plateforme');
     expect(texte).toContain('Téléphone : non confirmé');
     expect(screen.getAllByText('Segment')).toHaveLength(2);
   });
@@ -120,6 +120,44 @@ describe('ProspectDetailView', () => {
     const appels = await screen.findByRole('list', { name: 'Appels' });
     const texte = within(appels).getAllByRole('listitem')[0]?.textContent ?? '';
     expect(texte).toContain('Téléphone : Sortant · 1 min 32 · 14:02');
+  });
+
+  // « Mes contacts » ouvre la fiche sur cette ancre. La retirer laisserait le
+  // lien valide et l'écran ouvert ailleurs, sans que rien ne le signale.
+  it('titre « Motif » le commentaire que l’issue « Autre » a exigé', async () => {
+    fetchCallAttempts.mockResolvedValue([
+      {
+        id: 'att-3',
+        outcome: 'OTHER',
+        reasonLabel: 'Autre',
+        method: null,
+        comment: 'Rappelle son syndicat d’abord',
+        email: null,
+        fonctionnaire: null,
+        engagementEnCours: null,
+        dureeEtablissementMois: null,
+        rendezVousAt: null,
+        performedById: 'u-2',
+        performedByName: 'Awa Sy',
+        deviceCallType: null,
+        deviceCallDurationSeconds: null,
+        deviceCallAt: null,
+        clientCreatedAt: '2026-03-04T09:15:00.000Z',
+      },
+    ]);
+    renderWithQuery(<ProspectDetailView prospectId="p-1" role={ADMIN} />);
+
+    const appels = await screen.findByRole('list', { name: 'Appels' });
+    const texte = within(appels).getAllByRole('listitem')[0]?.textContent ?? '';
+    expect(texte).toContain('Motif : Rappelle son syndicat d’abord');
+  });
+
+  it('porte l’ancre « appels » que « Mes contacts » vise', async () => {
+    const { container } = renderWithQuery(<ProspectDetailView prospectId="p-1" role={ADMIN} />);
+
+    await screen.findByText('Appels');
+    const ancre = container.querySelector('#appels');
+    expect(ancre?.textContent).toContain('Appels');
   });
 
   it('sort les relevés non consignés, et replie ceux qu’une tentative couvre déjà', async () => {

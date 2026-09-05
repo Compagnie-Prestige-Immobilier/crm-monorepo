@@ -6,7 +6,7 @@ import type { AuthenticatedUser } from '../../common/decorators/current-user.dec
 import type { ProspectFilterDto } from '../../common/dto/prospect-filter.dto.js';
 import { inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
 import { PROSPECT_FROM, prospectConditions, representantConditions } from './analytics.sql.js';
-import { UNUSABLE_OUTCOMES, ALL_ROWS, rate } from './pilotage.sql.js';
+import { ALL_ROWS, rate } from './pilotage.sql.js';
 import type {
   AmbassadorConversionDto,
   DataQualityDto,
@@ -238,7 +238,8 @@ export class QualityService {
       INNER JOIN "call_attempts" ca ON ca."prospectId" = p."id" AND ${scope}
       WHERE ${where}
       GROUP BY ${idColumn}, ${labelColumn}
-      ORDER BY COUNT(*) FILTER (WHERE ca."outcome" IN ${UNUSABLE_OUTCOMES}) DESC, label ASC
+      ORDER BY COUNT(*) FILTER (WHERE ca."outcome" IN ('UNREACHABLE', 'WRONG_NUMBER')) DESC,
+        label ASC
     `;
 
     return rows.map((row) => ({

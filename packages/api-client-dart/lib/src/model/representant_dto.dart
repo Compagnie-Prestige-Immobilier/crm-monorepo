@@ -4,6 +4,7 @@
 
 // ignore_for_file: unused_element
 import 'package:crm_api_client/src/model/rep_call_outcome.dart';
+import 'package:crm_api_client/src/model/rappel_origine.dart';
 import 'package:crm_api_client/src/model/representant_relation.dart';
 import 'package:crm_api_client/src/model/whatsapp_status.dart';
 import 'package:crm_api_client/src/model/statut_qualification_effect.dart';
@@ -90,6 +91,8 @@ class RepresentantDto {
     required this.lastCallByName,
 
     required this.nextCallbackAt,
+
+    required this.nextCallbackOrigine,
   });
 
   @JsonKey(name: r'id', required: true, includeIfNull: false)
@@ -223,9 +226,18 @@ class RepresentantDto {
   @JsonKey(name: r'lastCallByName', required: true, includeIfNull: true)
   final String? lastCallByName;
 
-  /// Rappel promis par le dernier appel, tant qu’aucun appel ne l’a honoré.
+  /// Rappel dû, tant qu’aucun appel ne l’a honoré.
   @JsonKey(name: r'nextCallbackAt', required: true, includeIfNull: true)
   final DateTime? nextCallbackAt;
+
+  /// PROMIS : la date convenue avec la personne. AUTOMATIQUE : le délai de réessai du dernier statut non joint. Nul en même temps que `nextCallbackAt`.
+  @JsonKey(
+    name: r'nextCallbackOrigine',
+    required: true,
+    includeIfNull: true,
+    unknownEnumValue: RappelOrigine.unknownDefaultOpenApi,
+  )
+  final RappelOrigine? nextCallbackOrigine;
 
   bool operator ==(Object other) {
     return identical(this, other) ||
@@ -267,6 +279,7 @@ class RepresentantDto {
                 lastCallById,
                 lastCallByName,
                 nextCallbackAt,
+                nextCallbackOrigine,
               ],
               [
                 other.id,
@@ -303,6 +316,7 @@ class RepresentantDto {
                 other.lastCallById,
                 other.lastCallByName,
                 other.nextCallbackAt,
+                other.nextCallbackOrigine,
               ],
             );
   }
@@ -345,6 +359,7 @@ class RepresentantDto {
         lastCallById,
         lastCallByName,
         nextCallbackAt,
+        nextCallbackOrigine,
       ]);
 
   factory RepresentantDto.fromJson(Map<String, dynamic> json) =>

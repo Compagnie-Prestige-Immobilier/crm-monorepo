@@ -11,6 +11,7 @@ import {
   PrismaPg,
   Projet,
   ProspectStatut,
+  RappelOrigine,
   RepCallOutcome,
   RepresentantRelation,
   ScheduledCallbackStatus,
@@ -141,23 +142,23 @@ interface IssueRep {
 }
 
 const ISSUES_REP: readonly IssueRep[] = [
-  { outcome: RepCallOutcome.REACHED, statutCode: 'INTERESSE' },
+  { outcome: RepCallOutcome.REACHED, statutCode: 'ACCEPTE' },
   { outcome: RepCallOutcome.CALLBACK, statutCode: 'A_RAPPELER' },
   { outcome: RepCallOutcome.UNREACHABLE, statutCode: 'PAS_DE_REPONSE' },
   {
     outcome: RepCallOutcome.PROSPECTS_PROMISED,
-    statutCode: 'TRES_INTERESSE',
+    statutCode: 'ACCEPTE',
     promisedProspects: 12,
   },
-  { outcome: RepCallOutcome.REACHED, statutCode: 'DEMANDE_INFOS' },
+  { outcome: RepCallOutcome.REFUSED, statutCode: 'HORS_CIBLE' },
   { outcome: RepCallOutcome.UNREACHABLE, statutCode: 'MESSAGERIE' },
-  { outcome: RepCallOutcome.REFUSED, statutCode: 'NON_INTERESSE' },
+  { outcome: RepCallOutcome.REFUSED, statutCode: 'REFUSE' },
   { outcome: RepCallOutcome.WRONG_NUMBER, statutCode: 'FAUX_NUMERO' },
-  { outcome: RepCallOutcome.REACHED, statutCode: 'RDV_OBTENU' },
+  { outcome: RepCallOutcome.REFUSED, statutCode: 'RETRAITE' },
   { outcome: RepCallOutcome.UNREACHABLE, statutCode: 'NUMERO_OCCUPE' },
   {
-    outcome: RepCallOutcome.OTHER,
-    statutCode: 'DEMANDE_INFOS',
+    outcome: RepCallOutcome.REACHED,
+    statutCode: 'AUTRE_JOINT',
     comment: 'Rappel demandé par un collègue du même établissement.',
   },
 ];
@@ -354,6 +355,7 @@ function fiche(rang: number, fullName: string, contexte: Contexte) {
     lastCallAt: dernier?.clientCreatedAt ?? null,
     lastCallById: auteurId,
     nextCallbackAt: dernier?.callbackAt ?? null,
+    nextCallbackOrigine: dernier?.callbackAt ? RappelOrigine.PROMIS : null,
   };
 }
 

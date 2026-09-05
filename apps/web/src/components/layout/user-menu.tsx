@@ -24,6 +24,14 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { initials } from '@/lib/format';
 import { ROLE_LABELS, type SessionUser } from '@/lib/types';
+import { ficheTenue } from '@/lib/use-verrou-navigation';
+
+/**
+ * EB-08 : la fiche tenue se libère par une qualification, ou par un superviseur.
+ * Se déconnecter la laisserait verrouillée sur le serveur, hors de vue.
+ */
+const SOUS_VERROU =
+  'Vous avez une fiche en main. Qualifiez-la, ou demandez à un superviseur de la libérer.';
 
 export function UserMenu({ user, demoEnabled }: { user: SessionUser; demoEnabled: boolean }) {
   const router = useRouter();
@@ -33,6 +41,12 @@ export function UserMenu({ user, demoEnabled }: { user: SessionUser; demoEnabled
   if (pending === 'workspace') workspaceLabel = 'Changement d’espace…';
 
   async function switchWorkspace(): Promise<void> {
+    // L'écran resterait sur la fiche, mais son ouverture appartient à l'espace
+    // qu'on vient de quitter : la qualification n'aurait plus où atterrir.
+    if (ficheTenue()) {
+      toast.error(SOUS_VERROU);
+      return;
+    }
     setPending('workspace');
     try {
       const workspace = user.workspace === 'demo' ? 'public' : 'demo';
@@ -51,6 +65,10 @@ export function UserMenu({ user, demoEnabled }: { user: SessionUser; demoEnabled
   }
 
   async function signOut(): Promise<void> {
+    if (ficheTenue()) {
+      toast.error(SOUS_VERROU);
+      return;
+    }
     setPending('logout');
     try {
       const response = await fetch('/api/auth/logout', { method: 'POST' });

@@ -22,7 +22,7 @@ class StatutsQualificationApi {
   const StatutsQualificationApi(this._dio);
 
   /// Ajouter un statut de qualification.
-  ///
+  /// Le code est déduit du libellé, puis figé : l’historique le référence. Deux libellés qui ne se distinguent que par les accents ou la casse donnent le même code et le second est refusé.
   ///
   /// Parameters:
   /// * [createStatutQualificationDto]

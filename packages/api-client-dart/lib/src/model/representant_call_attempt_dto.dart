@@ -28,6 +28,8 @@ class RepresentantCallAttemptDto {
 
     required this.statutQualificationLabel,
 
+    required this.statutQualificationRequiresComment,
+
     required this.comment,
 
     required this.callbackAt,
@@ -83,6 +85,14 @@ class RepresentantCallAttemptDto {
     includeIfNull: true,
   )
   final String? statutQualificationLabel;
+
+  /// Le statut exigeait un motif : `comment` porte alors ce motif, et non un commentaire libre.
+  @JsonKey(
+    name: r'statutQualificationRequiresComment',
+    required: true,
+    includeIfNull: false,
+  )
+  final bool statutQualificationRequiresComment;
 
   @JsonKey(name: r'comment', required: true, includeIfNull: true)
   final String? comment;
@@ -149,6 +159,7 @@ class RepresentantCallAttemptDto {
                 outcome,
                 statutQualificationId,
                 statutQualificationLabel,
+                statutQualificationRequiresComment,
                 comment,
                 callbackAt,
                 promisedProspects,
@@ -172,6 +183,7 @@ class RepresentantCallAttemptDto {
                 other.outcome,
                 other.statutQualificationId,
                 other.statutQualificationLabel,
+                other.statutQualificationRequiresComment,
                 other.comment,
                 other.callbackAt,
                 other.promisedProspects,
@@ -201,6 +213,7 @@ class RepresentantCallAttemptDto {
         outcome,
         statutQualificationId,
         statutQualificationLabel,
+        statutQualificationRequiresComment,
         comment,
         callbackAt,
         promisedProspects,

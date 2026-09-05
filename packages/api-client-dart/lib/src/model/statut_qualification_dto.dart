@@ -32,6 +32,8 @@ class StatutQualificationDto {
 
     required this.requiresCallback,
 
+    required this.requiresComment,
+
     required this.retryAfterMinutes,
 
     required this.priorite,
@@ -67,6 +69,10 @@ class StatutQualificationDto {
   /// La date du rappel est exigée par ce statut.
   @JsonKey(name: r'requiresCallback', required: true, includeIfNull: false)
   final bool requiresCallback;
+
+  /// Le motif est exigé par ce statut : « Autre » ne dit rien seul.
+  @JsonKey(name: r'requiresComment', required: true, includeIfNull: false)
+  final bool requiresComment;
 
   /// Délai, en minutes, du réessai que l’application propose d’elle-même. Nul : aucun réessai.
   @JsonKey(name: r'retryAfterMinutes', required: true, includeIfNull: true)
@@ -115,6 +121,7 @@ class StatutQualificationDto {
                 label,
                 effect,
                 requiresCallback,
+                requiresComment,
                 retryAfterMinutes,
                 priorite,
                 relationStatus,
@@ -129,6 +136,7 @@ class StatutQualificationDto {
                 other.label,
                 other.effect,
                 other.requiresCallback,
+                other.requiresComment,
                 other.retryAfterMinutes,
                 other.priorite,
                 other.relationStatus,
@@ -149,6 +157,7 @@ class StatutQualificationDto {
         label,
         effect,
         requiresCallback,
+        requiresComment,
         retryAfterMinutes,
         priorite,
         relationStatus,

@@ -498,7 +498,7 @@ class ExportApi {
   /// * [statutQualificationId] - Statut de qualification du dernier appel. Sert le filtre de l’annuaire ET le tirage d’un lot d’appels.
   /// * [whatsappStatus]
   /// * [hasWhatsapp]
-  /// * [suivi] - A_RAPPELER : un rappel promis reste dû (`nextCallbackAt`), tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien.
+  /// * [suivi] - A_RAPPELER : un rappel reste dû (`nextCallbackAt`), promis ou automatique, tri par défaut sur son échéance. INJOIGNABLE : le dernier appel n’a pas abouti, tri par défaut du plus récent au plus ancien.
   /// * [lastCallById] - Qui a passé le dernier appel. Un téléconseiller y met son propre identifiant.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request

@@ -2,7 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { CallOutcome, EnrollmentMethod } from '@crm/database';
 import { describe, expect, it } from 'vitest';
 
-import { UNUSABLE_OUTCOMES } from '../analytics/pilotage.sql.js';
+import { NOT_REACHED_OUTCOMES } from '../analytics/pilotage.sql.js';
 import {
   PHASE2_STATUS_FOR_OUTCOME,
   isTerminalOutcome,
@@ -125,8 +125,8 @@ describe('motifs système', () => {
     ).not.toThrow();
   });
 
-  it('classe la joignabilité comme UNUSABLE_OUTCOMES du pilotage', () => {
-    const sql = UNUSABLE_OUTCOMES.sql;
+  it('classe la joignabilité comme NOT_REACHED_OUTCOMES du pilotage', () => {
+    const sql = NOT_REACHED_OUTCOMES.sql;
     for (const reason of SYSTEM_OUTCOME_REASONS) {
       expect(sql.includes(`'${reason.code}'`), `${reason.code} dans ${sql}`).toBe(
         !reason.countsAsReached,

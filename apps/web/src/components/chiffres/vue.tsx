@@ -7,6 +7,7 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
+import Link from 'next/link';
 import { useRef, useState } from 'react';
 
 import { BarreEdition } from '@/components/accueil/tableau-de-bord/barre-edition';
@@ -30,7 +31,7 @@ import { useUrlFilters } from '@/components/filters/use-url-filters';
 import { LiveIndicator } from '@/components/live/live-indicator';
 import { useLive } from '@/components/live/use-live';
 import { QueryErrorState } from '@/components/query-error-state';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -51,6 +52,7 @@ import {
   type PerimetreChiffres,
   type Projet,
 } from '@/lib/data/chiffres';
+import { fetchComptageOuvertures } from '@/lib/data/ouvertures';
 import {
   fetchDisposition,
   resetDisposition,
@@ -60,6 +62,8 @@ import {
   type DashboardEcran,
   type DashboardWidget,
 } from '@/lib/data/disposition';
+import { callbackKeys, fetchCallbacks } from '@/lib/data/console';
+import { formatNumber } from '@/lib/format';
 import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
 import { queryKeys } from '@/lib/query-keys';
 import type { Role } from '@/lib/types';
@@ -73,6 +77,12 @@ const CHARGEURS: Record<Jeu, (perimetre: PerimetreChiffres) => Promise<unknown>>
   methodes: fetchChiffresMethodes,
   banques: fetchChiffresBanques,
   campagne: fetchChiffresCampagne,
+  ouvertures: (perimetre) =>
+    fetchComptageOuvertures({
+      from: perimetre.plage.from,
+      to: perimetre.plage.to,
+      ...(perimetre.commercialId === null ? {} : { openedById: perimetre.commercialId }),
+    }),
 };
 
 const clefDeJeu = (jeu: Jeu, perimetre: PerimetreChiffres): readonly unknown[] => [
@@ -148,6 +158,36 @@ function etatDesJeux(
     isRefetching: resultats.some((r) => r.isFetching && r.data !== undefined),
     dataUpdatedAt: Math.max(0, ...resultats.map((r) => r.dataUpdatedAt)),
   };
+}
+
+/**
+ * EB-13 : la file de rappel s'atteint depuis le tableau de bord, avec son
+ * compte du jour. Elle suit le téléconseiller regardé.
+ */
+function LienRappels({
+  projet,
+  teleconseiller,
+}: {
+  projet: Projet;
+  teleconseiller: string | null;
+}) {
+  const rappels = useQuery({
+    queryKey: [...callbackKeys.list('today', teleconseiller), projet],
+    queryFn: () => fetchCallbacks('today', teleconseiller, undefined, projet),
+    retry: false,
+  });
+
+  return (
+    <Link
+      href={`${projet === 'CHUES' ? '/chues' : '/grand-public'}/rappels`}
+      className={buttonVariants({ variant: 'outline', size: 'sm' })}
+    >
+      À rappeler
+      {rappels.data === undefined
+        ? null
+        : ` · ${formatNumber(rappels.data.items.length)} aujourd’hui`}
+    </Link>
+  );
 }
 
 export function ChiffresView({ ecran, role }: { ecran: DashboardEcran; role: Role }) {
@@ -285,6 +325,7 @@ export function ChiffresView({ ecran, role }: { ecran: DashboardEcran; role: Rol
               </SelectContent>
             </Select>
           ) : null}
+          <LienRappels projet={projet} teleconseiller={filters.teleconseiller} />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <LiveIndicator

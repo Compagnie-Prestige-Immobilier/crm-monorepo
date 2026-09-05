@@ -21,6 +21,7 @@ import { HealthController } from '../../modules/health/health.controller.js';
 import { ImportsController } from '../../modules/imports/imports.controller.js';
 import { NotificationsController } from '../../modules/notifications/notifications.controller.js';
 import { NotificationTemplatesController } from '../../modules/notifications/templates.controller.js';
+import { OuverturesController } from '../../modules/ouvertures/ouvertures.controller.js';
 import { Phase2Controller } from '../../modules/phase2/phase2.controller.js';
 import { ProspectsController } from '../../modules/prospects/prospects.controller.js';
 import { ReferentielsController } from '../../modules/referentiels/referentiels.controller.js';
@@ -58,6 +59,7 @@ const CONTROLLERS: readonly Controller[] = [
   ImportsController,
   NotificationsController,
   NotificationTemplatesController,
+  OuverturesController,
   Phase2Controller,
   ProspectsController,
   ReferentielsController,
@@ -93,6 +95,13 @@ const TROIS_ETAPES: readonly string[] = [
   'ProspectsController.update',
 
   'RepCampaignsController.recordAttempt',
+
+  // Le verrou de traitement : ouvrir, garder le brouillon, relire la fiche en
+  // main. L'encadrement mene les trois etapes lui-meme, il ouvre donc aussi.
+  'OuverturesController.ouvrir',
+  'OuverturesController.courante',
+  'OuverturesController.enregistrerBrouillon',
+  'OuverturesController.comptage',
 
   // Le périmètre d'appel de l'appelant : le téléphone en a besoin pour borner
   // son tirage, quel que soit le rôle qui mène les trois étapes.
@@ -208,6 +217,11 @@ const ADMISES: readonly string[] = [
 
   'SuggestionsController.list',
 
+  // Liberer une fiche restee ouverte est un geste d'encadrement, jamais
+  // automatique : seuls le superviseur et l'administrateur l'atteignent.
+  'OuverturesController.ouvertes',
+  'OuverturesController.liberer',
+
   'SupervisionController.activite',
   'SupervisionController.creneaux',
   'SupervisionController.updateCreneaux',
@@ -285,7 +299,12 @@ const ADMISES_ACCUEIL: readonly string[] = [
  * rien.
  */
 const ADMISES_DIRECTION: readonly string[] = [
-  ...ADMISES.filter((route) => route !== 'AnalyticsController.bankAging'),
+  ...ADMISES.filter(
+    (route) =>
+      route !== 'AnalyticsController.bankAging' &&
+      route !== 'OuverturesController.ouvertes' &&
+      route !== 'OuverturesController.liberer',
+  ),
   ...REGISTRE,
   'ExportController.prospects',
   'VisitesController.createReferentiel',
@@ -456,10 +475,15 @@ describe('ce qu’une DIRECTION atteint, route par route', () => {
     expect(ouvertesDe(Role.DIRECTION)).toEqual([...ADMISES_DIRECTION].sort());
   });
 
-  it('lit tout ce que lit la supervision, hors dossiers bancaires', () => {
+  // Liberer une fiche restee ouverte est un geste d'ENCADREMENT sur le travail
+  // d'autrui, comme annuler un rappel : `manages()` le reserve au superviseur et
+  // a l'administrateur, et la direction n'y est pas.
+  it('lit tout ce que lit la supervision, hors dossiers bancaires et fiches a liberer', () => {
     const direction = new Set(ouvertesDe(Role.DIRECTION));
     expect(ouvertesDe(Role.SUPERVISEUR).filter((route) => !direction.has(route))).toEqual([
       'AnalyticsController.bankAging',
+      'OuverturesController.liberer',
+      'OuverturesController.ouvertes',
     ]);
   });
 

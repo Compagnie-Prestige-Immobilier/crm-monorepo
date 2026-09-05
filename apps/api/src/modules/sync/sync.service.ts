@@ -34,6 +34,7 @@ import { REPRESENTANT_INCLUDE, toRepresentantDto } from '../representants/repres
 import { resolveWhatsappPatch } from '../representants/whatsapp.js';
 import { applyRelationChange } from '../representants/relation-change.js';
 import { CallAttemptApplyStatus } from '../phase2/dto.js';
+import { fermerOuverture } from '../ouvertures/ouvertures.service.js';
 import { Phase2SyncService } from '../phase2/phase2-sync.service.js';
 import { VISITE_REGISTRE_ROLES, VisitesService, dakarDate } from '../visites/visites.service.js';
 import { RemindersService } from '../notifications/reminders.service.js';
@@ -869,6 +870,15 @@ export class SyncService {
         }),
         clientCreatedAt: data.clientCreatedAt,
       });
+
+      if (data.ouvertureId) {
+        await fermerOuverture(tx, {
+          ouvertureId: data.ouvertureId,
+          openedById: user.id,
+          attemptId: operation.entityId,
+          at: new Date(data.clientCreatedAt),
+        });
+      }
 
       return {
         // Un rejeu n'est pas un échec : la tentative était déjà enregistrée,

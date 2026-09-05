@@ -30,6 +30,8 @@ class CreateRepCallAttemptDto {
 
     this.statutQualificationId,
 
+    this.ouvertureId,
+
     this.promisedProspects,
 
     this.comment,
@@ -95,6 +97,10 @@ class CreateRepCallAttemptDto {
     includeIfNull: false,
   )
   final String? statutQualificationId;
+
+  /// Ouverture de fiche que cette qualification ferme. Le chronomètre se lit entre son `openedAt` et cette fermeture. Une ouverture inconnue, déjà fermée ou ouverte par un autre est ignorée : la tentative vient du terrain et ne se perd pas pour un verrou.
+  @JsonKey(name: r'ouvertureId', required: false, includeIfNull: false)
+  final String? ouvertureId;
 
   /// Fiches promises. Admis uniquement pour l’issue PROSPECTS_PROMISED.
   // minimum: 0
@@ -218,6 +224,7 @@ class CreateRepCallAttemptDto {
                 representantId,
                 outcome,
                 statutQualificationId,
+                ouvertureId,
                 promisedProspects,
                 comment,
                 relationStatus,
@@ -245,6 +252,7 @@ class CreateRepCallAttemptDto {
                 other.representantId,
                 other.outcome,
                 other.statutQualificationId,
+                other.ouvertureId,
                 other.promisedProspects,
                 other.comment,
                 other.relationStatus,
@@ -278,6 +286,7 @@ class CreateRepCallAttemptDto {
         representantId,
         outcome,
         statutQualificationId,
+        ouvertureId,
         promisedProspects,
         comment,
         relationStatus,

@@ -865,6 +865,7 @@ class WriteRepository {
     required String prospectId,
     required String outcome,
     required String createdById,
+    String? ouvertureId,
     String? reasonCode,
     String? method,
     String? comment,
@@ -957,6 +958,20 @@ class WriteRepository {
         attemptId: entityId,
         now: now,
       );
+      // Le verrou se lève ici et pas dans l'écran : une qualification
+      // enregistrée par un autre chemin doit rendre la fiche elle aussi.
+      if (ouvertureId != null) {
+        await (_db.update(_db.ouverturesFiche)..where(
+              (OuverturesFiche o) =>
+                  o.id.equals(ouvertureId) & o.closedAt.isNull(),
+            ))
+            .write(
+              OuverturesFicheCompanion(
+                closedAt: Value<DateTime?>(now),
+                closingAttemptId: Value<String?>(entityId),
+              ),
+            );
+      }
       await _enqueue(
         dependencyKey: 'phase2:$prospectId',
         entityType: callAttemptEntity,
@@ -964,6 +979,9 @@ class WriteRepository {
         op: 'create',
         payload: <String, Object?>{
           'prospectId': prospectId,
+          // Ferme l'ouverture côté serveur, et c'est ce qui arrête le
+          // chronomètre. Une ouverture inconnue y est ignorée en silence.
+          'ouvertureId': ?ouvertureId,
           'outcome': reason.outcome,
           'reasonCode': reason.code,
           'method': ?method,
@@ -1033,6 +1051,8 @@ class WriteRepository {
     bool? numeroConfirme,
     String? numeroSaisi,
     String? statutQualificationId,
+    String? ouvertureId,
+    String? createdByName,
     String? id,
   }) async {
     final String entityId = id ?? Ids.newId();
@@ -1134,6 +1154,42 @@ class WriteRepository {
         attemptId: entityId,
         now: now,
       );
+      // L'historique de la fiche, relu HORS LIGNE à l'ouverture suivante :
+      // aucune route ne le redescend, il n'existe que s'il est écrit ici.
+      await _db
+          .into(_db.repCallAttempts)
+          .insert(
+            RepCallAttemptsCompanion.insert(
+              id: entityId,
+              representantId: representantId,
+              createdById: Value<String?>(createdById),
+              createdByName: Value<String?>(createdByName),
+              outcome: outcome,
+              statutQualificationId: Value<String?>(statutQualificationId),
+              relationStatus: Value<String?>(relationStatus),
+              comment: Value<String?>(normalizedComment),
+              contacte: Value<bool?>(contacte),
+              connaitUes: Value<bool?>(connaitUES),
+              syndicat: Value<String?>(normalizedSyndicat),
+              etablissement: Value<String?>(nouvelEtablissement),
+              callbackAt: Value<DateTime?>(callbackAt),
+              clientCreatedAt: now,
+            ),
+          );
+      // Le verrou se lève ici et pas dans l'écran : une qualification
+      // enregistrée par un autre chemin doit rendre la fiche elle aussi.
+      if (ouvertureId != null) {
+        await (_db.update(_db.ouverturesFiche)..where(
+              (OuverturesFiche o) =>
+                  o.id.equals(ouvertureId) & o.closedAt.isNull(),
+            ))
+            .write(
+              OuverturesFicheCompanion(
+                closedAt: Value<DateTime?>(now),
+                closingAttemptId: Value<String?>(entityId),
+              ),
+            );
+      }
       await _enqueue(
         dependencyKey: representantId,
         entityType: repCallAttemptEntity,
@@ -1162,6 +1218,9 @@ class WriteRepository {
           'numeroConfirme': ?numeroConfirme,
           'phone': ?nouveauNumero,
           'statutQualificationId': ?statutQualificationId,
+          // Ferme l'ouverture côté serveur, et c'est ce qui arrête le
+          // chronomètre. Une ouverture inconnue y est ignorée en silence.
+          'ouvertureId': ?ouvertureId,
           'clientCreatedAt': now.toUtc().toIso8601String(),
           'deviceCallType': ?preuve?.journalType,
           'deviceCallDurationSeconds': ?preuve?.journalDureeS,

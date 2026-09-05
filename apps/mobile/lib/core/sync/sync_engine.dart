@@ -23,6 +23,21 @@ import 'token_store.dart';
 
 const String repCallAttemptEntity = 'rep_call_attempt';
 
+/// L'ouverture d'une fiche. Route REST dédiée et non `SyncEntity` : le verrou
+/// se joue sur un index unique, et une violation d'unicité dans la transaction
+/// de groupe annulerait les autres opérations du même représentant.
+const String ouvertureEntity = 'ouverture';
+
+/// Les entités poussées par une route dédiée. Un lot n'en mêle jamais deux :
+/// chacune a son propre envoi, et le lot de synchronisation n'en veut aucune.
+const Set<String> routesDediees = <String>{
+  repCallAttemptEntity,
+  ouvertureEntity,
+};
+
+String? _routeDedieeDe(OutboxData row) =>
+    routesDediees.contains(row.entityType) ? row.entityType : null;
+
 /// Un appel du journal du téléphone rapproché d'une fiche, que personne n'a
 /// consigné. Poussé par la route de synchronisation ordinaire.
 const String appelDetecteEntity = 'appel_detecte';
@@ -61,9 +76,13 @@ class SyncEngine {
   /// v4 : les liens banque, syndicat et représentant d'un prospect peuvent
   /// être nuls ; le tirage exige ce numéro en en-tête et refuse en dessous.
   /// v6 : la tentative auprès d'un représentant porte `statutQualificationId`.
+  /// v7 : le motif exigé par un statut (`requiresComment`) est lu et imposé
+  /// avant l'envoi. Les APK d'avant ne le lisent pas : servis, les deux statuts
+  /// « Autre » repartiraient sans motif, le serveur refuserait, et un refus
+  /// hors ligne est définitif.
   /// C'est ce nombre que la route dédiée compare au `minPayloadVersion` de
   /// chaque statut ; en dessous, aucun statut ne descend.
-  static const int payloadVersion = 6;
+  static const int payloadVersion = 7;
 
   /// Poids qu'un lot peut atteindre sur le fil ; c'est lui que le `sendTimeout`
   /// du profil `push` doit pouvoir émettre sur un lien montant EDGE.
@@ -156,6 +175,13 @@ class SyncEngine {
 
         if (batch.first.entityType == repCallAttemptEntity) {
           final _SendReport report = await _sendRepCallAttempts(batch);
+          acknowledged += report.acknowledged;
+          if (!report.keepGoing) break;
+          continue;
+        }
+
+        if (batch.first.entityType == ouvertureEntity) {
+          final _SendReport report = await _sendOuvertures(batch);
           acknowledged += report.acknowledged;
           if (!report.keepGoing) break;
           continue;
@@ -326,8 +352,7 @@ class SyncEngine {
         if (row.status != OutboxStatus.pending) break;
         if (row.nextAttemptAt.isAfter(at)) break;
         if (batch.isNotEmpty &&
-            (row.entityType == repCallAttemptEntity) !=
-                (batch.first.entityType == repCallAttemptEntity)) {
+            _routeDedieeDe(row) != _routeDedieeDe(batch.first)) {
           return batch;
         }
 
@@ -654,6 +679,58 @@ class SyncEngine {
                 ? SyncOpStatus.applied
                 : SyncOpStatus.duplicate,
             entityId: null,
+            rev: null,
+            serverUpdatedAt: null,
+            errorCode: null,
+            error: null,
+          ),
+        );
+        acknowledged++;
+      } on FormatException catch (error) {
+        await _markFailed(
+          row,
+          ClientErrorCodes.payloadSchemaMismatch,
+          error.message,
+        );
+      } on ApiException catch (error) {
+        await _handleBatchFailure(rows.sublist(index), error);
+        return _SendReport(acknowledged: acknowledged, keepGoing: false);
+      }
+    }
+    return _SendReport(acknowledged: acknowledged, keepGoing: true);
+  }
+
+  /// Une ouverture par requête, comme les tentatives : le lot de
+  /// synchronisation ne sait pas porter une route dédiée, et un refus du verrou
+  /// n'a pas à annuler l'ouverture suivante.
+  Future<_SendReport> _sendOuvertures(List<OutboxData> rows) async {
+    int acknowledged = 0;
+    for (int index = 0; index < rows.length; index++) {
+      final OutboxData row = rows[index];
+      try {
+        final Object? decoded = jsonDecode(row.payload);
+        if (decoded is! Map<String, dynamic>) {
+          throw const FormatException('payload non objet');
+        }
+        final Object? brut = decoded['openedAt'];
+        final DateTime? openedAt = brut is String
+            ? DateTime.tryParse(brut)
+            : null;
+        if (openedAt == null) throw const FormatException('openedAt illisible');
+        await _api.ouvrirFiche(
+          OuvrirFicheDto(
+            id: row.entityId,
+            openedAt: openedAt,
+            representantId: decoded['representantId'] as String?,
+            prospectId: decoded['prospectId'] as String?,
+          ),
+        );
+        await _markDone(
+          row,
+          SyncOperationResultDto(
+            opId: row.id,
+            status: SyncOpStatus.applied,
+            entityId: row.entityId,
             rev: null,
             serverUpdatedAt: null,
             errorCode: null,
@@ -1436,6 +1513,7 @@ class SyncEngine {
                 retryAfterMinutes: Value<int?>(
                   statut.retryAfterMinutes?.toInt(),
                 ),
+                relationStatus: Value<String?>(statut.relationStatus?.value),
                 isActive: Value<bool>(statut.isActive),
                 position: Value<int>(rang),
                 minPayloadVersion: Value<int>(statut.minPayloadVersion.toInt()),

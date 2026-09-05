@@ -218,6 +218,14 @@ enum StatutQualificationEffect {
   WRONG_NUMBER
 }
 
+// D'ou vient l'echeance d'un rappel. Sans elle, la file mele la date convenue
+// avec le representant et le simple delai de reessai : deplacer la premiere est
+// une parole trahie, deplacer la seconde ne coute rien.
+enum RappelOrigine {
+  PROMIS
+  AUTOMATIQUE
+}
+
 enum RepCallOutcome {
   REACHED
   PROSPECTS_PROMISED
@@ -316,6 +324,9 @@ model User {
 
   importJobs     ImportJob[]     @relation("ImportJobRequestedBy")
   segmentChanges SegmentChange[] @relation("SegmentChangeChangedBy")
+
+  fichesOuvertes  OuvertureFiche[] @relation("OuvertureFicheOpenedBy")
+  fichesLiberees  OuvertureFiche[] @relation("OuvertureFicheReleasedBy")
 
   scheduledCallbacks       ScheduledCallback[]          @relation("ScheduledCallbackAssignedTo")
   representantRelationsSet RepresentantRelationChange[] @relation("RepresentantRelationChangeChangedBy")
@@ -540,6 +551,12 @@ model Representant {
   lastCallBy      User?           @relation("RepresentantLastCallBy", fields: [lastCallById], references: [id], onDelete: Restrict)
   nextCallbackAt  DateTime?
 
+  /// Qui a fixe l'echeance : le representant lui-meme, ou le delai de reessai
+  /// de son statut. Un rappel promis se tient a l'heure dite ; un rappel
+  /// automatique se deplace sans rien trahir. Nulle en meme temps que
+  /// `nextCallbackAt`, contrainte CHECK.
+  nextCallbackOrigine RappelOrigine?
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -552,6 +569,7 @@ model Representant {
   suggestionsGiven    RepresentantSuggestion[]     @relation("RepresentantSuggestionSource")
   suggestionsResolved RepresentantSuggestion[]     @relation("RepresentantSuggestionResolved")
   lotItems            LotExportItem[]
+  ouvertures          OuvertureFiche[]
 
   @@index([phoneE164])
   @@index([createdById])
@@ -839,6 +857,7 @@ model Prospect {
 
   segmentChanges SegmentChange[]
   journeys       ProspectJourney[]
+  ouvertures     OuvertureFiche[]
 
   @@index([phoneE164])
   @@index([representantId])
@@ -1255,6 +1274,76 @@ model DeviceCallDetection {
   @@index([representantId, deviceCallAt])
   @@index([prospectId, deviceCallAt])
   @@map("device_call_detections")
+}
+
+/// Une fiche ouverte apres confirmation, et ce que cette ouverture engage.
+///
+/// Quatre besoins tenaient dans la meme ligne, aucun ne survit sans les autres :
+/// le comptage des fiches ouvertes, le chronometre qui alimente la DMT, le
+/// verrou qui interdit de partir sans qualifier, et le brouillon a restituer.
+/// Les separer aurait demande de recoller quatre tables sur le meme evenement.
+///
+/// Une table pour les deux cibles, sur le patron de `DeviceCallDetection` et de
+/// `LotExportItem` : deux colonnes nullables, exactement une renseignee, la
+/// contrainte CHECK tient l'exclusivite. Deux tables jumelles obligeraient a
+/// dupliquer le verrou, le chronometre et leurs index.
+///
+/// Rien n'est jamais supprime ici : chaque ouverture confirmee compte, meme
+/// repetee le meme jour sur la meme fiche.
+model OuvertureFiche {
+  // UUID v7 engendre par le client : l'ouverture existe hors ligne avant
+  // d'atteindre le serveur, et sert de cle d'idempotence a sa remontee.
+  id String @id
+
+  openedById String
+  openedBy   User   @relation("OuvertureFicheOpenedBy", fields: [openedById], references: [id], onDelete: Restrict)
+
+  representantId String?
+  representant   Representant? @relation(fields: [representantId], references: [id], onDelete: Cascade)
+  prospectId     String?
+  prospect       Prospect?     @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+
+  /// Horloge du terrain, comme `clientCreatedAt` ailleurs : c'est elle qui
+  /// demarre le chronometre et qui date la journee de travail.
+  openedAt DateTime
+  /// Nul tant que la fiche est verrouillee. La DMT est la difference avec
+  /// `openedAt`, jamais une colonne : une duree stockee se desaccorde de ses
+  /// deux bornes des la premiere correction.
+  closedAt DateTime?
+
+  /// La tentative qui a leve le verrou. Sans cle etrangere : deux tables
+  /// cibles, comme `DeviceCallDetection.attemptId`.
+  closingAttemptId String?
+
+  /// Les reponses deja saisies, restituees au rappel et apres un plantage.
+  /// Forme libre : le formulaire d'un prospect et celui d'un representant ne
+  /// portent pas les memes champs, et un brouillon incomplet ne se range pas
+  /// dans les colonnes typees de la tentative.
+  draft Json?
+
+  /// Liberation par un superviseur ou un administrateur. Jamais automatique :
+  /// une fiche qu'une machine libere est une fiche qu'on croit traitee.
+  releasedById String?
+  releasedBy   User?     @relation("OuvertureFicheReleasedBy", fields: [releasedById], references: [id], onDelete: Restrict)
+  releasedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Fiches ouvertes par teleconseiller et par journee de travail.
+  @@index([openedById, openedAt])
+  /// La meme lecture toutes files confondues, pour le tableau de bord.
+  @@index([openedAt])
+  /// Le brouillon a restituer et l'historique des ouvertures d'une fiche.
+  @@index([representantId, openedAt])
+  @@index([prospectId, openedAt])
+  // Index du curseur de synchronisation : une liberation faite en supervision
+  // redescend au telephone par le pull, en `orderBy: [updatedAt, id]`.
+  @@index([updatedAt, id])
+  // Le verrou est UNIQUE par teleconseiller, en index PARTIEL
+  // (`WHERE "closedAt" IS NULL`) pose dans la migration : Prisma ne sait pas
+  // exprimer la clause `WHERE`. Voir `ouvertures_fiche_verrou_unique`.
+  @@map("ouvertures_fiche")
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -2116,6 +2205,10 @@ model StatutQualification {
 
   /// La date du rappel est exigee par CETTE ligne, jamais par le code.
   requiresCallback Boolean @default(false)
+
+  /// Le motif est exige par CETTE ligne. Meme nom et meme role que sur
+  /// `CallOutcomeReason` : « Autre » ne dit rien tant qu'on ne l'a pas ecrit.
+  requiresComment Boolean @default(false)
 
   /// Un numero occupe se retente : l'app propose d'elle-meme un reessai apres
   /// ce delai, modifiable au moment de l'appel. Nul : pas de reessai propose.

@@ -61,17 +61,21 @@ function rep(over: Partial<RepresentantRow> & { id: string }): RepresentantRow {
   };
 }
 
-const EN_RETARD = rep({
-  id: 'r-1',
-  nextCallbackAt: '2020-03-04T09:00:00.000Z',
-});
+// `nextCallbackOrigine` manque au client engendré : posé à côté du reste.
+const EN_RETARD = {
+  ...rep({ id: 'r-1', nextCallbackAt: '2020-03-04T09:00:00.000Z' }),
+  nextCallbackOrigine: 'PROMIS',
+} as RepresentantRow;
 
-const A_VENIR = rep({
-  id: 'r-2',
-  fullName: 'Ousmane Fall',
-  phoneE164: '+221770000002',
-  nextCallbackAt: new Date(Date.now() + 3 * 86_400_000).toISOString(),
-});
+const A_VENIR = {
+  ...rep({
+    id: 'r-2',
+    fullName: 'Ousmane Fall',
+    phoneE164: '+221770000002',
+    nextCallbackAt: new Date(Date.now() + 3 * 86_400_000).toISOString(),
+  }),
+  nextCallbackOrigine: 'AUTOMATIQUE',
+} as RepresentantRow;
 
 const INJOIGNABLE = rep({
   id: 'r-3',
@@ -128,6 +132,16 @@ describe('RepresentantsSuiviView', () => {
 
     expect(within(dus).getByText('En retard')).toBeTruthy();
     expect(within(aVenir).queryByText('En retard')).toBeNull();
+  });
+
+  it('distingue le rappel promis de celui que le référentiel a reprogrammé', async () => {
+    await renderView();
+
+    const promis = (await screen.findByText('Aminata Ndiaye')).closest('tr') as HTMLElement;
+    const automatique = screen.getByText('Ousmane Fall').closest('tr') as HTMLElement;
+
+    expect(within(promis).getByText('Promis')).toBeTruthy();
+    expect(within(automatique).getByText('Automatique')).toBeTruthy();
   });
 
   it('bascule sur les injoignables et redemande la liste au serveur', async () => {

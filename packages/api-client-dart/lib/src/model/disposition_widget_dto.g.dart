@@ -174,6 +174,7 @@ const _$DashboardSourceEnumMap = {
   DashboardSource.prospectsNotes: 'prospects-notes',
   DashboardSource.adhesions: 'adhesions',
   DashboardSource.resteAAppeler: 'reste-a-appeler',
+  DashboardSource.fichesOuvertes: 'fiches-ouvertes',
   DashboardSource.parTeleconseiller: 'par-teleconseiller',
   DashboardSource.couvertureDerniereCampagne: 'couverture-derniere-campagne',
   DashboardSource.horsAttributionDerniereCampagne:

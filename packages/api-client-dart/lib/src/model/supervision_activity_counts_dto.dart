@@ -138,7 +138,7 @@ class SupervisionActivityCountsDto {
   @JsonKey(name: r'callback', required: true, includeIfNull: false)
   final num callback;
 
-  /// Part des appels dont le numéro s’est révélé exploitable, en pourcentage. `null` sans aucun appel : « personne appelé » n’est pas « personne joint ».
+  /// Part des appels joints, en pourcentage. Seule l’issue UNREACHABLE en est exclue : un faux numéro est une fiche traitée. `null` sans aucun appel : « personne appelé » n’est pas « personne joint ».
   @JsonKey(name: r'reachRate', required: true, includeIfNull: true)
   final num? reachRate;
 
@@ -178,7 +178,7 @@ class SupervisionActivityCountsDto {
   @JsonKey(name: r'repWrongNumber', required: true, includeIfNull: false)
   final num repWrongNumber;
 
-  /// Représentants qui ont DÉCROCHÉ et répondu : REACHED ou REFUSED. Un refus est un contact ; un rappel promis n’en est pas encore un.
+  /// Appels de la famille jointe : REACHED, REFUSED, CALLBACK, WRONG_NUMBER. Un refus est un contact, un rappel promis aussi. Recoupe `repCallback` et `repWrongNumber`, qui en détaillent deux issues.
   @JsonKey(name: r'repReached', required: true, includeIfNull: false)
   final num repReached;
 
@@ -194,7 +194,7 @@ class SupervisionActivityCountsDto {
   @JsonKey(name: r'repOther', required: true, includeIfNull: false)
   final num repOther;
 
-  /// Part des appels représentants où quelqu’un a répondu, en pourcentage. `null` sans aucun appel.
+  /// Part des appels représentants de la famille jointe, en pourcentage. `null` sans aucun appel.
   @JsonKey(name: r'repContactRate', required: true, includeIfNull: true)
   final num? repContactRate;
 
@@ -202,11 +202,11 @@ class SupervisionActivityCountsDto {
   @JsonKey(name: r'repCallbackRate', required: true, includeIfNull: true)
   final num? repCallbackRate;
 
-  /// Représentants DISTINCTS dont la dernière réponse de la fenêtre a été obtenue par ce téléconseiller. Attribué à qui a obtenu la réponse, pas à qui a appelé le premier. NON SOMMABLE entre périodes ni entre téléconseillers.
+  /// Représentants DISTINCTS dont la dernière réponse TRANCHÉE de la fenêtre a été obtenue par ce téléconseiller. Tranche celui dont le statut pose AMBASSADEUR ou REFUS : « Décédé », « Hors cible » ou « Autre » ferment la fiche sans trancher. Attribué à qui a obtenu la réponse, pas à qui a appelé le premier. NON SOMMABLE entre périodes ni entre téléconseillers.
   @JsonKey(name: r'repQuestioned', required: true, includeIfNull: false)
   final num repQuestioned;
 
-  /// Parmi `repQuestioned`, ceux dont cette dernière réponse est REACHED. NON SOMMABLE.
+  /// Parmi `repQuestioned`, ceux dont cette dernière réponse pose AMBASSADEUR. NON SOMMABLE.
   @JsonKey(name: r'repQualified', required: true, includeIfNull: false)
   final num repQualified;
 

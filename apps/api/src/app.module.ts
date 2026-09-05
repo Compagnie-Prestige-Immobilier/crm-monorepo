@@ -20,6 +20,7 @@ import { ClientRequestsModule } from './modules/client-requests/client-requests.
 import { DbDumpModule } from './modules/db-dump/db-dump.module.js';
 import { DemoModule } from './modules/demo/demo.module.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
+import { OuverturesModule } from './modules/ouvertures/ouvertures.module.js';
 import { Phase2Module } from './modules/phase2/phase2.module.js';
 import { RepCampaignsModule } from './modules/rep-campaigns/rep-campaigns.module.js';
 import { AnalyticsModule } from './modules/analytics/analytics.module.js';
@@ -104,6 +105,7 @@ const apiLogPath = resolve(import.meta.dirname, '../../../logs/api.log');
     UsersModule,
     ReferentielsModule,
     RepresentantsModule,
+    OuverturesModule,
     ProspectsModule,
     SyncModule,
     Phase2Module,

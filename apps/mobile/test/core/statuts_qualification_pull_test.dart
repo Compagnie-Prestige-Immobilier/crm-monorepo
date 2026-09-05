@@ -26,6 +26,7 @@ void main() {
     String code, {
     StatutQualificationEffect effect = StatutQualificationEffect.REACHED,
     bool requiresCallback = false,
+    bool requiresComment = false,
     bool isActive = true,
   }) => StatutQualificationDto(
     id: 'sq-$code',
@@ -33,6 +34,7 @@ void main() {
     label: code,
     effect: effect,
     requiresCallback: requiresCallback,
+    requiresComment: requiresComment,
     retryAfterMinutes: null,
     priorite: PrioriteTraitement.NORMALE,
     relationStatus: null,
@@ -72,8 +74,8 @@ void main() {
   test('la version déclarée est celle que le serveur compare', () async {
     await engine.pullStatutsQualification();
 
-    expect(api.statutCalls, <int>[6]);
-    expect(SyncEngine.payloadVersion, 6);
+    expect(api.statutCalls, <int>[7]);
+    expect(SyncEngine.payloadVersion, 7);
   });
 
   test('un statut retiré du serveur quitte le miroir', () async {

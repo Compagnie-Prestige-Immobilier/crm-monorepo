@@ -608,6 +608,8 @@ export class StatutQualificationDto {
   effect!: StatutQualificationEffect;
   @ApiProperty({ description: 'La date du rappel est exigée par ce statut.' })
   requiresCallback!: boolean;
+  @ApiProperty({ description: 'Le motif est exigé par ce statut : « Autre » ne dit rien seul.' })
+  requiresComment!: boolean;
   @ApiProperty({
     type: Number,
     nullable: true,
@@ -653,16 +655,11 @@ export class StatutQualificationFieldQueryDto {
 }
 
 export class CreateStatutQualificationDto {
-  @ApiProperty({ maxLength: 64, description: 'Immuable : l’historique le référence.' })
-  @IsString()
-  @MinLength(2)
-  @MaxLength(64)
-  @Matches(/^[A-Za-z][A-Za-z0-9_]*$/u, {
-    message: 'Le code ne contient que des lettres, des chiffres et des soulignés.',
+  @ApiProperty({
+    maxLength: 120,
+    description:
+      'Le code en est déduit, puis figé : majuscules, sans accents, espaces en tirets bas.',
   })
-  code!: string;
-
-  @ApiProperty({ maxLength: 120 })
   @IsString()
   @MinLength(2)
   @MaxLength(120)
@@ -676,6 +673,11 @@ export class CreateStatutQualificationDto {
   @IsOptional()
   @IsBoolean()
   requiresCallback?: boolean;
+
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @IsBoolean()
+  requiresComment?: boolean;
 
   @ApiPropertyOptional({ type: Number, nullable: true, minimum: 5, maximum: 10080 })
   @IsOptional()
@@ -716,6 +718,11 @@ export class UpdateStatutQualificationDto {
   @IsOptional()
   @IsBoolean()
   requiresCallback?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  requiresComment?: boolean;
 
   @ApiPropertyOptional({
     type: Number,

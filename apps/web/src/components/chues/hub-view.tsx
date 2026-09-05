@@ -46,6 +46,14 @@ export function HubView({ prenom }: { prenom: string }) {
     retry: false,
   });
 
+  const retards = useQuery({
+    queryKey: [...callbackKeys.list('overdue', null), 'CHUES'],
+    queryFn: () => fetchCallbacks('overdue', null, undefined, 'CHUES'),
+    retry: false,
+  });
+
+  const enRetard = retards.data?.items.length ?? 0;
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col items-start gap-2">
@@ -63,14 +71,14 @@ export function HubView({ prenom }: { prenom: string }) {
           Projet CHUES
         </h1>
         <p className="text-[0.9375rem] text-muted-foreground">
-          Bonjour {prenom}. Trois étapes, dans l’ordre.
+          Bonjour {prenom}. Trois étapes, dans l’ordre, puis ce qui revient.
         </p>
         <Button variant="outline" onClick={() => setNouveauRepresentant(true)}>
           Ajouter un représentant
         </Button>
       </div>
 
-      <ol className="grid gap-4 md:grid-cols-3">
+      <ol className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Etape
           titre="Qualifier un représentant"
           explication="Un enseignant relais accepte de transmettre les contacts de ses collègues."
@@ -108,18 +116,30 @@ export function HubView({ prenom }: { prenom: string }) {
               failed={enAttente.isError}
               valeur={enAttente.data}
               legende="pas encore convertis"
-              suite={
-                // Le nombre de rappels dus n'a pas de sens sans le nombre en
-                // attente : il ne s'affiche donc pas avant lui.
-                rappels.isPending || rappels.isError
-                  ? null
-                  : ` · ${formatNumber(rappels.data.items.length)} rappel${
-                      rappels.data.items.length > 1 ? 's' : ''
-                    } dus`
-              }
             />
           }
           action={<Geste href="/chues/console" label="Convertir un prospect" />}
+        />
+
+        {/* Le nombre de rappels dus ne disait rien accolé aux prospects en
+            attente. Sa propre tuile lui donne son échéance et son geste. */}
+        <Etape
+          titre="À rappeler"
+          explication="Les rappels promis et ceux que le référentiel a reprogrammés."
+          chiffre={
+            <Chiffre
+              pending={rappels.isPending}
+              failed={rappels.isError}
+              valeur={rappels.data?.items.length}
+              legende="dus aujourd’hui"
+              suite={
+                retards.isPending || retards.isError
+                  ? null
+                  : ` · ${formatNumber(enRetard)} en retard`
+              }
+            />
+          }
+          action={<Geste href="/chues/rappels" label="Voir les rappels" />}
         />
       </ol>
 

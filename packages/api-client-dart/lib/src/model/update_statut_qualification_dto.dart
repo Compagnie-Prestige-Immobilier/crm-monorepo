@@ -25,6 +25,8 @@ class UpdateStatutQualificationDto {
 
     this.requiresCallback,
 
+    this.requiresComment,
+
     this.retryAfterMinutes,
 
     this.priorite,
@@ -37,6 +39,9 @@ class UpdateStatutQualificationDto {
 
   @JsonKey(name: r'requiresCallback', required: false, includeIfNull: false)
   final bool? requiresCallback;
+
+  @JsonKey(name: r'requiresComment', required: false, includeIfNull: false)
+  final bool? requiresComment;
 
   /// Nul retire le réessai proposé.
   // minimum: 5
@@ -69,6 +74,7 @@ class UpdateStatutQualificationDto {
               [
                 label,
                 requiresCallback,
+                requiresComment,
                 retryAfterMinutes,
                 priorite,
                 relationStatus,
@@ -76,6 +82,7 @@ class UpdateStatutQualificationDto {
               [
                 other.label,
                 other.requiresCallback,
+                other.requiresComment,
                 other.retryAfterMinutes,
                 other.priorite,
                 other.relationStatus,
@@ -89,6 +96,7 @@ class UpdateStatutQualificationDto {
       mapPropsToHashCode([
         label,
         requiresCallback,
+        requiresComment,
         retryAfterMinutes,
         priorite,
         relationStatus,

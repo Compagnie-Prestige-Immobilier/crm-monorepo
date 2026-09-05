@@ -19,6 +19,10 @@ abstract class _$RepresentantCallAttemptDtoCWProxy {
     String? statutQualificationLabel,
   );
 
+  RepresentantCallAttemptDto statutQualificationRequiresComment(
+    bool statutQualificationRequiresComment,
+  );
+
   RepresentantCallAttemptDto comment(String? comment);
 
   RepresentantCallAttemptDto callbackAt(DateTime? callbackAt);
@@ -66,6 +70,7 @@ abstract class _$RepresentantCallAttemptDtoCWProxy {
     RepCallOutcome outcome,
     String? statutQualificationId,
     String? statutQualificationLabel,
+    bool statutQualificationRequiresComment,
     String? comment,
     DateTime? callbackAt,
     num? promisedProspects,
@@ -109,6 +114,13 @@ class _$RepresentantCallAttemptDtoCWProxyImpl
   RepresentantCallAttemptDto statutQualificationLabel(
     String? statutQualificationLabel,
   ) => this(statutQualificationLabel: statutQualificationLabel);
+
+  @override
+  RepresentantCallAttemptDto statutQualificationRequiresComment(
+    bool statutQualificationRequiresComment,
+  ) => this(
+    statutQualificationRequiresComment: statutQualificationRequiresComment,
+  );
 
   @override
   RepresentantCallAttemptDto comment(String? comment) => this(comment: comment);
@@ -191,6 +203,7 @@ class _$RepresentantCallAttemptDtoCWProxyImpl
     Object? outcome = const $CopyWithPlaceholder(),
     Object? statutQualificationId = const $CopyWithPlaceholder(),
     Object? statutQualificationLabel = const $CopyWithPlaceholder(),
+    Object? statutQualificationRequiresComment = const $CopyWithPlaceholder(),
     Object? comment = const $CopyWithPlaceholder(),
     Object? callbackAt = const $CopyWithPlaceholder(),
     Object? promisedProspects = const $CopyWithPlaceholder(),
@@ -228,6 +241,11 @@ class _$RepresentantCallAttemptDtoCWProxyImpl
           ? _value.statutQualificationLabel
           // ignore: cast_nullable_to_non_nullable
           : statutQualificationLabel as String?,
+      statutQualificationRequiresComment:
+          statutQualificationRequiresComment == const $CopyWithPlaceholder()
+          ? _value.statutQualificationRequiresComment
+          // ignore: cast_nullable_to_non_nullable
+          : statutQualificationRequiresComment as bool,
       comment: comment == const $CopyWithPlaceholder()
           ? _value.comment
           // ignore: cast_nullable_to_non_nullable
@@ -323,6 +341,7 @@ RepresentantCallAttemptDto _$RepresentantCallAttemptDtoFromJson(
       'outcome',
       'statutQualificationId',
       'statutQualificationLabel',
+      'statutQualificationRequiresComment',
       'comment',
       'callbackAt',
       'promisedProspects',
@@ -359,6 +378,10 @@ RepresentantCallAttemptDto _$RepresentantCallAttemptDtoFromJson(
     statutQualificationLabel: $checkedConvert(
       'statutQualificationLabel',
       (v) => v as String?,
+    ),
+    statutQualificationRequiresComment: $checkedConvert(
+      'statutQualificationRequiresComment',
+      (v) => v as bool,
     ),
     comment: $checkedConvert('comment', (v) => v as String?),
     callbackAt: $checkedConvert(
@@ -406,6 +429,8 @@ Map<String, dynamic> _$RepresentantCallAttemptDtoToJson(
   'outcome': _$RepCallOutcomeEnumMap[instance.outcome]!,
   'statutQualificationId': instance.statutQualificationId,
   'statutQualificationLabel': instance.statutQualificationLabel,
+  'statutQualificationRequiresComment':
+      instance.statutQualificationRequiresComment,
   'comment': instance.comment,
   'callbackAt': instance.callbackAt?.toIso8601String(),
   'promisedProspects': instance.promisedProspects,
