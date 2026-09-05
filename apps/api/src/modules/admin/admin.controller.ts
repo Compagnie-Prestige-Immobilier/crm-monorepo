@@ -9,6 +9,7 @@ import {
   type AuthenticatedUser,
 } from '../../common/decorators/current-user.decorator.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
+import { Cached } from '../../redis/cache.interceptor.js';
 import { PurgeCatalogDto, PurgeRequestDto, PurgeResultDto } from './dto.js';
 import { PurgeService } from './purge.service.js';
 import { SupervisionDto } from './supervision.dto.js';
@@ -67,6 +68,7 @@ export class AdminController {
   }
 
   @Get('supervision')
+  @Cached(30)
   @Roles(Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiOperation({
     operationId: 'getSupervision',

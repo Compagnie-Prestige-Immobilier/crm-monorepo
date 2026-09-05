@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { UserMenu } from '@/components/layout/user-menu';
+import { LiveStream } from '@/components/live/live-stream';
 import { QueryErrorState } from '@/components/query-error-state';
 import { readSession } from '@/lib/session';
 
@@ -29,6 +30,7 @@ export default async function HubLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-dvh flex-col">
+      <LiveStream />
       <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border px-4 md:px-6">
         <Image
           src="/brand/cpi-header.png"

@@ -7,6 +7,7 @@ import { DemoBanner } from '@/components/layout/demo-banner';
 import { SIDEBAR_COOKIE } from '@/components/layout/sidebar-cookie';
 import { SidebarShell } from '@/components/layout/sidebar-shell';
 import { Topbar } from '@/components/layout/topbar';
+import { LiveStream } from '@/components/live/live-stream';
 import { QueryErrorState } from '@/components/query-error-state';
 import { readSession } from '@/lib/session';
 
@@ -34,6 +35,7 @@ export default async function PanelLayout({ children }: { children: ReactNode })
 
   return (
     <CoqueShell>
+      <LiveStream />
       {/* Sidebar fixe à partir de 768 px ; en dessous elle devient un Sheet
           déclenché depuis la Topbar. Son état de repli est lu ICI, côté
           serveur : le premier octet de HTML porte déjà la bonne largeur, et la

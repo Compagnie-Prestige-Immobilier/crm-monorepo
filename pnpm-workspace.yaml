@@ -91,6 +91,9 @@ catalog:
   # ressources statiques de Swagger UI. Sans lui, /api/docs échoue au démarrage.
   '@fastify/static': '10.1.2'
   'fastify': '5.10.0'
+  # Cache des agrégats. 5.x et non 6.x : la 6 active RESP3 par défaut, que ni
+  # @fastify/rate-limit ni @nest-lab/throttler-storage-redis n'ont validé.
+  'ioredis': '5.11.1'
   'argon2': '0.45.0'
   'class-transformer': '0.5.1'
   'class-validator': '0.14.3'

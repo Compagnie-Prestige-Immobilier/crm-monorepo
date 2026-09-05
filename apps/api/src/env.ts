@@ -48,6 +48,8 @@ export const envSchema = z
 
     DATABASE_URL: z.url(),
     DATABASE_POOL_SIZE: z.coerce.number().int().min(2).default(10),
+    /** Absent : aucun cache, tout retombe sur Postgres. Obligatoire en production. */
+    REDIS_URL: z.url().optional(),
 
     JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 characters'),
     JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),
@@ -102,6 +104,14 @@ export const envSchema = z
   })
   .superRefine((env, context) => {
     if (env.NODE_ENV !== 'production') return;
+
+    if (!env.REDIS_URL) {
+      context.addIssue({
+        code: 'custom',
+        path: ['REDIS_URL'],
+        message: 'REDIS_URL is required in production',
+      });
+    }
 
     if (env.JWT_ACCESS_SECRET === env.JWT_REFRESH_SECRET) {
       context.addIssue({

@@ -9,13 +9,16 @@ export interface LiveState {
   readonly hidden: boolean;
   readonly failing: boolean;
   readonly paused: boolean;
+  /** Le serveur pousse les changements de ce sujet : le sondage n'est plus qu'un filet. */
+  readonly streamed?: boolean;
 }
 
 /** `false` et non `0`: TanStack Query traite `0` comme « aussi vite que possible ». */
 export function liveInterval(state: LiveState, nominalMs = LIVE_INTERVAL_MS): number | false {
   if (state.paused) return false;
   if (state.hidden) return false;
-  return state.failing ? Math.max(nominalMs, LIVE_ERROR_INTERVAL_MS) : nominalMs;
+  const base = state.streamed ? Math.max(nominalMs, LIVE_SLOW_INTERVAL_MS) : nominalMs;
+  return state.failing ? Math.max(base, LIVE_ERROR_INTERVAL_MS) : base;
 }
 
 export function shouldShowSkeleton(input: { isPending: boolean; hasData: boolean }): boolean {
