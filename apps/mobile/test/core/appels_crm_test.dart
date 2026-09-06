@@ -190,6 +190,45 @@ void main() {
     expect(ligne.rapprocheAt, t0);
   });
 
+  // Un sortant qui n'aboutit pas, puis la personne qui rappelle : tant que la
+  // tentative n'est pas consignée, le dernier appel fait foi.
+  testWidgets('un appel avorté puis un vrai échange : le dernier fait foi', (
+    WidgetTester tester,
+  ) async {
+    journal = <Map<String, Object?>>[
+      <String, Object?>{
+        'type': 'sortant',
+        'at': t0.add(const Duration(seconds: 30)).millisecondsSinceEpoch,
+        'dureeSecondes': 0,
+        'numero': '771234567',
+      },
+    ];
+    final ({BuildContext context, WidgetRef ref}) monte = await monter(tester);
+    final AppelsCrm appelsCrm = monte.ref.read(appelsCrmProvider.notifier);
+
+    await appelsCrm.lancer(
+      monte.context,
+      kind: 'representant',
+      id: 'rep-1',
+      e164: '+221771234567',
+    );
+    await appelsCrm.rapprocherEnAttente();
+    expect((await preuve())!.journalDureeS, 0);
+
+    journal.add(<String, Object?>{
+      'type': 'entrant',
+      'at': t0.add(const Duration(minutes: 2)).millisecondsSinceEpoch,
+      'dureeSecondes': 25,
+      'numero': '+221771234567',
+    });
+    await appelsCrm.rapprocherEnAttente();
+
+    final PreuvesAppelData ligne = (await preuve())!;
+    expect(ligne.journalType, 'entrant');
+    expect(ligne.journalDureeS, 25);
+    expect(ligne.journalAt, t0.add(const Duration(minutes: 2)));
+  });
+
   // Le journal rend aussi les appels que le téléconseiller passe pour lui : ils
   // ne doivent NI confirmer une fiche, NI laisser de ligne en base.
   testWidgets('un appel vers un autre numéro ne confirme rien', (
