@@ -32,6 +32,7 @@ import {
 import { queryKeys } from '@/lib/query-keys';
 import { REPRESENTANT_RELATION_LABELS } from '@/lib/representant-filters';
 import { PROSPECT_STATUT_LABELS, REP_CALL_OUTCOME_LABELS } from '@/lib/types';
+import type { RepresentantRow } from '@/lib/types';
 
 const NO_VALUE = '–';
 
@@ -40,6 +41,41 @@ const SOURCE_LABELS = { WEB: 'Panneau', MOBILE: 'Mobile' } as const;
 function ouiNonNsp(value: boolean | null): string {
   if (value === null) return NO_VALUE;
   return value ? 'Oui' : 'Non';
+}
+
+function afficheOuVide(value: string | null, repli: string = NO_VALUE): string {
+  return value ?? repli;
+}
+
+function pluriel(count: number): string {
+  return count === 1 ? '' : 's';
+}
+
+function libelleDernierAppel(outcome: RepresentantRow['lastCallOutcome']): string {
+  if (outcome === null) return 'Jamais appelé';
+  return REP_CALL_OUTCOME_LABELS[outcome];
+}
+
+function libelleDateAppel(lastCallAt: string | null): string {
+  if (lastCallAt === null) return NO_VALUE;
+  return formatDateTime(lastCallAt);
+}
+
+function PrenomSecondaire({ prenom }: { prenom: string | null }) {
+  if (prenom === null || prenom === '') return null;
+  return (
+    <span className="ml-2 text-[0.875rem] font-[400] text-muted-foreground">{prenom}</span>
+  );
+}
+
+function NoteDeFiche({ notes }: { notes: string | null }) {
+  if (notes === null || notes === '') return null;
+  return (
+    <div className="mt-4 border-t border-border pt-4">
+      <p className="text-[0.75rem] text-muted-foreground">Note de la fiche</p>
+      <p className="max-w-prose text-[0.875rem]">{notes}</p>
+    </div>
+  );
 }
 
 export function RepresentantDetailView({
@@ -117,11 +153,7 @@ export function RepresentantDetailView({
             <div className="min-w-0">
               <CardTitle className="text-[1.25rem]">
                 {representant.fullName}
-                {representant.prenom === null || representant.prenom === '' ? null : (
-                  <span className="ml-2 text-[0.875rem] font-[400] text-muted-foreground">
-                    {representant.prenom}
-                  </span>
-                )}
+                <PrenomSecondaire prenom={representant.prenom} />
               </CardTitle>
               <p className="truncate text-[0.8125rem] text-muted-foreground tabular-nums">
                 {formatPhone(representant.phoneE164)}
@@ -139,7 +171,7 @@ export function RepresentantDetailView({
                   {formatNumber(representant.prospectCount)}
                 </span>
                 <span className="block text-[0.6875rem] text-muted-foreground">
-                  prospect{representant.prospectCount === 1 ? '' : 's'}
+                  prospect{pluriel(representant.prospectCount)}
                 </span>
               </p>
             </div>
@@ -153,7 +185,7 @@ export function RepresentantDetailView({
             </div>
             <div className="min-w-0">
               <dt className="text-muted-foreground">IEF</dt>
-              <dd className="truncate font-[600]">{representant.iefName ?? NO_VALUE}</dd>
+              <dd className="truncate font-[600]">{afficheOuVide(representant.iefName)}</dd>
             </div>
             <div className="min-w-0">
               <dt className="text-muted-foreground">Saisi par</dt>
@@ -173,15 +205,17 @@ export function RepresentantDetailView({
             </div>
             <div className="min-w-0">
               <dt className="text-muted-foreground">Profession</dt>
-              <dd className="truncate font-[600]">{script.profession ?? 'Non demandée'}</dd>
+              <dd className="truncate font-[600]">
+                {afficheOuVide(script.profession, 'Non demandée')}
+              </dd>
             </div>
             <div className="min-w-0">
               <dt className="text-muted-foreground">Établissement</dt>
-              <dd className="truncate font-[600]">{representant.etablissement ?? NO_VALUE}</dd>
+              <dd className="truncate font-[600]">{afficheOuVide(representant.etablissement)}</dd>
             </div>
             <div className="min-w-0">
               <dt className="text-muted-foreground">Syndicat</dt>
-              <dd className="truncate font-[600]">{representant.syndicat ?? NO_VALUE}</dd>
+              <dd className="truncate font-[600]">{afficheOuVide(representant.syndicat)}</dd>
             </div>
             <div className="min-w-0">
               <dt className="text-muted-foreground">Déjà contacté</dt>
@@ -194,29 +228,18 @@ export function RepresentantDetailView({
             <div className="min-w-0">
               <dt className="text-muted-foreground">Dernier appel</dt>
               <dd className="truncate font-[600]">
-                {representant.lastCallOutcome == null
-                  ? 'Jamais appelé'
-                  : REP_CALL_OUTCOME_LABELS[representant.lastCallOutcome]}
+                {libelleDernierAppel(representant.lastCallOutcome)}
               </dd>
             </div>
             <div className="min-w-0">
               <dt className="text-muted-foreground">Appelé le</dt>
-              <dd className="truncate font-[600]">
-                {representant.lastCallAt == null
-                  ? NO_VALUE
-                  : formatDateTime(representant.lastCallAt)}
-              </dd>
+              <dd className="truncate font-[600]">{libelleDateAppel(representant.lastCallAt)}</dd>
             </div>
           </dl>
 
           {/* La note EST un champ de la fiche : elle reste dans la fiche, sous
               son intitulé, et non dans le fil qui suit. */}
-          {representant.notes === null || representant.notes === '' ? null : (
-            <div className="mt-4 border-t border-border pt-4">
-              <p className="text-[0.75rem] text-muted-foreground">Note de la fiche</p>
-              <p className="max-w-prose text-[0.875rem]">{representant.notes}</p>
-            </div>
-          )}
+          <NoteDeFiche notes={representant.notes} />
         </CardContent>
       </Card>
 
