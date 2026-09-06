@@ -280,6 +280,7 @@ describe('navigation d’un ADMIN', () => {
       '/chues/statistiques',
       '/chues/prospects',
       '/chues/campagnes',
+      '/chues/parametres-chues',
       '/chues/dossiers',
       '/chues/dossiers/etapes',
       '/chues/dossiers/export',
@@ -375,6 +376,7 @@ describe('navigation d’un ADMIN', () => {
       '/chues/dossiers',
     ]);
     expect(items.filter((item) => item.secondary === true).map((item) => item.href)).toEqual([
+      '/chues/parametres-chues',
       '/chues',
       '/chues/supervision',
       '/chues/rappels',
@@ -776,6 +778,7 @@ describe('navigation d’un SUPERVISEUR', () => {
       '/chues/representants',
       '/chues/prospects',
       '/chues/campagnes',
+      '/chues/parametres-chues',
     ]);
     expect(navItems('SUPERVISEUR', 'chues').map((item) => item.label)).toEqual([
       'Tableau de bord',
@@ -789,6 +792,7 @@ describe('navigation d’un SUPERVISEUR', () => {
       'Représentants',
       'Prospects',
       'Campagnes',
+      'Paramètres CHUES',
     ]);
   });
 
@@ -937,6 +941,7 @@ describe('navigation de la DIRECTION', () => {
       '/chues/representants',
       '/chues/prospects',
       '/chues/campagnes',
+      '/chues/parametres-chues',
     ]);
   });
 

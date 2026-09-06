@@ -19,6 +19,7 @@ import {
   PlugZapIcon,
   PlusCircleIcon,
   SettingsIcon,
+  SlidersHorizontalIcon,
   UploadIcon,
   UserPlusIcon,
   UsersIcon,
@@ -303,6 +304,16 @@ const SECTIONS: readonly NavSection[] = [
         icon: MegaphoneIcon,
         description: 'Fiches exportées pour le terrain',
         roles: ENCADREMENT,
+        secondary: true,
+      },
+      {
+        href: '/chues/parametres-chues',
+        label: 'Paramètres CHUES',
+        icon: SlidersHorizontalIcon,
+        description: 'Liens, contacts et messages envoyés',
+        // Pas `ENCADREMENT` : l'administrateur règle TOUT, la supervision et la
+        // direction seulement les deux textes envoyés aux prospects.
+        roles: ['ADMIN', 'SUPERVISEUR', 'DIRECTION'],
         secondary: true,
       },
 
