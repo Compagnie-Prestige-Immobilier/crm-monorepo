@@ -58,6 +58,7 @@ export function prospectFixture(over: Partial<ProspectRow> & { id: string }): Pr
     enrollmentCapturedByName: null,
     enrollmentCapturedAt: null,
     revueAt: null,
+    aRevoirAt: null,
     revueById: null,
     revueByName: null,
     lastOutcome: null,

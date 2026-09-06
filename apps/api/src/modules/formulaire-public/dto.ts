@@ -57,4 +57,13 @@ export class DemandePubliqueDto {
   @IsString()
   @MaxLength(200)
   site?: string;
+
+  @ApiPropertyOptional({
+    maxLength: 2048,
+    description: 'Jeton rendu par le widget Cloudflare Turnstile de la page.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  turnstileToken?: string;
 }

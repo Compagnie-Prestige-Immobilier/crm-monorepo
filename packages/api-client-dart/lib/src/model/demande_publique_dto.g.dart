@@ -23,6 +23,8 @@ abstract class _$DemandePubliqueDtoCWProxy {
 
   DemandePubliqueDto site(String? site);
 
+  DemandePubliqueDto turnstileToken(String? turnstileToken);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `DemandePubliqueDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -38,6 +40,7 @@ abstract class _$DemandePubliqueDtoCWProxy {
     String? employeur,
     String? message,
     String? site,
+    String? turnstileToken,
   });
 }
 
@@ -73,6 +76,10 @@ class _$DemandePubliqueDtoCWProxyImpl implements _$DemandePubliqueDtoCWProxy {
   DemandePubliqueDto site(String? site) => this(site: site);
 
   @override
+  DemandePubliqueDto turnstileToken(String? turnstileToken) =>
+      this(turnstileToken: turnstileToken);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `DemandePubliqueDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -88,6 +95,7 @@ class _$DemandePubliqueDtoCWProxyImpl implements _$DemandePubliqueDtoCWProxy {
     Object? employeur = const $CopyWithPlaceholder(),
     Object? message = const $CopyWithPlaceholder(),
     Object? site = const $CopyWithPlaceholder(),
+    Object? turnstileToken = const $CopyWithPlaceholder(),
   }) {
     return DemandePubliqueDto(
       nom: nom == const $CopyWithPlaceholder()
@@ -122,6 +130,10 @@ class _$DemandePubliqueDtoCWProxyImpl implements _$DemandePubliqueDtoCWProxy {
           ? _value.site
           // ignore: cast_nullable_to_non_nullable
           : site as String?,
+      turnstileToken: turnstileToken == const $CopyWithPlaceholder()
+          ? _value.turnstileToken
+          // ignore: cast_nullable_to_non_nullable
+          : turnstileToken as String?,
     );
   }
 }
@@ -149,6 +161,7 @@ DemandePubliqueDto _$DemandePubliqueDtoFromJson(Map<String, dynamic> json) =>
         employeur: $checkedConvert('employeur', (v) => v as String?),
         message: $checkedConvert('message', (v) => v as String?),
         site: $checkedConvert('site', (v) => v as String?),
+        turnstileToken: $checkedConvert('turnstileToken', (v) => v as String?),
       );
       return val;
     });
@@ -163,4 +176,5 @@ Map<String, dynamic> _$DemandePubliqueDtoToJson(DemandePubliqueDto instance) =>
       if (instance.employeur case final value?) 'employeur': value,
       if (instance.message case final value?) 'message': value,
       if (instance.site case final value?) 'site': value,
+      if (instance.turnstileToken case final value?) 'turnstileToken': value,
     };

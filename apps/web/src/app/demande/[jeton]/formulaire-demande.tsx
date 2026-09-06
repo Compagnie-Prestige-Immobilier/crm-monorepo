@@ -2,7 +2,8 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { AlertCircleIcon, CheckCircle2Icon, LoaderIcon } from 'lucide-react';
-import { useState } from 'react';
+import Script from 'next/script';
+import { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 
 import { Field } from '@/components/forms/field';
@@ -23,9 +24,15 @@ const VIDE: DemandePubliqueInput = {
   site: '',
 };
 
-export function FormulaireDemande({ jeton }: { jeton: string }) {
+const TURNSTILE_SCRIPT = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+
+/** Le nom du champ caché que le widget Turnstile pose dans le formulaire. */
+const TURNSTILE_CHAMP = 'cf-turnstile-response';
+
+export function FormulaireDemande({ jeton, cleSite }: { jeton: string; cleSite: string }) {
   const [envoye, setEnvoye] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
+  const formulaire = useRef<HTMLFormElement>(null);
 
   const {
     register,
@@ -36,13 +43,29 @@ export function FormulaireDemande({ jeton }: { jeton: string }) {
     defaultValues: VIDE,
   });
 
+  /**
+   * Le widget pose lui-même un champ caché dans le formulaire : il est lu ici
+   * plutôt que recopié dans un état, qui serait une seconde source de vérité.
+   */
+  function jetonAntiRobot(): string {
+    const element = formulaire.current;
+    if (element === null) return '';
+    const valeur = new FormData(element).get(TURNSTILE_CHAMP);
+    return typeof valeur === 'string' ? valeur : '';
+  }
+
   async function envoyer(valeurs: DemandePubliqueInput): Promise<void> {
     setErreur(null);
+    const turnstileToken = jetonAntiRobot();
+    if (cleSite !== '' && turnstileToken === '') {
+      setErreur('La vérification anti-robot n’est pas terminée. Patientez, puis renvoyez.');
+      return;
+    }
     try {
       const reponse = await fetch(`/api/demande/${encodeURIComponent(jeton)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(valeurs),
+        body: JSON.stringify({ ...valeurs, turnstileToken }),
       });
       if (!reponse.ok) {
         const charge: unknown = await reponse.json().catch(() => null);
@@ -70,6 +93,7 @@ export function FormulaireDemande({ jeton }: { jeton: string }) {
 
   return (
     <form
+      ref={formulaire}
       noValidate
       method="post"
       onSubmit={(evenement) => {
@@ -133,6 +157,13 @@ export function FormulaireDemande({ jeton }: { jeton: string }) {
         aria-hidden="true"
         className="sr-only"
       />
+
+      {cleSite === '' ? null : (
+        <>
+          <Script src={TURNSTILE_SCRIPT} async defer />
+          <div className="cf-turnstile" data-sitekey={cleSite} data-language="fr" />
+        </>
+      )}
 
       <Button type="submit" size="lg" disabled={isSubmitting} className="w-full sm:w-auto">
         {isSubmitting ? (

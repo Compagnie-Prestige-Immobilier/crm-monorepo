@@ -40,6 +40,7 @@ class Phase2Renseignements {
     this.dureeSystemeMois,
     this.whatsappStatus,
     this.whatsappE164,
+    this.champsLibres = const <String, String>{},
   });
 
   final String? nom;
@@ -67,6 +68,10 @@ class Phase2Renseignements {
   final String? whatsappStatus;
 
   final String? whatsappE164;
+
+  /// EB-27 : les réponses aux champs que l'administration a ajoutés au
+  /// formulaire de conversion, par identifiant de champ.
+  final Map<String, String> champsLibres;
 }
 
 @immutable
@@ -311,6 +316,7 @@ class Phase2Controller extends Notifier<Phase2State> {
         engagementEnCours: renseignements?.engagementEnCours,
         dureeEtablissementMois: renseignements?.dureeEtablissementMois,
         rendezVousAt: rendezVousAt,
+        champsLibres: renseignements?.champsLibres,
       );
     } on CallAttemptInvalid catch (e) {
       state = state.copyWith(saving: false, errorMessage: e.message);

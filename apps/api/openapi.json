@@ -21695,6 +21695,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Service momentanément indisponible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
           }
         },
         "summary": "Reçoit une demande envoyée depuis le formulaire public.",
@@ -34137,6 +34147,11 @@
             "type": "string",
             "maxLength": 200,
             "description": "Laisser vide."
+          },
+          "turnstileToken": {
+            "type": "string",
+            "maxLength": 2048,
+            "description": "Jeton rendu par le widget Cloudflare Turnstile de la page."
           }
         },
         "required": ["nom", "prenom", "phone"]
