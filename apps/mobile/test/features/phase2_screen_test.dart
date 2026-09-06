@@ -520,7 +520,9 @@ void main() {
     expect(api.premieresSaisies[ouvertureId], saisie.toUtc());
 
     await tester.pump();
-    expect(find.text('00:00'), findsOneWidget);
+    // La liste est restée défilée sur le champ Nom : le chronomètre, inséré en
+    // tête, est au-dessus du cadre.
+    expect(find.text('00:00', skipOffstage: false), findsOneWidget);
   });
 
   phase2TestWidgets('la confirmation refusée n\'ouvre rien et rend le champ', (
