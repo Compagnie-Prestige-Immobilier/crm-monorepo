@@ -125,7 +125,10 @@ test('CHU-SUP-01 les deux volets existent et l’onglet vit dans l’URL', async
   await expect(comptes).toHaveAttribute('aria-selected', 'true');
 
   await page.reload();
-  await expect(page.getByRole('tab', { name: 'Présence' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: 'Présence' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
   await expect(page.getByRole('tab', { name: 'Activité' })).toHaveAttribute(
     'aria-selected',
     'false',
