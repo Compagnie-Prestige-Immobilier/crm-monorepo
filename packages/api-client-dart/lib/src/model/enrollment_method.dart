@@ -16,6 +16,12 @@ enum EnrollmentMethod {
   APPOINTMENT(r'APPOINTMENT'),
   @JsonValue(r'WHATSAPP')
   WHATSAPP(r'WHATSAPP'),
+  @JsonValue(r'RDV_CPI')
+  RDV_CPI(r'RDV_CPI'),
+  @JsonValue(r'PLATEFORME_EN_LIGNE')
+  PLATEFORME_EN_LIGNE(r'PLATEFORME_EN_LIGNE'),
+  @JsonValue(r'MAIL')
+  MAIL(r'MAIL'),
   @JsonValue(r'unknown_default_open_api')
   unknownDefaultOpenApi(r'unknown_default_open_api');
 

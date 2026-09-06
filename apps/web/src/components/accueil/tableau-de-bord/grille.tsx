@@ -4,7 +4,8 @@ import {
   DndContext,
   DragOverlay,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   closestCenter,
   useSensor,
   useSensors,
@@ -326,8 +327,12 @@ export function WidgetGrid({
   onChangeTaille: (id: string, taille: DashboardTaille | undefined) => void;
   onChangePresentation: (id: string, presentation: DispositionPresentation) => void;
 }) {
+  // Souris et tactile séparés : un PointerSensor unique capte le `pointerdown`
+  // du doigt avant tout `touchstart` et le glissement partirait au premier pixel
+  // de défilement de la tablette.
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 

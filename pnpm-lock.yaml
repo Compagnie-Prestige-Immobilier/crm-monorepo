@@ -168,6 +168,9 @@ catalogs:
     pino-pretty:
       specifier: ^13.0.0
       version: 13.1.3
+    pino-roll:
+      specifier: 4.0.0
+      version: 4.0.0
     prettier:
       specifier: 3.9.5
       version: 3.9.5
@@ -186,6 +189,9 @@ catalogs:
     react-hook-form:
       specifier: ^7.64.0
       version: 7.85.0
+    react-joyride:
+      specifier: 3.2.0
+      version: 3.2.0
     reflect-metadata:
       specifier: 0.2.2
       version: 0.2.2
@@ -373,6 +379,9 @@ importers:
       pino-pretty:
         specifier: 'catalog:'
         version: 13.1.3
+      pino-roll:
+        specifier: 'catalog:'
+        version: 4.0.0
       reflect-metadata:
         specifier: 'catalog:'
         version: 0.2.2
@@ -449,6 +458,9 @@ importers:
       date-fns:
         specifier: 'catalog:'
         version: 4.4.0
+      exceljs:
+        specifier: 'catalog:'
+        version: 4.4.0
       libphonenumber-js:
         specifier: 'catalog:'
         version: 1.13.10
@@ -473,6 +485,9 @@ importers:
       react-hook-form:
         specifier: 'catalog:'
         version: 7.85.0(react@19.2.7)
+      react-joyride:
+        specifier: 'catalog:'
+        version: 3.2.0(@types/react@19.2.18)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       server-only:
         specifier: 'catalog:'
         version: 0.0.1
@@ -1070,6 +1085,17 @@ packages:
 
   '@floating-ui/utils@0.2.12':
     resolution: {integrity: sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww==}
+
+  '@gilbarbara/deep-equal@0.4.1':
+    resolution: {integrity: sha512-QF2BGeQjsa59T59XvFdR3is5jrl28Eg0J6giXAC5919bcqvR8XP4B+07tpbs6Y6/IQd4FBncaL2WVXIBgSxt4w==}
+
+  '@gilbarbara/hooks@0.11.0':
+    resolution: {integrity: sha512-CIVazdxqFRplUfm9wZL3/0X1TURJekhPMWGFdWzEmyJrGPiotX2yxA1KiB8N7VnhawIaMtb2Apnda4Y6DRwi2Q==}
+    peerDependencies:
+      react: 16.8 - 19
+
+  '@gilbarbara/types@0.2.2':
+    resolution: {integrity: sha512-QuQDBRRcm1Q8AbSac2W1YElurOhprj3Iko/o+P1fJxUWS4rOGKMVli98OXS7uo4z+cKAif6a+L9bcZFSyauQpQ==}
 
   '@hookform/resolvers@5.7.1':
     resolution: {integrity: sha512-8wS/P4UDr5sQDe4nFaV51TVyfDPrWgNIXweqG0Bs9Z5LSuzKLb+RQNPvkN2oHM5SRrJyWrVH/F+LOUcFjUyvwQ==}
@@ -3728,6 +3754,9 @@ packages:
     resolution: {integrity: sha512-2HvIEKRoqS62guEC+qBjpvRubdX910WCMuJTZ+I9yvqKU2/12eSL549HMwtabb4oupdj2sMP50k+XJfB/8JE6w==}
     engines: {node: '>=8'}
 
+  is-lite@2.0.0:
+    resolution: {integrity: sha512-70f2BMIQlbSUXVKaZUd9a9fJH3IH1PDckV0m4BIIO4LjnNYvOh4Ng7vXIXEwpA0KDZknRq+7fHwGTu0jIdx28g==}
+
   is-plain-obj@4.1.0:
     resolution: {integrity: sha512-+Pgi+vMuUNkJyExiMBt5IlFoMyKnr5zhJ4Uspz58WOhBF5QoIZkFyNHIbBAtHwzVAgk5RtndVNsDRN61/mmDqg==}
     engines: {node: '>=12'}
@@ -4477,6 +4506,9 @@ packages:
     resolution: {integrity: sha512-ttXRkkOz6WWC95KeY9+xxWL6AtImwbyMHrL1mSwqwW9u+vLp/WIElvHvCSDg0xO/Dzrggz1zv3rN5ovTRVowKg==}
     hasBin: true
 
+  pino-roll@4.0.0:
+    resolution: {integrity: sha512-axI1aQaIxXdw1F4OFFli1EDxIrdYNGLowkw/ZoZogX8oCSLHUghzwVVXUS8U+xD/Savwa5IXpiXmsSGKFX/7Sg==}
+
   pino-std-serializers@7.1.0:
     resolution: {integrity: sha512-BndPH67/JxGExRgiX1dX0w1FvZck5Wa4aal9198SrRhZjH3GxKQUKIBnYJTdj2HDN3UQAS06HlfcSbQj2OHmaw==}
 
@@ -4629,6 +4661,18 @@ packages:
     engines: {node: '>=18.0.0'}
     peerDependencies:
       react: ^16.8.0 || ^17 || ^18 || ^19
+
+  react-innertext@1.1.5:
+    resolution: {integrity: sha512-PWAqdqhxhHIv80dT9znP2KvS+hfkbRovFp4zFYHFFlOoQLRiawIic81gKb3U1wEyJZgMwgs3JoLtwryASRWP3Q==}
+    peerDependencies:
+      '@types/react': '>=0.0.0 <=99'
+      react: '>=0.0.0 <=99'
+
+  react-joyride@3.2.0:
+    resolution: {integrity: sha512-UrA/XWdWElMLNnjZt2eWmPFmpHl1IZ2CeI9XhS+PuEVvfqHMD9U4tavCq1csDAGVoj0YEGfaCDmhZwgNc9yE2g==}
+    peerDependencies:
+      react: 16.8 - 19
+      react-dom: 16.8 - 19
 
   react-remove-scroll-bar@2.3.8:
     resolution: {integrity: sha512-9r+yi9+mgU33AKcj6IbT9oRCO78WriSj6t/cF8DWBZJ9aOGPOTEDvdUDz1FwKim7QXWwmHqtdHnRJfhAxEG46Q==}
@@ -4790,6 +4834,12 @@ packages:
 
   scheduler@0.27.0:
     resolution: {integrity: sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q==}
+
+  scroll@3.0.1:
+    resolution: {integrity: sha512-pz7y517OVls1maEzlirKO5nPYle9AXsFzTMNJrRGmT951mzpIBy7sNHOg5o/0MQd/NqliCiWnAi0kZneMPFLcg==}
+
+  scrollparent@2.1.0:
+    resolution: {integrity: sha512-bnnvJL28/Rtz/kz2+4wpBjHzWoEzXhVg/TE8BeVGJHUqE8THNIRnDxDWMktwM+qahvlRdvlLdsQfYe+cuqfZeA==}
 
   scslre@0.3.0:
     resolution: {integrity: sha512-3A6sD0WYP7+QrjbfNA2FN3FsOaGGFoekCVgTyypy53gPxhbkCIjtO6YWgdrfM+n/8sI8JeXZOIxsHjMTNxQ4nQ==}
@@ -5801,6 +5851,17 @@ snapshots:
       react-dom: 19.2.7(react@19.2.7)
 
   '@floating-ui/utils@0.2.12': {}
+
+  '@gilbarbara/deep-equal@0.4.1': {}
+
+  '@gilbarbara/hooks@0.11.0(react@19.2.7)':
+    dependencies:
+      '@gilbarbara/deep-equal': 0.4.1
+      react: 19.2.7
+
+  '@gilbarbara/types@0.2.2':
+    dependencies:
+      type-fest: 4.41.0
 
   '@hookform/resolvers@5.7.1(@standard-schema/spec@1.1.0)(ajv@8.20.0)(class-transformer@0.5.1)(class-validator@0.14.3)(effect@3.20.0)(react-hook-form@7.85.0(react@19.2.7))(valibot@1.4.2(typescript@5.9.3))(zod@4.4.3)':
     dependencies:
@@ -8223,6 +8284,8 @@ snapshots:
 
   is-interactive@1.0.0: {}
 
+  is-lite@2.0.0: {}
+
   is-plain-obj@4.1.0: {}
 
   is-potential-custom-element-name@1.0.1:
@@ -8989,6 +9052,11 @@ snapshots:
       sonic-boom: 4.2.1
       strip-json-comments: 5.0.3
 
+  pino-roll@4.0.0:
+    dependencies:
+      date-fns: 4.4.0
+      sonic-boom: 4.2.1
+
   pino-std-serializers@7.1.0: {}
 
   pino@10.3.1:
@@ -9152,6 +9220,28 @@ snapshots:
     dependencies:
       react: 19.2.7
 
+  react-innertext@1.1.5(@types/react@19.2.18)(react@19.2.7):
+    dependencies:
+      '@types/react': 19.2.18
+      react: 19.2.7
+
+  react-joyride@3.2.0(@types/react@19.2.18)(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
+    dependencies:
+      '@fastify/deepmerge': 3.2.1
+      '@floating-ui/react-dom': 2.1.9(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@gilbarbara/deep-equal': 0.4.1
+      '@gilbarbara/hooks': 0.11.0(react@19.2.7)
+      '@gilbarbara/types': 0.2.2
+      is-lite: 2.0.0
+      react: 19.2.7
+      react-dom: 19.2.7(react@19.2.7)
+      react-innertext: 1.1.5(@types/react@19.2.18)(react@19.2.7)
+      scroll: 3.0.1
+      scrollparent: 2.1.0
+      use-sync-external-store: 1.6.0(react@19.2.7)
+    transitivePeerDependencies:
+      - '@types/react'
+
   react-remove-scroll-bar@2.3.8(@types/react@19.2.18)(react@19.2.7):
     dependencies:
       react: 19.2.7
@@ -9303,6 +9393,10 @@ snapshots:
     optional: true
 
   scheduler@0.27.0: {}
+
+  scroll@3.0.1: {}
+
+  scrollparent@2.1.0: {}
 
   scslre@0.3.0:
     dependencies:

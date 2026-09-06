@@ -57,8 +57,11 @@ export const ENROLLMENT_METHOD_LABELS: Readonly<Record<EnrollmentMethod, string>
   [EnrollmentMethod.APPOINTMENT]: 'RDV CPI',
   [EnrollmentMethod.PHYSICAL]: 'RDV CPI',
   [EnrollmentMethod.PLATFORM]: 'Plateforme en ligne',
+  [EnrollmentMethod.PLATEFORME_EN_LIGNE]: 'Plateforme en ligne',
   [EnrollmentMethod.VOICE_OR_ELECTRONIC_MESSAGING]: 'Mail',
+  [EnrollmentMethod.MAIL]: 'Mail',
   [EnrollmentMethod.WHATSAPP]: 'WhatsApp',
+  [EnrollmentMethod.RDV_CPI]: 'RDV CPI',
 };
 
 export const CALL_OUTCOME_LABELS: Readonly<Record<CallOutcome, string>> = {

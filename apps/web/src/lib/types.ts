@@ -230,8 +230,11 @@ export const ENROLLMENT_METHOD_LABELS: Record<EnrollmentMethod, string> = {
   APPOINTMENT: 'RDV CPI',
   PHYSICAL: 'RDV CPI',
   PLATFORM: 'Plateforme en ligne',
+  PLATEFORME_EN_LIGNE: 'Plateforme en ligne',
   VOICE_OR_ELECTRONIC_MESSAGING: 'Mail',
+  MAIL: 'Mail',
   WHATSAPP: 'WhatsApp',
+  RDV_CPI: 'RDV CPI',
 };
 
 export const CALL_OUTCOME_LABELS: Record<CallOutcome, string> = {
@@ -280,7 +283,10 @@ type FilterListCoverage = {
   PROSPECT_STATUTS: MissingFrom<ProspectStatut, (typeof PROSPECT_STATUTS)[number]>;
   BDD_SEGMENTS: MissingFrom<BddSegment, (typeof BDD_SEGMENTS)[number]>;
   PHASE2_STATUSES: MissingFrom<Phase2Status, (typeof PHASE2_STATUSES)[number]>;
-  ENROLLMENT_METHODS: MissingFrom<EnrollmentMethod, (typeof ENROLLMENT_METHODS)[number]>;
+  ENROLLMENT_METHODS: MissingFrom<
+    Exclude<EnrollmentMethod, 'RDV_CPI' | 'PLATEFORME_EN_LIGNE' | 'MAIL'>,
+    (typeof ENROLLMENT_METHODS)[number]
+  >;
   PROSPECT_SORT_FIELDS: MissingFrom<
     Schemas['ProspectSortField'],
     (typeof PROSPECT_SORT_FIELDS)[number]

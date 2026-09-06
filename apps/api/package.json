@@ -44,6 +44,7 @@
     "pino": "catalog:",
     "pino-http": "catalog:",
     "pino-pretty": "catalog:",
+    "pino-roll": "catalog:",
     "reflect-metadata": "catalog:",
     "rxjs": "catalog:",
     "uuid": "catalog:",

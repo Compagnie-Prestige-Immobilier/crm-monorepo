@@ -85,9 +85,12 @@ export function useBrouillonAuto(
     const surMasquage = (): void => {
       if (document.visibilityState === 'hidden') envoyer();
     };
+    const surPagehide = (): void => envoyer();
     document.addEventListener('visibilitychange', surMasquage);
+    window.addEventListener('pagehide', surPagehide);
     return () => {
       document.removeEventListener('visibilitychange', surMasquage);
+      window.removeEventListener('pagehide', surPagehide);
       // Le démontage suit la qualification, qui a fermé l'ouverture : écrire
       // encore serait refusé, et il n'y a plus rien à reprendre.
       annuler();

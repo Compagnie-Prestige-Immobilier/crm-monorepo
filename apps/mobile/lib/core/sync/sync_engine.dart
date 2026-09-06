@@ -588,7 +588,7 @@ class SyncEngine {
     if (raw is! Map<String, dynamic>) {
       throw FormatException('payload non objet', row.payload);
     }
-    Map<String, dynamic> decoded = raw;
+    Map<String, dynamic> decoded = EnrollmentMethods.normalizeLegacyMethod(raw);
     if (row.entityType == callAttemptEntity) {
       final CallReason reason = _resolveCallAttempt(
         decoded,
