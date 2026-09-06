@@ -135,6 +135,8 @@ abstract class _$ProspectDtoCWProxy {
 
   ProspectDto originLabel(String? originLabel);
 
+  ProspectDto aRevoirAt(DateTime? aRevoirAt);
+
   ProspectDto clientCreatedAt(DateTime clientCreatedAt);
 
   ProspectDto createdAt(DateTime createdAt);
@@ -214,6 +216,7 @@ abstract class _$ProspectDtoCWProxy {
     String? lastCallByName,
     String? origin,
     String? originLabel,
+    DateTime? aRevoirAt,
     DateTime clientCreatedAt,
     DateTime createdAt,
     DateTime updatedAt,
@@ -465,6 +468,9 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
       this(originLabel: originLabel);
 
   @override
+  ProspectDto aRevoirAt(DateTime? aRevoirAt) => this(aRevoirAt: aRevoirAt);
+
+  @override
   ProspectDto clientCreatedAt(DateTime clientCreatedAt) =>
       this(clientCreatedAt: clientCreatedAt);
 
@@ -549,6 +555,7 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
     Object? lastCallByName = const $CopyWithPlaceholder(),
     Object? origin = const $CopyWithPlaceholder(),
     Object? originLabel = const $CopyWithPlaceholder(),
+    Object? aRevoirAt = const $CopyWithPlaceholder(),
     Object? clientCreatedAt = const $CopyWithPlaceholder(),
     Object? createdAt = const $CopyWithPlaceholder(),
     Object? updatedAt = const $CopyWithPlaceholder(),
@@ -815,6 +822,10 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
           ? _value.originLabel
           // ignore: cast_nullable_to_non_nullable
           : originLabel as String?,
+      aRevoirAt: aRevoirAt == const $CopyWithPlaceholder()
+          ? _value.aRevoirAt
+          // ignore: cast_nullable_to_non_nullable
+          : aRevoirAt as DateTime?,
       clientCreatedAt: clientCreatedAt == const $CopyWithPlaceholder()
           ? _value.clientCreatedAt
           // ignore: cast_nullable_to_non_nullable
@@ -915,6 +926,7 @@ ProspectDto _$ProspectDtoFromJson(
       'lastCallByName',
       'origin',
       'originLabel',
+      'aRevoirAt',
       'clientCreatedAt',
       'createdAt',
       'updatedAt',
@@ -1117,6 +1129,10 @@ ProspectDto _$ProspectDtoFromJson(
     lastCallByName: $checkedConvert('lastCallByName', (v) => v as String?),
     origin: $checkedConvert('origin', (v) => v as String?),
     originLabel: $checkedConvert('originLabel', (v) => v as String?),
+    aRevoirAt: $checkedConvert(
+      'aRevoirAt',
+      (v) => v == null ? null : DateTime.parse(v as String),
+    ),
     clientCreatedAt: $checkedConvert(
       'clientCreatedAt',
       (v) => DateTime.parse(v as String),
@@ -1197,6 +1213,7 @@ Map<String, dynamic> _$ProspectDtoToJson(ProspectDto instance) =>
       'lastCallByName': instance.lastCallByName,
       'origin': instance.origin,
       'originLabel': instance.originLabel,
+      'aRevoirAt': instance.aRevoirAt?.toIso8601String(),
       'clientCreatedAt': instance.clientCreatedAt.toIso8601String(),
       'createdAt': instance.createdAt.toIso8601String(),
       'updatedAt': instance.updatedAt.toIso8601String(),

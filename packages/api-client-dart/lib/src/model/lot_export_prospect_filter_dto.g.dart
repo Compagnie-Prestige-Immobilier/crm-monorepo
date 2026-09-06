@@ -464,6 +464,7 @@ const _$EnrollmentMethodEnumMap = {
 
 const _$LotExportProspectFilterDtoOriginEnumEnumMap = {
   LotExportProspectFilterDtoOriginEnum.BANQUE: 'BANQUE',
+  LotExportProspectFilterDtoOriginEnum.FORMULAIRE_PUBLIC: 'FORMULAIRE_PUBLIC',
   LotExportProspectFilterDtoOriginEnum.unknownDefaultOpenApi:
       'unknown_default_open_api',
 };
