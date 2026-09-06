@@ -67,6 +67,23 @@ function classesJour(etat: EtatJour): string {
   );
 }
 
+function horsPlage(day: Date, minDate: Date | null, maxDate: Date | null): boolean {
+  if (minDate !== null && day < minDate) return true;
+  if (maxDate !== null && day > maxDate) return true;
+  return false;
+}
+
+function estDansPlage(day: Date, rangeStart: Date | null, rangeEnd: Date | null): boolean {
+  if (rangeStart === null || rangeEnd === null) return false;
+  return day > rangeStart && day < rangeEnd;
+}
+
+function estLimiteDePlage(day: Date, minDate: Date | null, maxDate: Date | null): boolean {
+  if (minDate !== null && isSameDay(day, minDate)) return true;
+  if (maxDate !== null && isSameDay(day, maxDate)) return true;
+  return false;
+}
+
 function JourCellule({
   day,
   month,
@@ -82,17 +99,15 @@ function JourCellule({
   maxDate: Date | null;
   onPick: (day: Date) => void;
 }) {
-  const disabled = (minDate !== null && day < minDate) || (maxDate !== null && day > maxDate);
+  const disabled = horsPlage(day, minDate, maxDate);
   const rangeStart = minDate ?? selected;
   const rangeEnd = maxDate ?? selected;
-  const inRange = rangeStart !== null && rangeEnd !== null && day > rangeStart && day < rangeEnd;
+  const inRange = estDansPlage(day, rangeStart, rangeEnd);
   const choisi = selected !== null && isSameDay(day, selected);
   const etat: EtatJour = {
     horsMois: !isSameMonth(day, month),
     inRange,
-    rangeBoundary:
-      (minDate !== null && isSameDay(day, minDate)) ||
-      (maxDate !== null && isSameDay(day, maxDate)),
+    rangeBoundary: estLimiteDePlage(day, minDate, maxDate),
     today: isToday(day),
     choisi,
     disabled,
