@@ -1089,17 +1089,36 @@ export class SyncService {
     await this.assertProspectWritable(tx, user, existing);
 
     if (operation.op === SyncOp.DELETE) {
-      if (!existing || existing.deletedAt) {
-        return existingOutcome(operation.entityId, existing);
-      }
-      assertRev(operation, existing.rev);
-      const row = await tx.prospect.update({
-        where: { id: existing.id },
-        data: { deletedAt: new Date(), rev: { increment: 1 } },
-      });
-      return applied(row.id, row.rev, row.updatedAt);
+      return this.deleteProspect(tx, operation, existing);
     }
+    if (!existing || existing.deletedAt) {
+      return this.createProspect(tx, user, operation, existing);
+    }
+    return this.updateProspect(tx, operation, existing);
+  }
 
+  private async deleteProspect(
+    tx: Prisma.TransactionClient,
+    operation: SyncOperationDto,
+    existing: ProspectRow | null,
+  ): Promise<OperationOutcome> {
+    if (!existing || existing.deletedAt) {
+      return existingOutcome(operation.entityId, existing);
+    }
+    assertRev(operation, existing.rev);
+    const row = await tx.prospect.update({
+      where: { id: existing.id },
+      data: { deletedAt: new Date(), rev: { increment: 1 } },
+    });
+    return applied(row.id, row.rev, row.updatedAt);
+  }
+
+  private async createProspect(
+    tx: Prisma.TransactionClient,
+    user: AuthenticatedUser,
+    operation: SyncOperationDto,
+    existing: ProspectRow | null,
+  ): Promise<OperationOutcome> {
     const data = operation.data || {};
     const phoneE164 = requirePhone(data);
     // Un lien VIDÉ se déclare, il ne se devine pas : `includeIfNull: false`
@@ -1107,68 +1126,76 @@ export class SyncService {
     // identique au silence d'une application ancienne.
     const videe = new Set(operation.clearedFields ?? []);
 
-    if (!existing || existing.deletedAt) {
-      requireText(data.nom, 'nom');
-      // Le prenom est facultatif, comme tout le reste sauf le nom et le
-      // telephone : une chaine vide s'enregistre, un refus ferait abandonner
-      // la fiche entiere.
-      // Banque, syndicat et representant sont FACULTATIFS. Un teleconseiller au
-      // telephone ne les obtient pas toujours, et une fiche Grand Public n'en a
-      // aucun : les exiger faisait abandonner la saisie entiere.
-      if (data.representantId) {
-        await assertRepresentantUsable(tx, data.representantId);
-      }
-      await assertProspectPhoneFree(tx, phoneE164, operation.entityId);
-
-      const row = await tx.prospect.upsert({
-        where: { id: operation.entityId },
-        create: {
-          id: operation.entityId,
-          nom: data.nom.trim(),
-          prenom: textOrEmpty(data.prenom),
-          phoneE164,
-          banqueId: valueOrNull(data.banqueId),
-          syndicatId: valueOrNull(data.syndicatId),
-          representantId: valueOrNull(data.representantId),
-          createdById: user.id,
-          ...definedValues({
-            projet: data.projet,
-            type: data.type,
-            profession: data.profession,
-            dureeSystemeMois: data.dureeSystemeMois,
-            canalProvenanceId: data.canalProvenanceId,
-            statut: data.statut,
-          }),
-          ...clearableValue('etablissement', data.etablissement, videe, null),
-          ...situationGrandPublic(data),
-          ...whatsappProspect(data, phoneE164, WHATSAPP_NEUF, videe),
-          clientCreatedAt: clientDate(data.clientCreatedAt, operation.clientUpdatedAt),
-        },
-        update: {
-          nom: data.nom.trim(),
-          prenom: textOrEmpty(data.prenom),
-          phoneE164,
-          banqueId: valueOrNull(data.banqueId),
-          syndicatId: valueOrNull(data.syndicatId),
-          representantId: valueOrNull(data.representantId),
-          ...definedValues({
-            projet: data.projet,
-            type: data.type,
-            profession: data.profession,
-            dureeSystemeMois: data.dureeSystemeMois,
-            canalProvenanceId: data.canalProvenanceId,
-            statut: data.statut,
-          }),
-          ...clearableValue('etablissement', data.etablissement, videe, null),
-          ...situationGrandPublic(data),
-          ...whatsappProspect(data, phoneE164, existing ?? WHATSAPP_NEUF, videe),
-          deletedAt: null,
-          rev: { increment: 1 },
-        },
-      });
-      await openJourney(tx, row.id, data.projet ?? Projet.CHUES, data.statut);
-      return applied(row.id, row.rev, row.updatedAt);
+    requireText(data.nom, 'nom');
+    // Le prenom est facultatif, comme tout le reste sauf le nom et le
+    // telephone : une chaine vide s'enregistre, un refus ferait abandonner
+    // la fiche entiere.
+    // Banque, syndicat et representant sont FACULTATIFS. Un teleconseiller au
+    // telephone ne les obtient pas toujours, et une fiche Grand Public n'en a
+    // aucun : les exiger faisait abandonner la saisie entiere.
+    if (data.representantId) {
+      await assertRepresentantUsable(tx, data.representantId);
     }
+    await assertProspectPhoneFree(tx, phoneE164, operation.entityId);
+
+    const row = await tx.prospect.upsert({
+      where: { id: operation.entityId },
+      create: {
+        id: operation.entityId,
+        nom: data.nom.trim(),
+        prenom: textOrEmpty(data.prenom),
+        phoneE164,
+        banqueId: valueOrNull(data.banqueId),
+        syndicatId: valueOrNull(data.syndicatId),
+        representantId: valueOrNull(data.representantId),
+        createdById: user.id,
+        ...definedValues({
+          projet: data.projet,
+          type: data.type,
+          profession: data.profession,
+          dureeSystemeMois: data.dureeSystemeMois,
+          canalProvenanceId: data.canalProvenanceId,
+          statut: data.statut,
+        }),
+        ...clearableValue('etablissement', data.etablissement, videe, null),
+        ...situationGrandPublic(data),
+        ...whatsappProspect(data, phoneE164, WHATSAPP_NEUF, videe),
+        clientCreatedAt: clientDate(data.clientCreatedAt, operation.clientUpdatedAt),
+      },
+      update: {
+        nom: data.nom.trim(),
+        prenom: textOrEmpty(data.prenom),
+        phoneE164,
+        banqueId: valueOrNull(data.banqueId),
+        syndicatId: valueOrNull(data.syndicatId),
+        representantId: valueOrNull(data.representantId),
+        ...definedValues({
+          projet: data.projet,
+          type: data.type,
+          profession: data.profession,
+          dureeSystemeMois: data.dureeSystemeMois,
+          canalProvenanceId: data.canalProvenanceId,
+          statut: data.statut,
+        }),
+        ...clearableValue('etablissement', data.etablissement, videe, null),
+        ...situationGrandPublic(data),
+        ...whatsappProspect(data, phoneE164, existing ?? WHATSAPP_NEUF, videe),
+        deletedAt: null,
+        rev: { increment: 1 },
+      },
+    });
+    await openJourney(tx, row.id, data.projet ?? Projet.CHUES, data.statut);
+    return applied(row.id, row.rev, row.updatedAt);
+  }
+
+  private async updateProspect(
+    tx: Prisma.TransactionClient,
+    operation: SyncOperationDto,
+    existing: ProspectRow,
+  ): Promise<OperationOutcome> {
+    const data = operation.data || {};
+    const phoneE164 = requirePhone(data);
+    const videe = new Set(operation.clearedFields ?? []);
 
     assertRev(operation, existing.rev);
     if (phoneE164 !== existing.phoneE164) {
