@@ -178,17 +178,6 @@ void main() {
   }
 
   /// Choisit une durée du système de paiement, à l'étape de la banque.
-  Future<void> choisirDuree(WidgetTester tester, int mois) async {
-    final Finder option = find.descendant(
-      of: find.byWidgetPredicate((Widget w) => w is CpiChoiceGroup<int>),
-      matching: find.text(formatDureeMois(mois)),
-    );
-    await tester.ensureVisible(option);
-    await tester.pumpAndSettle();
-    await tester.tap(option);
-    await tester.pumpAndSettle();
-  }
-
   /// Ouvre une liste assistée et y choisit une valeur du référentiel.
   Future<void> choisirDansListe(
     WidgetTester tester,
@@ -244,7 +233,7 @@ void main() {
     await continuer(tester);
 
     await remplir(tester, 'Profession', 'Institutrice');
-    await remplir(tester, 'Ancienneté', '36');
+    await remplir(tester, 'Durée dans la fonction', '36');
     await repondre(tester, 'Fonctionnaire', Tri.oui);
     await continuer(tester);
 
@@ -252,7 +241,6 @@ void main() {
     await choisirDansListe(tester, 'Banque', 'Banque Test');
     await repondre(tester, 'Engagement en cours à la banque', Tri.non);
     await choisirDansListe(tester, 'Revenu mensuel', 'Revenu Test');
-    await choisirDuree(tester, 24);
     await continuer(tester);
   }
 
@@ -381,10 +369,10 @@ void main() {
       await tester.pumpWidget(host());
       await resultat(tester, '771234567');
 
-      expect(find.text('Prise de rendez-vous'), findsOneWidget);
-      expect(find.text('Plateforme'), findsOneWidget);
-      expect(find.text('Physique'), findsOneWidget);
-      expect(find.text('Par appel ou message'), findsOneWidget);
+      expect(find.text('RDV CPI'), findsOneWidget);
+      expect(find.text('Plateforme en ligne'), findsOneWidget);
+      expect(find.text('Mail'), findsOneWidget);
+      expect(find.text('WhatsApp'), findsOneWidget);
       expect(find.text('L\'appel n\'a pas abouti'), findsOneWidget);
     },
   );
@@ -420,9 +408,9 @@ void main() {
 
       await continuer(tester);
       await dossier(tester);
-      await tester.ensureVisible(find.text('Plateforme'));
+      await tester.ensureVisible(find.text('Plateforme en ligne'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Plateforme'));
+      await tester.tap(find.text('Plateforme en ligne'));
       await tester.pumpAndSettle();
 
       final CallAttempt attempt =
@@ -573,9 +561,9 @@ void main() {
   ) async {
     await tester.pumpWidget(host());
     await resultat(tester, '771234567');
-    await tester.ensureVisible(find.text('Plateforme'));
+    await tester.ensureVisible(find.text('Plateforme en ligne'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Plateforme'));
+    await tester.tap(find.text('Plateforme en ligne'));
     await tester.pumpAndSettle();
 
     final OuverturesFicheData fermee =
@@ -627,9 +615,9 @@ void main() {
     await remplir(tester, 'E-mail', 'awa.sow@exemple.sn');
     await dossier(tester);
     await remplir(tester, 'Commentaire', 'Rappeler après la rentrée.');
-    await tester.ensureVisible(find.text('Plateforme'));
+    await tester.ensureVisible(find.text('Plateforme en ligne'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Plateforme'));
+    await tester.tap(find.text('Plateforme en ligne'));
     await tester.pumpAndSettle();
 
     final CallAttempt attempt = (await db.select(db.callAttempts).get()).single;
@@ -755,7 +743,7 @@ void main() {
     // La durée est à l'étape du travail, celle qui suit l'identité.
     await continuer(tester);
     await remplir(tester, 'Profession', 'Institutrice');
-    await remplir(tester, 'Ancienneté', '900');
+    await remplir(tester, 'Durée dans la fonction', '900');
 
     expect(
       find.textContaining('De 0 à 600 mois', skipOffstage: false),
@@ -782,7 +770,7 @@ void main() {
     await remplir(tester, 'Prénom', 'Awa');
     await continuer(tester);
     await remplir(tester, 'Profession', 'Institutrice');
-    await remplir(tester, 'Ancienneté', '36');
+    await remplir(tester, 'Durée dans la fonction', '36');
     await repondre(tester, 'Fonctionnaire', Tri.oui);
     await continuer(tester);
 
@@ -792,15 +780,6 @@ void main() {
     expect(reproche(), 'Choisissez le revenu mensuel');
 
     await choisirDansListe(tester, 'Revenu mensuel', 'Revenu Test');
-    expect(reproche(), 'Choisissez la durée du système');
-    expect(
-      tester
-          .widget<CpiButton>(find.widgetWithText(CpiButton, 'Continuer'))
-          .onPressed,
-      isNull,
-    );
-
-    await choisirDuree(tester, 24);
     expect(reproche(), isNull);
     expect(
       tester
@@ -818,8 +797,7 @@ void main() {
 
     expect(find.text('Revenu mensuel'), findsOneWidget);
     expect(find.text('Revenu Test'), findsOneWidget);
-    expect(find.text('Durée du système'), findsOneWidget);
-    expect(find.text('2 ans (24 mois)'), findsOneWidget);
+    expect(find.text('Durée du système'), findsNothing);
   });
 
   // ═══ LA PRISE DE RENDEZ-VOUS ═══
@@ -834,9 +812,9 @@ void main() {
     await tester.pumpWidget(host());
     await resultat(tester, '771234567');
 
-    await tester.ensureVisible(find.text('Prise de rendez-vous'));
+    await tester.ensureVisible(find.text('RDV CPI'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Prise de rendez-vous'));
+    await tester.tap(find.text('RDV CPI'));
     await tester.pumpAndSettle();
     expect(find.text('Enregistrer le rendez-vous'), findsOneWidget);
 
@@ -846,7 +824,7 @@ void main() {
     expect(await db.countMyAttempts().getSingle(), 0);
     // La carte est toujours là : l'appel n'est pas consigné et le
     // téléconseiller peut choisir une autre issue.
-    expect(find.text('Plateforme'), findsOneWidget);
+    expect(find.text('Plateforme en ligne'), findsOneWidget);
   });
 
   phase2TestWidgets('un rendez-vous confirmé part avec sa date', (
@@ -855,9 +833,9 @@ void main() {
     await tester.pumpWidget(host());
     await resultat(tester, '771234567');
 
-    await tester.ensureVisible(find.text('Prise de rendez-vous'));
+    await tester.ensureVisible(find.text('RDV CPI'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Prise de rendez-vous'));
+    await tester.tap(find.text('RDV CPI'));
     await tester.pumpAndSettle();
 
     // La feuille s'ouvre sur aujourd'hui à 9 h ; « Demain » est la deuxième
@@ -893,7 +871,7 @@ void main() {
           .onPressed,
       isNull,
     );
-    expect(find.text('Plateforme'), findsNothing);
+    expect(find.text('Plateforme en ligne'), findsNothing);
 
     await type(tester, '771234567');
 
@@ -903,7 +881,7 @@ void main() {
           .onPressed,
       isNotNull,
     );
-    expect(find.text('Plateforme'), findsNothing);
+    expect(find.text('Plateforme en ligne'), findsNothing);
   });
 
   // EB-08 : le numéro ne change plus sous une fiche ouverte, c'est la seule
@@ -960,9 +938,9 @@ void main() {
           .widget<CallAudioRecorder>(find.byType(CallAudioRecorder))
           .onChanged(recording.path);
 
-      await tester.ensureVisible(find.text('Plateforme'));
+      await tester.ensureVisible(find.text('Plateforme en ligne'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Plateforme'));
+      await tester.tap(find.text('Plateforme en ligne'));
       await tester.pumpAndSettle();
       expect(await db.countMyAttempts().getSingle(), 1);
       await tester.tap(find.text('Numéro suivant'));
@@ -985,10 +963,10 @@ void main() {
 
     // La carte est là, mais plus rien ne l'entoure qui prenne une touche : une
     // carte muette vaut mieux qu'un `onPress` nul qu'on oublierait de vérifier.
-    expect(find.text('Plateforme'), findsOneWidget);
+    expect(find.text('Plateforme en ligne'), findsOneWidget);
     expect(
       find.ancestor(
-        of: find.text('Plateforme'),
+        of: find.text('Plateforme en ligne'),
         // `FTappable` est une fabrique : son type d'exécution n'est pas
         // `FTappable`, et `find.byType` compare les types à l'identique.
         matching: find.byWidgetPredicate((Widget w) => w is FTappable),
@@ -1037,9 +1015,9 @@ void main() {
     // souvent à une main. Une carte qui porte la décision de tout l'écran est
     // dimensionnée bien au-delà.
     for (final String label in const <String>[
-      'Plateforme',
-      'Physique',
-      'Par appel ou message',
+      'Plateforme en ligne',
+      'Mail',
+      'WhatsApp',
       'L\'appel n\'a pas abouti',
     ]) {
       final Finder tappable = find.ancestor(
@@ -1071,7 +1049,7 @@ void main() {
       );
       // Aucune carte de saisie : le serveur refuserait l'écriture, et proposer un
       // formulaire qui ne peut pas aboutir ferait perdre du temps au commercial.
-      expect(find.text('Plateforme'), findsNothing);
+      expect(find.text('Plateforme en ligne'), findsNothing);
       expect(find.text('L\'appel n\'a pas abouti'), findsNothing);
       // Ni « Continuer » : l'étape du résultat n'a rien à consigner ici.
       expect(find.text('Continuer'), findsNothing);
@@ -1325,7 +1303,7 @@ void main() {
 
       // La logique, elle, est identique : le même numéro donne le même écran.
       await resultat(tester, '771234567');
-      expect(find.text('Plateforme'), findsOneWidget);
+      expect(find.text('Plateforme en ligne'), findsOneWidget);
     },
   );
 
@@ -1379,9 +1357,9 @@ void main() {
 
     // Choix d'une carte : retour de SÉLECTION, exact au moment où il est émis.
     haptics.clear();
-    await tester.ensureVisible(find.text('Plateforme'));
+    await tester.ensureVisible(find.text('Plateforme en ligne'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Plateforme'));
+    await tester.tap(find.text('Plateforme en ligne'));
     await tester.pumpAndSettle();
     expect(haptics, isNotEmpty);
     expect(await db.countMyAttempts().getSingle(), 1);
@@ -1415,7 +1393,7 @@ void main() {
     expect(find.bySemanticsLabel(RegExp('Fonctionnaire : Oui')), findsWidgets);
 
     await remplir(tester, 'Profession', 'Institutrice');
-    await remplir(tester, 'Ancienneté', '36');
+    await remplir(tester, 'Durée dans la fonction', '36');
     await repondre(tester, 'Fonctionnaire', Tri.oui);
     await continuer(tester);
 
@@ -1423,15 +1401,14 @@ void main() {
     await choisirDansListe(tester, 'Banque', 'Banque Test');
     await repondre(tester, 'Engagement en cours à la banque', Tri.non);
     await choisirDansListe(tester, 'Revenu mensuel', 'Revenu Test');
-    await choisirDuree(tester, 24);
     await continuer(tester);
 
     expect(
-      find.bySemanticsLabel(RegExp('Méthode obtenue : Plateforme')),
+      find.bySemanticsLabel(RegExp('Méthode obtenue : Plateforme en ligne')),
       findsOneWidget,
     );
     expect(
-      find.bySemanticsLabel(RegExp('Méthode obtenue : Prise de rendez-vous')),
+      find.bySemanticsLabel(RegExp('Méthode obtenue : RDV CPI')),
       findsOneWidget,
     );
     // Le dossier a fait défiler l'étape : l'en-tête est hors du cache

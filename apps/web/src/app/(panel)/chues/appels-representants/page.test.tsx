@@ -59,6 +59,12 @@ describe('garde de l’étape 1, « Qualifier un représentant »', () => {
 
     await AppelsRepresentantsPage().catch(() => undefined);
 
-    expect(guardRoles).toHaveBeenCalledWith(['ADMIN', 'COMMERCIAL', 'SUPERVISEUR', 'DIRECTION']);
+    expect(guardRoles).toHaveBeenCalledWith([
+      'ADMIN',
+      'COMMERCIAL',
+      'CHARGE_CLIENTELE',
+      'SUPERVISEUR',
+      'DIRECTION',
+    ]);
   });
 });

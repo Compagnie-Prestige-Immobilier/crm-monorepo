@@ -1,5 +1,5 @@
 import { ForbiddenException } from '@nestjs/common';
-import { Role } from '@crm/database';
+import { ProspectStatut, Role } from '@crm/database';
 import type { Prisma } from '@crm/database';
 
 import type { AuthenticatedUser } from './decorators/current-user.decorator.js';
@@ -41,18 +41,32 @@ export const readScope = (
  * superviseur ne compose que les numéros qui lui reviennent. Sa vue d'ensemble
  * de l'annuaire et de la supervision passe par un appel sans cette option.
  */
+const enMain = (
+  user: Pick<AuthenticatedUser, 'id'>,
+): (Prisma.RepresentantWhereInput & Prisma.ProspectWhereInput)[] => [
+  { createdById: user.id },
+  { lotItems: { some: { assigneeId: user.id } } },
+];
+
 export const attributionScope = (
   user: Pick<AuthenticatedUser, 'id' | 'role'>,
   options: { malgreLeRole?: boolean } = {},
 ): Prisma.RepresentantWhereInput & Prisma.ProspectWhereInput =>
-  readsEveryone(user) && options.malgreLeRole !== true
-    ? {}
-    : { OR: [{ createdById: user.id }, { lotItems: { some: { assigneeId: user.id } } }] };
+  readsEveryone(user) && options.malgreLeRole !== true ? {} : { OR: enMain(user) };
 
-/** Portée de lecture des PROSPECTS à l'écran. */
+/**
+ * Portée de lecture des PROSPECTS à l'écran.
+ *
+ * Le chargé de clientèle y ajoute TOUTE demande convertie, quel qu'en soit
+ * l'auteur : c'est lui qui la relit avant l'enrôlement, et une portée bornée à
+ * ses propres fiches lui aurait caché celles qu'il doit justement revoir.
+ */
 export const prospectReadScope = (
   user: Pick<AuthenticatedUser, 'id' | 'role'>,
-): Prisma.ProspectWhereInput => attributionScope(user);
+): Prisma.ProspectWhereInput =>
+  user.role === Role.CHARGE_CLIENTELE
+    ? { OR: [...enMain(user), { statut: ProspectStatut.CONVERTI }] }
+    : attributionScope(user);
 
 /**
  * Portée des prospects sur le TÉLÉPHONE : aucune. Le tirage est GLOBAL et c'est

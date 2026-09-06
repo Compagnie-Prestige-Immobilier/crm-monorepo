@@ -14,6 +14,7 @@ import '../../../core/router/single_push.dart';
 import '../../../core/telephonie/appels_crm.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/phone.dart';
+import '../../../core/utils/whatsapp.dart';
 import '../../../data/local/database.dart';
 import '../../../ui/async_value_x.dart';
 import '../../../ui/widgets/cpi_action_bar.dart';
@@ -275,7 +276,8 @@ class _Situation extends ConsumerWidget {
       _ligne('Mode d\'épargne', kModeEpargneLabels[data.modeEpargne ?? '']),
       _ligne('Pays de résidence', pays),
       _ligne('Ville', data.villeResidence),
-      _ligne('WhatsApp', data.whatsappE164),
+      _ligne('WhatsApp', _whatsapp(data)),
+      _ligne('Établissement', data.etablissement),
       _ligne('Personne relais', data.relaisNom),
       _ligne('Téléphone du relais', data.relaisPhoneE164),
       _ligne('Tranche de revenus', tranche),
@@ -292,6 +294,15 @@ class _Situation extends ConsumerWidget {
       child: CpiCard.rows(lignes),
     );
   }
+
+  /// Un numéro sur `AUTRE_NUMERO`, la réponse sinon. Une fiche de la diaspora
+  /// d'avant EB-23 porte son numéro sans statut : il reste lisible.
+  static String? _whatsapp(ProspectSyncViewData data) =>
+      switch (WhatsappStatus.parse(data.whatsappStatus)) {
+        WhatsappStatus.memeNumero => 'Même numéro',
+        WhatsappStatus.aucun => 'Pas de WhatsApp',
+        _ => data.whatsappE164,
+      };
 
   static CpiRow? _ligne(String titre, String? valeur) =>
       valeur == null || valeur.trim().isEmpty

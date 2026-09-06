@@ -38,6 +38,8 @@ class Phase2Renseignements {
     this.engagementEnCours,
     this.incomeBandId,
     this.dureeSystemeMois,
+    this.whatsappStatus,
+    this.whatsappE164,
   });
 
   final String? nom;
@@ -57,8 +59,14 @@ class Phase2Renseignements {
   final String? incomeBandId;
 
   /// Durée du système de paiement, en mois. Distincte de
-  /// [dureeEtablissementMois], qui est l'ancienneté au poste.
+  /// [dureeEtablissementMois], qui est la durée dans la fonction.
   final int? dureeSystemeMois;
+
+  /// Nul tant que la question n'a pas été posée : le serveur laisse alors le
+  /// couple du prospect intact.
+  final String? whatsappStatus;
+
+  final String? whatsappE164;
 }
 
 @immutable
@@ -296,6 +304,8 @@ class Phase2Controller extends Notifier<Phase2State> {
         syndicatId: renseignements?.syndicatId,
         incomeBandId: renseignements?.incomeBandId,
         dureeSystemeMois: renseignements?.dureeSystemeMois,
+        whatsappStatus: renseignements?.whatsappStatus,
+        whatsappE164: renseignements?.whatsappE164,
         email: renseignements?.email,
         fonctionnaire: renseignements?.fonctionnaire,
         engagementEnCours: renseignements?.engagementEnCours,
@@ -368,11 +378,13 @@ class Phase2Controller extends Notifier<Phase2State> {
       ? '${reason.label} : ${labelForMethod(method ?? '')}'
       : reason.label;
 
+  /// EB-24. `physical` n'est plus proposé mais reste sur les tentatives déjà
+  /// consignées, sous le libellé qui l'a absorbé.
   static String labelForMethod(String method) => switch (method) {
-    EnrollmentMethods.platform => 'Plateforme',
-    EnrollmentMethods.physical => 'Physique',
-    EnrollmentMethods.voiceOrElectronicMessaging => 'Voix / messagerie',
-    EnrollmentMethods.appointment => 'Prise de rendez-vous',
+    EnrollmentMethods.appointment || EnrollmentMethods.physical => 'RDV CPI',
+    EnrollmentMethods.platform => 'Plateforme en ligne',
+    EnrollmentMethods.voiceOrElectronicMessaging => 'Mail',
+    EnrollmentMethods.whatsapp => 'WhatsApp',
     _ => method,
   };
 

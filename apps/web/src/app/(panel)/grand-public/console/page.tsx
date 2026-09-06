@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: 'Appeler les prospects' };
 
 /** Le même écran, sur les prospects GRAND PUBLIC : `ConsoleView` lit le projet. */
 export default async function GrandPublicConsolePage() {
-  const guard = await guardRoles(['ADMIN', 'COMMERCIAL']);
+  const guard = await guardRoles(['ADMIN', 'COMMERCIAL', 'CHARGE_CLIENTELE']);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
     return (

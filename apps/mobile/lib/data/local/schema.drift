@@ -390,7 +390,11 @@ CREATE TABLE prospects (
     mode_epargne TEXT,
     pays_residence_id TEXT,
     ville_residence TEXT,
+    -- Le couple de `representants`, aux mêmes règles : sans CHECK, et le numéro
+    -- n'est renseigné que sur `AUTRE_NUMERO`.
+    whatsapp_status TEXT NOT NULL DEFAULT 'NON_DEMANDE',
     whatsapp_e164 TEXT,
+    etablissement TEXT,
     relais_nom TEXT,
     relais_phone_e164 TEXT,
     -- Dernier appel consigné, écrit par le SERVEUR au pull et, hors ligne, par

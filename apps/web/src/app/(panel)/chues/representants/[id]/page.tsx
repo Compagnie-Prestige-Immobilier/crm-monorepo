@@ -14,7 +14,13 @@ import { readsOnly } from '@/lib/types';
 export const metadata: Metadata = { title: 'Représentant' };
 
 export default async function RepresentantPage({ params }: { params: Promise<{ id: string }> }) {
-  const guard = await guardRoles(['ADMIN', 'COMMERCIAL', 'SUPERVISEUR', 'DIRECTION']);
+  const guard = await guardRoles([
+    'ADMIN',
+    'COMMERCIAL',
+    'CHARGE_CLIENTELE',
+    'SUPERVISEUR',
+    'DIRECTION',
+  ]);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
     return <PermissionDenied role={guard.user.role} what="La fiche d’un représentant" />;

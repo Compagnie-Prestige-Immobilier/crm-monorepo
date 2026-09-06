@@ -106,6 +106,14 @@ export async function updateProspect(
   );
 }
 
+/** La revue du closing, avant transmission à l'enrôlement. */
+export async function marquerProspectRevue(
+  id: string,
+  client: ApiClient = getApiClient(),
+): Promise<ProspectRow> {
+  return unwrap(await client.POST('/api/v1/prospects/{id}/revue', { params: { path: { id } } }));
+}
+
 export async function deleteProspect(
   id: string,
   client: ApiClient = getApiClient(),
