@@ -1,7 +1,7 @@
 'use client';
 
 import { PrinterIcon } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -42,6 +42,142 @@ const PLAFOND_IMPRESSION_TOTALE = 3000;
 
 function pagesEnviron(lignes: number): number {
   return Math.max(1, Math.ceil(lignes / LIGNES_PAR_PAGE_PAPIER));
+}
+
+type ColonneRegistre = {
+  colonne: ImpressionColonne;
+  className?: string;
+  render: (visite: Visite) => ReactNode;
+};
+
+const COLONNES_REGISTRE: ColonneRegistre[] = [
+  {
+    colonne: 'N° REGISTRE',
+    className: 'font-[600] whitespace-nowrap',
+    render: (visite) => visite.reference,
+  },
+  {
+    colonne: VISITE_COLONNES.date,
+    className: 'whitespace-nowrap',
+    render: (visite) => formatDate(visite.date),
+  },
+  {
+    colonne: VISITE_COLONNES.time,
+    className: 'whitespace-nowrap',
+    render: (visite) => visite.time ?? '',
+  },
+  {
+    colonne: VISITE_COLONNES.visitorName,
+    className: 'font-[600]',
+    render: (visite) => visite.visitorName,
+  },
+  {
+    colonne: VISITE_COLONNES.phone,
+    className: 'whitespace-nowrap',
+    render: (visite) => visite.phone ?? '',
+  },
+  { colonne: VISITE_COLONNES.entreprise, render: (visite) => visite.entreprise.label },
+  { colonne: VISITE_COLONNES.direction, render: (visite) => visite.direction?.label ?? '' },
+  { colonne: VISITE_COLONNES.destinataire, render: (visite) => visite.destinataire?.label ?? '' },
+  { colonne: VISITE_COLONNES.objet, render: (visite) => visite.objet.label },
+  {
+    colonne: VISITE_COLONNES.comment,
+    className: 'max-w-[20rem]',
+    render: (visite) => visite.comment ?? '',
+  },
+];
+
+function LigneImpression({
+  visite,
+  colonnesImprimees,
+}: {
+  visite: Visite;
+  colonnesImprimees: ReadonlySet<ImpressionColonne>;
+}) {
+  return (
+    <TableRow>
+      {COLONNES_REGISTRE.map(({ colonne, className, render }) =>
+        impressionColonneVisible(colonne, colonnesImprimees) ? (
+          <TableCell key={colonne} className={className}>
+            {render(visite)}
+          </TableCell>
+        ) : null,
+      )}
+    </TableRow>
+  );
+}
+
+function ChoixPortee({
+  portee,
+  onChangePortee,
+  pageItemsCount,
+  total,
+  depasseLePlafond,
+}: {
+  portee: 'page' | 'tout';
+  onChangePortee: (value: 'page' | 'tout') => void;
+  pageItemsCount: number;
+  total: number;
+  depasseLePlafond: boolean;
+}) {
+  return (
+    <fieldset className="flex flex-col gap-2">
+      <legend className="pb-1 text-[0.8125rem] font-[600]">Quoi imprimer</legend>
+      <label
+        className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 ${
+          portee === 'page' ? 'border-primary bg-secondary' : 'border-border'
+        }`}
+      >
+        <input
+          type="radio"
+          name="portee-impression"
+          checked={portee === 'page'}
+          className="mt-0.5 size-4 accent-[var(--primary)]"
+          onChange={() => {
+            onChangePortee('page');
+          }}
+        />
+        <span>
+          <span className="block text-[0.875rem] font-[600]">La page affichée</span>
+          <span className="block text-[0.75rem] text-muted-foreground">
+            {formatNumber(pageItemsCount)} visites, environ{' '}
+            {formatNumber(pagesEnviron(pageItemsCount))} pages
+          </span>
+        </span>
+      </label>
+      <label
+        className={`flex items-start gap-3 rounded-md border p-3 ${
+          depasseLePlafond
+            ? 'cursor-not-allowed opacity-50'
+            : 'cursor-pointer' +
+              (portee === 'tout' ? ' border-primary bg-secondary' : ' border-border')
+        }`}
+      >
+        <input
+          type="radio"
+          name="portee-impression"
+          disabled={depasseLePlafond}
+          checked={portee === 'tout'}
+          className="mt-0.5 size-4 accent-[var(--primary)]"
+          onChange={() => {
+            onChangePortee('tout');
+          }}
+        />
+        <span>
+          <span className="block text-[0.875rem] font-[600]">Tout le résultat filtré</span>
+          <span className="block text-[0.75rem] text-muted-foreground">
+            {formatNumber(total)} visites, environ {formatNumber(pagesEnviron(total))} pages
+          </span>
+        </span>
+      </label>
+      {depasseLePlafond ? (
+        <p role="alert" className="text-[0.8125rem] text-destructive">
+          {formatNumber(total)} visites : trop pour une impression. Réduisez la période, ou exportez
+          en Excel.
+        </p>
+      ) : null}
+    </fieldset>
+  );
 }
 
 function periodeTexte(filters: VisiteFilters, today: string): string {
@@ -182,65 +318,13 @@ export function ImpressionDialog({
             </div>
           ) : (
             <>
-              <fieldset className="flex flex-col gap-2">
-                <legend className="pb-1 text-[0.8125rem] font-[600]">Quoi imprimer</legend>
-                <label
-                  className={`flex cursor-pointer items-start gap-3 rounded-md border p-3 ${
-                    portee === 'page' ? 'border-primary bg-secondary' : 'border-border'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="portee-impression"
-                    checked={portee === 'page'}
-                    className="mt-0.5 size-4 accent-[var(--primary)]"
-                    onChange={() => {
-                      setPortee('page');
-                    }}
-                  />
-                  <span>
-                    <span className="block text-[0.875rem] font-[600]">La page affichée</span>
-                    <span className="block text-[0.75rem] text-muted-foreground">
-                      {formatNumber(pageItemsCount)} visites, environ{' '}
-                      {formatNumber(pagesEnviron(pageItemsCount))} pages
-                    </span>
-                  </span>
-                </label>
-                <label
-                  className={`flex items-start gap-3 rounded-md border p-3 ${
-                    depasseLePlafond
-                      ? 'cursor-not-allowed opacity-50'
-                      : 'cursor-pointer' +
-                        (portee === 'tout' ? ' border-primary bg-secondary' : ' border-border')
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="portee-impression"
-                    disabled={depasseLePlafond}
-                    checked={portee === 'tout'}
-                    className="mt-0.5 size-4 accent-[var(--primary)]"
-                    onChange={() => {
-                      setPortee('tout');
-                    }}
-                  />
-                  <span>
-                    <span className="block text-[0.875rem] font-[600]">
-                      Tout le résultat filtré
-                    </span>
-                    <span className="block text-[0.75rem] text-muted-foreground">
-                      {formatNumber(total)} visites, environ {formatNumber(pagesEnviron(total))}{' '}
-                      pages
-                    </span>
-                  </span>
-                </label>
-                {depasseLePlafond ? (
-                  <p role="alert" className="text-[0.8125rem] text-destructive">
-                    {formatNumber(total)} visites : trop pour une impression. Réduisez la période,
-                    ou exportez en Excel.
-                  </p>
-                ) : null}
-              </fieldset>
+              <ChoixPortee
+                portee={portee}
+                onChangePortee={setPortee}
+                pageItemsCount={pageItemsCount}
+                total={total}
+                depasseLePlafond={depasseLePlafond}
+              />
 
               <fieldset className="flex flex-col gap-2">
                 <legend className="pb-1 text-[0.8125rem] font-[600]">Orientation</legend>
@@ -347,40 +431,11 @@ export function ImpressionDialog({
             </TableHeader>
             <TableBody>
               {toutesLesVisites.map((visite) => (
-                <TableRow key={visite.id}>
-                  {impressionColonneVisible('N° REGISTRE', colonnesImprimees) ? (
-                    <TableCell className="font-[600] whitespace-nowrap">
-                      {visite.reference}
-                    </TableCell>
-                  ) : null}
-                  {impressionColonneVisible(VISITE_COLONNES.date, colonnesImprimees) ? (
-                    <TableCell className="whitespace-nowrap">{formatDate(visite.date)}</TableCell>
-                  ) : null}
-                  {impressionColonneVisible(VISITE_COLONNES.time, colonnesImprimees) ? (
-                    <TableCell className="whitespace-nowrap">{visite.time ?? ''}</TableCell>
-                  ) : null}
-                  {impressionColonneVisible(VISITE_COLONNES.visitorName, colonnesImprimees) ? (
-                    <TableCell className="font-[600]">{visite.visitorName}</TableCell>
-                  ) : null}
-                  {impressionColonneVisible(VISITE_COLONNES.phone, colonnesImprimees) ? (
-                    <TableCell className="whitespace-nowrap">{visite.phone ?? ''}</TableCell>
-                  ) : null}
-                  {impressionColonneVisible(VISITE_COLONNES.entreprise, colonnesImprimees) ? (
-                    <TableCell>{visite.entreprise.label}</TableCell>
-                  ) : null}
-                  {impressionColonneVisible(VISITE_COLONNES.direction, colonnesImprimees) ? (
-                    <TableCell>{visite.direction?.label ?? ''}</TableCell>
-                  ) : null}
-                  {impressionColonneVisible(VISITE_COLONNES.destinataire, colonnesImprimees) ? (
-                    <TableCell>{visite.destinataire?.label ?? ''}</TableCell>
-                  ) : null}
-                  {impressionColonneVisible(VISITE_COLONNES.objet, colonnesImprimees) ? (
-                    <TableCell>{visite.objet.label}</TableCell>
-                  ) : null}
-                  {impressionColonneVisible(VISITE_COLONNES.comment, colonnesImprimees) ? (
-                    <TableCell className="max-w-[20rem]">{visite.comment ?? ''}</TableCell>
-                  ) : null}
-                </TableRow>
+                <LigneImpression
+                  key={visite.id}
+                  visite={visite}
+                  colonnesImprimees={colonnesImprimees}
+                />
               ))}
             </TableBody>
           </Table>
