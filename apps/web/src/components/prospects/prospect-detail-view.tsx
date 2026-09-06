@@ -1,12 +1,14 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
+import { toast } from 'sonner';
 
 import { DetailBackLink } from '@/components/detail-back-link';
 import { ProspectSegmentHistory } from '@/components/prospects/prospect-segment-history';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDuration } from '@/lib/data/admin';
@@ -14,8 +16,10 @@ import {
   fetchProspect,
   fetchProspectCallAttempts,
   fetchProspectDeviceCalls,
+  marquerProspectRevue,
   type DeviceCallDetection,
 } from '@/lib/data/prospects';
+import { toastApiError } from '@/lib/mutation-feedback';
 import {
   formatDate,
   formatDateTime,
@@ -31,6 +35,7 @@ import {
   PHASE2_STATUS_LABELS,
   PROSPECT_STATUT_LABELS,
   SEGMENT_LABELS,
+  peutRevoirUneDemande,
   type ProspectRow,
   type Role,
 } from '@/lib/types';
@@ -111,6 +116,7 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
             <div className="flex flex-wrap items-center justify-end gap-2">
               <Badge variant="outline">{PROSPECT_STATUT_LABELS[prospect.statut]}</Badge>
               <Badge variant="secondary">{PHASE2_STATUS_LABELS[prospect.phase2Status]}</Badge>
+              <RevueDemande prospect={prospect} role={role} />
             </div>
           </div>
         </CardHeader>
@@ -178,6 +184,52 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
         </Card>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * La revue du closing. Rien à afficher tant que la demande n'est pas convertie :
+ * il n'y a alors rien à transmettre à l'enrôlement.
+ */
+function RevueDemande({ prospect, role }: { prospect: ProspectRow; role: Role }) {
+  const queryClient = useQueryClient();
+  const revue = useMutation({
+    mutationFn: () => marquerProspectRevue(prospect.id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.prospectsRoot });
+      toast.success('Demande revue.');
+    },
+    onError: (error) => {
+      toastApiError(error, 'La revue n’a pas pu être enregistrée.');
+    },
+  });
+
+  if (prospect.statut !== 'CONVERTI') return null;
+
+  if (prospect.revueAt !== null) {
+    return (
+      <Badge variant="success">
+        Revue le {formatDate(prospect.revueAt)}
+        {prospect.revueByName === null ? '' : ` par ${prospect.revueByName}`}
+      </Badge>
+    );
+  }
+
+  return (
+    <>
+      <Badge variant="warning">Demande non revue</Badge>
+      {peutRevoirUneDemande(role) ? (
+        <Button
+          size="sm"
+          disabled={revue.isPending}
+          onClick={() => {
+            revue.mutate();
+          }}
+        >
+          Marquer revue
+        </Button>
+      ) : null}
+    </>
   );
 }
 

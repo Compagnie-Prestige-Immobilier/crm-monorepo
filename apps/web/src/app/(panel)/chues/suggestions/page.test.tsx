@@ -51,6 +51,12 @@ describe('garde des numéros suggérés', () => {
 
     await SuggestionsPage().catch(() => undefined);
 
-    expect(guardRoles).toHaveBeenCalledWith(['ADMIN', 'COMMERCIAL', 'SUPERVISEUR', 'DIRECTION']);
+    expect(guardRoles).toHaveBeenCalledWith([
+      'ADMIN',
+      'COMMERCIAL',
+      'CHARGE_CLIENTELE',
+      'SUPERVISEUR',
+      'DIRECTION',
+    ]);
   });
 });

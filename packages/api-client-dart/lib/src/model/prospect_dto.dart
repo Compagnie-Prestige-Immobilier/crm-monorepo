@@ -124,6 +124,12 @@ class ProspectDto {
 
     required this.enrollmentCapturedAt,
 
+    required this.revueAt,
+
+    required this.revueById,
+
+    required this.revueByName,
+
     required this.lastOutcome,
 
     required this.lastComment,
@@ -352,6 +358,16 @@ class ProspectDto {
   @JsonKey(name: r'enrollmentCapturedAt', required: true, includeIfNull: true)
   final DateTime? enrollmentCapturedAt;
 
+  /// Revue du closing avant l’enrôlement. Nulle tant que la demande n’a pas été revue.
+  @JsonKey(name: r'revueAt', required: true, includeIfNull: true)
+  final DateTime? revueAt;
+
+  @JsonKey(name: r'revueById', required: true, includeIfNull: true)
+  final String? revueById;
+
+  @JsonKey(name: r'revueByName', required: true, includeIfNull: true)
+  final String? revueByName;
+
   /// Résultat de la dernière tentative d’appel enregistrée.
   @JsonKey(
     name: r'lastOutcome',
@@ -462,6 +478,9 @@ class ProspectDto {
                 enrollmentCapturedById,
                 enrollmentCapturedByName,
                 enrollmentCapturedAt,
+                revueAt,
+                revueById,
+                revueByName,
                 lastOutcome,
                 lastComment,
                 lastAttemptAt,
@@ -525,6 +544,9 @@ class ProspectDto {
                 other.enrollmentCapturedById,
                 other.enrollmentCapturedByName,
                 other.enrollmentCapturedAt,
+                other.revueAt,
+                other.revueById,
+                other.revueByName,
                 other.lastOutcome,
                 other.lastComment,
                 other.lastAttemptAt,
@@ -594,6 +616,9 @@ class ProspectDto {
         enrollmentCapturedById,
         enrollmentCapturedByName,
         enrollmentCapturedAt,
+        revueAt,
+        revueById,
+        revueByName,
         lastOutcome,
         lastComment,
         lastAttemptAt,

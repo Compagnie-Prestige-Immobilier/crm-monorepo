@@ -45,6 +45,9 @@ enum Role {
   SUPERVISEUR
   DIRECTION
   ACCUEIL
+  /// Le closing : tout ce que fait un téléconseiller, plus la lecture et la
+  /// revue de TOUTE demande convertie, quel qu'en soit l'auteur.
+  CHARGE_CLIENTELE
 }
 
 // Où en est la relation avec un représentant, du point de vue de l'équipe qui
@@ -295,6 +298,7 @@ model User {
 
   // Phase 2
   enrollmentsCaptured  Prospect[]           @relation("ProspectEnrollmentCapturedBy")
+  prospectsRevus       Prospect[]           @relation("ProspectRevueBy")
   callAttempts         CallAttempt[]        @relation("CallAttemptPerformedBy")
   journeysConsented    ProspectJourney[]    @relation("ProspectJourneyConsentBy")
   journeysConverted    ProspectJourney[]    @relation("ProspectJourneyConvertedBy")
@@ -843,6 +847,14 @@ model Prospect {
   enrollmentCapturedAt   DateTime?
   enrollmentCapturedById String?
   enrollmentCapturedBy   User?             @relation("ProspectEnrollmentCapturedBy", fields: [enrollmentCapturedById], references: [id], onDelete: SetNull)
+
+  /// La revue du closing, avant transmission à l'enrôlement. Nulle tant que
+  /// personne n'a relu la demande, et c'est cette absence que l'écran signale.
+  /// `SetNull` comme les colonnes voisines : le départ d'un compte ne doit pas
+  /// retenir la fiche, seule la date porte la preuve que la revue a eu lieu.
+  revueAt   DateTime?
+  revueById String?
+  revueBy   User?     @relation("ProspectRevueBy", fields: [revueById], references: [id], onDelete: SetNull)
 
   /// Le DERNIER appel (par `clientCreatedAt`), recopié depuis `CallAttempt` pour
   /// que « mes contacts » se filtre sur la fiche. Pas de `nextCallbackAt` ici :

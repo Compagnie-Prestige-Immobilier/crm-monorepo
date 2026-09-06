@@ -101,6 +101,12 @@ abstract class _$ProspectDtoCWProxy {
 
   ProspectDto enrollmentCapturedAt(DateTime? enrollmentCapturedAt);
 
+  ProspectDto revueAt(DateTime? revueAt);
+
+  ProspectDto revueById(String? revueById);
+
+  ProspectDto revueByName(String? revueByName);
+
   ProspectDto lastOutcome(CallOutcome? lastOutcome);
 
   ProspectDto lastComment(String? lastComment);
@@ -183,6 +189,9 @@ abstract class _$ProspectDtoCWProxy {
     String? enrollmentCapturedById,
     String? enrollmentCapturedByName,
     DateTime? enrollmentCapturedAt,
+    DateTime? revueAt,
+    String? revueById,
+    String? revueByName,
     CallOutcome? lastOutcome,
     String? lastComment,
     DateTime? lastAttemptAt,
@@ -380,6 +389,16 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
       this(enrollmentCapturedAt: enrollmentCapturedAt);
 
   @override
+  ProspectDto revueAt(DateTime? revueAt) => this(revueAt: revueAt);
+
+  @override
+  ProspectDto revueById(String? revueById) => this(revueById: revueById);
+
+  @override
+  ProspectDto revueByName(String? revueByName) =>
+      this(revueByName: revueByName);
+
+  @override
   ProspectDto lastOutcome(CallOutcome? lastOutcome) =>
       this(lastOutcome: lastOutcome);
 
@@ -485,6 +504,9 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
     Object? enrollmentCapturedById = const $CopyWithPlaceholder(),
     Object? enrollmentCapturedByName = const $CopyWithPlaceholder(),
     Object? enrollmentCapturedAt = const $CopyWithPlaceholder(),
+    Object? revueAt = const $CopyWithPlaceholder(),
+    Object? revueById = const $CopyWithPlaceholder(),
+    Object? revueByName = const $CopyWithPlaceholder(),
     Object? lastOutcome = const $CopyWithPlaceholder(),
     Object? lastComment = const $CopyWithPlaceholder(),
     Object? lastAttemptAt = const $CopyWithPlaceholder(),
@@ -693,6 +715,18 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
           ? _value.enrollmentCapturedAt
           // ignore: cast_nullable_to_non_nullable
           : enrollmentCapturedAt as DateTime?,
+      revueAt: revueAt == const $CopyWithPlaceholder()
+          ? _value.revueAt
+          // ignore: cast_nullable_to_non_nullable
+          : revueAt as DateTime?,
+      revueById: revueById == const $CopyWithPlaceholder()
+          ? _value.revueById
+          // ignore: cast_nullable_to_non_nullable
+          : revueById as String?,
+      revueByName: revueByName == const $CopyWithPlaceholder()
+          ? _value.revueByName
+          // ignore: cast_nullable_to_non_nullable
+          : revueByName as String?,
       lastOutcome: lastOutcome == const $CopyWithPlaceholder()
           ? _value.lastOutcome
           // ignore: cast_nullable_to_non_nullable
@@ -816,6 +850,9 @@ ProspectDto _$ProspectDtoFromJson(
       'enrollmentCapturedById',
       'enrollmentCapturedByName',
       'enrollmentCapturedAt',
+      'revueAt',
+      'revueById',
+      'revueByName',
       'lastOutcome',
       'lastComment',
       'lastAttemptAt',
@@ -978,6 +1015,12 @@ ProspectDto _$ProspectDtoFromJson(
       'enrollmentCapturedAt',
       (v) => v == null ? null : DateTime.parse(v as String),
     ),
+    revueAt: $checkedConvert(
+      'revueAt',
+      (v) => v == null ? null : DateTime.parse(v as String),
+    ),
+    revueById: $checkedConvert('revueById', (v) => v as String?),
+    revueByName: $checkedConvert('revueByName', (v) => v as String?),
     lastOutcome: $checkedConvert(
       'lastOutcome',
       (v) => $enumDecodeNullable(
@@ -1071,6 +1114,9 @@ Map<String, dynamic> _$ProspectDtoToJson(ProspectDto instance) =>
       'enrollmentCapturedById': instance.enrollmentCapturedById,
       'enrollmentCapturedByName': instance.enrollmentCapturedByName,
       'enrollmentCapturedAt': instance.enrollmentCapturedAt?.toIso8601String(),
+      'revueAt': instance.revueAt?.toIso8601String(),
+      'revueById': instance.revueById,
+      'revueByName': instance.revueByName,
       'lastOutcome': _$CallOutcomeEnumMap[instance.lastOutcome],
       'lastComment': instance.lastComment,
       'lastAttemptAt': instance.lastAttemptAt?.toIso8601String(),

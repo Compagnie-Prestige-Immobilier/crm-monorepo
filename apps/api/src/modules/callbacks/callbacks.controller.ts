@@ -29,7 +29,7 @@ export class CallbacksController {
   constructor(private readonly callbacks: CallbacksService) {}
 
   @Get()
-  @Roles(Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION)
+  @Roles(Role.ADMIN, Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiOperation({
     operationId: 'listScheduledCallbacks',
     summary: 'Rappels promis encore dus.',
@@ -46,7 +46,7 @@ export class CallbacksController {
   }
 
   @Post(':id/cancel')
-  @Roles(Role.ADMIN, Role.COMMERCIAL)
+  @Roles(Role.ADMIN, Role.COMMERCIAL, Role.CHARGE_CLIENTELE)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     operationId: 'cancelScheduledCallback',

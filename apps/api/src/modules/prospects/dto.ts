@@ -507,6 +507,19 @@ export class ProspectDto {
   enrollmentCapturedAt!: string | null;
 
   @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description:
+      'Revue du closing avant l’enrôlement. Nulle tant que la demande n’a pas été revue.',
+  })
+  revueAt!: string | null;
+
+  @ApiProperty({ type: String, format: 'uuid', nullable: true }) revueById!: string | null;
+
+  @ApiProperty({ type: String, nullable: true }) revueByName!: string | null;
+
+  @ApiProperty({
     enum: CallOutcome,
     enumName: 'CallOutcome',
     nullable: true,
