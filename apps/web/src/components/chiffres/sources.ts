@@ -1,9 +1,9 @@
 import type { components } from '@crm/api-client';
 
 import type {
+  CatalogueEntree,
   DonneesSource,
   EquipeLigne,
-  Forme,
 } from '@/components/accueil/tableau-de-bord/sources';
 import { activityLines, formatDuration } from '@/lib/data/admin';
 import type {
@@ -57,9 +57,7 @@ export interface Jeux {
   enrolement?: ChiffresEnrolement;
 }
 
-export interface SourceChiffre {
-  label: string;
-  forme: Forme;
+export interface SourceChiffre extends CatalogueEntree {
   jeu: Jeu;
   description: string;
   groupe: string;
@@ -427,8 +425,10 @@ export const SOURCES_CHIFFRES = {
     label: 'Taux d’exploitation',
     forme: 'classement',
     jeu: 'campagnes',
-    description: 'Fiches traitées, une part par campagne de la période.',
+    description:
+      'Fiches traitées, une part par campagne de la période. Une part ouvre sa campagne.',
     groupe: 'Campagnes',
+    lien: (id) => `/chues/campagnes/${id}`,
     extraire: ({ campagnes }) =>
       campagnes === undefined
         ? null

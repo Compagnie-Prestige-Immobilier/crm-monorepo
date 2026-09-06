@@ -18,6 +18,7 @@ import {
   rectSortingStrategy,
   sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable';
+import { useRouter } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 
 import { CarteWidget } from '@/components/accueil/tableau-de-bord/carte-widget';
@@ -148,7 +149,15 @@ function marqueSerie(
   marque: DashboardMarque | undefined,
   titre: string,
   presentation: Presentation,
+  ouvrir?: (id: string) => void,
 ): ReactNode {
+  const onSelect =
+    ouvrir === undefined
+      ? undefined
+      : (index: number): void => {
+          const item = items[index];
+          if (item !== undefined) ouvrir(item.id);
+        };
   switch (marque) {
     case 'barres-horizontales':
       return <BarresHorizontalesChart items={items} presentation={presentation} />;
@@ -161,9 +170,9 @@ function marqueSerie(
     case 'escalier':
       return <EscalierChart items={items} presentation={presentation} />;
     case 'anneau':
-      return <AnneauChart items={items} presentation={presentation} />;
+      return <AnneauChart items={items} presentation={presentation} onSelect={onSelect} />;
     case 'camembert':
-      return <CamembertChart items={items} presentation={presentation} />;
+      return <CamembertChart items={items} presentation={presentation} onSelect={onSelect} />;
     case 'aire-polaire':
       return <AirePolaireChart items={items} presentation={presentation} />;
     case 'radar':
@@ -185,6 +194,7 @@ export function renderMark(
   presentation: Presentation,
   catalogue: Catalogue = SOURCES,
   messageVide = 'Aucune visite sur la période.',
+  ouvrir?: (id: string) => void,
 ): ReactNode {
   const titre = catalogue[source]?.label ?? source;
 
@@ -203,7 +213,7 @@ export function renderMark(
     donnees.forme === 'classement'
       ? appliquerPresentation(donnees.donnee, presentation)
       : donnees.donnee;
-  return marqueSerie(items, marque, titre, presentation);
+  return marqueSerie(items, marque, titre, presentation, ouvrir);
 }
 
 /** dnd-kit ne traduit rien par défaut : ces textes seraient sinon lus en anglais. */
@@ -266,6 +276,7 @@ export function WidgetGrid({
   };
 
   const [activeId, setActiveId] = useState<string | null>(null);
+  const router = useRouter();
 
   const handleDragStart = (event: DragStartEvent): void => {
     setActiveId(String(event.active.id));
@@ -280,6 +291,7 @@ export function WidgetGrid({
 
   const cards = widgets.map((widget, index) => {
     const source = donnees.get(widget.id);
+    const lien = catalogue[widget.source]?.lien;
     return (
       <CarteWidget
         key={widget.id}
@@ -317,6 +329,11 @@ export function WidgetGrid({
               widget.presentation,
               catalogue,
               messageVide,
+              lien === undefined
+                ? undefined
+                : (id) => {
+                    router.push(lien(id));
+                  },
             )}
       </CarteWidget>
     );

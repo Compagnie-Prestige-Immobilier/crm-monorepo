@@ -207,6 +207,28 @@ test('CHU-SUP-03 les trois périodes changent la requête', async ({ page }) => 
 });
 
 test('CHU-SUP-04 le tri par colonne bascule et se voit', async ({ page }) => {
+  // Deux lignes aux appels différents : sans écart, le tri ne peut rien montrer.
+  const ligne = (id: string, nom: string, repCalls: number) => ({
+    ...ACTIVITE_VIDE.totals,
+    repCalls,
+    bucket: jour(0),
+    teleconseillerId: id,
+    teleconseillerName: nom,
+  });
+  await page.route(`**${ACTIVITE}**`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...ACTIVITE_VIDE,
+        teleconseillers: [
+          { id: 'tc-ali', fullName: 'Ali Test' },
+          { id: 'tc-zoe', fullName: 'Zoé Test' },
+        ],
+        items: [ligne('tc-ali', 'Ali Test', 3), ligne('tc-zoe', 'Zoé Test', 9)],
+      }),
+    });
+  });
   await page.goto('/chues/supervision');
 
   const tableau = page.getByRole('table').first();

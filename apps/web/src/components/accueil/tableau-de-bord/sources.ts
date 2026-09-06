@@ -89,6 +89,8 @@ export interface CatalogueEntree {
   question?: string;
   description?: string;
   groupe?: string;
+  /** L'écran qu'ouvre une part du graphique, à partir de son identifiant. */
+  lien?: (id: string) => string;
 }
 
 export type Catalogue = Readonly<Record<string, CatalogueEntree>>;

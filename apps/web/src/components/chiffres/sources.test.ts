@@ -145,6 +145,7 @@ describe('les cartes du lot 2', () => {
         { id: 'b', label: 'Thiès', value: 5 },
       ],
     });
+    expect(chues['taux-d-exploitation']?.lien?.('a')).toBe('/chues/campagnes/a');
     expect(chues['exploitation-par-campagne']?.extraire({ campagnes })).toMatchObject({
       donnee: [{ ligne: 'Dakar', segments: [{ value: 30 }, { value: 20 }] }, { ligne: 'Thiès' }],
     });
