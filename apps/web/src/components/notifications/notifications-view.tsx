@@ -384,9 +384,7 @@ function HistoriqueRow({
           }}
         >
           <span className="block font-[600]">{row.title}</span>
-          <span className="block truncate text-[0.8125rem] text-muted-foreground">
-            {row.body}
-          </span>
+          <span className="block truncate text-[0.8125rem] text-muted-foreground">{row.body}</span>
         </button>
       </TableCell>
       <TableCell>
