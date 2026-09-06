@@ -35,6 +35,51 @@ async function messageDeRefus(amont: Response): Promise<string | undefined> {
   return code === 'CAPTCHA_REFUSE' ? REFUS_CAPTCHA : REFUS[amont.status];
 }
 
+type CorpsAnalyse = z.infer<typeof corpsSchema>;
+
+function buildDemandePayload(data: CorpsAnalyse): Record<string, unknown> {
+  const { site, email, profession, employeur, message, turnstileToken, ...identite } = data;
+  return {
+    ...identite,
+    ...(email === '' ? {} : { email }),
+    ...(profession === '' ? {} : { profession }),
+    ...(employeur === '' ? {} : { employeur }),
+    ...(message === '' ? {} : { message }),
+    ...(site === '' ? {} : { site }),
+    ...(turnstileToken === '' ? {} : { turnstileToken }),
+  };
+}
+
+type OrigineResolue = { ok: true; origin: string } | { ok: false; reponse: NextResponse };
+
+function resolveOrigin(): OrigineResolue {
+  try {
+    return { ok: true, origin: serverApiOrigin() };
+  } catch (error) {
+    if (error instanceof ApiConfigurationError) {
+      return { ok: false, reponse: NextResponse.json(configErrorBody(error), { status: 500 }) };
+    }
+    throw error;
+  }
+}
+
+async function relayerVersFormulairePublic(
+  origin: string,
+  jeton: string,
+  demande: Record<string, unknown>,
+  visiteur: string | null,
+): Promise<Response> {
+  return fetch(`${origin}${API_PREFIX}/formulaire-public/${encodeURIComponent(jeton)}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(visiteur === null ? {} : { 'x-forwarded-for': visiteur }),
+    },
+    body: JSON.stringify(demande),
+    cache: 'no-store',
+  });
+}
+
 /**
  * Le relais `/api/v1` attache toujours un jeton de session et renvoie 401 sans
  * cookie : une page publique ne peut pas l'emprunter. Ce relais-ci ne porte
@@ -62,40 +107,15 @@ export async function POST(
     return NextResponse.json({ error: 'Vérifiez les champs signalés.' }, { status: 400 });
   }
 
-  const { site, email, profession, employeur, message, turnstileToken, ...identite } = parsed.data;
-  const demande = {
-    ...identite,
-    ...(email === '' ? {} : { email }),
-    ...(profession === '' ? {} : { profession }),
-    ...(employeur === '' ? {} : { employeur }),
-    ...(message === '' ? {} : { message }),
-    ...(site === '' ? {} : { site }),
-    ...(turnstileToken === '' ? {} : { turnstileToken }),
-  };
+  const origine = resolveOrigin();
+  if (!origine.ok) return origine.reponse;
 
-  let origin: string;
-  try {
-    origin = serverApiOrigin();
-  } catch (error) {
-    if (error instanceof ApiConfigurationError) {
-      return NextResponse.json(configErrorBody(error), { status: 500 });
-    }
-    throw error;
-  }
-
+  const demande = buildDemandePayload(parsed.data);
   const visiteur = request.headers.get('x-forwarded-for') ?? request.headers.get('x-real-ip');
 
   let amont: Response;
   try {
-    amont = await fetch(`${origin}${API_PREFIX}/formulaire-public/${encodeURIComponent(jeton)}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(visiteur === null ? {} : { 'x-forwarded-for': visiteur }),
-      },
-      body: JSON.stringify(demande),
-      cache: 'no-store',
-    });
+    amont = await relayerVersFormulairePublic(origine.origin, jeton, demande, visiteur);
   } catch {
     return NextResponse.json(
       { error: 'Le serveur CPI est injoignable. Réessayez dans un instant.' },
