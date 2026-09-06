@@ -34,7 +34,7 @@ import { whatsappDuProspect, type WhatsappPatchProspect } from '../prospects/wha
 import { REPRESENTANT_INCLUDE, toRepresentantDto } from '../representants/representants.service.js';
 import { resolveWhatsappPatch } from '../representants/whatsapp.js';
 import { applyRelationChange } from '../representants/relation-change.js';
-import { CallAttemptApplyStatus } from '../phase2/dto.js';
+import { CallAttemptApplyStatus, type CallAttemptResultDto } from '../phase2/dto.js';
 import { fermerOuverture } from '../ouvertures/ouvertures.service.js';
 import { Phase2SyncService } from '../phase2/phase2-sync.service.js';
 import { VISITE_REGISTRE_ROLES, VisitesService, dakarDate } from '../visites/visites.service.js';
@@ -183,6 +183,61 @@ function errorMessageOf(error: { getResponse: () => unknown; message: string }):
     if (typeof message === 'string') return message;
   }
   return error.message;
+}
+
+function requireCallAttemptFields(data: SyncEntityDataDto | undefined): asserts data is SyncEntityDataDto & {
+  prospectId: string;
+  outcome: NonNullable<SyncEntityDataDto['outcome']>;
+  clientCreatedAt: string;
+} {
+  if (!data?.prospectId || !data.outcome || !data.clientCreatedAt) {
+    throw new OperationError(
+      SyncOpStatus.INVALID,
+      'CALL_ATTEMPT_INCOMPLETE',
+      'Une tentative d’appel exige prospectId, outcome et clientCreatedAt.',
+    );
+  }
+}
+
+function callAttemptOutcome(entityId: string, result: CallAttemptResultDto): OperationOutcome {
+  return {
+    // Un rejeu n'est pas un échec : la tentative était déjà enregistrée, rien
+    // n'a été réécrit, et le client peut retirer l'opération de sa file en
+    // toute sécurité.
+    status:
+      result.status === CallAttemptApplyStatus.DUPLICATE
+        ? SyncOpStatus.DUPLICATE
+        : SyncOpStatus.APPLIED,
+    entityId,
+    rev: result.state.rev,
+    serverUpdatedAt: result.state.updatedAt,
+    errorCode: null,
+    error: null,
+  };
+}
+
+/** Le push ne renvoie jamais d'erreur HTTP pour une opération isolée, sous peine de condamner les autres du lot. */
+function translateCallAttemptError(error: unknown): unknown {
+  if (error instanceof ConflictException) {
+    return new OperationError(
+      SyncOpStatus.CONFLICT,
+      errorCodeOf(error) ?? 'PHASE2_ALREADY_COMPLETED',
+      errorMessageOf(error),
+    );
+  }
+  if (
+    error instanceof BadRequestException ||
+    error instanceof NotFoundException ||
+    // Hors campagne : refus DÉFINITIF de l'opération, pas du lot.
+    error instanceof ForbiddenException
+  ) {
+    return new OperationError(
+      SyncOpStatus.INVALID,
+      errorCodeOf(error) ?? 'CALL_ATTEMPT_INVALID',
+      errorMessageOf(error),
+    );
+  }
+  return error;
 }
 
 /**
@@ -877,13 +932,7 @@ export class SyncService {
     payloadVersion: number,
   ): Promise<OperationOutcome> {
     const data = operation.data;
-    if (!data?.prospectId || !data.outcome || !data.clientCreatedAt) {
-      throw new OperationError(
-        SyncOpStatus.INVALID,
-        'CALL_ATTEMPT_INCOMPLETE',
-        'Une tentative d’appel exige prospectId, outcome et clientCreatedAt.',
-      );
-    }
+    requireCallAttemptFields(data);
 
     try {
       const result = await this.phase2Sync.applyCallAttempt(
@@ -893,13 +942,13 @@ export class SyncService {
           id: operation.entityId,
           prospectId: data.prospectId,
           outcome: data.outcome,
-          ...(data.reasonCode === undefined ? {} : { reasonCode: data.reasonCode }),
-          ...(data.method === undefined ? {} : { method: data.method }),
-          ...(data.comment === undefined ? {} : { comment: data.comment }),
-          ...(data.callbackAt === undefined ? {} : { callbackAt: data.callbackAt }),
           // Renseignements de conversion (phase 3). Les uns vont sur la tentative,
           // les autres sur le prospect : voir `CallAttemptOpDto`.
           ...definedValues({
+            reasonCode: data.reasonCode,
+            method: data.method,
+            comment: data.comment,
+            callbackAt: data.callbackAt,
             email: data.email,
             fonctionnaire: data.fonctionnaire,
             engagementEnCours: data.engagementEnCours,
@@ -936,45 +985,12 @@ export class SyncService {
         });
       }
 
-      return {
-        // Un rejeu n'est pas un échec : la tentative était déjà enregistrée,
-        // rien n'a été réécrit, et le client peut retirer l'opération de sa
-        // file en toute sécurité.
-        status:
-          result.status === CallAttemptApplyStatus.DUPLICATE
-            ? SyncOpStatus.DUPLICATE
-            : SyncOpStatus.APPLIED,
-        entityId: operation.entityId,
-        rev: result.state.rev,
-        serverUpdatedAt: result.state.updatedAt,
-        errorCode: null,
-        error: null,
-      };
+      return callAttemptOutcome(operation.entityId, result);
     } catch (error) {
       // Le service de phase 2 lève des exceptions HTTP ; le push ne renvoie
       // jamais d'erreur HTTP pour une opération isolée, sous peine de
       // condamner les 199 autres du lot. On les rabat donc dans le corps.
-      if (error instanceof ConflictException) {
-        throw new OperationError(
-          SyncOpStatus.CONFLICT,
-          errorCodeOf(error) ?? 'PHASE2_ALREADY_COMPLETED',
-          errorMessageOf(error),
-        );
-      }
-      if (
-        error instanceof BadRequestException ||
-        error instanceof NotFoundException ||
-        // Hors campagne : refus DÉFINITIF de l'opération, pas du lot. Une 403
-        // HTTP condamnerait les 199 autres tentatives du même envoi.
-        error instanceof ForbiddenException
-      ) {
-        throw new OperationError(
-          SyncOpStatus.INVALID,
-          errorCodeOf(error) ?? 'CALL_ATTEMPT_INVALID',
-          errorMessageOf(error),
-        );
-      }
-      throw error;
+      throw translateCallAttemptError(error);
     }
   }
 
