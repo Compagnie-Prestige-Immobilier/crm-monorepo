@@ -38,6 +38,7 @@ import { VisitesImportController } from '../../modules/visites/visites-import.co
 import { DashboardsController } from '../../modules/dashboards/dashboards.controller.js';
 import { UsersController } from '../../modules/users/users.controller.js';
 import { LotsExportController } from '../../modules/lots-export/lots-export.controller.js';
+import { ParametresChuesController } from '../../modules/parametres-chues/parametres-chues.controller.js';
 
 type Controller = new (...args: never[]) => object;
 
@@ -75,6 +76,7 @@ const CONTROLLERS: readonly Controller[] = [
   VisitesController,
   VisitesImportController,
   LotsExportController,
+  ParametresChuesController,
 ];
 
 /**
@@ -202,6 +204,10 @@ const ADMISES: readonly string[] = [
   'ReferentielsController.listRegions',
   'ReferentielsController.listRegionsWithDepartements',
   'ReferentielsController.listSyndicats',
+
+  'ParametresChuesController.lire',
+  'ParametresChuesController.ecrire',
+  'ParametresChuesController.journal',
 
   'LotsExportController.list',
   'LotsExportController.get',
@@ -514,7 +520,12 @@ describe('ce qu’une DIRECTION atteint, route par route', () => {
   it('lit tout ce que lit la supervision, hors dossiers bancaires et fiches a liberer', () => {
     const direction = new Set(ouvertesDe(Role.DIRECTION));
     expect(ouvertesDe(Role.SUPERVISEUR).filter((route) => !direction.has(route))).toEqual(
-      ['AnalyticsController.bankAging', ...ENCADREMENT_DES_CAMPAGNES, 'OuverturesController.liberer', 'OuverturesController.ouvertes'].sort(),
+      [
+        'AnalyticsController.bankAging',
+        ...ENCADREMENT_DES_CAMPAGNES,
+        'OuverturesController.liberer',
+        'OuverturesController.ouvertes',
+      ].sort(),
     );
   });
 

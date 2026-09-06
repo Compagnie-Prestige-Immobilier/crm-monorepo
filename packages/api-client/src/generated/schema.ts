@@ -3268,6 +3268,44 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/parametres-chues': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Les réglages CHUES, valeurs d’usine comprises. */
+    get: operations['getParametresChues'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Règle les paramètres CHUES.
+     * @description La supervision et la direction ne changent que les textes du message WhatsApp et de l’accusé de réception. Tout le reste est réservé à l’administrateur.
+     */
+    patch: operations['updateParametresChues'];
+    trace?: never;
+  };
+  '/api/v1/parametres-chues/journal': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Qui a changé quoi, et ce que la valeur disait avant. */
+    get: operations['getJournalParametresChues'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/enrolement/{projet}/inscriptions': {
     parameters: {
       query?: never;
@@ -7578,6 +7616,44 @@ export interface components {
     RetirerTeleconseillerDto: {
       /** Format: uuid */
       teleconseillerId: string;
+    };
+    ParametresChuesDto: {
+      plateformeChuesUrl: string;
+      plateformeGrandPublicUrl: string;
+      emailChues: string;
+      whatsappChuesE164: string;
+      messageWhatsapp: string;
+      accuseReceptionObjet: string;
+      accuseReceptionCorps: string;
+      destinatairesEnrolement: string[];
+      destinatairesBpe: string[];
+      destinatairesSupervision: string[];
+      destinatairesDirection: string[];
+    };
+    UpdateParametresChuesDto: {
+      plateformeChuesUrl?: string;
+      plateformeGrandPublicUrl?: string;
+      emailChues?: string;
+      whatsappChuesE164?: string;
+      messageWhatsapp?: string;
+      accuseReceptionObjet?: string;
+      accuseReceptionCorps?: string;
+      destinatairesEnrolement?: string[];
+      destinatairesBpe?: string[];
+      destinatairesSupervision?: string[];
+      destinatairesDirection?: string[];
+    };
+    ParametreChangementDto: {
+      /** Format: uuid */
+      id: string;
+      cle: string;
+      ancienne: string | null;
+      nouvelle: string;
+      parNom: string;
+      le: string;
+    };
+    JournalParametresDto: {
+      items: components['schemas']['ParametreChangementDto'][];
     };
     InscriptionPlateformeDto: {
       /** Format: uuid */
@@ -19775,6 +19851,150 @@ export interface operations {
       };
       /** @description LOT_EXPORT_NOT_FOUND. */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getParametresChues: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ParametresChuesDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  updateParametresChues: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateParametresChuesDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ParametresChuesDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description PARAMETRE_RESERVE_ADMIN. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getJournalParametresChues: {
+    parameters: {
+      query?: {
+        limite?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['JournalParametresDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
         headers: {
           [name: string]: unknown;
         };
