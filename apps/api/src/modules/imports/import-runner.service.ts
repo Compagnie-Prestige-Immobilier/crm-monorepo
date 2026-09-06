@@ -65,6 +65,12 @@ interface Totals {
   errors: ImportRowError[];
 }
 
+interface ConsumeState {
+  seen: number;
+  pendingConsumed: number;
+  buffer: unknown[];
+}
+
 @Injectable()
 export class ImportRunnerService {
   private readonly logger = new Logger(ImportRunnerService.name);
@@ -99,21 +105,27 @@ export class ImportRunnerService {
       source = await this.openSource(job, adapter);
       return await this.consume(job, adapter, claim, source);
     } catch (error) {
-      if (error instanceof LostLeaseError) return { result: 'lost' };
-      if (error instanceof ImportRunFailure) {
-        return await this.fail(claim, error.code, error.message);
-      }
-      if (error instanceof ImportAdapterFailure) {
-        return await this.fail(claim, error.code, error.message);
-      }
-      if (error instanceof UnreadableWorkbookError) {
-        return await this.fail(claim, 'IMPORT_FILE_UNREADABLE', error.reason);
-      }
-      this.logger.error(`Import ${jobId} : échec inattendu. ${String(error)}`);
-      return await this.fail(claim, 'IMPORT_FAILED', String(error));
+      return await this.mapFailure(jobId, claim, error);
     } finally {
       await source?.close();
     }
+  }
+
+  private async mapFailure(
+    jobId: string,
+    claim: ImportClaim,
+    error: unknown,
+  ): Promise<ImportRunOutcome> {
+    if (error instanceof LostLeaseError) return { result: 'lost' };
+    if (error instanceof ImportRunFailure) return await this.fail(claim, error.code, error.message);
+    if (error instanceof ImportAdapterFailure) {
+      return await this.fail(claim, error.code, error.message);
+    }
+    if (error instanceof UnreadableWorkbookError) {
+      return await this.fail(claim, 'IMPORT_FILE_UNREADABLE', error.reason);
+    }
+    this.logger.error(`Import ${jobId} : échec inattendu. ${String(error)}`);
+    return await this.fail(claim, 'IMPORT_FAILED', String(error));
   }
 
   private async openSource(job: ImportJob, adapter: AnyImportAdapter): Promise<SheetSource> {
@@ -148,82 +160,110 @@ export class ImportRunnerService {
       errors: reportedErrors(job.report),
     };
 
-    const started = new Date();
-    if (
-      !(await claim.write(
-        {
-          status: ImportStatus.running,
-          startedAt: job.startedAt ?? started,
-          totalRows: source.declaredDataRows,
-        },
-        started,
-      ))
-    ) {
-      throw new LostLeaseError();
-    }
-    this.live.emit('imports');
+    await this.markRunning(job, claim, source);
 
     const run = await adapter.prepare(this.contextOn(job, this.prisma));
+    const seen = await this.consumeRows(job, adapter, claim, source, skip, chunkSize, totals, run);
 
-    let seen = 0;
-    let pendingConsumed = 0;
-    let buffer: unknown[] = [];
+    return await this.finishRun(job, claim, totals, seen);
+  }
 
-    const flush = async (): Promise<void> => {
-      if (pendingConsumed === 0) return;
-      await this.writeChunk(job, adapter, claim, buffer, pendingConsumed, totals, run);
-      buffer = [];
-      pendingConsumed = 0;
-    };
+  private async markRunning(job: ImportJob, claim: ImportClaim, source: SheetSource): Promise<void> {
+    const started = new Date();
+    const written = await claim.write(
+      {
+        status: ImportStatus.running,
+        startedAt: job.startedAt ?? started,
+        totalRows: source.declaredDataRows,
+      },
+      started,
+    );
+    if (!written) throw new LostLeaseError();
+    this.live.emit('imports');
+  }
+
+  private async consumeRows(
+    job: ImportJob,
+    adapter: AnyImportAdapter,
+    claim: ImportClaim,
+    source: SheetSource,
+    skip: number,
+    chunkSize: number,
+    totals: Totals,
+    run: unknown,
+  ): Promise<number> {
+    const state: ConsumeState = { seen: 0, pendingConsumed: 0, buffer: [] };
 
     for await (const raw of source.rows()) {
       if (isBlankRow(raw.cells)) continue;
-
-      seen += 1;
-
-      if (exceedsCeiling(seen, adapter.maxRows)) {
-        throw new ImportRunFailure(
-          'IMPORT_TOO_MANY_ROWS',
-          `Le fichier dépasse le plafond de ${String(adapter.maxRows)} lignes. Découpez-le.`,
-        );
-      }
-
-      if (seen <= skip) continue;
-
-      const parsed = adapter.parseRow(raw.cells, raw.rowNumber, run);
-      if (parsed.ok) {
-        buffer.push(parsed.row);
-      } else {
-        totals.errorRows += 1;
-        totals.errors = boundErrors(totals.errors, [parsed.error]);
-      }
-
-      pendingConsumed += 1;
-      if (pendingConsumed >= chunkSize) await flush();
+      await this.consumeRow(job, adapter, claim, raw, skip, chunkSize, totals, run, state);
     }
 
-    await flush();
+    if (state.pendingConsumed > 0) {
+      await this.writeChunk(job, adapter, claim, state.buffer, state.pendingConsumed, totals, run);
+    }
 
+    return state.seen;
+  }
+
+  private async consumeRow(
+    job: ImportJob,
+    adapter: AnyImportAdapter,
+    claim: ImportClaim,
+    raw: { readonly cells: Record<string, string>; readonly rowNumber: number },
+    skip: number,
+    chunkSize: number,
+    totals: Totals,
+    run: unknown,
+    state: ConsumeState,
+  ): Promise<void> {
+    state.seen += 1;
+    if (exceedsCeiling(state.seen, adapter.maxRows)) {
+      throw new ImportRunFailure(
+        'IMPORT_TOO_MANY_ROWS',
+        `Le fichier dépasse le plafond de ${String(adapter.maxRows)} lignes. Découpez-le.`,
+      );
+    }
+    if (state.seen <= skip) return;
+
+    const parsed = adapter.parseRow(raw.cells, raw.rowNumber, run);
+    if (parsed.ok) {
+      state.buffer.push(parsed.row);
+    } else {
+      totals.errorRows += 1;
+      totals.errors = boundErrors(totals.errors, [parsed.error]);
+    }
+
+    state.pendingConsumed += 1;
+    if (state.pendingConsumed < chunkSize) return;
+    await this.writeChunk(job, adapter, claim, state.buffer, state.pendingConsumed, totals, run);
+    state.buffer = [];
+    state.pendingConsumed = 0;
+  }
+
+  private async finishRun(
+    job: ImportJob,
+    claim: ImportClaim,
+    totals: Totals,
+    seen: number,
+  ): Promise<ImportRunOutcome> {
     const finished = new Date();
     const report = buildReport(job, totals, seen);
-    if (
-      !(await claim.write(
-        {
-          status: ImportStatus.succeeded,
-          processedRows: totals.processed,
-          createdRows: totals.created,
-          updatedRows: totals.updated,
-          skippedRows: totals.skipped,
-          errorRows: totals.errorRows,
-          totalRows: seen,
-          report,
-          finishedAt: finished,
-        },
-        finished,
-      ))
-    ) {
-      throw new LostLeaseError();
-    }
+    const written = await claim.write(
+      {
+        status: ImportStatus.succeeded,
+        processedRows: totals.processed,
+        createdRows: totals.created,
+        updatedRows: totals.updated,
+        skippedRows: totals.skipped,
+        errorRows: totals.errorRows,
+        totalRows: seen,
+        report,
+        finishedAt: finished,
+      },
+      finished,
+    );
+    if (!written) throw new LostLeaseError();
 
     this.live.emit('imports');
     return { result: 'succeeded', created: totals.created, processed: totals.processed };
