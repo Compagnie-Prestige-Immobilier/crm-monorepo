@@ -134,6 +134,46 @@ function modifier(widgets: Brouillon, id: string, patch: Partial<DashboardWidget
   return widgets?.map((widget) => (widget.id === id ? { ...widget, ...patch } : widget)) ?? widgets;
 }
 
+function widgetsActifs(
+  editing: boolean,
+  brouillon: Brouillon,
+  disposition: { widgets: DashboardWidget[] } | undefined,
+  catalogue: Catalogue,
+): DashboardWidget[] {
+  const base = editing ? (brouillon ?? []) : (disposition?.widgets ?? []);
+  return base.filter((widget) => catalogue[widget.source] !== undefined);
+}
+
+function clePeriodeComparaison(
+  comparaisonPlage: ReturnType<typeof plageComparaison>,
+): ReturnType<typeof queryKeys.visitesStats> {
+  return queryKeys.visitesStats(comparaisonPlage?.du ?? '', comparaisonPlage?.au ?? '');
+}
+
+function comparaisonActivee(
+  comparaisonPlage: ReturnType<typeof plageComparaison>,
+  tropLarge: boolean,
+): boolean {
+  return comparaisonPlage !== null && !tropLarge;
+}
+
+function BoutonReinitialiser({
+  disposition,
+  pending,
+  onReset,
+}: {
+  disposition: { source: string } | undefined;
+  pending: boolean;
+  onReset: () => void;
+}) {
+  if (disposition?.source !== 'utilisateur') return null;
+  return (
+    <Button type="button" variant="ghost" disabled={pending} onClick={onReset}>
+      Revenir à la disposition par défaut
+    </Button>
+  );
+}
+
 export function DashboardVisitesView({ role }: { role: Role }) {
   const { filters, setFilters } = useUrlFilters(dashboardFiltersAdapter);
   const plage = plageDeFiltres(filters);
@@ -153,12 +193,12 @@ export function DashboardVisitesView({ role }: { role: Role }) {
   });
 
   const comparaisonQuery = useQuery({
-    queryKey: queryKeys.visitesStats(comparaisonPlage?.du ?? '', comparaisonPlage?.au ?? ''),
+    queryKey: clePeriodeComparaison(comparaisonPlage),
     queryFn: () => {
       const cible = comparaisonPlage ?? plage;
       return fetchVisiteDashboardStats(cible.du, cible.au);
     },
-    enabled: comparaisonPlage !== null && !tropLarge,
+    enabled: comparaisonActivee(comparaisonPlage, tropLarge),
   });
 
   const dispositionQuery = useQuery({
@@ -206,9 +246,7 @@ export function DashboardVisitesView({ role }: { role: Role }) {
     },
   });
 
-  const widgets = (editing ? brouillon : (dispositionQuery.data?.widgets ?? [])).filter(
-    (widget) => catalogue[widget.source] !== undefined,
-  );
+  const widgets = widgetsActifs(editing, brouillon, dispositionQuery.data, catalogue);
 
   const donneesParSource = donneesDuCatalogue(catalogue, statsQuery.data);
   const donneesParWidget = donneesDesWidgets(widgets, donneesParSource);
@@ -272,18 +310,13 @@ export function DashboardVisitesView({ role }: { role: Role }) {
             />
           ) : (
             <>
-              {dispositionQuery.data?.source === 'utilisateur' ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  disabled={resetMutation.isPending}
-                  onClick={() => {
-                    resetMutation.mutate();
-                  }}
-                >
-                  Revenir à la disposition par défaut
-                </Button>
-              ) : null}
+              <BoutonReinitialiser
+                disposition={dispositionQuery.data}
+                pending={resetMutation.isPending}
+                onReset={() => {
+                  resetMutation.mutate();
+                }}
+              />
               <Button
                 type="button"
                 variant="outline"
