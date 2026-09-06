@@ -188,6 +188,16 @@ export class ProspectFilterDto {
   dateTo?: string;
 
   @ApiPropertyOptional({
+    description:
+      'Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : ' +
+      '`false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.',
+  })
+  @IsOptional()
+  @Transform(queryBoolean)
+  @IsBoolean()
+  revue?: boolean;
+
+  @ApiPropertyOptional({
     description: 'Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.',
     default: false,
   })

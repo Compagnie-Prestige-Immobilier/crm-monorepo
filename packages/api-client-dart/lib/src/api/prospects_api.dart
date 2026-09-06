@@ -759,6 +759,7 @@ class ProspectsApi {
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [revue] - Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
   /// * [page]
   /// * [pageSize]
@@ -793,6 +794,7 @@ class ProspectsApi {
     String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
+    bool? revue,
     bool? includeDeleted = false,
     num? page = 1,
     num? pageSize = 25,
@@ -839,6 +841,7 @@ class ProspectsApi {
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
+      if (revue != null) r'revue': revue,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
       if (page != null) r'page': page,
       if (pageSize != null) r'pageSize': pageSize,

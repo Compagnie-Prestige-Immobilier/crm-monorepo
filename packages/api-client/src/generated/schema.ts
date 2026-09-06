@@ -7589,6 +7589,8 @@ export interface components {
        * @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
        */
       dateTo?: string;
+      /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+      revue?: boolean;
       /**
        * @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
        * @default false
@@ -11728,6 +11730,8 @@ export interface operations {
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
         page?: number;
@@ -14900,6 +14904,8 @@ export interface operations {
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
       };
@@ -14982,6 +14988,8 @@ export interface operations {
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
       };
@@ -15064,6 +15072,8 @@ export interface operations {
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
         granularity?: components['schemas']['TimeGranularity'];
@@ -15147,6 +15157,8 @@ export interface operations {
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
         limit?: number;
@@ -15230,6 +15242,8 @@ export interface operations {
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
       };
@@ -15312,6 +15326,8 @@ export interface operations {
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
       };
@@ -15394,6 +15410,8 @@ export interface operations {
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
       };
@@ -15476,6 +15494,8 @@ export interface operations {
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
       };
@@ -15558,6 +15578,8 @@ export interface operations {
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
       };
@@ -15640,6 +15662,8 @@ export interface operations {
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
       };
@@ -15722,6 +15746,8 @@ export interface operations {
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
         limit?: number;
@@ -15805,6 +15831,8 @@ export interface operations {
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
       };
@@ -15887,6 +15915,8 @@ export interface operations {
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
       };
@@ -15969,6 +15999,8 @@ export interface operations {
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
       };
@@ -16051,6 +16083,8 @@ export interface operations {
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
       };
@@ -16133,6 +16167,8 @@ export interface operations {
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
         limit?: number;
@@ -16218,6 +16254,8 @@ export interface operations {
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
       };
@@ -16300,6 +16338,8 @@ export interface operations {
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
       };
@@ -16441,6 +16481,8 @@ export interface operations {
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
       };
@@ -18422,6 +18464,8 @@ export interface operations {
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
         /** @description `filtered` : une feuille correspondant aux filtres. `consolidated` : cinq feuilles (Consolidé, BDD1…BDD4) ; le paramètre `segment` y est sans effet, puisque c’est le classeur lui-même qui porte la segmentation. */

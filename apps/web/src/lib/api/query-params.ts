@@ -33,6 +33,7 @@ export function toFilterQuery(filters: ProspectFilters): AnalyticsQuery {
   if (filters.enrollmentCapturedById !== null) {
     query.enrollmentCapturedById = filters.enrollmentCapturedById;
   }
+  if (filters.revue !== null) query.revue = filters.revue;
   if (filters.dateFrom !== null) query.dateFrom = startOfDay(filters.dateFrom);
   if (filters.dateTo !== null) query.dateTo = endOfDay(filters.dateTo);
 
