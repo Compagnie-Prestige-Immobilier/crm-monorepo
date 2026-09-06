@@ -647,7 +647,8 @@ void main() {
     expect(op['banqueId'], 'bq-1');
     expect(op['syndicatId'], 'sy-1');
     expect(op['incomeBandId'], 'rev-1');
-    expect(op['dureeSystemeMois'], 24);
+    // EB-22 : la durée du système de paiement a quitté le formulaire CHUES.
+    expect(op.containsKey('dureeSystemeMois'), isFalse);
     expect(op['comment'], 'Rappeler après la rentrée.');
     expect(op.containsKey('rendezVousAt'), isFalse);
   });
