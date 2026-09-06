@@ -62,6 +62,10 @@ class AppDatabase extends _$AppDatabase {
       prospects.canalProvenanceId,
       ..._prospectsV23(prospects),
       prospects.callAttemptCount,
+      // Ajoutées par la v34, et NEUVES ici pour la même raison que les autres :
+      // la recopie irait sinon les lire dans une table qui ne les a pas.
+      prospects.whatsappStatus,
+      prospects.etablissement,
     ],
     columnTransformer: <GeneratedColumn<Object>, Expression<Object>>{
       prospects.projet: const Constant<String>('CHUES'),

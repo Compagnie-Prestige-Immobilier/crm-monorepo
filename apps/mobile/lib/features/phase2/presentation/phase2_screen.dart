@@ -31,7 +31,6 @@ import '../../../ui/widgets/cpi_action_bar.dart';
 import '../../../ui/widgets/cpi_choice_group.dart';
 import '../../../ui/widgets/cpi_forui.dart';
 import '../../../ui/widgets/cpi_kit.dart';
-import '../../../ui/widgets/cpi_pressable.dart';
 import '../../../ui/widgets/cpi_steps.dart';
 import '../../../ui/widgets/local_typeahead.dart';
 import '../../../ui/widgets/phone_field.dart';
@@ -146,8 +145,7 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _form.grandPublic =
-        ProjectScope.maybeOf(context) == CpiProject.grandPublic;
+    _form.grandPublic = ProjectScope.maybeOf(context) == CpiProject.grandPublic;
   }
 
   /// Une lettre tapée ou une case cochée : le brouillon est sale, et c'est de
@@ -704,18 +702,17 @@ class Phase2FormFields {
   String? get erreurWhatsapp {
     if (whatsappMemeNumero != Tri.non) return null;
     if (whatsapp.text.trim().isEmpty) return null;
-    return Phone.parse(whatsapp.text) is PhoneValid
-        ? null
-        : 'Numéro incomplet';
+    return Phone.parse(whatsapp.text) is PhoneValid ? null : 'Numéro incomplet';
   }
 
   /// Le couple EB-23 tel qu'il part. `null` quand la question n'a pas été
   /// posée : le serveur laisse alors la fiche telle quelle.
   String? get whatsappStatus => switch (whatsappMemeNumero) {
     Tri.oui => WhatsappStatus.memeNumero.code,
-    Tri.non => whatsappE164 == null
-        ? WhatsappStatus.aucun.code
-        : WhatsappStatus.autreNumero.code,
+    Tri.non =>
+      whatsappE164 == null
+          ? WhatsappStatus.aucun.code
+          : WhatsappStatus.autreNumero.code,
     Tri.nonDemande => null,
   };
 
@@ -1097,6 +1094,22 @@ class _EtapeRenseignements extends StatelessWidget {
       readOnly: true,
       description: 'Numéro de l\'annuaire',
     ),
+    _ChoixTri(
+      label: 'Ce numéro est sur WhatsApp',
+      value: fields.whatsappMemeNumero,
+      onChanged: (Tri choix) {
+        fields.whatsappMemeNumero = choix;
+        if (choix != Tri.non) fields.whatsapp.clear();
+        onChanged();
+      },
+    ),
+    if (fields.whatsappMemeNumero == Tri.non)
+      PhoneField(
+        controller: fields.whatsapp,
+        focusNode: fields.whatsappFocus,
+        label: 'Numéro WhatsApp',
+        helper: 'Laissez vide s\'il n\'a pas WhatsApp.',
+      ),
     CpiField(
       label: 'E-mail',
       controller: fields.email,
