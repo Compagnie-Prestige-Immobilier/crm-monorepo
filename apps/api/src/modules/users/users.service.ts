@@ -176,8 +176,8 @@ export class UsersService {
     const email = input.email?.trim().toLowerCase();
     const username = input.username?.trim().toLowerCase();
     await this.assertIdentifiersFree(
-      email && email !== existing.email ? email : undefined,
-      username && username !== existing.username ? username : undefined,
+      this.identifierIfChanged(email, existing.email),
+      this.identifierIfChanged(username, existing.username),
     );
 
     const roleChanged = input.role !== undefined && input.role !== existing.role;
@@ -394,6 +394,10 @@ export class UsersService {
     await this.revokeSessions(id);
     await this.redis.bust(freshUserKey(id));
     return { ok: true };
+  }
+
+  private identifierIfChanged(next: string | undefined, current: string): string | undefined {
+    return next && next !== current ? next : undefined;
   }
 
   private async revokeSessions(userId: string): Promise<void> {
