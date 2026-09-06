@@ -78,6 +78,9 @@ describe('contrat des réponses d’erreur', () => {
         .map(([method]) => `${method.toUpperCase()} ${path}`),
     );
 
+    // Les routes portant `@Public()` : elles n'ont ni jeton a refuser ni role a
+    // comparer. EB-27 en ajoute une, le formulaire que le prospect remplit sans
+    // compte.
     for (const route of manquantes) {
       expect(
         route.includes('/auth/') ||

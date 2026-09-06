@@ -620,6 +620,7 @@ ProspectDto prospectDto({
   lastCallByName: null,
   origin: null,
   originLabel: null,
+  aRevoirAt: null,
   clientCreatedAt: DateTime.utc(2026, 8, 12, 10),
   createdAt: DateTime.utc(2026, 8, 12, 10),
   updatedAt: DateTime.utc(2026, 8, 12, 11),
