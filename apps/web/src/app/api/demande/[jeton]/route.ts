@@ -38,16 +38,8 @@ async function messageDeRefus(amont: Response): Promise<string | undefined> {
 type CorpsAnalyse = z.infer<typeof corpsSchema>;
 
 function buildDemandePayload(data: CorpsAnalyse): Record<string, unknown> {
-  const { site, email, profession, employeur, message, turnstileToken, ...identite } = data;
-  return {
-    ...identite,
-    ...(email === '' ? {} : { email }),
-    ...(profession === '' ? {} : { profession }),
-    ...(employeur === '' ? {} : { employeur }),
-    ...(message === '' ? {} : { message }),
-    ...(site === '' ? {} : { site }),
-    ...(turnstileToken === '' ? {} : { turnstileToken }),
-  };
+  const { turnstileToken, ...demande } = data;
+  return { ...demande, ...(turnstileToken === '' ? {} : { turnstileToken }) };
 }
 
 type OrigineResolue = { ok: true; origin: string } | { ok: false; reponse: NextResponse };
