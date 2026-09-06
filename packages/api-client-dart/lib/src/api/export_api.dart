@@ -368,6 +368,7 @@ class ExportApi {
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [revue] - Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
   /// * [mode] - `filtered` : une feuille correspondant aux filtres. `consolidated` : cinq feuilles (Consolidé, BDD1…BDD4) ; le paramètre `segment` y est sans effet, puisque c’est le classeur lui-même qui porte la segmentation.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
@@ -399,6 +400,7 @@ class ExportApi {
     String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
+    bool? revue,
     bool? includeDeleted = false,
     ExportMode? mode,
     CancelToken? cancelToken,
@@ -443,6 +445,7 @@ class ExportApi {
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
+      if (revue != null) r'revue': revue,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
       if (mode != null) r'mode': mode,
     };

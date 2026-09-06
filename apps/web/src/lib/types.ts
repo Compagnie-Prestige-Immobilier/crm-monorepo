@@ -170,6 +170,8 @@ export interface ProspectFilters {
   phase2Status: Phase2Status | null;
   enrollmentMethod: EnrollmentMethod | null;
   enrollmentCapturedById: string | null;
+  /** Revue du closing : `false` isole les demandes converties qui restent à revoir. */
+  revue: boolean | null;
   dateFrom: string | null;
   dateTo: string | null;
   page: number;

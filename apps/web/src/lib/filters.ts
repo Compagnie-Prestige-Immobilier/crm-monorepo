@@ -1,5 +1,6 @@
 import {
   readEnum,
+  readFrenchBoolean,
   readIsoDate,
   readPositiveInt,
   readString,
@@ -38,6 +39,7 @@ export const EMPTY_FILTERS: ProspectFilters = {
   phase2Status: null,
   enrollmentMethod: null,
   enrollmentCapturedById: null,
+  revue: null,
   dateFrom: null,
   dateTo: null,
   page: 1,
@@ -77,6 +79,7 @@ export function parseProspectFilters(params: RawSearchParams | URLSearchParams):
     phase2Status: readEnum<Phase2Status>(params, 'phase2Status', PHASE2_STATUSES),
     enrollmentMethod: readEnum<EnrollmentMethod>(params, 'enrollmentMethod', ENROLLMENT_METHODS),
     enrollmentCapturedById: readString(params, 'enrollmentCapturedById'),
+    revue: readFrenchBoolean(params, 'revue'),
     dateFrom: readIsoDate(params, 'dateFrom'),
     dateTo: readIsoDate(params, 'dateTo'),
     page: readPositiveInt(params, 'page', 1),
@@ -106,6 +109,7 @@ export function serializeProspectFilters(filters: ProspectFilters): URLSearchPar
   put('phase2Status', filters.phase2Status);
   put('enrollmentMethod', filters.enrollmentMethod);
   put('enrollmentCapturedById', filters.enrollmentCapturedById);
+  if (filters.revue !== null) put('revue', filters.revue ? 'oui' : 'non');
   put('dateFrom', filters.dateFrom);
   put('dateTo', filters.dateTo);
   if (filters.page !== 1) put('page', String(filters.page));
@@ -130,6 +134,7 @@ export const ADVANCED_FILTER_KEYS = [
   'phase2Status',
   'enrollmentMethod',
   'enrollmentCapturedById',
+  'revue',
 ] as const;
 
 export type AdvancedFilterKey = (typeof ADVANCED_FILTER_KEYS)[number];
@@ -157,6 +162,7 @@ export function clearAdvancedFilters(): Partial<ProspectFilters> {
     phase2Status: null,
     enrollmentMethod: null,
     enrollmentCapturedById: null,
+    revue: null,
   } satisfies Record<AdvancedFilterKey, null>;
 }
 
@@ -182,6 +188,7 @@ export function countActiveFilters(filters: ProspectFilters): number {
   if (filters.phase2Status !== null) count += 1;
   if (filters.enrollmentMethod !== null) count += 1;
   if (filters.enrollmentCapturedById !== null) count += 1;
+  if (filters.revue !== null) count += 1;
   if (filters.dateFrom !== null || filters.dateTo !== null) count += 1;
   return count;
 }
