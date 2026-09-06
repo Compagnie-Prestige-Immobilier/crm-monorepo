@@ -23,9 +23,24 @@ import { EMPTY_FILTERS } from '@/lib/filters';
 import { formatDate, formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
-import { PROSPECT_STATUT_LABELS, type ProspectRow } from '@/lib/types';
+import { PROSPECT_STATUT_LABELS, type Paginated, type ProspectRow } from '@/lib/types';
 import { useDebouncedSearch } from '@/lib/use-debounced-search';
 import { cn } from '@/lib/utils';
+
+function pairForMerge<T extends ProspectRow | null>(
+  prospect: ProspectRow,
+  duplicate: T,
+  keepOriginal: boolean,
+): { survivor: ProspectRow | T; absorbed: ProspectRow | T } {
+  return keepOriginal
+    ? { survivor: prospect, absorbed: duplicate }
+    : { survivor: duplicate, absorbed: prospect };
+}
+
+function mergeButtonLabel(survivor: ProspectRow | null): string {
+  if (survivor === null) return 'Fusionner';
+  return `Conserver ${survivor.prenom} ${survivor.nom}`;
+}
 
 export function ProspectMergeDialog({
   prospect,
@@ -69,8 +84,7 @@ export function ProspectMergeDialog({
       if (prospect === null || duplicate === null) {
         throw new Error('Sélectionnez la fiche à fusionner.');
       }
-      const survivor = keepOriginal ? prospect : duplicate;
-      const absorbed = keepOriginal ? duplicate : prospect;
+      const { survivor, absorbed } = pairForMerge(prospect, duplicate, keepOriginal);
       return mergeProspects({
         targetId: survivor.id,
         sourceId: absorbed.id,
@@ -91,8 +105,7 @@ export function ProspectMergeDialog({
 
   if (prospect === null) return null;
 
-  const survivor = keepOriginal ? prospect : duplicate;
-  const absorbed = keepOriginal ? duplicate : prospect;
+  const { survivor, absorbed } = pairForMerge(prospect, duplicate, keepOriginal);
 
   return (
     <Dialog
@@ -129,58 +142,13 @@ export function ProspectMergeDialog({
           </div>
 
           {search.trim().length >= 2 ? (
-            <div className="max-h-52 overflow-y-auto rounded-md border border-border scrollbar-thin">
-              {isFetching && candidates === undefined ? (
-                <div className="flex flex-col gap-2 p-3">
-                  <Skeleton className="h-9 w-full" />
-                  <Skeleton className="h-9 w-full" />
-                </div>
-              ) : (
-                (() => {
-                  const rows = (candidates?.items ?? []).filter((row) => row.id !== prospect.id);
-                  if (rows.length === 0) {
-                    return (
-                      <p className="p-4 text-center text-[0.8125rem] text-muted-foreground">
-                        Aucune autre fiche ne correspond.
-                      </p>
-                    );
-                  }
-                  return (
-                    <ul>
-                      {rows.map((row) => (
-                        <li key={row.id}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setDuplicate(row);
-                            }}
-                            aria-pressed={duplicate?.id === row.id}
-                            className={cn(
-                              'flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left',
-                              'transition-colors hover:bg-secondary',
-                              'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
-                              duplicate?.id === row.id && 'bg-secondary',
-                            )}
-                          >
-                            <span className="min-w-0">
-                              <span className="block truncate font-[600]">
-                                {row.prenom} {row.nom}
-                              </span>
-                              <span className="block truncate text-[0.75rem] text-muted-foreground">
-                                {formatPhone(row.phoneE164)} · {row.representantName}
-                              </span>
-                            </span>
-                            <span className="shrink-0 text-[0.75rem] text-muted-foreground">
-                              {formatDate(row.clientCreatedAt)}
-                            </span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  );
-                })()
-              )}
-            </div>
+            <MergeCandidatesList
+              isFetching={isFetching}
+              candidates={candidates}
+              excludeId={prospect.id}
+              duplicate={duplicate}
+              onSelect={setDuplicate}
+            />
           ) : null}
         </div>
 
@@ -208,23 +176,7 @@ export function ProspectMergeDialog({
               </div>
             </fieldset>
 
-            <p
-              role="alert"
-              className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive-surface px-3 py-2.5 text-[0.8125rem] text-destructive"
-            >
-              <AlertTriangleIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-              <span>
-                Cette opération est <strong>irréversible</strong>. La fiche{' '}
-                <strong>
-                  {absorbed?.prenom} {absorbed?.nom}
-                </strong>{' '}
-                sera supprimée ; la fiche conservée sera{' '}
-                <strong>
-                  {survivor?.prenom} {survivor?.nom}
-                </strong>
-                .
-              </span>
-            </p>
+            <MergeWarning absorbed={absorbed} survivor={survivor} />
           </>
         )}
 
@@ -251,11 +203,130 @@ export function ProspectMergeDialog({
             ) : (
               <ArrowRightIcon aria-hidden="true" />
             )}
-            {survivor === null ? 'Fusionner' : `Conserver ${survivor.prenom} ${survivor.nom}`}
+            {mergeButtonLabel(survivor)}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function MergeCandidatesList({
+  isFetching,
+  candidates,
+  excludeId,
+  duplicate,
+  onSelect,
+}: {
+  isFetching: boolean;
+  candidates: Paginated<ProspectRow> | undefined;
+  excludeId: string;
+  duplicate: ProspectRow | null;
+  onSelect: (row: ProspectRow) => void;
+}) {
+  if (isFetching && candidates === undefined) {
+    return (
+      <div className="max-h-52 overflow-y-auto rounded-md border border-border scrollbar-thin">
+        <MergeCandidatesSkeleton />
+      </div>
+    );
+  }
+
+  const rows = (candidates?.items ?? []).filter((row) => row.id !== excludeId);
+
+  return (
+    <div className="max-h-52 overflow-y-auto rounded-md border border-border scrollbar-thin">
+      <MergeCandidatesRows rows={rows} selectedId={duplicate?.id ?? null} onSelect={onSelect} />
+    </div>
+  );
+}
+
+function MergeCandidatesSkeleton() {
+  return (
+    <div className="flex flex-col gap-2 p-3">
+      <Skeleton className="h-9 w-full" />
+      <Skeleton className="h-9 w-full" />
+    </div>
+  );
+}
+
+function MergeCandidatesRows({
+  rows,
+  selectedId,
+  onSelect,
+}: {
+  rows: ProspectRow[];
+  selectedId: string | null;
+  onSelect: (row: ProspectRow) => void;
+}) {
+  if (rows.length === 0) {
+    return (
+      <p className="p-4 text-center text-[0.8125rem] text-muted-foreground">
+        Aucune autre fiche ne correspond.
+      </p>
+    );
+  }
+
+  return (
+    <ul>
+      {rows.map((row) => (
+        <li key={row.id}>
+          <button
+            type="button"
+            onClick={() => {
+              onSelect(row);
+            }}
+            aria-pressed={selectedId === row.id}
+            className={cn(
+              'flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left',
+              'transition-colors hover:bg-secondary',
+              'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
+              selectedId === row.id && 'bg-secondary',
+            )}
+          >
+            <span className="min-w-0">
+              <span className="block truncate font-[600]">
+                {row.prenom} {row.nom}
+              </span>
+              <span className="block truncate text-[0.75rem] text-muted-foreground">
+                {formatPhone(row.phoneE164)} · {row.representantName}
+              </span>
+            </span>
+            <span className="shrink-0 text-[0.75rem] text-muted-foreground">
+              {formatDate(row.clientCreatedAt)}
+            </span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function MergeWarning({
+  absorbed,
+  survivor,
+}: {
+  absorbed: ProspectRow | null;
+  survivor: ProspectRow | null;
+}) {
+  return (
+    <p
+      role="alert"
+      className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive-surface px-3 py-2.5 text-[0.8125rem] text-destructive"
+    >
+      <AlertTriangleIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+      <span>
+        Cette opération est <strong>irréversible</strong>. La fiche{' '}
+        <strong>
+          {absorbed?.prenom} {absorbed?.nom}
+        </strong>{' '}
+        sera supprimée ; la fiche conservée sera{' '}
+        <strong>
+          {survivor?.prenom} {survivor?.nom}
+        </strong>
+        .
+      </span>
+    </p>
   );
 }
 
