@@ -66,6 +66,22 @@ interface ReminderCandidate {
   readonly variables: Record<string, string>;
 }
 
+interface UnloggedCallDetection {
+  readonly deviceCallType: string;
+  readonly representant: { readonly fullName: string } | null;
+  readonly prospect: { readonly nom: string; readonly prenom: string } | null;
+}
+
+/** Fiche et libellé du type d'appel, pour le message d'alerte. */
+const describeUnloggedCall = (
+  detection: UnloggedCallDetection,
+): { readonly fiche: string; readonly type: string } => ({
+  fiche:
+    detection.representant?.fullName ??
+    [detection.prospect?.prenom, detection.prospect?.nom].filter(Boolean).join(' ').trim(),
+  type: DEVICE_CALL_LABELS[detection.deviceCallType as DeviceCallType] ?? detection.deviceCallType,
+});
+
 @Injectable()
 export class RemindersService {
   private readonly logger = new Logger(RemindersService.name);
@@ -359,11 +375,7 @@ export class RemindersService {
     });
     if (!destinataires.length) return 0;
 
-    const fiche =
-      detection.representant?.fullName ??
-      [detection.prospect?.prenom, detection.prospect?.nom].filter(Boolean).join(' ').trim();
-    const type =
-      DEVICE_CALL_LABELS[detection.deviceCallType as DeviceCallType] ?? detection.deviceCallType;
+    const { fiche, type } = describeUnloggedCall(detection);
     const heure = new Intl.DateTimeFormat('fr-FR', {
       timeZone: this.config.BUSINESS_TIME_ZONE,
       hour: '2-digit',
