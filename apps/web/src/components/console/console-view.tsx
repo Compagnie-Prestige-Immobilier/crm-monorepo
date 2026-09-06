@@ -129,21 +129,13 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
     retry: false,
   });
 
-  const venuDesRappels = demandee === null ? null : (parLien.data ?? null);
-  const aConfirmer =
-    vise ?? (venuDesRappels !== null && aQualifier(venuDesRappels) ? venuDesRappels : null);
-  // Une fiche close ne peut plus recevoir de statut : l'ouvrir sous verrou y
-  // enfermerait le téléconseiller. Elle se consulte, elle ne se compte pas.
-  const consultee =
-    ouverte ??
-    (venuDesRappels !== null && !aQualifier(venuDesRappels)
-      ? { prospect: venuDesRappels, ouverture: null }
-      : null);
+  const venuDesRappels = fichePendante(demandee, parLien.data);
+  const { aConfirmer, consultee } = deriverFiches(vise, ouverte, venuDesRappels);
 
   const annuaire = useQuery({
     queryKey: queryKeys.prospects(annuaireFilters(projet, cherche)),
     queryFn: () => fetchProspects(annuaireFilters(projet, cherche)),
-    enabled: consultee === null && aConfirmer === null,
+    enabled: pasDeFicheOuverte(consultee, aConfirmer),
     placeholderData: (previous) => previous,
   });
 
@@ -207,7 +199,7 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
     );
   }
 
-  if (demandee !== null && parLien.isPending) return <ListeSkeleton />;
+  if (chargementParLien(demandee, parLien.isPending)) return <ListeSkeleton />;
 
   return (
     <div className="flex w-full flex-col gap-5">
@@ -283,6 +275,61 @@ const brouillonDe = (
 });
 
 const aQualifier = (prospect: ProspectRow): boolean => prospect.phase2Status === 'PENDING';
+
+function fichePendante(
+  demandee: string | null,
+  data: ProspectRow | null | undefined,
+): ProspectRow | null {
+  return demandee === null ? null : (data ?? null);
+}
+
+interface FichesDerivees {
+  aConfirmer: ProspectRow | null;
+  consultee: Ouverte | null;
+}
+
+function deriverFiches(
+  vise: ProspectRow | null,
+  ouverte: Ouverte | null,
+  venuDesRappels: ProspectRow | null,
+): FichesDerivees {
+  const aConfirmer =
+    vise ?? (venuDesRappels !== null && aQualifier(venuDesRappels) ? venuDesRappels : null);
+  // Une fiche close ne peut plus recevoir de statut : l'ouvrir sous verrou y
+  // enfermerait le téléconseiller. Elle se consulte, elle ne se compte pas.
+  const consultee =
+    ouverte ??
+    (venuDesRappels !== null && !aQualifier(venuDesRappels)
+      ? { prospect: venuDesRappels, ouverture: null }
+      : null);
+  return { aConfirmer, consultee };
+}
+
+function pasDeFicheOuverte(consultee: Ouverte | null, aConfirmer: ProspectRow | null): boolean {
+  return consultee === null && aConfirmer === null;
+}
+
+function chargementParLien(demandee: string | null, isPending: boolean): boolean {
+  return demandee !== null && isPending;
+}
+
+function estFicheClose(prospect: ProspectRow, refusee: boolean): boolean {
+  return prospect.phase2Status !== 'PENDING' || refusee;
+}
+
+function ficheVerrouillee(ouverture: OuvertureFiche | null, closed: boolean): boolean {
+  return ouverture !== null && !closed;
+}
+
+function saisieCommencee(
+  conversion: ConversionDraft | null,
+  slots: readonly CallbackSlot[] | null,
+  draftOutcome: CallOutcome | null,
+  comment: string,
+): boolean {
+  return conversion !== null || slots !== null || draftOutcome !== null || comment !== '';
+}
+
 
 /**
  * La fiche que le serveur tient encore, remise à l'écran telle quelle : au
@@ -494,9 +541,9 @@ function Consignation({
   const formulaire = useChampsConversion(projet);
 
   const nomComplet = nomDe(prospect);
-  const closed = prospect.phase2Status !== 'PENDING' || refusee;
+  const closed = estFicheClose(prospect, refusee);
   const [now] = useState(() => Date.now());
-  const verrouille = ouverture !== null && !closed;
+  const verrouille = ficheVerrouillee(ouverture, closed);
 
   const departChrono = useBrouillonAuto(ouverture, brouillonDe(comment, conversion));
 
@@ -627,8 +674,7 @@ function Consignation({
   }, [conversion, submitConversion, slots, freeCallback, draftOutcome, record]);
 
   const etape = etapeCourante(closed, conversion, slots);
-  const saisieEnCours =
-    conversion !== null || slots !== null || draftOutcome !== null || comment !== '';
+  const saisieEnCours = saisieCommencee(conversion, slots, draftOutcome, comment);
 
   const retenu = useCallback(() => {
     toast.error('Consignez l’appel avant de quitter cette fiche.');
@@ -704,17 +750,8 @@ function Consignation({
     },
   });
 
-  return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
-      {verrouille ? null : (
-        <Button variant="ghost" className="self-start px-0" onClick={onAbandon}>
-          <ArrowLeftIcon aria-hidden="true" />
-          Revenir à la liste
-        </Button>
-      )}
-
-      {departChrono === null ? null : <Chrono firstInputAt={departChrono} />}
-
+  function corpsFiche(): React.ReactNode {
+    return (
       <section aria-label="Fiche courante" className="flex flex-col gap-4">
         <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">{nomComplet}</h2>
 
@@ -859,6 +896,21 @@ function Consignation({
           </>
         )}
       </section>
+    );
+  }
+
+  return (
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
+      {verrouille ? null : (
+        <Button variant="ghost" className="self-start px-0" onClick={onAbandon}>
+          <ArrowLeftIcon aria-hidden="true" />
+          Revenir à la liste
+        </Button>
+      )}
+
+      {departChrono === null ? null : <Chrono firstInputAt={departChrono} />}
+
+      {corpsFiche()}
 
       <details
         open={helpOpen}
