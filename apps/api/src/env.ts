@@ -1,5 +1,13 @@
 import { z } from 'zod';
 
+const isOrigin = (value: string): boolean => {
+  try {
+    return new URL(value).origin === value;
+  } catch {
+    return false;
+  }
+};
+
 const originList = z
   .string()
   .default('http://localhost:3000')
@@ -14,14 +22,10 @@ const originList = z
       return z.NEVER;
     }
 
-    for (const origin of origins) {
-      try {
-        const url = new URL(origin);
-        if (url.origin !== origin) throw new Error('Origin must not include a path');
-      } catch {
-        context.addIssue({ code: 'custom', message: `Invalid CORS origin: ${origin}` });
-        return z.NEVER;
-      }
+    const invalid = origins.find((origin) => !isOrigin(origin));
+    if (invalid) {
+      context.addIssue({ code: 'custom', message: `Invalid CORS origin: ${invalid}` });
+      return z.NEVER;
     }
 
     return origins;
@@ -33,8 +37,7 @@ const booleanFlag = (fallback: boolean) =>
     .default(fallback ? 'true' : 'false')
     .transform((value) => value === 'true');
 
-export const envSchema = z
-  .object({
+const envObjectSchema = z.object({
     NODE_ENV: z.enum(['development', 'test', 'production']),
     LOG_LEVEL: z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
@@ -116,81 +119,99 @@ export const envSchema = z
     PLATEFORME_CHUES_TOKEN: z.string().default(''),
     PLATEFORME_GRAND_PUBLIC_URL: z.union([z.url(), z.literal('')]).default(''),
     PLATEFORME_GRAND_PUBLIC_TOKEN: z.string().default(''),
-  })
-  .superRefine((env, context) => {
-    if (env.NODE_ENV !== 'production') return;
+});
 
-    if (!env.REDIS_URL) {
-      context.addIssue({
-        code: 'custom',
-        path: ['REDIS_URL'],
-        message: 'REDIS_URL is required in production',
-      });
-    }
+type ApiEnvShape = z.infer<typeof envObjectSchema>;
+type ProdCheck = (env: ApiEnvShape, context: z.RefinementCtx) => void;
 
-    if (env.JWT_ACCESS_SECRET === env.JWT_REFRESH_SECRET) {
-      context.addIssue({
-        code: 'custom',
-        path: ['JWT_REFRESH_SECRET'],
-        message: 'JWT_REFRESH_SECRET must differ from JWT_ACCESS_SECRET',
-      });
-    }
+const checkRedisRequired: ProdCheck = (env, context) => {
+  if (env.REDIS_URL) return;
+  context.addIssue({ code: 'custom', path: ['REDIS_URL'], message: 'REDIS_URL is required in production' });
+};
 
-    if (env.API_DOCS_ENABLED) {
-      context.addIssue({
-        code: 'custom',
-        path: ['API_DOCS_ENABLED'],
-        message: 'API_DOCS_ENABLED must be false in production',
-      });
-    }
-
-    // La fabrique de démonstration écrit neuf cent mille lignes : elle n'a rien
-    // à faire sur la base qui porte les vraies fiches.
-    if (env.DEMO_WORKSPACE_ENABLED) {
-      context.addIssue({
-        code: 'custom',
-        path: ['DEMO_WORKSPACE_ENABLED'],
-        message: 'DEMO_WORKSPACE_ENABLED must be false in production',
-      });
-    }
-
-    for (const origin of env.API_CORS_ORIGINS) {
-      if (!origin.startsWith('https://')) {
-        context.addIssue({
-          code: 'custom',
-          path: ['API_CORS_ORIGINS'],
-          message: `Production CORS origins must use https: ${origin}`,
-        });
-      }
-    }
-
-    // Une URL sans jeton tirerait en anonyme et remonterait un 401 toutes les
-    // quinze minutes, sans que personne ne sache que le jeton n'a jamais été posé.
-    const plateformes = [
-      [
-        'PLATEFORME_CHUES_URL',
-        'PLATEFORME_CHUES_TOKEN',
-        env.PLATEFORME_CHUES_URL,
-        env.PLATEFORME_CHUES_TOKEN,
-      ],
-      [
-        'PLATEFORME_GRAND_PUBLIC_URL',
-        'PLATEFORME_GRAND_PUBLIC_TOKEN',
-        env.PLATEFORME_GRAND_PUBLIC_URL,
-        env.PLATEFORME_GRAND_PUBLIC_TOKEN,
-      ],
-    ] as const;
-
-    for (const [cleUrl, cleJeton, url, jeton] of plateformes) {
-      if (url !== '' && jeton.trim() === '') {
-        context.addIssue({
-          code: 'custom',
-          path: [cleJeton],
-          message: `${cleJeton} is required when ${cleUrl} is set`,
-        });
-      }
-    }
+const checkJwtSecretsDiffer: ProdCheck = (env, context) => {
+  if (env.JWT_ACCESS_SECRET !== env.JWT_REFRESH_SECRET) return;
+  context.addIssue({
+    code: 'custom',
+    path: ['JWT_REFRESH_SECRET'],
+    message: 'JWT_REFRESH_SECRET must differ from JWT_ACCESS_SECRET',
   });
+};
+
+const checkDocsDisabled: ProdCheck = (env, context) => {
+  if (!env.API_DOCS_ENABLED) return;
+  context.addIssue({
+    code: 'custom',
+    path: ['API_DOCS_ENABLED'],
+    message: 'API_DOCS_ENABLED must be false in production',
+  });
+};
+
+// La fabrique de démonstration écrit neuf cent mille lignes : elle n'a rien à
+// faire sur la base qui porte les vraies fiches.
+const checkDemoWorkspaceDisabled: ProdCheck = (env, context) => {
+  if (!env.DEMO_WORKSPACE_ENABLED) return;
+  context.addIssue({
+    code: 'custom',
+    path: ['DEMO_WORKSPACE_ENABLED'],
+    message: 'DEMO_WORKSPACE_ENABLED must be false in production',
+  });
+};
+
+const checkCorsOriginsAreHttps: ProdCheck = (env, context) => {
+  env.API_CORS_ORIGINS.forEach((origin) => {
+    if (origin.startsWith('https://')) return;
+    context.addIssue({
+      code: 'custom',
+      path: ['API_CORS_ORIGINS'],
+      message: `Production CORS origins must use https: ${origin}`,
+    });
+  });
+};
+
+// Une URL sans jeton tirerait en anonyme et remonterait un 401 toutes les
+// quinze minutes, sans que personne ne sache que le jeton n'a jamais été posé.
+const checkPlateformeToken = (
+  context: z.RefinementCtx,
+  cleUrl: string,
+  cleJeton: string,
+  url: string,
+  jeton: string,
+) => {
+  if (url === '' || jeton.trim() !== '') return;
+  context.addIssue({ code: 'custom', path: [cleJeton], message: `${cleJeton} is required when ${cleUrl} is set` });
+};
+
+const checkPlateformeTokens: ProdCheck = (env, context) => {
+  checkPlateformeToken(
+    context,
+    'PLATEFORME_CHUES_URL',
+    'PLATEFORME_CHUES_TOKEN',
+    env.PLATEFORME_CHUES_URL,
+    env.PLATEFORME_CHUES_TOKEN,
+  );
+  checkPlateformeToken(
+    context,
+    'PLATEFORME_GRAND_PUBLIC_URL',
+    'PLATEFORME_GRAND_PUBLIC_TOKEN',
+    env.PLATEFORME_GRAND_PUBLIC_URL,
+    env.PLATEFORME_GRAND_PUBLIC_TOKEN,
+  );
+};
+
+const PROD_CHECKS: ProdCheck[] = [
+  checkRedisRequired,
+  checkJwtSecretsDiffer,
+  checkDocsDisabled,
+  checkDemoWorkspaceDisabled,
+  checkCorsOriginsAreHttps,
+  checkPlateformeTokens,
+];
+
+export const envSchema = envObjectSchema.superRefine((env, context) => {
+  if (env.NODE_ENV !== 'production') return;
+  PROD_CHECKS.forEach((check) => check(env, context));
+});
 
 export type ApiEnv = z.infer<typeof envSchema>;
 

@@ -133,28 +133,9 @@ export class CallRecordingsService {
 
     const limit = now.getTime() - env.CALL_RECORDING_RETENTION_HOURS * 3_600_000;
     const recordings = entries.filter((name) => name.endsWith('.m4a'));
-    let expired = 0;
-    let orphaned = 0;
 
-    const survivors: string[] = [];
-
-    for (const name of recordings) {
-      const file = join(env.CALL_RECORDING_DIR, name);
-      let age: number;
-      try {
-        age = (await stat(file)).mtimeMs;
-      } catch {
-        continue;
-      }
-
-      if (age < limit) {
-        if (await this.remove(file)) expired += 1;
-        continue;
-      }
-      survivors.push(name.slice(0, -'.m4a'.length));
-    }
-
-    if (survivors.length === 0) return { expired, orphaned };
+    const { expired, survivors } = await this.sweepAged(env.CALL_RECORDING_DIR, recordings, limit);
+    if (survivors.length === 0) return { expired, orphaned: 0 };
 
     // LECTURE GLOBALE : le fichier survit a la ligne, donc la question n'est
     // pas « cette tentative m'est-elle visible » mais « existe-t-elle encore ».
@@ -164,13 +145,49 @@ export class CallRecordingsService {
       select: { id: true },
     });
     const alive = new Set(rows.map((row) => row.id));
-
-    for (const attemptId of survivors) {
-      if (alive.has(attemptId)) continue;
-      if (await this.remove(join(env.CALL_RECORDING_DIR, `${attemptId}.m4a`))) orphaned += 1;
-    }
+    const orphaned = await this.sweepOrphans(env.CALL_RECORDING_DIR, survivors, alive);
 
     return { expired, orphaned };
+  }
+
+  private async sweepAged(
+    dir: string,
+    recordings: readonly string[],
+    limit: number,
+  ): Promise<{ expired: number; survivors: string[] }> {
+    let expired = 0;
+    const survivors: string[] = [];
+
+    for (const name of recordings) {
+      const file = join(dir, name);
+      let age: number;
+      try {
+        age = (await stat(file)).mtimeMs;
+      } catch {
+        continue;
+      }
+
+      if (age >= limit) {
+        survivors.push(name.slice(0, -'.m4a'.length));
+        continue;
+      }
+      if (await this.remove(file)) expired += 1;
+    }
+
+    return { expired, survivors };
+  }
+
+  private async sweepOrphans(
+    dir: string,
+    survivors: readonly string[],
+    alive: ReadonlySet<string>,
+  ): Promise<number> {
+    let orphaned = 0;
+    for (const attemptId of survivors) {
+      if (alive.has(attemptId)) continue;
+      if (await this.remove(join(dir, `${attemptId}.m4a`))) orphaned += 1;
+    }
+    return orphaned;
   }
 
   private async remove(file: string): Promise<boolean> {

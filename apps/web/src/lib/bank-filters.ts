@@ -149,16 +149,17 @@ export function bankBasePath(projet: Projet | null): string {
 }
 
 export function countActiveBankFilters(filters: BankCaseFilters): number {
-  let count = 0;
-  if (filters.search.trim() !== '') count += 1;
-  if (filters.stageId !== null) count += 1;
-  if (filters.stageType !== null) count += 1;
-  if (filters.banqueId !== null) count += 1;
-  if (filters.agentId !== null) count += 1;
-  if (filters.rejectionReasonId !== null) count += 1;
-  if (filters.dateFrom !== null || filters.dateTo !== null) count += 1;
-  if (filters.amountMin !== null || filters.amountMax !== null) count += 1;
-  return count;
+  const activeFlags = [
+    filters.search.trim() !== '',
+    filters.stageId !== null,
+    filters.stageType !== null,
+    filters.banqueId !== null,
+    filters.agentId !== null,
+    filters.rejectionReasonId !== null,
+    filters.dateFrom !== null || filters.dateTo !== null,
+    filters.amountMin !== null || filters.amountMax !== null,
+  ];
+  return activeFlags.filter(Boolean).length;
 }
 
 export const BANK_ADVANCED_FILTER_KEYS = [
@@ -184,7 +185,7 @@ export function clearBankAdvancedFilters(): Partial<BankCaseFilters> {
 const startOfDay = (isoDate: string): string => `${isoDate}T00:00:00.000Z`;
 const endOfDay = (isoDate: string): string => `${isoDate}T23:59:59.999Z`;
 
-export function toBankFilterQuery(filters: BankCaseFilters): BankAnalyticsQuery {
+function toBankIdentityQuery(filters: BankCaseFilters): BankAnalyticsQuery {
   const query: BankAnalyticsQuery = {};
 
   if (filters.projet !== null) query.projet = filters.projet;
@@ -193,6 +194,13 @@ export function toBankFilterQuery(filters: BankCaseFilters): BankAnalyticsQuery 
   if (filters.stageId !== null) query.stageId = filters.stageId;
   if (filters.stageType !== null) query.stageType = filters.stageType;
   if (filters.banqueId !== null) query.banqueId = filters.banqueId;
+
+  return query;
+}
+
+function toBankRangeQuery(filters: BankCaseFilters): BankAnalyticsQuery {
+  const query: BankAnalyticsQuery = {};
+
   if (filters.agentId !== null) query.agentId = filters.agentId;
   if (filters.rejectionReasonId !== null) query.rejectionReasonId = filters.rejectionReasonId;
   if (filters.dateFrom !== null) query.dateFrom = startOfDay(filters.dateFrom);
@@ -201,6 +209,10 @@ export function toBankFilterQuery(filters: BankCaseFilters): BankAnalyticsQuery 
   if (filters.amountMax !== null) query.amountMax = filters.amountMax;
 
   return query;
+}
+
+export function toBankFilterQuery(filters: BankCaseFilters): BankAnalyticsQuery {
+  return { ...toBankIdentityQuery(filters), ...toBankRangeQuery(filters) };
 }
 
 export function toBankCaseQuery(filters: BankCaseFilters): BankCaseQuery {

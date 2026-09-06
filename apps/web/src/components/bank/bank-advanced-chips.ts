@@ -29,25 +29,27 @@ export interface BankChipOptions {
   reasons: readonly FilterOption[];
 }
 
+type ChipExtractor = (filters: BankCaseFilters, options: BankChipOptions) => string | null;
+
+const CHIP_EXTRACTORS: Record<BankAdvancedFilterKey, ChipExtractor> = {
+  banqueId: (filters, options) =>
+    filters.banqueId === null ? null : optionLabel(options.banques, filters.banqueId),
+  agentId: (filters, options) =>
+    filters.agentId === null ? null : optionLabel(options.agents, filters.agentId),
+  rejectionReasonId: (filters, options) =>
+    filters.rejectionReasonId === null
+      ? null
+      : optionLabel(options.reasons, filters.rejectionReasonId),
+  amountMin: (filters) => (filters.amountMin === null ? null : formatXof(filters.amountMin)),
+  amountMax: (filters) => (filters.amountMax === null ? null : formatXof(filters.amountMax)),
+};
+
 function chipValue(
   key: BankAdvancedFilterKey,
   filters: BankCaseFilters,
   options: BankChipOptions,
 ): string | null {
-  switch (key) {
-    case 'banqueId':
-      return filters.banqueId === null ? null : optionLabel(options.banques, filters.banqueId);
-    case 'agentId':
-      return filters.agentId === null ? null : optionLabel(options.agents, filters.agentId);
-    case 'rejectionReasonId':
-      return filters.rejectionReasonId === null
-        ? null
-        : optionLabel(options.reasons, filters.rejectionReasonId);
-    case 'amountMin':
-      return filters.amountMin === null ? null : formatXof(filters.amountMin);
-    case 'amountMax':
-      return filters.amountMax === null ? null : formatXof(filters.amountMax);
-  }
+  return CHIP_EXTRACTORS[key](filters, options);
 }
 
 export function buildBankAdvancedChips(

@@ -111,52 +111,55 @@ export interface ComplementRefus {
   readonly value: string;
 }
 
-/**
- * Valide les cinq colonnes de qualification, POUR LES DEUX CHEMINS D'IMPORT.
- *
- * L'import synchrone et le moteur d'arrière-plan appliquent les mêmes règles ;
- * les écrire deux fois les ferait diverger au premier correctif, et l'écart se
- * verrait comme un import qui accepte ce que l'autre refuse.
- */
-export function parseComplements(
-  cells: Record<'notes' | 'relation' | 'whatsapp' | 'charge' | 'dateAppel' | 'issue', string>,
+type ComplementCells = Record<
+  'notes' | 'relation' | 'whatsapp' | 'charge' | 'dateAppel' | 'issue',
+  string
+>;
+
+function parseRelationStep(raw: string): RepresentantRelation | ComplementRefus {
+  const relationStatus = parseRelation(raw);
+  if (relationStatus) return relationStatus;
+  return {
+    rang: 6,
+    code: 'RELATION_UNKNOWN',
+    message: 'Statut de relation inconnu. Inconnu, Contacté, Ambassadeur ou Refus.',
+    value: raw,
+  };
+}
+
+function parseWhatsappStep(raw: string): WhatsappStatus | ComplementRefus {
+  const whatsappStatus = parseWhatsapp(raw);
+  if (whatsappStatus) return whatsappStatus;
+  return {
+    rang: 7,
+    code: 'WHATSAPP_UNKNOWN',
+    message:
+      'Statut WhatsApp inconnu. Non demandé, Même numéro ou Aucun. « Autre numéro » ne s’importe pas : le second numéro n’a pas de colonne.',
+    value: raw,
+  };
+}
+
+function parseOwnerStep(
+  raw: string,
   comptes: ReadonlyMap<string, { readonly id: string }>,
-): Complements | ComplementRefus {
-  const relationStatus = parseRelation(cells.relation);
-  if (!relationStatus) {
-    return {
-      rang: 6,
-      code: 'RELATION_UNKNOWN',
-      message: 'Statut de relation inconnu. Inconnu, Contacté, Ambassadeur ou Refus.',
-      value: cells.relation,
-    };
-  }
+): string | null | ComplementRefus {
+  if (raw === '') return null;
+  const owner = comptes.get(normalizeKey(raw));
+  if (owner) return owner.id;
+  return {
+    rang: 8,
+    code: 'OWNER_UNKNOWN',
+    message: 'Chargé de compte introuvable. Identifiant, e-mail ou nom complet d’un compte actif.',
+    value: raw,
+  };
+}
 
-  const whatsappStatus = parseWhatsapp(cells.whatsapp);
-  if (!whatsappStatus) {
-    return {
-      rang: 7,
-      code: 'WHATSAPP_UNKNOWN',
-      message:
-        'Statut WhatsApp inconnu. Non demandé, Même numéro ou Aucun. « Autre numéro » ne s’importe pas : le second numéro n’a pas de colonne.',
-      value: cells.whatsapp,
-    };
-  }
-
-  const owner = cells.charge === '' ? undefined : comptes.get(normalizeKey(cells.charge));
-  if (cells.charge !== '' && owner === undefined) {
-    return {
-      rang: 8,
-      code: 'OWNER_UNKNOWN',
-      message:
-        'Chargé de compte introuvable. Identifiant, e-mail ou nom complet d’un compte actif.',
-      value: cells.charge,
-    };
-  }
-
-  // L'issue ne vaut RIEN sans sa date : elle décrit un appel, et un appel sans
-  // date ne peut pas être écrit — `clientCreatedAt` est obligatoire, et
-  // l'inventer daterait l'appel du jour de l'import.
+/**
+ * L'issue ne vaut RIEN sans sa date : elle décrit un appel, et un appel sans
+ * date ne peut pas être écrit — `clientCreatedAt` est obligatoire, et
+ * l'inventer daterait l'appel du jour de l'import.
+ */
+function parseCallDateStep(cells: Pick<ComplementCells, 'dateAppel' | 'issue'>): Date | null | ComplementRefus {
   const date = parseDateAppel(cells.dateAppel);
   if (cells.dateAppel !== '' && date === null) {
     return {
@@ -174,36 +177,91 @@ export function parseComplements(
       value: cells.issue,
     };
   }
+  return date;
+}
 
-  const outcome = parseOutcome(cells.issue);
+/**
+ * La MÊME règle qu'en base : `rep_call_attempts_other_requires_comment`.
+ * « Autre » sans un mot d'explication est un fourre-tout dont personne ne
+ * tire rien six mois plus tard — et la contrainte ferait échouer la tranche
+ * entière au lieu de cette seule ligne.
+ */
+function parseOutcomeStep(
+  issue: string,
+  notes: string,
+): { readonly outcome: RepCallOutcome; readonly comment: string | null } | ComplementRefus {
+  const outcome = parseOutcome(issue);
   if (!outcome) {
     return {
       rang: 10,
       code: 'CALL_OUTCOME_UNKNOWN',
       message: 'Issue d’appel inconnue. Joint, Injoignable, Refus, Faux numéro ou Autre.',
-      value: cells.issue,
+      value: issue,
     };
   }
 
-  // La MÊME règle qu'en base : `rep_call_attempts_other_requires_comment`.
-  // « Autre » sans un mot d'explication est un fourre-tout dont personne ne
-  // tire rien six mois plus tard — et la contrainte ferait échouer la tranche
-  // entière au lieu de cette seule ligne.
-  const comment = cells.notes.trim() === '' ? null : cells.notes.trim().slice(0, 2_000);
+  const comment = notes.trim() === '' ? null : notes.trim().slice(0, 2_000);
   if (outcome === RepCallOutcome.OTHER && comment === null) {
     return {
       rang: 10,
       code: 'CALL_COMMENT_REQUIRED',
       message: 'L’issue « Autre » exige une note : sans elle, l’appel n’apprend rien.',
-      value: cells.issue,
+      value: issue,
     };
   }
+
+  return { outcome, comment };
+}
+
+function parseAppelStep(cells: ComplementCells): Complements['appel'] | ComplementRefus {
+  const date = parseCallDateStep(cells);
+  if (date === null) return null;
+  if (!(date instanceof Date)) return date;
+
+  const parsedOutcome = parseOutcomeStep(cells.issue, cells.notes);
+  if (!('outcome' in parsedOutcome)) return parsedOutcome;
+
+  return { date, outcome: parsedOutcome.outcome, comment: parsedOutcome.comment };
+}
+
+function resolveOwnerAndAppel(
+  cells: ComplementCells,
+  comptes: ReadonlyMap<string, { readonly id: string }>,
+): { readonly ownerId: string | null; readonly appel: Complements['appel'] } | ComplementRefus {
+  const ownerId = parseOwnerStep(cells.charge, comptes);
+  if (ownerId !== null && typeof ownerId !== 'string') return ownerId;
+
+  const appel = parseAppelStep(cells);
+  if (appel !== null && !('date' in appel)) return appel;
+
+  return { ownerId, appel };
+}
+
+/**
+ * Valide les cinq colonnes de qualification, POUR LES DEUX CHEMINS D'IMPORT.
+ *
+ * L'import synchrone et le moteur d'arrière-plan appliquent les mêmes règles ;
+ * les écrire deux fois les ferait diverger au premier correctif, et l'écart se
+ * verrait comme un import qui accepte ce que l'autre refuse.
+ */
+export function parseComplements(
+  cells: ComplementCells,
+  comptes: ReadonlyMap<string, { readonly id: string }>,
+): Complements | ComplementRefus {
+  const relationStatus = parseRelationStep(cells.relation);
+  if (typeof relationStatus !== 'string') return relationStatus;
+
+  const whatsappStatus = parseWhatsappStep(cells.whatsapp);
+  if (typeof whatsappStatus !== 'string') return whatsappStatus;
+
+  const resolved = resolveOwnerAndAppel(cells, comptes);
+  if ('code' in resolved) return resolved;
 
   return {
     relationStatus,
     whatsappStatus,
-    ownerId: owner?.id ?? null,
-    appel: date === null ? null : { date, outcome, comment },
+    ownerId: resolved.ownerId,
+    appel: resolved.appel,
   };
 }
 

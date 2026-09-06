@@ -89,6 +89,24 @@ const mapWithConcurrency = async <T, R>(
 const classifyBrevoFailure = (httpStatus: number): BrevoFailureKind =>
   httpStatus === 429 || httpStatus >= 500 ? 'transient' : 'permanent';
 
+const trimmedOrNull = (value: string | undefined): string | null => {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+};
+
+const trimmedOrDefault = (value: string | undefined, fallback: string): string => {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : fallback;
+};
+
+const missingBrevoConfigReason = (apiKey: string | null, senderEmail: string | null): string | null => {
+  if (!apiKey) return 'BREVO_API_KEY est absent : aucun transport e-mail configuré.';
+  if (!senderEmail) {
+    return "BREVO_SENDER_EMAIL est absent : Brevo refuse un envoi sans adresse d'expédition.";
+  }
+  return null;
+};
+
 @Injectable()
 export class BrevoHttpTransport implements BrevoTransport {
   private readonly logger = new Logger(BrevoHttpTransport.name);
@@ -99,20 +117,10 @@ export class BrevoHttpTransport implements BrevoTransport {
 
   constructor(env: NodeJS.ProcessEnv = process.env) {
     const config = readNotificationsEnv(env);
-    this.apiKey = config.BREVO_API_KEY?.trim() ? config.BREVO_API_KEY.trim() : null;
-    this.senderEmail = config.BREVO_SENDER_EMAIL?.trim() ? config.BREVO_SENDER_EMAIL.trim() : null;
-    this.senderName = config.BREVO_SENDER_NAME?.trim()
-      ? config.BREVO_SENDER_NAME.trim()
-      : DEFAULT_SENDER_NAME;
-
-    if (!this.apiKey) {
-      this.reason = 'BREVO_API_KEY est absent : aucun transport e-mail configuré.';
-    } else if (!this.senderEmail) {
-      this.reason =
-        "BREVO_SENDER_EMAIL est absent : Brevo refuse un envoi sans adresse d'expédition.";
-    } else {
-      this.reason = null;
-    }
+    this.apiKey = trimmedOrNull(config.BREVO_API_KEY);
+    this.senderEmail = trimmedOrNull(config.BREVO_SENDER_EMAIL);
+    this.senderName = trimmedOrDefault(config.BREVO_SENDER_NAME, DEFAULT_SENDER_NAME);
+    this.reason = missingBrevoConfigReason(this.apiKey, this.senderEmail);
 
     if (this.reason) {
       this.logger.warn(`${this.reason} Les notifications partent en push uniquement.`);

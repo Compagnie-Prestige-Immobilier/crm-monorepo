@@ -132,30 +132,7 @@ export class BankCasesExportService {
       const ids = await this.pageIds(filter, after);
       if (ids.length === 0) break;
 
-      const rows = await this.prisma.bankCase.findMany({
-        where: { id: { in: ids } },
-        include: BANK_CASE_INCLUDE,
-        orderBy: { id: 'asc' },
-      });
-      for (const row of rows) {
-        cases.addRow(caseRow(row)).commit();
-        exported += 1;
-      }
-
-      // LECTURE GLOBALE délibérée : `ids` vient de la page de dossiers
-      // ci-dessus, déjà filtrée par `bankCaseConditions`. Une transition
-      // n'existe que rattachée à son dossier ; refiltrer ici ne retirerait
-      // rien et ferait seulement croire à un second garde-fou.
-      const transitions = await this.prisma.bankCaseTransition.findMany({
-        where: { caseId: { in: ids } },
-        include: BANK_TRANSITION_INCLUDE,
-        orderBy: [{ caseId: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
-      });
-      const byId = new Map(rows.map((row) => [row.id, row]));
-      for (const transition of transitions) {
-        const parent = byId.get(transition.caseId);
-        if (parent) history.addRow(historyRow(parent, transition)).commit();
-      }
+      exported += await this.exportPage(ids, cases, history);
 
       after = ids.at(-1);
       if (ids.length < PAGE_SIZE) break;
@@ -243,6 +220,36 @@ export class BankCasesExportService {
     }
 
     summary.commit();
+  }
+
+  private async exportPage(
+    ids: string[],
+    cases: ExcelJS.Worksheet,
+    history: ExcelJS.Worksheet,
+  ): Promise<number> {
+    const rows = await this.prisma.bankCase.findMany({
+      where: { id: { in: ids } },
+      include: BANK_CASE_INCLUDE,
+      orderBy: { id: 'asc' },
+    });
+    for (const row of rows) cases.addRow(caseRow(row)).commit();
+
+    // LECTURE GLOBALE délibérée : `ids` vient de la page de dossiers ci-dessus,
+    // déjà filtrée par `bankCaseConditions`. Une transition n'existe que
+    // rattachée à son dossier ; refiltrer ici ne retirerait rien et ferait
+    // seulement croire à un second garde-fou.
+    const transitions = await this.prisma.bankCaseTransition.findMany({
+      where: { caseId: { in: ids } },
+      include: BANK_TRANSITION_INCLUDE,
+      orderBy: [{ caseId: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+    });
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    for (const transition of transitions) {
+      const parent = byId.get(transition.caseId);
+      if (parent) history.addRow(historyRow(parent, transition)).commit();
+    }
+
+    return rows.length;
   }
 
   /** Une page d'identifiants, filtrée par la MÊME requête que la liste et les agrégats. */

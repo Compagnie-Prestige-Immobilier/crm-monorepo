@@ -84,6 +84,17 @@ export async function loadVisiteReferentiels(
   };
 }
 
+function resolveAlias(
+  index: ReadonlyMap<string, Entry>,
+  aliases: ReadonlyMap<string, string> | undefined,
+  key: string,
+): Entry | null {
+  if (aliases === undefined) return null;
+  const code = aliases.get(key);
+  if (code === undefined) return null;
+  return index.get(normalizeKey(code)) ?? null;
+}
+
 export function resolveReferentiel(
   index: ReadonlyMap<string, Entry>,
   raw: string | undefined,
@@ -91,13 +102,7 @@ export function resolveReferentiel(
 ): Entry | null {
   const key = normalizeKey((raw ?? '').trim());
   if (key === '') return null;
-
-  const direct = index.get(key);
-  if (direct !== undefined) return direct;
-  if (aliases === undefined) return null;
-
-  const code = aliases.get(key);
-  return code === undefined ? null : (index.get(normalizeKey(code)) ?? null);
+  return index.get(key) ?? resolveAlias(index, aliases, key);
 }
 
 export type VisiteReferentielKindAttendu = 'entreprise' | 'direction' | 'destinataire' | 'objet';
@@ -175,20 +180,25 @@ export function readSheetDate(raw: string): string | null {
   return new Date(EXCEL_EPOCH_UTC + serial * 86_400_000).toISOString().slice(0, 10);
 }
 
+function fromHourMinute(raw: string): string | null {
+  const match = HOUR_MINUTE.exec(raw);
+  if (match === null) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour >= 24 || minute >= 60) return null;
+  return `${pad2(hour)}:${pad2(minute)}`;
+}
+
+function fromHourAlone(raw: string): string | null {
+  const match = HOUR_ALONE.exec(raw);
+  if (match === null) return null;
+  const hour = Number(match[1]);
+  return hour < 24 ? `${pad2(hour)}:00` : null;
+}
+
 /** `11H08`, `11h45`, `12H`, `15` et `14H15H` se lisent. `17H5` ne se devine pas. */
 export function readSheetTime(raw: string): string | null {
-  const both = HOUR_MINUTE.exec(raw);
-  if (both !== null) {
-    const hour = Number(both[1]);
-    const minute = Number(both[2]);
-    return hour < 24 && minute < 60 ? `${pad2(hour)}:${pad2(minute)}` : null;
-  }
-
-  const alone = HOUR_ALONE.exec(raw);
-  if (alone === null) return null;
-
-  const hour = Number(alone[1]);
-  return hour < 24 ? `${pad2(hour)}:00` : null;
+  return fromHourMinute(raw) ?? fromHourAlone(raw);
 }
 
 /**
